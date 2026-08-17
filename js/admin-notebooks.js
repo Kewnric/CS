@@ -1807,8 +1807,8 @@ function _renderAnswerKeyContentNow() {
   const container = document.getElementById('answer-key-content');
 
   let html = `
-    <div style="display: flex; gap: 2rem; height: 100%; flex-wrap: wrap;">
-      <div style="flex: 1 1 500px; display:flex; flex-direction:column; min-width: 0; overflow-y: auto; max-height: 60vh;">
+    <div class="nb-qmodal-cols">
+      <div class="nb-qmodal-main">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
           <h4 style="font-weight:700; font-size:0.75rem; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.05em; margin:0;">ANSWER KEYS</h4>
           <button onclick="addAnswerKeySample()" class="btn btn-ghost btn-sm" style="color:var(--color-primary); font-weight:600;">
@@ -1909,7 +1909,7 @@ function _renderAnswerKeyContentNow() {
         </div>
       </div>
 
-      <div style="flex: 1 1 300px; max-width: 400px; display:flex; flex-direction:column; gap:1rem; min-width: 0; overflow-y: auto; max-height: 60vh;">
+      <div class="nb-qmodal-side">
         <div class="card-flat" style="padding:1.25rem; border:1px solid var(--border-color);">
           <h4 style="font-weight:700; font-size:0.75rem; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.75rem;">BULK ADD ANSWER KEY</h4>
           <p style="font-size:0.7rem; color:var(--text-secondary); margin-bottom:0.5rem;">Auto-detects: letters, True/False, words (fuzzy-matched to choices), matching pairs</p>
@@ -2131,8 +2131,21 @@ function _tokenizeBulkInput(text) {
     const qM = t.match(/^[Qq]?(\d{1,3})[.)=:]\s+(.+)$/);
     if (qM && qM[2].trim()) {
       hasActiveQ = true; seenNumQ = true; afterBlank = false; choicesStarted = false;
-      tokens.push({ type: 'question', qNum: parseInt(qM[1]), text: qM[2].trim() });
+      // A trailing [MCQ] / [T/F] / [Match] / [Ident] / [Multi] settles the type
+      // instead of leaving it to be guessed from the shape of what follows.
+      const tagged = _extractTypeTag(qM[2].trim());
+      tokens.push({ type: 'question', qNum: parseInt(qM[1]), text: tagged.text, forcedType: tagged.type });
       continue;
+    }
+
+    // 5a. TAB-SEPARATED PAIR — what you get pasting two columns out of a
+    //     spreadsheet or a table, which was previously read as prose.
+    if (t.includes('\t')) {
+      const cells = t.split('\t').map(c => c.trim()).filter(Boolean);
+      if (cells.length === 2) {
+        tokens.push({ type: 'pair', left: cells[0], right: cells[1] });
+        hasActiveQ = true; choicesStarted = true; continue;
+      }
     }
 
     // 5. MATCHING PAIR: "term -> definition"
@@ -2181,6 +2194,70 @@ function _tokenizeBulkInput(text) {
   return tokens;
 }
 
+/** Pulls a trailing [MCQ] / [T/F] / [Match] / [Ident] / [Multi] off a question. */
+function _extractTypeTag(text) {
+  const m = text.match(/\s*\[(mcq|multi|multiple|checkbox|tf|t\/f|truefalse|true\/false|match|matching|ident|identification|text)\]\s*$/i);
+  if (!m) return { text, type: null };
+  const raw = m[1].toLowerCase();
+  const map = {
+    mcq: 'mcq',
+    multi: 'checkbox', multiple: 'checkbox', checkbox: 'checkbox',
+    tf: 'truefalse', 't/f': 'truefalse', truefalse: 'truefalse', 'true/false': 'truefalse',
+    match: 'matching', matching: 'matching',
+    ident: 'text', identification: 'text', text: 'text'
+  };
+  return { text: text.slice(0, m.index).trim(), type: map[raw] || null };
+}
+
+/**
+ * Turns whatever was written after "Answer:" into something the question can
+ * actually hold. Previously only a bare letter worked, so "Answer: B) 4",
+ * "Answer: printf()" and "Answer: A and C" all landed as-is and graded nothing.
+ * @returns {{answer: string|string[], unresolved: boolean}}
+ */
+function _resolveBulkAnswer(rawAnswer, choices, type) {
+  const raw = String(rawAnswer == null ? '' : rawAnswer).trim();
+  if (!raw) return { answer: type === 'checkbox' ? [] : '', unresolved: false };
+  const letters = Object.keys(choices || {});
+
+  if (type === 'text') return { answer: raw, unresolved: false };
+
+  if (type === 'truefalse') {
+    const v = raw.toLowerCase().replace(/[^a-z]/g, '');
+    if (['a', 'true', 't'].includes(v)) return { answer: 'A', unresolved: false };
+    if (['b', 'false', 'f'].includes(v)) return { answer: 'B', unresolved: false };
+    return { answer: '', unresolved: true };
+  }
+
+  // Split on comma / "and" / "&" / "+" so multi-answers arrive as a list.
+  const parts = raw.split(/\s*(?:,|;|\band\b|&|\+|\/)\s*/i).map(x => x.trim()).filter(Boolean);
+  const resolved = [];
+  let unresolved = false;
+
+  parts.forEach(part => {
+    // "B" or "B) 4" or "(B) 4" — take the leading letter when it names a choice.
+    const lead = part.match(/^\(?([A-Za-z])\)?[.):\]]?(?:\s|$)/);
+    if (lead && letters.includes(lead[1].toUpperCase())) {
+      resolved.push(lead[1].toUpperCase());
+      return;
+    }
+    // A number: 1 -> first choice.
+    const num = part.match(/^(\d{1,2})$/);
+    if (num) {
+      const idx = parseInt(num[1], 10) - 1;
+      if (letters[idx]) { resolved.push(letters[idx]); return; }
+    }
+    // The answer written out as the choice's own text.
+    const hit = letters.find(L => String(choices[L] || '').trim().toLowerCase() === part.toLowerCase());
+    if (hit) { resolved.push(hit); return; }
+    unresolved = true;
+  });
+
+  const unique = [...new Set(resolved)];
+  if (type === 'checkbox') return { answer: unique, unresolved: unresolved && !unique.length };
+  return { answer: unique[0] || '', unresolved: unresolved && !unique.length };
+}
+
 /* Type auto-detection */
 function _detectQuestionType(q) {
   if (q.pairs && q.pairs.length >= 2) return 'matching';
@@ -2202,14 +2279,24 @@ function _assembleBulkQuestions(tokens) {
 
   function finalize() {
     if (!cur) return;
-    cur.type = _detectQuestionType(cur);
-    if (cur.type === 'truefalse') {
-      cur.choices = { A: 'True', B: 'False' };
-      if (typeof cur.answer === 'string') {
-        if (/^(true|t)$/i.test(cur.answer)) cur.answer = 'A';
-        else if (/^(false|f)$/i.test(cur.answer)) cur.answer = 'B';
-      }
-    }
+    const raw = cur._rawAnswer != null ? cur._rawAnswer : cur.answer;
+
+    // Resolve permissively FIRST, so type detection can see that "A and C" is
+    // two answers. Detecting first left cur.answer empty and every multi-answer
+    // question came out as a single-choice MCQ.
+    const probe = _resolveBulkAnswer(raw, cur.choices, 'checkbox');
+    cur.answer = probe.answer;
+
+    // An explicit [tag] on the question line beats the guess.
+    cur.type = cur.forcedType || _detectQuestionType(cur);
+    delete cur.forcedType;
+    if (cur.type === 'truefalse') cur.choices = { A: 'True', B: 'False' };
+
+    // Now shape it for the type that was chosen.
+    const res = _resolveBulkAnswer(raw, cur.choices, cur.type);
+    cur.answer = res.answer;
+    if (res.unresolved) cur._unresolvedAnswer = String(raw || '').trim();
+    delete cur._rawAnswer;
     // Single pair isn't matching — merge back to question text
     if (cur.pairs && cur.pairs.length < 2 && cur.type !== 'matching') {
       cur.pairs.forEach(p => { cur.question += (cur.question ? ' ' : '') + p.left + ' -> ' + p.right; });
@@ -2219,9 +2306,10 @@ function _assembleBulkQuestions(tokens) {
     cur = null;
   }
 
-  function startQ(qNum, text) {
+  function startQ(qNum, text, forcedType) {
     finalize();
-    cur = { qNum, type: 'mcq', question: text || '', hint: '', answer: '', explanation: '', choices: {}, pairs: [] };
+    cur = { qNum, type: 'mcq', question: text || '', hint: '', answer: '', explanation: '',
+            choices: {}, pairs: [], forcedType: forcedType || null };
   }
 
   for (const tok of tokens) {
@@ -2229,7 +2317,7 @@ function _assembleBulkQuestions(tokens) {
       case 'blank': break;
       case 'header': break;
       case 'question':
-        startQ(tok.qNum, tok.text);
+        startQ(tok.qNum, tok.text, tok.forcedType);
         if (tok.qNum >= autoQ) autoQ = tok.qNum + 1;
         break;
       case 'choice':
@@ -2250,15 +2338,9 @@ function _assembleBulkQuestions(tokens) {
         cur.pairs.push({ left: tok.left, right: tok.right });
         break;
       case 'answer':
-        if (cur) {
-          if (/^[A-Za-z]$/.test(tok.text)) {
-            cur.answer = tok.text.toUpperCase();
-          } else if (/^[A-Za-z](?:\s*[,&]\s*[A-Za-z])+$/.test(tok.text)) {
-            cur.answer = tok.text.match(/[A-Za-z]/g).map(l => l.toUpperCase());
-          } else {
-            cur.answer = tok.text;
-          }
-        }
+        // Kept verbatim: finalize() resolves it once the choices are known, so
+        // "Answer: printf()" can be matched against the choice text.
+        if (cur) cur._rawAnswer = tok.text;
         break;
       case 'explanation':
         if (cur) cur.explanation = cur.explanation ? cur.explanation + ' ' + tok.text : tok.text;
@@ -2314,9 +2396,18 @@ function bulkAddGivenQuestions() {
 
   currentGivenQuestionsData.sort((a, b) => a.qNum - b.qNum);
 
-  // Update section questions array
+  // Bulk add is an explicit authoring action, so it may GROW the section — but
+  // through the same count that everything else reads, and the field on the
+  // form is updated with it. It never silently resurrects a count you lowered.
   const sec = notebookAdminState.sections[activeGivenQuestionSectionIdx];
-  sec.questions = currentGivenQuestionsData.map(d => d.qNum).sort((a, b) => a - b);
+  const highest = currentGivenQuestionsData.reduce((m, d) => Math.max(m, d.qNum || 0), 0);
+  const newCount = Math.min(200, Math.max((sec.questions || []).length, highest));
+  sec.questions = Array.from({ length: newCount }, (_, i) => i + 1);
+  sec.answerKeysData = JSON.parse(JSON.stringify(currentGivenQuestionsData));
+  nbNormalizeSection(sec);
+  currentGivenQuestionsData = JSON.parse(JSON.stringify(sec.answerKeysData));
+  const countEl = document.getElementById('nb-sec-count-' + activeGivenQuestionSectionIdx);
+  if (countEl) countEl.value = String(newCount);
 
   if (textarea) textarea.value = '';
   renderGivenQuestionContent();
@@ -2330,19 +2421,45 @@ function _showParseReport(parsed) {
   parsed.forEach(q => { counts[q.type] = (counts[q.type] || 0) + 1; });
   const typeLabels = { mcq: 'MCQ', checkbox: 'Multi-Select', text: 'Identification', matching: 'Matching', truefalse: 'True/False' };
   const parts = Object.entries(counts).map(([t, c]) => `${c} ${typeLabels[t] || t}`);
-  const answersFound = parsed.filter(q => q.answer && (typeof q.answer === 'string' ? q.answer.trim() : q.answer.length > 0)).length;
-  const reportEl = document.getElementById('gq-parse-report');
-  if (reportEl) {
-    reportEl.innerHTML = `
-      <div style="padding:0.75rem; background:var(--color-success)0a; border:1px solid var(--color-success)33; border-radius:var(--radius-sm);">
-        <div style="display:flex; align-items:center; gap:0.5rem;">
-          <i data-lucide="check-circle" style="width:16px;height:16px;color:var(--color-success);"></i>
-          <strong style="color:var(--color-success);">${parsed.length} question${parsed.length !== 1 ? 's' : ''} parsed</strong>
-        </div>
-        <div style="font-size:0.8rem; color:var(--text-secondary); margin-top:0.25rem;">${parts.join(', ')}${answersFound > 0 ? ` · ${answersFound} answer${answersFound !== 1 ? 's' : ''} auto-filled` : ''}</div>
-      </div>`;
-    if (typeof lucide !== 'undefined') lucide.createIcons({ el: reportEl });
+
+  const hasAns = (q) => Array.isArray(q.answer) ? q.answer.length > 0 : String(q.answer || '').trim() !== '';
+  const answersFound = parsed.filter(hasAns).length;
+
+  /* The report only ever said what worked. These are the things that quietly
+     did not, and each one is a question that will not grade. */
+  const problems = [];
+  const noAnswer = parsed.filter(q => !hasAns(q) && q.type !== 'matching');
+  if (noAnswer.length) {
+    problems.push(`${noAnswer.length} with no answer (${noAnswer.slice(0, 6).map(q => 'Q' + q.qNum).join(', ')}${noAnswer.length > 6 ? '…' : ''})`);
   }
+  const unresolved = parsed.filter(q => q._unresolvedAnswer);
+  if (unresolved.length) {
+    problems.push(`${unresolved.length} answer${unresolved.length !== 1 ? 's' : ''} that match no choice (${unresolved.slice(0, 4).map(q => 'Q' + q.qNum + ': "' + q._unresolvedAnswer + '"').join(', ')})`);
+  }
+  const emptyChoices = parsed.filter(q => (q.type === 'mcq' || q.type === 'checkbox') && Object.keys(q.choices || {}).length < 2);
+  if (emptyChoices.length) {
+    problems.push(`${emptyChoices.length} choice question${emptyChoices.length !== 1 ? 's' : ''} with fewer than 2 choices`);
+  }
+  const dupes = parsed.map(q => q.qNum).filter((n, i, a) => a.indexOf(n) !== i);
+  if (dupes.length) problems.push(`repeated question numbers: ${[...new Set(dupes)].join(', ')}`);
+  const halfPairs = parsed.filter(q => q.type === 'matching' && (q.pairs || []).some(pr => !pr.left || !pr.right));
+  if (halfPairs.length) problems.push(`${halfPairs.length} matching question${halfPairs.length !== 1 ? 's' : ''} with an incomplete pair`);
+
+  parsed.forEach(q => { delete q._unresolvedAnswer; });
+
+  const reportEl = document.getElementById('gq-parse-report');
+  if (!reportEl) return;
+  const ok = problems.length === 0;
+  reportEl.innerHTML = `
+    <div class="nb-parse-report ${ok ? 'is-ok' : 'is-warn'}">
+      <div class="nb-parse-head">
+        <i data-lucide="${ok ? 'check-circle' : 'alert-triangle'}" style="width:16px;height:16px;"></i>
+        <strong>${parsed.length} question${parsed.length !== 1 ? 's' : ''} parsed</strong>
+      </div>
+      <div class="nb-parse-sub">${parts.join(', ')}${answersFound > 0 ? ` · ${answersFound} answer${answersFound !== 1 ? 's' : ''} filled in` : ''}</div>
+      ${problems.length ? `<ul class="nb-parse-problems">${problems.map(x => `<li>${escapeHTML(x)}</li>`).join('')}</ul>` : ''}
+    </div>`;
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: reportEl });
 }
 
 function quickAddQuestions(type, count) {
@@ -2585,8 +2702,8 @@ function _renderGivenQuestionContentNow() {
     </div>`;
 
   let html = `
-    <div style="display: flex; gap: 1.5rem; height: 100%; flex-wrap: wrap;">
-      <div style="flex: 1 1 500px; display:flex; flex-direction:column; min-width: 0; overflow-y: auto; max-height: 60vh;">
+    <div class="nb-qmodal-cols">
+      <div class="nb-qmodal-main">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.75rem;">
           <h4 style="font-weight:700; font-size:0.75rem; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.05em; margin:0;">QUESTIONS (${currentGivenQuestionsData.length})</h4>
         </div>
@@ -2595,7 +2712,7 @@ function _renderGivenQuestionContentNow() {
         </div>
       </div>
 
-      <div style="flex: 1 1 300px; max-width: 420px; display:flex; flex-direction:column; gap:0.75rem; min-width: 0; overflow-y: auto; max-height: 60vh;">
+      <div class="nb-qmodal-side">
         <div class="card-flat" style="padding:1rem; border:1px solid var(--border-color);">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
             <h4 style="font-weight:700; font-size:0.75rem; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.05em; margin:0;">UNIFIED BULK ADD</h4>

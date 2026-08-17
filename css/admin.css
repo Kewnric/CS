@@ -1694,3 +1694,63 @@
 .nb-match-item.is-linked .nb-match-dot,
 .nb-match-item.is-picked .nb-match-dot { border-color: #f472b6; background: #f472b6; }
 .nb-match-empty { font-size: 0.75rem; color: var(--text-tertiary); padding: 0.5rem; }
+
+/* Both question modals: the columns fill the dialog instead of stopping at a
+   hardcoded 60vh, which left a third of a 92vh modal empty. The body no longer
+   scrolls — each column scrolls on its own. */
+.nb-modal-full .modal-body-scroll {
+  overflow: hidden;
+  display: flex;
+  padding-bottom: 0;
+}
+.nb-qmodal-cols {
+  display: flex;
+  gap: 1.25rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+}
+.nb-qmodal-main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 0.35rem;
+}
+.nb-qmodal-side {
+  flex: 0 0 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+/* Under a certain width the side panel goes below rather than squeezing. */
+@media (max-width: 1100px) {
+  .nb-qmodal-cols { flex-direction: column; }
+  .nb-qmodal-side { flex: 0 0 auto; max-height: 42%; }
+}
+
+/* Bulk-add report — it used to report only success. */
+.nb-parse-report {
+  padding: 0.6rem 0.7rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+}
+.nb-parse-report.is-ok { border-color: rgba(16, 185, 129, 0.35); }
+.nb-parse-report.is-warn { border-color: rgba(245, 158, 11, 0.45); }
+.nb-parse-head { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; }
+.nb-parse-report.is-ok .nb-parse-head { color: var(--color-success); }
+.nb-parse-report.is-warn .nb-parse-head { color: var(--color-warning); }
+.nb-parse-sub { font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.2rem; }
+.nb-parse-problems {
+  margin: 0.4rem 0 0;
+  padding-left: 1rem;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--color-warning);
+}
