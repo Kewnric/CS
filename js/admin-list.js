@@ -79,7 +79,27 @@ function adminClearSelection() {
 }
 
 /** The bar only exists while something is selected. */
+/** Keeps the Select all button honest: it flips to Deselect when all are on. */
+function _adminPaintSelectAllBtn() {
+  const btn = document.getElementById('admin-select-all-btn');
+  if (!btn) return;
+  const ids = _adminVisibleIds();
+  const allOn = ids.length > 0 && ids.every(x => adminSelection.has(x));
+  const span = btn.querySelector('span');
+  if (span) span.textContent = allOn ? 'Deselect all' : 'Select all';
+  const ic = btn.querySelector('i, svg');
+  if (ic) {
+    const want = allOn ? 'square' : 'check-square';
+    if (ic.getAttribute('data-lucide') !== want) {
+      ic.setAttribute('data-lucide', want);
+      if (typeof lucide !== 'undefined') lucide.createIcons({ root: btn });
+    }
+  }
+  btn.classList.toggle('is-on', allOn);
+}
+
 function _adminRenderSelectionBar() {
+  _adminPaintSelectAllBtn();
   const host = document.getElementById('admin-selection-bar');
   if (!host) return;
   // Drop ids that were deleted or filtered away, so the count never lies.
@@ -209,8 +229,16 @@ function _adminRememberGroups() {
   const closed = groups.filter(d => !d.open).map(d => d.dataset.group);
   try { localStorage.setItem('adminGroupsCollapsed', JSON.stringify(closed)); }
   catch (e) { /* quota — the groups still work for this session */ }
-  const btn = document.getElementById('admin-groups-btn');
-  if (btn) btn.textContent = closed.length === groups.length ? 'Expand all' : 'Collapse all';
+  // The button carries an icon now, so only its label span is rewritten —
+  // setting textContent on the button itself wiped the icon out.
+  const allClosed = closed.length === groups.length;
+  const lbl = document.getElementById('admin-groups-label');
+  if (lbl) lbl.textContent = allClosed ? 'Expand all' : 'Collapse all';
+  const ic = document.getElementById('admin-groups-ic');
+  if (ic) {
+    ic.setAttribute('data-lucide', allClosed ? 'chevrons-up-down' : 'chevrons-down-up');
+    if (typeof lucide !== 'undefined') lucide.createIcons({ root: ic.parentElement });
+  }
 }
 
 function renderAdmin() {

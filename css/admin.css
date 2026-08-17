@@ -1462,12 +1462,8 @@
   background: var(--color-primary-subtle);
 }
 
-.admin-select-all-row {
-  display: flex;
-  justify-content: flex-end;
-  padding: 0 0.25rem 0.35rem;
-}
-.admin-select-all-row .admin-groups-btn { margin-left: 0; }
+/* .admin-select-all-row is gone — Select all moved into the panel header next
+   to Collapse all, so it no longer occupies a line by itself. */
 
 /* Bulk action bar — appears only while a selection exists. */
 .admin-selection-bar {

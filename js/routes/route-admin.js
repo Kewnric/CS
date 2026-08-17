@@ -522,15 +522,24 @@ function adminCodingTemplate() {
                 <i data-lucide="code" style="color:var(--color-primary);width:16px;height:16px;"></i>
                 <span class="admin-panel-name">Programs</span>
                 <span class="admin-panel-count" id="admin-programs-count">0</span>
-                <button class="admin-groups-btn" onclick="event.preventDefault(); event.stopPropagation(); adminToggleAllGroups();"
-                        id="admin-groups-btn" title="Expand or collapse every folder">Collapse all</button>
+                <span class="admin-panel-tools">
+                  <button class="admin-tool-btn" id="admin-select-all-btn"
+                          onclick="event.preventDefault(); event.stopPropagation(); adminSelectAllVisible();"
+                          title="Select or deselect every program shown (Ctrl+A)" aria-label="Select all programs">
+                    <i data-lucide="check-square" class="admin-tool-ic"></i>
+                    <span>Select all</span>
+                  </button>
+                  <button class="admin-tool-btn" id="admin-groups-btn"
+                          onclick="event.preventDefault(); event.stopPropagation(); adminToggleAllGroups();"
+                          title="Expand or collapse every folder" aria-label="Collapse all folders">
+                    <i data-lucide="chevrons-down-up" class="admin-tool-ic" id="admin-groups-ic"></i>
+                    <span id="admin-groups-label">Collapse all</span>
+                  </button>
+                </span>
               </summary>
               <div class="admin-panel-body">
                 <!-- Only present while something is selected (see _adminRenderSelectionBar). -->
                 <div id="admin-selection-bar" class="admin-selection-bar hidden" role="toolbar" aria-label="Bulk actions"></div>
-                <div class="admin-select-all-row">
-                  <button class="admin-groups-btn" onclick="adminSelectAllVisible()" title="Select or deselect every program shown (Ctrl+A)">Select all</button>
-                </div>
                 <div id="admin-table-body-preview"></div>
               </div>
             </details>

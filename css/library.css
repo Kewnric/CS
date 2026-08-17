@@ -559,6 +559,57 @@
    and it reads a size larger than the panels below it. */
 .admin-panel-programs > summary { font-size: 0.95rem; }
 .admin-panel-programs > summary .admin-panel-name { font-weight: 700; }
+/* These were underlined text links floating in the panel header — they read as
+   stray words rather than controls, and "Select all" sat on a line of its own
+   below the header. Both are now the same small pill button with an icon,
+   grouped at the right end of the header. */
+.admin-panel-tools {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  flex-shrink: 0;
+}
+.admin-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.22rem 0.5rem;
+  font-family: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--text-tertiary);
+  background: var(--bg-surface-hover);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.14s ease, border-color 0.14s ease, background 0.14s ease;
+}
+.admin-tool-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+.admin-tool-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.admin-tool-btn.is-on {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+.admin-tool-ic { width: 12px; height: 12px; flex-shrink: 0; }
+
+/* Narrow panes: keep the icons, drop the words rather than wrapping. */
+@media (max-width: 520px) {
+  .admin-tool-btn span { display: none; }
+  .admin-tool-btn { padding: 0.3rem; }
+}
+
+/* Still used by the tree panes' own collapse links. */
 .admin-groups-btn {
   margin-left: auto;
   border: none;
@@ -566,7 +617,6 @@
   color: var(--text-tertiary);
   font-size: 0.72rem;
   font-weight: 600;
-  text-decoration: underline;
   cursor: pointer;
   padding: 0.2rem;
   white-space: nowrap;
