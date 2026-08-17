@@ -1810,7 +1810,12 @@ function _renderAnswerKeyContentNow() {
     <div class="nb-qmodal-cols">
       <div class="nb-qmodal-main">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
-          <h4 style="font-weight:700; font-size:0.75rem; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.05em; margin:0;">ANSWER KEYS</h4>
+          <h4 style="font-weight:700; font-size:0.75rem; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.05em; margin:0; display:flex; align-items:center; gap:0.35rem;">
+            ANSWER KEYS
+            <button onclick="nbFormatMenu(event, 'answer')" class="nb-fmt-btn" title="Copy the accepted answer-key format" aria-label="Copy answer key format to clipboard">
+              <i data-lucide="clipboard-copy"></i>
+            </button>
+          </h4>
           <button onclick="addAnswerKeySample()" class="btn btn-ghost btn-sm" style="color:var(--color-primary); font-weight:600;">
             <i data-lucide="plus-circle" style="width:14px;height:14px;"></i> Add Answer
           </button>
@@ -2134,7 +2139,12 @@ function _tokenizeBulkInput(text) {
       // A trailing [MCQ] / [T/F] / [Match] / [Ident] / [Multi] settles the type
       // instead of leaving it to be guessed from the shape of what follows.
       const tagged = _extractTypeTag(qM[2].trim());
-      tokens.push({ type: 'question', qNum: parseInt(qM[1]), text: tagged.text, forcedType: tagged.type });
+      // "1. Pick a colour?  A. red  B. blue" — all on one line, which a compact
+      // paste often produces. Split the choices off the prompt.
+      const inline = _splitInlineChoices(tagged.text);
+      tokens.push({ type: 'question', qNum: parseInt(qM[1]), text: inline.text, forcedType: tagged.type });
+      inline.choices.forEach(c => tokens.push({ type: 'choice', letter: c.letter, text: c.text, isCorrect: c.isCorrect }));
+      if (inline.choices.length) choicesStarted = true;
       continue;
     }
 
@@ -2187,11 +2197,49 @@ function _tokenizeBulkInput(text) {
       tokens.push({ type: 'continuation', text: t }); continue;
     }
 
-    // 8. UNKNOWN — new auto-numbered question
-    tokens.push({ type: 'unknown', text: t });
+    // 8. UNKNOWN — an unnumbered question line. It opens a block like a
+    //    numbered one does; without this, the "A." / "B." lines beneath it were
+    //    not treated as choices at all and the question came out as free text.
+    const inlineU = _splitInlineChoices(t);
+    tokens.push({ type: 'unknown', text: inlineU.text });
+    inlineU.choices.forEach(c => tokens.push({ type: 'choice', letter: c.letter, text: c.text, isCorrect: c.isCorrect }));
+    hasActiveQ = true;
+    choicesStarted = inlineU.choices.length > 0;
     afterBlank = false;
   }
   return tokens;
+}
+
+/**
+ * Pulls choices off a line that carries both the prompt and its options.
+ * Only fires on two or more markers running A, B, C… in order, so an ordinary
+ * sentence containing "a." or a middle initial is left alone.
+ * @returns {{text: string, choices: Array<{letter,text,isCorrect}>}}
+ */
+function _splitInlineChoices(line) {
+  const re = /(?:^|\s)\*?\(?([A-Za-z])\)?[.)]\s+/g;
+  const hits = [];
+  let m;
+  while ((m = re.exec(line)) !== null) {
+    hits.push({ letter: m[1].toUpperCase(), start: m.index + (m[0].startsWith(' ') ? 1 : 0), end: re.lastIndex,
+                starred: m[0].includes('*') });
+  }
+  // Must start at A and run consecutively, otherwise this is prose.
+  const consecutive = hits.length >= 2 && hits[0].letter === 'A' &&
+    hits.every((h, k) => h.letter.charCodeAt(0) === 65 + k);
+  if (!consecutive) return { text: line, choices: [] };
+
+  const text = line.slice(0, hits[0].start).trim();
+  if (!text) return { text: line, choices: [] };   // the whole line was choices
+
+  const choices = hits.map((h, k) => {
+    const stop = k + 1 < hits.length ? hits[k + 1].start : line.length;
+    const raw = line.slice(h.end, stop).trim();
+    const cleaned = (typeof _extractAnswerMarker === 'function') ? _extractAnswerMarker(raw) : { text: raw, isCorrect: false };
+    return { letter: h.letter, text: cleaned.text, isCorrect: cleaned.isCorrect || h.starred };
+  }).filter(c => c.text);
+
+  return choices.length >= 2 ? { text, choices } : { text: line, choices: [] };
 }
 
 /** Pulls a trailing [MCQ] / [T/F] / [Match] / [Ident] / [Multi] off a question. */
@@ -2361,6 +2409,178 @@ function _assembleBulkQuestions(tokens) {
 }
 
 /* Main entry point: parse unified textarea and apply */
+/* ============================================================
+   FORMAT REFERENCE — copy to clipboard
+   ------------------------------------------------------------
+   The parser accepts a lot, but nothing told you what. These build a spec you
+   can paste to another model so the questions come back in a shape this
+   importer reads on the first try, rather than being hand-fixed afterwards.
+   ============================================================ */
+const NB_FMT_NL = String.fromCharCode(10);
+
+function _nbGivenFormatSpec() {
+  const L = [
+    'QUESTION FORMAT — StudySession notebook import',
+    '',
+    'One question per block, blank line between blocks. Numbering is optional;',
+    'unnumbered blocks are numbered in the order they appear.',
+    'Add [MCQ] [Multi] [T/F] [Match] [Ident] at the end of a question line to',
+    'set its type explicitly, otherwise the type is inferred.',
+    '',
+    '--- 1. MULTIPLE CHOICE (one correct) ---',
+    '1. Which function prints to stdout in C? [MCQ]',
+    'A. printf()',
+    'B. console.log()',
+    'C. echo()',
+    'Answer: A',
+    '',
+    '--- 2. MULTI-SELECT (more than one correct) ---',
+    '2. Which of these are loops? [Multi]',
+    'A. for',
+    'B. if',
+    'C. while',
+    'Answer: A and C',
+    '',
+    '--- 3. TRUE / FALSE ---',
+    '3. The mitochondria produces ATP. [T/F]',
+    'Answer: True',
+    '',
+    '--- 4. IDENTIFICATION (typed answer) ---',
+    '4. Name the green pigment in chloroplasts. [Ident]',
+    'Answer: Chlorophyll',
+    'Hint: Starts with C.',
+    '',
+    '--- 5. MATCHING (two or more pairs) ---',
+    '5. Match the organelle to its job: [Match]',
+    'Nucleus -> Holds DNA',
+    'Ribosome -> Makes protein',
+    'Lysosome -> Digests waste',
+    '',
+    'ACCEPTED VARIATIONS',
+    '- numbering: "1." "1)" "1:" "Q1." or none at all',
+    '- choices:   "A." "A)" "(A)" "A:" — and they may sit on the question line',
+    '- correct choice may be marked with * instead of an Answer line: "*B. Whale"',
+    '- Answer accepts: a letter ("B"), letter with text ("B) 4"), the choice',
+    '  text itself ("printf()"), a position ("2"), several ("A and C", "A, C")',
+    '- matching pairs accept "->", "=>", "→" or a TAB between the two sides',
+    '- "Hint:" and "Explanation:" lines attach to the question above them',
+    '- headers like "PART I - MULTIPLE CHOICE" and "Instructions: ..." are ignored',
+    '',
+    'AVOID',
+    '- putting two questions in one block without a blank line between them',
+    '- numbering choices ("1. printf()") — numbers start a new question',
+    '- a single matching pair; matching needs at least two'
+  ];
+  return L.join(NB_FMT_NL);
+}
+
+function _nbAnswerFormatSpec() {
+  const L = [
+    'ANSWER KEY FORMAT — StudySession notebook import',
+    '',
+    'One line per question. The number must match the question it answers.',
+    '',
+    '--- MULTIPLE CHOICE --- (the letter of the correct choice)',
+    '1. B',
+    '1 = B',
+    'Answer 1: B',
+    '',
+    '--- MULTI-SELECT --- (every correct letter)',
+    '2. A, C',
+    '2 = A and C',
+    '',
+    '--- TRUE / FALSE ---',
+    '3. True',
+    '3 = T',
+    '',
+    '--- IDENTIFICATION --- (the exact expected text)',
+    '4. Chlorophyll',
+    '',
+    '--- MATCHING --- (pair each term with its match)',
+    '5. Nucleus -> Holds DNA',
+    '5. Ribosome -> Makes protein',
+    '5. Lysosome -> Digests waste',
+    '',
+    'NOTES',
+    '- an "Explanation: ..." line after an answer is stored with it',
+    '- letters are case-insensitive',
+    '- an answer for a question number that does not exist is reported, not',
+    '  silently dropped'
+  ];
+  return L.join(NB_FMT_NL);
+}
+
+/** The spec plus instructions, ready to hand to a model. */
+function _nbAiPromptSpec() {
+  const L = [
+    'You are writing quiz questions that will be pasted into StudySession Pro.',
+    'Follow this format EXACTLY. Output plain text only — no markdown, no code',
+    'fences, no commentary before or after.',
+    '',
+    'Rules:',
+    '- one question per block, one blank line between blocks',
+    '- number every question sequentially starting at 1',
+    '- put the type tag at the end of the question line',
+    '- every question except Matching must have an Answer line',
+    '- Multiple choice: 3-4 plausible options, exactly one correct',
+    '- Multi-select: at least two correct, and say so in the question',
+    '- Matching: at least two pairs, one per line, using ->',
+    '- keep each question on a single line',
+    '',
+    _nbGivenFormatSpec(),
+    '',
+    'Now generate <N> questions about <TOPIC> using the formats above.'
+  ];
+  return L.join(NB_FMT_NL);
+}
+
+/** Copies a spec, using the same clipboard path the share links use. */
+function nbCopyFormat(kind) {
+  const spec = kind === 'answer' ? _nbAnswerFormatSpec()
+             : kind === 'ai' ? _nbAiPromptSpec()
+             : _nbGivenFormatSpec();
+  const label = kind === 'answer' ? 'Answer key format copied'
+              : kind === 'ai' ? 'AI prompt copied — paste it to your model'
+              : 'Question format copied';
+  if (typeof copyShareLink === 'function') copyShareLink(spec, label);
+  else if (navigator.clipboard) navigator.clipboard.writeText(spec);
+  _nbCloseFormatMenu();
+}
+
+function _nbCloseFormatMenu() {
+  document.getElementById('nb-format-menu')?.remove();
+}
+
+/** Small menu so one button covers question, answer key and the AI prompt. */
+function nbFormatMenu(ev, defaultKind) {
+  ev.stopPropagation();
+  const existing = document.getElementById('nb-format-menu');
+  if (existing) { existing.remove(); return; }
+
+  const btn = ev.currentTarget;
+  const menu = document.createElement('div');
+  menu.id = 'nb-format-menu';
+  menu.className = 'nb-format-menu';
+  const item = (kind, icon, title, sub) =>
+    `<button type="button" class="nb-format-item" onclick="nbCopyFormat('${kind}')">
+       <i data-lucide="${icon}"></i>
+       <span><strong>${title}</strong><em>${sub}</em></span>
+     </button>`;
+  menu.innerHTML =
+    item('given', 'list-checks', 'Question format', 'All five types, with examples') +
+    item('answer', 'key', 'Answer key format', 'How to write the answers') +
+    item('ai', 'sparkles', 'AI prompt', 'Format plus instructions, for a model');
+  document.body.appendChild(menu);
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: menu });
+
+  const r = btn.getBoundingClientRect();
+  const mh = menu.getBoundingClientRect().height;
+  menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 292)) + 'px';
+  menu.style.top = (r.bottom + mh > window.innerHeight ? Math.max(8, r.top - mh - 6) : r.bottom + 6) + 'px';
+
+  setTimeout(() => document.addEventListener('click', _nbCloseFormatMenu, { once: true }), 0);
+}
+
 function bulkAddGivenQuestions() {
   syncGivenQuestionData();
   const textarea = document.getElementById('gq-bulk-unified');
@@ -2716,7 +2936,12 @@ function _renderGivenQuestionContentNow() {
         <div class="card-flat" style="padding:1rem; border:1px solid var(--border-color);">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
             <h4 style="font-weight:700; font-size:0.75rem; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.05em; margin:0;">UNIFIED BULK ADD</h4>
-            <button onclick="toggleFormatGuide()" class="btn btn-ghost" style="padding:0.2rem 0.4rem; font-size:0.7rem; color:var(--color-primary); font-weight:700; border:1px solid var(--color-primary)33; border-radius:var(--radius-sm);" title="Show paste format guide">?</button>
+            <div style="display:flex; align-items:center; gap:0.3rem;">
+              <button onclick="nbFormatMenu(event, 'given')" class="nb-fmt-btn" title="Copy the accepted format — hand it to an AI so its output pastes in cleanly" aria-label="Copy format to clipboard">
+                <i data-lucide="clipboard-copy"></i>
+              </button>
+              <button onclick="toggleFormatGuide()" class="btn btn-ghost" style="padding:0.2rem 0.4rem; font-size:0.7rem; color:var(--color-primary); font-weight:700; border:1px solid var(--color-primary)33; border-radius:var(--radius-sm);" title="Show paste format guide">?</button>
+            </div>
           </div>
           ${formatGuideHtml}
           <p style="font-size:0.7rem; color:var(--text-secondary); margin-bottom:0.5rem;">Paste everything — questions, choices, answers, matching pairs. Auto-detected.</p>
