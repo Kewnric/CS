@@ -399,7 +399,7 @@ function csLibraryHTML() {
     </div>` : '';
 
   return `
-    <div class="cs-wrap">
+    <div class="cheat-wrap">
       <header class="cs-head">
         <h1><span class="cs-head-icon"><i data-lucide="book-marked"></i></span>
           Cheat Sheet Library
@@ -601,7 +601,7 @@ function csSheetHTML() {
             oncontextmenu="${ro ? '' : `csPageMenu(event,${i});return false;`}">${csEsc(p.name)}</button>`).join('');
 
   return `
-    <div class="cs-wrap cs-sheet">
+    <div class="cheat-wrap cs-sheet">
       <div class="cs-sheet-head">
         <button class="btn-back-dark cs-back" onclick="csBack()"><i data-lucide="chevron-left" style="width:15px;height:15px;"></i> Library</button>
         <h1 class="cs-sheet-title" ${ro ? '' : 'contenteditable="true" spellcheck="false" data-cs-title="1"'}>${csEsc(s.title)}</h1>

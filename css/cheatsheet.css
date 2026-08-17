@@ -5,7 +5,11 @@
    ============================================================ */
 
 .cs-route { height: 100%; overflow-y: auto; }
-.cs-wrap { max-width: 1180px; margin: 0 auto; padding: 1.75rem 2rem 3rem; }
+/* Was .cs-wrap, which collided with the custom-select wrapper of the same
+   name in admin.css (cs = custom select there, cheat sheet here). This
+   padding was landing on every dropdown in Admin, inflating a 40px control
+   to 116px. */
+.cheat-wrap { max-width: 1180px; margin: 0 auto; padding: 1.75rem 2rem 3rem; }
 
 .cs-head h1 {
   display: flex; align-items: center; gap: 0.6rem;
@@ -194,7 +198,7 @@
 .cs-add-note:hover { border-color: var(--color-warning); color: var(--color-warning); }
 
 /* Inside the attempt overlay the paper already fills the page. */
-#cheat-body .cs-wrap { padding: 1rem 1.2rem 2rem; max-width: none; }
+#cheat-body .cheat-wrap { padding: 1rem 1.2rem 2rem; max-width: none; }
 #cheat-body .cs-paper { box-shadow: none; }
 
 /* Code block: the attempt editor's own layout — a transparent textarea over a

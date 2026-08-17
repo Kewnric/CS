@@ -579,9 +579,9 @@
 .admin-group { border-bottom: 1px solid var(--border-color); }
 .admin-group:last-child { border-bottom: none; }
 .admin-group > summary {
-  position: sticky;
-  top: 0;
-  z-index: 2;
+  /* Not sticky. Pinned to the top of a 400px pane it covered the row above it
+     and left the list looking like it had lost a line. With three groups on
+     screen there was nothing to keep oriented about anyway. */
   display: flex;
   align-items: center;
   gap: 0.45rem;
