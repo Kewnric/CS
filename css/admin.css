@@ -1502,3 +1502,82 @@
 .asb-btn:hover { color: var(--text-primary); border-color: var(--color-primary); }
 .asb-danger:hover { color: var(--color-danger); border-color: var(--color-danger); }
 .asb-ghost { border-color: transparent; background: transparent; }
+
+/* ============================================================
+   NOTES ADMIN — section cards
+   ============================================================ */
+
+/* The validation summary is a button now: it scrolls to the first bad section
+   rather than leaving you to find the highlighted card yourself. */
+.nb-validation-summary {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.6rem;
+  font: inherit;
+  background: var(--bg-surface-hover);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.nb-validation-summary:hover { border-color: var(--color-primary); }
+
+/* Was a readonly <input> that looked editable and did nothing. */
+.nb-type-readout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  padding: 0 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-align: center;
+  border-radius: var(--radius-sm);
+  color: var(--nb-badge, var(--color-primary));
+  background: color-mix(in srgb, var(--nb-badge, #818cf8) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--nb-badge, #818cf8) 35%, transparent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nb-type-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+  vertical-align: middle;
+  color: var(--nb-badge, #818cf8);
+  background: color-mix(in srgb, var(--nb-badge, #818cf8) 13%, transparent);
+  border: 1px solid color-mix(in srgb, var(--nb-badge, #818cf8) 27%, transparent);
+}
+
+/* Folding: a long notebook was an unbroken column of full-height cards. */
+.nb-section-fold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+.nb-section-fold:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
+.nb-section-fold i, .nb-section-fold svg { width: 15px; height: 15px; }
+.nb-section-card.is-collapsed { opacity: 0.92; }
+.nb-section-card.has-error { border-color: color-mix(in srgb, var(--color-danger) 45%, transparent); }
+.nb-section-dup i, .nb-section-dup svg { color: var(--text-tertiary); }
+.nb-section-dup:hover i, .nb-section-dup:hover svg { color: var(--color-primary); }
+
+/* Landing flash after jumping to an issue. */
+@keyframes nbFlash {
+  0%, 55% { box-shadow: 0 0 0 2px var(--color-warning); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.nb-flash { animation: nbFlash 1.4s ease-out; }
+@media (prefers-reduced-motion: reduce) { .nb-flash { animation: none; } }

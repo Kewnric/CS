@@ -207,6 +207,9 @@ function getNotebookFormHTML() {
         <div class="af-section-header" style="color:var(--color-primary);">
           <i data-lucide="list" class="af-section-icon" style="color:var(--color-primary);"></i>
           <span>Sections</span>
+          <button onclick="nbToggleAllSections()" class="btn btn-ghost btn-sm af-section-action" title="Collapse or expand every section">
+            <i data-lucide="chevrons-down-up" style="width:13px;height:13px;"></i> Fold all
+          </button>
           <button onclick="addNotebookSection()" class="btn btn-ghost btn-sm af-section-action" style="color:var(--color-primary);">
             <i data-lucide="plus-circle" style="width:13px;height:13px;"></i> Add Section
           </button>
@@ -219,6 +222,9 @@ function getNotebookFormHTML() {
       <div class="admin-form-footer">
         <div class="af-footer-hint"><kbd>Ctrl</kbd>+<kbd>S</kbd> save</div>
         <div class="af-footer-actions">
+          <button onclick="nbPreviewNotebook()" class="btn btn-secondary" title="Save and try this notebook as a student would">
+            <i data-lucide="play" style="width:15px;height:15px;"></i> Preview
+          </button>
           <button onclick="confirmCloseAdminForm(closeNotebookForm, saveNotebookForm)" class="btn btn-secondary">
             <i data-lucide="x" style="width:15px;height:15px;"></i> Discard
           </button>
@@ -705,6 +711,15 @@ function adminNotesTemplate() {
         </div>
         <div class="pane-1-content">
           <div id="admin-study-wrapper">
+            <div class="admin-panel-tools" style="justify-content:flex-end; margin-bottom:0.4rem;">
+              <button class="admin-tool-btn" id="nb-select-all-btn" onclick="nbSelectAllVisible()"
+                      title="Select or deselect every notebook shown (Ctrl+A)" aria-label="Select all notebooks">
+                <i data-lucide="check-square" class="admin-tool-ic"></i>
+                <span>Select all</span>
+              </button>
+            </div>
+            <!-- Only present while something is selected (see _nbRenderSelectionBar). -->
+            <div id="nb-selection-bar" class="admin-selection-bar hidden" role="toolbar" aria-label="Bulk actions"></div>
             <div style="display:flex; flex-direction:column; gap:0.25rem;" id="notebook-table-body"></div>
             
             <div class="card-flat" style="margin-top: 2rem; padding: 1.25rem;" id="notebook-category-container">

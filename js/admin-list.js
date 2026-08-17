@@ -560,7 +560,7 @@ function openListItemFolderPicker(itemId, scope, triggerBtn) {
 
   // Detect current selection for highlighting
   let currentParentId = null;
-  if (itemId === '__bulk__') currentParentId = null;
+  if (itemId === '__bulk__' || itemId === '__bulk_nb__') currentParentId = null;
   else if (scope === 'challenge') currentParentId = (state.challenges.find(c => c.id === itemId) || {}).parentId || null;
   else if (scope === 'snippet') currentParentId = ((state.snippets || []).find(s => s.id === itemId) || {}).parentId || null;
   else if (scope === 'notebook') currentParentId = ((state.notebooks || []).find(n => n.id === itemId) || {}).parentId || null;
@@ -662,6 +662,11 @@ function openListItemFolderPicker(itemId, scope, triggerBtn) {
     // '__bulk__' means the whole selection, not one row (see adminBulkMove).
     if (itemId === '__bulk__') {
       _adminApplyBulkMove(val);
+      cleanup();
+      return;
+    }
+    if (itemId === '__bulk_nb__') {
+      _nbApplyBulkMove(val);
       cleanup();
       return;
     }

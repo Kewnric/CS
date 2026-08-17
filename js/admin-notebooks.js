@@ -56,6 +56,154 @@ function switchAdminStudyTab(tabId, btnEl) {
   else renderNotebookAdmin();
 }
 
+/* ============================================================
+   NOTES PANE 1 — MULTI-SELECT
+   ------------------------------------------------------------
+   Same behaviour the coding list has: click opens, ctrl/cmd toggles, shift
+   takes a range, and the bar acts on everything at once. Deleting ten
+   notebooks was ten separate confirmations.
+   ============================================================ */
+const nbSelection = new Set();
+let _nbLastPickedId = null;
+
+function _nbVisibleIds() {
+  return [...document.querySelectorAll('#notebook-table-body .admin-list-item[data-nb-id]')].map(el => el.dataset.nbId);
+}
+
+function nbRowClick(e, id) {
+  if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
+    document.querySelectorAll('#notebook-table-body .admin-list-item').forEach(el => el.classList.remove('active'));
+    const row = document.querySelector(`#notebook-table-body .admin-list-item[data-nb-id="${id}"]`);
+    if (row) row.classList.add('active');
+    _nbLastPickedId = id;
+    openNotebookForm(id);
+    return;
+  }
+  e.preventDefault();
+  if (e.shiftKey && _nbLastPickedId) {
+    const ids = _nbVisibleIds();
+    const a = ids.indexOf(_nbLastPickedId), b = ids.indexOf(id);
+    if (a !== -1 && b !== -1) ids.slice(Math.min(a, b), Math.max(a, b) + 1).forEach(x => nbSelection.add(x));
+  } else if (nbSelection.has(id)) nbSelection.delete(id);
+  else nbSelection.add(id);
+  _nbLastPickedId = id;
+  renderNotebookAdmin();
+}
+
+function nbToggleSelect(id, on) {
+  if (on) nbSelection.add(id); else nbSelection.delete(id);
+  _nbLastPickedId = id;
+  renderNotebookAdmin();
+}
+
+function nbSelectAllVisible() {
+  const ids = _nbVisibleIds();
+  const allOn = ids.length && ids.every(x => nbSelection.has(x));
+  if (allOn) ids.forEach(x => nbSelection.delete(x));
+  else ids.forEach(x => nbSelection.add(x));
+  renderNotebookAdmin();
+}
+
+function nbClearSelection() {
+  if (!nbSelection.size) return;
+  nbSelection.clear();
+  renderNotebookAdmin();
+}
+
+function _nbRenderSelectionBar() {
+  const host = document.getElementById('nb-selection-bar');
+  if (!host) return;
+  const live = new Set((state.notebooks || []).map(n => n.id));
+  [...nbSelection].forEach(id => { if (!live.has(id)) nbSelection.delete(id); });
+
+  const n = nbSelection.size;
+  const selBtn = document.getElementById('nb-select-all-btn');
+  if (selBtn) {
+    const ids = _nbVisibleIds();
+    const allOn = ids.length > 0 && ids.every(x => nbSelection.has(x));
+    const sp = selBtn.querySelector('span');
+    if (sp) sp.textContent = allOn ? 'Deselect all' : 'Select all';
+    selBtn.classList.toggle('is-on', allOn);
+  }
+
+  if (!n) { host.classList.add('hidden'); host.innerHTML = ''; return; }
+  host.classList.remove('hidden');
+  host.innerHTML = `
+    <span class="asb-count">${n} selected</span>
+    <button class="asb-btn" onclick="nbBulkMove(this)"><i data-lucide="folder-input" style="width:13px;height:13px;"></i> Move to…</button>
+    <button class="asb-btn" onclick="nbBulkExport()"><i data-lucide="download" style="width:13px;height:13px;"></i> Export</button>
+    <button class="asb-btn asb-danger" onclick="nbBulkDelete()"><i data-lucide="trash-2" style="width:13px;height:13px;"></i> Delete</button>
+    <button class="asb-btn asb-ghost" onclick="nbClearSelection()">Clear</button>`;
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: host });
+}
+
+function nbBulkDelete() {
+  const ids = [...nbSelection];
+  if (!ids.length) return;
+  const items = (state.notebooks || []).filter(n => ids.includes(n.id));
+  const names = items.slice(0, 3).map(n => n.title).join(', ');
+  showConfirm('Delete ' + ids.length + ' notebook' + (ids.length !== 1 ? 's' : '') + '?',
+    names + (items.length > 3 ? ' and ' + (items.length - 3) + ' more' : '') + '. You can undo this.',
+    () => {
+      const snapshot = JSON.parse(JSON.stringify(items));
+      state.notebooks = (state.notebooks || []).filter(n => !ids.includes(n.id));
+      nbSelection.clear();
+      saveData();
+      renderNotebookAdmin();
+      if (typeof pushUndo === 'function') {
+        pushUndo('Deleted ' + snapshot.length + ' notebooks', () => {
+          snapshot.forEach(n => state.notebooks.push(n));
+          saveData(); renderNotebookAdmin();
+        });
+      }
+    });
+}
+
+function nbBulkMove(triggerBtn) {
+  if (!nbSelection.size) return;
+  openListItemFolderPicker('__bulk_nb__', 'notebook', triggerBtn);
+}
+
+function _nbApplyBulkMove(folderId) {
+  const ids = [...nbSelection];
+  const target = folderId === '__none__' ? null : folderId;
+  (state.notebooks || []).forEach(n => { if (ids.includes(n.id)) n.parentId = target; });
+  saveData();
+  renderNotebookAdmin();
+  const name = target ? ((state.nodes || []).find(x => x.id === target) || {}).name : 'Uncategorized';
+  if (typeof toast === 'function') toast('Moved ' + ids.length + ' to "' + (name || 'Uncategorized') + '".', { type: 'success' });
+}
+
+function nbBulkExport() {
+  const ids = [...nbSelection];
+  if (!ids.length) return;
+  const picked = (state.notebooks || []).filter(n => ids.includes(n.id));
+  const folderIds = new Set(picked.map(n => n.parentId).filter(Boolean));
+  const payload = {
+    _export: 'studysession-notebooks',
+    exportedAt: new Date().toISOString(),
+    nodes: (state.nodes || []).filter(n => folderIds.has(n.id)),
+    notebooks: picked
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'notebooks-' + picked.length + '-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  if (typeof toast === 'function') toast('Exported ' + picked.length + ' notebook' + (picked.length !== 1 ? 's' : '') + '.', { type: 'success' });
+}
+
+document.addEventListener('keydown', (e) => {
+  if (!document.getElementById('nb-selection-bar')) return;
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '') ||
+                 (document.activeElement || {}).isContentEditable;
+  if (typing) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') { e.preventDefault(); nbSelectAllVisible(); }
+  else if (e.key === 'Escape' && nbSelection.size) nbClearSelection();
+});
+
 function renderNotebookAdmin() {
   updateAdminFilter();
 
@@ -94,11 +242,16 @@ function renderNotebookAdmin() {
     }
 
     tbody.innerHTML = filteredNotebooks.map(nb => `
-      <div class="admin-list-item${notebookAdminState && notebookAdminState.id === nb.id ? ' active' : ''}"
+      <div class="admin-list-item${notebookAdminState && notebookAdminState.id === nb.id ? ' active' : ''}${nbSelection.has(nb.id) ? ' is-selected' : ''}" data-nb-id="${nb.id}"
         role="button" tabindex="0"
-        onclick="document.querySelectorAll('.admin-list-item').forEach(el=>el.classList.remove('active'));this.classList.add('active');openNotebookForm('${nb.id}')"
-        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.querySelectorAll('.admin-list-item').forEach(el=>el.classList.remove('active'));this.classList.add('active');openNotebookForm('${nb.id}')}"
+        onclick="nbRowClick(event, '${nb.id}')"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();nbRowClick(event, '${nb.id}')}"
         aria-label="${escapeHTML(nb.title)}">
+        <label class="ali-check" onclick="event.stopPropagation()" title="Select">
+          <input type="checkbox" ${nbSelection.has(nb.id) ? 'checked' : ''}
+                 onchange="nbToggleSelect('${nb.id}', this.checked)"
+                 aria-label="Select ${escapeHTML(nb.title)}">
+        </label>
         <div class="admin-list-item-left">
           <div class="admin-list-item-title" style="display:flex; align-items:center; gap:0.5rem;">
             <i data-lucide="${nb.icon || 'book'}" style="width:16px;height:16px;color:var(--color-primary);"></i>
@@ -135,6 +288,8 @@ function renderNotebookAdmin() {
     `).join('');
   }
 
+  _nbRenderSelectionBar();
+
   // Folder list (tree view)
   const catList = document.getElementById('notebook-category-list');
   if (catList) {
@@ -147,7 +302,34 @@ function renderNotebookAdmin() {
   lucide.createIcons();
 }
 
+/**
+ * Opens a notebook for editing, asking first if the open one has unsaved edits.
+ * Switching used to discard them silently: type a title, click another row in
+ * the list, and the work was gone with no prompt and no undo.
+ */
 function openNotebookForm(id) {
+  if (window.adminIsDirty && notebookAdminState && notebookAdminState.id !== id) {
+    const from = (notebookAdminState.title || 'this notebook').trim() || 'this notebook';
+    _showThreeButtonDialog('Unsaved changes',
+      `"${from}" has changes you have not saved yet.`,
+      [
+        { label: 'Save & continue', primary: true, action: 'save' },
+        { label: 'Discard changes', danger: true, action: 'discard' },
+        { label: 'Cancel', action: 'cancel' }
+      ],
+      (choice) => {
+        if (choice === 'cancel') return;
+        if (choice === 'save' && saveNotebookForm({ silent: true }) === false) return;
+        window.adminIsDirty = false;
+        openNotebookForm(id);
+      });
+    return;
+  }
+  _openNotebookFormNow(id);
+}
+
+function _openNotebookFormNow(id) {
+  _nbCollapsedSections.clear();
   const emptyState = document.getElementById('admin-empty-state');
   if (emptyState) emptyState.classList.add('hidden');
   const formContainer = document.getElementById('notebook-form-container');
@@ -328,6 +510,25 @@ function saveNotebookForm(opts = {}) {
   // Update sections with current input values (same sync the live form uses)
   syncAllNotebookSections();
 
+  // The banner called these "blocking" while save went through regardless.
+  // A deliberate save now has to acknowledge them; autosaves never interrupt.
+  if (!opts.silent && !opts.force) {
+    const v = (typeof _notebookValidationSummary === 'function') ? _notebookValidationSummary() : { errors: 0 };
+    if (v.errors > 0) {
+      _showThreeButtonDialog('Save with unanswerable questions?',
+        `${v.errors} question${v.errors !== 1 ? 's have' : ' has'} no correct answer set, so ${v.errors !== 1 ? 'they' : 'it'} cannot be graded. Students will still see ${v.errors !== 1 ? 'them' : 'it'}.`,
+        [
+          { label: 'Fix them first', primary: true, action: 'fix' },
+          { label: 'Save anyway', danger: true, action: 'save' }
+        ],
+        (choice) => {
+          if (choice === 'save') saveNotebookForm({ ...opts, force: true });
+          else _nbJumpToFirstIssue();
+        });
+      return false;
+    }
+  }
+
   if (notebookAdminState.id === 'new') notebookAdminState.id = 'nb_' + Date.now();
   // Deep-clone into state: silent saves keep the form open, and sharing the
   // object meant later UNSAVED edits mutated state directly.
@@ -345,6 +546,7 @@ function saveNotebookForm(opts = {}) {
     closeNotebookForm();
     window.adminIsDirty = false;
     if (_vErrors > 0) {
+      // Only reachable via "Save anyway" — the user already chose this.
       showMessage('Saved — needs attention', `Notebook saved, but ${_vErrors} question${_vErrors !== 1 ? 's have' : ' has'} no answer key and won't be graded. Reopen this notebook to fix the highlighted sections.`, true);
     } else {
       showMessage('Success', 'Notebook saved successfully!');
@@ -352,6 +554,27 @@ function saveNotebookForm(opts = {}) {
     renderNotebookAdmin();
   }
   return true;
+}
+
+/**
+ * Saves, then opens the notebook as a student sees it. Authoring blind and
+ * finding out later was the only option before — there was no way to look at a
+ * section without leaving Admin and hunting for it in the Library.
+ */
+function nbPreviewNotebook() {
+  if (!notebookAdminState) return;
+  if (!(notebookAdminState.sections || []).length) {
+    showMessage('Nothing to preview', 'Add a section with at least one question first.', true);
+    return;
+  }
+  if (saveNotebookForm({ silent: true, force: true }) === false) return;
+  if (typeof setSessionParam === 'function') {
+    setSessionParam('activeNotebook', notebookAdminState.id);
+    setSessionParam('notebookTimeLimit', 0);
+    if (typeof clearSessionParam === 'function') clearSessionParam('notebookDrill');
+  }
+  window.adminIsDirty = false;
+  if (typeof spaNavigate === 'function') spaNavigate('notes-practice');
 }
 
 function deleteNotebook(id) {
@@ -494,11 +717,55 @@ function bulkAddNotebookSections() {
   if (typeof setSaveStatus === 'function') setSaveStatus('notebook-save-status', 'unsaved');
 }
 
+/**
+ * Removing a section took its questions and answer keys with it on one click,
+ * with no confirmation and nothing to undo. Now it asks when there is something
+ * to lose, and always leaves an undo behind.
+ */
 function removeNotebookSection(idx) {
-  notebookAdminState.sections.splice(idx, 1);
+  const sec = notebookAdminState.sections[idx];
+  if (!sec) return;
+  const qn = (sec.questions || []).length;
+  const kn = (sec.answerKeysData || []).length;
+
+  const drop = () => {
+    const snapshot = JSON.parse(JSON.stringify(sec));
+    notebookAdminState.sections.splice(idx, 1);
+    renderNotebookSectionsForm();
+    window.adminIsDirty = true;
+    if (typeof setSaveStatus === 'function') setSaveStatus('notebook-save-status', 'unsaved');
+    if (typeof pushUndo === 'function') {
+      pushUndo(`Removed section "${snapshot.label || 'Untitled'}"`, () => {
+        notebookAdminState.sections.splice(Math.min(idx, notebookAdminState.sections.length), 0, snapshot);
+        renderNotebookSectionsForm();
+        window.adminIsDirty = true;
+      });
+    }
+  };
+
+  // An empty section is not worth a dialog.
+  if (!qn && !kn) { drop(); return; }
+  const what = [];
+  if (qn) what.push(qn + ' question' + (qn !== 1 ? 's' : ''));
+  if (kn) what.push(kn + ' answer key' + (kn !== 1 ? 's' : ''));
+  showConfirm('Remove this section?',
+    `"${sec.label || 'Section ' + (idx + 1)}" contains ${what.join(' and ')}. You can undo this.`,
+    drop);
+}
+
+/** Copy a section, questions and answer keys included, right below the original. */
+function duplicateNotebookSection(idx) {
+  const sec = notebookAdminState.sections[idx];
+  if (!sec) return;
+  syncAllNotebookSections();
+  const copy = JSON.parse(JSON.stringify(sec));
+  copy.id = (typeof generateId === 'function') ? generateId() : 'sec_' + Date.now();
+  copy.label = (sec.label || 'Section') + ' (copy)';
+  notebookAdminState.sections.splice(idx + 1, 0, copy);
   renderNotebookSectionsForm();
   window.adminIsDirty = true;
   if (typeof setSaveStatus === 'function') setSaveStatus('notebook-save-status', 'unsaved');
+  if (typeof toast === 'function') toast('Section duplicated.', { type: 'success' });
 }
 
 /* ============================================================
@@ -580,6 +847,41 @@ function _updateNbValidationSummary() {
   if (el) { el.innerHTML = _nbValidationSummaryInner(); if (typeof lucide !== 'undefined') lucide.createIcons({ el }); }
 }
 
+/* Which section cards are folded. Index-based and reset per form open, so it
+   never survives into a different notebook. */
+const _nbCollapsedSections = new Set();
+
+function nbToggleSection(idx) {
+  syncAllNotebookSections();
+  if (_nbCollapsedSections.has(idx)) _nbCollapsedSections.delete(idx);
+  else _nbCollapsedSections.add(idx);
+  renderNotebookSectionsForm();
+}
+
+function nbToggleAllSections() {
+  syncAllNotebookSections();
+  const secs = (notebookAdminState && notebookAdminState.sections) || [];
+  if (_nbCollapsedSections.size >= secs.length && secs.length) _nbCollapsedSections.clear();
+  else secs.forEach((_, i) => _nbCollapsedSections.add(i));
+  renderNotebookSectionsForm();
+}
+
+/** Scrolls to the first section with an error and opens it if it was folded. */
+function _nbJumpToFirstIssue() {
+  const secs = (notebookAdminState && notebookAdminState.sections) || [];
+  const idx = secs.findIndex(sec => validateNotebookSection(sec).errors > 0);
+  if (idx === -1) return;
+  if (_nbCollapsedSections.has(idx)) {
+    _nbCollapsedSections.delete(idx);
+    renderNotebookSectionsForm();
+  }
+  const card = document.querySelector(`.nb-section-card[data-idx="${idx}"]`);
+  if (!card) return;
+  card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  card.classList.add('nb-flash');
+  setTimeout(() => card.classList.remove('nb-flash'), 1400);
+}
+
 function renderNotebookSectionsForm() {
   const container = document.getElementById('notebook-sections-content');
   if (!container) return;
@@ -589,7 +891,10 @@ function renderNotebookSectionsForm() {
   if (!notebookAdminState.sections || notebookAdminState.sections.length === 0) {
     html += '<div class="nb-section-empty">No sections added yet. Add one below to start.</div>';
   } else {
-    html += `<div id="nb-validation-summary" class="nb-validation-summary" style="padding:0.5rem 0.75rem; margin-bottom:0.6rem; background:var(--bg-surface-hover); border:1px solid var(--border-color); border-radius:var(--radius-md);">${_nbValidationSummaryInner()}</div>`;
+    // Clickable: "3 blocking issues" now takes you to the first one instead of
+    // leaving you to hunt through a long form for the highlighted card.
+    html += `<button type="button" id="nb-validation-summary" class="nb-validation-summary"
+               onclick="_nbJumpToFirstIssue()" title="Go to the first issue">${_nbValidationSummaryInner()}</button>`;
     html += notebookAdminState.sections.map((sec, idx) => {
       // Auto-detect section test type from answerKeysData
       const akData = sec.answerKeysData || [];
@@ -600,26 +905,35 @@ function renderNotebookSectionsForm() {
       else sectionTestType = 'mixed';
       const typeBadgeMap = { mcq: { label: 'MCQ', color: '#818cf8' }, checkbox: { label: 'Multi', color: '#10b981' }, text: { label: 'Text', color: '#fbbf24' }, matching: { label: 'Match', color: '#f472b6' }, truefalse: { label: 'T/F', color: '#38bdf8' }, mixed: { label: 'Mixed', color: '#f97316' } };
       const badge = typeBadgeMap[sectionTestType] || typeBadgeMap.mcq;
+      const collapsed = _nbCollapsedSections.has(idx);
       // Build detailed type summary
       const typeCounts = {};
       akData.forEach(d => { const t = d.type || 'mcq'; typeCounts[t] = (typeCounts[t] || 0) + 1; });
       const typeSummaryParts = Object.entries(typeCounts).map(([t, c]) => `${c} ${(typeBadgeMap[t] || {label: t}).label}`);
       const typeSummary = typeSummaryParts.length > 0 ? typeSummaryParts.join(', ') : 'No questions';
       return `
-      <div class="nb-section-card" data-idx="${idx}" draggable="true"
+      <div class="nb-section-card${collapsed ? ' is-collapsed' : ''}${validateNotebookSection(sec).errors ? ' has-error' : ''}" data-idx="${idx}" draggable="true"
            ondragstart="nbSectionDragStart(event, ${idx})"
            ondragover="nbSectionDragOver(event)"
            ondrop="nbSectionDrop(event, ${idx})"
            ondragend="nbSectionDragEnd(event)">
         <div class="nb-section-card-header">
           <span class="nb-section-handle" title="Drag to reorder" aria-hidden="true"><i data-lucide="grip-vertical"></i></span>
+          <button type="button" class="nb-section-fold" onclick="nbToggleSection(${idx})"
+                  title="${collapsed ? 'Expand' : 'Collapse'} this section"
+                  aria-expanded="${collapsed ? 'false' : 'true'}" aria-label="${collapsed ? 'Expand' : 'Collapse'} section ${idx + 1}">
+            <i data-lucide="chevron-${collapsed ? 'right' : 'down'}"></i>
+          </button>
           <h4 class="nb-section-card-title">Section ${idx + 1}</h4>
-          <div class="nb-section-card-meta">${(sec.questions || []).length} question${(sec.questions || []).length !== 1 ? 's' : ''} · <span style="font-size:0.6rem;font-weight:700;padding:0.1rem 0.35rem;border-radius:999px;background:${badge.color}22;color:${badge.color};border:1px solid ${badge.color}44;vertical-align:middle;">${typeSummary || badge.label}</span></div>
+          <div class="nb-section-card-meta">${(sec.questions || []).length} question${(sec.questions || []).length !== 1 ? 's' : ''} · <span class="nb-type-badge" style="--nb-badge:${badge.color};">${escapeHTML(typeSummary || badge.label)}</span></div>
+          <button onclick="syncAllNotebookSections(); duplicateNotebookSection(${idx})" class="btn btn-ghost btn-sm nb-section-dup" title="Duplicate section" aria-label="Duplicate section ${idx + 1}">
+            <i data-lucide="copy" style="width:14px;height:14px;"></i>
+          </button>
           <button onclick="syncAllNotebookSections(); removeNotebookSection(${idx})" class="btn btn-ghost btn-sm nb-section-remove" title="Remove Section" aria-label="Remove Section ${idx + 1}">
             <i data-lucide="trash-2" style="width:14px;height:14px;color:var(--color-danger);"></i>
           </button>
         </div>
-        <div class="nb-section-card-body">
+        <div class="nb-section-card-body${collapsed ? ' hidden' : ''}">
           <div class="nb-section-fields">
             <div class="af-field" style="flex:1; min-width:160px;">
               <label class="form-label">Label</label>
@@ -627,7 +941,11 @@ function renderNotebookSectionsForm() {
             </div>
             <div class="af-field" style="width:120px;">
               <label class="form-label">Type</label>
-              <input class="form-input nb-input-compact" value="${typeSummary || badge.label}" readonly style="cursor:default; color:${badge.color}; font-weight:600; text-align:center; background:${badge.color}0a; border-color:${badge.color}44; font-size:0.7rem;" title="Auto-detected from question types" />
+              <!-- Was a readonly <input>: it looked editable, took a click and did
+                   nothing. It is a derived summary, so it reads as one now. -->
+              <div class="nb-type-readout" style="--nb-badge:${badge.color};" title="Auto-detected from the answer key">
+                ${escapeHTML(typeSummary || badge.label)}
+              </div>
             </div>
             <div class="af-field" style="width:100px;">
               <label class="form-label">Questions</label>
@@ -732,7 +1050,27 @@ function syncNotebookSection(idx) {
   if (labelEl) sec.label = labelEl.value;
   if (choicesEl) sec.choices = parseInt(choicesEl.value) || 4;
   if (countEl) {
-    const count = Math.max(0, parseInt(countEl.value) || 0);
+    // The field accepted anything: 999 built 999 questions, -5 silently wiped
+    // the section. Clamp to the same 1-200 the input advertises.
+    const raw = parseInt(countEl.value, 10);
+    const count = isNaN(raw) ? 0 : Math.max(0, Math.min(200, raw));
+    if (!isNaN(raw) && raw !== count) countEl.value = String(count);
+
+    const prev = (sec.questions || []).length;
+    if (count < prev) {
+      // Dropping the count strands the answer keys for the questions removed.
+      // Say so while it can still be undone, rather than only in the validator.
+      const stranded = (sec.answerKeysData || []).filter(d => +d.qNum > count).length;
+      if (stranded && !sec._orphanWarned) {
+        sec._orphanWarned = true;
+        if (typeof toast === 'function') {
+          toast(stranded + ' answer key' + (stranded !== 1 ? 's are' : ' is') + ' now above the question count and will be ignored.',
+            { type: 'warning', duration: 6000 });
+        }
+      }
+    } else if (count >= prev) {
+      sec._orphanWarned = false;
+    }
     sec.questions = Array.from({ length: count }, (_, i) => i + 1);
   }
   // Live-update validation without a full re-render (keeps input focus).
