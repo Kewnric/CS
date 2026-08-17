@@ -1,0 +1,85 @@
+/* ============================================================
+   TREE-EXTRAS.CSS — the star, the per-item highlight colour, the
+   optional row badges, and the colour picker.
+   ============================================================ */
+
+/* A favourited program had no marker anywhere in the tree — the only clue was
+   on its card in the right-hand pane. */
+.tree-node-star {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  margin-left: 0.3rem;
+  color: var(--color-warning);
+  fill: currentColor;
+}
+
+/* Per-item highlight colour: a bar down the left of the row. */
+.tree-node.has-accent > .tree-node-row {
+  position: relative;
+}
+.tree-node.has-accent > .tree-node-row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--row-accent, transparent);
+}
+.tree-node.has-accent > .tree-node-row .tree-node-label { color: var(--row-accent, inherit); }
+
+/* Optional badges, toggled from the pane menu. */
+.tree-badge-level,
+.tree-badge-tag {
+  flex-shrink: 0;
+  font-size: 0.5625rem;
+  font-weight: 700;
+  padding: 0.05rem 0.3rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.tree-badge-level { background: rgba(99, 102, 241, 0.18); color: var(--color-primary); }
+.tree-badge-tag {
+  background: rgba(6, 182, 212, 0.15);
+  color: var(--color-accent);
+  max-width: 5.5rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Colour picker */
+.tree-color-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+}
+.tree-color-swatch {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+  border: 2px solid transparent;
+  cursor: pointer;
+  color: var(--text-tertiary);
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.tree-color-swatch:hover { transform: scale(1.08); }
+.tree-color-swatch.active { border-color: var(--text-primary); }
+
+/* Back control at the head of a breadcrumb. Navigating out of a program detail
+   meant aiming at the right crumb; from a deep path that is a small target. */
+.browse-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  margin-right: 0.5rem;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.72rem;
+  flex-shrink: 0;
+}

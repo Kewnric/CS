@@ -1,0 +1,175 @@
+/* ============================================================
+   TERMINAL.CSS — Run Code terminal chrome
+   ------------------------------------------------------------
+   The transcript itself is styled in editor.css (.term-output-area,
+   .term-line, .term-echo …). This file covers the controls that sit
+   around it: the footer, the stdin / compiler-options / history
+   drawers, and the run clock.
+   ============================================================ */
+
+.run-code-footer-left,
+.run-code-footer-right {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+.run-code-footer-left { gap: 0.6rem; }
+
+.term-elapsed {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  min-width: 34px;
+}
+.term-engine-badge {
+  font-size: 0.6875rem;
+  color: #484f58;
+  font-family: var(--font-mono);
+  background: #0d1117;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid #21262d;
+}
+.term-engine-badge:empty { display: none; }
+
+.term-queue-chip {
+  font-size: 0.66rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: #a5b4fc;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+
+.term-icon-btn { padding: 0.3rem 0.4rem; }
+.term-footer-sep {
+  width: 1px;
+  height: 18px;
+  background: #30363d;
+  margin: 0 0.15rem;
+  flex-shrink: 0;
+}
+
+/* --- Drawers between the transcript and the footer --- */
+.term-stdin-panel,
+.term-opts,
+.term-history-panel {
+  flex-shrink: 0;
+  padding: 0.75rem 1rem;
+  background: #0d1117;
+  border-top: 1px solid #21262d;
+  animation: termDrawer 0.14s ease-out;
+}
+@keyframes termDrawer {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.term-stdin-panel label {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  margin-bottom: 0.4rem;
+  line-height: 1.45;
+}
+.term-stdin-panel textarea {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  resize: vertical;
+}
+.term-stdin-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+/* --- Compiler options --- */
+.term-opts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.75rem 1.25rem;
+}
+.term-opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  max-width: 320px;
+}
+.term-opt input[type="checkbox"] {
+  margin-top: 2px;
+  width: 14px;
+  height: 14px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.term-opt > span:first-child { padding-top: 3px; }
+.term-opt strong { display: block; color: var(--text-primary); font-weight: 700; }
+.term-opt em {
+  display: block;
+  font-style: normal;
+  font-size: 0.69rem;
+  color: var(--text-tertiary);
+  margin-top: 1px;
+  line-height: 1.4;
+}
+.term-opt select { font-size: 0.75rem; padding: 0.2rem 1.4rem 0.2rem 0.45rem; height: auto; width: auto; }
+.term-opt-args {
+  flex-basis: 100%;
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+}
+.term-opt-args code {
+  font-family: var(--font-mono);
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: #8b949e;
+}
+
+/* --- Previous runs --- */
+.term-history-empty { font-size: 0.76rem; color: var(--text-tertiary); margin: 0; line-height: 1.5; }
+.term-history-list { display: flex; flex-direction: column; gap: 0.25rem; }
+.term-history-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.76rem;
+  cursor: pointer;
+  text-align: left;
+}
+.term-history-row:hover { background: #161b22; color: var(--text-primary); }
+.term-history-row.active { border-color: var(--color-primary); color: var(--color-primary); }
+.term-history-when { flex: 1; font-family: var(--font-mono); }
+.term-history-exit,
+.term-history-size { font-size: 0.68rem; color: var(--text-tertiary); flex-shrink: 0; }
+.term-history-back {
+  align-self: flex-start;
+  margin-top: 0.35rem;
+  border: none;
+  background: none;
+  color: var(--color-primary);
+  font-size: 0.73rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.2rem;
+}
+
+@media (max-width: 720px) {
+  .run-code-footer { flex-wrap: wrap; gap: 0.5rem; }
+  .term-opt { max-width: none; }
+}

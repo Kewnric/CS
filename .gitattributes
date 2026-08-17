@@ -1,0 +1,4 @@
+# Normalise line endings to LF in the repository. Without this, Windows checks
+# files out as CRLF and a later edit can show up as a whole-file diff.
+* text=auto eol=lf
+*.svg text eol=lf

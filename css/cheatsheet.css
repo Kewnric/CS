@@ -1,0 +1,588 @@
+/* ============================================================
+   CHEATSHEET.CSS — the Cheat Sheet Library.
+   One wide pane, not the two-pane library layout: a reference
+   book wants the page, not a tree beside it.
+   ============================================================ */
+
+.cs-route { height: 100%; overflow-y: auto; }
+.cs-wrap { max-width: 1180px; margin: 0 auto; padding: 1.75rem 2rem 3rem; }
+
+.cs-head h1 {
+  display: flex; align-items: center; gap: 0.6rem;
+  font-size: 1.6rem; font-weight: 800; color: var(--text-primary); margin: 0;
+}
+.cs-head-icon {
+  width: 34px; height: 34px; border-radius: var(--radius-md);
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(245, 158, 11, 0.14); color: var(--color-warning);
+}
+.cs-head-count {
+  font-size: 0.7rem; font-weight: 800; padding: 0.1rem 0.5rem; border-radius: 999px;
+  background: var(--bg-surface-hover); color: var(--text-tertiary);
+}
+.cs-head-sub { color: var(--text-secondary); font-size: 0.875rem; margin: 0.35rem 0 1.1rem; }
+
+.cs-toolbar { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.1rem; flex-wrap: wrap; }
+.cs-search { flex: 1; min-width: 220px; }
+.cs-select {
+  padding: 0.42rem 0.6rem; font-size: 0.78rem; border-radius: var(--radius-md);
+  background: var(--bg-surface); border: 1px solid var(--border-color); color: var(--text-secondary);
+}
+.cs-new { flex-shrink: 0; }
+
+/* Cards */
+.cs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.85rem; }
+.cs-card {
+  display: flex; flex-direction: column; gap: 0.4rem; text-align: left;
+  padding: 0.85rem 0.9rem; min-height: 132px; cursor: pointer;
+  background: var(--bg-surface); border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg); color: var(--text-primary);
+  transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
+}
+.cs-card:hover { transform: translateY(-2px); border-color: var(--color-warning); box-shadow: var(--shadow-lg); }
+.cs-card.has-accent { border-left: 3px solid var(--cs-accent, var(--color-warning)); }
+.cs-card-top { display: flex; align-items: center; justify-content: space-between; color: var(--color-warning); }
+.cs-card-top i, .cs-card-top svg { width: 18px; height: 18px; }
+.cs-card-pages { font-size: 0.625rem; font-weight: 700; color: var(--text-tertiary); }
+.cs-card-title { font-weight: 700; font-size: 0.95rem; line-height: 1.3; }
+.cs-card-tags { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.cs-tag {
+  font-size: 0.5625rem; font-weight: 700; padding: 0.08rem 0.35rem; border-radius: 999px;
+  background: rgba(99, 102, 241, 0.16); color: var(--color-primary);
+}
+.cs-card-foot { margin-top: auto; font-size: 0.625rem; color: var(--text-tertiary); }
+.cs-pages { margin-top: 1.5rem; justify-content: center; display: flex; gap: 0.25rem; }
+
+.cs-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 0.6rem; padding: 3.5rem 1rem; text-align: center;
+}
+.cs-empty i, .cs-empty svg { width: 42px; height: 42px; opacity: 0.4; color: var(--color-warning); }
+.cs-empty h2 { font-size: 1.05rem; margin: 0; }
+.cs-empty p { font-size: 0.8125rem; color: var(--text-tertiary); max-width: 420px; margin: 0; }
+
+/* ── A sheet ───────────────────────────────────────────────── */
+.cs-sheet-head { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.9rem; flex-wrap: wrap; }
+.cs-back { flex-shrink: 0; padding: 0.22rem 0.55rem; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 0.15rem; }
+.cs-sheet-title { font-size: 1.45rem; font-weight: 800; margin: 0; outline: none; border-radius: var(--radius-sm); }
+.cs-sheet-title:focus { background: var(--bg-surface-hover); box-shadow: 0 0 0 2px var(--color-primary-glow); }
+.cs-sheet-tags { display: flex; gap: 0.25rem; }
+
+.cs-tabs { display: flex; align-items: center; gap: 0.25rem; margin-bottom: -1px; flex-wrap: wrap; }
+.cs-tab {
+  padding: 0.35rem 0.75rem; font-size: 0.75rem; font-weight: 600; cursor: pointer;
+  background: transparent; color: var(--text-tertiary);
+  border: 1px solid var(--border-color); border-bottom: none;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+}
+.cs-tab.active { background: var(--bg-surface); color: var(--color-warning); border-bottom-color: var(--bg-surface); }
+.cs-tab-add { padding: 0.35rem 0.5rem; }
+.cs-tab-add i, .cs-tab-add svg { width: 13px; height: 13px; }
+
+/* Warm paper, so it reads as a page rather than another dark panel. */
+.cs-paper {
+  --cs-paper-bg: var(--bg-surface);
+  position: relative;
+  min-height: 380px;
+  padding: 1.5rem 1.6rem 2.4rem;
+  background:
+    repeating-linear-gradient(transparent, transparent 31px, rgba(148, 163, 184, 0.07) 31px, rgba(148, 163, 184, 0.07) 32px),
+    var(--cs-paper-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 0 var(--radius-lg) var(--radius-lg) var(--radius-lg);
+  color: var(--text-primary);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), var(--shadow-lg);
+}
+
+.cs-blank { display: flex; flex-direction: column; align-items: center; gap: 0.4rem; padding: 3rem 0; color: var(--text-tertiary); }
+.cs-blank i, .cs-blank svg { width: 30px; height: 30px; opacity: 0.5; }
+.cs-blank p { font-size: 0.8125rem; margin: 0; }
+
+.cs-block { margin-bottom: 1.15rem; }
+.cs-block-head {
+  display: flex; align-items: center; gap: 0.35rem;
+  font-size: 0.625rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em;
+  color: var(--text-tertiary); margin-bottom: 0.35rem;
+}
+.cs-block-head i, .cs-block-head svg { width: 12px; height: 12px; }
+.cs-block-tools { margin-left: auto; display: flex; gap: 0.15rem; opacity: 0; transition: opacity 0.14s ease; }
+.cs-block:hover .cs-block-tools { opacity: 1; }
+.cs-block-tools button {
+  background: none; border: none; cursor: pointer; color: var(--text-tertiary); padding: 0.1rem;
+  display: inline-flex; border-radius: 3px;
+}
+.cs-block-tools button:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+.cs-block-tools button.danger:hover { color: var(--color-danger); }
+.cs-block-tools i, .cs-block-tools svg { width: 13px; height: 13px; }
+
+[data-ph]:empty::before { content: attr(data-ph); color: var(--text-tertiary); opacity: 0.75; }
+.cs-paper [contenteditable]:focus { outline: 2px solid rgba(99, 102, 241, 0.35); outline-offset: 2px; border-radius: 3px; }
+
+.cs-terms { width: 100%; border-collapse: collapse; }
+.cs-terms td { padding: 0.3rem 0.5rem; vertical-align: top; border-bottom: 1px solid var(--border-color); font-size: 0.875rem; }
+.cs-term { width: 30%; font-weight: 700; color: var(--color-warning); }
+.cs-def { color: var(--text-secondary); }
+.cs-rowdel { width: 24px; }
+.cs-rowdel button { background: none; border: none; cursor: pointer; color: var(--text-tertiary); }
+.cs-rowdel i, .cs-rowdel svg { width: 12px; height: 12px; }
+
+.cs-mini {
+  display: inline-flex; align-items: center; gap: 0.2rem; margin-top: 0.35rem;
+  padding: 0.15rem 0.45rem; font-size: 0.6875rem; font-weight: 600; cursor: pointer;
+  background: var(--bg-surface-hover); border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm); color: var(--text-secondary); text-decoration: none;
+}
+.cs-mini:hover { background: var(--bg-elevated); color: var(--text-primary); border-color: var(--color-primary); }
+.cs-mini i, .cs-mini svg { width: 11px; height: 11px; }
+
+.cs-codewrap { border-radius: var(--radius-md); overflow: hidden; border: 1px solid #2b2a26; }
+.cs-codebar { display: flex; align-items: center; justify-content: space-between; padding: 0.2rem 0.5rem; background: #16181d; }
+.cs-lang { font-size: 0.625rem; font-weight: 800; text-transform: uppercase; color: #7d8590; letter-spacing: 0.06em; }
+.cs-codebar .cs-mini { margin: 0; background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.14); color: #c9d1d9; }
+.cs-code {
+  margin: 0; padding: 0.7rem 0.8rem; background: #0d1117; color: #e6edf3;
+  font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.6;
+  white-space: pre-wrap; word-break: break-word; min-height: 3.2rem; outline: none;
+}
+.cs-cap { font-size: 0.7rem; color: var(--text-tertiary); margin-top: 0.3rem; font-style: italic; }
+.cs-text { font-size: 0.9rem; line-height: 1.75; color: var(--text-primary); outline: none; white-space: pre-wrap; }
+
+.cs-table { width: 100%; border-collapse: collapse; background: var(--bg-elevated); }
+.cs-table td { background: var(--bg-elevated); border: 1px solid var(--border-color); padding: 0.3rem 0.5rem; font-size: 0.8125rem; min-width: 60px; }
+.cs-tabletools { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+
+.cs-img { max-width: 100%; border-radius: var(--radius-md); display: block; box-shadow: var(--shadow-md); }
+.cs-drop {
+  display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
+  padding: 1.6rem; border: 2px dashed var(--border-color); border-radius: var(--radius-md); color: var(--text-tertiary);
+}
+.cs-drop i, .cs-drop svg { width: 26px; height: 26px; opacity: 0.6; }
+.cs-drop p { font-size: 0.75rem; margin: 0; }
+
+.cs-linkrow { display: flex; align-items: center; gap: 0.4rem; font-size: 0.8125rem; flex-wrap: wrap; }
+.cs-linkrow i, .cs-linkrow svg { width: 14px; height: 14px; color: var(--color-primary); }
+.cs-linklabel { font-weight: 700; outline: none; }
+.cs-linkurl { color: var(--text-tertiary); font-family: var(--font-mono); font-size: 0.72rem; outline: none; }
+
+/* Sticky notes float over the page and can be dragged anywhere. */
+.cs-note {
+  position: absolute; width: 168px; min-height: 96px; padding: 0.55rem 0.6rem;
+  background: var(--cs-note, #fde68a); color: #3b3222;
+  border-radius: 3px; box-shadow: 3px 4px 10px rgba(0, 0, 0, 0.22);
+  transform: rotate(-1.2deg); cursor: grab; z-index: 5;
+}
+.cs-note:active { cursor: grabbing; }
+.cs-note-body { color: #2f2718; font-size: 0.78rem; line-height: 1.5; outline: none; cursor: text; white-space: pre-wrap; }
+.cs-note-x {
+  position: absolute; top: 2px; right: 2px; background: none; border: none;
+  cursor: pointer; color: rgba(59, 50, 34, 0.45); padding: 2px; display: inline-flex;
+}
+.cs-note-x:hover { color: var(--color-danger); }
+.cs-note-x i, .cs-note-x svg { width: 11px; height: 11px; }
+
+/* Block palette */
+.cs-add { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.9rem; }
+.cs-add-btn {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.35rem 0.6rem; font-size: 0.72rem; font-weight: 600; cursor: pointer;
+  background: var(--bg-surface); border: 1px solid var(--border-color);
+  border-radius: var(--radius-md); color: var(--text-secondary);
+  transition: color 0.14s, border-color 0.14s;
+}
+.cs-add-btn:hover { color: var(--text-primary); border-color: var(--color-primary); }
+.cs-add-btn i, .cs-add-btn svg { width: 13px; height: 13px; }
+.cs-add-note:hover { border-color: var(--color-warning); color: var(--color-warning); }
+
+/* Inside the attempt overlay the paper already fills the page. */
+#cheat-body .cs-wrap { padding: 1rem 1.2rem 2rem; max-width: none; }
+#cheat-body .cs-paper { box-shadow: none; }
+
+/* Code block: the attempt editor's own layout — a transparent textarea over a
+   highlighted <pre>, sharing one set of mono metrics so the two never drift. */
+.cs-codebar-right { display: inline-flex; gap: 0.3rem; align-items: center; }
+.cs-codeedit { display: flex; background: #0d1117; max-height: 460px; }
+.cs-gutter {
+  flex-shrink: 0; padding: 0.7rem 0.5rem 0.7rem 0.7rem; text-align: right;
+  font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.6;
+  color: #484f58; user-select: none; overflow: hidden;
+  border-right: 1px solid #1c2128;
+}
+.cs-codestack { position: relative; flex: 1; min-width: 0; }
+.cs-code {
+  margin: 0; padding: 0.7rem 0.8rem;
+  font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.6;
+  tab-size: 4; -moz-tab-size: 4;
+  white-space: pre; overflow: auto;
+  border: 0; outline: none;
+}
+.cs-code-hl {
+  position: absolute; inset: 0; pointer-events: none;
+  background: #0d1117; color: #e6edf3;
+}
+.cs-code-ta {
+  position: relative; width: 100%; min-height: 7rem; height: 100%;
+  background: transparent; color: transparent; caret-color: #58a6ff;
+  resize: vertical; display: block;
+}
+.cs-code-ta::selection { background: rgba(88, 166, 255, 0.3); }
+.cs-code-ta::placeholder { color: #484f58; }
+
+/* Dialogs and menus opened from inside the sheet.
+   .cheat-overlay sits at z-index 10000; .modal-overlay is 1000 and .fd-overlay
+   1200, so "Topics..." opened behind the sheet and looked like nothing had
+   happened. */
+body.cheat-open .modal-overlay,
+body.cheat-open .fd-overlay { z-index: 10100; }
+body.cheat-open .tree-ctx { z-index: 10150; }
+
+/* ── Card covers and badges ───────────────────────────────── */
+.cs-card { padding: 0; overflow: hidden; }
+.cs-cover {
+  position: relative; height: 62px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(135deg, var(--cs-a, #6366f1), var(--cs-b, #22d3ee));
+}
+.cs-cover::after {
+  content: ''; position: absolute; inset: 0;
+  background: repeating-linear-gradient(45deg, rgba(255,255,255,0.07) 0 6px, transparent 6px 12px);
+}
+.cs-cover > i, .cs-cover > svg { width: 22px; height: 22px; color: #fff; opacity: 0.95; z-index: 1; }
+.cs-cover-pages {
+  position: absolute; top: 6px; right: 7px; z-index: 1;
+  font-size: 0.5625rem; font-weight: 800; padding: 0.06rem 0.35rem; border-radius: 999px;
+  background: rgba(0, 0, 0, 0.34); color: #fff; backdrop-filter: blur(3px);
+}
+.cs-card-body { display: flex; flex-direction: column; gap: 0.35rem; padding: 0.6rem 0.75rem 0.75rem; flex: 1; }
+.cs-badges { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.cs-badge {
+  display: inline-flex; align-items: center; gap: 0.18rem;
+  font-size: 0.5625rem; font-weight: 700; padding: 0.06rem 0.32rem; border-radius: 999px;
+  background: var(--bg-surface-hover); color: var(--text-tertiary);
+}
+.cs-badge i, .cs-badge svg { width: 9px; height: 9px; }
+.cs-badge.cs-k-terms { background: rgba(245, 158, 11, 0.16); color: var(--color-warning); }
+.cs-badge.cs-k-code { background: rgba(99, 102, 241, 0.16); color: var(--color-primary); }
+.cs-badge.cs-k-image { background: rgba(168, 85, 247, 0.16); color: #c084fc; }
+
+/* ── Code block: the attempt editor's own affordances ─────────
+   The gutter is three fixed columns - marker, number, fold - so nothing can
+   land on top of anything else. The first pass let the chevron sit on the
+   digits, which is what made it look cluttered. */
+.cs-codebar-right { display: inline-flex; gap: 0.3rem; align-items: center; }
+.cs-codeedit {
+  display: flex;
+  background: #0d1117;
+  max-height: 460px;
+  border-top: 1px solid #1c2128;
+  --line-mark-tri: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 14'%3E%3Cpath d='M3.4 3.6 L9.1 7 L3.4 10.4 Z' fill='%23fff' stroke='%23fff' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E");
+  transition: box-shadow 0.15s ease;
+}
+/* The active editor is marked by a quiet inset accent on the left edge, not a
+   2px ring around the whole card. */
+/* Focus is shown by the caret and the border alone - the inset accent bar
+   read as a stray blue edge. */
+.cs-codewrap:focus-within { border-color: #3d444d; }
+
+
+.cs-gutter {
+  flex-shrink: 0;
+  padding: 0.7rem 0 0.7rem 0;
+  font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.6;
+  color: #484f58; user-select: none; overflow: hidden;
+  border-right: 1px solid #1c2128;
+  min-width: 46px;
+}
+.cs-gutter .cs-ln {
+  display: grid;
+  grid-template-columns: 14px 1fr 15px;
+  align-items: center;
+  position: relative; cursor: pointer;
+  transition: color 0.12s, background-color 0.12s;
+}
+.cs-gutter .cs-ln .cs-lnno { text-align: right; }
+.cs-gutter .cs-ln:hover { color: #c9d1d9; }
+.cs-gutter .cs-ln.active { color: #e6edf3; background: rgba(99, 102, 241, 0.1); }
+.cs-gutter .cs-ln.marked { color: #7fe6f5; background: rgba(34, 211, 238, 0.09); }
+
+/* Marker column. The ghost previews where a mark would land, exactly as the
+   attempt editor does on hover. */
+.cs-gutter .cs-ln::before {
+  content: ''; position: absolute; left: 3px; top: 50%;
+  width: 9px; height: 10.5px; transform: translateY(-50%);
+  -webkit-mask: var(--line-mark-tri) no-repeat center / contain;
+  mask: var(--line-mark-tri) no-repeat center / contain;
+  background: #22d3ee; opacity: 0;
+  transition: opacity 0.12s ease;
+  pointer-events: none;
+}
+.cs-gutter .cs-ln:hover::before { opacity: 0.32; }
+.cs-gutter .cs-ln.marked::before {
+  opacity: 1;
+  background: linear-gradient(135deg, #d8fdff 0%, #5ce7f7 30%, #16b6d8 60%, #06718c 100%);
+  filter: drop-shadow(0 0 3px rgba(34, 211, 238, 0.5));
+}
+.cs-gutter .cs-ln.marked:hover::before { opacity: 1; }
+
+/* Fold chevron: its own column, revealed on gutter hover. A folded block keeps
+   its chevron visible - it is the only sign the code is still there. */
+.cs-gutter .cs-fold {
+  justify-self: center;
+  width: 13px; height: 13px; line-height: 13px; text-align: center;
+  font-size: 9px; color: #6e7681; cursor: pointer; border-radius: 3px;
+  opacity: 0; transition: opacity 0.14s ease, color 0.14s ease;
+}
+.cs-gutter:hover .cs-fold, .cs-gutter .cs-fold.on { opacity: 1; }
+.cs-gutter .cs-fold:hover { color: #58a6ff; background: rgba(88, 166, 255, 0.14); }
+.cs-gutter .cs-fold.on { color: #58a6ff; }
+
+.cs-codestack { position: relative; flex: 1; min-width: 0; }
+.cs-code {
+  margin: 0; padding: 0.7rem 0.8rem;
+  font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.6;
+  tab-size: 4; -moz-tab-size: 4;
+  white-space: pre; overflow: auto;
+  border: 0; outline: none;
+}
+.cs-code-hl { position: absolute; inset: 0; pointer-events: none; background: #0d1117; color: #e6edf3; }
+.cs-code-ta {
+  position: relative; width: 100%; min-height: 7rem; height: 100%;
+  background: transparent; color: transparent; caret-color: #58a6ff;
+  resize: vertical; display: block;
+}
+.cs-code-ta:focus, .cs-code-ta:focus-visible { outline: none; box-shadow: none; }
+.cs-code-ta::selection { background: rgba(88, 166, 255, 0.3); }
+.cs-code-ta::placeholder { color: #484f58; }
+
+/* Renamable title, so a sheet full of snippets says what each one is. */
+.cs-codename {
+  font-family: var(--font-mono); font-size: 0.7rem; font-weight: 700;
+  color: #c9d1d9; outline: none; padding: 0 0.25rem; border-radius: 3px;
+  min-width: 3rem; display: inline-block;
+}
+.cs-codename:hover { background: rgba(255, 255, 255, 0.06); }
+.cs-codename:focus { background: rgba(255, 255, 255, 0.1); box-shadow: 0 0 0 1px var(--color-primary); }
+.cs-codename:empty::before { content: attr(data-ph); color: #6e7681; font-weight: 500; }
+.cs-codebar { gap: 0.5rem; }
+.cs-codebar .cs-lang { flex-shrink: 0; }
+
+/* Folded: read-only, and it says so rather than silently ignoring keystrokes. */
+.cs-codeedit.is-folded .cs-code-ta { cursor: default; }
+.cs-foldnote {
+  display: inline-block; margin-top: 0.3rem; padding: 0.05rem 0.4rem;
+  font-size: 0.65rem; border-radius: 3px;
+  background: rgba(88, 166, 255, 0.16); color: #58a6ff;
+}
+
+/* Sticky shapes */
+.cs-note { display: flex; flex-direction: column; transform-origin: center; }
+.cs-note-bar {
+  display: flex; align-items: center; gap: 0.2rem; margin: -0.2rem -0.2rem 0.2rem;
+  opacity: 0; transition: opacity 0.14s ease;
+}
+.cs-note:hover .cs-note-bar { opacity: 1; }
+.cs-note-shape {
+  flex: 1; min-width: 0; font-size: 0.5625rem; font-weight: 700; padding: 0 0.15rem;
+  background: rgba(0, 0, 0, 0.14); border: none; border-radius: 3px;
+  color: rgba(59, 50, 34, 0.75); cursor: pointer;
+}
+.cs-note-size {
+  position: absolute; right: 1px; bottom: 1px; width: 12px; height: 12px;
+  cursor: nwse-resize; opacity: 0; transition: opacity 0.14s ease;
+  background: linear-gradient(135deg, transparent 50%, rgba(59, 50, 34, 0.5) 50%);
+  border-radius: 0 0 3px 0;
+}
+.cs-note-rot {
+  position: absolute; top: -9px; left: 50%; margin-left: -9px;
+  width: 18px; height: 18px; border-radius: 50%; cursor: grab;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--bg-elevated); border: 1px solid var(--border-color);
+  color: var(--text-secondary); opacity: 0; transition: opacity 0.14s ease;
+}
+.cs-note-rot i, .cs-note-rot svg { width: 10px; height: 10px; }
+.cs-note:hover .cs-note-size, .cs-note:hover .cs-note-rot { opacity: 1; }
+
+.cs-shape-circle { border-radius: 50%; align-items: center; justify-content: center; text-align: center; }
+.cs-shape-circle .cs-note-body { padding: 0 0.8rem; }
+.cs-shape-circle .cs-note-bar { position: absolute; top: 8px; left: 12px; right: 12px; margin: 0; }
+
+.cs-shape-arrow {
+  background: transparent !important; box-shadow: none; padding: 0;
+  color: var(--cs-note, #fde68a); justify-content: center;
+}
+.cs-arrow { width: 100%; height: 24px; display: block; overflow: visible; }
+.cs-arrow-label {
+  position: absolute; left: 0; right: 0; top: -2px; text-align: center;
+  font-size: 0.65rem; font-weight: 700; color: var(--cs-note, #fde68a);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+.cs-shape-arrow .cs-note-bar { position: absolute; top: -14px; left: 0; right: 0; margin: 0; }
+
+/* Namespaced so a block type can never collide with a global utility class.
+   `class="cs-badge table"` was picking up components.css's `.table {width:100%}`
+   and stretching into a full-width bar. */
+.cs-badge[class*="cs-k-"] { width: auto; }
+.cs-badge.cs-k-check { background: rgba(34, 197, 94, 0.16); color: var(--color-success); }
+.cs-badge.cs-k-callout { background: rgba(239, 68, 68, 0.14); color: #f87171; }
+
+/* ── Topic chips + view toggle ─────────────────────────────── */
+.cs-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; margin: -0.5rem 0 1rem; }
+.cs-chip {
+  padding: 0.18rem 0.6rem; font-size: 0.6875rem; font-weight: 700; cursor: pointer;
+  border-radius: 999px; border: 1px solid var(--border-color);
+  background: transparent; color: var(--text-tertiary);
+  transition: color 0.14s, border-color 0.14s, background 0.14s;
+}
+.cs-chip:hover { color: var(--text-primary); border-color: var(--color-primary); }
+.cs-chip.active { background: var(--color-primary-subtle); border-color: var(--color-primary); color: var(--color-primary); }
+.cs-viewtoggle {
+  flex-shrink: 0; width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-md); border: 1px solid var(--border-color);
+  background: var(--bg-surface); color: var(--text-secondary); cursor: pointer;
+}
+.cs-viewtoggle:hover { color: var(--text-primary); border-color: var(--color-primary); }
+.cs-viewtoggle i, .cs-viewtoggle svg { width: 15px; height: 15px; }
+
+/* Pinned */
+.cs-card.is-pinned { border-color: rgba(245, 158, 11, 0.45); }
+.cs-cover-pin {
+  position: absolute; top: 6px; left: 7px; z-index: 1; color: #fff;
+  background: rgba(0, 0, 0, 0.34); border-radius: 999px; padding: 2px 3px; display: inline-flex;
+}
+.cs-cover-pin i, .cs-cover-pin svg { width: 10px; height: 10px; }
+.cs-pin { width: 11px; height: 11px; color: var(--color-warning); margin-right: 0.25rem; vertical-align: -1px; }
+
+/* List view - cards are heavy once there are thirty of them. */
+.cs-list { display: flex; flex-direction: column; gap: 2px; }
+.cs-row {
+  display: grid; grid-template-columns: 20px 1fr auto auto auto;
+  align-items: center; gap: 0.6rem; width: 100%; text-align: left;
+  padding: 0.5rem 0.7rem; cursor: pointer;
+  background: var(--bg-surface); border: 1px solid transparent; border-radius: var(--radius-md);
+  color: var(--text-primary);
+}
+.cs-row:hover { border-color: var(--color-primary); background: var(--bg-surface-hover); }
+.cs-row-icon { width: 16px; height: 16px; }
+.cs-row-title { font-weight: 700; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cs-row-tags { display: flex; gap: 0.2rem; }
+.cs-row-meta, .cs-row-when { font-size: 0.625rem; color: var(--text-tertiary); white-space: nowrap; }
+
+/* ── Search hits ───────────────────────────────────────────── */
+.cs-hits { display: flex; flex-direction: column; gap: 0.15rem; margin-top: 0.35rem; }
+.cs-hitrow {
+  display: grid; grid-template-columns: 12px auto 1fr; align-items: center; gap: 0.25rem;
+  font-size: 0.625rem; color: var(--text-tertiary); cursor: pointer;
+  padding: 0.1rem 0.25rem; border-radius: 3px;
+}
+.cs-hitrow:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+.cs-hitrow i, .cs-hitrow svg { width: 10px; height: 10px; }
+.cs-hit-where { font-weight: 700; color: var(--color-primary); }
+.cs-hit-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cs-hit-more { font-size: 0.5625rem; color: var(--text-tertiary); padding-left: 0.25rem; }
+.cs-block.cs-hit { animation: csHit 2.4s ease-out; border-radius: var(--radius-md); }
+@keyframes csHit {
+  0%, 60% { box-shadow: 0 0 0 2px var(--color-primary), 0 0 18px var(--color-primary-glow); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* ── Block reordering ──────────────────────────────────────── */
+.cs-grip { cursor: grab; opacity: 0; transition: opacity 0.14s ease; }
+.cs-block:hover .cs-grip { opacity: 0.6; }
+.cs-block.cs-dragging { opacity: 0.45; }
+.cs-block.cs-drop-above { box-shadow: 0 -2px 0 var(--color-primary); }
+.cs-block.cs-drop-below { box-shadow: 0 2px 0 var(--color-primary); }
+
+/* ── Checklist ─────────────────────────────────────────────── */
+.cs-checks { display: flex; flex-direction: column; gap: 0.15rem; }
+.cs-check { display: grid; grid-template-columns: 15px 1fr 18px; align-items: start; gap: 0.45rem; font-size: 0.875rem; }
+.cs-check input { margin-top: 0.25rem; accent-color: var(--color-primary); }
+.cs-check.done > span { text-decoration: line-through; color: var(--text-tertiary); }
+.cs-check > span { outline: none; }
+.cs-rowx { background: none; border: none; cursor: pointer; color: var(--text-tertiary); padding: 0; }
+.cs-rowx i, .cs-rowx svg { width: 11px; height: 11px; }
+
+/* ── Callout ───────────────────────────────────────────────── */
+.cs-callout {
+  display: grid; grid-template-columns: 18px 1fr; gap: 0.5rem; align-items: start;
+  padding: 0.6rem 0.7rem; border-radius: var(--radius-md);
+  border-left: 3px solid var(--cs-cal, var(--color-primary));
+  background: color-mix(in srgb, var(--cs-cal, var(--color-primary)) 10%, transparent);
+}
+.cs-callout i, .cs-callout svg { width: 15px; height: 15px; color: var(--cs-cal, var(--color-primary)); margin-top: 1px; }
+.cs-callout-body { font-size: 0.85rem; line-height: 1.6; outline: none; white-space: pre-wrap; }
+.cs-callout-note { --cs-cal: var(--color-primary); }
+.cs-callout-tip { --cs-cal: var(--color-success); }
+.cs-callout-warn { --cs-cal: var(--color-warning); }
+.cs-callout-danger { --cs-cal: var(--color-danger); }
+.cs-callout-kinds { display: flex; gap: 0.25rem; margin-top: 0.3rem; }
+.cs-mini.on { background: var(--color-primary-subtle); border-color: var(--color-primary); color: var(--color-primary); }
+
+/* ── Markdown in notes ─────────────────────────────────────── */
+.cs-text p { margin: 0 0 0.4rem; }
+.cs-text ul, .cs-text ol { margin: 0 0 0.4rem; padding-left: 1.2rem; }
+.cs-text li { margin-bottom: 0.15rem; }
+.cs-text code {
+  font-family: var(--font-mono); font-size: 0.85em;
+  background: rgba(148, 163, 184, 0.14); padding: 0.05rem 0.28rem; border-radius: 3px; color: var(--color-accent);
+}
+.cs-text strong { color: var(--text-primary); }
+.cs-text a { color: var(--color-primary); }
+
+/* ── Study mode ────────────────────────────────────────────── */
+.cs-sheet-tools { margin-left: auto; display: flex; gap: 0.3rem; }
+.cs-sheet-tools .cs-mini { margin-top: 0; }
+.cs-veil {
+  color: transparent !important; background: rgba(148, 163, 184, 0.12);
+  border-radius: 3px; cursor: pointer; user-select: none;
+}
+.cs-veil::after { content: 'reveal'; color: var(--text-tertiary); font-size: 0.6875rem; font-style: italic; }
+
+/* ── Dialogs ───────────────────────────────────────────────── */
+.cs-swatches { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; padding: 0.5rem 0; }
+.cs-swatch {
+  aspect-ratio: 1; border-radius: var(--radius-sm); border: 2px solid transparent; cursor: pointer;
+  color: var(--text-tertiary); font-size: 0.75rem;
+}
+.cs-swatch.active { border-color: var(--text-primary); }
+.cs-icons { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.4rem; padding: 0.5rem 0; }
+.cs-icon {
+  aspect-ratio: 1; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-sm); border: 1px solid var(--border-color);
+  background: var(--bg-surface); color: var(--text-secondary); cursor: pointer;
+}
+.cs-icon.active { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-primary-subtle); }
+.cs-dlg-hint { font-size: 0.75rem; color: var(--text-tertiary); margin: 0 0 0.5rem; }
+.cs-proglist, .cs-hist { max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.cs-progrow, .cs-hist-row {
+  text-align: left; padding: 0.35rem 0.55rem; font-size: 0.8125rem; cursor: pointer;
+  background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm); color: var(--text-secondary);
+}
+.cs-progrow:hover, .cs-hist-row:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+.cs-progrow.active { border-color: var(--color-primary); color: var(--color-primary); }
+.cs-hist-row { display: flex; justify-content: space-between; gap: 0.5rem; }
+.cs-hist-meta { font-size: 0.6875rem; color: var(--text-tertiary); }
+
+/* ── Print ─────────────────────────────────────────────────────
+   A cheat sheet is the one thing here someone may genuinely want on paper. */
+#cs-print { display: none; }
+@media print {
+  body.cs-printing > *:not(#cs-print) { display: none !important; }
+  body.cs-printing #cs-print { display: block; }
+  #cs-print {
+    background: #fff; color: #111; font-size: 11pt;
+  }
+  .cs-print-page { page-break-after: always; padding: 0 0 1rem; }
+  .cs-print-page:last-child { page-break-after: auto; }
+  .cs-print-page h2 { font-size: 14pt; border-bottom: 1px solid #999; padding-bottom: 4px; margin: 0 0 10px; }
+  #cs-print .cs-block { margin-bottom: 10pt; break-inside: avoid; }
+  #cs-print .cs-block-head { color: #666; }
+  #cs-print .cs-block-tools, #cs-print .cs-mini, #cs-print .cs-grip { display: none !important; }
+  #cs-print .cs-code, #cs-print .cs-code-hl { background: #f4f4f4 !important; color: #111 !important; }
+  #cs-print .cs-code-ta { display: none; }
+  #cs-print .cs-codeedit { max-height: none; }
+  #cs-print .cs-term { color: #000; }
+  #cs-print .cs-def, #cs-print .cs-text, #cs-print .cs-callout-body { color: #222; }
+  #cs-print .cs-veil { color: inherit !important; background: none; }
+  #cs-print .cs-veil::after { content: ''; }
+  #cs-print .cs-table td { border-color: #999; background: #fff; }
+  #cs-print .cs-note { box-shadow: none; border: 1px solid #ccc; }
+}

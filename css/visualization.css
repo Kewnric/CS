@@ -1,0 +1,3276 @@
+/* ============================================================
+   VISUALIZATION.CSS — Mindmap Canvas, Nodes, Links, Menus
+   ============================================================ */
+
+/* --- Top Navigation Bar --- */
+.viz-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.625rem 1rem;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+  z-index: 50;
+  gap: 0.75rem;
+}
+
+.viz-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.viz-topbar-left h1 {
+  font-size: 1.125rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.viz-topbar-left h1 i,
+.viz-topbar-left h1 svg {
+  color: var(--color-primary);
+  width: 22px;
+  height: 22px;
+}
+
+.viz-module-tabs {
+  display: flex;
+  gap: 0.25rem;
+  background: var(--bg-surface-hover);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  padding: 0.2rem;
+}
+
+.viz-module-tab {
+  padding: 0.4rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  white-space: nowrap;
+}
+
+.viz-module-tab i,
+.viz-module-tab svg {
+  width: 14px;
+  height: 14px;
+}
+
+.viz-module-tab:hover {
+  color: var(--text-primary);
+  background: rgba(148, 163, 184, 0.1);
+}
+
+.viz-module-tab.active {
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+  box-shadow: 0 2px 8px var(--color-primary-glow);
+}
+
+.viz-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.viz-topbar-actions .btn {
+  font-size: 0.8125rem;
+}
+
+/* --- Split Workspace --- */
+.viz-workspace {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  padding: 0.5rem;
+  gap: 0.25rem;
+}
+
+/* --- Content List Pane (Left) --- */
+.viz-content-pane {
+  width: 40%;
+  max-width: 480px;
+  min-width: 320px;
+  /* Resizer drag handles the actual width changes dynamically */
+  background: var(--bg-surface);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+  transition: width 0.3s ease;
+  z-index: 20;
+}
+
+/* Padding comes from .pane-1-header, which this element also carries — setting
+   it here as well is what kept the two panes visibly different. */
+.viz-content-header {
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.viz-content-title {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.viz-content-title i,
+.viz-content-title svg {
+  width: 14px;
+  height: 14px;
+}
+
+.viz-content-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  flex-wrap: wrap;
+}
+
+.viz-breadcrumb-item {
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-weight: 600;
+  background: none;
+  border: none;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  padding: 0.125rem 0.25rem;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.viz-breadcrumb-item:hover {
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
+.viz-breadcrumb-sep {
+  font-size: 0.625rem;
+  color: var(--text-tertiary);
+}
+
+/* Same box as .pane-1-content in layout.css. It used to be `0.25rem 0`, so the
+   rows ran flush into the pane's edges while every library tree had a 1rem
+   gutter — the two panes are the same component and looked nothing alike. */
+.viz-content-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Viz content pane uses browse-style tree nodes — share the tree-node layout */
+.viz-content-body .tree-node-row {
+  /* Inherit default padding and font-size from layout.css for consistency */
+}
+
+.viz-content-body .tree-node-row[draggable="true"] {
+  cursor: grab;
+}
+
+.viz-content-body .tree-node-row[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.viz-tree-section-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.625rem 0.75rem 0.25rem;
+}
+
+/* Content list items */
+.viz-list-item {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+  border: 1px solid transparent;
+  position: relative;
+  overflow: hidden;
+}
+
+.viz-list-item[draggable="true"] {
+  cursor: grab;
+}
+
+.viz-list-item[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.viz-list-item i,
+.viz-list-item svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.viz-list-item .viz-item-icon-folder {
+  color: var(--color-accent);
+}
+
+.viz-list-item .viz-item-icon-item {
+  color: var(--text-tertiary);
+}
+
+.viz-folder-chevron {
+  color: var(--text-tertiary);
+  width: 12px !important;
+  height: 12px !important;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.viz-folder-row {
+  cursor: pointer;
+}
+
+.viz-list-item:hover {
+  background: rgba(148, 163, 184, 0.12);
+  border-color: var(--border-color-subtle);
+}
+
+.viz-list-item.active {
+  background: radial-gradient(circle at left, rgba(34, 211, 238, 0.15) 0%, transparent 80%), var(--bg-surface-hover);
+  border-color: transparent;
+}
+
+.viz-list-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 15%;
+  bottom: 15%;
+  width: 3px;
+  background: #22d3ee;
+  box-shadow: 2px 0 8px #22d3ee;
+  border-radius: 0 4px 4px 0;
+}
+
+.viz-item-label {
+  flex: 1;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viz-item-badge {
+  font-size: 0.6875rem;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.viz-content-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  color: var(--text-tertiary);
+  text-align: center;
+  padding: 2rem;
+  gap: 0.5rem;
+}
+
+.viz-content-empty i,
+.viz-content-empty svg {
+  width: 36px;
+  height: 36px;
+  opacity: 0.4;
+}
+
+.viz-content-empty p {
+  font-size: 0.8125rem;
+}
+
+/* --- Canvas Pane (Right) --- */
+.viz-canvas-pane {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-surface);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  z-index: 10;
+}
+
+.viz-canvas-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.9rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-surface-hover);
+  z-index: 20;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.viz-canvas-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.01em;
+  flex-shrink: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viz-canvas-toolbar>div:last-child {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: nowrap;
+}
+
+.viz-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--bg-surface-hover);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  padding: 0.125rem;
+}
+
+.viz-zoom-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-family: var(--font-sans);
+}
+
+.viz-zoom-btn:hover {
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+}
+
+.viz-zoom-btn i,
+.viz-zoom-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.viz-zoom-level {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  min-width: 36px;
+  text-align: center;
+  user-select: none;
+}
+
+/* --- SVG Canvas --- */
+.viz-canvas-container {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  cursor: grab;
+  background-color: var(--bg-body);
+  background-image:
+    radial-gradient(circle, var(--border-color) 1px, transparent 1px);
+  background-size: 24px 24px;
+  transition: background-color 0.2s ease;
+}
+
+.viz-canvas-container.panning {
+  cursor: grabbing;
+}
+
+.viz-canvas-container.linking-mode {
+  cursor: crosshair;
+}
+
+.viz-canvas-container.color-paint-mode,
+.viz-canvas-container.color-paint-mode .viz-node {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2'%3E%3Cpath d='M20.84 4.61a5.5 5.5 0 0 0-7.78 0L3 14.67V21h6.33l10.06-10.06a5.5 5.5 0 0 0 0-7.77z'/%3E%3C/svg%3E") 0 20, crosshair;
+}
+
+.viz-content-body .tree-node-row.drag-over {
+  background: rgba(34, 211, 238, 0.08);
+  outline: 1px solid var(--color-primary-subtle);
+  border-radius: 4px;
+}
+
+.viz-canvas-container.drag-over {
+  background-color: rgba(34, 211, 238, 0.03);
+  box-shadow: inset 0 0 0 2px var(--color-primary-subtle);
+}
+
+.viz-canvas-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transform-origin: 0 0;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.viz-canvas-svg line,
+.viz-canvas-svg path {
+  pointer-events: stroke;
+}
+
+.viz-nodes-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* --- Node Styles --- */
+.viz-node {
+  position: absolute;
+  user-select: none;
+  cursor: pointer;
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+  pointer-events: auto;
+  width: max-content;
+}
+
+.viz-node-inner {
+  background: var(--bg-elevated);
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 0.75rem 1rem;
+  min-width: 140px;
+  max-width: 260px;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease;
+  position: relative;
+}
+
+.viz-node:hover .viz-node-inner {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-lg), 0 0 12px var(--color-primary-glow);
+  transform: translateY(-1px);
+}
+
+.viz-node.not-linked .viz-node-inner {
+  background: repeating-linear-gradient(45deg,
+      rgba(255, 255, 255, 0.03),
+      rgba(255, 255, 255, 0.03) 10px,
+      transparent 10px,
+      transparent 20px), var(--bg-elevated);
+  border-style: dashed;
+  opacity: 0.85;
+}
+
+.viz-node.not-linked:hover .viz-node-inner {
+  border-style: solid;
+  opacity: 1;
+}
+
+.viz-node.selected .viz-node-inner {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-glow), var(--shadow-lg);
+}
+
+.viz-node[data-draft="true"] .viz-node-inner {
+  border-style: dashed;
+  border-color: var(--text-tertiary);
+  opacity: 0.75;
+  box-shadow: none;
+}
+
+.viz-node[data-draft="true"]:hover .viz-node-inner {
+  border-color: var(--color-primary);
+  opacity: 1;
+}
+
+.viz-node-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.viz-node-header i,
+.viz-node-header svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.viz-node-title {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* When node has custom width, allow wrapping */
+.viz-node-inner[style*="width"] .viz-node-title {
+  white-space: normal;
+  word-break: break-word;
+}
+
+.viz-node-subtitle {
+  font-size: 0.6875rem;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* FIX: Giant, Indestructible Root Node Styles */
+.viz-node[data-type="root"] {
+  z-index: 10;
+}
+
+.viz-node[data-type="root"] .viz-node-inner {
+  border: 3px solid var(--color-primary);
+  background: radial-gradient(circle at center, var(--color-primary-subtle) 0%, var(--bg-elevated) 100%);
+  padding: 1rem 1.5rem;
+  min-width: 160px;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.15);
+  animation: glowPulse 3s ease-in-out infinite;
+}
+
+.viz-node[data-type="root"] .viz-node-header {
+  justify-content: center;
+  margin-bottom: 0.25rem;
+}
+
+.viz-node[data-type="root"] .viz-node-header i,
+.viz-node[data-type="root"] .viz-node-header svg {
+  width: 24px;
+  height: 24px;
+  color: var(--color-primary);
+}
+
+.viz-node[data-type="root"] .viz-node-title {
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-primary);
+}
+
+/* Node type variants */
+.viz-node[data-type="folder"] .viz-node-inner {
+  border-color: rgba(6, 182, 212, 0.3);
+}
+
+.viz-node[data-type="folder"] .viz-node-header i,
+.viz-node[data-type="folder"] .viz-node-header svg {
+  color: var(--color-accent);
+}
+
+.viz-node[data-type="comment"] .viz-node-inner {
+  background: var(--bg-surface) !important;
+  border-color: var(--color-warning);
+  border-style: solid !important;
+  opacity: 1 !important;
+  max-width: none !important;
+  min-width: 100px !important;
+  min-height: 50px !important;
+  resize: both !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 0.75rem !important;
+  transition: none !important;
+}
+
+/* Comment nodes must always look solid even if unlinked or draft */
+.viz-node[data-type="comment"].not-linked .viz-node-inner,
+.viz-node[data-type="comment"][data-draft="true"] .viz-node-inner {
+  background: var(--bg-surface) !important;
+  border-style: solid !important;
+  opacity: 1 !important;
+}
+
+.viz-comment-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  margin-top: 0;
+  overflow: visible;
+}
+
+.viz-comment-content {
+  flex: 1;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: visible;
+  height: auto;
+  width: 100%;
+}
+
+/* --- Comment Editor Popup --- */
+.viz-comment-editor-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.viz-comment-editor-window {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: var(--radius-lg);
+  width: 80%;
+  max-width: 800px;
+  height: 70vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  animation: scaleIn 0.2s ease-out;
+  resize: both;
+  overflow: hidden;
+}
+
+.viz-comment-editor-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  color: #c9d1d9;
+  font-family: monospace;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.viz-comment-editor-header span {
+  flex: 1;
+  font-weight: bold;
+}
+
+.viz-comment-editor-close {
+  background: none;
+  border: none;
+  color: #8b949e;
+  cursor: pointer;
+  padding: 0.25rem;
+}
+
+.viz-comment-editor-close:hover {
+  color: #f85149;
+}
+
+.viz-comment-editor-body {
+  flex: 1;
+  padding: 1rem;
+  display: flex;
+}
+
+.viz-comment-editor-textarea {
+  flex: 1;
+  background: #000;
+  color: #e6edf3;
+  border: 1px solid #30363d;
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 1rem;
+  resize: both;
+  outline: none;
+  width: 100%;
+}
+
+.viz-comment-editor-textarea:focus {
+  border-color: #06b6d4;
+  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.3);
+}
+
+.viz-comment-editor-footer {
+  padding: 1rem;
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid #30363d;
+  background: #161b22;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+
+
+.viz-node.dragging {
+  z-index: 1000;
+  opacity: 0.85;
+}
+
+.viz-node.dragging .viz-node-inner {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+  transform: scale(1.03);
+}
+
+/* Node color overrides */
+.viz-node[data-color="red"] .viz-node-inner {
+  border-color: #ef4444 !important;
+}
+
+.viz-node[data-color="orange"] .viz-node-inner {
+  border-color: #f97316 !important;
+}
+
+.viz-node[data-color="yellow"] .viz-node-inner {
+  border-color: #eab308 !important;
+}
+
+.viz-node[data-color="green"] .viz-node-inner {
+  border-color: #22c55e !important;
+}
+
+.viz-node[data-color="blue"] .viz-node-inner {
+  border-color: #3b82f6 !important;
+}
+
+.viz-node[data-color="purple"] .viz-node-inner {
+  border-color: #a855f7 !important;
+}
+
+.viz-node[data-color="pink"] .viz-node-inner {
+  border-color: #ec4899 !important;
+}
+
+.viz-node[data-color="cyan"] .viz-node-inner {
+  border-color: #06b6d4 !important;
+}
+
+/* --- Link/Connection Lines --- */
+.viz-link-group {
+  cursor: pointer;
+}
+
+.viz-link-hitbox {
+  stroke: transparent;
+  stroke-width: 20;
+  fill: none;
+  pointer-events: stroke;
+}
+
+.viz-link {
+  stroke: var(--text-tertiary);
+  stroke-width: 2;
+  fill: none;
+  transition: stroke 0.2s ease, stroke-width 0.2s ease, opacity 0.3s ease;
+  pointer-events: none;
+  /* Let the hitbox handle the pointer events */
+}
+
+.viz-link-group:hover .viz-link {
+  stroke: var(--color-primary);
+  stroke-width: 3;
+}
+
+.viz-link.locked {
+  stroke: var(--color-warning);
+  stroke-dasharray: 6 3;
+}
+
+.viz-link-lock {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  border: 2px solid var(--color-warning);
+  color: var(--color-warning);
+  font-size: 0.625rem;
+  pointer-events: auto;
+  box-shadow: var(--shadow-sm);
+  z-index: 5;
+  animation: popIn 0.3s 0.15s cubic-bezier(0.34, 1.56, 0.64, 1) backwards;
+  transition: transform 0.15s ease;
+}
+
+.viz-link-lock:hover {
+  transform: scale(1.2);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+}
+
+.viz-link-lock i,
+.viz-link-lock svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Custom non-parent/child links */
+.viz-link.custom-link {
+  stroke: var(--color-warning);
+  stroke-dasharray: 4 4;
+}
+
+/* --- Context Menus --- */
+.viz-context-menu {
+  position: fixed;
+  z-index: 2000;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xl), 0 0 20px rgba(0, 0, 0, 0.15);
+  padding: 0.375rem;
+  min-width: 200px;
+  animation: popIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: top left;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.viz-context-menu.hidden {
+  display: none;
+}
+
+.viz-ctx-item {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+}
+
+.viz-ctx-item i,
+.viz-ctx-item svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+
+.viz-ctx-item:hover {
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  transform: translateX(2px);
+}
+
+.viz-ctx-item:hover i,
+.viz-ctx-item:hover svg {
+  transform: scale(1.1);
+}
+
+.viz-ctx-item.danger:hover {
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+.viz-ctx-divider {
+  height: 1px;
+  background: var(--border-color);
+  margin: 0.25rem 0.5rem;
+}
+
+/* Color picker in context menu */
+.viz-color-picker {
+  display: flex;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  flex-wrap: wrap;
+}
+
+.viz-color-swatch {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.viz-color-swatch:hover {
+  transform: scale(1.2);
+  border-color: var(--text-primary);
+}
+
+.viz-color-swatch.active {
+  border-color: var(--text-primary);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+}
+
+/* --- Link Context Menu (compact) --- */
+.viz-link-menu {
+  position: fixed;
+  z-index: 2000;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xl);
+  padding: 0.375rem;
+  min-width: 160px;
+  animation: scaleIn 0.12s ease-out;
+}
+
+.viz-link-menu.hidden {
+  display: none;
+}
+
+/* --- Linking Mode Overlay Text --- */
+.viz-linking-hint {
+  position: absolute;
+  bottom: 3.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--radius-full);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  box-shadow: var(--shadow-lg);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  animation: fadeInUp 0.3s ease-out;
+  pointer-events: none;
+}
+
+.viz-linking-hint i,
+.viz-linking-hint svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* --- Canvas Empty State --- */
+.viz-canvas-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--text-tertiary);
+  text-align: center;
+  pointer-events: none;
+}
+
+.viz-canvas-empty i,
+.viz-canvas-empty svg {
+  width: 56px;
+  height: 56px;
+  opacity: 0.25;
+}
+
+.viz-canvas-empty h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.viz-canvas-empty p {
+  font-size: 0.8125rem;
+  max-width: 260px;
+}
+
+/* --- Fog of War (Locked Nodes) --- */
+.viz-node.viz-fog-of-war .viz-node-inner {
+  filter: blur(5px) grayscale(100%) brightness(0.4);
+  pointer-events: none;
+  user-select: none;
+  position: relative;
+}
+
+.viz-node.viz-fog-of-war {}
+
+.viz-node.viz-fog-of-war:hover .viz-node-inner {
+  border-color: var(--border-color);
+  box-shadow: var(--shadow-md);
+  transform: none;
+}
+
+.viz-fog-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.7) 0%, rgba(0, 0, 0, 0.4) 100%);
+  border-radius: var(--radius-lg);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.viz-fog-overlay i,
+.viz-fog-overlay svg {
+  width: 14px;
+  height: 14px;
+  color: var(--color-warning);
+  opacity: 0.9;
+  filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.6));
+}
+
+.viz-fog-label {
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: var(--color-warning);
+  letter-spacing: 0.15em;
+  text-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+}
+
+/* Fog reveal animation */
+@keyframes fogReveal {
+  0% {
+    filter: blur(5px) grayscale(100%) brightness(0.4);
+    opacity: 0.5;
+  }
+
+  50% {
+    filter: blur(2px) grayscale(50%) brightness(0.7);
+    opacity: 0.8;
+  }
+
+  100% {
+    filter: none;
+    opacity: 1;
+  }
+}
+
+.viz-node.viz-fog-reveal .viz-node-inner {
+  animation: fogReveal 1.2s ease-out forwards;
+}
+
+.viz-node.viz-fog-reveal .viz-fog-overlay {
+  animation: fadeOut 0.8s ease-out forwards;
+}
+
+@keyframes fadeOut {
+  0% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    pointer-events: none;
+  }
+}
+
+/* --- Prerequisite Picker Modal --- */
+.prereq-picker-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.prereq-picker-window {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5);
+  animation: scaleIn 0.25s ease-out;
+  overflow: hidden;
+}
+
+.prereq-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-surface);
+}
+
+.prereq-picker-header h2 {
+  font-size: 1.125rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-primary);
+}
+
+.prereq-picker-header h2 i,
+.prereq-picker-header h2 svg {
+  color: var(--color-warning);
+  width: 20px;
+  height: 20px;
+}
+
+.prereq-picker-search {
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.prereq-picker-search input {
+  width: 100%;
+  background: var(--bg-surface-hover);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  padding: 0.5rem 1rem 0.5rem 2.25rem;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.prereq-picker-search input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-glow);
+}
+
+.prereq-picker-search input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.prereq-picker-search-wrapper {
+  position: relative;
+}
+
+.prereq-picker-search-wrapper i,
+.prereq-picker-search-wrapper svg {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+
+.prereq-picker-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.prereq-picker-folder {
+  margin-bottom: 0.25rem;
+}
+
+.prereq-picker-folder-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.prereq-picker-folder-header:hover {
+  background: rgba(148, 163, 184, 0.1);
+  color: var(--text-primary);
+}
+
+.prereq-picker-folder-header i,
+.prereq-picker-folder-header svg {
+  width: 14px;
+  height: 14px;
+}
+
+.prereq-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem 0.5rem 1.75rem;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.prereq-picker-item:hover {
+  background: rgba(148, 163, 184, 0.1);
+  border-color: var(--border-color-subtle);
+}
+
+.prereq-picker-item.checked {
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.prereq-picker-item-label {
+  flex: 1;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.prereq-picker-item-meta {
+  font-size: 0.6875rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.prereq-picker-checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-warning);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.prereq-picker-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-surface);
+}
+
+.prereq-picker-count {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.prereq-picker-count span {
+  color: var(--color-warning);
+  font-weight: 800;
+}
+
+.prereq-picker-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: var(--text-tertiary);
+  text-align: center;
+  gap: 0.5rem;
+}
+
+.prereq-picker-empty i,
+.prereq-picker-empty svg {
+  width: 32px;
+  height: 32px;
+  opacity: 0.4;
+}
+
+/* --- Tier Picker Modal --- */
+.tier-picker-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.75rem 0.5rem;
+  border-radius: var(--radius-md);
+  border: 2px solid transparent;
+  background: var(--bg-surface-hover);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+}
+
+.tier-picker-tile:hover {
+  border-color: var(--tier-color, var(--color-primary));
+  background: color-mix(in srgb, var(--tier-color, var(--color-primary)) 12%, transparent);
+  transform: translateY(-1px);
+}
+
+.tier-picker-tile.selected {
+  border-color: var(--tier-color, var(--color-primary));
+  background: color-mix(in srgb, var(--tier-color, var(--color-primary)) 18%, transparent);
+}
+
+.tier-picker-tile-label {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: var(--tier-color, var(--text-primary));
+  line-height: 1;
+}
+
+.tier-picker-tile-desc {
+  font-size: 0.6875rem;
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+.tier-picker-clear {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.5rem;
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--border-color);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.tier-picker-clear:hover,
+.tier-picker-clear.selected {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+  background: var(--color-danger-bg);
+}
+
+/* --- Responsive --- */
+@media (max-width: 1024px) {
+  .viz-content-pane {
+    width: 260px;
+    min-width: 220px;
+  }
+
+  .viz-module-tabs {
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .viz-workspace {
+    flex-direction: column;
+  }
+
+  .viz-content-pane {
+    width: 100%;
+    max-width: 100%;
+    min-width: 100%;
+    height: 40%;
+  }
+
+  .viz-canvas-pane {
+    height: 60%;
+  }
+
+  .viz-topbar {
+    flex-wrap: wrap;
+  }
+}
+
+/* === SEARCH BAR === */
+.viz-search-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.viz-search-icon {
+  position: absolute;
+  left: 0.625rem;
+  width: 13px;
+  height: 13px;
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+
+.viz-search-input {
+  width: 100%;
+  background: var(--bg-surface-hover);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  padding: 0.4rem 2rem 0.4rem 2rem;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.viz-search-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-glow);
+}
+
+.viz-search-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.viz-search-clear {
+  position: absolute;
+  right: 0.375rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  border-radius: 50%;
+  transition: background 0.15s, color 0.15s;
+}
+
+.viz-search-clear:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--color-danger);
+}
+
+.viz-search-clear i,
+.viz-search-clear svg {
+  width: 12px;
+  height: 12px;
+}
+
+.viz-search-clear.hidden {
+  display: none;
+}
+
+/* === NODE BADGE (completion check) === */
+.viz-node-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.viz-node-badge-done {
+  background: var(--color-success);
+  color: #fff;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
+  animation: popIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* === COLLAPSE BADGE === */
+.viz-collapse-badge {
+  position: absolute;
+  bottom: -8px;
+  right: -8px;
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  pointer-events: none;
+  z-index: 5;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* === BRIDGE GHOST (collapsed node's external connections) === */
+.viz-node.viz-bridge-ghost {
+  opacity: 0.25;
+  pointer-events: none;
+  filter: grayscale(0.5);
+  transition: opacity 0.3s ease;
+}
+
+.viz-node.viz-bridge-ghost .viz-node-inner {
+  border-style: dashed;
+}
+
+.viz-bridge-ghost-link path.viz-link {
+  opacity: 0.25;
+}
+
+/* === SEARCH HIGHLIGHT / DIM === */
+.viz-node.viz-search-match .viz-node-inner {
+  border-color: var(--color-accent) !important;
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.25), var(--shadow-lg) !important;
+}
+
+.viz-node.viz-search-dim {
+  opacity: 0.25;
+  transition: opacity 0.2s;
+}
+
+/* === SVG PATH for bezier links (replaces line) === */
+.viz-link-hitbox {
+  stroke: transparent;
+  stroke-width: 20;
+  fill: none;
+  pointer-events: stroke;
+}
+
+/* === MINIMAP === */
+.viz-minimap {
+  position: absolute;
+  bottom: 1rem;
+  right: 1rem;
+  width: 180px;
+  height: 110px;
+  background: rgba(13, 17, 23, 0.85);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 50;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: opacity 0.25s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.viz-minimap:hover {
+  opacity: 0.92;
+  box-shadow: var(--shadow-xl), 0 0 0 1px var(--color-primary-subtle);
+}
+
+.viz-minimap:active {
+  transform: scale(0.98);
+}
+
+#viz-minimap-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.viz-minimap-viewport {
+  position: absolute;
+  border: 1.5px solid var(--color-primary);
+  background: rgba(99, 102, 241, 0.1);
+  border-radius: 2px;
+  pointer-events: none;
+  transition: left 0.05s linear, top 0.05s linear, width 0.05s linear, height 0.05s linear;
+}
+
+/* === POPUP HEADER + STATS === */
+.viz-popup-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 0.875rem 0.625rem;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.viz-popup-stats {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-surface-hover);
+}
+
+.viz-popup-stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem 0.25rem;
+  border-right: 1px solid var(--border-color);
+}
+
+.viz-popup-stat:last-child {
+  border-right: none;
+}
+
+.viz-popup-stat-val {
+  font-size: 1rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  line-height: 1;
+}
+
+.viz-popup-stat-label {
+  font-size: 0.6rem;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 0.2rem;
+  font-weight: 600;
+}
+
+/* ============================================================
+   BRAIN MODULE — Sidebar Styles
+   ============================================================ */
+
+.brain-sidebar-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 0.75rem 0.5rem 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.brain-new-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  width: 100%;
+  justify-content: center;
+}
+
+.brain-new-btn:hover {
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+}
+
+.brain-new-btn-secondary {
+  background: var(--bg-surface-hover);
+  border-color: var(--border-color);
+  color: var(--text-secondary);
+}
+
+.brain-new-btn-secondary:hover {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+}
+
+/* Version items */
+.brain-version-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: 1px solid transparent;
+  position: relative;
+  overflow: hidden;
+  font-size: 0.875rem;
+}
+
+.brain-version-item:hover {
+  background: rgba(148, 163, 184, 0.12);
+  border-color: var(--border-color-subtle);
+}
+
+.brain-version-item.active {
+  background: radial-gradient(circle at left, rgba(34, 211, 238, 0.15) 0%, transparent 80%), var(--bg-surface-hover);
+}
+
+.brain-version-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 15%;
+  bottom: 15%;
+  width: 3px;
+  background: #22d3ee;
+  box-shadow: 2px 0 8px #22d3ee;
+  border-radius: 0 4px 4px 0;
+}
+
+.brain-version-name {
+  flex: 1;
+  font-weight: 600;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.brain-active-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  flex-shrink: 0;
+  box-shadow: 0 0 6px var(--color-primary-glow);
+  animation: glowPulse 2s ease-in-out infinite;
+}
+
+/* Folder items */
+.brain-folder-item {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--radius-md);
+  font-size: 0.8125rem;
+  transition: background var(--transition-fast);
+}
+
+.brain-folder-item:hover {
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.brain-folder-name {
+  flex: 1;
+  font-weight: 600;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.brain-folder-actions {
+  display: none;
+  gap: 0.125rem;
+}
+
+.brain-folder-item:hover .brain-folder-actions {
+  display: flex;
+}
+
+.brain-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  padding: 0;
+}
+
+.brain-icon-btn:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+/* ============================================================
+   TOOLBAR PILL BUTTONS + DROPDOWNS
+   ============================================================ */
+
+.viz-toolbar-pill-btn {
+  width: auto;
+  padding: 0 0.7rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  gap: 0.35rem;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-color);
+  height: 30px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
+}
+
+.viz-toolbar-pill-btn:hover {
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px var(--color-primary-glow);
+}
+
+.viz-toolbar-pill-btn.is-active {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-glow), 0 2px 6px rgba(99, 102, 241, 0.25);
+}
+
+.viz-toolbar-pill-btn.is-active i {
+  color: white !important;
+}
+
+.viz-toolbar-pill-btn.is-active.viz-state-fog {
+  background: var(--color-warning);
+  border-color: var(--color-warning);
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18), 0 2px 6px rgba(245, 158, 11, 0.25);
+}
+
+.viz-toolbar-pill-btn.is-active.viz-state-flow {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.18), 0 2px 6px rgba(6, 182, 212, 0.25);
+}
+
+.viz-toolbar-pill-btn.is-active.viz-state-color {
+  background: var(--color-success);
+  border-color: var(--color-success);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18), 0 2px 6px rgba(16, 185, 129, 0.25);
+}
+
+.viz-toolbar-pill-btn.is-active.viz-state-globe {
+  background: #8b5cf6;
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.18), 0 2px 6px rgba(139, 92, 246, 0.25);
+}
+
+.viz-toolbar-pill-btn i {
+  flex-shrink: 0;
+  transition: transform 0.18s ease;
+}
+
+.viz-toolbar-pill-btn.is-active i {
+  transform: scale(1.1);
+}
+
+.viz-pill-chevron {
+  display: flex;
+  align-items: center;
+  border-left: 1px solid var(--border-color);
+  padding-left: 0.275rem;
+  margin-left: 0.15rem;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+
+.viz-pill-chevron:hover {
+  opacity: 1;
+}
+
+.viz-toolbar-dropdown {
+  position: relative;
+}
+
+.viz-toolbar-popup {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xl), 0 0 24px rgba(0, 0, 0, 0.18);
+  padding: 0.5rem;
+  min-width: 160px;
+  z-index: 600;
+  animation: popIn 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: top right;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.viz-toolbar-popup.hidden {
+  display: none;
+}
+
+.viz-link-type-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.625rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.viz-link-type-option:hover {
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  transform: translateX(2px);
+}
+
+.viz-link-type-option.active {
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
+.viz-link-type-option i,
+.viz-link-type-option svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   FLOWY DRAG ANIMATIONS
+   ============================================================ */
+
+/* No transition — direct DOM updates keep dragging-child in sync with parent */
+.viz-node.dragging-child {
+  transition: none !important;
+}
+
+.viz-node.dragging-child .viz-node-inner {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18) !important;
+  opacity: 0.88;
+}
+
+/* Entrance animation for newly added nodes */
+@keyframes nodeEntrance {
+  0% {
+    opacity: 0;
+    transform: scale(0.82) translateY(8px);
+  }
+
+  60% {
+    opacity: 1;
+    transform: scale(1.04) translateY(-2px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.viz-node.viz-node-entering .viz-node-inner {
+  animation: nodeEntrance 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* ============================================================
+   IMPROVED NODE TRANSITIONS (no-flicker)
+   ============================================================ */
+
+.viz-node:hover .viz-node-inner {
+  transform: translateY(-1px);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, opacity 0.18s ease, transform 0.15s ease;
+}
+
+.viz-node.dragging .viz-node-inner {
+  transform: scale(1.03);
+  transition: none !important;
+}
+
+/* ============================================================
+   CANVAS BACKGROUND SUBTLE ANIMATION
+   ============================================================ */
+
+@keyframes canvasGridPulse {
+
+  0%,
+  100% {
+    background-size: 24px 24px;
+  }
+
+  50% {
+    background-size: 24.5px 24.5px;
+  }
+}
+
+/* ============================================================
+   LINK HOVER IMPROVEMENTS
+   ============================================================ */
+
+.viz-link-group {
+  transition: opacity 0.2s ease;
+}
+
+.viz-link {
+  transition: stroke 0.2s ease, stroke-width 0.2s ease, opacity 0.25s ease;
+}
+
+/* ============================================================
+   IMPROVED ZOOM CONTROLS
+   ============================================================ */
+
+.viz-zoom-controls {
+  transition: opacity 0.2s ease;
+}
+
+.viz-zoom-btn {
+  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+
+.viz-zoom-btn:hover {
+  transform: scale(1.08);
+}
+
+.viz-zoom-btn:active {
+  transform: scale(0.94);
+}
+
+/* ============================================================
+   MODULE TAB IMPROVEMENTS
+   ============================================================ */
+
+.viz-module-tab {
+  transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.viz-module-tab.active {
+  animation: none;
+  box-shadow: 0 2px 10px var(--color-primary-glow);
+}
+
+/* ============================================================
+   CANVAS TOOLBAR IMPROVEMENTS
+   ============================================================ */
+
+/* ============================================================
+   MINIMAP IMPROVEMENTS
+   ============================================================ */
+
+.viz-minimap {
+  transition: opacity 0.25s ease, transform 0.2s ease;
+}
+
+/* ============================================================
+   POPUP ANIMATION IMPROVEMENTS
+   ============================================================ */
+
+#viz-node-details-popup {
+  animation: popIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl), 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+#viz-node-details-popup.hidden {
+  display: none;
+}
+
+/* Keyboard shortcuts hint overlay */
+.viz-shortcuts-hint {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  background: rgba(13, 17, 23, 0.8);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  padding: 0.3rem 0.75rem;
+  font-size: 0.6875rem;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  z-index: 30;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: fadeInUp 0.4s 1s ease-out both;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+.viz-shortcuts-hint kbd {
+  background: var(--bg-surface-hover);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  padding: 0.1rem 0.3rem;
+  font-size: 0.625rem;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}
+
+.viz-shortcuts-sep {
+  opacity: 0.3;
+}
+
+/* ============================================================
+   SELECTED NODE GLOW PULSE
+   ============================================================ */
+
+@keyframes selectedGlow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px var(--color-primary-glow), var(--shadow-lg);
+  }
+
+  50% {
+    box-shadow: 0 0 0 5px var(--color-primary-glow), var(--shadow-lg);
+  }
+}
+
+.viz-node.selected .viz-node-inner {
+  border-color: var(--color-primary);
+  animation: selectedGlow 2.4s ease-in-out infinite;
+}
+
+/* ============================================================
+   LINKING HINT IMPROVEMENTS
+   ============================================================ */
+
+.viz-linking-hint {
+  animation: fadeInUp 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+  box-shadow: 0 4px 20px var(--color-primary-glow);
+}
+
+/* ============================================================
+   GLOBE MODE — Obsidian-style circle nodes that expand on hover
+   ============================================================ */
+
+.viz-globe-node {
+  /* Override: no width:max-content; let the circle define size */
+  width: auto !important;
+}
+
+/* Collapsed circle */
+.viz-globe-circle {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  border: 2px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-md);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease, opacity 0.18s ease;
+  position: relative;
+  cursor: pointer;
+}
+
+.viz-globe-circle i,
+.viz-globe-circle svg {
+  width: 18px;
+  height: 18px;
+  color: var(--text-secondary);
+  transition: color 0.18s ease;
+  flex-shrink: 0;
+}
+
+/* Color variants for globe circles */
+.viz-globe-node[data-type="folder"] .viz-globe-circle {
+  border-color: rgba(6, 182, 212, 0.45);
+}
+
+.viz-globe-node[data-type="folder"] .viz-globe-circle i {
+  color: var(--color-accent);
+}
+
+.viz-globe-node[data-type="challenge"] .viz-globe-circle i {
+  color: #22c55e;
+}
+
+.viz-globe-node[data-type="snippet"] .viz-globe-circle i {
+  color: #f59e0b;
+}
+
+.viz-globe-node[data-type="notebook"] .viz-globe-circle i {
+  color: #a855f7;
+}
+
+/* Completed badge on globe */
+.viz-globe-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-success);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 5px rgba(34, 197, 94, 0.5);
+  pointer-events: none;
+}
+
+/* Expanded card that appears on hover */
+.viz-globe-expand {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 10px);
+  transform: translateY(-50%) scale(0.88);
+  transform-origin: left center;
+  background: var(--bg-elevated);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-lg);
+  padding: 0.6rem 0.9rem;
+  min-width: 160px;
+  max-width: 240px;
+  box-shadow: var(--shadow-xl), 0 0 16px var(--color-primary-glow);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 200;
+  white-space: nowrap;
+}
+
+.viz-globe-expand .viz-node-header {
+  gap: 0.4rem;
+}
+
+.viz-globe-expand .viz-node-header i,
+.viz-globe-expand .viz-node-header svg {
+  width: 14px;
+  height: 14px;
+}
+
+.viz-globe-expand .viz-node-title {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viz-globe-expand .viz-node-subtitle {
+  font-size: 0.6875rem;
+  color: var(--text-tertiary);
+}
+
+/* Show expand on hover */
+.viz-globe-node:hover .viz-globe-circle {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 4px var(--color-primary-glow), var(--shadow-lg);
+  transform: scale(1.12);
+}
+
+.viz-globe-node:hover .viz-globe-expand {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(-50%) scale(1);
+}
+
+/* Selected globe node */
+.viz-globe-node.selected .viz-globe-circle {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-glow), var(--shadow-lg);
+  animation: selectedGlobe 2.4s ease-in-out infinite;
+}
+
+@keyframes selectedGlobe {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px var(--color-primary-glow), var(--shadow-lg);
+  }
+
+  50% {
+    box-shadow: 0 0 0 6px var(--color-primary-glow), var(--shadow-lg);
+  }
+}
+
+/* Color overrides on globe circles */
+.viz-globe-node[data-color="red"] .viz-globe-circle {
+  border-color: #ef4444 !important;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.viz-globe-node[data-color="orange"] .viz-globe-circle {
+  border-color: #f97316 !important;
+  background: rgba(249, 115, 22, 0.08);
+}
+
+.viz-globe-node[data-color="yellow"] .viz-globe-circle {
+  border-color: #eab308 !important;
+  background: rgba(234, 179, 8, 0.08);
+}
+
+.viz-globe-node[data-color="green"] .viz-globe-circle {
+  border-color: #22c55e !important;
+  background: rgba(34, 197, 94, 0.08);
+}
+
+.viz-globe-node[data-color="blue"] .viz-globe-circle {
+  border-color: #3b82f6 !important;
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.viz-globe-node[data-color="purple"] .viz-globe-circle {
+  border-color: #a855f7 !important;
+  background: rgba(168, 85, 247, 0.08);
+}
+
+.viz-globe-node[data-color="pink"] .viz-globe-circle {
+  border-color: #ec4899 !important;
+  background: rgba(236, 72, 153, 0.08);
+}
+
+.viz-globe-node[data-color="cyan"] .viz-globe-circle {
+  border-color: #06b6d4 !important;
+  background: rgba(6, 182, 212, 0.08);
+}
+
+/* Globe fog variant */
+.viz-globe-node.viz-fog-of-war .viz-globe-circle {
+  filter: blur(2px) grayscale(100%) brightness(0.4);
+  pointer-events: none;
+}
+
+.viz-globe-node.viz-fog-of-war:hover .viz-globe-circle {
+  filter: blur(2px) grayscale(100%) brightness(0.4);
+  transform: none;
+  box-shadow: var(--shadow-md);
+}
+
+/* Link temp line stays visible with crosshair */
+.viz-canvas-container.linking-mode .viz-globe-node {
+  cursor: crosshair;
+}
+
+/* ============================================================
+   CONNECTION PORTS — 4-point hover dots for drag-linking
+   ============================================================ */
+
+.viz-port {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  border: 2px solid var(--bg-elevated);
+  box-shadow: 0 0 0 2px var(--color-primary-glow), 0 2px 6px rgba(0, 0, 0, 0.3);
+  cursor: crosshair;
+  z-index: 300;
+  opacity: 0;
+  transform: scale(0.5);
+  transition: opacity 0.15s ease, transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* A hidden port must not eat the pointer. These were opacity:0 with
+     pointer-events:auto, so every node had four invisible targets around it
+     that swallowed clicks meant for the node or the canvas. */
+  pointer-events: none;
+}
+
+/* The dot stays 10px; the thing you have to HIT is 26px. A 10px circle scaled
+   to 0.5 gave a 5px target, and the canvas scales that down again with zoom —
+   at 60% it was a 3px bullseye. */
+.viz-port::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 26px;
+  height: 26px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+}
+
+/* Position each port */
+.viz-port[data-side="top"] {
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%) scale(0.5);
+}
+
+.viz-port[data-side="bottom"] {
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%) scale(0.5);
+}
+
+.viz-port[data-side="left"] {
+  left: -6px;
+  top: 50%;
+  transform: translateY(-50%) scale(0.5);
+}
+
+.viz-port[data-side="right"] {
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%) scale(0.5);
+}
+
+/* All four ports appear on hover, so you can aim at the side you want instead
+   of chasing the single one the pointer happened to be nearest to. The nearest
+   is emphasised (below) and the rest sit back at low opacity. */
+.viz-node:hover .viz-port,
+.viz-node.viz-link-target .viz-port {
+  opacity: 0.45;
+  pointer-events: auto;
+}
+
+.viz-node[data-near-side="top"] .viz-port[data-side="top"],
+.viz-node[data-near-side="bottom"] .viz-port[data-side="bottom"],
+.viz-node[data-near-side="left"] .viz-port[data-side="left"],
+.viz-node[data-near-side="right"] .viz-port[data-side="right"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.viz-node[data-near-side="top"] .viz-port[data-side="top"] {
+  transform: translateX(-50%) scale(1);
+}
+
+.viz-node[data-near-side="bottom"] .viz-port[data-side="bottom"] {
+  transform: translateX(-50%) scale(1);
+}
+
+.viz-node[data-near-side="left"] .viz-port[data-side="left"] {
+  transform: translateY(-50%) scale(1);
+}
+
+.viz-node[data-near-side="right"] .viz-port[data-side="right"] {
+  transform: translateY(-50%) scale(1);
+}
+
+/* Hide ports while dragging a node or panning */
+.viz-node.dragging .viz-port,
+.viz-node.dragging-child .viz-port,
+.viz-canvas-container.panning .viz-port {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Port hover glow */
+.viz-port:hover {
+  background: #fff;
+  box-shadow: 0 0 0 3px var(--color-primary), 0 0 12px var(--color-primary-glow);
+  transform: translateX(-50%) scale(1.3) !important;
+}
+
+.viz-port[data-side="left"]:hover,
+.viz-port[data-side="right"]:hover {
+  transform: translateY(-50%) scale(1.3) !important;
+}
+
+/* === PANE SWAP === */
+.viz-workspace.panes-swapped {
+  flex-direction: row-reverse;
+}
+
+/* Smooth pane order transition */
+.viz-content-pane,
+.viz-canvas-pane {
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    width 0.3s ease,
+    opacity 0.25s ease;
+}
+
+.viz-workspace.swapping .viz-content-pane,
+.viz-workspace.swapping .viz-canvas-pane {
+  opacity: 0;
+  transform: scaleX(0.96);
+}
+
+/* Swap button in topbar */
+.viz-swap-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-hover);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.viz-swap-btn:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary-subtle);
+  background: var(--color-primary-subtle);
+}
+
+.viz-swap-btn i,
+.viz-swap-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* === COLLAPSIBLE VIZ-MODULE-TABS === */
+.viz-module-tabs-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  overflow: hidden;
+}
+
+.viz-module-tabs {
+  max-width: 9999px;
+  overflow: hidden;
+  transition: max-width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.25s ease,
+    padding 0.25s ease;
+}
+
+.viz-module-tabs.collapsed {
+  max-width: 0;
+  opacity: 0;
+  padding: 0;
+  pointer-events: none;
+}
+
+.viz-tabs-toggle-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-hover);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.viz-tabs-toggle-btn:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary-subtle);
+  background: var(--color-primary-subtle);
+}
+
+.viz-tabs-toggle-btn i,
+.viz-tabs-toggle-btn svg {
+  width: 13px;
+  height: 13px;
+  transition: transform 0.3s ease;
+}
+
+.viz-tabs-toggle-btn.collapsed i,
+.viz-tabs-toggle-btn.collapsed svg {
+  transform: rotate(180deg);
+}
+
+/* === COLLAPSIBLE VIZ-CANVAS-TOOLBAR === */
+.viz-canvas-toolbar-wrap {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.viz-canvas-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-surface-hover);
+  z-index: 20;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  overflow: visible;
+  /* must not clip dropdown popups */
+  max-height: 60px;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.2s ease,
+    padding 0.2s ease;
+}
+
+.viz-canvas-toolbar.collapsed {
+  max-height: 0;
+  opacity: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+  pointer-events: none;
+}
+
+/* Separator between button groups */
+.viz-toolbar-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--border-color);
+  flex-shrink: 0;
+}
+
+/* Collapse btn chevron rotates when toolbar is hidden */
+#viz-toolbar-collapse-btn i,
+#viz-toolbar-collapse-btn svg {
+  width: 12px;
+  height: 12px;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.viz-canvas-toolbar-wrap.toolbar-collapsed #viz-toolbar-collapse-btn i,
+.viz-canvas-toolbar-wrap.toolbar-collapsed #viz-toolbar-collapse-btn svg {
+  transform: rotate(180deg);
+}
+
+/* When collapsed: give wrap a known height so the floating tab has a positioning context */
+.viz-canvas-toolbar-wrap.toolbar-collapsed {
+  min-height: 24px;
+}
+
+/* Floating reveal tab — droops below the wrap top edge */
+.viz-canvas-toolbar-wrap.toolbar-collapsed #viz-toolbar-collapse-btn {
+  position: absolute;
+  top: 0;
+  right: 0.75rem;
+  z-index: 25;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-top: none;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  padding: 0.2rem 0.5rem;
+  pointer-events: all;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  transition: background 0.15s, color 0.15s;
+}
+
+.viz-canvas-toolbar-wrap.toolbar-collapsed #viz-toolbar-collapse-btn:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+/* === SIDEBAR-BOTTOM COLLAPSIBLE === */
+.sidebar-bottom-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  user-select: none;
+  color: var(--text-tertiary);
+  transition: color 0.15s, background 0.15s;
+}
+
+.sidebar-bottom-toggle:hover {
+  color: var(--text-secondary);
+  background: rgba(148, 163, 184, 0.07);
+}
+
+.sidebar-bottom-toggle-icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.sidebar-bottom-toggle-chevron {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-left: auto;
+}
+
+/* When expanded: chevron points up (content visible below toggle) */
+/* When collapsed: chevron points down (content hidden) */
+.sidebar-bottom-toggle.collapsed .sidebar-bottom-toggle-chevron {
+  transform: rotate(180deg);
+}
+
+.sidebar-bottom-content {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-height: 400px;
+  transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.2s ease;
+  /* Match .sidebar-menu's horizontal padding (0.5rem) so bottom-section
+     icons sit in the same column as the top nav icons (was 0 → 8px off). */
+  padding: 0.25rem 0.5rem;
+}
+
+.sidebar-bottom-content.collapsed {
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+/* ============================================================
+   OBSIDIAN-STYLE HOVER FOCUS + FORCE LAYOUT
+   ============================================================ */
+
+/* Smooth fade for the focus effect (nodes keep their other transitions) */
+.viz-node {
+  transition: opacity 0.22s ease;
+}
+
+.viz-link-group {
+  transition: opacity 0.22s ease;
+}
+
+/* While hovering a node: fade all non-neighborhood nodes/links */
+.viz-canvas-container.viz-focus .viz-node:not(.viz-hover-main):not(.viz-hover-adj) {
+  opacity: 0.15;
+}
+
+.viz-canvas-container.viz-focus .viz-link-group:not(.viz-link-adj) {
+  opacity: 0.06;
+}
+
+/* The hovered node gets a ring; neighbors stay fully lit */
+.viz-canvas-container.viz-focus .viz-node.viz-hover-main {
+  z-index: 30;
+}
+
+.viz-canvas-container.viz-focus .viz-node.viz-hover-main .viz-node-inner,
+.viz-canvas-container.viz-focus .viz-node.viz-hover-main .viz-globe-circle {
+  box-shadow: 0 0 0 2px var(--color-primary), 0 0 24px var(--color-primary-glow);
+}
+
+/* Connected links glow */
+.viz-canvas-container.viz-focus .viz-link-group.viz-link-adj .viz-link {
+  stroke: var(--color-primary);
+  opacity: 1;
+  stroke-width: 2.5;
+}
+
+/* Force-layout toggle active state: inherit the standard pill fill (primary
+   background + white icon) from .viz-toolbar-pill-btn.is-active — overriding
+   `color` here made the icon primary-on-primary (invisible). Only add a
+   breathing glow to show the simulation is running. */
+#viz-force-toggle-btn.is-active {
+  animation: vizForcePulse 1.8s ease-in-out infinite;
+}
+
+@keyframes vizForcePulse {
+  0%, 100% { box-shadow: 0 0 0 3px var(--color-primary-glow), 0 2px 6px rgba(99, 102, 241, 0.25); }
+  50% { box-shadow: 0 0 0 6px var(--color-primary-glow), 0 0 16px var(--color-primary); }
+}
+
+/* The pane header is the library's pane-1-header (see route-visualization.js);
+   these only cover what is specific to this pane. */
+.viz-content-header.pane-1-header {
+  /* padding/gap come from .pane-1-header — do not fork them, or the two panes
+     drift apart again. */
+  gap: 0.75rem;
+}
+.section-header-icon-wrap.viz-icon-wrap {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.22), rgba(34, 211, 238, 0.18));
+  color: var(--color-primary);
+}
+.viz-content-header .viz-content-breadcrumb { margin-top: -0.25rem; }
+
+/* ── Brain canvas options ───────────────────────────────────── */
+.brain-only-tools { display: inline-flex; align-items: center; gap: 0.4rem; }
+.brain-only-tools.hidden { display: none; }
+.viz-zoom-btn.viz-toolbar-pill-btn.active {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+.brain-saved-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+  font-size: 0.66rem;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  /* Reserved width. The chip's text changes on a 5s ticker and after every
+     save, and it sits in the same flex row as the Brain toolbar buttons — when
+     it grew, it shoved them sideways, and a shift between mouseup and click is
+     enough for the browser to drop the click entirely. */
+  min-width: 6.5rem;
+}
+.brain-saved-chip.is-empty > i,
+.brain-saved-chip.is-empty > svg { visibility: hidden; }
+.brain-saved-chip.hidden { display: none; }
+
+/* Read-only version: the canvas still pans and zooms, nodes just don't move. */
+.viz-canvas-container.brain-locked .viz-node { cursor: default; }
+.viz-canvas-container.brain-locked .viz-node:active { transform: none; }
+/* Links off: the paths hide, the nodes stay — a dense map becomes readable. */
+.viz-canvas-container.brain-hide-links #viz-canvas-svg { opacity: 0; pointer-events: none; }
+
+/* Node/link count on a version row — enough to tell a draft from a real map. */
+.brain-version-size {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--text-tertiary);
+  opacity: 0.75;
+}
+.tree-node-row.active .brain-version-size { color: var(--color-primary); opacity: 1; }
+
+/* ── Brain sidebar ──────────────────────────────────────────────
+   The three full-width buttons that used to sit above the list are gone;
+   creating lives in the pane's right-click menu and the header "+". */
+.viz-content-empty.brain-empty {
+  gap: 0.6rem;
+  padding: 1.5rem 1rem;
+}
+.viz-content-empty.brain-empty .btn { margin-top: 0.2rem; }
+.brain-empty-hint {
+  font-size: 0.68rem;
+  color: var(--text-tertiary);
+  line-height: 1.45;
+  max-width: 210px;
+  margin: 0;
+}
+
+/* ── Compare versions ─────────────────────────────────────────── */
+.brain-diff { text-align: left; }
+.brain-diff-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+.brain-diff-head em { font-style: normal; color: var(--text-tertiary); font-size: 0.72rem; }
+.brain-diff-counts {
+  display: flex;
+  gap: 1rem;
+  margin: 0.55rem 0 0.2rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+}
+.brain-diff-title {
+  margin: 0.85rem 0 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.brain-diff-title.added { color: var(--color-success); }
+.brain-diff-title.removed { color: var(--color-danger); }
+.brain-diff-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  max-height: 150px;
+  overflow-y: auto;
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+  line-height: 1.55;
+}
+.brain-diff-more, .brain-diff-none {
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  font-style: italic;
+  margin: 0;
+}
+
+/* ── General: one pane over all three libraries ─────────────────
+   The pane used to be a flat list with none of the tree's affordances; these
+   only cover what is specific to having three libraries in one tree. */
+.viz-gen-head > .tree-node-row {
+  background: rgba(148, 163, 184, 0.06);
+}
+.viz-gen-head > .tree-node-row .tree-node-label {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--text-secondary);
+}
+.viz-gen-head-icon { color: var(--color-primary); }
+
+/* Library tint on the leaf rows, so a snippet is never mistaken for a program
+   in a tree that holds all three. */
+.tree-node[data-scope="challenge"] .viz-gen-item-icon { color: var(--color-primary); }
+.tree-node[data-scope="snippet"] .viz-gen-item-icon { color: var(--color-accent); }
+.tree-node[data-scope="notebook"] .viz-gen-item-icon { color: #a855f7; }
+
+.viz-gen-star {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  color: var(--color-warning);
+  fill: currentColor;
+}
+.viz-gen-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-left: 0.25rem;
+  background: var(--color-primary);
+  box-shadow: 0 0 6px var(--color-primary-glow);
+}
+
+/* ── Canvas: which library a node came from ─────────────────────
+   Three identical grey rectangles told you nothing on the General canvas. */
+.viz-node[data-scope="challenge"] .viz-node-inner { border-left: 3px solid var(--color-primary); }
+.viz-node[data-scope="snippet"] .viz-node-inner { border-left: 3px solid var(--color-accent); }
+.viz-node[data-scope="notebook"] .viz-node-inner { border-left: 3px solid #a855f7; }
+.viz-node[data-type="root"] .viz-node-inner,
+.viz-node[data-type="comment"] .viz-node-inner { border-left-width: 0; }
+
+.viz-scope-legend {
+  position: absolute;
+  left: 0.75rem;
+  bottom: 0.75rem;
+  z-index: 15;
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: var(--radius-md);
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid var(--border-color);
+  backdrop-filter: blur(6px);
+  font-size: 0.6875rem;
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+.viz-scope-legend.hidden { display: none; }
+.viz-legend-item { display: inline-flex; align-items: center; gap: 0.3rem; }
+.viz-legend-item i {
+  width: 10px;
+  height: 3px;
+  border-radius: 2px;
+  display: inline-block;
+}
+.viz-legend-item[data-scope="challenge"] i { background: var(--color-primary); }
+.viz-legend-item[data-scope="snippet"] i { background: var(--color-accent); }
+.viz-legend-item[data-scope="notebook"] i { background: #a855f7; }
+
+/* ── Comment notes: extruded rectangles ─────────────────────────
+   These were 16px-radius pills with one flat `0 4px 8px` drop shadow, so a
+   canvas full of short text notes read as a scatter of blobs. A note is a slab
+   now: square corners, a lit top edge, a shaded bottom edge, and a hard offset
+   below it so it sits ABOVE the grid rather than being printed on it. */
+.viz-node[data-type="comment"] .viz-node-inner {
+  border-radius: 0 !important;
+  border: 1px solid rgba(245, 158, 11, 0.45) !important;
+  background:
+    linear-gradient(158deg,
+      rgba(255, 255, 255, 0.055) 0%,
+      rgba(255, 255, 255, 0.012) 42%,
+      rgba(0, 0, 0, 0.16) 100%),
+    var(--bg-elevated) !important;
+  box-shadow:
+    /* bevel: light catches the top-left, the bottom-right falls away */
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 1px 0 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55),
+    inset -1px 0 0 rgba(0, 0, 0, 0.4),
+    /* the extrusion: a solid side face, then the shadow it casts. Sized to
+       still read at the ~60% zoom the canvas is usually worked at, since the
+       whole layer is scaled down with it. */
+    4px 4px 0 rgba(245, 158, 11, 0.16),
+    9px 9px 0 rgba(0, 0, 0, 0.42),
+    14px 18px 26px rgba(0, 0, 0, 0.5) !important;
+  transition: box-shadow 0.16s ease, transform 0.16s ease, border-color 0.16s ease !important;
+}
+
+.viz-node[data-type="comment"] .viz-comment-content {
+  color: var(--text-primary);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
+}
+
+/* Raised further on hover — the slab lifts and its shadow lengthens. */
+.viz-node[data-type="comment"]:hover .viz-node-inner {
+  border-color: rgba(245, 158, 11, 0.8) !important;
+  transform: translate(-2px, -2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 1px 0 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55),
+    inset -1px 0 0 rgba(0, 0, 0, 0.4),
+    5px 5px 0 rgba(245, 158, 11, 0.22),
+    8px 8px 0 rgba(0, 0, 0, 0.36),
+    14px 18px 28px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Pressed while dragging: the slab sinks onto the board. */
+.viz-node[data-type="comment"].dragging .viz-node-inner,
+.viz-node[data-type="comment"] .viz-node-inner:active {
+  transform: translate(2px, 2px);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+    1px 1px 0 rgba(245, 158, 11, 0.16),
+    2px 2px 0 rgba(0, 0, 0, 0.3),
+    4px 5px 10px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Selected: the lit edge picks up the accent instead of plain white. */
+.viz-node[data-type="comment"].selected .viz-node-inner {
+  border-color: var(--color-warning) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(253, 224, 71, 0.42),
+    inset 1px 0 0 rgba(253, 224, 71, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55),
+    inset -1px 0 0 rgba(0, 0, 0, 0.4),
+    4px 4px 0 rgba(245, 158, 11, 0.32),
+    7px 7px 0 rgba(0, 0, 0, 0.34),
+    12px 16px 26px rgba(0, 0, 0, 0.5) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viz-node[data-type="comment"] .viz-node-inner { transition: none !important; }
+  .viz-node[data-type="comment"]:hover .viz-node-inner,
+  .viz-node[data-type="comment"].dragging .viz-node-inner { transform: none; }
+}
+
+/* ── Nothing on the canvas surface is selectable text ───────────
+   Dragging to pan started a native text selection, so the shortcut hint, the
+   zoom readout, the "Saved …" chip and the legend all lit up blue behind the
+   drag. Only .viz-node carried user-select: none, and the drag runs across
+   everything else in the pane. */
+.viz-canvas-pane,
+.viz-canvas-toolbar,
+.viz-canvas-container,
+.viz-shortcuts-hint,
+.viz-scope-legend,
+.viz-minimap,
+.viz-canvas-empty {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* The comment editor is a real text surface — it stays selectable. */
+.viz-comment-editor-overlay,
+.viz-comment-editor-overlay * {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* ── Topbar action buttons ──────────────────────────────────────
+   vizToggleSnap() has always set `is-active` on #viz-snap-btn, but only
+   .viz-toolbar-pill-btn.is-active was ever styled — so the grid toggle in the
+   top bar looked identical on and off. */
+.viz-topbar-actions .btn.is-active {
+  background: var(--color-primary-subtle);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.viz-topbar-actions .btn.is-active i,
+.viz-topbar-actions .btn.is-active svg {
+  color: var(--color-primary);
+}
+
+/* A small dot so the state is legible even at a glance, and for anyone who
+   cannot pick the tint out of the toolbar. */
+.viz-topbar-actions .btn.is-active::after {
+  content: '';
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: 0 0 6px var(--color-primary);
+}
+
+.viz-topbar-actions .btn {
+  position: relative;
+}
+
+/* Instant tooltip. The native `title` takes about a second to appear and is
+   drawn in OS chrome, which is why these buttons read as unlabelled icons. */
+.viz-tip {
+  position: relative;
+}
+
+.viz-tip::before {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  z-index: 400;
+  padding: 0.28rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  transform: translateY(-3px);
+  pointer-events: none;
+  transition: opacity 0.12s ease 0.25s, transform 0.12s ease 0.25s;
+}
+
+.viz-tip:hover::before,
+.viz-tip:focus-visible::before {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viz-tip::before { transition: opacity 0.12s ease 0.25s; transform: none; }
+  .viz-tip:hover::before { transform: none; }
+}
+
+/* ── Link drop preview ──────────────────────────────────────────
+   While a link is being dragged, the node under the pointer shows which of its
+   four sides the link will actually attach to. Before this you released and
+   found out afterwards. */
+.viz-node.viz-link-target .viz-node-inner {
+  border-color: var(--color-primary) !important;
+  box-shadow: 0 0 0 2px var(--color-primary-glow), 0 0 18px var(--color-primary-glow);
+}
+
+.viz-node.viz-link-target .viz-port[data-side].viz-port-snap {
+  opacity: 1;
+  background: #fff;
+  box-shadow: 0 0 0 3px var(--color-primary), 0 0 14px var(--color-primary);
+}
+
+/* The edge itself lights up, so the target side is readable at any zoom. */
+.viz-node.viz-link-target[data-snap-side="top"] .viz-node-inner { border-top: 3px solid var(--color-primary) !important; }
+.viz-node.viz-link-target[data-snap-side="bottom"] .viz-node-inner { border-bottom: 3px solid var(--color-primary) !important; }
+.viz-node.viz-link-target[data-snap-side="left"] .viz-node-inner { border-left: 3px solid var(--color-primary) !important; }
+.viz-node.viz-link-target[data-snap-side="right"] .viz-node-inner { border-right: 3px solid var(--color-primary) !important; }
+
+/* ── Force-layout controls ──────────────────────────────────────
+   The same four Obsidian exposes: Center, Repel, Link, Link distance. */
+.viz-force-panel {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 40;
+  width: 216px;
+  padding: 0.65rem 0.75rem 0.5rem;
+  border-radius: var(--radius-md);
+  background: rgba(13, 17, 23, 0.92);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-xl);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  user-select: none;
+}
+
+.viz-force-panel.hidden { display: none; }
+
+.vf-title {
+  font-size: 0.625rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  margin-bottom: 0.45rem;
+}
+
+.vf-row {
+  display: grid;
+  grid-template-columns: 4.6rem 1fr 2.2rem;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.3rem;
+  cursor: pointer;
+}
+
+.vf-label { font-size: 0.6875rem; color: var(--text-secondary); }
+
+.vf-val {
+  font-size: 0.625rem;
+  font-family: var(--font-mono);
+  color: var(--text-tertiary);
+  text-align: right;
+}
+
+.vf-row input[type="range"] {
+  width: 100%;
+  height: 3px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--border-color);
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+.vf-row input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  border: 2px solid var(--bg-elevated);
+  cursor: grab;
+}
+
+.vf-row input[type="range"]::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  border: 2px solid var(--bg-elevated);
+  cursor: grab;
+}
+
+.vf-reset {
+  width: 100%;
+  margin-top: 0.35rem;
+  padding: 0.25rem;
+  font-size: 0.625rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.vf-reset:hover { color: var(--text-primary); border-color: var(--color-primary); }

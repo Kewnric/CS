@@ -1,0 +1,481 @@
+/* ============================================================
+   MOTION.CSS — "Wow" interaction layer (Phase 1)
+   Additive, opt-in motion utilities. Built on the design tokens
+   in global.css (--transition-spring, --shadow-glow, --glass-*).
+   Everything here degrades to static under prefers-reduced-motion.
+   ============================================================ */
+
+/* ----------------------------------------------------------------
+   1. VIEW TRANSITIONS — smooth crossfade+slide between SPA routes.
+   The router wraps the #spa-content swap in document.startViewTransition().
+   Browsers without support fall back to the existing .route-enter class.
+   ---------------------------------------------------------------- */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 260ms;
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+::view-transition-old(root) {
+  animation-name: mx-vt-out;
+}
+::view-transition-new(root) {
+  animation-name: mx-vt-in;
+}
+@keyframes mx-vt-out {
+  to {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.995);
+  }
+}
+@keyframes mx-vt-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.995);
+  }
+}
+
+/* ----------------------------------------------------------------
+   2. SCROLL REVEAL — elements with [data-reveal] fade/slide in once
+   they enter the viewport (driven by Motion.scan() + IntersectionObserver).
+   Optional [data-reveal-delay] adds a stagger via --mx-delay.
+   ---------------------------------------------------------------- */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: var(--mx-delay, 0ms);
+  will-change: opacity, transform;
+}
+[data-reveal='left'] {
+  transform: translateX(-24px);
+}
+[data-reveal='right'] {
+  transform: translateX(24px);
+}
+[data-reveal='scale'] {
+  transform: scale(0.94);
+}
+[data-reveal].mx-revealed {
+  opacity: 1;
+  transform: none;
+}
+
+/* ----------------------------------------------------------------
+   3. SKELETON LOADERS — shimmer placeholders for async surfaces.
+   ---------------------------------------------------------------- */
+.mx-skel {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-surface-hover, rgba(255, 255, 255, 0.04));
+  border-radius: var(--radius-md, 8px);
+}
+.mx-skel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.08),
+    transparent
+  );
+  animation: mx-shimmer 1.4s infinite;
+}
+.mx-skel-text {
+  height: 0.8em;
+  margin: 0.4em 0;
+}
+.mx-skel-line {
+  height: 14px;
+  margin: 10px 0;
+}
+.mx-skel-block {
+  height: 96px;
+}
+@keyframes mx-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* ----------------------------------------------------------------
+   4. MICRO-INTERACTIONS — opt-in hover/press affordances.
+   ---------------------------------------------------------------- */
+.mx-lift {
+  transition:
+    transform var(--transition-spring, 300ms cubic-bezier(0.34, 1.56, 0.64, 1)),
+    box-shadow var(--transition-base, 250ms ease);
+}
+.mx-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg, 0 12px 28px rgba(0, 0, 0, 0.25));
+}
+.mx-lift:active {
+  transform: translateY(-1px) scale(0.997);
+}
+
+/* Tactile press for buttons/cards */
+.mx-press {
+  transition: transform 120ms ease;
+}
+.mx-press:active {
+  transform: scale(0.96);
+}
+
+/* Animated gradient glow border (e.g. featured cards / active quest) */
+.mx-glow-border {
+  position: relative;
+  isolation: isolate;
+}
+.mx-glow-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    120deg,
+    var(--color-primary, #6366f1),
+    var(--color-accent, #22d3ee),
+    var(--color-primary, #6366f1)
+  );
+  background-size: 300% 300%;
+  animation: mx-border-pan 6s linear infinite;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  z-index: -1;
+}
+@keyframes mx-border-pan {
+  to {
+    background-position: 300% 0;
+  }
+}
+
+/* Ripple (JS adds .mx-ripple spans to .mx-ripple-host on pointerdown) */
+.mx-ripple-host {
+  position: relative;
+  overflow: hidden;
+}
+.mx-ripple {
+  position: absolute;
+  border-radius: 50%;
+  transform: scale(0);
+  background: currentColor;
+  opacity: 0.25;
+  pointer-events: none;
+  animation: mx-ripple-anim 600ms ease-out forwards;
+}
+@keyframes mx-ripple-anim {
+  to {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+/* Count-up numbers get a subtle tabular alignment so they don't jitter */
+.mx-counting {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Stronger, consistent keyboard focus ring across interactive elements */
+a:focus-visible,
+button:focus-visible,
+[role='button']:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--color-primary, #6366f1);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm, 6px);
+}
+
+/* ----------------------------------------------------------------
+   5. TOASTS — stacking notification system (Motion.toast()).
+   ---------------------------------------------------------------- */
+#mx-toast-container {
+  position: fixed;
+  bottom: 1.25rem;
+  right: 1.25rem;
+  z-index: 100000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  pointer-events: none;
+  max-width: min(92vw, 380px);
+}
+.mx-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--radius-md, 10px);
+  background: var(--bg-elevated, #1b2440);
+  color: var(--text-primary, #e8edf7);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-left: 3px solid var(--color-primary, #6366f1);
+  box-shadow: var(--shadow-lg, 0 12px 28px rgba(0, 0, 0, 0.35));
+  font-size: 0.875rem;
+  line-height: 1.4;
+  animation: mx-toast-in 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.mx-toast.mx-leaving {
+  animation: mx-toast-out 0.28s ease forwards;
+}
+.mx-toast-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+}
+.mx-toast-body {
+  flex: 1;
+  min-width: 0;
+}
+.mx-toast-title {
+  font-weight: 700;
+  margin-bottom: 0.1rem;
+}
+.mx-toast-close {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-tertiary, #8a94ab);
+  cursor: pointer;
+  padding: 2px;
+  line-height: 0;
+  border-radius: 4px;
+}
+.mx-toast-close:hover {
+  color: var(--text-primary, #fff);
+}
+.mx-toast.success {
+  border-left-color: var(--color-success, #22c55e);
+}
+.mx-toast.error {
+  border-left-color: var(--color-danger, #ef4444);
+}
+.mx-toast.warning {
+  border-left-color: var(--color-warning, #f59e0b);
+}
+.mx-toast.info {
+  border-left-color: var(--color-accent, #22d3ee);
+}
+.mx-toast-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: 100%;
+  transform-origin: left;
+  background: currentColor;
+  opacity: 0.35;
+  animation: mx-toast-progress linear forwards;
+}
+@keyframes mx-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(40px) scale(0.96);
+  }
+}
+@keyframes mx-toast-out {
+  to {
+    opacity: 0;
+    transform: translateX(40px) scale(0.96);
+    height: 0;
+    margin: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+@keyframes mx-toast-progress {
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* ----------------------------------------------------------------
+   6. REDUCED MOTION — collapse every effect above to static.
+   (global.css already neutralizes animation/transition durations;
+   this guarantees reveal elements are visible and effects are calm.)
+   ---------------------------------------------------------------- */
+/* ----------------------------------------------------------------
+   7. ANALYTICS OVERVIEW — inline-SVG trend + distribution charts
+   (rendered by analytics-chart.js into the Analytics detail pane).
+   ---------------------------------------------------------------- */
+.ac-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.25rem;
+  height: 100%;
+  overflow-y: auto;
+}
+.ac-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.ac-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+}
+.ac-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.75rem 0.9rem;
+  background: var(--bg-surface, #131c31);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-md, 10px);
+}
+.ac-kpi-val {
+  font-size: 1.5rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+.ac-kpi-lbl {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+  font-weight: 600;
+}
+.ac-card {
+  background: var(--bg-surface, #131c31);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-lg, 14px);
+  padding: 1rem 1.1rem 1.2rem;
+}
+.ac-card-title {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary);
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+.ac-trend {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.ac-line {
+  stroke-dasharray: 2000;
+  stroke-dashoffset: 2000;
+  animation: ac-draw 1.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes ac-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.ac-dot {
+  opacity: 0;
+  animation: ac-dot-in 0.3s ease forwards;
+  animation-delay: 1.2s;
+}
+@keyframes ac-dot-in {
+  from {
+    opacity: 0;
+    transform: scale(0);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.ac-dist {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-around;
+  gap: 0.5rem;
+  height: 150px;
+}
+.ac-dist-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  flex: 1;
+  height: 100%;
+  justify-content: flex-end;
+}
+.ac-dist-bar-track {
+  width: 60%;
+  max-width: 42px;
+  flex: 1;
+  display: flex;
+  align-items: flex-end;
+}
+.ac-dist-bar {
+  width: 100%;
+  border-radius: 6px 6px 0 0;
+  min-height: 3px;
+  animation: ac-bar-grow 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-origin: bottom;
+}
+@keyframes ac-bar-grow {
+  from {
+    transform: scaleY(0);
+  }
+}
+.ac-dist-count {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.ac-dist-label {
+  font-size: 0.625rem;
+  color: var(--text-tertiary);
+  font-weight: 600;
+}
+@media (max-width: 560px) {
+  .ac-kpis {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .ac-line {
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+    animation: none !important;
+  }
+  .ac-dot {
+    opacity: 1;
+    animation: none !important;
+  }
+  .ac-dist-bar {
+    animation: none !important;
+  }
+  .mx-skel::after,
+  .mx-glow-border::before,
+  .mx-ripple,
+  .mx-toast-progress {
+    animation: none !important;
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none !important;
+  }
+  .mx-lift:hover {
+    transform: none;
+  }
+}

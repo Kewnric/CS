@@ -1,0 +1,526 @@
+/* ============================================================
+   AUTH.CSS — Storage Mode Picker, Cloud Toast, User Badge
+   ============================================================ */
+
+/* ---------- Storage Mode Popup Overlay ---------- */
+.smp-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  animation: fadeIn 0.3s ease-out;
+}
+
+.smp-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5), 0 0 80px rgba(99, 102, 241, 0.08);
+  max-width: 520px;
+  width: 100%;
+  overflow: hidden;
+  animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.smp-header {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(6, 182, 212, 0.08) 100%);
+  border-bottom: 1px solid var(--border-color);
+  padding: 2rem 2rem 1.5rem;
+  text-align: center;
+}
+
+.smp-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.smp-logo i {
+  color: var(--color-primary);
+  width: 32px;
+  height: 32px;
+}
+
+.smp-logo span {
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.smp-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.smp-body {
+  padding: 1.5rem 2rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* ---------- Option Buttons ---------- */
+.smp-option {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+  width: 100%;
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+}
+
+.smp-option:hover {
+  background: var(--bg-surface-hover);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-glow), 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.smp-option:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.smp-option-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.smp-option-icon.local {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.15), rgba(99, 102, 241, 0.05));
+  color: var(--color-primary);
+}
+
+.smp-option-icon.cloud {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(6, 182, 212, 0.05));
+  color: var(--color-success);
+}
+
+.smp-option-text h3 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 0.125rem;
+}
+
+.smp-option-text p {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.smp-option .smp-arrow {
+  margin-left: auto;
+  color: var(--text-tertiary);
+  transition: transform 0.2s ease, color 0.2s ease;
+  flex-shrink: 0;
+}
+
+.smp-option:hover .smp-arrow {
+  transform: translateX(3px);
+  color: var(--color-primary);
+}
+
+/* Focus was landing on <body>, so nothing was announced and nothing was
+   outlined. Now the first option takes focus on open — it has to be visible. */
+.smp-option:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* "Last used" marker on whichever mode was remembered. */
+.smp-last-badge {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.5625rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: 2px;
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+  border: 1px solid var(--color-primary);
+}
+
+.smp-remember {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.9rem;
+  padding: 0 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.smp-remember input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.smp-remember:hover { color: var(--text-secondary); }
+
+/* ---------- Cloud Save Toast ---------- */
+.cloud-toast {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 10000;
+  background: var(--bg-elevated);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: var(--color-success);
+  padding: 0.625rem 1rem;
+  border-radius: var(--radius-full);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: var(--font-sans);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25), 0 0 10px rgba(16, 185, 129, 0.1);
+  transform: translateX(120%);
+  opacity: 0;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.cloud-toast-show {
+  transform: translateX(0);
+  opacity: 1;
+}
+
+.cloud-toast-error {
+  border-color: rgba(239, 68, 68, 0.3);
+  color: var(--color-danger);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25), 0 0 10px rgba(239, 68, 68, 0.1);
+}
+
+/* ---------- Cloud User Badge (Sidebar) ---------- */
+.cloud-user-badge {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.6rem 0.7rem;
+  margin: 0.25rem 0.5rem;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.10), rgba(99, 102, 241, 0.06));
+  border: 1px solid rgba(16, 185, 129, 0.18);
+  border-radius: var(--radius-md);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  position: relative;
+  overflow: hidden;
+}
+
+.cloud-user-badge::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, transparent 60%, rgba(16,185,129,0.04));
+  pointer-events: none;
+}
+
+.cu-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.cloud-user-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  object-fit: cover;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
+}
+
+.cloud-user-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-size: 0.78rem;
+}
+
+/* Status row */
+.cu-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.68rem;
+  color: var(--text-tertiary);
+  padding-left: 0.1rem;
+  letter-spacing: 0.01em;
+}
+
+.cu-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-success);
+  box-shadow: 0 0 0 2px rgba(16,185,129,0.18);
+  flex-shrink: 0;
+  transition: background 0.18s, box-shadow 0.18s;
+}
+.cu-status-dot.dirty {
+  background: var(--color-warning);
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.22);
+  animation: cuDirtyPulse 1.6s ease-in-out infinite;
+}
+.cu-status-dot.saving {
+  background: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.22);
+  animation: cuSavingPulse 1s ease-in-out infinite;
+}
+.cu-status-dot.saved {
+  background: var(--color-success);
+  box-shadow: 0 0 0 2px rgba(16,185,129,0.18);
+}
+@keyframes cuDirtyPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.18); opacity: 0.75; }
+}
+@keyframes cuSavingPulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.3); }
+}
+
+/* Actions row: Save now + Sign out */
+.cu-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.35rem;
+}
+
+.cu-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
+  font-family: inherit;
+  white-space: nowrap;
+}
+.cu-action-btn i { flex-shrink: 0; }
+.cu-action-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+}
+.cu-action-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.cu-save-btn {
+  border-color: rgba(99, 102, 241, 0.35);
+  color: var(--color-primary);
+  background: rgba(99, 102, 241, 0.08);
+}
+.cu-save-btn:hover:not(:disabled) {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 12px var(--color-primary-glow);
+}
+
+.cu-signout-btn {
+  border-color: rgba(239, 68, 68, 0.25);
+  color: var(--color-danger);
+  background: rgba(239, 68, 68, 0.05);
+}
+.cu-signout-btn:hover:not(:disabled) {
+  background: var(--color-danger);
+  color: white;
+  border-color: var(--color-danger);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+/* Sidebar collapsed: compact icon-only mode */
+.app-sidebar:not(.expanded) .cloud-user-badge {
+  padding: 0.4rem;
+}
+.app-sidebar:not(.expanded) .cloud-user-name,
+.app-sidebar:not(.expanded) .cu-status-text,
+.app-sidebar:not(.expanded) .cu-action-btn span {
+  display: none;
+}
+.app-sidebar:not(.expanded) .cu-actions {
+  grid-template-columns: 1fr 1fr;
+  gap: 0.25rem;
+}
+.app-sidebar:not(.expanded) .cu-status {
+  justify-content: center;
+}
+
+/* ---------- Mobile ---------- */
+@media (max-width: 640px) {
+  .smp-card {
+    max-width: 100%;
+  }
+  .smp-header {
+    padding: 1.5rem 1.25rem 1.25rem;
+  }
+  .smp-body {
+    padding: 1.25rem;
+  }
+}
+
+/* ============================================================
+   SIGN-IN PROGRESS (replaces choose buttons during sign-in)
+   ============================================================ */
+.smp-body.hidden { display: none; }
+
+.smp-progress-container {
+  padding: 1.5rem 1.75rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  animation: smpProgressEnter 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.smp-progress-container.hidden { display: none; }
+
+@keyframes smpProgressEnter {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.smp-progress-icon {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(99,102,241,0.18), rgba(6,182,212,0.12));
+  border: 1px solid rgba(99,102,241,0.25);
+  box-shadow: 0 0 0 6px rgba(99,102,241,0.06), 0 8px 24px rgba(0,0,0,0.25);
+}
+.smp-progress-icon i {
+  width: 26px;
+  height: 26px;
+  color: var(--color-primary);
+  z-index: 1;
+}
+.smp-progress-icon-ring {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  border-top-color: var(--color-primary);
+  border-right-color: var(--color-accent);
+  animation: smpSpin 1.05s linear infinite;
+}
+@keyframes smpSpin { to { transform: rotate(360deg); } }
+
+.smp-progress-text {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  text-align: center;
+  min-height: 1.3em;
+}
+
+.smp-progress-track {
+  width: 100%;
+  height: 8px;
+  background: var(--bg-surface);
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  position: relative;
+}
+
+.smp-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-accent));
+  border-radius: 999px;
+  transition: width 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  box-shadow: 0 0 8px rgba(99,102,241,0.45);
+}
+
+.smp-progress-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(255,255,255,0.30) 50%,
+    transparent 100%);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: smpShimmer 1.4s linear infinite;
+  border-radius: inherit;
+}
+@keyframes smpShimmer {
+  from { background-position: -100% 0; }
+  to   { background-position:  200% 0; }
+}
+
+.smp-progress-hint {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  text-align: center;
+  max-width: 280px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .smp-progress-icon-ring,
+  .smp-progress-bar::after { animation: none; }
+}
+
+/* Disabled state on choose buttons during sign-in */
+.smp-option.smp-btn-disabled,
+.smp-option:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}

@@ -1,0 +1,6 @@
+# This folder IS the published site and IS the git repo — everything here ships.
+# Only Windows/macOS droppings need keeping out; they would otherwise be
+# committed and served alongside the app.
+Thumbs.db
+desktop.ini
+.DS_Store

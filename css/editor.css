@@ -1,0 +1,3458 @@
+/* ============================================================
+   EDITOR.CSS — Code Editor, Syntax Highlighting, Diff View
+   ============================================================ */
+
+/* --- Code Editor Container --- */
+.editor-container {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  min-height: 250px;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.7;
+  background: #0d1117;
+  border-radius: var(--radius-md);
+  border: 1px solid #21262d;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: border-color var(--transition-fast);
+}
+
+.editor-container:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-glow);
+}
+
+.editor-pre {
+  position: absolute;
+  inset: 0;
+  padding: 1.25rem;
+  margin: 0;
+  overflow: auto;
+  pointer-events: none;
+  white-space: pre;
+  z-index: 0;
+}
+
+.editor-pre code {
+  display: block;
+  min-height: 100%;
+  /* Positioned so it paints above the absolutely-placed .ed-mark-band rows. */
+  position: relative;
+  z-index: 1;
+  font-family: var(--font-mono);
+  font-size: inherit;
+  line-height: inherit;
+  tab-size: 2;
+}
+
+.editor-textarea {
+  position: absolute;
+  inset: 0;
+  padding: 1.25rem;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  resize: none;
+  overflow: auto;
+  background: transparent;
+  color: transparent;
+  caret-color: #58a6ff;
+  outline: none;
+  border: none;
+  white-space: pre;
+  z-index: 10;
+  font-family: var(--font-mono);
+  font-size: inherit;
+  line-height: inherit;
+  tab-size: 2;
+}
+
+.editor-textarea::placeholder {
+  color: #484f58;
+}
+
+/* The code editor auto-focuses and has its own visible caret, so the global
+   :focus-visible outline (motion.css) just paints an always-on blue ring around
+   the editor. Suppress it here (higher specificity than `textarea:focus-visible`). */
+.editor-textarea:focus,
+.editor-textarea:focus-visible {
+  outline: none;
+}
+
+/* --- Practice Area Editor (full dark mode) --- */
+.practice-editor-area {
+  flex: 1;
+  /* A positive floor here is what makes the two side panes give ground. Without
+     it the editor was handed whatever was left over: at 1024px that was 282px,
+     about 30 columns, while a 380px sidebar and a 340px panel both held full
+     width. ~52 columns at the editor's mono metrics. */
+  min-width: 460px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: #0d1117;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+
+/* --- Syntax Highlighting Colors (VS Code Dark+ Theme) --- */
+.syntax-string { color: #ce9178; }
+.syntax-comment { color: #6a9955; font-style: italic; }
+.syntax-keyword { color: #569cd6; }
+.syntax-type { color: #569cd6; }
+.syntax-control { color: #c586c0; }
+.syntax-primitive { color: #569cd6; }
+.syntax-number { color: #b5cea8; }
+.syntax-bracket { color: #ffd700; }
+.syntax-function { color: #dcdcaa; }
+.syntax-function-call { color: #dcdcaa; }
+.syntax-stdlib { color: #dcdcaa; }
+.syntax-preproc { color: #c586c0; }
+.syntax-header { color: #ce9178; }
+.syntax-operator { color: #c586c0; }
+
+/* --- Practice Sidebar --- */
+.practice-sidebar {
+  width: 380px;
+  /* 280px was the floor at every size. Together with the panel's 340 that left
+     the editor ~282px (30 columns) at 1024 - squeezed between two rigid panes.
+     The instructions read fine narrower; the editor does not. */
+  min-width: 280px;
+  flex: 0 1 380px;
+  border-right: 1px solid #21262d;
+  background: #161b22;
+  padding: 1.5rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.practice-sidebar h2 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #e6edf3;
+  padding-bottom: 0.625rem;
+  border-bottom: 1px solid #21262d;
+}
+
+.practice-sidebar p {
+  color: #b1bac4;
+  font-size: 0.875rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.practice-footer {
+  margin-top: auto;
+  padding-top: 1.25rem;
+  border-top: 1px solid #21262d;
+}
+
+.practice-footer p {
+  font-size: 0.75rem;
+  color: #484f58;
+}
+
+/* --- Sample Display (inside practice sidebar) --- */
+.sample-title {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.375rem;
+}
+
+.sample-content {
+  background: #0d1117;
+  padding: 0.875rem;
+  border-radius: var(--radius-md);
+  border: 1px solid #21262d;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: #b1bac4;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+/* Colored text inside samples */
+.sample-content .sample-label {
+  color: #ffa657;
+}
+
+/* --- Practice Top Bar --- */
+.practice-topbar {
+  background: #161b22;
+  border-bottom: 1px solid #21262d;
+  padding: 0.75rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.practice-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.practice-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* The difficulty chip used to be gated on the boss bar because both fought for
+   the topbar. The program title (and its chip) now live above the Description
+   in the sidebar, so there is nothing left to crowd — the chip always shows. */
+
+/* Title badge + boss bar sit side by side, matching the SAO nameplate layout. */
+.practice-topbar-center {
+  flex: 1;
+  min-width: 0;
+  margin: 0 0.75rem;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+.practice-title-badge {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 42%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  color: #e6edf3;
+  padding: 0.375rem 0.75rem;
+  background: #0d1117;
+  border-radius: var(--radius-md);
+  border: 1px solid #21262d;
+  font-size: 0.875rem;
+}
+
+.timer-display {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #0d1117;
+  padding: 0.375rem 0.75rem;
+  border-radius: var(--radius-md);
+  border: 1px solid #21262d;
+}
+
+.timer-display svg {
+  color: var(--color-primary);
+  width: 16px;
+  height: 16px;
+}
+
+.timer-display span {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #e6edf3;
+  letter-spacing: 0.05em;
+}
+
+/* Millisecond field on the count-up clock. Smaller and dimmer than the
+   minutes/seconds: at full weight three digits flickering 30×/s pulled the eye
+   away from everything else in the topbar. The fixed width stops the rest of
+   the row from shuffling as the digits change. */
+#practice-timer .timer-ms {
+  font-size: 0.72em;
+  color: #8b949e;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+  display: inline-block;
+  width: 3.1ch;
+  text-align: left;
+}
+
+.timer-display[oncontextmenu] { cursor: context-menu; }
+
+.timer-expired {
+  color: var(--color-danger) !important;
+}
+
+/* --- Right-click timer editor ------------------------------------------- */
+.timer-menu {
+  position: fixed;
+  z-index: 10000;
+  width: 262px;
+  padding: 0.7rem;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: var(--radius-md);
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.6);
+  animation: timerMenuIn 0.13s ease-out;
+}
+@keyframes timerMenuIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.timer-menu-title {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: 0.55rem;
+}
+.timer-menu-modes { display: flex; gap: 0.35rem; margin-bottom: 0.6rem; }
+.timer-mode {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.timer-mode:hover { color: var(--text-primary); border-color: #484f58; }
+.timer-mode.active {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.timer-menu-fields { display: flex; gap: 0.4rem; }
+.timer-menu-fields label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+}
+.timer-menu-fields input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.28rem 0.35rem;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  text-align: center;
+  color: var(--text-primary);
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: var(--radius-sm);
+}
+.timer-menu-presets { display: flex; gap: 0.3rem; margin-top: 0.4rem; }
+.timer-preset {
+  flex: 1;
+  padding: 0.22rem 0;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.timer-preset:hover { color: var(--color-primary); border-color: var(--color-primary); }
+/* Count-up mode has no duration to set — grey the whole group out at once. */
+.timer-menu-fields.disabled,
+.timer-menu-presets.disabled { opacity: 0.4; pointer-events: none; }
+
+.timer-menu-restart {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+  font-size: 0.73rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.timer-menu-restart input {
+  width: 13px;
+  height: 13px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+.timer-menu-note {
+  margin: 0.4rem 0 0;
+  font-size: 0.68rem;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+  min-height: 2.9em;
+}
+.timer-menu-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  margin-top: 0.3rem;
+}
+
+.btn-back-dark {
+  color: #8b949e;
+  background: none;
+  border: none;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  transition: color var(--transition-fast);
+}
+
+.btn-back-dark:hover {
+  color: #e6edf3;
+}
+
+.btn-submit {
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+  color: white;
+  border: none;
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all var(--transition-fast);
+}
+
+.btn-submit:hover {
+  box-shadow: 0 4px 16px var(--color-primary-glow);
+  transform: translateY(-1px);
+}
+
+/* --- Diff / Solution View --- */
+.diff-topbar {
+  background: #161b22;
+  border-bottom: 1px solid #21262d;
+  padding: 0.75rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.diff-topbar-tools {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.diff-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 1px;
+}
+.diff-nav-count {
+  min-width: 46px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: #8b949e;
+}
+.diff-nav-count.clean { color: #3fb950; }
+
+.diff-legend {
+  display: flex;
+  gap: 1rem;
+  margin-left: 0.35rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.diff-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.diff-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.diff-legend-dot.match { background: var(--color-success); }
+.diff-legend-dot.minor { background: var(--color-warning); }
+.diff-legend-dot.wrong { background: var(--color-danger); }
+
+/* The stage owns the remaining height; the ruler floats at its right edge and
+   the panels scroll inside it. Scrolling used to happen at TWO levels (this
+   container and each panel body), which is what let the two sides drift out of
+   alignment — now only the panel bodies scroll, and they scroll together. */
+.diff-stage {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding-right: 14px;
+  background: #0d1117;
+}
+
+.diff-panels {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 1.5rem;
+  gap: 1.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  background: #0d1117;
+}
+
+.diff-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  background: #161b22;
+  border-radius: var(--radius-md);
+  border: 1px solid #21262d;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.diff-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  background: #1c2333;
+  padding: 0.5rem 0.6rem 0.5rem 1rem;
+  font-weight: 700;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  border-bottom: 1px solid #21262d;
+  flex-shrink: 0;
+}
+.diff-panel-header > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.diff-copy-btn { flex-shrink: 0; padding: 2px 6px; font-size: 0.6875rem; }
+
+.diff-panel-header.actual { color: #b1bac4; }
+.diff-panel-header.expected { color: var(--color-success); }
+
+.diff-panel-body {
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  padding: 0.25rem;
+  scroll-behavior: auto;
+}
+
+.diff-line {
+  display: flex;
+  padding: 0.125rem 0.625rem;
+  min-height: 1.5rem;
+}
+
+/* Wide enough for four digits — at 2rem a 100+ line file squeezed the code. */
+.diff-line-number {
+  width: 3.4rem;
+  color: #484f58;
+  user-select: none;
+  text-align: right;
+  padding-right: 0.75rem;
+  flex-shrink: 0;
+}
+/* Your own lines link back into the editor at that exact line. */
+.diff-line-number.linkable { cursor: pointer; }
+.diff-line-number.linkable:hover {
+  color: var(--color-primary, #818cf8);
+  text-decoration: underline;
+}
+
+.diff-line-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+/* Comments carried over from the source. They never take part in the
+   comparison — they're here so the reference can still teach. */
+.diff-comment {
+  color: #6a9955;
+  font-style: italic;
+  opacity: 0.85;
+}
+
+.diff-collapsed {
+  justify-content: center;
+  color: #484f58;
+  font-style: italic;
+  font-size: 0.75rem;
+  padding: 0.25rem;
+}
+
+/* The row you navigated to with n/p or the ruler. */
+.diff-line.row-focus {
+  outline: 1px solid rgba(99, 102, 241, 0.75);
+  outline-offset: -1px;
+}
+
+/* Diff line statuses */
+.diff-line.perfect {
+  background: rgba(16, 185, 129, 0.08);
+  border-left: 3px solid var(--color-success);
+}
+
+.diff-line.partial {
+  background: rgba(245, 158, 11, 0.08);
+  border-left: 3px solid var(--color-warning);
+}
+
+.diff-line.wrong,
+.diff-line.missing,
+.diff-line.extra {
+  background: rgba(239, 68, 68, 0.08);
+  border-left: 3px solid var(--color-danger);
+}
+
+.diff-line.expected-highlight {
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.diff-line.extra-expected {
+  background: rgba(99, 102, 241, 0.03);
+}
+
+/* --- Character-Level Diff Highlighting --- */
+.diff-char-match {
+  color: #3fb950;
+  background: rgba(63, 185, 80, 0.12);
+  border-radius: 2px;
+}
+
+.diff-char-offset {
+  color: #d29922;
+  background: rgba(210, 153, 34, 0.15);
+  border-radius: 2px;
+}
+
+.diff-char-wrong {
+  color: #f85149;
+  background: rgba(248, 81, 73, 0.15);
+  border-radius: 2px;
+}
+
+.diff-char-missing {
+  color: #f85149;
+  background: rgba(248, 81, 73, 0.1);
+  border-radius: 2px;
+}
+
+.diff-char-neutral {
+  color: #8b949e;
+}
+
+.diff-char-placeholder {
+  font-style: italic;
+  color: #484f58;
+  font-size: 0.75rem;
+}
+
+/* ============================================================
+   SOLUTION PAGE — summary, comparison controls, ruler,
+   explanations, search
+   ============================================================ */
+
+/* --- Summary strip: what this attempt actually scored --- */
+.sol-summary {
+  padding: 0.7rem 1rem 0.6rem;
+  background: #10151d;
+  border-bottom: 1px solid #21262d;
+  flex-shrink: 0;
+}
+.sol-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.55rem;
+}
+.sol-title {
+  font-family: var(--font-sans);
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #e6edf3;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sol-variant { font-weight: 500; font-size: 0.78rem; color: #6e7681; }
+.sol-actions { display: flex; gap: 0.4rem; flex-shrink: 0; }
+
+.sol-stats { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+.sol-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0.3rem 0.6rem;
+  min-width: 68px;
+  border: 1px solid #21262d;
+  border-radius: 8px;
+  background: #161b22;
+  font-family: var(--font-sans);
+}
+.sol-stat-v { font-size: 0.86rem; font-weight: 800; color: #e6edf3; line-height: 1.2; }
+.sol-stat-k {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6e7681;
+}
+.sol-stat-v.sol-basis { font-size: 0.72rem; font-weight: 700; color: #8b949e; }
+.sol-score.perfect { border-color: rgba(16, 185, 129, 0.45); }
+.sol-score.perfect .sol-stat-v { color: #34d399; }
+.sol-score.mid { border-color: rgba(245, 158, 11, 0.4); }
+.sol-score.mid .sol-stat-v { color: #fbbf24; }
+.sol-score.low { border-color: rgba(239, 68, 68, 0.4); }
+.sol-score.low .sol-stat-v { color: #f87171; }
+.sol-delta { font-weight: 800; letter-spacing: 0; text-transform: none; }
+.sol-delta.up { color: #34d399; }
+.sol-delta.down { color: #f87171; }
+.sol-delta.flat { color: #6e7681; }
+
+/* --- Breakdown: missing vs wrong vs extra is a different lesson each --- */
+.sol-breakdown { margin-top: 0.55rem; }
+.sol-bar {
+  display: flex;
+  height: 7px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: #21262d;
+}
+.sol-bar-seg { height: 100%; }
+.sol-bar-seg.perfect { background: #3fb950; }
+.sol-bar-seg.partial { background: #d29922; }
+.sol-bar-seg.wrong   { background: #f85149; }
+.sol-bar-seg.missing { background: #a5252a; }
+.sol-bar-seg.extra   { background: #6e40c9; }
+.sol-bar-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 0.35rem;
+  font-family: var(--font-sans);
+  font-size: 0.66rem;
+  color: #8b949e;
+}
+.sol-bar-key-item { display: inline-flex; align-items: center; gap: 0.3rem; }
+.sol-bar-key-item b { color: #c9d1d9; }
+.sol-bar-dot { width: 8px; height: 8px; border-radius: 2px; }
+.sol-bar-dot.perfect { background: #3fb950; }
+.sol-bar-dot.partial { background: #d29922; }
+.sol-bar-dot.wrong   { background: #f85149; }
+.sol-bar-dot.missing { background: #a5252a; }
+.sol-bar-dot.extra   { background: #6e40c9; }
+
+/* --- Compare bar: which attempt, against what --- */
+.sol-compare {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 1rem;
+  background: #0f141b;
+  border-bottom: 1px solid #21262d;
+  font-family: var(--font-sans);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.sol-cmp-field { display: inline-flex; align-items: center; gap: 0.4rem; min-width: 0; }
+.sol-cmp-field > span {
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6e7681;
+}
+.sol-cmp-select {
+  height: 28px;
+  padding: 0 1.6rem 0 0.5rem;
+  font-size: 0.74rem;
+  max-width: 260px;
+}
+.sol-cmp-hint { font-size: 0.7rem; color: #d29922; }
+
+/* --- Comparison options --- */
+.diff-options {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.85rem;
+  padding: 0.5rem 1rem;
+  background: #0f141b;
+  border-bottom: 1px solid #21262d;
+  font-family: var(--font-sans);
+  flex-shrink: 0;
+}
+.sol-opt-label {
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6e7681;
+}
+.sol-opt {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.74rem;
+  color: #c9d1d9;
+  cursor: pointer;
+}
+.sol-opt.disabled { opacity: 0.45; cursor: not-allowed; }
+.sol-opt input[type="checkbox"] { width: 13px; height: 13px; accent-color: var(--color-primary); cursor: inherit; }
+.sol-opt-note { font-size: 0.7rem; color: #6e7681; font-style: italic; }
+.sol-seg { display: inline-flex; background: #161b22; border: 1px solid #30363d; border-radius: 6px; overflow: hidden; }
+.sol-seg-btn {
+  border: none;
+  background: transparent;
+  color: #8b949e;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.sol-seg-btn:hover { color: #e6edf3; }
+.sol-seg-btn.active { background: rgba(99, 102, 241, 0.18); color: var(--color-primary, #818cf8); }
+
+/* --- Search across the panels --- */
+.diff-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.4rem 1rem;
+  background: #0f141b;
+  border-bottom: 1px solid #21262d;
+  flex-shrink: 0;
+}
+.diff-search-bar .ed-find-input { flex: 1; max-width: 340px; }
+mark.diff-hit {
+  background: rgba(210, 153, 34, 0.35);
+  color: inherit;
+  border-radius: 2px;
+}
+mark.diff-hit.current {
+  background: #d29922;
+  color: #12161c;
+  box-shadow: 0 0 0 1px #ffd76e;
+}
+
+/* --- Overview ruler: the shape of the damage, at a glance --- */
+.diff-ruler {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  background: #0b0f14;
+  border-left: 1px solid #21262d;
+  cursor: pointer;
+}
+.diff-ruler-tick {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  height: 3px;
+  border-radius: 1px;
+  opacity: 0.85;
+}
+.diff-ruler-tick:hover { opacity: 1; left: 0; right: 0; height: 5px; }
+.diff-ruler-tick.partial { background: #d29922; }
+.diff-ruler-tick.wrong   { background: #f85149; }
+.diff-ruler-tick.missing { background: #a5252a; }
+.diff-ruler-tick.extra   { background: #6e40c9; }
+.diff-ruler-view {
+  position: absolute;
+  left: 0;
+  right: 0;
+  min-height: 12px;
+  background: rgba(139, 148, 158, 0.16);
+  border-top: 1px solid rgba(139, 148, 158, 0.3);
+  border-bottom: 1px solid rgba(139, 148, 158, 0.3);
+  pointer-events: none;
+}
+
+/* --- Inline explanations ---
+   The right-hand copy is hidden rather than omitted: identical text at an
+   identical width wraps to an identical height, which is what keeps the two
+   panels row-aligned while they scroll in lockstep. */
+.diff-explain {
+  display: flex;
+  padding: 0.1rem 0.625rem 0.35rem;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: #d29922;
+  background: rgba(210, 153, 34, 0.06);
+  border-left: 3px solid rgba(210, 153, 34, 0.5);
+}
+/* Only the TEXT is hidden on the mirrored copy — the tint and the left rule stay,
+   so the right-hand panel shows a band tied to the row above it rather than an
+   unexplained gap. */
+.diff-explain.ghost .diff-explain-text { visibility: hidden; }
+.diff-explain.missing, .diff-explain.extra {
+  color: #f0883e;
+  background: rgba(240, 136, 62, 0.06);
+  border-left-color: rgba(240, 136, 62, 0.5);
+}
+.diff-explain-text { display: block; min-width: 0; }
+.diff-explain-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  margin-right: 5px;
+  border-radius: 50%;
+  /* Explicit, not currentColor: `color` on this element is the badge's TEXT
+     colour, so currentColor would paint the disc the same dark shade. */
+  background: #d29922;
+  color: #12161c;
+  font-style: normal;
+  font-weight: 900;
+  font-size: 0.6rem;
+  vertical-align: -1px;
+}
+.diff-explain.missing .diff-explain-mark,
+.diff-explain.extra .diff-explain-mark { background: #f0883e; }
+
+/* --- Unified-mode +/- gutter (base rule lives with the unified view below) --- */
+.diff-line-prefix.add { color: #3fb950; }
+.diff-line-prefix.del { color: #f85149; }
+
+/* --- Per-file difference count in the solution tabs --- */
+.file-tab-diffs {
+  margin-left: 0.35rem;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(248, 81, 73, 0.18);
+  color: #f87171;
+  font-size: 0.6rem;
+  font-weight: 800;
+}
+.file-tab-diffs.ok { background: rgba(63, 185, 80, 0.18); color: #3fb950; }
+
+/* Below this the two panels can't both stay readable; stack them and let the
+   sticky headers keep saying which is which. */
+@media (max-width: 900px) {
+  .diff-panels { flex-direction: column; overflow: auto; padding: 0.75rem; gap: 0.75rem; }
+  .diff-panel { min-height: 45vh; }
+  .diff-topbar { flex-wrap: wrap; gap: 0.5rem; }
+  .diff-legend { display: none; }
+  .sol-cmp-select { max-width: 150px; }
+}
+
+@media print {
+  .diff-topbar, .sol-compare, .diff-options, .diff-search-bar, .diff-ruler, .sol-actions { display: none !important; }
+  .diff-panels { overflow: visible; }
+  .diff-panel-body { overflow: visible; }
+}
+
+/* --- Example Code View (Training Grounds snippet viewer) --- */
+.example-line {
+  display: block;
+  line-height: 1.7;
+  padding: 0 0;
+}
+
+.example-line-highlight {
+  background: rgba(99, 102, 241, 0.12);
+  border-left: 3px solid var(--color-primary);
+  padding-left: 0.25rem;
+  margin-left: -0.25rem;
+  animation: pulseHighlight 2.5s infinite ease-in-out;
+}
+
+/* --- MiSide Character Reveal Animation --- */
+.miside-char-hidden {
+  opacity: 0;
+  filter: blur(4px);
+  display: inline;
+}
+
+.miside-char-reveal {
+  opacity: 1;
+  filter: blur(0);
+  display: inline;
+  animation: misideReveal 0.15s ease-out forwards;
+}
+
+@keyframes misideReveal {
+  0% {
+    opacity: 0;
+    filter: blur(4px);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+/* --- Run Code Button --- */
+.btn-run-code {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all var(--transition-fast);
+}
+
+.btn-run-code:hover {
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
+  transform: translateY(-1px);
+}
+
+.btn-run-code i,
+.btn-run-code svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* --- Consistent practice top-bar controls (uniform heights) --- */
+.practice-topbar-right {
+  gap: 0.55rem;
+}
+
+/* The three action buttons (Retry / Run Code / Submit) — identical size */
+.practice-action-btn {
+  height: 38px;
+  padding: 0 1rem;
+  font-size: 0.875rem;
+  border-radius: var(--radius-md);
+  box-sizing: border-box;
+}
+
+.practice-action-btn i,
+.practice-action-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Square icon-only toggles (boss bar / cheat sheet / full screen) */
+.practice-icon-btn {
+  height: 38px;
+  width: 38px;
+  padding: 0;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.practice-icon-btn:hover {
+  color: var(--text-primary);
+}
+
+/* Timer pill matches the button height */
+.practice-topbar-right .timer-display {
+  height: 38px;
+  box-sizing: border-box;
+}
+
+/* --- Run Code Output Popup --- */
+.run-code-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.run-code-window {
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 12px;
+  width: 85%;
+  max-width: 850px;
+  height: 75vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(6, 182, 212, 0.08);
+  animation: scaleIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow: hidden;
+}
+
+.run-code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1.25rem;
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  border-radius: 12px 12px 0 0;
+}
+
+.run-code-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  color: #e6edf3;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-weight: 700;
+  font-size: 0.9375rem;
+}
+
+.run-code-header-left i,
+.run-code-header-left svg {
+  width: 18px;
+  height: 18px;
+  color: #06b6d4;
+}
+
+.run-code-close-btn {
+  background: none;
+  border: none;
+  color: #8b949e;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.run-code-close-btn:hover {
+  color: #f85149;
+  background: rgba(248, 81, 73, 0.12);
+}
+
+.run-code-close-btn i,
+.run-code-close-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.run-code-body {
+  flex: 1;
+  padding: 1.25rem;
+  overflow: hidden;
+  display: flex;
+}
+
+.run-code-output {
+  flex: 1;
+  background: #000;
+  color: #e6edf3;
+  border: 1px solid #06b6d4;
+  border-radius: 8px;
+  padding: 1.25rem;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  overflow-y: auto;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.4);
+}
+
+/* Error state */
+.run-code-output.run-code-error {
+  color: #f85149;
+  border-color: #f85149;
+  box-shadow: inset 0 0 20px rgba(248, 81, 73, 0.08);
+}
+
+/* Warning state */
+.run-code-output.run-code-warning {
+  color: #d29922;
+  border-color: #d29922;
+  box-shadow: inset 0 0 20px rgba(210, 153, 34, 0.08);
+}
+
+/* Success state */
+.run-code-output.run-code-success {
+  color: #3fb950;
+  border-color: #3fb950;
+  box-shadow: inset 0 0 20px rgba(63, 185, 80, 0.08);
+}
+
+.run-code-compiling {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  color: #8b949e;
+  font-style: italic;
+}
+
+.run-code-spinner {
+  width: 16px;
+  height: 16px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.run-code-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.25rem;
+  background: #161b22;
+  border-top: 1px solid #30363d;
+  border-radius: 0 0 12px 12px;
+}
+
+.run-code-status {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #8b949e;
+  font-family: var(--font-sans);
+}
+
+.run-code-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 15px;
+  background-color: #e6edf3;
+  vertical-align: middle;
+  margin-left: 2px;
+  animation: blinkCursor 1s step-end infinite;
+}
+
+@keyframes blinkCursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* --- Run Code Toast Notification --- */
+.run-code-toast {
+  position: fixed;
+  top: 1.5rem;
+  right: 1.5rem;
+  z-index: 100000;
+  background: #161b22;
+  border: 1px solid #30363d;
+  color: #e6edf3;
+  padding: 1rem 1.25rem;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  animation: toastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  max-width: 400px;
+}
+
+.run-code-toast-warning {
+  border-left: 4px solid #d29922;
+}
+
+.run-code-toast-warning i {
+  color: #d29922;
+  flex-shrink: 0;
+}
+
+@keyframes toastSlideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* --- Interactive Terminal --- */
+.term-output-area {
+  flex: 1;
+  background: #000;
+  color: #e6edf3;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  padding: 1rem 1.25rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  /* NOT pre-wrap: this element now has element children, and pre-wrap would
+     render the template's own newlines and indentation as blank lines at the
+     top of every run. Whitespace is preserved per LINE instead. */
+  white-space: normal;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.4);
+  min-height: 0;
+}
+
+.term-line {
+  min-height: 1.5em;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* --- Typing happens INSIDE the transcript ---------------------------------
+   A console leaves `printf("Enter choice: ")` on an open line and puts your
+   keystrokes right after the colon. The input field is therefore invisible and
+   the characters you type are rendered inline by termTranscriptHTML() — there
+   is no separate input box below the output any more. */
+.term-surface {
+  position: relative;
+  cursor: text;
+}
+/* The transcript is its own element so re-rendering never re-inserts the input
+   element beside it — re-parenting a focused node blurs it. */
+.term-lines { white-space: normal; }
+.term-hidden-input {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: transparent;
+  caret-color: transparent;
+  opacity: 0;
+  /* Not display:none — it has to stay focusable so real keyboards, IMEs and
+     paste all still work. */
+}
+.term-echo {
+  color: #7ee787;
+  font-weight: 600;
+}
+/* The caret sits on the text baseline when it follows a prompt. */
+.term-line .run-code-cursor {
+  vertical-align: text-bottom;
+  height: 1.1em;
+  width: 0.6em;
+  margin-left: 1px;
+}
+
+.term-stdout {
+  color: #e6edf3;
+}
+
+.term-stdin {
+  color: #58a6ff;
+  position: relative;
+  padding-left: 1.25em;
+}
+
+.term-stdin::before {
+  content: '›';
+  position: absolute;
+  left: 0;
+  color: #3fb950;
+  font-weight: 700;
+}
+
+.term-error {
+  color: #f85149;
+}
+
+.term-warning {
+  color: #d29922;
+}
+
+.term-info {
+  color: #484f58;
+  font-style: italic;
+  font-size: 0.8125rem;
+}
+
+.term-input-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  background: #0d1117;
+  border-top: 1px solid #30363d;
+}
+
+.term-input-prompt {
+  color: #3fb950;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-weight: 700;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.term-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #58a6ff;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 0.9375rem;
+  padding: 0.25rem 0;
+  caret-color: #e6edf3;
+}
+
+.term-input::placeholder {
+  color: #30363d;
+  font-style: italic;
+}
+
+/* --- Editor Line Numbers Gutter (with integrated resizer handle) ---
+   Sized by its content, never by a fixed width: at a fixed 36px a 100+ line
+   file (or a larger editor font) pushed the digits flush against the left edge
+   and then clipped them. min-width keeps short files from looking pinched.
+
+   The 14px strip on the left only exists to hold a line mark, so reserving it
+   on every file left a permanently empty column. It is opened by padding —
+   which animates, unlike an auto width — the moment the file has its first
+   mark. See .has-marks below. */
+.editor-line-numbers {
+  width: auto;
+  /* Clears the always-open marker column (16px) plus two digits and padding. */
+  min-width: 46px;
+  /* Nothing on the gutter itself animates any more. It used to ease
+     padding-left AND min-width while each ROW eased its own padding-left and
+     padding-right - four competing animations over the same axis. min-width
+     snapped to its new value while the paddings were still easing, so the
+     digits jumped left and then slid back to centre. The only thing that moves
+     now is the width of the two side partitions (see .ln-mark-col). */
+  flex-shrink: 0;
+  /* Match the editor background so the gutter reads as part of the editor — not
+     as a second dark band next to the divider (which looked "weird"). */
+  background: #0d1117;
+  border-right: 1px solid #1c2128;
+  padding: 1.25rem 0 1.25rem 4px;
+  overflow: hidden;
+  user-select: none;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  line-height: 1.7;
+  color: #484f58;
+  position: relative;
+}
+
+/* (The old gutter handle pill was removed — the resizer-divider now carries the
+   grip handle, so there's only one clear divider control.) */
+
+/* No fixed height: the row must be exactly one LINE tall, and the line height
+   is set at runtime (applyEditorViewSettings syncs the gutter, the textarea and
+   the highlight layer together). The old `height: 1.7em` was a leftover from
+   when the gutter's line-height was 1.7 — once the editor moved to 1.5 the
+   gutter gained ~2.8px per row, so the numbers slid out of step with the code
+   and were ~20px out by line 8. Letting line-height size the row keeps them
+   locked at any font size. */
+/* marker | number | fold. The number sits in the middle partition and is
+   centred inside it, so neither side can ever print over it. */
+.editor-line-numbers .line-num {
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  position: relative;
+  cursor: pointer;
+  transition: color 0.14s ease, background-color 0.14s ease, opacity 0.16s ease 0.06s;
+}
+.editor-line-numbers .ln-no {
+  flex: 1 1 auto;
+  text-align: center;
+  min-width: 1.1em;
+}
+/* Shared box for both side partitions. Clipped, not just faded: each child is
+   absolutely positioned against this box, so with a column collapsed to 0 they
+   hung outside it and sat over the digits - invisible, but still occupying that
+   ground. */
+.editor-line-numbers .ln-mark-col,
+.editor-line-numbers .ln-fold-col {
+  position: relative;
+  height: 1em;
+  overflow: hidden;
+  transition: flex-basis 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* The marker partition is always open. It never moves, so the digits never
+   move either, and the ghost has somewhere to sit the instant you point at a
+   row rather than after the column has finished opening. */
+.editor-line-numbers .ln-mark-col { flex: 0 0 16px; }
+
+/* The fold partition still opens on hover, and stays open while a block is
+   actually folded - that chevron is the only sign the code is still there. */
+.editor-line-numbers .ln-fold-col { flex: 0 0 0px; width: 0; }
+.editor-line-numbers:not(.gutter-hidden):hover .ln-fold-col { flex-basis: 16px; }
+.editor-line-numbers.has-folded:not(.gutter-hidden) .ln-fold-col { flex-basis: 16px; }
+
+.editor-line-numbers .line-num.active {
+  color: #e6edf3;
+  background: rgba(99, 102, 241, 0.08);
+}
+
+/* This file has at least one mark: open the marker column. Hovering the gutter
+   opens it too, so the "where would this land" ghost has somewhere to sit
+   instead of printing over the digits. 18px clears the marker (4px inset +
+   10px wide) with a hair to spare.
+
+   min-width has to move with the padding. On a short file the digits are
+   narrower than the 36px floor, so the extra padding was absorbed by that floor
+   and the gutter never visibly opened — the hover looked broken. */
+
+/* The marker column is padding on the ROW, not on the gutter.
+   As gutter padding it sat outside every .line-num box, so the triangle and the
+   hover ghost were drawn on ground that no element with a click handler
+   occupied - which is why clicking a mark did nothing and you had to hit the
+   digits instead. As row padding the whole column is inside the row's hit area.
+   It also only opens on hover now: `has-marks` kept it wedged open for the
+   whole file, which is what pushed the digits off-centre. */
+
+/* A mark that has JUST been placed grows into position instead of popping in.
+   The class is only set on the paint where the mark first appears (see
+   updateLineNumbers) — the gutter is rebuilt on every keystroke, so animating
+   every .line-mark made the triangles blink the whole time you typed. */
+.editor-line-numbers .line-mark.just-added { animation: lineMarkIn 0.22s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes lineMarkIn {
+  from { opacity: 0; transform: translateY(-50%) translateX(-5px) scale(0.5); }
+  to   { opacity: 1; transform: translateY(-50%) translateX(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .editor-line-numbers { transition: none; }
+  .editor-line-numbers .line-mark.just-added { animation: none; }
+}
+
+/* --- Line marks: click a line number to pin a marker on that line ---------
+   The triangle is a CSS gradient shown through an SVG mask rather than an
+   inline <svg> per line: the mask carries the rounded corners (a stroked path
+   with round joins), the gradient does the 3D shading, and ::after lays the
+   gloss over the top-left face. No ids, so nothing collides when the gutter is
+   rebuilt on every keystroke. */
+.editor-line-numbers {
+  --line-mark-tri: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 14'%3E%3Cpath d='M3.4 3.6 L9.1 7 L3.4 10.4 Z' fill='%23fff' stroke='%23fff' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+/* Anchored to the row, which starts at the gutter's padding edge — so the
+   offset is NEGATIVE, back out into the marker column the padding just opened
+   (18px of padding − 14px = 4px from the gutter's own left edge). A positive
+   left: 4px put the triangle 4px inside the row, i.e. straight over the digits. */
+.editor-line-numbers .line-mark,
+.editor-line-numbers .ln-mark-col::before {
+  position: absolute;
+  left: 1px;
+  top: 50%;
+  width: 10px;
+  height: 11.7px;
+  transform: translateY(-50%);
+  -webkit-mask: var(--line-mark-tri) no-repeat center / contain;
+  mask: var(--line-mark-tri) no-repeat center / contain;
+  pointer-events: none;
+}
+.editor-line-numbers .line-mark {
+  background: linear-gradient(135deg, #d8fdff 0%, #5ce7f7 30%, #16b6d8 60%, #06718c 100%);
+  filter: drop-shadow(0 0 4px rgba(34, 211, 238, 0.55));
+}
+/* Clipped by the parent's mask, so this is the lit face of the solid. */
+.editor-line-numbers .line-mark::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(158deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.22) 26%, transparent 52%);
+}
+/* Ghost on hover, the way an editor previews where a breakpoint would land. */
+/* The ghost previews where a mark would land. It only exists while the column
+   is open, so it can never be drawn over the digits. */
+.editor-line-numbers:not(.gutter-hidden):hover .line-num:hover .ln-mark-col::before {
+  content: '';
+  background: #22d3ee;
+  opacity: 0.3;
+}
+.editor-line-numbers .line-num.marked .ln-mark-col::before { content: none; }
+/* The ghost only appears once the column is open, so it can never be drawn over
+   the digits on a narrow gutter. */
+.editor-line-numbers:not(:hover) .line-num:hover::before { content: none; }
+.editor-line-numbers .line-num.marked {
+  color: #7fe6f5;
+  background: rgba(34, 211, 238, 0.09);
+}
+
+/* The band behind the marked line itself, inside the syntax layer so it scrolls
+   with the code (see _edPaintMarkBands). */
+.ed-mark-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(34, 211, 238, 0.16), rgba(34, 211, 238, 0.05) 55%, transparent);
+  border-top: 1px solid rgba(34, 211, 238, 0.16);
+  border-bottom: 1px solid rgba(34, 211, 238, 0.16);
+}
+
+/* Collapsed gutter — only the resizer pill ::before remains visible. The rows
+   fade as the column slides shut rather than vanishing in one frame. */
+.editor-line-numbers.gutter-hidden {
+  width: 10px;
+  min-width: 0;
+  border-right: none;
+  padding: 0;
+  background: transparent;
+}
+.editor-line-numbers.gutter-hidden .line-num {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+/* --- Keyboard shortcut hints --- */
+.shortcut-hint kbd {
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  color: #8b949e;
+}
+
+/* ============================================================
+   SAO BOSS HEALTH BAR — practice + practice-set topbar
+   ------------------------------------------------------------
+   Topbar row:  [crystal] [title badge] [cap] [plate + track] [readout]
+
+   All geometry is traced from the Sword Art Online nameplate and expressed as
+   clip-path polygons. Every diagonal is a fixed px run (never a %), so the
+   chamfers keep their exact angle at any bar length:
+
+     cap        ]-bracket — the spine is on the RIGHT and the notch opens LEFT
+     plate      right end chamfered 14px  →  /
+     track      the bar is THICK on the left and steps UP 5px at 55% to a
+                thinner right section, which then chamfers 8px at its end
+     well       the track polygon inset 2px, giving a true outline that
+                follows the diagonals (a CSS border gets clipped off them)
+     readout    HP box chamfered 8px on its leading edge, LV box 6px trailing
+
+   The painter (_bossBarPaint) only sets the fill width and --sao-hue; the
+   gradient, glow, ghost tint and critical pulse all derive from those here so
+   the whole plate stays in step as HP drains green → amber → red.
+   ============================================================ */
+.sao-boss {
+  --sao-hue: 82;              /* SAO yellow-green at full HP → 0 (red) at empty */
+  --sao-h: 26px;              /* plate height */
+  --sao-chamfer: 14px;        /* plate right-end diagonal run */
+  --sao-tr-chamfer: 8px;      /* track right-end diagonal run */
+  --sao-step: 5px;            /* how far the bar thins after the step */
+  --sao-step-x: 55%;          /* where along the track that step happens */
+  --sao-frame: #4a4f57;       /* one constant tone for the whole frame */
+  /* Light the gem throws onto the frame. The gem itself stays red; the spill is
+     the editor's line-mark cyan (#22d3ee, see .line-mark) so the topbar and the
+     gutter read as lit by the same UI, not two competing accents. Bare channels
+     so alpha can vary per stop. */
+  --sao-spill: 34, 211, 238;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 260px;
+  min-width: 0;
+  max-width: 620px;
+  padding: 12px 0 12px;
+  user-select: none;
+}
+
+/* ---------- Crystal marker (leftmost in the topbar, before the title) ----------
+   Three transform layers, because a single element can only run one transform
+   animation: the outer bobs, the middle spins on its vertical axis, the gem
+   itself keeps the glow (filter) and takes the hit reaction. */
+.sao-crystal {
+  position: relative;
+  flex: 0 0 auto;
+  width: 17px;
+  height: 29px;
+  margin: -6px 2px 0 6px;
+  perspective: 90px;
+  animation: saoCrystalFloat 3.2s ease-in-out infinite;
+}
+.sao-crystal-spin {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  animation: saoCrystalSpin 4.5s linear infinite;
+}
+/* Each blade is a plane through the vertical axis. The blade carries the fixed
+   rotation; the svg inside it carries the glow and the hit reaction, so the hit
+   animation can't clobber the blade's angle. */
+.sao-crystal-blade {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  backface-visibility: visible;
+}
+.sao-crystal-spin .sao-crystal-gem {
+  position: absolute;
+  inset: 0;
+  backface-visibility: visible;
+}
+@keyframes saoCrystalSpin {
+  from { transform: rotateY(0deg); }
+  to   { transform: rotateY(360deg); }
+}
+.sao-crystal::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: 36px;
+  height: 36px;
+  margin: -18px 0 0 -18px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 45, 110, 0.3), rgba(255, 20, 90, 0.08) 45%, transparent 70%);
+  animation: saoCrystalHalo 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+.sao-crystal-gem {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 2px rgba(255, 80, 135, 0.6)) drop-shadow(0 0 6px rgba(255, 0, 80, 0.3));
+  animation: saoCrystalGlow 2.8s ease-in-out infinite;
+}
+.sao-crystal-shine {
+  opacity: 0.2;
+  animation: saoCrystalShine 3.6s ease-in-out infinite;
+}
+
+@keyframes saoCrystalFloat {
+  0%, 100% { transform: translateY(2.5px); }
+  50%      { transform: translateY(-3.5px); }
+}
+@keyframes saoCrystalHalo {
+  0%, 100% { opacity: 0.45; transform: scale(0.9); }
+  50%      { opacity: 0.8;  transform: scale(1.08); }
+}
+@keyframes saoCrystalGlow {
+  0%, 100% { filter: drop-shadow(0 0 2px rgba(255, 80, 135, 0.55)) drop-shadow(0 0 5px rgba(255, 0, 80, 0.26)); }
+  50%      { filter: drop-shadow(0 0 3.5px rgba(255, 110, 160, 0.75)) drop-shadow(0 0 9px rgba(255, 0, 80, 0.42)); }
+}
+@keyframes saoCrystalShine {
+  0%, 100% { opacity: 0.12; }
+  50%      { opacity: 0.5; }
+}
+
+/* ---------- The detached "]" bracket — spine right, notch opening left ---------- */
+.sao-plate-cap {
+  flex: 0 0 auto;
+  width: 10px;
+  height: var(--sao-h);
+  /* Flat, same slab colour as the plate (see .sao-plate) — no top-to-bottom
+     ramp, so the bracket and the plate read as one continuous frame. It is the
+     piece nearest the crystal, though, so it takes the strongest spill: without
+     it the bracket read as a grey chip floating between a glowing gem and a lit
+     plate. The tint sits ON the flat colour, left→right, so it adds no vertical
+     banding. The gem stays red; what it throws onto the frame is the editor's
+     line-mark cyan (see --sao-spill), so the topbar answers the gutter. */
+  background-color: var(--sao-frame);
+  background-image: linear-gradient(90deg,
+    rgba(var(--sao-spill), 0.38) 0%,
+    rgba(var(--sao-spill), 0.25) 55%,
+    rgba(var(--sao-spill), 0.15) 100%);
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% 100%,
+    0 100%,
+    0 calc(100% - 5px),
+    calc(100% - 4px) calc(100% - 5px),
+    calc(100% - 4px) 5px,
+    0 5px
+  );
+}
+
+/* ---------- Gunmetal plate ---------- */
+.sao-plate {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: var(--sao-h);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 calc(var(--sao-chamfer) + 3px) 0 6px;
+  /* Flat slab, no vertical ramp. The old brushed-metal gradient ran from near
+     white at the top lip to near black at the bottom, which made the frame look
+     lit from above and washed out the boss name sitting on it. One constant
+     tone reads as a solid piece of the UI at every height. */
+  background-color: var(--sao-frame);
+  clip-path: polygon(0 0, 100% 0, calc(100% - var(--sao-chamfer)) 100%, 0 100%);
+}
+
+/* Crystal spill only: a wash at the far-left edge so the crystal reads as
+   casting light onto the frame rather than floating beside it. Runs left→right,
+   so it doesn't reintroduce the top-lighter/bottom-darker banding. */
+.sao-plate::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg,
+    rgba(var(--sao-spill), 0.17) 0%,
+    rgba(var(--sao-spill), 0.09) 3%,
+    rgba(var(--sao-spill), 0.035) 8%,
+    rgba(var(--sao-spill), 0.012) 13%,
+    transparent 19%);
+}
+
+.sao-plate-lv {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #f4f4f4;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+/* Boss name at the very left of the plate, as on the SAO party frames — a
+   lighter slab divided from the bar by a hairline. Carries the admin alias so a
+   long program title can't eat the HP track. */
+.sao-plate-name {
+  flex: 0 0 auto;
+  max-width: 30%;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  position: relative;
+  z-index: 1;
+  padding: 0 10px 0 5px;
+  margin-right: 7px;
+  border-right: 1px solid rgba(255, 255, 255, 0.26);
+  /* Lighter weight and a tight shadow: at 800 with a heavy shadow the letters
+     smeared into the metal instead of sitting cleanly on it. */
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.035em;
+  color: #ffffff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.7);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- HP track: outline shape ---------- */
+.sao-track {
+  position: relative;
+  z-index: 1;              /* above the plate's lighting pass */
+  flex: 1 1 auto;
+  min-width: 40px;
+  height: 16px;
+  background: #ededed;
+  /* Thick on the LEFT, stepping UP to a thinner right section, then chamfered. */
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    calc(100% - var(--sao-tr-chamfer)) calc(100% - var(--sao-step)),
+    calc(var(--sao-step-x) + var(--sao-step)) calc(100% - var(--sao-step)),
+    var(--sao-step-x) 100%,
+    0 100%
+  );
+}
+
+/* The same polygon inset 1px — the gap between the two IS the outline, so it
+   follows the chamfer and the step instead of being clipped off them. */
+.sao-well {
+  position: absolute;
+  inset: 1px;
+  background: #0d0d0d;
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    calc(100% - var(--sao-tr-chamfer)) calc(100% - var(--sao-step)),
+    calc(var(--sao-step-x) + var(--sao-step)) calc(100% - var(--sao-step)),
+    var(--sao-step-x) 100%,
+    0 100%
+  );
+  overflow: hidden;
+}
+
+/* The HP that was just lost: left standing in red where the bar used to reach,
+   then receding down to the new value. It sits behind the fill, so only the
+   stretch between new HP and old HP is ever visible. */
+.sao-ghost {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  background: linear-gradient(180deg, #ff6b6b 0%, #e8253f 55%, #a80f26 100%);
+  box-shadow: inset 0 0 6px rgba(255, 120, 120, 0.5);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 7px) 100%, 0 100%);
+  /* The painter owns this transition: it pins the width with `none`, holds, then
+     sets an explicit transition to recede. Relying on a CSS transition-delay here
+     let the browser coalesce the pin and the recede into one frame. */
+  transition: none;
+}
+
+/* Flat two-tone green like the reference: a brighter upper band over a slightly
+   deeper lower one, no heavy gloss and no segment dividers. */
+.sao-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  background: linear-gradient(180deg,
+    hsl(var(--sao-hue) 76% 57%) 0%,
+    hsl(var(--sao-hue) 78% 52%) 58%,
+    hsl(var(--sao-hue) 82% 42%) 59%,
+    hsl(var(--sao-hue) 80% 39%) 100%);
+  /* The leading edge is cut on the diagonal, like the SAO party bars — a flat
+     vertical edge read as a progress bar rather than an HP gauge. */
+  clip-path: polygon(0 0, 100% 0, calc(100% - 7px) 100%, 0 100%);
+  transition: width 0.26s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s linear;
+}
+/* Segment notches. The painter (_bossPaintTicks) hands over one segment's width
+   as a percentage of the track, picked so any boss lands on ~8–24 segments; the
+   second layer marks every fifth notch a little brighter so the eye can count
+   them. Both are drawn at the END of their tile, so no line sits on the left
+   edge of the bar. */
+.sao-ticks {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  /* Off until the painter knows the boss's max HP — the fallback segment width
+     below would otherwise notch the bar on an arbitrary scale for one frame. */
+  display: none;
+  background-repeat: repeat-x;
+  background-image:
+    linear-gradient(90deg, transparent calc(100% - 1px), rgba(255, 255, 255, 0.5) calc(100% - 1px)),
+    linear-gradient(90deg, transparent calc(100% - 1px), rgba(255, 255, 255, 0.19) calc(100% - 1px));
+  background-size: var(--sao-seg-major, 25%) 100%, var(--sao-seg, 5%) 100%;
+}
+
+/* ---------- Damage shards ---------- */
+/* Petal shards: they lift off the wound and drift in a straight diagonal line,
+   up and to the right. No wobble and no tumbling — the only rotation is a small
+   turn of the petal itself. --pt-lean is the horizontal reach, --pt-y the rise. */
+.sao-shard {
+  position: absolute;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 0 3px rgba(255, 60, 105, 0.75)) drop-shadow(0 0 7px rgba(255, 0, 60, 0.35));
+  animation: saoPetal var(--pt-dur, 2s) cubic-bezier(0.25, 0.5, 0.4, 1) var(--pt-delay, 0s) forwards;
+  will-change: transform, opacity;
+}
+@keyframes saoPetal {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) rotate(0deg) scale(0.5);
+  }
+  14% { opacity: 1; }
+  78% { opacity: 0.75; }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--pt-lean, 28px)), calc(-50% + var(--pt-y, -40px)))
+               rotate(var(--pt-rot, 20deg)) scale(0.8);
+  }
+}
+
+/* Just a soft sheen along the top edge — the reference bar is nearly flat. */
+.sao-gloss {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    rgba(255, 255, 255, 0.18) 0%,
+    rgba(255, 255, 255, 0.04) 40%,
+    rgba(0, 0, 0, 0.05) 60%,
+    rgba(0, 0, 0, 0.16) 100%);
+}
+
+/* ---------- HP / percent readout ---------- */
+.sao-readout {
+  position: absolute;
+  right: 0;
+  bottom: 1px;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: #ffffff;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.55));
+  pointer-events: none;
+}
+.sao-readout > span {
+  /* Same flat slab tone as the plate, one step lighter so the numbers still
+     separate from the frame behind them without a top-lit ramp. */
+  background-color: #565c65;
+  padding: 2px 7px;
+  line-height: 1.3;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+  white-space: nowrap;
+}
+/* Fully square slab — no cut corners on any edge. */
+.sao-hp { padding-left: 9px; }
+.sao-lv {
+  min-width: 46px;
+  text-align: center;
+}
+
+/* ---------- Reactive states ---------- */
+/* TARGET LOCK. The crystal used to flare on every point of damage, which meant
+   it strobed continuously while you typed. It now fires only when you take aim
+   at the boss again — coming back from the Run Code terminal, or switching to
+   another problem in a set — the way an RPG re-acquires a target.
+   Two parts: the gem flashes white, and a reticle ring snaps inward around it. */
+.sao-crystal.boss-lock .sao-crystal-gem { animation: saoCrystalLock 0.62s cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes saoCrystalLock {
+  0%   { filter: drop-shadow(0 0 2px rgba(255, 80, 135, 0.55)); transform: scale(1); }
+  18%  { filter: drop-shadow(0 0 9px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 20px rgba(255, 40, 110, 0.75)); transform: scale(1.22); }
+  46%  { filter: drop-shadow(0 0 5px rgba(255, 200, 225, 0.7)) drop-shadow(0 0 12px rgba(255, 0, 80, 0.5)); transform: scale(0.96); }
+  100% { filter: drop-shadow(0 0 2px rgba(255, 80, 135, 0.55)); transform: scale(1); }
+}
+/* The reticle. ::before is already the resting halo, so this rides on ::after. */
+.sao-crystal::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: 30px;
+  height: 30px;
+  margin: -15px 0 0 -15px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 235, 245, 0.95);
+  box-shadow: 0 0 12px rgba(255, 60, 125, 0.85), inset 0 0 8px rgba(255, 60, 125, 0.6);
+  opacity: 0;
+  pointer-events: none;
+}
+.sao-crystal.boss-lock::after { animation: saoLockRing 0.62s cubic-bezier(0.22, 1, 0.36, 1); }
+@keyframes saoLockRing {
+  0%   { opacity: 0;    transform: scale(2.6) rotate(-45deg); }
+  30%  { opacity: 0.95; transform: scale(1.1) rotate(-8deg); }
+  60%  { opacity: 0.7;  transform: scale(0.92) rotate(0deg); }
+  100% { opacity: 0;    transform: scale(1.5) rotate(6deg); }
+}
+
+/* Under 25% HP the outline throbs — the boss is nearly down. */
+.sao-boss.boss-critical .sao-track { animation: saoCritical 0.9s ease-in-out infinite; }
+@keyframes saoCritical {
+  0%, 100% { background: #ededed; }
+  50%      { background: hsl(var(--sao-hue) 100% 72%); }
+}
+
+/* Slain: the crystal goes dark and stops turning. */
+.sao-crystal.boss-slain,
+.sao-crystal.boss-slain .sao-crystal-spin,
+.sao-crystal.boss-slain .sao-crystal-gem { animation: none; }
+.sao-crystal.boss-slain .sao-crystal-gem { filter: grayscale(1) brightness(0.5); opacity: 0.45; }
+.sao-crystal.boss-slain::before { animation: none; opacity: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sao-crystal,
+  .sao-crystal::before,
+  .sao-crystal-spin,
+  .sao-crystal-gem,
+  .sao-crystal-shine,
+  .sao-boss.boss-critical .sao-track,
+  .sao-crystal.boss-lock::after,
+  .sao-crystal.boss-lock .sao-crystal-gem { animation: none !important; }
+  .sao-fill, .sao-ghost { transition: none !important; }
+  .sao-crystal-shine { opacity: 0.32; }
+}
+
+/* Between the topbar's wrap breakpoint (1024px, layout.css) and a roomy desktop
+   the bar shares one row with the buttons, so it drops the HP numbers rather
+   than letting the readout crowd the track. layout.css restores them below
+   1024px, where the bar gets a full row to itself. */
+@media (max-width: 1180px) {
+  .practice-title-badge { max-width: 30%; font-size: 0.8125rem; }
+  .sao-hp { display: none; }
+}
+
+
+/* --- Timer last-minute warning pulse --- */
+.timer-warning {
+  color: var(--color-warning) !important;
+  animation: timerWarnPulse 1s ease-in-out infinite;
+}
+
+@keyframes timerWarnPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/* --- Time's-up full-screen flash --- */
+.times-up-flash {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: radial-gradient(circle at center, rgba(239, 68, 68, 0.18), rgba(0, 0, 0, 0.55));
+  animation: timesUpFade 1.5s ease-out forwards;
+}
+
+.times-up-flash span {
+  font-family: var(--font-sans);
+  font-weight: 900;
+  font-size: clamp(2rem, 8vw, 5rem);
+  letter-spacing: 0.12em;
+  color: #fff;
+  text-shadow: 0 0 30px rgba(239, 68, 68, 0.9);
+  animation: timesUpZoom 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes timesUpFade {
+  0% { opacity: 0; }
+  15% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes timesUpZoom {
+  0% { transform: scale(0.6); opacity: 0; }
+  20% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* --- Pause Timer --- */
+.editor-paused {
+  filter: blur(8px);
+  pointer-events: none;
+  transition: filter 0.3s ease;
+}
+
+.btn-pause-timer {
+  background: none;
+  border: none;
+  color: #8b949e;
+  cursor: pointer;
+  padding: 2px;
+  margin-left: 4px;
+  display: flex;
+  align-items: center;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.btn-pause-timer:hover {
+  color: #e6edf3;
+  background: rgba(255,255,255,0.08);
+}
+
+.timer-paused {
+  color: var(--color-warning) !important;
+  animation: pauseBlink 1.2s ease-in-out infinite;
+}
+
+@keyframes pauseBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* --- Per-file reset button on tabs --- */
+.file-tab-reset {
+  background: none;
+  border: none;
+  color: #484f58;
+  cursor: pointer;
+  padding: 2px;
+  margin-left: 4px;
+  display: none;
+  align-items: center;
+  border-radius: 3px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.file-tab:hover .file-tab-reset,
+.file-tab.active .file-tab-reset {
+  display: inline-flex;
+}
+
+.file-tab-reset:hover {
+  color: var(--color-warning);
+  background: rgba(245, 158, 11, 0.12);
+}
+
+/* --- Hint System --- */
+.hint-item {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.375rem;
+  font-size: 0.8125rem;
+  color: #b1bac4;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.hint-number {
+  background: rgba(245, 158, 11, 0.25);
+  color: #f59e0b;
+  font-weight: 700;
+  font-size: 0.6875rem;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* --- Enhanced Result Modal --- */
+.result-stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.result-stat { text-align: center; }
+
+.result-stat-value {
+  display: block;
+  font-weight: 700;
+  font-size: 0.9375rem;
+  color: var(--text-primary);
+}
+
+.result-stat-label {
+  font-size: 0.6875rem;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.result-file-breakdown {
+  margin: 0.5rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.result-file-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.result-file-name {
+  width: 80px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.result-file-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-surface);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.result-file-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s ease;
+}
+
+.result-file-pct {
+  width: 36px;
+  text-align: right;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* --- Sortable table headers --- */
+.sortable-th {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.15s;
+}
+
+.sortable-th:hover {
+  color: var(--color-primary);
+}
+
+/* --- Difficulty Badge --- */
+.difficulty-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--diff-color);
+  background: color-mix(in srgb, var(--diff-color) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--diff-color) 25%, transparent);
+  vertical-align: middle;
+  margin-left: 6px;
+}
+
+/* Boss level, set per-program in Admin — matches the SAO plate's LV. chip. */
+.level-badge {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #ff8fb4;
+  background: rgba(255, 45, 110, 0.12);
+  border: 1px solid rgba(255, 45, 110, 0.3);
+  vertical-align: middle;
+  margin-left: 6px;
+}
+
+/* --- Unified Diff View --- */
+/* Like .diff-panels: the panel BODY is the only scroller, so the overview ruler
+   has one element to measure and follow. */
+.diff-unified-panel {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 1.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  background: #0d1117;
+}
+
+.diff-line-prefix {
+  width: 1.5rem;
+  flex-shrink: 0;
+  text-align: center;
+  font-weight: 700;
+  user-select: none;
+}
+
+/* --- Mobile: practice & run-code adjustments --- */
+@media (max-width: 600px) {
+  .practice-sidebar {
+    width: 100%;
+    min-width: 0;
+    max-height: 35vh;
+    border-right: none;
+    border-bottom: 1px solid #21262d;
+  }
+
+  .run-code-window {
+    width: 98%;
+    height: 85vh;
+  }
+
+  .practice-topbar-right {
+    gap: 0.5rem;
+  }
+
+  .btn-submit,
+  .btn-run-code {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+}
+
+/* ============================================================
+   PRACTICE SIDEBAR FOOTER - tip + tidy shortcut chips
+   ============================================================ */
+.practice-footer-tip { display: flex; gap: 0.45rem; align-items: flex-start; color: var(--text-tertiary, #8b949e); font-size: 0.75rem; line-height: 1.55; margin: 0; }
+.practice-footer-tip svg { color: var(--color-primary, #6366f1); }
+.practice-footer-tip strong { color: var(--text-secondary, #c9d1d9); }
+.practice-kbd-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.45rem 0.9rem; margin-top: 0.75rem; }
+.practice-kbd-row { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; min-width: 0; }
+.practice-kbd-keys { display: inline-flex; gap: 2px; flex-shrink: 0; }
+.practice-kbd-row kbd { font-size: 0.62rem; padding: 1px 5px; border-radius: 4px; background: #161b22; border: 1px solid #30363d; border-bottom-width: 2px; color: #8b949e; font-family: var(--font-mono, monospace); }
+.practice-kbd-row em { font-style: normal; font-size: 0.68rem; color: #6e7681; white-space: nowrap; }
+
+/* ============================================================
+   BOSS DEFEATED - SAO-style full-page glass shatter
+   ============================================================ */
+.boss-shatter-overlay { position: fixed; inset: 0; z-index: 99998; pointer-events: none; overflow: hidden; }
+.boss-shatter-flash { position: absolute; inset: 0; background: radial-gradient(circle at 50% 45%, rgba(190, 242, 255, 0.95), rgba(125, 211, 252, 0.35) 45%, transparent 75%); animation: bossFlash 0.55s ease-out forwards; }
+@keyframes bossFlash { 0% { opacity: 0; } 12% { opacity: 1; } 100% { opacity: 0; } }
+.boss-shatter-ring { position: absolute; left: 50%; top: 45%; width: 60px; height: 60px; margin: -30px 0 0 -30px; border-radius: 50%; border: 3px solid rgba(165, 243, 252, 0.9); box-shadow: 0 0 40px rgba(34, 211, 238, 0.8), inset 0 0 30px rgba(34, 211, 238, 0.5); animation: bossRing 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+/* A second, slower ring gives the shockwave depth instead of one flat pop. */
+.boss-shatter-ring-2 { border-width: 2px; border-color: rgba(255, 255, 255, 0.75); animation: bossRing 1.25s cubic-bezier(0.16, 1, 0.3, 1) 0.12s forwards; }
+@keyframes bossRing { 0% { transform: scale(0.2); opacity: 1; } 100% { transform: scale(18); opacity: 0; } }
+
+/* Hairline cracks that shoot out from the impact point before the glass goes */
+.boss-crack {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  height: 2px;
+  width: var(--crack-len, 40vmax);
+  transform-origin: 0 50%;
+  transform: rotate(var(--crack-rot, 0deg)) scaleX(0);
+  background: linear-gradient(90deg, rgba(224, 250, 255, 0.95), rgba(34, 211, 238, 0.5) 45%, transparent);
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.8);
+  animation: bossCrack 0.7s cubic-bezier(0.12, 0.9, 0.2, 1) var(--crack-delay, 0s) forwards;
+  opacity: 0;
+}
+@keyframes bossCrack {
+  0%   { opacity: 0; transform: rotate(var(--crack-rot, 0deg)) scaleX(0); }
+  12%  { opacity: 1; }
+  55%  { opacity: 0.9; transform: rotate(var(--crack-rot, 0deg)) scaleX(1); }
+  100% { opacity: 0; transform: rotate(var(--crack-rot, 0deg)) scaleX(1); }
+}
+
+.boss-shatter-text { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%) scale(0.6); font-family: var(--font-mono, monospace); font-weight: 900; font-size: 3.2rem; letter-spacing: 0.35em; color: #e0faff; text-shadow: 0 0 18px rgba(34, 211, 238, 0.9), 0 0 60px rgba(34, 211, 238, 0.6); animation: bossText 1.9s cubic-bezier(0.2, 1.4, 0.35, 1) forwards; opacity: 0; }
+/* Chromatic split under the word — reads as the glass refracting it. */
+.boss-shatter-text::before,
+.boss-shatter-text::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.boss-shatter-text::before { color: rgba(255, 60, 120, 0.65); animation: bossTextSplitA 1.9s ease-out forwards; }
+.boss-shatter-text::after  { color: rgba(80, 240, 255, 0.65); animation: bossTextSplitB 1.9s ease-out forwards; }
+@keyframes bossText {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.5) skewX(-14deg); letter-spacing: 0.9em; }
+  16%  { opacity: 1; transform: translate(-50%, -50%) scale(1.12) skewX(0deg); letter-spacing: 0.3em; }
+  32%  { transform: translate(-50%, -50%) scale(1) ; letter-spacing: 0.35em; }
+  78%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -54%) scale(1.06); letter-spacing: 0.42em; }
+}
+@keyframes bossTextSplitA {
+  0%, 100% { transform: translate(0, 0); opacity: 0; }
+  18%      { transform: translate(-5px, 2px); opacity: 0.8; }
+  50%      { transform: translate(-2px, 0); opacity: 0.35; }
+}
+@keyframes bossTextSplitB {
+  0%, 100% { transform: translate(0, 0); opacity: 0; }
+  18%      { transform: translate(5px, -2px); opacity: 0.8; }
+  50%      { transform: translate(2px, 0); opacity: 0.35; }
+}
+.boss-shard { position: absolute; animation: bossShard var(--shard-dur, 1.4s) cubic-bezier(0.17, 0.85, 0.3, 1) var(--shard-delay, 0s) forwards; opacity: 0; will-change: transform, opacity; }
+@keyframes bossShard {
+  /* Barely a beat at the impact point before they scatter — a longer hold piled
+     every shard on the centre for the first third of a second. */
+  0%   { opacity: 0; transform: translate(0, 0) rotate(0deg) scale(0.3); }
+  4%   { opacity: 1; transform: translate(calc(var(--shard-dx, 200px) * 0.03), calc(var(--shard-dy, 300px) * 0.02)) rotate(0deg) scale(1.05); }
+  32%  { transform: translate(calc(var(--shard-dx, 200px) * 0.46), calc(var(--shard-dy, 300px) * 0.32)) rotate(calc(var(--shard-rot, 180deg) * 0.34)) scale(0.95); }
+  72%  { opacity: 0.9; }
+  100% { opacity: 0; transform: translate(var(--shard-dx, 200px), var(--shard-dy, 300px)) rotate(var(--shard-rot, 180deg)) scale(0.42); }
+}
+.boss-shake { animation: bossShake 0.5s ease-in-out; }
+@keyframes bossShake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-7px, 3px); }
+  40% { transform: translate(6px, -4px); }
+  60% { transform: translate(-4px, 2px); }
+  80% { transform: translate(3px, -2px); }
+}
+
+/* ============================================================
+   MULTI-PROBLEM SESSION (#/practice-set)
+   ============================================================ */
+.pset-switchbar { display: flex; align-items: center; gap: 0.75rem; padding: 0.45rem 1rem; background: #0d1117; border-bottom: 1px solid #21262d; }
+.pset-switch-label { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.68rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: #8b949e; flex-shrink: 0; }
+.pset-switcher { display: flex; gap: 0.4rem; flex-wrap: wrap; flex: 1; }
+.pset-box { position: relative; width: 40px; height: 34px; border-radius: 8px; border: 1px solid #30363d; background: #161b22; color: #8b949e; font-weight: 700; font-size: 0.82rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; transition: all 0.14s ease; font-family: var(--font-mono, monospace); }
+.pset-box:hover { border-color: #8b949e; color: #e6edf3; }
+.pset-box.current { border-color: var(--color-primary, #6366f1); color: #fff; background: rgba(99, 102, 241, 0.18); box-shadow: 0 0 0 1px var(--color-primary, #6366f1); }
+.pset-box.edited { color: #e6edf3; }
+.pset-box.edited::after { content: ""; position: absolute; top: 4px; right: 4px; width: 5px; height: 5px; border-radius: 50%; background: #f59e0b; }
+.pset-box.pass { border-color: #10b981; color: #10b981; background: rgba(16, 185, 129, 0.12); }
+.pset-box.pass.current { box-shadow: 0 0 0 1px #10b981; color: #34d399; }
+.pset-box.fail { border-color: #ef4444; color: #ef4444; background: rgba(239, 68, 68, 0.1); }
+.pset-box.fail.current { box-shadow: 0 0 0 1px #ef4444; }
+.pset-box-badge { position: absolute; top: -5px; right: -5px; width: 13px !important; height: 13px !important; background: #0d1117; border-radius: 50%; padding: 1px; }
+.pset-progress-label { font-size: 0.7rem; color: #8b949e; white-space: nowrap; flex-shrink: 0; font-family: var(--font-mono, monospace); }
+.pset-file-problem { align-self: center; margin-left: 0.75rem; font-size: 0.7rem; color: #8b949e; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pset-check-panel { background: #0d1117; border: 1px solid #21262d; border-radius: 8px; padding: 0.75rem; margin-top: 0.5rem; }
+.pset-check-title { display: flex; align-items: center; gap: 0.4rem; font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #8b949e; margin-bottom: 0.6rem; }
+.pset-check-summary { display: flex; align-items: center; gap: 0.45rem; font-weight: 700; font-size: 0.82rem; margin-bottom: 0.5rem; }
+.pset-check-summary.pass { color: #34d399; }
+.pset-check-summary.fail { color: #f87171; }
+.pset-check-summary.mid { color: #fbbf24; }
+.pset-stale-note { display: flex; align-items: center; gap: 0.3rem; font-size: 0.68rem; color: #fbbf24; margin-bottom: 0.5rem; }
+.pset-test-row { display: flex; align-items: center; gap: 0.45rem; font-size: 0.75rem; padding: 0.3rem 0.4rem; border-radius: 6px; }
+.pset-test-row.pass { color: #34d399; background: rgba(16, 185, 129, 0.07); }
+.pset-test-row.fail { color: #f87171; background: rgba(239, 68, 68, 0.07); }
+.pset-test-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pset-test-err { font-size: 0.66rem; opacity: 0.85; }
+.pset-test-diff { font-size: 0.68rem; color: #8b949e; padding: 0.35rem 0.5rem 0.5rem 1.6rem; display: flex; flex-direction: column; gap: 2px; }
+.pset-test-diff code { background: #161b22; padding: 1px 5px; border-radius: 4px; color: #e6edf3; white-space: pre-wrap; }
+.pset-compile-err { font-size: 0.66rem; background: #161b22; color: #f87171; padding: 0.5rem; border-radius: 6px; white-space: pre-wrap; max-height: 160px; overflow: auto; font-family: var(--font-mono, monospace); }
+.pset-summary-avg { display: flex; align-items: center; gap: 0.75rem; padding: 0.9rem 1rem; border-radius: var(--radius-md); margin-bottom: 0.9rem; background: var(--bg-surface-hover); border: 1px solid var(--border-color); color: var(--text-secondary); font-size: 0.8rem; }
+.pset-summary-avg-num { font-size: 1.8rem; font-weight: 900; }
+.pset-summary-avg.pass .pset-summary-avg-num { color: #10b981; }
+.pset-summary-avg.mid .pset-summary-avg-num { color: #f59e0b; }
+.pset-summary-avg.fail .pset-summary-avg-num { color: #ef4444; }
+.pset-summary-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0.25rem; border-bottom: 1px solid rgba(128, 128, 128, 0.12); font-size: 0.82rem; }
+.pset-summary-num { font-weight: 800; color: var(--text-tertiary); width: 1.4em; }
+.pset-summary-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); font-weight: 600; }
+.pset-summary-basis { font-size: 0.66rem; color: var(--text-tertiary); white-space: nowrap; }
+
+/* ============================================================
+   SET QUESTION SWITCHER (Solution diff page — practice set attempts)
+   ============================================================ */
+.set-question-switcher {
+  background: #0d1117;
+  border-bottom: 1px solid #21262d;
+  padding: 0;
+}
+.set-q-switcher-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 1rem;
+}
+.set-q-switcher-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #8b949e;
+  flex-shrink: 0;
+}
+.set-q-switcher-grid {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+.set-q-btn {
+  position: relative;
+  width: 38px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid #30363d;
+  background: #161b22;
+  color: #8b949e;
+  font-weight: 700;
+  font-size: 0.82rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.14s ease;
+  font-family: var(--font-mono, monospace);
+}
+.set-q-btn:hover {
+  border-color: #8b949e;
+  color: #e6edf3;
+}
+.set-q-btn.active {
+  border-color: var(--color-primary, #6366f1);
+  color: #fff;
+  background: rgba(99, 102, 241, 0.18);
+  box-shadow: 0 0 0 1px var(--color-primary, #6366f1);
+}
+.set-q-btn.pass {
+  border-color: #10b981;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.12);
+}
+.set-q-btn.pass.active {
+  box-shadow: 0 0 0 1px #10b981;
+  color: #34d399;
+}
+.set-q-btn.partial {
+  border-color: #f59e0b;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+}
+.set-q-btn.partial.active {
+  box-shadow: 0 0 0 1px #f59e0b;
+  color: #fbbf24;
+}
+.set-q-btn.fail {
+  border-color: #ef4444;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+.set-q-btn.fail.active {
+  box-shadow: 0 0 0 1px #ef4444;
+  color: #f87171;
+}
+.set-q-switcher-title {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #e6edf3;
+  margin-left: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 250px;
+}
+
+/* ============================================================
+   PRACTICE THIRD WINDOW (Problems / Tests / Executions)
+   ============================================================ */
+/* The panel used to be `width: 340px; flex-shrink: 0`, so between 1024 and
+   ~1150px it held its full width and squeezed the editor to 282px - about 30
+   columns, which is unusable for C. It gives ground now instead: the editor
+   keeps a workable minimum and the panel shrinks toward 240px first. */
+.practice-panel { width: 340px; flex: 0 1 340px; min-width: 240px; background: #0d1117; border-left: 1px solid #21262d; display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; }
+/* Around 55 columns at the editor's 14px mono - enough for a normal C line. */
+.practice-layout:not(.zen) .editor-wrap, .practice-layout:not(.zen) .editor-shell { min-width: 0; }
+#editor-textarea { min-width: 0; }
+/* Pinned to the bottom of the panel. margin-top:auto keeps it at the floor when
+   the tab body is short; sticky keeps it in view once the body scrolls.
+   The extra right padding clears the fixed settings FAB (46px + 20px inset),
+   which now shares this corner. */
+.pp-footer {
+  margin-top: auto;
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: #0d1117;
+  border-top: 1px solid #21262d;
+  z-index: 2;
+}
+.pp-runcode-btn,
+.pp-finish-btn { flex: 1 1 0; min-width: 0; justify-content: center; white-space: nowrap; }
+.pp-runcode-btn { flex-grow: 0.85; }
+/* The two footer buttons sit side by side, so they have to react identically.
+   btn-primary brightens its gradient on hover while btn-run-code only lifted
+   and glowed, which made the pair look like one was half-disabled. Each keeps
+   its own colour; only the response is shared. */
+.pp-runcode-btn:hover {
+  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
+  transform: translateY(-1px);
+}
+.pp-runcode-btn:active,
+.pp-finish-btn:active { transform: translateY(0) scale(0.97); }
+.pp-section { padding: 0.75rem; border-bottom: 1px solid #21262d; }
+.pp-section-title, .pp-block-title { display: flex; align-items: center; gap: 0.4rem; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #8b949e; margin-bottom: 0.6rem; }
+.pp-problem-grid { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+/* Now the topmost sticky element, so it needs its own ground — without a
+   background the scrolling test rows showed through it. */
+/* Height matches the editor's file-tab row so the two line up across the seam. */
+.pp-tabs { display: flex; height: calc(var(--ed-toolbar-h, 38px) + 1px); flex-shrink: 0; border-bottom: 1px solid #21262d; position: sticky; top: 0; background: #0d1117; z-index: 2; }
+.pp-tab { flex: 1; height: var(--ed-toolbar-h, 38px); display: flex; align-items: center; justify-content: center; gap: 0.35rem; background: none; border: none; border-bottom: 2px solid transparent; color: #8b949e; font-weight: 700; font-size: 0.78rem; padding: 0 0.5rem; cursor: pointer; transition: color 0.15s, border-color 0.15s; }
+.pp-tab:hover { color: #e6edf3; }
+.pp-tab.active { color: var(--color-primary, #6366f1); border-bottom-color: var(--color-primary, #6366f1); }
+.pp-tab-body { padding: 0.75rem; flex: 1; }
+.pp-tests { display: flex; flex-direction: column; gap: 0.25rem; }
+.pp-row-wrap { display: flex; flex-direction: column; }
+.pp-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.5rem; border-radius: 7px; font-size: 0.8rem; }
+.pp-row.ok { background: rgba(16, 185, 129, 0.08); }
+.pp-row.no { background: rgba(239, 68, 68, 0.08); }
+.pp-row-ic { width: 15px !important; height: 15px !important; flex-shrink: 0; }
+.pp-row-ic.ok { color: #34d399; }
+.pp-row-ic.no { color: #f87171; }
+.pp-row-ic.idle { color: #484f58; }
+.pp-row-label { flex: 1; min-width: 0; color: #c9d1d9; overflow: hidden; text-overflow: ellipsis; }
+.pp-row-label .pp-hidden { color: #6e7681; font-style: italic; font-size: 0.72rem; }
+.pp-run-btn { flex-shrink: 0; width: 24px; height: 24px; border-radius: 6px; border: 1px solid #30363d; background: #161b22; color: var(--color-primary, #818cf8); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s, border-color 0.15s, transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.15s; }
+.pp-run-btn:hover { background: rgba(99, 102, 241, 0.15); border-color: var(--color-primary, #6366f1); transform: scale(1.12); box-shadow: 0 0 10px rgba(99, 102, 241, 0.35); }
+.pp-run-btn:active { transform: scale(0.9); }
+.pp-run-btn svg { transition: transform 0.15s ease; }
+.pp-run-btn:hover svg { transform: translateX(1px); }
+/* --- Expandable test row: your output beside the expected output --- */
+.pp-row-toggle {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #6e7681;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.pp-row-toggle:hover { background: #21262d; color: #e6edf3; }
+.pp-row-toggle svg { transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.pp-row-toggle:hover svg { transform: scale(1.2); }
+
+/* The output panel rolls down out of the row and back up into it. <details>-style
+   height animation isn't available here (the element is created and destroyed by
+   the re-render), so it is a keyframed clip + slide; the closing pass is added by
+   ppToggleTestDetail just before the row is rebuilt. */
+.pp-test-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 0.4rem 0.3rem 0.6rem 1.9rem;
+  font-size: 0.68rem;
+}
+/* Only the panel that was just opened rolls down. The class is set for a single
+   paint (see _ppJustOpened) — animating every .pp-test-detail meant opening a
+   second row replayed the first row's animation too, so both flickered. */
+/* Straight down and straight up, the same motion the library folders use.
+   It used to scaleY from 0.8 with a moving clip-path and transform-origin at the
+   top, which reads as a page tipping over - "flipped like a book". Height alone
+   has no perspective in it. */
+.pp-test-detail.just-opened,
+.pp-test-detail.closing { overflow: hidden; }
+.pp-test-detail.just-opened { animation: ppDetailDown 0.26s cubic-bezier(0.4, 0, 0.2, 1); }
+.pp-test-detail.closing { animation: ppDetailUp 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+@keyframes ppDetailDown {
+  from { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; }
+  to   { opacity: 1; max-height: 480px; padding-top: 0.4rem; padding-bottom: 0.6rem; }
+}
+@keyframes ppDetailUp {
+  from { opacity: 1; max-height: 480px; padding-top: 0.4rem; padding-bottom: 0.6rem; }
+  to   { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pp-test-detail.just-opened, .pp-test-detail.closing { animation: none; }
+}
+/* Side by side, but keyed off the PANEL's width rather than the viewport's —
+   the panel is resizable, so a viewport media query would be the wrong scale.
+   Below ~250px of room the two stack rather than shrink into unreadable strips. */
+.pp-io-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 5px;
+  min-width: 0;
+}
+.pp-io {
+  min-width: 0;
+  border: 1px solid #21262d;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #0f141a;
+}
+.pp-io.ok { border-color: rgba(16, 185, 129, 0.42); }
+.pp-io.no { border-color: rgba(239, 68, 68, 0.42); }
+.pp-io-head {
+  padding: 3px 6px;
+  background: #161b22;
+  border-bottom: 1px solid #21262d;
+  font-size: 0.6rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8b949e;
+}
+.pp-io.ok .pp-io-head { color: #34d399; }
+.pp-io.no .pp-io-head { color: #f87171; }
+.pp-io-body {
+  margin: 0;
+  padding: 5px 6px;
+  max-height: 132px;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  line-height: 1.45;
+  color: #e6edf3;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.pp-io-empty { color: #565d66; font-style: italic; }
+.pp-io-stdin { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
+.pp-io-tag {
+  flex-shrink: 0;
+  margin-top: 4px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #8b949e;
+}
+.pp-io-stdin .pp-io-body {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid #21262d;
+  border-radius: 6px;
+  background: #0f141a;
+  max-height: 76px;
+}
+.pp-io-note { color: #6e7681; font-style: italic; }
+.pp-test-err { color: #f87171; }
+.pp-score { margin-top: 0.6rem; padding: 0.45rem 0.6rem; border-radius: 7px; font-weight: 800; font-size: 0.82rem; text-align: center; }
+.pp-score.pass { background: rgba(16,185,129,0.12); color: #34d399; }
+.pp-score.fail { background: rgba(239,68,68,0.1); color: #f87171; }
+.pp-score.idle { background: #161b22; color: #8b949e; font-weight: 600; }
+.pp-stale { color: #fbbf24; font-weight: 600; }
+.pp-empty { text-align: center; color: #6e7681; padding: 1.5rem 0.75rem; }
+.pp-empty svg { width: 30px; height: 30px; opacity: 0.5; margin-bottom: 0.5rem; }
+.pp-empty p { font-size: 0.8rem; margin: 0.2rem 0; }
+.pp-empty .pp-empty-sub { font-size: 0.72rem; color: #565d66; }
+.pp-execs { display: flex; flex-direction: column; gap: 0.4rem; }
+.pp-exec-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem; border: 1px solid #21262d; border-radius: 8px; background: #161b22; }
+.pp-exec-row.best { border-color: rgba(16,185,129,0.5); }
+.pp-exec-info { flex: 1; min-width: 0; }
+.pp-exec-label { font-size: 0.78rem; font-weight: 600; color: #c9d1d9; }
+.pp-best-tag { font-size: 0.58rem; font-weight: 800; color: #34d399; background: rgba(16,185,129,0.15); padding: 1px 5px; border-radius: 999px; margin-left: 4px; }
+.pp-exec-time { font-size: 0.68rem; color: #6e7681; font-family: var(--font-mono, monospace); }
+.pp-restore-btn { flex-shrink: 0; }
+@media (max-width: 900px) {
+  .practice-panel { display: none; }
+}
+
+/* ============================================================
+   PRACTICE EDITOR CHROME — toolbar, find bar, output strip,
+   zen mode, collapsible shortcuts, boss combo + best marker
+   ============================================================ */
+
+/* --- Toolbar row: file tabs on the left, editor tools on the right --- */
+.practice-body { --ed-toolbar-h: 38px; }
+
+.editor-toolbar-row {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  height: calc(var(--ed-toolbar-h) + 1px);
+  border-bottom: 1px solid var(--border-color);
+  background: #0d1117;
+  flex-shrink: 0;
+}
+.editor-toolbar-row .file-tab-bar {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: var(--ed-toolbar-h);
+  min-height: var(--ed-toolbar-h);
+  overflow-x: auto;
+  border-bottom: none;
+}
+.editor-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 0.4rem;
+  flex-shrink: 0;
+}
+.ed-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: #8b949e;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.ed-tool:hover { background: #21262d; color: #e6edf3; }
+.ed-tool.active { color: var(--color-primary); background: rgba(99, 102, 241, 0.14); }
+.ed-tool svg { width: 14px; height: 14px; }
+.ed-tool-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  background: #161b22;
+  border-radius: 6px;
+  padding: 1px;
+}
+.ed-font-label {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: #8b949e;
+  min-width: 16px;
+  text-align: center;
+}
+.ed-save-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.66rem;
+  color: #6e7681;
+  white-space: nowrap;
+  margin-right: 0.35rem;
+}
+
+/* --- Find & replace --- */
+.ed-find-bar {
+  position: absolute;
+  top: 8px;
+  right: 14px;
+  z-index: 20;
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+}
+.ed-find-bar.open { display: flex; }
+.ed-find-row { display: flex; align-items: center; gap: 4px; }
+.ed-find-ic { width: 13px; height: 13px; color: #6e7681; flex-shrink: 0; }
+.ed-find-input {
+  width: 190px;
+  padding: 3px 7px;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: #e6edf3;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 5px;
+  outline: none;
+}
+.ed-find-input:focus { border-color: var(--color-primary); }
+.ed-find-input.no-match { border-color: var(--color-danger); }
+.ed-find-count {
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  color: #8b949e;
+  min-width: 34px;
+  text-align: center;
+}
+
+/* --- Last-run output strip under the editor --- */
+.editor-output {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid #21262d;
+  background: #0d1117;
+  max-height: 200px;
+}
+.editor-output:not(.has-output) { display: none; }
+.editor-output.collapsed .editor-output-body { display: none; }
+.editor-output-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  font-size: 0.68rem;
+  color: #8b949e;
+  border-bottom: 1px solid #21262d;
+  flex-shrink: 0;
+}
+.editor-output-title { font-weight: 600; }
+.editor-output-status { margin-left: auto; font-family: var(--font-mono); font-size: 0.65rem; }
+.editor-output-body {
+  overflow: auto;
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  line-height: 1.5;
+  max-height: 170px;
+}
+
+/* --- Folding a side pane away (Zen mode, and the divider arrows) -----------
+   These used to be `display: none`, which made both panes vanish between one
+   frame and the next. Sliding them shut instead keeps the eye on where the
+   editor came from. Width is animated rather than transform because the editor
+   has to reflow into the space as it opens up, not be covered by it.
+
+   The inline width/flex-basis the drag resizer writes has to be beaten, hence
+   the !important on the collapsed state. */
+.practice-sidebar,
+.practice-panel {
+  transition:
+    width 0.26s cubic-bezier(0.4, 0, 0.2, 1),
+    flex-basis 0.26s cubic-bezier(0.4, 0, 0.2, 1),
+    min-width 0.26s cubic-bezier(0.4, 0, 0.2, 1),
+    padding 0.26s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.16s ease,
+    visibility 0s;
+}
+
+/* While the seam is being dragged the pane must track the cursor exactly. The
+   fold-away transition above animates every width change, including the one
+   the drag writes on each mousemove, so the edge lagged a quarter-second
+   behind the pointer and kept coasting after the mouse stopped. The drag
+   helpers set this class for the length of the gesture. */
+body.is-resizing .practice-sidebar,
+body.is-resizing .practice-panel { transition: none; }
+
+.practice-layout.zen .practice-sidebar,
+.practice-layout.zen .practice-panel,
+.practice-layout.hide-left .practice-sidebar,
+.practice-layout.hide-right .practice-panel {
+  width: 0 !important;
+  min-width: 0 !important;
+  flex-basis: 0 !important;
+  flex-grow: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  border-width: 0 !important;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  /* Only leaves the accessibility tree once it has finished closing. */
+  visibility: hidden;
+  transition-delay: 0s, 0s, 0s, 0s, 0s, 0.26s;
+}
+
+.practice-layout.zen .resizer-divider { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  .practice-sidebar,
+  .practice-panel { transition: none; }
+}
+
+/* --- Collapsible shortcut sheet --- */
+.practice-shortcuts { margin-top: 0.5rem; }
+.practice-shortcuts > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #8b949e;
+  padding: 4px 0;
+  user-select: none;
+  transition: color 0.15s ease;
+}
+.practice-shortcuts > summary::-webkit-details-marker { display: none; }
+.practice-shortcuts > summary:hover { color: #e6edf3; }
+.practice-shortcuts[open] > summary { margin-bottom: 0.35rem; }
+/* The keyboard glyph turns as the sheet opens, so the toggle reads as a hinge. */
+.practice-shortcuts > summary svg { transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+.practice-shortcuts[open] > summary svg { transform: rotate(-8deg) scale(1.1); }
+/* <details> gives no open/close transition of its own, so the grid rolls itself
+   down. grid-template-rows 0fr → 1fr animates without hard-coding a height. */
+.practice-shortcuts > .practice-kbd-grid { animation: kbdSheetIn 0.26s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes kbdSheetIn {
+  from { opacity: 0; transform: translateY(-6px); clip-path: inset(0 0 100% 0); }
+  to   { opacity: 1; transform: translateY(0); clip-path: inset(0 0 0 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .practice-shortcuts > .practice-kbd-grid { animation: none; }
+  .practice-shortcuts[open] > summary svg { transform: none; }
+}
+
+/* --- Runnable sample header --- */
+.sample-head { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; }
+.sample-head .sample-title { margin: 0; }
+.sample-run-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.66rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.sample-run-btn:hover {
+  border-color: var(--color-success, #10b981);
+  color: var(--color-success, #10b981);
+  background: rgba(16, 185, 129, 0.1);
+}
+
+/* --- Boss: combo chip + personal-best marker --- */
+.sao-combo {
+  position: absolute;
+  right: 0;
+  top: -2px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: #ffd76e;
+  text-shadow: 0 0 8px rgba(255, 190, 60, 0.8);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+}
+.sao-combo.show { opacity: 1; transform: translateY(0); }
+.sao-combo.pop { animation: saoComboPop 0.34s cubic-bezier(0.2, 1.6, 0.4, 1); }
+@keyframes saoComboPop {
+  0% { transform: translateY(0) scale(0.7); }
+  60% { transform: translateY(0) scale(1.18); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+/* Personal best. Gold, not white — the segment notches are the white lines now,
+   and two white lines meaning two different things read as one broken scale. */
+.sao-best {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #ffd76e;
+  box-shadow: 0 0 6px rgba(255, 190, 60, 0.85);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.sao-lv { cursor: pointer; }
+.sao-lv.unset { color: rgba(255, 255, 255, 0.55); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sao-combo, .sao-combo.pop { animation: none !important; transition: none !important; }
+}
+
+/* --- Sidebar program header (full name above the Description) --- */
+.practice-prog-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid #21262d;
+}
+.practice-program-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #e6edf3;
+  overflow-wrap: anywhere;
+}
+.practice-program-version {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #6e7681;
+}
+.practice-program-version:empty { display: none; }
+
+/* --- Footer row: shortcuts toggle + autosave chip side by side --- */
+.practice-footer-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.practice-footer-row .practice-shortcuts { flex: 1 1 auto; min-width: 0; margin-top: 0; }
+.practice-footer-row .ed-save-state {
+  flex: 0 0 auto;
+  margin: 4px 0 0 0;
+  white-space: nowrap;
+}
+/* Expanding the sheet hands the row over to it — the chip steps aside. */
+.practice-shortcuts[open] ~ .ed-save-state { display: none; }
+
+/* --- Collapse either side panel independently (Zen mode hides both at once) ---
+   The pane itself is folded shut by the shared rule above (it slides, rather
+   than blinking out). The divider STAYS when its pane is collapsed: it carries
+   the arrow that brings the pane back, so hiding it would strand the pane with
+   no way to reopen it. It just stops being a drag handle (see
+   .resizer-divider.collapsed in layout.css) — there is nothing left to size. */
+
+.ed-tool-sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 3px;
+  background: #30363d;
+  flex-shrink: 0;
+}
+
+/* ============================================================
+   CHEAT SHEET — per-program reference sheet (Admin switch)
+   ------------------------------------------------------------
+   The attempt stays visible but blurred behind an inset page, so the sheet
+   reads as something laid over your work rather than another screen. The page
+   is warm off-white, not #fff: this opens over a dark editor, and a pure white
+   sheet at full size is a flashbang.
+   ============================================================ */
+.cheat-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  padding: 4.5vh 4.5vw;
+  background: rgba(4, 8, 15, 0.5);
+  backdrop-filter: blur(9px) saturate(85%);
+  -webkit-backdrop-filter: blur(9px) saturate(85%);
+  animation: cheatFade 0.18s ease-out;
+}
+.cheat-page {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  border-radius: 12px;
+  /* Was cream paper. Against a dark editor it read as a flashbang, and the
+     app's own light heading colours landed on it almost invisibly. */
+  background: linear-gradient(180deg, var(--bg-elevated) 0%, var(--bg-surface) 100%);
+  box-shadow:
+    0 30px 70px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+  color: var(--text-primary);
+  overflow: auto;
+  transform-origin: center;
+  animation: cheatOpen 0.34s cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+.cheat-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-surface-hover);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.cheat-close:hover { background: var(--bg-elevated); color: var(--text-primary); border-color: var(--color-primary); }
+.cheat-close svg { width: 16px; height: 16px; }
+.cheat-body { min-height: 100%; padding: 2rem 2.25rem; }
+
+.cheat-overlay.closing { animation: cheatFade 0.16s ease-in reverse both; }
+.cheat-overlay.closing .cheat-page { animation: cheatOpen 0.16s ease-in reverse both; }
+
+@keyframes cheatFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes cheatOpen {
+  from { opacity: 0; transform: scale(0.42); }
+  to { opacity: 1; transform: scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cheat-overlay, .cheat-page,
+  .cheat-overlay.closing, .cheat-overlay.closing .cheat-page { animation: none !important; }
+}
+
+/* ============================================================
+   TEST-RESULT FEEDBACK — confetti / ✕ rain / starfall
+   ------------------------------------------------------------
+   Spawned by practice-panel.js into one fixed, click-through layer over the
+   whole window. It cannot live inside .pp-row-wrap: the results panel scrolls
+   and clips, so a burst thrown from a row would be sliced off at the panel
+   edge instead of spilling across the page.
+   ============================================================ */
+.pp-fx {
+  position: fixed;
+  inset: 0;
+  z-index: 9600;
+  pointer-events: none;
+  overflow: hidden;
+}
+.pp-fx > i {
+  position: absolute;
+  display: block;
+  will-change: transform, opacity;
+}
+
+/* Passed — a burst out of the row. */
+.pp-confetti {
+  width: 7px;
+  height: 4px;
+  border-radius: 1px;
+  animation: ppConfetti 1.1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+@keyframes ppConfetti {
+  0%   { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
+  /* Out along the fan first, then gravity takes over. */
+  55%  { opacity: 1; transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(1); }
+  100% { opacity: 0; transform: translate(calc(var(--dx) * 1.15), calc(var(--dy) + 70px)) rotate(var(--rot)) scale(0.7); }
+}
+
+/* Failed — a shower of crosses falling out of the row. */
+.pp-cross {
+  color: #f87171;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 0 6px rgba(248, 113, 113, 0.5);
+  animation: ppCross 1.2s cubic-bezier(0.55, 0, 1, 0.45) forwards;
+}
+@keyframes ppCross {
+  0%   { opacity: 0; transform: translate(0, -6px) rotate(0deg); }
+  18%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--drift), var(--fall)) rotate(140deg); }
+}
+
+/* Every case passed — stars down the whole page. */
+.pp-star {
+  color: #fde68a;
+  font-style: normal;
+  line-height: 1;
+  text-shadow: 0 0 8px rgba(251, 191, 36, 0.75), 0 0 16px rgba(251, 191, 36, 0.35);
+  animation: ppStar 2.6s linear forwards;
+}
+@keyframes ppStar {
+  0%   { opacity: 0; transform: translate(0, 0) rotate(0deg) scale(0.6); }
+  12%  { opacity: 1; transform: translate(calc(var(--drift) * 0.12), 40px) rotate(40deg) scale(1); }
+  85%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--drift), var(--fall)) rotate(320deg) scale(0.85); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-fx { display: none; }
+}
+
+/* --- Code folding ---------------------------------------------------------
+   The chevron sits on the RIGHT of the gutter, between the number and the
+   code, where VS Code puts it. Like the marker column it only claims space on
+   a file that actually has something to fold. */
+/* Reserved on HOVER only. Holding 20px open the whole time pushed every
+   number left the moment a file contained a single brace, so the column
+   jumped sideways as you typed. The padding is what expands; the digits
+   stay where they are. */
+
+.line-fold {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.14s ease, color 0.14s ease;
+  color: #6e7681;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* A collapsed block keeps its chevron visible — it is the only sign the code
+   is still there, and hiding it until hover would make a fold easy to forget. */
+.editor-line-numbers:hover .line-fold,
+.line-fold.closed { opacity: 1; }
+.line-fold:hover { color: #e6edf3; }
+.line-fold::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-right: 1.6px solid currentColor;
+  border-bottom: 1.6px solid currentColor;
+  transform: rotate(45deg) translate(-1.5px, -1.5px);
+  transition: transform 0.16s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.line-fold.closed::before { transform: rotate(-45deg) translate(-1px, -1px); }
+.line-fold.closed { color: #22d3ee; }
+.editor-line-numbers .line-num.folded { color: #7fe6f5; }
+
+/* The `⋯ }` marker that stands in for the collapsed block, and the tint behind
+   its line. Both are overlays in #editor-pre, never text in the file. */
+.ed-fold-badge {
+  position: absolute;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 7px;
+  border-radius: 4px;
+  border: 1px solid rgba(34, 211, 238, 0.45);
+  background: rgba(34, 211, 238, 0.13);
+  color: #7fe6f5;
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+.ed-fold-badge:hover {
+  background: rgba(34, 211, 238, 0.26);
+  border-color: rgba(34, 211, 238, 0.8);
+}
+.ed-fold-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(90deg, rgba(34, 211, 238, 0.10), rgba(34, 211, 238, 0.03) 60%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .line-fold, .line-fold::before { transition: none; }
+}
+
+
+/* Hit targets. Measured 11x20 (the pane arrows) and 15x15 (tab reset) - both
+   well under the 24px minimum, and the arrows are the control you reach for
+   most on a narrow screen. The painted size is unchanged; only the target
+   grows, via a pseudo-element so no layout shifts. */
+#rz-left-btn, #rz-right-btn, .file-tab-reset { position: relative; }
+#rz-left-btn::after, #rz-right-btn::after, .file-tab-reset::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 26px;
+  height: 26px;
+  transform: translate(-50%, -50%);
+}
+
+
+/* Below ~1150px both side panes give ground before the editor does. */
+@media (max-width: 1150px) {
+  .practice-layout:not(.zen) .practice-sidebar { min-width: 210px; }
+  .practice-layout:not(.zen) .practice-panel { min-width: 210px; }
+}
+
+/* Zen and the collapse toggles deliberately hand the editor everything, and
+   below 1000px the side panes are gone anyway. */
+.practice-layout.zen .practice-editor-area,
+.practice-layout.hide-left .practice-editor-area,
+.practice-layout.hide-right .practice-editor-area { min-width: 0; }
+@media (max-width: 1000px) { .practice-editor-area { min-width: 0; } }
