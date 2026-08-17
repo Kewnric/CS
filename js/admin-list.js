@@ -175,6 +175,8 @@ function renderAdmin() {
 
   // Counts on the collapsed panel headers, so you can see what's inside them
   // without opening each one.
+  const progCount = document.getElementById('admin-programs-count');
+  if (progCount) progCount.textContent = (state.challenges || []).length;
   const setCount = document.getElementById('admin-sets-count');
   if (setCount) setCount.textContent = (state.codingSets || []).length;
   const catCount = document.getElementById('admin-cats-count');

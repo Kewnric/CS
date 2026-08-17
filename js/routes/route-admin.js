@@ -516,14 +516,19 @@ function adminCodingTemplate() {
             <!-- Programs -->
             <!-- Programs: the full list, grouped by folder. It used to show two
                  and hide the rest behind a "Show N more…" disclosure. -->
-            <div class="card-flat admin-programs-card">
-              <h2 class="admin-programs-title">
-                <i data-lucide="code" style="color:var(--color-primary);"></i> Programs
-                <button class="admin-groups-btn" onclick="adminToggleAllGroups()" id="admin-groups-btn"
-                        title="Expand or collapse every folder">Collapse all</button>
-              </h2>
-              <div id="admin-table-body-preview"></div>
-            </div>
+            <details class="admin-panel admin-panel-programs" open>
+              <summary>
+                <i data-lucide="chevron-right" class="admin-panel-chev"></i>
+                <i data-lucide="code" style="color:var(--color-primary);width:16px;height:16px;"></i>
+                <span class="admin-panel-name">Programs</span>
+                <span class="admin-panel-count" id="admin-programs-count">0</span>
+                <button class="admin-groups-btn" onclick="event.preventDefault(); event.stopPropagation(); adminToggleAllGroups();"
+                        id="admin-groups-btn" title="Expand or collapse every folder">Collapse all</button>
+              </summary>
+              <div class="admin-panel-body">
+                <div id="admin-table-body-preview"></div>
+              </div>
+            </details>
 
             <!-- Practice Sets. Programs is what you come here for, so everything
                  below it is collapsed by default rather than sharing the scroll. -->

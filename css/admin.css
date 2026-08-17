@@ -1423,3 +1423,11 @@
   cursor: pointer;
 }
 .cs-opt-remove:hover { background: rgba(239, 68, 68, 0.15); color: var(--color-danger); }
+
+/* A control that cannot act should look like it. Both library selects and the
+   Add button disable themselves when the library (or the program) is empty. */
+.sb-add-library select:disabled,
+.sb-add-row .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

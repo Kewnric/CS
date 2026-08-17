@@ -88,9 +88,9 @@ const GuidedTutorial = (function () {
     return pageSteps;
   }
 
-  function hasCompleted(pageId) {
-    return localStorage.getItem('tutorial_done_' + pageId) === '1';
-  }
+  /* hasCompleted() lived here. Nothing reads "have they seen this yet" any
+     more — the tour only runs when asked for, so whether it ran before is not
+     a reason to show or hide it. markCompleted still records the finish. */
 
   function markCompleted(pageId) {
     localStorage.setItem('tutorial_done_' + pageId, '1');
@@ -465,21 +465,25 @@ const GuidedTutorial = (function () {
   }
 
   // ── Public init (called by each page) ──
+  /**
+   * Registers which page's steps to use. It does NOT start anything.
+   *
+   * This used to pop the welcome screen 800ms after any page a user had not
+   * yet "completed" — which meant a fresh browser, a cleared profile or a new
+   * device got an overlay in the face before the page had settled. The tour is
+   * now entirely opt-in: the only way in is GuidedTutorial.start(), behind the
+   * tour button each page already carries.
+   */
   function init(pageId) {
     currentPageId = pageId;
     createOverlayElements();
-
-    // Auto-show on first visit (slight delay so page renders)
-    if (!hasCompleted(pageId)) {
-      setTimeout(() => {
-        createWelcomeScreen(pageId, () => startTutorial(false));
-      }, 800);
-    }
   }
 
-  // ── Manual trigger ──
+  // ── Manual trigger — the only way a tour ever begins ──
   function manualStart() {
-    startTutorial(true);
+    // Show the welcome card first: asked for deliberately, it is an intro
+    // rather than an interruption, and it still leads into the same steps.
+    createWelcomeScreen(currentPageId, () => startTutorial(true));
   }
 
   // ── Force-cleanup (e.g. on route change) so no spotlight/overlay lingers ──

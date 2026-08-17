@@ -553,15 +553,12 @@
    dropdown. It now shows everything, grouped by folder, and the
    secondary panels collapse so Programs owns the pane.
    ============================================================ */
-.admin-programs-card { margin-bottom: 1rem; padding: 0.85rem; }
-.admin-programs-title {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 700;
-  font-size: 1.05rem;
-  margin-bottom: 0.75rem;
-}
+/* Programs is now the same <details> panel as Practice Sets, Categories and
+   Skill Tree Locks — it was the only section in the pane that could not be
+   collapsed. It stays open by default because it is what you come here for,
+   and it reads a size larger than the panels below it. */
+.admin-panel-programs > summary { font-size: 0.95rem; }
+.admin-panel-programs > summary .admin-panel-name { font-weight: 700; }
 .admin-groups-btn {
   margin-left: auto;
   border: none;

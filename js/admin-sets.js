@@ -161,7 +161,8 @@ function openSetBuilder(id) {
           </div>
           <div class="af-field" style="flex:1;">
             <label class="form-label"><i data-lucide="folder" class="af-label-icon"></i>Category <span class="af-label-hint">(Coding Library)</span></label>
-            <select id="sb-category" class="form-select" onchange="setBuilderState.parentId = this.value || null">${folderOptionsHtml}</select>
+            <select id="sb-category" class="hidden" aria-hidden="true" tabindex="-1">${folderOptionsHtml}</select>
+            <div id="sb-category-cs"></div>
           </div>
         </div>
 
@@ -174,7 +175,7 @@ function openSetBuilder(id) {
           <div class="sb-add-library">
             <select id="sb-lib-challenge" class="form-select" onchange="_sbFillVariantSelect()"></select>
             <select id="sb-lib-variant" class="form-select"></select>
-            <button class="btn btn-secondary btn-sm" onclick="sbAddLibraryProblem()"><i data-lucide="plus" style="width:13px;height:13px;"></i> Add from library</button>
+            <button id="sb-add-lib-btn" class="btn btn-secondary btn-sm" onclick="sbAddLibraryProblem()"><i data-lucide="plus" style="width:13px;height:13px;"></i> Add from library</button>
           </div>
           <button class="btn btn-secondary btn-sm" onclick="sbAddManualProblem()" style="white-space:nowrap;">
             <i data-lucide="pen-line" style="width:13px;height:13px;"></i> Add manual problem
@@ -192,9 +193,75 @@ function openSetBuilder(id) {
   overlay.addEventListener('keydown', e => { if (e.key === 'Escape') closeSetBuilder(); });
 
   _sbFillChallengeSelect();
+  _sbRenderCategorySelect();
   renderSbProblems();
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: overlay });
   setTimeout(() => document.getElementById('sb-title')?.focus(), 50);
+}
+
+/* Same control and the same "make one right here" ability the program form
+   has — the set builder was the one place still on a bare <select>, so filing a
+   set into a new folder meant closing the dialog and losing the draft. */
+let _sbPendingFolders = [];
+
+function _sbSyncNativeCategory(value) {
+  const el = document.getElementById('sb-category');
+  if (!el) return;
+  el.innerHTML = _adminFolderOpts()
+    .map(o => `<option value="${escapeHTML(o.value)}">${escapeHTML(o.label || 'Uncategorized')}</option>`)
+    .join('');
+  el.value = value || '';
+}
+
+function _sbRenderCategorySelect() {
+  if (typeof renderCustomSelect !== 'function' || !setBuilderState) return;
+  renderCustomSelect('sb-category-cs', _adminFolderOpts(), setBuilderState.parentId || '', (val) => {
+    setBuilderState.parentId = val || null;
+    _sbSyncNativeCategory(val);
+  }, 'Select category...', {
+    createLabel: 'New category...',
+    onCreate: () => _sbCreateCategory(),
+    removable: (id) => _sbPendingFolders.includes(id),
+    onRemove: (id) => _sbRemovePendingFolder(id)
+  });
+}
+
+function _sbCreateCategory() {
+  showInputDialog('New category', null, 'Category name', '', (name) => {
+    const t = (name || '').trim();
+    if (!t || !setBuilderState) return;
+    const dupe = (state.nodes || []).some(n =>
+      n.type === 'folder' && n.scope === 'challenge' && (n.name || '').toLowerCase() === t.toLowerCase());
+    if (dupe) {
+      if (typeof toast === 'function') toast('A category called "' + t + '" already exists.', { type: 'warning' });
+      return;
+    }
+    const node = createNode(t, 'folder', null, 'challenge');
+    _sbPendingFolders.push(node.id);
+    setBuilderState.parentId = node.id;
+    _sbSyncNativeCategory(node.id);
+    _sbRenderCategorySelect();
+    if (typeof toast === 'function') toast('Category "' + t + '" created.', { type: 'success' });
+  });
+}
+
+function _sbRemovePendingFolder(id) {
+  if (!_sbPendingFolders.includes(id)) return;
+  const hasItems = (state.challenges || []).some(c => c.parentId === id) ||
+                   (state.codingSets || []).some(x => x.parentId === id);
+  if (hasItems) {
+    if (typeof toast === 'function') toast('That category is not empty any more.', { type: 'warning' });
+    _sbPendingFolders = _sbPendingFolders.filter(x => x !== id);
+    _sbRenderCategorySelect();
+    return;
+  }
+  state.nodes = (state.nodes || []).filter(n => n.id !== id);
+  _sbPendingFolders = _sbPendingFolders.filter(x => x !== id);
+  if (setBuilderState && setBuilderState.parentId === id) setBuilderState.parentId = null;
+  saveData();
+  _sbSyncNativeCategory(setBuilderState ? (setBuilderState.parentId || '') : '');
+  _sbRenderCategorySelect();
+  if (typeof renderAdmin === 'function') renderAdmin();
 }
 
 function closeSetBuilder() {
@@ -205,17 +272,35 @@ function closeSetBuilder() {
 function _sbFillChallengeSelect() {
   const sel = document.getElementById('sb-lib-challenge');
   if (!sel) return;
-  sel.innerHTML = (state.challenges || []).map(c => `<option value="${c.id}">${escapeHTML(c.title)}</option>`).join('')
-    || '<option value="">No programs available</option>';
+  const list = state.challenges || [];
+  sel.innerHTML = list.length
+    ? list.map(c => `<option value="${c.id}">${escapeHTML(c.title)}</option>`).join('')
+    : '<option value="">No programs in the library yet</option>';
+  // Offering a control that cannot do anything is worse than not offering it:
+  // with an empty library the button silently returned and nothing happened.
+  sel.disabled = !list.length;
   _sbFillVariantSelect();
 }
 
 function _sbFillVariantSelect() {
   const chSel = document.getElementById('sb-lib-challenge');
   const vSel = document.getElementById('sb-lib-variant');
+  const addBtn = document.getElementById('sb-add-lib-btn');
   if (!chSel || !vSel) return;
   const c = (state.challenges || []).find(ch => ch.id === chSel.value);
-  vSel.innerHTML = c ? (c.variants || []).map(v => `<option value="${v.id}">${escapeHTML(v.name)}</option>`).join('') : '';
+  const variants = c ? (c.variants || []) : [];
+  // An empty <select> renders as a blank box with no hint that anything is
+  // wrong. Say what is missing instead.
+  vSel.innerHTML = variants.length
+    ? variants.map(v => `<option value="${v.id}">${escapeHTML(v.name)}</option>`).join('')
+    : `<option value="">${c ? 'This program has no versions' : 'No version'}</option>`;
+  vSel.disabled = !variants.length;
+  if (addBtn) {
+    addBtn.disabled = !variants.length;
+    addBtn.title = variants.length ? '' :
+      (c ? 'Give this program a version in the Programs list first'
+         : 'Add a program to the library, or use "Add manual problem"');
+  }
 }
 
 function renderSbProblems() {
@@ -265,6 +350,16 @@ function sbAddLibraryProblem() {
   const c = (state.challenges || []).find(ch => ch.id === chSel.value);
   if (!c) return;
   const vId = vSel && vSel.value ? vSel.value : (c.variants[0] && c.variants[0].id);
+  if (!vId) {
+    if (typeof toast === 'function') toast('That program has no versions to add.', { type: 'warning' });
+    return;
+  }
+  const dupe = (setBuilderState.problems || []).some(pr =>
+    pr.source === 'library' && pr.challengeId === c.id && pr.variantId === vId);
+  if (dupe) {
+    if (typeof toast === 'function') toast('That version is already in this set.', { type: 'warning' });
+    return;
+  }
   setBuilderState.problems.push({ id: generateId(), source: 'library', challengeId: c.id, variantId: vId });
   renderSbProblems();
 }
@@ -414,6 +509,7 @@ function saveSetBuilder() {
     return;
   }
 
+  _sbPendingFolders = [];   // the set is filed now, so its folders are permanent
   if (setBuilderState.id === 'new') setBuilderState.id = generateId();
   if (!setBuilderState.createdAt) setBuilderState.createdAt = Date.now();
   const saved = JSON.parse(JSON.stringify(setBuilderState));
