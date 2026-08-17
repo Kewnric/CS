@@ -90,9 +90,18 @@
           </div>
           <i data-lucide="chevron-right" class="smp-arrow" style="width:18px;height:18px;"></i>
         </button>
-        <label class="smp-remember">
+        <label class="smp-remember" for="smp-remember-cb">
           <input type="checkbox" id="smp-remember-cb">
-          <span>Remember my choice on this device</span>
+          <span class="smp-remember-box" aria-hidden="true">
+            <svg class="smp-remember-check" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3.5 8.5L6.5 11.5L12.5 5" stroke="currentColor" stroke-width="2.2"
+                    stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span class="smp-remember-text">
+            <span class="smp-remember-title">Remember my choice</span>
+            <span class="smp-remember-hint">Skip this screen next time on this device</span>
+          </span>
         </label>
       </div>
       <div id="smp-progress-container" class="hidden smp-progress-container">
