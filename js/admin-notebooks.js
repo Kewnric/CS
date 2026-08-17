@@ -1341,12 +1341,20 @@ function openBulkQuestionImport(idx) {
     <div style="background:var(--bg-elevated);border:1px solid var(--border-color);border-radius:var(--radius-lg);padding:1.5rem;width:640px;max-width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 48px rgba(0,0,0,0.5);">
       <h3 style="font-weight:700;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.5rem;font-size:1.05rem;">
         <i data-lucide="clipboard-paste" style="width:18px;height:18px;color:var(--color-primary);"></i> Import Questions
+        <!-- This dialog explains the format, so this is where you want to take a
+             copy of it — for your own notes, or to hand to an AI. -->
+        <button onclick="nbFormatMenu(event, 'given')" class="nb-fmt-btn" style="margin-left:auto;"
+                title="Copy this format — paste it to an AI so its questions import cleanly"
+                aria-label="Copy the import format to the clipboard">
+          <i data-lucide="clipboard-copy"></i>
+        </button>
       </h3>
       <p style="font-size:0.78rem;color:var(--text-tertiary);margin-bottom:0.5rem;line-height:1.5;">
         Paste questions separated by a blank line. Mark the correct choice with <code>*</code> or an <code>Answer:</code> line.
         Two letters (<code>Answer: A, C</code>) make a multi-select; <code>True</code>/<code>False</code> auto-detects.
         A word answer with no choices makes an <em>identification</em> question; <code>term -&gt; definition</code> lines make a <em>matching</em> question.
         <code>Explanation:</code> and <code>Hint:</code> lines are picked up too.
+        <button onclick="nbFormatMenu(event, 'given')" class="nb-fmt-link">Copy this format</button>
       </p>
       <textarea id="bulk-q-input" spellcheck="false" style="width:100%;flex:1;min-height:240px;font-family:var(--font-mono);font-size:0.78rem;padding:0.6rem;border-radius:var(--radius-md);border:1px solid var(--border-color);background:var(--bg-surface);color:var(--text-primary);resize:vertical;" placeholder="${escapeHTML(example)}"></textarea>
       <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;color:var(--text-secondary);margin:0.6rem 0;cursor:pointer;">
@@ -2122,6 +2130,12 @@ function _tokenizeBulkInput(text) {
       tokens.push({ type: 'header', text: t }); continue;
     }
 
+    // 2b. STANDALONE ANSWER MARKER: "*A" or "*A, C" on its own line. The Import
+    //     dialog advertises this, but the line was falling through to the
+    //     unknown branch and starting a whole new question.
+    const starM = t.match(/^\*\s*([A-Za-z](?:\s*[,&+]\s*[A-Za-z])*)\s*$/);
+    if (starM) { tokens.push({ type: 'answer', text: starM[1].trim() }); continue; }
+
     // 3. ANSWER LINE: "Answer: X"
     const ansM = t.match(/^(?:Answer|Ans|Correct)\s*[:=]\s*(.+)$/i);
     if (ansM) { tokens.push({ type: 'answer', text: ansM[1].trim() }); continue; }
@@ -2418,6 +2432,25 @@ function _assembleBulkQuestions(tokens) {
    ============================================================ */
 const NB_FMT_NL = String.fromCharCode(10);
 
+/** The exact sample this dialog shows as its placeholder. */
+function _nbImportExample() {
+  return [
+    'Q: Which function prints to stdout in C?',
+    'A) printf()', 'B) console.log()', 'C) echo()', '*A',
+    'Explanation: printf is the standard C output.',
+    '',
+    'Select all valid C loop keywords',
+    'A) for', 'B) loop', 'C) while', 'Answer: A, C',
+    '',
+    'What is the capital of France?',
+    'Answer: Paris',
+    '',
+    'Match the following:',
+    'Cell -> Biology',
+    'Atom -> Chemistry'
+  ].join(NB_FMT_NL);
+}
+
 function _nbGivenFormatSpec() {
   const L = [
     'QUESTION FORMAT — StudySession notebook import',
@@ -2538,9 +2571,11 @@ function _nbAiPromptSpec() {
 function nbCopyFormat(kind) {
   const spec = kind === 'answer' ? _nbAnswerFormatSpec()
              : kind === 'ai' ? _nbAiPromptSpec()
+             : kind === 'sample' ? _nbImportExample()
              : _nbGivenFormatSpec();
   const label = kind === 'answer' ? 'Answer key format copied'
               : kind === 'ai' ? 'AI prompt copied — paste it to your model'
+              : kind === 'sample' ? 'Sample questions copied'
               : 'Question format copied';
   if (typeof copyShareLink === 'function') copyShareLink(spec, label);
   else if (navigator.clipboard) navigator.clipboard.writeText(spec);
@@ -2569,6 +2604,7 @@ function nbFormatMenu(ev, defaultKind) {
   menu.innerHTML =
     item('given', 'list-checks', 'Question format', 'All five types, with examples') +
     item('answer', 'key', 'Answer key format', 'How to write the answers') +
+    item('sample', 'file-text', 'Sample block', 'The example shown here, ready to edit') +
     item('ai', 'sparkles', 'AI prompt', 'Format plus instructions, for a model');
   document.body.appendChild(menu);
   if (typeof lucide !== 'undefined') lucide.createIcons({ el: menu });

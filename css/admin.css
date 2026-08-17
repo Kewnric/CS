@@ -1775,7 +1775,9 @@
 
 .nb-format-menu {
   position: fixed;
-  z-index: 10050;          /* over the question modals, which sit at 1000 */
+  /* Above the Import Questions overlay too, which sits at 99999 — the menu was
+     opening behind it. */
+  z-index: 100000;
   width: 284px;
   padding: 0.25rem;
   border-radius: var(--radius-md);
@@ -1802,3 +1804,18 @@
 .nb-format-item span { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
 .nb-format-item strong { font-size: 0.8125rem; font-weight: 600; }
 .nb-format-item em { font-style: normal; font-size: 0.6875rem; color: var(--text-tertiary); }
+
+/* Inline "Copy this format" link, for the Import Questions explanation. */
+.nb-fmt-link {
+  border: none;
+  background: none;
+  padding: 0;
+  margin-left: 0.3rem;
+  font: inherit;
+  font-weight: 700;
+  color: var(--color-primary);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.nb-fmt-link:hover { color: var(--text-primary); }
