@@ -1014,24 +1014,21 @@ function shareNotebook(notebookId) {
   const url = window.location.origin + window.location.pathname + '?data=' + encoded;
   warnIfShareUrlTooLong(url);
 
-  navigator.clipboard.writeText(url).then(() => {
-    if (typeof showShareToast === 'function') showShareToast('Notebook link copied!');
-    else if (typeof showMessage === 'function') showMessage('Shared', 'Link copied to clipboard!');
-  }).catch(() => {
-    prompt('Copy this share link:', url);
-  });
+  copyShareLink(url, 'Notebook link copied!');
 }
 
 function checkSharedNotebook() {
-  const params = new URLSearchParams(window.location.search);
-  const dataParam = params.get('data');
-  if (!dataParam) return;
+  // See browse.js: the payload is captured at boot and applied once a storage
+  // mode is known. This handles the case where the library mounts first.
+  if (typeof hasPendingShare === 'function' && hasPendingShare()) {
+    const pending = takePendingShare();
+    if (pending && pending._type === 'notebook') importSharedNotebook(pending);
+  }
+}
 
-  const shared = decodeShareData(dataParam);
-  if (!shared || shared._type !== 'notebook') return;
-
-  window.history.replaceState({}, document.title, window.location.pathname);
-
+/** Files a shared notebook into the current workspace and opens it. */
+function importSharedNotebook(shared) {
+  if (!shared) return null;
   const tempId = 'shared_notebook_' + Date.now();
   const tempNotebook = {
     id: tempId,
@@ -1042,7 +1039,8 @@ function checkSharedNotebook() {
     parentId: null,
     sections: (shared.sections || []).map(sec => ({
       ...sec,
-      id: sec.id || generateId()
+      id: sec.id || generateId(),
+      questions: (sec.questions || []).map(q => ({ ...q, id: q.id || generateId() }))
     }))
   };
 
@@ -1050,14 +1048,17 @@ function checkSharedNotebook() {
   state.notebooks.unshift(tempNotebook);
   saveData();
 
+  const qCount = tempNotebook.sections.reduce((n, sec) => n + ((sec.questions || []).length), 0);
+  if (typeof showShareToast === 'function') {
+    showShareToast('Added "' + tempNotebook.title + '"' + (qCount ? ' with ' + qCount + ' question' + (qCount !== 1 ? 's' : '') : ''));
+  }
+
   setTimeout(() => {
-    // Switch to notes tab if in study.html
     const notesTabBtn = document.getElementById('training-tab-notes');
     if (notesTabBtn) notesTabBtn.click();
-    
-    // Select the notebook
-    notesSelectNotebook(tempId);
+    if (typeof notesSelectNotebook === 'function') notesSelectNotebook(tempId);
   }, 300);
+  return tempId;
 }
 
 // ============================================================

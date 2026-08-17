@@ -329,6 +329,35 @@ function finishBoot() {
   SpaRouter.init();
   _attachUnloadGuard();
   _updateCloudStatusUI();
+  applyPendingShare();
+}
+
+/**
+ * Files a share that was waiting for a storage mode, then takes the user to it.
+ * Runs after the account's data has loaded, so it is saved into that account
+ * rather than into whatever was on screen when the link was opened.
+ */
+function applyPendingShare() {
+  if (typeof hasPendingShare !== 'function' || !hasPendingShare()) return;
+  const shared = takePendingShare();
+  if (!shared) return;
+
+  const go = (route, importer) => {
+    try { importer(shared); } catch (e) { console.error('[Share] import failed:', e); return; }
+    if (typeof spaNavigate === 'function') spaNavigate(route);
+  };
+
+  setTimeout(() => {
+    if (shared._type === 'challenge' && typeof importSharedChallenge === 'function') {
+      go('browse', importSharedChallenge);
+    } else if (shared._type === 'notebook' && typeof importSharedNotebook === 'function') {
+      go('study', importSharedNotebook);
+    } else if (shared._type === 'snippet' && typeof importSharedSnippet === 'function') {
+      go('snippets', importSharedSnippet);
+    } else {
+      console.warn('[Share] nothing can import type:', shared._type);
+    }
+  }, 60);
 }
 
 /* ---------- Choose Local ---------- */
@@ -1393,6 +1422,11 @@ function _showStaleTabBanner() {
 /* ---------- Boot ---------- */
 
 async function bootApp() {
+  // Lift ?data= out of the URL before the picker appears. Whatever mode the
+  // user then chooses — Local, or a Google account — is the one the shared
+  // item gets written into.
+  if (typeof captureSharePayload === 'function') captureSharePayload();
+
   // A redirect sign-in lands back here on a fresh page load, so this has to run
   // before anything decides to show the picker again.
   if (sessionStorage.getItem('ssp.pendingRedirect') || authRemembered() === 'online') {

@@ -1139,12 +1139,7 @@ function shareSnippet(snippetId) {
 
   const url = window.location.origin + window.location.pathname + '?data=' + encoded;
   warnIfShareUrlTooLong(url);
-  navigator.clipboard.writeText(url).then(() => {
-    if (typeof showShareToast === 'function') showShareToast('Snippet link copied!');
-    else if (typeof showMessage === 'function') showMessage('Shared', 'Link copied to clipboard!');
-  }).catch(() => {
-    prompt('Copy this share link:', url);
-  });
+  copyShareLink(url, 'Snippet link copied!');
 }
 
 // ============================================================
@@ -1169,17 +1164,16 @@ registerTreeHost('snippets', {
 });
 
 function checkSharedSnippet() {
-  const params = new URLSearchParams(window.location.search);
-  const dataParam = params.get('data');
-  if (!dataParam) return;
+  // See browse.js: captured at boot, applied once a storage mode is known.
+  if (typeof hasPendingShare === 'function' && hasPendingShare()) {
+    const pending = takePendingShare();
+    if (pending && pending._type === 'snippet') importSharedSnippet(pending);
+  }
+}
 
-  const shared = decodeShareData(dataParam);
-  if (!shared || shared._type !== 'snippet') return;
-
-  // Clean URL without reloading
-  window.history.replaceState({}, document.title, window.location.pathname);
-
-  // Inject as a temporary snippet
+/** Files a shared snippet into the current workspace and opens it. */
+function importSharedSnippet(shared) {
+  if (!shared) return null;
   const tempId = 'shared_snippet_' + Date.now();
   const tempSnippet = {
     id: tempId,
@@ -1194,15 +1188,13 @@ function checkSharedSnippet() {
     }))
   };
 
-  // Add to state and persist
   if (!state.snippets) state.snippets = [];
   state.snippets.unshift(tempSnippet);
   saveData();
 
-  // Auto-select and show the snippet
-  setTimeout(() => {
-    selectSnippet(tempId);
-  }, 300);
+  if (typeof showShareToast === 'function') showShareToast('Added "' + tempSnippet.title + '"');
+  setTimeout(() => { if (typeof selectSnippet === 'function') selectSnippet(tempId); }, 300);
+  return tempId;
 }
 
 // ============================================================

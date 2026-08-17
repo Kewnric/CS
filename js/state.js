@@ -549,9 +549,16 @@ function setState(updaterFn) {
 }
 
 // --- Shareable Challenge/Snippet URL Encoding ---
+/* Plain base64 puts "+" and "/" in a query string, where "+" decodes as a
+   space. That was patched on the way back in with a replace(/ /g, '+'), which
+   only held while nothing else in the pipeline touched the string. URL-safe
+   base64 has no characters that need escaping, so the round trip is exact. */
 function encodeShareData(data) {
   try {
-    return btoa(encodeURIComponent(JSON.stringify(data)));
+    return btoa(encodeURIComponent(JSON.stringify(data)))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '');
   } catch (e) {
     console.error('[Share] Encode failed:', e);
     return null;
@@ -560,12 +567,124 @@ function encodeShareData(data) {
 
 function decodeShareData(str) {
   try {
-    const base64Str = str.replace(/ /g, '+');
-    return JSON.parse(decodeURIComponent(atob(base64Str)));
+    // Accept both: links copied before this change are still plain base64,
+    // where a "+" may already have become a space in transit.
+    let b64 = String(str).replace(/-/g, '+').replace(/_/g, '/').replace(/ /g, '+');
+    while (b64.length % 4) b64 += '=';
+    return JSON.parse(decodeURIComponent(atob(b64)));
   } catch (e) {
     console.error('[Share] Decode failed:', e);
     return null;
   }
+}
+
+/* ============================================================
+   SHARE CLIPBOARD
+   ------------------------------------------------------------
+   navigator.clipboard is undefined on plain http and in older browsers, so
+   `navigator.clipboard.writeText(...)` threw synchronously — before the
+   .catch() that was meant to provide the fallback could ever run. The share
+   button simply died with a TypeError.
+   ============================================================ */
+function copyShareLink(url, okMessage) {
+  const done = () => {
+    if (typeof showShareToast === 'function') showShareToast(okMessage || 'Link copied to clipboard!');
+    else if (typeof toast === 'function') toast(okMessage || 'Link copied to clipboard!', { type: 'success' });
+  };
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(done).catch(() => _shareCopyFallback(url, done));
+    return;
+  }
+  _shareCopyFallback(url, done);
+}
+
+/** execCommand first; if even that fails, show the link so it can be copied. */
+function _shareCopyFallback(url, done) {
+  let ok = false;
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = url;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:-1000px;left:-1000px;opacity:0;';
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, ta.value.length);
+    ok = document.execCommand('copy');
+    ta.remove();
+  } catch (e) { ok = false; }
+
+  if (ok) { done(); return; }
+  _showShareLinkDialog(url);
+}
+
+/** Last resort: a selectable field, rather than a prompt() the browser may block. */
+function _showShareLinkDialog(url) {
+  document.getElementById('share-link-overlay')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'share-link-overlay';
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal-content" style="max-width:560px;">
+      <h2 class="modal-title">Copy this link</h2>
+      <p class="modal-desc">Your browser blocked automatic copying. Select the link and copy it.</p>
+      <textarea class="form-textarea" readonly rows="4"
+        style="font-family:var(--font-mono);font-size:0.75rem;word-break:break-all;">${escapeHTML(url)}</textarea>
+      <div style="display:flex;justify-content:flex-end;gap:0.5rem;margin-top:1rem;">
+        <button class="btn btn-primary" onclick="document.getElementById('share-link-overlay').remove()">Done</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const ta = overlay.querySelector('textarea');
+  if (ta) { ta.focus(); ta.select(); }
+}
+
+/* ============================================================
+   PENDING SHARE — applied only once a storage mode is chosen
+   ------------------------------------------------------------
+   A ?data= link used to be read by whichever library route happened to mount.
+   Open one in a browser that had never picked Local or Cloud and the picker
+   came up, the router had not started, and after signing in the app landed on
+   Home — so the shared item was silently dropped unless the user happened to
+   walk to the right library while the URL still carried the parameter.
+
+   The payload is now lifted out of the URL at boot and held until a mode is
+   chosen, then written into whichever account was picked.
+   ============================================================ */
+const PENDING_SHARE_KEY = 'ssp.pendingShare';
+
+/** Called at boot, before the storage picker. Clears ?data= from the URL. */
+function captureSharePayload() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get('data');
+    if (!raw) return;
+    const decoded = decodeShareData(raw);
+    // Strip the parameter either way: a corrupt link should not survive a reload.
+    window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+    if (!decoded || !decoded._type) {
+      if (typeof showMessage === 'function') {
+        showMessage('Broken share link', 'That link could not be read. It may have been cut short by the app it was sent through.', true);
+      }
+      return;
+    }
+    sessionStorage.setItem(PENDING_SHARE_KEY, JSON.stringify(decoded));
+  } catch (e) {
+    console.warn('[Share] capture failed:', e);
+  }
+}
+
+function takePendingShare() {
+  try {
+    const raw = sessionStorage.getItem(PENDING_SHARE_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(PENDING_SHARE_KEY);
+    return JSON.parse(raw);
+  } catch (e) { return null; }
+}
+
+function hasPendingShare() {
+  try { return !!sessionStorage.getItem(PENDING_SHARE_KEY); } catch (e) { return false; }
 }
 
 /**

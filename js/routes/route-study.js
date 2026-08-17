@@ -58,11 +58,13 @@ function studyTemplate() {
 }
 
 function studyInit() {
-  // Snippet share links now live on the Snippet Library page — bounce there.
+  // Snippet share links belong to the Snippet Library — bounce there. The
+  // payload now lives in the pending-share store, not in the URL (the URL is
+  // cleaned at boot), so read it from there without consuming it.
   try {
-    const dataParam = new URLSearchParams(window.location.search).get('data');
-    if (dataParam && typeof decodeShareData === 'function') {
-      const shared = decodeShareData(dataParam);
+    if (typeof hasPendingShare === 'function' && hasPendingShare()) {
+      const raw = sessionStorage.getItem(PENDING_SHARE_KEY);
+      const shared = raw ? JSON.parse(raw) : null;
       if (shared && shared._type === 'snippet') { spaNavigate('snippets'); return; }
     }
   } catch (e) { /* malformed share data — ignore */ }

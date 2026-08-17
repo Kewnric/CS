@@ -1710,19 +1710,42 @@ function shareChallenge(challengeId) {
   const challenge = state.challenges.find(c => c.id === challengeId);
   if (!challenge) return;
 
-  // Create a minimal shareable object (strip history-only fields)
+  /* Everything that defines the program travels. The old payload carried only
+     title/tags/cover and a variant's name+code, so a shared program arrived
+     with no test cases, no minimum requirements and a single flattened file —
+     it looked complete and then failed the moment you pressed Check Code.
+     Only the recipient's own progress is left behind. */
   const shareable = {
     _type: 'challenge',
+    _v: 2,
     title: challenge.title,
     tags: challenge.tags || [],
     coverDescription: challenge.coverDescription || '',
+    level: challenge.level != null ? challenge.level : null,
+    icon: challenge.icon || null,
+    color: challenge.color || null,
+    alias: challenge.alias || null,
+    cheatsheet: !!challenge.cheatsheet,
     variants: (challenge.variants || []).map(v => ({
       id: v.id,
       name: v.name,
       description: v.description || '',
       code: v.code || '',
       starterCode: v.starterCode || '',
-      samples: v.samples || []
+      samples: v.samples || [],
+      tests: (v.tests || []).map(t => ({
+        name: t.name || '',
+        stdin: t.stdin || '',
+        expected: t.expected || '',
+        hidden: !!t.hidden
+      })),
+      minRequirements: (v.minRequirements || []).map(r => ({ type: r.type })),
+      files: (v.files || []).map(f => ({
+        name: f.name,
+        ext: f.ext,
+        code: f.code || '',
+        starterCode: f.starterCode || ''
+      }))
     }))
   };
 
@@ -1734,13 +1757,7 @@ function shareChallenge(challengeId) {
 
   const url = window.location.origin + window.location.pathname + '?data=' + encoded;
   warnIfShareUrlTooLong(url);
-
-  navigator.clipboard.writeText(url).then(() => {
-    showShareToast('Link copied to clipboard!');
-  }).catch(() => {
-    // Fallback: prompt
-    prompt('Copy this share link:', url);
-  });
+  copyShareLink(url, 'Link copied to clipboard!');
 }
 
 function showShareToast(message) {
@@ -1757,37 +1774,64 @@ function showShareToast(message) {
 }
 
 function checkSharedChallenge() {
-  const params = new URLSearchParams(window.location.search);
-  const dataParam = params.get('data');
-  if (!dataParam) return;
+  // Nothing is read from the URL here any more: captureSharePayload() lifted it
+  // out at boot and applyPendingShare() files it the moment a storage mode is
+  // known. This remains so a share can still be handled if the library mounts
+  // first (e.g. a link opened in a session that already had a mode).
+  if (typeof hasPendingShare === 'function' && hasPendingShare()) {
+    const pending = takePendingShare();
+    if (pending && pending._type === 'challenge') importSharedChallenge(pending);
+  }
+}
 
-  const shared = decodeShareData(dataParam);
-  if (!shared || shared._type !== 'challenge') return;
-
-  // Clean URL without reloading
-  window.history.replaceState({}, document.title, window.location.pathname);
-
-  // Inject as a temporary challenge
+/**
+ * Files a shared program into the current workspace and shows it.
+ * @returns {string|null} the new id
+ */
+function importSharedChallenge(shared) {
+  if (!shared) return null;
   const tempId = 'shared_' + Date.now();
   const tempChallenge = {
     id: tempId,
     title: '[Shared] ' + (shared.title || 'Challenge'),
     tags: shared.tags || [],
     coverDescription: shared.coverDescription || '',
+    level: shared.level != null ? shared.level : null,
+    icon: shared.icon || null,
+    color: shared.color || null,
+    alias: shared.alias || null,
+    cheatsheet: !!shared.cheatsheet,
     parentId: null,
     variants: (shared.variants || []).map(v => ({
-      ...v,
-      id: v.id || generateId()
+      id: v.id || generateId(),
+      name: v.name || 'Version 1',
+      description: v.description || '',
+      code: v.code || '',
+      starterCode: v.starterCode || '',
+      samples: v.samples || [],
+      tests: v.tests || [],
+      minRequirements: v.minRequirements || [],
+      activeFileIndex: 0,
+      // Older links carry no files array; rebuild one from the flat code so the
+      // editor always has something to open.
+      files: (v.files && v.files.length)
+        ? v.files.map(f => ({ id: generateId(), name: f.name || 'main', ext: f.ext || '.c',
+                              code: f.code || '', starterCode: f.starterCode || '' }))
+        : [{ id: generateId(), name: 'main', ext: '.c', code: v.code || '', starterCode: v.starterCode || '' }]
     }))
   };
 
-  // Add to state and persist so it carries over to practice.html
+  if (!state.challenges) state.challenges = [];
   state.challenges.unshift(tempChallenge);
   saveData();
 
-  // Select the Uncategorized folder so the user can see the shared challenge
+  const testCount = tempChallenge.variants.reduce((n, v) => n + (v.tests || []).length, 0);
+  if (typeof showShareToast === 'function') {
+    showShareToast('Added "' + tempChallenge.title + '"' + (testCount ? ' with ' + testCount + ' test case' + (testCount !== 1 ? 's' : '') : ''));
+  }
+
   setTimeout(() => {
-    selectBrowseNode('__root__');
+    if (typeof selectBrowseNode === 'function') selectBrowseNode('__root__');
     setTimeout(() => {
       const card = document.getElementById('card-' + tempId);
       if (card) {
@@ -1795,8 +1839,9 @@ function checkSharedChallenge() {
         card.style.transition = 'box-shadow 0.3s ease';
         card.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
-    }, 100);
+    }, 120);
   }, 300);
+  return tempId;
 }
 
 // ============================================================
