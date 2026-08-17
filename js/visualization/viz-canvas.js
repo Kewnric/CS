@@ -461,6 +461,8 @@ function vizRenderCanvas() {
         vizHideAllMenus();
         vizOpenCommentEditor(node);
       });
+    } else {
+      el.addEventListener('dblclick', (e) => vizNodeDblClick(e, node.id));
     }
 
     // Add connection ports (not on comment nodes — they're free-form)

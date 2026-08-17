@@ -526,6 +526,11 @@ function adminCodingTemplate() {
                         id="admin-groups-btn" title="Expand or collapse every folder">Collapse all</button>
               </summary>
               <div class="admin-panel-body">
+                <!-- Only present while something is selected (see _adminRenderSelectionBar). -->
+                <div id="admin-selection-bar" class="admin-selection-bar hidden" role="toolbar" aria-label="Bulk actions"></div>
+                <div class="admin-select-all-row">
+                  <button class="admin-groups-btn" onclick="adminSelectAllVisible()" title="Select or deselect every program shown (Ctrl+A)">Select all</button>
+                </div>
                 <div id="admin-table-body-preview"></div>
               </div>
             </details>

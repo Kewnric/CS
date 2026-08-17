@@ -1431,3 +1431,78 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* ============================================================
+   ADMIN MULTI-SELECT
+   ------------------------------------------------------------
+   Checkboxes stay out of the way until they matter: hidden at rest, shown on
+   hover, and pinned open for any row that is actually selected.
+   ============================================================ */
+.ali-check {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding-right: 0.5rem;
+  opacity: 0;
+  transition: opacity 0.14s ease;
+  cursor: pointer;
+}
+.admin-list-item:hover .ali-check,
+.admin-list-item.is-selected .ali-check,
+.ali-check:focus-within { opacity: 1; }
+.ali-check input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.admin-list-item.is-selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
+.admin-select-all-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 0.25rem 0.35rem;
+}
+.admin-select-all-row .admin-groups-btn { margin-left: 0; }
+
+/* Bulk action bar — appears only while a selection exists. */
+.admin-selection-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-subtle);
+}
+.admin-selection-bar.hidden { display: none; }
+.asb-count {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--color-primary);
+  margin-right: 0.25rem;
+  white-space: nowrap;
+}
+.asb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.asb-btn:hover { color: var(--text-primary); border-color: var(--color-primary); }
+.asb-danger:hover { color: var(--color-danger); border-color: var(--color-danger); }
+.asb-ghost { border-color: transparent; background: transparent; }

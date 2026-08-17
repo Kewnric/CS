@@ -17,6 +17,184 @@ function toggleAdminSection(sectionId, e) {
 }
 
 /** Expand every folder group, or collapse them all if they're already open. */
+/* ============================================================
+   MULTI-SELECT
+   ------------------------------------------------------------
+   The list had no way to act on more than one program: deleting ten meant ten
+   confirms. Rows carry a checkbox; click selects and opens as before, ctrl or
+   cmd click toggles, shift click takes a range, and the bar that appears
+   handles the whole selection at once.
+   ============================================================ */
+const adminSelection = new Set();
+let _adminLastPickedId = null;
+
+/** Every program id currently rendered, in the order shown. */
+function _adminVisibleIds() {
+  return [...document.querySelectorAll('.admin-list-item[data-prog-id]')].map(el => el.dataset.progId);
+}
+
+function adminRowClick(e, id) {
+  // Plain click keeps the old behaviour: open it for editing.
+  if (!e.shiftKey && !e.ctrlKey && !e.metaKey) {
+    document.querySelectorAll('.admin-list-item').forEach(el => el.classList.remove('active'));
+    const row = document.querySelector(`.admin-list-item[data-prog-id="${id}"]`);
+    if (row) row.classList.add('active');
+    _adminLastPickedId = id;
+    openAdminForm(id);
+    return;
+  }
+  e.preventDefault();
+  if (e.shiftKey && _adminLastPickedId) {
+    const ids = _adminVisibleIds();
+    const a = ids.indexOf(_adminLastPickedId);
+    const b = ids.indexOf(id);
+    if (a !== -1 && b !== -1) {
+      ids.slice(Math.min(a, b), Math.max(a, b) + 1).forEach(x => adminSelection.add(x));
+    }
+  } else {
+    if (adminSelection.has(id)) adminSelection.delete(id); else adminSelection.add(id);
+  }
+  _adminLastPickedId = id;
+  renderAdmin();
+}
+
+function adminToggleSelect(id, on) {
+  if (on) adminSelection.add(id); else adminSelection.delete(id);
+  _adminLastPickedId = id;
+  renderAdmin();
+}
+
+function adminSelectAllVisible() {
+  const ids = _adminVisibleIds();
+  const allOn = ids.length && ids.every(x => adminSelection.has(x));
+  if (allOn) ids.forEach(x => adminSelection.delete(x));
+  else ids.forEach(x => adminSelection.add(x));
+  renderAdmin();
+}
+
+function adminClearSelection() {
+  if (!adminSelection.size) return;
+  adminSelection.clear();
+  renderAdmin();
+}
+
+/** The bar only exists while something is selected. */
+function _adminRenderSelectionBar() {
+  const host = document.getElementById('admin-selection-bar');
+  if (!host) return;
+  // Drop ids that were deleted or filtered away, so the count never lies.
+  const live = new Set((state.challenges || []).map(c => c.id));
+  [...adminSelection].forEach(id => { if (!live.has(id)) adminSelection.delete(id); });
+
+  const n = adminSelection.size;
+  if (!n) { host.classList.add('hidden'); host.innerHTML = ''; return; }
+  host.classList.remove('hidden');
+  host.innerHTML = `
+    <span class="asb-count">${n} selected</span>
+    <button class="asb-btn" onclick="adminBulkMove(this)"><i data-lucide="folder-input" style="width:13px;height:13px;"></i> Move to…</button>
+    <button class="asb-btn" onclick="adminBulkDuplicate()"><i data-lucide="copy" style="width:13px;height:13px;"></i> Duplicate</button>
+    <button class="asb-btn" onclick="adminBulkExport()"><i data-lucide="download" style="width:13px;height:13px;"></i> Export</button>
+    <button class="asb-btn asb-danger" onclick="adminBulkDelete()"><i data-lucide="trash-2" style="width:13px;height:13px;"></i> Delete</button>
+    <button class="asb-btn asb-ghost" onclick="adminClearSelection()">Clear</button>`;
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: host });
+}
+
+function adminBulkDelete() {
+  const ids = [...adminSelection];
+  if (!ids.length) return;
+  const items = (state.challenges || []).filter(c => ids.includes(c.id));
+  const names = items.slice(0, 3).map(c => c.title).join(', ');
+  showConfirm('Delete ' + ids.length + ' program' + (ids.length !== 1 ? 's' : '') + '?',
+    names + (items.length > 3 ? ' and ' + (items.length - 3) + ' more' : '') + '. You can undo this.',
+    () => {
+      const snapshot = JSON.parse(JSON.stringify(items));
+      state.challenges = (state.challenges || []).filter(c => !ids.includes(c.id));
+      adminSelection.clear();
+      saveData();
+      renderAdmin();
+      // One undo for the whole batch, not one per program.
+      if (typeof pushUndo === 'function') {
+        pushUndo('Deleted ' + snapshot.length + ' programs', () => {
+          snapshot.forEach(c => state.challenges.push(c));
+          saveData(); renderAdmin();
+        });
+      }
+    });
+}
+
+function adminBulkMove(triggerBtn) {
+  const ids = [...adminSelection];
+  if (!ids.length) return;
+  // Same picker the single-row Move button uses; '__bulk__' tells it to apply
+  // the choice to the whole selection.
+  openListItemFolderPicker('__bulk__', 'challenge', triggerBtn);
+}
+
+function _adminApplyBulkMove(folderId) {
+  const ids = [...adminSelection];
+  const target = folderId === '__none__' ? null : folderId;
+  (state.challenges || []).forEach(c => { if (ids.includes(c.id)) c.parentId = target; });
+  saveData();
+  renderAdmin();
+  const name = target ? ((state.nodes || []).find(n => n.id === target) || {}).name : 'Uncategorized';
+  if (typeof toast === 'function') toast('Moved ' + ids.length + ' to "' + (name || 'Uncategorized') + '".', { type: 'success' });
+}
+
+function adminBulkDuplicate() {
+  const ids = [...adminSelection];
+  if (!ids.length) return;
+  const copies = (state.challenges || []).filter(c => ids.includes(c.id)).map(c => {
+    const copy = JSON.parse(JSON.stringify(c));
+    copy.id = generateId();
+    copy.title = c.title + ' (copy)';
+    (copy.variants || []).forEach(v => { v.id = generateId(); });
+    return copy;
+  });
+  copies.forEach(c => state.challenges.push(c));
+  adminSelection.clear();
+  saveData();
+  renderAdmin();
+  if (typeof toast === 'function') toast('Duplicated ' + copies.length + ' program' + (copies.length !== 1 ? 's' : '') + '.', { type: 'success' });
+}
+
+/** Export just the selection, so a subset can be handed over without the rest. */
+function adminBulkExport() {
+  const ids = [...adminSelection];
+  if (!ids.length) return;
+  const picked = (state.challenges || []).filter(c => ids.includes(c.id));
+  const folderIds = new Set(picked.map(c => c.parentId).filter(Boolean));
+  const payload = {
+    _export: 'studysession-programs',
+    exportedAt: new Date().toISOString(),
+    nodes: (state.nodes || []).filter(n => folderIds.has(n.id)),
+    challenges: picked
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'programs-' + picked.length + '-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  if (typeof toast === 'function') toast('Exported ' + picked.length + ' program' + (picked.length !== 1 ? 's' : '') + '.', { type: 'success' });
+}
+
+/* Ctrl+A selects the visible list, Escape drops the selection — only while the
+   admin list has focus, so it cannot hijack typing in the form. */
+document.addEventListener('keydown', (e) => {
+  const onAdmin = document.getElementById('admin-selection-bar');
+  if (!onAdmin) return;
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '') ||
+                 (document.activeElement || {}).isContentEditable;
+  if (typing) return;
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a') {
+    e.preventDefault();
+    adminSelectAllVisible();
+  } else if (e.key === 'Escape' && adminSelection.size) {
+    adminClearSelection();
+  }
+});
+
 function adminToggleAllGroups() {
   const groups = [...document.querySelectorAll('.admin-group')];
   if (!groups.length) return;
@@ -86,11 +264,16 @@ function renderAdmin() {
   const renderPrograms = (list) => {
     if (list.length === 0) return '';
     return list.map(c => `
-      <div class="admin-list-item${adminState && adminState.id === c.id ? ' active' : ''}"
-        role="button" tabindex="0"
-        onclick="document.querySelectorAll('.admin-list-item').forEach(el=>el.classList.remove('active'));this.classList.add('active');openAdminForm('${c.id}')"
-        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.querySelectorAll('.admin-list-item').forEach(el=>el.classList.remove('active'));this.classList.add('active');openAdminForm('${c.id}')}"
+      <div class="admin-list-item${adminState && adminState.id === c.id ? ' active' : ''}${adminSelection.has(c.id) ? ' is-selected' : ''}"
+        role="button" tabindex="0" data-prog-id="${c.id}"
+        onclick="adminRowClick(event, '${c.id}')"
+        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();adminRowClick(event, '${c.id}')}"
         aria-label="${escapeHTML(c.title)}">
+        <label class="ali-check" onclick="event.stopPropagation()" title="Select">
+          <input type="checkbox" ${adminSelection.has(c.id) ? 'checked' : ''}
+                 onchange="adminToggleSelect('${c.id}', this.checked)"
+                 aria-label="Select ${escapeHTML(c.title)}">
+        </label>
         <div class="admin-list-item-left">
           <div class="admin-list-item-title">${escapeHTML(c.title)}</div>
           <div class="admin-list-item-meta">
@@ -175,6 +358,8 @@ function renderAdmin() {
 
   // Counts on the collapsed panel headers, so you can see what's inside them
   // without opening each one.
+  _adminRenderSelectionBar();
+
   const progCount = document.getElementById('admin-programs-count');
   if (progCount) progCount.textContent = (state.challenges || []).length;
   const setCount = document.getElementById('admin-sets-count');
@@ -347,7 +532,8 @@ function openListItemFolderPicker(itemId, scope, triggerBtn) {
 
   // Detect current selection for highlighting
   let currentParentId = null;
-  if (scope === 'challenge') currentParentId = (state.challenges.find(c => c.id === itemId) || {}).parentId || null;
+  if (itemId === '__bulk__') currentParentId = null;
+  else if (scope === 'challenge') currentParentId = (state.challenges.find(c => c.id === itemId) || {}).parentId || null;
   else if (scope === 'snippet') currentParentId = ((state.snippets || []).find(s => s.id === itemId) || {}).parentId || null;
   else if (scope === 'notebook') currentParentId = ((state.notebooks || []).find(n => n.id === itemId) || {}).parentId || null;
 
@@ -445,6 +631,12 @@ function openListItemFolderPicker(itemId, scope, triggerBtn) {
 
   function commit(val) {
     const newParent = val === '__none__' ? null : val;
+    // '__bulk__' means the whole selection, not one row (see adminBulkMove).
+    if (itemId === '__bulk__') {
+      _adminApplyBulkMove(val);
+      cleanup();
+      return;
+    }
     moveItemToFolder(itemId, scope, newParent);
     cleanup();
     renderAdmin();

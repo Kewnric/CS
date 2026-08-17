@@ -815,11 +815,10 @@ function vizNodeClick(e, nodeId) {
     vizRenderContentPane();
     vizHideNodePopup();
   } else if (node && ['challenge', 'snippet', 'notebook'].includes(node.type)) {
-    if (isFogged) {
-      vizHideNodePopup();
-    } else {
-      vizShowNodePopup(node, e.clientX, e.clientY);
-    }
+    // Selection only. The detail card used to appear on a single click, so it
+    // opened while you were panning, box-selecting or just aiming at a node —
+    // it now needs a deliberate double-click (see vizNodeDblClick).
+    vizHideNodePopup();
   } else {
     vizHideNodePopup();
   }
@@ -1160,6 +1159,19 @@ function vizClearSearch() {
   viz.paneQuery = '';
   vizRenderContentPane();
   vizSearchNodes('');
+}
+
+/** Double-click a program/snippet/notebook node to open its detail card. */
+function vizNodeDblClick(e, nodeId) {
+  e.stopPropagation();
+  if (viz.linkModeEnabled || viz.linkingFrom) return;
+  const node = viz.nodes.find(n => n.id === nodeId);
+  if (!node || !['challenge', 'snippet', 'notebook'].includes(node.type)) return;
+  // Same fog test the single-click path uses: the class on the rendered node.
+  const nodeEl = e.target.closest('.viz-node');
+  if (nodeEl && nodeEl.classList.contains('viz-fog-of-war')) { vizHideNodePopup(); return; }
+  viz.selectedNodeId = nodeId;
+  vizShowNodePopup(node, e.clientX, e.clientY);
 }
 
 function vizShowNodePopup(node, x, y) {
