@@ -210,6 +210,10 @@ function renderCustomSelect(containerId, options, currentValue, onChange, placeh
   opts = opts || {};
   const searchable = opts.searchable !== false && options.length > 6;
   const clearable = !!opts.clearable;
+  /* opts.onCreate  — shows a "create" row at the bottom of the list
+     opts.removable — (value) => bool, puts an X on that row
+     opts.onRemove  — (value) => void, fired by the X */
+  const creatable = typeof opts.onCreate === 'function';
 
   const selected = options.find(o => o.value === currentValue) || null;
 
@@ -222,7 +226,14 @@ function renderCustomSelect(containerId, options, currentValue, onChange, placeh
   function optionRowHTML(o, isActive) {
     const iconPart = o.icon ? `<i data-lucide="${o.icon}" style="width:15px;height:15px;color:var(--text-tertiary);" class="cs-opt-icon"></i>` : '';
     const badgePart = o.badge ? `<span style="margin-left:auto;font-size:0.625rem;font-weight:700;padding:0.125rem 0.4rem;border-radius:999px;background:var(--bg-surface-hover);color:var(--text-tertiary);">${escapeHTML(o.badge)}</span>` : '';
-    return `<div class="cs-option${isActive ? ' cs-option-active' : ''}" data-value="${escapeHTML(o.value)}" role="option" aria-selected="${isActive ? 'true' : 'false'}">${iconPart}<span class="cs-opt-label">${escapeHTML(o.label)}</span>${isActive ? '<i data-lucide="check" style="width:13px;height:13px;margin-left:auto;color:var(--color-primary);"></i>' : badgePart}</div>`;
+    // The X only appears while opts.removable says so — for a folder made here
+    // and not yet committed by saving the program.
+    const removable = typeof opts.removable === 'function' && o.value && opts.removable(o.value);
+    const removeBtn = removable
+      ? `<button type="button" class="cs-opt-remove" data-remove="${escapeHTML(o.value)}" title="Delete this new category" aria-label="Delete category ${escapeHTML(o.label)}"><i data-lucide="x" style="width:12px;height:12px;"></i></button>`
+      : '';
+    const tail = removable ? removeBtn : (isActive ? '<i data-lucide="check" style="width:13px;height:13px;margin-left:auto;color:var(--color-primary);"></i>' : badgePart);
+    return `<div class="cs-option${isActive ? ' cs-option-active' : ''}${removable ? ' cs-option-new' : ''}" data-value="${escapeHTML(o.value)}" role="option" aria-selected="${isActive ? 'true' : 'false'}">${iconPart}<span class="cs-opt-label">${escapeHTML(o.label)}</span>${tail}</div>`;
   }
 
   container.innerHTML = `
@@ -258,6 +269,7 @@ function renderCustomSelect(containerId, options, currentValue, onChange, placeh
     optionsEl.innerHTML = `
       ${searchable ? `<div class="cs-search-wrap"><i data-lucide="search" style="width:13px;height:13px;color:var(--text-tertiary);"></i><input class="cs-search" type="text" placeholder="Search..." aria-label="Search options" /></div>` : ''}
       <div class="cs-list">${options.map(o => optionRowHTML(o, o.value === currentValue)).join('')}</div>
+      ${creatable ? `<button type="button" class="cs-create-row"><i data-lucide="plus" style="width:13px;height:13px;"></i><span>${escapeHTML(opts.createLabel || 'Create new')}</span></button>` : ''}
     `;
     document.body.appendChild(backdrop);
     document.body.appendChild(optionsEl);
@@ -267,6 +279,14 @@ function renderCustomSelect(containerId, options, currentValue, onChange, placeh
 
     backdrop.addEventListener('click', () => closeDropdown());
     listEl.querySelectorAll('.cs-option').forEach(opt => bindOption(opt));
+    const createRow = optionsEl.querySelector('.cs-create-row');
+    if (createRow) {
+      createRow.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeDropdown();
+        opts.onCreate();
+      });
+    }
     if (searchEl) {
       searchEl.addEventListener('input', () => { renderList(); highlightAt(0); });
       searchEl.addEventListener('keydown', (e) => handleKey(e));
@@ -331,6 +351,16 @@ function renderCustomSelect(containerId, options, currentValue, onChange, placeh
   }
 
   function bindOption(opt) {
+    const rm = opt.querySelector('.cs-opt-remove');
+    if (rm) {
+      rm.addEventListener('click', (e) => {
+        e.stopPropagation();   // deleting is not choosing
+        e.preventDefault();
+        const v = rm.getAttribute('data-remove');
+        closeDropdown();
+        if (typeof opts.onRemove === 'function') opts.onRemove(v);
+      });
+    }
     opt.addEventListener('mouseenter', () => {
       const rows = Array.from(listEl.querySelectorAll('.cs-option'));
       const idx = rows.indexOf(opt);

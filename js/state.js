@@ -183,42 +183,13 @@ function loadData() {
         console.log('[Migration] Converted flat categories → tree nodes:', state.nodes.length, 'folders created');
       }
 
-      // Merge custom seed categories and entries dynamically into existing state
-      if (typeof buildCustomSeed === 'function') {
-        const custom = buildCustomSeed();
-        let mergedAny = false;
-        const existingNodeIds = new Set(state.nodes.map(n => n.id));
-        custom.nodes.forEach(node => {
-          if (!existingNodeIds.has(node.id)) {
-            state.nodes.push(node);
-            mergedAny = true;
-          }
-        });
-        const existingChallengeIds = new Set(state.challenges.map(c => c.id));
-        custom.challenges.forEach(ch => {
-          if (!existingChallengeIds.has(ch.id)) {
-            state.challenges.push(ch);
-            mergedAny = true;
-          }
-        });
-        const existingSnippetIds = new Set(state.snippets.map(s => s.id));
-        custom.snippets.forEach(sn => {
-          if (!existingSnippetIds.has(sn.id)) {
-            state.snippets.push(sn);
-            mergedAny = true;
-          }
-        });
-        const existingNotebookIds = new Set(state.notebooks.map(nb => nb.id));
-        custom.notebooks.forEach(nb => {
-          if (!existingNotebookIds.has(nb.id)) {
-            state.notebooks.push(nb);
-            mergedAny = true;
-          }
-        });
-        if (mergedAny) {
-          saveData();
-        }
-      }
+      // Sample content used to be merged back in here on EVERY load: anything
+      // from the seed whose id was missing from state was treated as absent
+      // rather than deleted, and re-added. Deleting a sample program was
+      // therefore the exact thing that guaranteed its return on the next
+      // reload — in the library, on the Visualize canvas, everywhere. There is
+      // no seed to merge any more, and a deletion is now permanent.
+
     } catch (e) {
       console.error("Failed to parse local storage", e);
     }
@@ -237,189 +208,20 @@ function loadData() {
  * immediately sees a populated workspace.
  */
 function buildDefaultSeed() {
-  // Challenge folders
-  const fChBasics      = { id: 'default_folder_ch_basics',      type: 'folder', name: 'Getting Started',    parentId: null, scope: 'challenge', order: 0, description: 'Beginner-friendly programs to get familiar with the editor.' };
-  const fChAlgorithms  = { id: 'default_folder_ch_algorithms',  type: 'folder', name: 'Algorithms',         parentId: null, scope: 'challenge', order: 1, description: 'Sorting, searching, and classic algorithm problems.' };
-  const fChStructures  = { id: 'default_folder_ch_structures',  type: 'folder', name: 'Data Structures',    parentId: null, scope: 'challenge', order: 2, description: 'Linked lists, trees, hash maps, and more.' };
+  /* An empty workspace. This used to hand back 3 challenge folders, 3 snippet
+     folders, 2 notebook folders and 9 example items, and js/custom-seed.js
+     added 16 more programs across 5 folders on top. Every route already has a
+     real empty state, so a new user gets those instead of somebody else's
+     example content to delete.
 
-  // Snippet folders
-  const fSnBasics      = { id: 'default_folder_sn_basics',      type: 'folder', name: 'Basics',             parentId: null, scope: 'snippet',   order: 0, description: 'Core syntax and patterns.' };
-  const fSnPatterns    = { id: 'default_folder_sn_patterns',    type: 'folder', name: 'Patterns',           parentId: null, scope: 'snippet',   order: 1, description: 'Reusable code patterns.' };
-  const fSnAdvanced    = { id: 'default_folder_sn_advanced',    type: 'folder', name: 'Advanced',           parentId: null, scope: 'snippet',   order: 2, description: 'Higher-level techniques.' };
-
-  // Notebook folders
-  const fNbGeneral     = { id: 'default_folder_nb_general',     type: 'folder', name: 'General',            parentId: null, scope: 'notebook',  order: 0, description: 'General-purpose quizzes.' };
-  const fNbConcepts    = { id: 'default_folder_nb_concepts',    type: 'folder', name: 'Concepts',           parentId: null, scope: 'notebook',  order: 1, description: 'Concept-focused quizzes.' };
-
-  const custom = (typeof buildCustomSeed === 'function') ? buildCustomSeed() : { nodes: [], challenges: [], snippets: [], notebooks: [] };
-
-  const nodes = [
-    fChBasics, fChAlgorithms, fChStructures,
-    fSnBasics, fSnPatterns, fSnAdvanced,
-    fNbGeneral, fNbConcepts,
-    ...custom.nodes
-  ];
-
-  const challenges = [
-    {
-      id: 'default_challenge_hello', _isDefault: true,
-      title: 'Hello, World!', parentId: fChBasics.id, order: 0,
-      tags: ['Beginner', 'C', 'Example'],
-      coverDescription: 'The traditional first program — print Hello, World! to the console.',
-      variants: [{
-        id: 'def_v_hello', name: 'C Version',
-        description: 'Write a C program that prints `Hello, World!` followed by a newline.',
-        starterCode: '#include <stdio.h>\n\nint main(void) {\n    // Your code here\n    return 0;\n}\n',
-        code: '#include <stdio.h>\n\nint main(void) {\n    printf("Hello, World!\\n");\n    return 0;\n}\n',
-        files: [{ id: 'def_f_hello_main', name: 'main', ext: '.c',
-          starterCode: '#include <stdio.h>\n\nint main(void) {\n    // Your code here\n    return 0;\n}\n',
-          code: '#include <stdio.h>\n\nint main(void) {\n    printf("Hello, World!\\n");\n    return 0;\n}\n'
-        }],
-        samples: [{ title: 'Expected Output', content: 'Hello, World!\n' }],
-        tests: [{ id: 'def_t_hello_1', name: 'Prints greeting', stdin: '', expected: 'Hello, World!\n', hidden: false }]
-      }]
-    },
-    {
-      id: 'default_challenge_sum', _isDefault: true,
-      title: 'Sum of Two Integers', parentId: fChBasics.id, order: 1,
-      tags: ['Beginner', 'Arithmetic'],
-      coverDescription: 'Read two integers from input and print their sum.',
-      variants: [{
-        id: 'def_v_sum', name: 'C Version',
-        description: 'Read two integers `a` and `b` separated by whitespace, then print `a + b`.',
-        starterCode: '#include <stdio.h>\n\nint main(void) {\n    int a, b;\n    // TODO: read a and b, print a + b\n    return 0;\n}\n',
-        code: '#include <stdio.h>\n\nint main(void) {\n    int a, b;\n    scanf("%d %d", &a, &b);\n    printf("%d\\n", a + b);\n    return 0;\n}\n',
-        files: [{ id: 'def_f_sum_main', name: 'main', ext: '.c',
-          starterCode: '#include <stdio.h>\n\nint main(void) {\n    int a, b;\n    // TODO: read a and b, print a + b\n    return 0;\n}\n',
-          code: '#include <stdio.h>\n\nint main(void) {\n    int a, b;\n    scanf("%d %d", &a, &b);\n    printf("%d\\n", a + b);\n    return 0;\n}\n'
-        }],
-        samples: [{ title: 'Sample 1', content: 'Input:\n3 4\nOutput:\n7\n' }],
-        tests: [
-          { id: 'def_t_sum_1', name: '3 + 4', stdin: '3 4', expected: '7\n', hidden: false },
-          { id: 'def_t_sum_2', name: 'Negatives', stdin: '-5 8', expected: '3\n', hidden: true }
-        ]
-      }]
-    },
-    {
-      id: 'default_challenge_reverse', _isDefault: true,
-      title: 'Reverse a String', parentId: fChAlgorithms.id, order: 0,
-      tags: ['String', 'Algorithm'],
-      coverDescription: 'Reverse the characters of a null-terminated C string in place.',
-      variants: [{
-        id: 'def_v_reverse', name: 'In-place',
-        description: 'Write a function `void reverse(char *s)` that reverses `s` in place. Then read a line from stdin and print the reversed string.',
-        starterCode: '#include <stdio.h>\n#include <string.h>\n\nvoid reverse(char *s) {\n    // TODO\n}\n\nint main(void) {\n    char buf[256];\n    if (fgets(buf, sizeof buf, stdin)) {\n        size_t n = strlen(buf);\n        if (n && buf[n-1] == \'\\n\') buf[n-1] = 0;\n        reverse(buf);\n        printf("%s\\n", buf);\n    }\n    return 0;\n}\n',
-        code: '#include <stdio.h>\n#include <string.h>\n\nvoid reverse(char *s) {\n    size_t i = 0, j = strlen(s);\n    if (!j) return;\n    for (--j; i < j; ++i, --j) {\n        char t = s[i]; s[i] = s[j]; s[j] = t;\n    }\n}\n\nint main(void) {\n    char buf[256];\n    if (fgets(buf, sizeof buf, stdin)) {\n        size_t n = strlen(buf);\n        if (n && buf[n-1] == \'\\n\') buf[n-1] = 0;\n        reverse(buf);\n        printf("%s\\n", buf);\n    }\n    return 0;\n}\n',
-        files: [{ id: 'def_f_reverse_main', name: 'main', ext: '.c',
-          starterCode: '#include <stdio.h>\n#include <string.h>\n\nvoid reverse(char *s) {\n    // TODO\n}\n',
-          code: '#include <stdio.h>\n#include <string.h>\n\nvoid reverse(char *s) {\n    size_t i = 0, j = strlen(s);\n    if (!j) return;\n    for (--j; i < j; ++i, --j) {\n        char t = s[i]; s[i] = s[j]; s[j] = t;\n    }\n}\n'
-        }],
-        samples: [{ title: 'Sample', content: 'Input:\nhello\nOutput:\nolleh\n' }]
-      }]
-    },
-    {
-      id: 'default_challenge_linkedlist', _isDefault: true,
-      title: 'Linked List — Print in Order', parentId: fChStructures.id, order: 0,
-      tags: ['Linked List', 'Pointer'],
-      coverDescription: 'Define a simple singly-linked list and print all values from head to tail.',
-      variants: [{
-        id: 'def_v_ll', name: 'Singly Linked',
-        description: 'Build a linked list of 3 nodes containing 1, 2, 3 and print each value on its own line.',
-        starterCode: '#include <stdio.h>\n#include <stdlib.h>\n\ntypedef struct Node { int val; struct Node *next; } Node;\n\nint main(void) {\n    // TODO: build list 1 -> 2 -> 3 and print each value\n    return 0;\n}\n',
-        code: '#include <stdio.h>\n#include <stdlib.h>\n\ntypedef struct Node { int val; struct Node *next; } Node;\n\nint main(void) {\n    Node *c = malloc(sizeof *c); c->val = 3; c->next = NULL;\n    Node *b = malloc(sizeof *b); b->val = 2; b->next = c;\n    Node *a = malloc(sizeof *a); a->val = 1; a->next = b;\n    for (Node *p = a; p; p = p->next) printf("%d\\n", p->val);\n    return 0;\n}\n',
-        files: [{ id: 'def_f_ll_main', name: 'main', ext: '.c',
-          starterCode: '#include <stdio.h>\n#include <stdlib.h>\n\ntypedef struct Node { int val; struct Node *next; } Node;\n\nint main(void) {\n    // TODO\n    return 0;\n}\n',
-          code: '#include <stdio.h>\n#include <stdlib.h>\n\ntypedef struct Node { int val; struct Node *next; } Node;\n\nint main(void) {\n    Node *c = malloc(sizeof *c); c->val = 3; c->next = NULL;\n    Node *b = malloc(sizeof *b); b->val = 2; b->next = c;\n    Node *a = malloc(sizeof *a); a->val = 1; a->next = b;\n    for (Node *p = a; p; p = p->next) printf("%d\\n", p->val);\n    return 0;\n}\n'
-        }],
-        samples: [{ title: 'Expected Output', content: '1\n2\n3\n' }]
-      }]
-    },
-    ...custom.challenges
-  ];
-
-  const snippets = [
-    {
-      id: 'default_snippet_for_loop', _isDefault: true,
-      title: 'For Loop Pattern', parentId: fSnBasics.id, order: 0,
-      tags: ['Loop', 'Beginner'],
-      description: '<p>A <strong>for loop</strong> iterates over a range of numbers. It has three parts: <em>initialization</em>, <em>condition</em>, and <em>increment</em>.</p>',
-      comments: '<p>Use <code>for</code> when you know how many times you want to iterate. Use <code>while</code> when the count is condition-driven.</p>',
-      starterCode: '',
-      relatedChallenges: [],
-      examples: [{ id: 'def_ex_for_1', name: 'Count to 5', code: 'for (int i = 0; i < 5; i++) {\n    printf("%d\\n", i);\n}\n', highlightLines: '1' }],
-      tryCodingTargetIndices: [0]
-    },
-    {
-      id: 'default_snippet_pointers', _isDefault: true,
-      title: 'Pointer Basics', parentId: fSnBasics.id, order: 1,
-      tags: ['Pointer', 'Memory'],
-      description: '<p>A <strong>pointer</strong> stores the address of a value. Dereference with <code>*</code>, take address with <code>&amp;</code>.</p>',
-      comments: '<p>A NULL pointer points to nothing — always check before dereferencing.</p>',
-      starterCode: '',
-      relatedChallenges: [],
-      examples: [{ id: 'def_ex_ptr_1', name: 'Address & Deref', code: 'int x = 42;\nint *p = &x;\nprintf("%d\\n", *p);  // prints 42\n', highlightLines: '2-3' }],
-      tryCodingTargetIndices: [0]
-    },
-    {
-      id: 'default_snippet_swap', _isDefault: true,
-      title: 'Swap Pattern', parentId: fSnPatterns.id, order: 0,
-      tags: ['Pattern', 'Swap'],
-      description: '<p>Swapping two values needs a temporary variable (or, for ints, an XOR trick).</p>',
-      comments: '<p>Prefer the temporary-variable version for clarity. The XOR trick fails if both addresses are the same.</p>',
-      starterCode: '',
-      relatedChallenges: [],
-      examples: [
-        { id: 'def_ex_swap_1', name: 'With Temp', code: 'int t = a;\na = b;\nb = t;\n', highlightLines: '' },
-        { id: 'def_ex_swap_2', name: 'XOR Trick', code: 'a ^= b;\nb ^= a;\na ^= b;\n', highlightLines: '' }
-      ],
-      tryCodingTargetIndices: [0]
-    },
-    ...custom.snippets
-  ];
-
-  const notebooks = [
-    {
-      id: 'default_notebook_quickstart', _isDefault: true,
-      title: 'Quick Start Quiz', parentId: fNbGeneral.id, order: 0,
-      icon: 'book',
-      tags: ['Beginner'],
-      description: 'A sample notebook with example questions to get you started.',
-      sections: [{
-        id: 'def_sec_qs_basics', label: 'Basics', choices: 4,
-        questions: [1, 2, 3],
-        answerKey: '1=A\n2=C\n3=B',
-        answerKeysData: [
-          { qNum: 1, type: 'mcq', answer: 'A', explanation: 'printf is the standard C output function.', question: 'Which function prints to stdout in C?', hint: '', choices: { A: 'printf()', B: 'console.log()', C: 'echo()', D: 'System.out.println()' } },
-          { qNum: 2, type: 'mcq', answer: 'C', explanation: 'const declares a value that cannot be reassigned.', question: 'Which keyword declares a constant?', hint: '', choices: { A: 'var', B: 'let', C: 'const', D: 'static' } },
-          { qNum: 3, type: 'mcq', answer: 'B', explanation: 'A semicolon terminates statements in C.', question: 'Which character ends a statement in C?', hint: '', choices: { A: ':', B: ';', C: '.', D: ',' } }
-        ]
-      }]
-    },
-    {
-      id: 'default_notebook_pointers', _isDefault: true,
-      title: 'Pointer Concepts', parentId: fNbConcepts.id, order: 0,
-      icon: 'cpu',
-      tags: ['Pointer'],
-      description: 'Test your understanding of C pointers.',
-      sections: [{
-        id: 'def_sec_ptr', label: 'Pointers', choices: 4,
-        questions: [1, 2],
-        answerKey: '1=B\n2=A',
-        answerKeysData: [
-          { qNum: 1, type: 'mcq', answer: 'B', explanation: 'The & operator returns the address of a variable.', question: 'Which operator returns the address of a variable?', hint: '', choices: { A: '*', B: '&', C: '@', D: '#' } },
-          { qNum: 2, type: 'mcq', answer: 'A', explanation: 'NULL is the conventional sentinel for a pointer that points to nothing.', question: 'What value indicates a pointer that points to nothing?', hint: '', choices: { A: 'NULL', B: '0xFFFF', C: 'undefined', D: '-1' } }
-        ]
-      }]
-    },
-    ...custom.notebooks
-  ];
-
+     Used by both first-time boot and Reset Data, so both now produce a clean
+     workspace rather than restoring samples. */
   return {
-    nodes,
-    challenges,
-    snippets,
-    notebooks,
-    expandedNodes: [fChBasics.id, fSnBasics.id, fNbGeneral.id],
+    nodes: [],
+    challenges: [],
+    snippets: [],
+    notebooks: [],
+    expandedNodes: [],
     categoryRequirements: {},
     snippetProgress: {},
     badges: [],

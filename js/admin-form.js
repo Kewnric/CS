@@ -83,15 +83,7 @@ function openAdminForm(id) {
 
   // Render custom category dropdown
   if (typeof renderCustomSelect === 'function') {
-    const _fpOpts2 = [{ value: '', label: 'Uncategorized', icon: 'inbox' }].concat(
-      fpOpts.map(f => ({ value: f.id, label: f.label.trim(), icon: 'folder' }))
-    );
-    renderCustomSelect('admin-category-cs', _fpOpts2, adminState.parentId || '', (val) => {
-      adminState.parentId = val || null;
-      document.getElementById('admin-category').value = val;
-      window.adminIsDirty = true;
-      setSaveStatus('admin-save-status', 'unsaved');
-    }, 'Select category...');
+    _adminRenderCategorySelect(fpOpts);
   }
 
   renderAdminTags();
@@ -245,6 +237,105 @@ function removeAdminTag(idx) {
   setSaveStatus('admin-save-status', 'unsaved');
 }
 
+
+/* ============================================================
+   CATEGORY DROPDOWN — pick one, or make one without leaving the form
+   ------------------------------------------------------------
+   Filing a program used to mean abandoning a half-filled form, going to the
+   folder pane, making the folder, and coming back. The dropdown can do it.
+
+   A folder made here is "pending" until the program is saved, and pending
+   folders carry an X so a typo can be undone on the spot. Saving the program
+   commits them and the X disappears — by then something is filed in there.
+   ============================================================ */
+let _adminPendingFolders = [];
+
+/** Same depth-first walk the native <select> uses, so both stay in step. */
+function _adminFolderOpts() {
+  const out = [];
+  (function walk(pid, d) {
+    getChildFolders(pid, 'challenge').forEach(f => {
+      out.push({ value: f.id, label: '  '.repeat(d) + f.name, icon: 'folder' });
+      walk(f.id, d + 1);
+    });
+  })(null, 0);
+  return [{ value: '', label: 'Uncategorized', icon: 'inbox' }]
+    .concat(out.map(o => ({ value: o.value, label: o.label.trim(), icon: 'folder' })));
+}
+
+/* saveAdminForm reads the hidden native <select>, not adminState. Assigning an
+   id that has no matching <option> silently leaves the value empty, so a folder
+   created here would be forgotten the moment the program was saved. Rebuild the
+   options whenever the folder list changes. */
+function _adminSyncNativeCategory(value) {
+  const el = document.getElementById('admin-category');
+  if (!el) return;
+  el.innerHTML = _adminFolderOpts()
+    .map(o => `<option value="${escapeHTML(o.value)}">${escapeHTML(o.label || 'Uncategorized')}</option>`)
+    .join('');
+  el.value = value || '';
+}
+
+function _adminRenderCategorySelect() {
+  if (typeof renderCustomSelect !== 'function') return;
+  renderCustomSelect('admin-category-cs', _adminFolderOpts(), adminState.parentId || '', (val) => {
+    adminState.parentId = val || null;
+    _adminSyncNativeCategory(val);
+    window.adminIsDirty = true;
+    setSaveStatus('admin-save-status', 'unsaved');
+  }, 'Select category...', {
+    createLabel: 'New category...',
+    onCreate: () => _adminCreateCategory(),
+    removable: (id) => _adminPendingFolders.includes(id),
+    onRemove: (id) => _adminRemovePendingFolder(id)
+  });
+}
+
+function _adminCreateCategory() {
+  showInputDialog('New category', null, 'Category name', '', (name) => {
+    const t = (name || '').trim();
+    if (!t) return;
+    const dupe = (state.nodes || []).some(n =>
+      n.type === 'folder' && n.scope === 'challenge' && (n.name || '').toLowerCase() === t.toLowerCase());
+    if (dupe) {
+      if (typeof toast === 'function') toast('A category called "' + t + '" already exists.', { type: 'warning' });
+      return;
+    }
+    const node = createNode(t, 'folder', null, 'challenge');
+    _adminPendingFolders.push(node.id);
+
+    // Selected straight away — creating it here means you want to use it.
+    adminState.parentId = node.id;
+    _adminSyncNativeCategory(node.id);
+    window.adminIsDirty = true;
+    setSaveStatus('admin-save-status', 'unsaved');
+
+    _adminRenderCategorySelect();
+    if (typeof renderAdmin === 'function') renderAdmin();
+    if (typeof toast === 'function') toast('Category "' + t + '" created.', { type: 'success' });
+  });
+}
+
+function _adminRemovePendingFolder(id) {
+  if (!_adminPendingFolders.includes(id)) return;   // only ones made in this form
+  const node = (state.nodes || []).find(n => n.id === id);
+  const kids = (state.challenges || []).filter(c => c.parentId === id).length;
+  if (kids) {
+    if (typeof toast === 'function') toast('That category is not empty any more.', { type: 'warning' });
+    _adminPendingFolders = _adminPendingFolders.filter(x => x !== id);
+    _adminRenderCategorySelect();
+    return;
+  }
+  state.nodes = (state.nodes || []).filter(n => n.id !== id);
+  _adminPendingFolders = _adminPendingFolders.filter(x => x !== id);
+  if (adminState.parentId === id) adminState.parentId = null;
+  saveData();
+  _adminSyncNativeCategory(adminState.parentId || '');
+  _adminRenderCategorySelect();
+  if (typeof renderAdmin === 'function') renderAdmin();
+  if (typeof toast === 'function') toast('Removed "' + ((node && node.name) || 'category') + '".', { type: 'info' });
+}
+
 function saveAdminForm(opts = {}) {
   // Sync DOM fields back to state before saving
   const titleEl = document.getElementById('admin-title');
@@ -306,6 +397,9 @@ function saveAdminForm(opts = {}) {
   }
 
   saveData();
+  // The program is filed now, so the folders it was filed into are no longer
+  // provisional. This is what takes the X off them.
+  _adminPendingFolders = [];
   setSaveStatus('admin-save-status', 'saved');
   if (opts.silent) {
     // Keep form open for autosave/silent saves
