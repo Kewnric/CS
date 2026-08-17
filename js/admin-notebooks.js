@@ -1072,6 +1072,9 @@ function syncNotebookSection(idx) {
       sec._orphanWarned = false;
     }
     sec.questions = Array.from({ length: count }, (_, i) => i + 1);
+    // Truncate/extend the records with it, so Modify Given and Modify Answer
+    // Key both show exactly this many questions.
+    nbNormalizeSection(sec);
   }
   // Live-update validation without a full re-render (keeps input focus).
   const vEl = document.getElementById('nb-sec-validation-' + idx);
@@ -1082,6 +1085,120 @@ function syncNotebookSection(idx) {
 function syncAllNotebookSections() {
   if (!notebookAdminState || !notebookAdminState.sections) return;
   notebookAdminState.sections.forEach((_, idx) => syncNotebookSection(idx));
+}
+
+/* ============================================================
+   QUESTION MODEL — one record per question, count is the authority
+   ------------------------------------------------------------
+   There were three places that decided how many questions a section had, and
+   they disagreed:
+
+     - the Questions field wrote sec.questions = [1..N]
+     - both modals ADDED a record for anything missing, never removed extras
+     - saveGivenQuestionModal did the opposite, overwriting sec.questions from
+       whatever records happened to exist
+
+   So setting 20, then 10, then opening Modify Given and saving put it back to
+   20. sec.questions is now the only authority: normalise() makes the record
+   list match it exactly, keeping the data of the questions that survive.
+
+   Every question is ONE record shared by both modals. Modify Given owns the
+   prompt, image, hint, choices and pair labels; Modify Answer Key owns which of
+   those is correct. Both agree on `type`.
+   ============================================================ */
+const NB_TYPES = ['mcq', 'checkbox', 'text', 'matching', 'truefalse'];
+
+function nbBlankQuestion(qNum, type) {
+  const d = { qNum, type: type || 'mcq', question: '', hint: '', image: '', explanation: '' };
+  nbApplyTypeDefaults(d);
+  return d;
+}
+
+/** Gives a record the shape its type needs, and drops answers that type can't hold. */
+function nbApplyTypeDefaults(d) {
+  const t = NB_TYPES.includes(d.type) ? d.type : 'mcq';
+  d.type = t;
+  if (t === 'mcq') {
+    if (!d.choices || !Object.keys(d.choices).length) d.choices = { A: '', B: '', C: '', D: '' };
+    if (Array.isArray(d.answer)) d.answer = d.answer[0] || '';
+    if (typeof d.answer !== 'string') d.answer = '';
+    if (d.answer && !Object.keys(d.choices).includes(d.answer)) d.answer = '';
+    delete d.pairs;
+  } else if (t === 'checkbox') {
+    if (!d.choices || !Object.keys(d.choices).length) d.choices = { A: '', B: '', C: '', D: '' };
+    if (!Array.isArray(d.answer)) d.answer = (typeof d.answer === 'string' && d.answer) ? [d.answer] : [];
+    d.answer = d.answer.filter(a => Object.keys(d.choices).includes(a));
+    delete d.pairs;
+  } else if (t === 'truefalse') {
+    d.choices = { A: 'True', B: 'False' };
+    if (Array.isArray(d.answer)) d.answer = d.answer[0] || '';
+    // Accept either the letter or the word, store the letter.
+    const v = String(d.answer || '').trim().toLowerCase();
+    d.answer = (v === 'a' || v === 'true') ? 'A' : (v === 'b' || v === 'false') ? 'B' : '';
+    delete d.pairs;
+  } else if (t === 'text') {
+    if (Array.isArray(d.answer)) d.answer = d.answer.join(', ');
+    if (typeof d.answer !== 'string') d.answer = '';
+    delete d.choices;
+    delete d.pairs;
+  } else if (t === 'matching') {
+    if (!Array.isArray(d.pairs) || !d.pairs.length) d.pairs = [{ left: '', right: '' }, { left: '', right: '' }];
+    d.pairs = d.pairs.map(pr => ({ left: (pr && pr.left) || '', right: (pr && pr.right) || '' }));
+    delete d.choices;
+    d.answer = '';
+  }
+  return d;
+}
+
+/**
+ * Makes a section's records match its question count exactly.
+ * @returns {number} how many records were dropped
+ */
+function nbNormalizeSection(sec) {
+  if (!sec) return 0;
+  const count = (sec.questions || []).length;
+  sec.questions = Array.from({ length: count }, (_, i) => i + 1);
+  const byNum = {};
+  (sec.answerKeysData || []).forEach(d => { if (d && d.qNum != null) byNum[+d.qNum] = d; });
+  const dropped = Object.keys(byNum).filter(n => +n > count || +n < 1).length;
+  sec.answerKeysData = sec.questions.map(q => nbApplyTypeDefaults(byNum[q] || nbBlankQuestion(q)));
+  return dropped;
+}
+
+/* ---------- Scroll + focus preservation ----------
+   Every edit rebuilt the modal's innerHTML, which threw the scroll position to
+   the top: changing one question's type at Q12 dumped you back at Q1. This
+   keeps the scroll where it was and puts the caret back. */
+function nbRerender(containerId, renderFn) {
+  const host = document.getElementById(containerId);
+  // The question list scrolls in a panel INSIDE this container, not the
+  // container itself, so record every scrollable descendant by position.
+  const scrollersBefore = host
+    ? [host, ...host.querySelectorAll('*')].filter(el => el.scrollHeight > el.clientHeight + 4).map(el => el.scrollTop)
+    : [];
+  const outerTop = host ? host.scrollTop : 0;
+
+  const act = document.activeElement;
+  const focusId = act && act.id ? act.id : null;
+  const selStart = act && act.selectionStart != null ? act.selectionStart : null;
+
+  renderFn();
+
+  const host2 = document.getElementById(containerId);
+  if (host2) {
+    const after = [host2, ...host2.querySelectorAll('*')].filter(el => el.scrollHeight > el.clientHeight + 4);
+    after.forEach((el, i) => { if (scrollersBefore[i] != null) el.scrollTop = scrollersBefore[i]; });
+    host2.scrollTop = outerTop;
+  }
+  if (focusId) {
+    const el = document.getElementById(focusId);
+    if (el) {
+      try {
+        el.focus({ preventScroll: true });
+        if (selStart != null && el.setSelectionRange) el.setSelectionRange(selStart, selStart);
+      } catch (e) { /* not a text field */ }
+    }
+  }
 }
 
 // === Answer Key Modal Logic ===
@@ -1273,15 +1390,17 @@ function openAnswerKeyModal(idx) {
     sec.answerKeysData = parseOldAnswerKey(sec.answerKey);
   }
 
+  // The count owns the list: exactly one record per question, no more.
+  nbNormalizeSection(sec);
   currentAnswerKeysData = JSON.parse(JSON.stringify(sec.answerKeysData));
-
-  // Ensure we have an entry for every question in the section
-  sec.questions.forEach(q => {
-    if (!currentAnswerKeysData.find(d => d.qNum === q)) {
-      currentAnswerKeysData.push({ qNum: q, type: 'mcq', answer: '', explanation: '' });
-    }
+  // Freeze the pool of right-hand options as authored, before any connecting
+  // rewrites pr.right. Read lazily it would consume its own source.
+  currentAnswerKeysData.forEach(d => {
+    if ((d.type || 'mcq') !== 'matching') return;
+    d._rightPool = (d.pairs || []).map(pr => pr.right || '');
+    delete d._rightOrder;
   });
-  currentAnswerKeysData.sort((a, b) => a.qNum - b.qNum);
+  _nbMatchPick = {};
 
   document.getElementById('answer-key-modal').classList.remove('hidden');
   renderAnswerKeyContent();
@@ -1299,7 +1418,9 @@ function saveAnswerKeyModal() {
 
   syncAnswerKeyData();
 
-  sec.answerKeysData = JSON.parse(JSON.stringify(currentAnswerKeysData));
+  // _rightPool / _rightOrder are connector scratch space, not data.
+  sec.answerKeysData = JSON.parse(JSON.stringify(currentAnswerKeysData))
+    .map(d => { delete d._rightPool; delete d._rightOrder; return d; });
 
   sec.answerKey = currentAnswerKeysData
     .filter(d => {
@@ -1331,13 +1452,9 @@ function syncAnswerKeyData() {
       const checked = document.querySelector(`input[name="ak-tf-${i}"]:checked`);
       if (checked) d.answer = checked.value;
     } else if (qType === 'matching') {
+      // Nothing to read back: connecting writes straight to d.pairs, and the
+      // term text itself belongs to Modify Given Question.
       if (!d.pairs) d.pairs = [];
-      d.pairs.forEach((pair, pi) => {
-        const lEl = document.getElementById(`ak-pair-l-${i}-${pi}`);
-        const rEl = document.getElementById(`ak-pair-r-${i}-${pi}`);
-        if (lEl) pair.left = lEl.value;
-        if (rEl) pair.right = rEl.value;
-      });
     } else {
       const ansEl = document.getElementById(`ak-ans-${i}`);
       if (ansEl) d.answer = ansEl.value.toUpperCase();
@@ -1358,7 +1475,162 @@ function removeAnswerKeySample(idx) {
   renderAnswerKeyContent();
 }
 
+/* ============================================================
+   MATCHING — click to connect
+   ------------------------------------------------------------
+   Terms on the left, definitions on the right in a fixed shuffled order. Click
+   a term, then click a definition: they join and a line is drawn. Clicking a
+   connected item again releases it.
+
+   The stored shape is unchanged — d.pairs[i] = {left, right} — so nothing
+   downstream (the quiz, the validator, bulk import) has to know about this.
+   ============================================================ */
+let _nbMatchPick = {};      // akIdx -> selected left index
+
+/** A stable shuffle per question, so the right column doesn't jump on re-render. */
+function _nbRightOrder(d, akIdx) {
+  const n = (d.pairs || []).length;
+  if (!d._rightOrder || d._rightOrder.length !== n) {
+    const order = Array.from({ length: n }, (_, k) => k);
+    // Deterministic from the question number: same layout every time it opens.
+    let seed = (d.qNum || 1) * 9301 + 49297;
+    for (let k = order.length - 1; k > 0; k--) {
+      seed = (seed * 9301 + 49297) % 233280;
+      const j = Math.floor((seed / 233280) * (k + 1));
+      [order[k], order[j]] = [order[j], order[k]];
+    }
+    d._rightOrder = order;
+  }
+  return d._rightOrder;
+}
+
+function _nbMatchConnectorHtml(d, akIdx) {
+  const pairs = d.pairs || [];
+  if (!pairs.length) {
+    return `<div class="nb-match-empty">No pairs yet — add the terms in <strong>Modify Given Question</strong> first.</div>`;
+  }
+  const order = _nbRightOrder(d, akIdx);
+  const picked = _nbMatchPick[akIdx];
+  const linked = pairs.map(pr => (pr.right || '').trim()).filter(Boolean);
+
+  const leftRows = pairs.map((pr, li) => {
+    const has = !!(pr.right || '').trim();
+    return `<button type="button" class="nb-match-item nb-match-left${picked === li ? ' is-picked' : ''}${has ? ' is-linked' : ''}"
+              data-side="left" data-idx="${li}" onclick="nbMatchPickLeft(${akIdx}, ${li})"
+              title="${has ? 'Connected — click to release' : 'Click, then click its match'}">
+              <span class="nb-match-num">${li + 1}</span>
+              <span class="nb-match-text">${escapeHTML(pr.left || '(empty term)')}</span>
+              <span class="nb-match-dot"></span>
+            </button>`;
+  }).join('');
+
+  const rightRows = order.map((ri) => {
+    const value = (pairs[ri] && pairs[ri].rightPool !== undefined) ? pairs[ri].rightPool : (pairs[ri] || {}).right;
+    const label = _nbRightLabel(d, ri);
+    const usedBy = pairs.findIndex(pr => (pr.right || '') === label && label !== '');
+    return `<button type="button" class="nb-match-item nb-match-right${usedBy !== -1 ? ' is-linked' : ''}"
+              data-side="right" data-idx="${ri}" onclick="nbMatchPickRight(${akIdx}, ${ri})"
+              title="${usedBy !== -1 ? 'Matched with ' + escapeHTML(pairs[usedBy].left || 'term ' + (usedBy + 1)) : 'Click to connect'}">
+              <span class="nb-match-dot"></span>
+              <span class="nb-match-text">${escapeHTML(label || '(empty match)')}</span>
+              ${usedBy !== -1 ? `<span class="nb-match-num">${usedBy + 1}</span>` : '<span class="nb-match-num nb-match-num-blank"></span>'}
+            </button>`;
+  }).join('');
+
+  return `
+    <div class="nb-match-wrap" id="nb-match-${akIdx}">
+      <div class="nb-match-head">
+        <span>Click a term, then its match</span>
+        <span class="nb-match-progress">${linked.length}/${pairs.length} connected</span>
+        <button type="button" class="nb-match-clear" onclick="nbMatchClearAll(${akIdx})">Clear</button>
+      </div>
+      <div class="nb-match-cols">
+        <div class="nb-match-col">${leftRows}</div>
+        <svg class="nb-match-lines" aria-hidden="true"></svg>
+        <div class="nb-match-col">${rightRows}</div>
+      </div>
+    </div>`;
+}
+
+/** The pool of right-hand options, as authored. Captured when the modal opens. */
+function _nbRightLabel(d, ri) {
+  if (!d._rightPool) d._rightPool = (d.pairs || []).map(pr => pr.right || '');
+  return d._rightPool[ri] || '';
+}
+
+function nbMatchPickLeft(akIdx, li) {
+  const d = currentAnswerKeysData[akIdx];
+  if (!d) return;
+  const pr = d.pairs[li];
+  if (pr && (pr.right || '').trim()) {   // already connected → release it
+    pr.right = '';
+    _nbMatchPick[akIdx] = undefined;
+  } else {
+    _nbMatchPick[akIdx] = (_nbMatchPick[akIdx] === li) ? undefined : li;
+  }
+  renderAnswerKeyContent();
+}
+
+function nbMatchPickRight(akIdx, ri) {
+  const d = currentAnswerKeysData[akIdx];
+  if (!d) return;
+  const label = _nbRightLabel(d, ri);
+  const takenBy = d.pairs.findIndex(pr => (pr.right || '') === label && label !== '');
+  if (takenBy !== -1) {                  // clicking a used match frees it
+    d.pairs[takenBy].right = '';
+    renderAnswerKeyContent();
+    return;
+  }
+  const li = _nbMatchPick[akIdx];
+  if (li == null) return;                // nothing picked on the left yet
+  d.pairs[li].right = label;
+  _nbMatchPick[akIdx] = undefined;
+  renderAnswerKeyContent();
+}
+
+function nbMatchClearAll(akIdx) {
+  const d = currentAnswerKeysData[akIdx];
+  if (!d) return;
+  (d.pairs || []).forEach(pr => { pr.right = ''; });
+  _nbMatchPick[akIdx] = undefined;
+  renderAnswerKeyContent();
+}
+
+/** Draws one line per connection, after layout so the dots are where we think. */
+function nbDrawMatchLines() {
+  document.querySelectorAll('.nb-match-wrap').forEach(wrap => {
+    const svg = wrap.querySelector('.nb-match-lines');
+    const cols = wrap.querySelector('.nb-match-cols');
+    if (!svg || !cols) return;
+    const box = cols.getBoundingClientRect();
+    svg.setAttribute('viewBox', `0 0 ${Math.round(box.width)} ${Math.round(box.height)}`);
+    svg.setAttribute('width', Math.round(box.width));
+    svg.setAttribute('height', Math.round(box.height));
+
+    const akIdx = +wrap.id.replace('nb-match-', '');
+    const d = currentAnswerKeysData[akIdx];
+    if (!d) return;
+    let paths = '';
+    (d.pairs || []).forEach((pr, li) => {
+      const label = (pr.right || '').trim();
+      if (!label) return;
+      const ri = (d._rightPool || []).indexOf(label);
+      const lEl = wrap.querySelector(`.nb-match-left[data-idx="${li}"] .nb-match-dot`);
+      const rEl = wrap.querySelector(`.nb-match-right[data-idx="${ri}"] .nb-match-dot`);
+      if (!lEl || !rEl) return;
+      const a = lEl.getBoundingClientRect(), b = rEl.getBoundingClientRect();
+      const x1 = a.x + a.width / 2 - box.x, y1 = a.y + a.height / 2 - box.y;
+      const x2 = b.x + b.width / 2 - box.x, y2 = b.y + b.height / 2 - box.y;
+      const mid = (x1 + x2) / 2;
+      paths += `<path d="M${x1},${y1} C${mid},${y1} ${mid},${y2} ${x2},${y2}" fill="none" stroke="#f472b6" stroke-width="2" stroke-linecap="round" opacity="0.85"/>`;
+    });
+    svg.innerHTML = paths;
+  });
+}
+
 function addAkMatchPair(akIdx) {
+  const _d = currentAnswerKeysData[akIdx];
+  if (_d && _d._rightPool) { _d._rightPool.push(''); delete _d._rightOrder; }
   syncAnswerKeyData();
   const d = currentAnswerKeysData[akIdx];
   if (!d) return;
@@ -1531,7 +1803,7 @@ function bulkAddAnswers() {
   renderAnswerKeyContent();
 }
 
-function renderAnswerKeyContent() {
+function _renderAnswerKeyContentNow() {
   const container = document.getElementById('answer-key-content');
 
   let html = `
@@ -1581,31 +1853,11 @@ function renderAnswerKeyContent() {
           </div>
         `;
       } else if (qType === 'matching') {
-        if (!d.pairs) d.pairs = [];
-        const pairs = d.pairs;
-        answerInputHtml = `
-          <div style="display:flex; flex-direction:column; gap:0.25rem;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-size:0.75rem; color:var(--text-tertiary);">Matching Pairs (correct pairing order):</span>
-              <button onclick="addAkMatchPair(${i})" class="btn btn-ghost btn-sm" style="color:var(--color-primary); font-size:0.7rem; padding:0.15rem 0.4rem;">
-                <i data-lucide="plus" style="width:12px;height:12px;"></i> Add Pair
-              </button>
-            </div>
-            <div style="display:flex; flex-direction:column; gap:0.35rem; background:var(--bg-surface); padding:0.5rem; border-radius:var(--radius-sm); border:1px solid var(--border-color);">
-              ${pairs.length > 0 ? pairs.map((p, pi) => `
-                <div style="display:flex; align-items:center; gap:0.3rem; font-size:0.8rem;">
-                  <span style="color:var(--text-tertiary); width:16px; font-weight:700; flex-shrink:0;">${pi + 1}.</span>
-                  <input id="ak-pair-l-${i}-${pi}" value="${escapeHTML(p.left || '')}" class="form-input" style="flex:1; font-size:0.8rem; padding:0.25rem 0.4rem; min-width:0;" placeholder="Term..." />
-                  <span style="color:#f472b6; font-weight:700; flex-shrink:0;">→</span>
-                  <input id="ak-pair-r-${i}-${pi}" value="${escapeHTML(p.right || '')}" class="form-input" style="flex:1; font-size:0.8rem; padding:0.25rem 0.4rem; min-width:0;" placeholder="Definition..." />
-                  <button onclick="removeAkMatchPair(${i},${pi})" class="btn btn-ghost btn-sm" style="padding:0.15rem; flex-shrink:0;" title="Remove pair">
-                    <i data-lucide="x" style="width:12px;height:12px;color:var(--color-danger);"></i>
-                  </button>
-                </div>
-              `).join('') : '<span style="font-size:0.75rem; color:var(--text-tertiary);">No pairs yet. Click "Add Pair" or use bulk add.</span>'}
-            </div>
-          </div>
-        `;
+        // Two columns and a click each side, instead of retyping both halves of
+        // every pair into text boxes. The right column is shuffled, so the
+        // pairing is something you set rather than something already implied by
+        // the row order.
+        answerInputHtml = _nbMatchConnectorHtml(d, i);
       } else if (qType === 'truefalse') {
         const curAns = typeof d.answer === 'string' ? d.answer : '';
         answerInputHtml = `
@@ -1687,7 +1939,9 @@ function renderAnswerKeyContent() {
   `;
 
   container.innerHTML = html;
-  lucide.createIcons();
+  // Scoped: the global call rescans the whole document for [data-lucide]
+  // on every re-render, with the sidebar and form still mounted.
+  lucide.createIcons({ el: container });
 }
 
 // === Given Question Modal Logic ===
@@ -1703,14 +1957,8 @@ function openGivenQuestionModal(idx) {
     sec.answerKeysData = [];
   }
 
+  nbNormalizeSection(sec);
   currentGivenQuestionsData = JSON.parse(JSON.stringify(sec.answerKeysData));
-
-  sec.questions.forEach(q => {
-    if (!currentGivenQuestionsData.find(d => d.qNum === q)) {
-      currentGivenQuestionsData.push({ qNum: q, type: 'mcq', answer: '', explanation: '', question: '', hint: '', image: '', choices: {}, pairs: [] });
-    }
-  });
-  currentGivenQuestionsData.sort((a, b) => a.qNum - b.qNum);
 
   document.getElementById('given-question-modal').classList.remove('hidden');
   renderGivenQuestionContent();
@@ -1748,11 +1996,9 @@ function saveGivenQuestionModal() {
     }
   });
 
-  // Auto-update sec.questions array to match the actual question count from given questions
-  const allQNums = sec.answerKeysData.map(d => d.qNum).sort((a, b) => a - b);
-  if (allQNums.length > 0) {
-    sec.questions = allQNums;
-  }
+  // sec.questions is NOT rebuilt from the records here. Doing that was what
+  // resurrected a count the user had already lowered.
+  nbNormalizeSection(sec);
 
   closeGivenQuestionModal();
   renderNotebookSectionsForm();
@@ -1796,17 +2042,17 @@ function syncGivenQuestionData() {
 function changeGivenQuestionType(idx, newType) {
   syncGivenQuestionData();
   const d = currentGivenQuestionsData[idx];
+  if (!d || d.type === newType) return;
+  // A letter answer means nothing once the question is Text, and a typed answer
+  // means nothing once it is MCQ. Same family (mcq/checkbox/truefalse all pick
+  // from choices) keeps what it can; crossing families starts clean.
+  const family = (t) => (t === 'mcq' || t === 'checkbox' || t === 'truefalse') ? 'choice' : t;
+  if (family(d.type) !== family(newType)) d.answer = '';
   d.type = newType;
-  // Initialize type-specific data on switch
-  if (newType === 'matching' && (!d.pairs || d.pairs.length === 0)) {
-    d.pairs = [{ left: '', right: '' }, { left: '', right: '' }];
-  }
-  if (newType === 'truefalse') {
-    d.choices = { A: 'True', B: 'False' };
-  }
-  if ((newType === 'mcq' || newType === 'checkbox') && Object.keys(d.choices || {}).length === 0) {
-    d.choices = { A: '', B: '', C: '', D: '' };
-  }
+  // One place decides what each type needs and what it cannot keep — an "A"
+  // left over from MCQ is not a valid Text answer, and a T/F question cannot
+  // hold four choices.
+  nbApplyTypeDefaults(d);
   renderGivenQuestionContent();
 }
 
@@ -2188,7 +2434,18 @@ function toggleFormatGuide() {
   if (el) el.classList.toggle('hidden');
 }
 
+/* Public names keep their meaning; the scroll and caret survive the rebuild. */
 function renderGivenQuestionContent() {
+  nbRerender('given-question-content', _renderGivenQuestionContentNow);
+}
+
+function renderAnswerKeyContent() {
+  nbRerender('answer-key-content', _renderAnswerKeyContentNow);
+  // Lines need final layout, so they are drawn once the frame is painted.
+  requestAnimationFrame(() => { try { nbDrawMatchLines(); } catch (e) { /* no connectors on screen */ } });
+}
+
+function _renderGivenQuestionContentNow() {
   const container = document.getElementById('given-question-content');
 
   const typeBadgeColors = { mcq: '#818cf8', checkbox: '#10b981', text: '#fbbf24', matching: '#f472b6', truefalse: '#38bdf8' };
@@ -2372,7 +2629,9 @@ function renderGivenQuestionContent() {
   `;
 
   container.innerHTML = html;
-  lucide.createIcons();
+  // Scoped: the global call rescans the whole document for [data-lucide]
+  // on every re-render, with the sidebar and form still mounted.
+  lucide.createIcons({ el: container });
 }
 
 /* Helper functions for question image uploads (Base64 compression) */
