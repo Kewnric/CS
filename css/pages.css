@@ -1801,3 +1801,19 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
 .card-set-ribbon { display: inline-flex; align-items: center; gap: 4px; align-self: flex-start; font-size: 0.6rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-accent); background: rgba(6, 182, 212, 0.12); border: 1px solid rgba(6, 182, 212, 0.3); padding: 0.14rem 0.5rem; border-radius: 999px; margin-bottom: 0.5rem; }
 /* Practice-set tree row badge tint */
 .tree-set-node .tree-node-badge { background: rgba(6, 182, 212, 0.18); color: var(--color-accent); }
+
+/* ── Notebook attempt: flags, and the grid's position numbering ────────── */
+.np-grid-box { position: relative; }
+.np-grid-box.flagged { border-color: var(--color-warning); }
+.np-grid-flag {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-warning);
+}
+#np-flag-btn.is-flagged { color: var(--color-warning) !important; }
+#np-flag-btn.is-flagged i,
+#np-flag-btn.is-flagged svg { fill: currentColor; }

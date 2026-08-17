@@ -36,6 +36,8 @@ function initNotesPracticeSession() {
   reviewMode = false;
   reviewRecord = null;
   isCheckingAnswer = false;
+  npFlags = [];
+  npBindKeys();
   if (gradeAdvanceTimer !== null) { clearTimeout(gradeAdvanceTimer); gradeAdvanceTimer = null; }
 
   const npRoot = document.getElementById('notes-practice-view') || document.getElementById('main-content');
@@ -53,6 +55,7 @@ function initNotesPracticeSession() {
   }
 
   timeLimit = getSessionParam('notebookTimeLimit') || 0;
+  const _npResume = reviewRecordId ? null : npReadProgress();
 
   if (!nbId || !state.notebooks) {
     spaNavigate('study');
@@ -84,6 +87,32 @@ function initNotesPracticeSession() {
 
   renderSidebar();
   renderQuestion();
+
+  // An unfinished attempt on this notebook is offered back rather than
+  // overwritten. Answering anything replaces it, so the offer has to come now.
+  if (_npResume && _npResume.notebookId === activeNotebook.id && !reviewRecord) {
+    const mins = Math.max(1, Math.round((Date.now() - (_npResume.savedAt || Date.now())) / 60000));
+    const answered = (_npResume.answers || []).reduce(
+      (n, sec) => n + Object.values(sec || {}).filter(v => v != null && v !== '').length, 0);
+    _showThreeButtonDialog('Unfinished attempt',
+      `You left "${_npResume.title || activeNotebook.title}" about ${mins} minute${mins !== 1 ? 's' : ''} ago with ${answered} question${answered !== 1 ? 's' : ''} answered.`,
+      [
+        { label: 'Resume', primary: true, action: 'resume' },
+        { label: 'Start over', danger: true, action: 'fresh' }
+      ],
+      (choice) => {
+        if (choice === 'resume' && npApplyProgress(_npResume)) {
+          initTimer();
+          renderSidebar();
+          renderQuestion();
+          npPaintFlagBtn();
+        } else {
+          npClearProgress();
+        }
+      });
+  } else if (_npResume) {
+    npClearProgress();   // a draft for a different notebook is stale
+  }
 
   // Initialize theme selector
   const savedTheme = localStorage.getItem('theme') || 'dark';
@@ -150,6 +179,7 @@ function initSessionState() {
     const ans = {};
     const st = {};
     const gr = {};
+    if (!npFlags[idx]) npFlags[idx] = new Set();
     (sec.questions || []).forEach(q => {
       ans[q] = reviewRecord ? (reviewRecord.sections[idx]?.answers?.[q] || null) : null;
       st[q] = 'unopened';
@@ -237,6 +267,111 @@ function initTimer() {
   }, 1000);
 }
 
+/* ----------------------------------------------------------
+   TIMER MENU — right-click, as on the coding attempt
+   ---------------------------------------------------------- */
+function _npTimerMenuClose() {
+  document.getElementById('np-timer-menu')?.remove();
+}
+
+function npTimerMenu(e) {
+  if (e) e.preventDefault();
+  if (reviewMode) return;
+  if (document.getElementById('np-timer-menu')) { _npTimerMenuClose(); return; }
+
+  const limit = timeLimit || 0;
+  const h = Math.floor(limit / 3600), m = Math.floor((limit % 3600) / 60), sec = limit % 60;
+  const mode = limit > 0 ? 'down' : 'up';
+
+  const el = document.createElement('div');
+  el.id = 'np-timer-menu';
+  el.className = 'timer-menu';
+  el.innerHTML = `
+    <div class="timer-menu-title"><i data-lucide="timer" style="width:13px;height:13px;"></i> Timer</div>
+    <div class="timer-menu-modes" role="radiogroup" aria-label="Timer mode">
+      <button type="button" class="timer-mode${mode === 'up' ? ' active' : ''}" data-mode="up" role="radio" aria-checked="${mode === 'up'}">
+        <i data-lucide="arrow-up-circle" style="width:13px;height:13px;"></i> Count up
+      </button>
+      <button type="button" class="timer-mode${mode === 'down' ? ' active' : ''}" data-mode="down" role="radio" aria-checked="${mode === 'down'}">
+        <i data-lucide="arrow-down-circle" style="width:13px;height:13px;"></i> Countdown
+      </button>
+    </div>
+    <div class="timer-menu-fields" id="np-tm-fields">
+      <label>H <input type="number" id="np-tm-h" min="0" max="23" value="${h}"></label>
+      <label>M <input type="number" id="np-tm-m" min="0" max="59" value="${m}"></label>
+      <label>S <input type="number" id="np-tm-s" min="0" max="59" value="${sec}"></label>
+    </div>
+    <div class="timer-menu-presets">
+      ${[5, 15, 30, 60].map(mins => `<button type="button" class="timer-preset" data-mins="${mins}">${mins < 60 ? mins + 'm' : '1h'}</button>`).join('')}
+    </div>
+    <label class="timer-menu-restart"><input type="checkbox" id="np-tm-restart"> Restart the clock from zero</label>
+    <p class="timer-menu-note" id="np-tm-note"></p>
+    <div class="timer-menu-actions">
+      <button type="button" class="btn btn-secondary btn-sm" id="np-tm-cancel">Cancel</button>
+      <button type="button" class="btn btn-primary btn-sm" id="np-tm-apply">Apply</button>
+    </div>`;
+  document.body.appendChild(el);
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el });
+
+  const anchor = document.getElementById('np-timer-container');
+  const r = anchor ? anchor.getBoundingClientRect() : { left: 20, bottom: 60 };
+  const box = el.getBoundingClientRect();
+  el.style.left = Math.max(8, Math.min(r.left, window.innerWidth - box.width - 8)) + 'px';
+  el.style.top = (r.bottom + box.height > window.innerHeight ? Math.max(8, r.top - box.height - 6) : r.bottom + 6) + 'px';
+
+  let chosen = mode;
+  const fields = el.querySelector('#np-tm-fields');
+  const note = el.querySelector('#np-tm-note');
+  const paint = () => {
+    fields.style.opacity = chosen === 'down' ? '1' : '0.4';
+    fields.style.pointerEvents = chosen === 'down' ? '' : 'none';
+    note.textContent = chosen === 'down'
+      ? 'Submits automatically when it reaches zero.'
+      : 'Counts up with no limit.';
+  };
+  paint();
+
+  el.querySelectorAll('.timer-mode').forEach(b => b.addEventListener('click', () => {
+    chosen = b.dataset.mode;
+    el.querySelectorAll('.timer-mode').forEach(x => x.classList.toggle('active', x === b));
+    paint();
+  }));
+  el.querySelectorAll('.timer-preset').forEach(b => b.addEventListener('click', () => {
+    chosen = 'down';
+    el.querySelectorAll('.timer-mode').forEach(x => x.classList.toggle('active', x.dataset.mode === 'down'));
+    const mins = parseInt(b.dataset.mins, 10);
+    el.querySelector('#np-tm-h').value = Math.floor(mins / 60);
+    el.querySelector('#np-tm-m').value = mins % 60;
+    el.querySelector('#np-tm-s').value = 0;
+    paint();
+  }));
+  el.querySelector('#np-tm-cancel').addEventListener('click', _npTimerMenuClose);
+  el.querySelector('#np-tm-apply').addEventListener('click', () => {
+    const restart = el.querySelector('#np-tm-restart').checked;
+    if (chosen === 'up') {
+      timeLimit = 0;
+      if (restart) timeRemaining = 0;
+    } else {
+      const hh = parseInt(el.querySelector('#np-tm-h').value, 10) || 0;
+      const mm = parseInt(el.querySelector('#np-tm-m').value, 10) || 0;
+      const ss = parseInt(el.querySelector('#np-tm-s').value, 10) || 0;
+      const total = hh * 3600 + mm * 60 + ss;
+      if (total <= 0) { note.textContent = 'Set a time above zero, or choose Count up.'; return; }
+      timeLimit = total;
+      timeRemaining = total;
+    }
+    if (typeof setSessionParam === 'function') setSessionParam('notebookTimeLimit', timeLimit);
+    initTimer();
+    npSaveProgress();
+    _npTimerMenuClose();
+  });
+
+  setTimeout(() => document.addEventListener('click', function once(ev) {
+    if (el.contains(ev.target)) { document.addEventListener('click', once, { once: true }); return; }
+    _npTimerMenuClose();
+  }, { once: true }), 0);
+}
+
 function updateTimerDisplay() {
   const display = document.getElementById('np-timer-display');
   if (!display) return;
@@ -292,6 +427,7 @@ function switchSection(idx) {
 }
 
 function jumpToQuestion(qNum) {
+  npSaveProgress();
   // Cancel any pending auto-advance timer so it doesn't double-skip
   if (gradeAdvanceTimer !== null) {
     clearTimeout(gradeAdvanceTimer);
@@ -436,14 +572,14 @@ function selectAnswer(letter) {
     const idx = current.indexOf(letter);
     if (idx >= 0) current.splice(idx, 1);
     else current.push(letter);
-    sessionAnswers[currentSectionIdx][currentQuestionNum] = current;
+    sessionAnswers[currentSectionIdx][currentQuestionNum] = current; npSaveProgress();
     sessionStatus[currentSectionIdx][currentQuestionNum] = 'opened';
     renderQuestion();
     return;
   }
 
   // MCQ: immediate grade
-  sessionAnswers[currentSectionIdx][currentQuestionNum] = letter;
+  sessionAnswers[currentSectionIdx][currentQuestionNum] = letter; npSaveProgress();
   sessionStatus[currentSectionIdx][currentQuestionNum] = 'answered';
   gradeAndAdvance();
 }
@@ -462,7 +598,7 @@ function confirmTextAnswer() {
   if (sessionStatus[currentSectionIdx][currentQuestionNum] === 'answered') return;
   const ta = document.getElementById('np-text-answer-input');
   if (!ta || !ta.value.trim()) return;
-  sessionAnswers[currentSectionIdx][currentQuestionNum] = ta.value.trim();
+  sessionAnswers[currentSectionIdx][currentQuestionNum] = ta.value.trim(); npSaveProgress();
   sessionStatus[currentSectionIdx][currentQuestionNum] = 'answered';
   gradeAndAdvance();
 }
@@ -483,7 +619,7 @@ function selectMatchingLeft(leftIdx) {
     // If it was already matched, clear the match so user can redo it or leave it unmatched
     if (current[leftIdx] !== undefined) {
       delete current[leftIdx];
-      sessionAnswers[currentSectionIdx][currentQuestionNum] = current;
+      sessionAnswers[currentSectionIdx][currentQuestionNum] = current; npSaveProgress();
     }
     window._matchingSelectedLeft = leftIdx;
   }
@@ -505,7 +641,7 @@ function selectMatchingRight(rightOrigIdx) {
     });
     if (foundLeftKey !== null) {
       delete current[foundLeftKey];
-      sessionAnswers[currentSectionIdx][currentQuestionNum] = current;
+      sessionAnswers[currentSectionIdx][currentQuestionNum] = current; npSaveProgress();
       renderQuestion();
     }
     return;
@@ -517,7 +653,7 @@ function selectMatchingRight(rightOrigIdx) {
     if (current[k] === rightOrigIdx) delete current[k];
   });
   current[window._matchingSelectedLeft] = rightOrigIdx;
-  sessionAnswers[currentSectionIdx][currentQuestionNum] = current;
+  sessionAnswers[currentSectionIdx][currentQuestionNum] = current; npSaveProgress();
   sessionStatus[currentSectionIdx][currentQuestionNum] = 'opened';
   window._matchingSelectedLeft = null;
   renderQuestion();
@@ -653,7 +789,11 @@ function renderSidebar() {
   const gridContainer = document.getElementById('np-question-grid');
   if (!gridContainer) return;
 
-  gridContainer.innerHTML = (sec.questions || []).map(qNum => {
+  // The grid used to print the AUTHORED number. Questions are shuffled, so it
+  // read "2 1 5 3 4" while the header said "1 / 5" — the first button was the
+  // first question but was labelled 2. Position is what the header counts, so
+  // position is what the button shows; the original number is on the tooltip.
+  gridContainer.innerHTML = (sec.questions || []).map((qNum, pos) => {
     let cls = 'np-grid-box';
 
     if (reviewMode) {
@@ -673,9 +813,144 @@ function renderSidebar() {
     }
 
     if (qNum === currentQuestionNum) cls += ' active';
+    if (npIsFlagged(currentSectionIdx, qNum)) cls += ' flagged';
 
-    return `<button class="${cls}" onclick="jumpToQuestion(${qNum})">${qNum}</button>`;
+    const flagged = npIsFlagged(currentSectionIdx, qNum);
+    return `<button class="${cls}" onclick="jumpToQuestion(${qNum})"
+              title="Question ${pos + 1}${flagged ? ' — flagged for review' : ''}"
+              aria-label="Go to question ${pos + 1}${flagged ? ', flagged' : ''}">${pos + 1}${flagged ? '<span class="np-grid-flag"></span>' : ''}</button>`;
   }).join('');
+}
+
+/* ============================================================
+   IN-PROGRESS ATTEMPT — saved as you go
+   ------------------------------------------------------------
+   saveData() only ran AFTER submitting, so closing the tab, a crash or a flat
+   battery lost the whole attempt. Answers, flags, position and the clock are
+   written to localStorage on every change, and offered back on return.
+   ============================================================ */
+const NP_RESUME_KEY = 'npAttemptInProgress';
+let npFlags = [];          // flags[secIdx] = Set of qNum
+let _npSaveTimer = null;
+
+function npIsFlagged(secIdx, qNum) {
+  return !!(npFlags[secIdx] && npFlags[secIdx].has(qNum));
+}
+
+function npToggleFlag(secIdx, qNum) {
+  if (secIdx == null || qNum == null) return;
+  if (!npFlags[secIdx]) npFlags[secIdx] = new Set();
+  if (npFlags[secIdx].has(qNum)) npFlags[secIdx].delete(qNum);
+  else npFlags[secIdx].add(qNum);
+  npSaveProgress();
+  renderSidebar();     // the grid is drawn there
+  npPaintFlagBtn();
+}
+
+function npPaintFlagBtn() {
+  const btn = document.getElementById('np-flag-btn');
+  if (!btn) return;
+  const on = npIsFlagged(currentSectionIdx, currentQuestionNum);
+  btn.classList.toggle('is-flagged', on);
+  btn.title = on ? 'Unflag this question (F)' : 'Flag for review (F)';
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+}
+
+/** Debounced: typing an identification answer should not write on every key. */
+function npSaveProgress() {
+  clearTimeout(_npSaveTimer);
+  _npSaveTimer = setTimeout(npFlushProgress, 400);
+}
+
+function npFlushProgress() {
+  if (reviewMode || !activeNotebook) return;
+  try {
+    localStorage.setItem(NP_RESUME_KEY, JSON.stringify({
+      notebookId: activeNotebook.id,
+      title: activeNotebook.title,
+      savedAt: Date.now(),
+      sectionIdx: currentSectionIdx,
+      questionNum: currentQuestionNum,
+      order: (activeNotebook.sections || []).map(sec => (sec.questions || []).slice()),
+      answers: sessionAnswers,
+      status: sessionStatus,
+      flags: npFlags.map(set => set ? [...set] : []),
+      timeRemaining: typeof timeRemaining === 'number' ? timeRemaining : null,
+      timeLimit: timeLimit || 0
+    }));
+  } catch (e) { /* quota — the attempt still works, it just will not resume */ }
+}
+
+function npClearProgress() {
+  try { localStorage.removeItem(NP_RESUME_KEY); } catch (e) { /* nothing to clear */ }
+}
+
+function npReadProgress() {
+  try {
+    const raw = localStorage.getItem(NP_RESUME_KEY);
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    return (d && d.notebookId) ? d : null;
+  } catch (e) { return null; }
+}
+
+/** Puts a saved attempt back exactly where it was. */
+function npApplyProgress(d) {
+  if (!d || !activeNotebook) return false;
+  try {
+    (activeNotebook.sections || []).forEach((sec, i) => {
+      if (d.order && d.order[i] && d.order[i].length === (sec.questions || []).length) {
+        sec.questions = d.order[i].slice();   // the shuffle it was taken with
+      }
+    });
+    if (d.answers) sessionAnswers = d.answers;
+    if (d.status) sessionStatus = d.status;
+    npFlags = (d.flags || []).map(arr => new Set(arr || []));
+    currentSectionIdx = d.sectionIdx || 0;
+    currentQuestionNum = d.questionNum != null ? d.questionNum : null;
+    if (d.timeLimit > 0 && typeof d.timeRemaining === 'number') {
+      timeLimit = d.timeLimit;
+      timeRemaining = d.timeRemaining;
+    }
+    return true;
+  } catch (e) { return false; }
+}
+
+/* ---------- Keyboard ----------
+   The page was mouse-only apart from Enter in a text answer. On a fifty
+   question set that is a lot of clicking. */
+let _npKeyHandler = null;
+
+function npBindKeys() {
+  if (_npKeyHandler) return;
+  _npKeyHandler = (e) => {
+    if (reviewMode) return;
+    const el = document.activeElement;
+    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((el || {}).tagName || '') || (el || {}).isContentEditable;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (typing && e.key !== 'Escape') return;
+
+    const k = e.key.toLowerCase();
+    if (k === 'n' || e.key === 'ArrowRight') { e.preventDefault(); npNextQuestion(); }
+    else if (k === 'p' || e.key === 'ArrowLeft') { e.preventDefault(); npPrevQuestion(); }
+    else if (k === 'f') { e.preventDefault(); npToggleFlag(currentSectionIdx, currentQuestionNum); }
+    else if (k === 'h') { e.preventDefault(); if (typeof showHintModal === 'function') showHintModal(); }
+    else if (/^[1-9]$/.test(k) || /^[a-e]$/.test(k)) {
+      // A number or a letter picks that choice, whichever the student thinks in.
+      const idx = /^[1-9]$/.test(k) ? parseInt(k, 10) - 1 : k.charCodeAt(0) - 97;
+      // The choices are buttons carrying selectAnswer('X') — match on that
+      // rather than on a class, which is generated inline here.
+      const boxes = [...document.querySelectorAll('#np-bubbles-container button[onclick^="selectAnswer"]')];
+      if (boxes[idx]) { e.preventDefault(); boxes[idx].click(); }
+    }
+  };
+  document.addEventListener('keydown', _npKeyHandler);
+}
+
+function npUnbindKeys() {
+  if (!_npKeyHandler) return;
+  document.removeEventListener('keydown', _npKeyHandler);
+  _npKeyHandler = null;
 }
 
 /* ----------------------------------------------------------
@@ -1250,6 +1525,9 @@ function processSubmission() {
   if (!state.notebookHistory) state.notebookHistory = [];
   state.notebookHistory.unshift(record);
   saveData();
+  // The attempt is finished, so the in-progress copy is no longer wanted.
+  npClearProgress();
+  npUnbindKeys();
 
   reviewRecord = record;
 

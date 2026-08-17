@@ -10,10 +10,12 @@ function notesPracticeTemplate() {
         <div class="practice-topbar-right" style="display:flex; align-items:center; gap: 1rem;">
           <button id="np-hint-btn" onclick="showHintModal()" class="tutorial-trigger-btn" title="Show Hint" style="color: silver;"><i data-lucide="lightbulb"></i></button>
           <button id="np-align-btn" onclick="toggleNpTextAlign()" class="tutorial-trigger-btn" title="Text: Centered" style="color: silver;"><i data-lucide="align-center"></i></button>
+          <button id="np-flag-btn" onclick="npToggleFlag(currentSectionIdx, currentQuestionNum)" class="tutorial-trigger-btn" title="Flag for review (F)" aria-pressed="false" style="color: silver;"><i data-lucide="flag"></i></button>
+          <button id="np-cheat-btn" onclick="openCheatsheet()" class="tutorial-trigger-btn" title="Cheat sheet" style="color: silver;"><i data-lucide="book-open-check"></i></button>
           <select id="theme-selector" class="form-select" onchange="changeTheme(this.value)" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; width: auto;">
             <option value="dark">Night</option><option value="light">Day</option><option value="purple">Purple</option><option value="green">Green</option>
           </select>
-          <div id="np-timer-container" class="timer-display"><i data-lucide="clock"></i><span id="np-timer-display">--:--</span></div>
+          <div id="np-timer-container" class="timer-display" oncontextmenu="npTimerMenu(event)" title="Right-click to change the timer"><i data-lucide="clock"></i><span id="np-timer-display">--:--</span></div>
           <button onclick="npSubmitAttempt()" class="btn-submit" id="np-submit-btn"><i data-lucide="check" style="width:16px;height:16px;"></i> Submit</button>
         </div>
       </div>
@@ -32,7 +34,7 @@ function notesPracticeTemplate() {
             <h3 style="font-size: 0.8125rem; font-weight: 700; color: #8b949e; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.75rem;" id="np-current-section-title">Section</h3>
             <div id="np-question-grid" class="np-grid"></div>
           </div>
-          <div class="practice-footer" id="np-footer-text"><p>Select your answers by clicking the bubbles. Navigate with Previous/Next or click the grid.</p></div>
+          <div class="practice-footer" id="np-footer-text"><p>Keys: <kbd>1-9</kbd>/<kbd>A-E</kbd> answer &middot; <kbd>N</kbd>/<kbd>P</kbd> or arrows move &middot; <kbd>F</kbd> flag &middot; <kbd>H</kbd> hint. Right-click the timer to change it.</p></div>
         </div>
         <div class="np-question-pane" style="flex: 1; display: flex; align-items: flex-start; justify-content: center; background: #0d1117; position: relative; overflow-y: auto;">
           <div style="position: absolute; top: 1rem; left: 1.25rem; font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-tertiary); opacity: 0.8; z-index: 1;" id="np-q-progress">0 / 0</div>
@@ -80,4 +82,7 @@ function notesPracticeInit() { initNotesPracticeSession(); }
 function notesPracticeDestroy() {
   if (typeof timerInterval !== 'undefined' && timerInterval) { clearInterval(timerInterval); timerInterval = null; }
   if (typeof gradeAdvanceTimer !== 'undefined' && gradeAdvanceTimer) { clearTimeout(gradeAdvanceTimer); gradeAdvanceTimer = null; }
+  // Leaving mid-attempt keeps the draft; the keys go with the page.
+  if (typeof npFlushProgress === 'function') npFlushProgress();
+  if (typeof npUnbindKeys === 'function') npUnbindKeys();
 }

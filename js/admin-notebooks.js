@@ -1233,6 +1233,15 @@ function parseOldAnswerKey(str) {
  * @returns {Array<{type,question,choices,answer,explanation,hint}>}
  */
 function parseBulkQuestions(text) {
+  // The Import Questions dialog uses this parser, and it never stripped the
+  // type tag. A question written "Match these: [Match]" reached the student
+  // with the tag still in it. (_tokenizeBulkInput, used by Unified Bulk Add,
+  // strips it — the two had drifted apart.)
+  if (typeof _extractTypeTag === 'function') {
+    text = String(text || '').split(String.fromCharCode(10))
+      .map(line => _extractTypeTag(line.trim()).text || line)
+      .join(String.fromCharCode(10));
+  }
   if (!text) return [];
   const blocks = String(text).replace(/\r\n/g, '\n').split(/\n\s*\n+/).map(b => b.trim()).filter(Boolean);
   const out = [];
