@@ -99,22 +99,17 @@ function renderSnippetList() {
   container.classList.toggle('hide-tree-items', localStorage.getItem('snippetsHideItems') === 'true');
 
   // Attach right-click context to folder rows only (snippet file rows are
-  // items, not folders — the folder menu would misbehave on them)
-  container.querySelectorAll('.tree-node:not(.tree-item-node) > .tree-node-row[data-node-id]').forEach(row => {
-    row.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      showSnippetCtxMenu(e, row.getAttribute('data-node-id'));
-    });
-  });
+  // Folders use the shared menu (see the snippets host below). Attaching the
+  // legacy one here as well meant one right-click opened two stacked menus —
+  // the same bug the coding and notes trees had.
 
-  // Allow right-click on empty area to create root folder
+  // Right-click the empty pane: new folders and the row display toggles.
   if (_snippetContainerCtxHandler) {
     container.removeEventListener('contextmenu', _snippetContainerCtxHandler);
   }
   _snippetContainerCtxHandler = (e) => {
     if (e.target === container || e.target.closest('.empty-state')) {
-      e.preventDefault();
-      showSnippetCtxMenu(e, null);
+      treePaneContextMenu(e, 'snippets');
     }
   };
   container.addEventListener('contextmenu', _snippetContainerCtxHandler);
@@ -158,6 +153,7 @@ function renderSnippetTreeRecursive(parentId, depth, query, itemsOnly, rootList)
           <div class="tree-node-row ${isActive ? 'active' : ''}"
                ${treeRowAttrs({ ns: 'snippets', id: folder.id, kind: 'folder', level: depth, expanded: expanded, selected: isActive })}
                style="padding-left: calc(0.5rem + 0rem)"
+               oncontextmenu="treeContextMenu(event, '${folder.id}', 'snippets')"
                onclick="selectSnippetFolder('${folder.id}')">
             <i data-lucide="chevron-right" class="tree-node-chevron ${chevronClass}" onclick="toggleSnippetFolder('${folder.id}', event)"></i>
             <i data-lucide="${folder.icon || 'folder'}" class="tree-node-icon folder-icon-color"></i>
@@ -180,7 +176,7 @@ function renderSnippetTreeRecursive(parentId, depth, query, itemsOnly, rootList)
     if (query && !libMatches(sn, query, 'snippet')) return;
     const isActive = activeSnippetId === sn.id;
     html += `
-      <div class="tree-node tree-item-node" data-level="${depth + 1}" data-node-id="${sn.id}">
+      <div class="tree-node tree-item-node${sn.color ? ' has-accent' : ''}" data-level="${depth + 1}" data-node-id="${sn.id}"${sn.color && typeof treeColorOf === 'function' ? ` style="--row-accent:${treeColorOf(sn.color)}"` : ''}>
         <div class="tree-node-row ${isActive ? 'active' : ''}"
              ${treeRowAttrs({ ns: 'snippets', id: sn.id, kind: 'item', level: depth + 1, selected: isActive })}
              style="padding-left: calc(0.5rem + ${TREE_ITEM_INSET}rem)"
@@ -189,6 +185,8 @@ function renderSnippetTreeRecursive(parentId, depth, query, itemsOnly, rootList)
           <i class="tree-node-chevron invisible"></i>
           <i data-lucide="code" class="tree-node-icon item-icon-color" style="width:14px;height:14px;"></i>
           <span class="tree-node-label" style="font-weight:400; font-size:0.875rem;">${escapeHTML(sn.title)}</span>
+          ${snipShow('tags') && (sn.tags || []).length ? `<span class="tree-badge-tag">${escapeHTML(sn.tags[0])}</span>` : ''}
+          ${sn.favorite ? '<i data-lucide="star" class="tree-node-star"></i>' : ''}
         </div>
       </div>
     `;
@@ -1147,6 +1145,38 @@ function shareSnippet(snippetId) {
 // ============================================================
 
 /* Drag and drop lives in tree-dnd.js, shared with the other library trees. */
+/* Row display toggles, matching the coding and notes trees. */
+const SNIP_SHOW_KEY = 'snipRowShow';
+function snipShow(what) {
+  try { return (JSON.parse(localStorage.getItem(SNIP_SHOW_KEY)) || {})[what] === true; } catch (e) { return false; }
+}
+function snipToggleShow(what) {
+  let o = {};
+  try { o = JSON.parse(localStorage.getItem(SNIP_SHOW_KEY)) || {}; } catch (e) { o = {}; }
+  o[what] = !o[what];
+  try { localStorage.setItem(SNIP_SHOW_KEY, JSON.stringify(o)); } catch (e) { /* quota */ }
+  renderSnippetList();
+}
+
+function snipFind(id) {
+  return (state.snippets || []).find(s => s.id === id) ||
+         (state.nodes || []).find(n => n.id === id) || null;
+}
+
+function snipToggleFavorite(id) {
+  const it = snipFind(id);
+  if (!it) return;
+  it.favorite = !it.favorite;
+  saveData(); renderSnippetList();
+  if (typeof toast === 'function') toast(it.favorite ? 'Added to favourites.' : 'Removed from favourites.', { type: 'info' });
+}
+
+function snipCollapseAll(collapse) {
+  const folders = (state.nodes || []).filter(n => n.type === 'folder' && n.scope === 'snippet');
+  state.expandedNodes = collapse ? [] : folders.map(f => f.id).concat('__root__');
+  saveData(); renderSnippetList();
+}
+
 registerTreeHost('snippets', {
   scope: 'snippet',
   container: '#snippet-list-container',
@@ -1160,7 +1190,80 @@ registerTreeHost('snippets', {
   toggle: (id) => toggleSnippetFolder(id, null),
   acceptsDrop: (targetId) => libRootAcceptsDrop('snippets', targetId),
   onDropInto: (targetId, ids) => libRootDropInto('snippets', targetId, ids,
-    (id) => (state.snippets || []).find(s => s.id === id))
+    (id) => (state.snippets || []).find(s => s.id === id)),
+
+  /* Folders had no menu at all here, and a snippet's offered only "Move to…" —
+     so renaming or deleting either one was impossible from the tree. */
+  onRename: (id, kind) => {
+    const it = snipFind(id);
+    if (!it) return;
+    showInputDialog(kind === 'folder' ? 'Rename folder' : 'Rename snippet', null, 'Name',
+      it.name || it.title || '', (v) => {
+        const t = (v || '').trim();
+        if (!t) return;
+        if (kind === 'folder') it.name = t; else it.title = t;
+        saveData(); renderSnippetList();
+      });
+  },
+  onNewSubfolder: (id) => {
+    showInputDialog('New folder', null, 'Folder name', '', (v) => {
+      const name = (v || '').trim();
+      if (!name || typeof createNode !== 'function') return;
+      createNode(name, 'folder', id, 'snippet');
+      if (id && !isNodeExpanded(id)) toggleNodeExpanded(id);
+      saveData(); renderSnippetList();
+    });
+  },
+  onDelete: (id, kind) => {
+    const it = snipFind(id);
+    if (!it) return;
+    if (kind === 'folder') {
+      const n = countItemsRecursive(id, 'snippet');
+      showConfirm('Delete folder?',
+        n ? `Delete "${it.name}"? The ${n} snippet${n !== 1 ? 's' : ''} inside move up a level.` : `Delete "${it.name}"?`,
+        () => {
+          (state.nodes || []).forEach(c => { if (c.parentId === id) c.parentId = it.parentId || null; });
+          (state.snippets || []).forEach(sn => { if (sn.parentId === id) sn.parentId = it.parentId || null; });
+          state.nodes = (state.nodes || []).filter(x => x.id !== id);
+          saveData(); renderSnippetList();
+        });
+      return;
+    }
+    if (typeof softDeleteSnippet === 'function') softDeleteSnippet(id, () => renderSnippetList());
+  },
+  extraActions: (id, kind) => {
+    const it = snipFind(id);
+    if (kind === 'folder') {
+      return [
+        { icon: 'image', label: 'Change icon...', fn: () => { if (typeof browseSetIcon === 'function') browseSetIcon(id); } },
+        { icon: 'palette', label: 'Highlight colour...', fn: () => { if (typeof browseSetColor === 'function') browseSetColor(id); } }
+      ];
+    }
+    const fav = !!(it && it.favorite);
+    return [
+      { icon: fav ? 'star-off' : 'star', label: fav ? 'Remove from favourites' : 'Add to favourites', fn: () => snipToggleFavorite(id) },
+      { icon: 'palette', label: 'Highlight colour...', fn: () => { if (typeof browseSetColor === 'function') browseSetColor(id); } },
+      { icon: 'image', label: 'Change icon...', fn: () => { if (typeof browseSetIcon === 'function') browseSetIcon(id); } },
+      { icon: 'share-2', label: 'Share link', fn: () => { if (typeof shareSnippet === 'function') shareSnippet(id); } }
+    ];
+  },
+  paneActions: () => ([
+    { icon: 'folder-plus', label: 'New root folder', fn: () => {
+      showInputDialog('New folder', null, 'Folder name', '', (v) => {
+        const name = (v || '').trim();
+        if (!name || typeof createNode !== 'function') return;
+        createNode(name, 'folder', null, 'snippet');
+        saveData(); renderSnippetList();
+      });
+    } },
+    { sep: true },
+    { icon: snipShow('tags') ? 'check-square' : 'square', label: 'Show topic badge', fn: () => snipToggleShow('tags') },
+    { sep: true },
+    { icon: 'chevrons-down-up', label: 'Collapse all folders', fn: () => snipCollapseAll(true) },
+    { icon: 'chevrons-up-down', label: 'Expand all folders', fn: () => snipCollapseAll(false) }
+  ]),
+  // Moving between folders asks first; reordering inside one does not.
+  confirmMove: true
 });
 
 function checkSharedSnippet() {
@@ -1201,44 +1304,10 @@ function importSharedSnippet(shared) {
 // SNIPPET CONTEXT MENU 
 // ============================================================
 
-function showSnippetCtxMenu(e, nodeId) {
-  snippetCtxTargetNodeId = nodeId;
-  const menu = document.getElementById('snippet-context-menu');
-  if (!menu) return;
+/* showSnippetCtxMenu() lived here. It opened a second, differently-styled menu
+   over the shared one; its actions hang off registerTreeHost('snippets') now
+   and are reached through treeContextMenu like every other library. */
 
-  menu.style.left = e.clientX + 'px';
-  menu.style.top = e.clientY + 'px';
-  menu.classList.remove('hidden');
-
-  const isRoot = nodeId === null;
-  const newFolderBtn = document.getElementById('sctx-new-folder');
-  const renameBtn = document.getElementById('sctx-rename');
-  const moveBtn = document.getElementById('sctx-move');
-  const deleteBtn = document.getElementById('sctx-delete');
-
-  if (isRoot) {
-    if (newFolderBtn) newFolderBtn.innerHTML = `<i data-lucide="folder-plus"></i> New Root Folder`;
-    if (renameBtn) renameBtn.style.display = 'none';
-    if (moveBtn) moveBtn.style.display = 'none';
-    if (deleteBtn) deleteBtn.style.display = 'none';
-  } else {
-    if (newFolderBtn) newFolderBtn.innerHTML = `<i data-lucide="folder-plus"></i> New Subfolder`;
-    if (renameBtn) renameBtn.style.display = '';
-    if (moveBtn) moveBtn.style.display = '';
-    if (deleteBtn) deleteBtn.style.display = '';
-  }
-
-  const tierBtn = document.getElementById('sctx-tier');
-  const lockBtn = document.getElementById('sctx-lock');
-  if (tierBtn) tierBtn.style.display = isRoot ? 'none' : '';
-  if (lockBtn) lockBtn.style.display = isRoot ? 'none' : '';
-
-  const ctxMenu = document.getElementById('snippet-context-menu');
-  if (typeof lucide !== 'undefined') lucide.createIcons({ root: ctxMenu });
-  setTimeout(() => {
-    document.addEventListener('click', closeSnippetCtxMenu, { once: true });
-  }, 10);
-}
 
 function snippetCtxSetTier(value) {
   if (!snippetCtxTargetNodeId) return;
