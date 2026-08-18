@@ -2379,9 +2379,15 @@ window.updateAnalyticsSubSummary = function(type) {
     const strip = document.getElementById('analytics-notes-summary-strip');
     const headerSub = document.getElementById('analytics-notes-header-stats');
     if (!strip) return;
-    const totalAttempts = state.notebookHistory.length;
+    // Attempts for notebooks that have since been deleted were still counted
+    // here, so the attempt total was inflated and — worse — every deleted
+    // notebook's score kept dragging the average down forever. Coding analytics
+    // already filters these out (see anAttempts); notes now matches it.
+    const _liveNb = new Set((state.notebooks || []).map(n => n.id));
+    const _nbHistory = (state.notebookHistory || []).filter(h => h && _liveNb.has(h.notebookId));
+    const totalAttempts = _nbHistory.length;
     const mastered = (typeof _notebookBestPct === 'function') ? state.notebooks.filter(nb => _notebookBestPct(nb) >= 80).length : 0;
-    const avgScore = totalAttempts > 0 ? Math.round(state.notebookHistory.reduce((sum, h) => {
+    const avgScore = totalAttempts > 0 ? Math.round(_nbHistory.reduce((sum, h) => {
       let c = 0, q = 0;
       if (h.sections) h.sections.forEach(s => { c += (s.correct || 0); q += (s.total || 0); });
       return sum + (q > 0 ? Math.round((c / q) * 100) : 0);
@@ -2428,10 +2434,13 @@ window.updateAnalyticsSubSummary = function(type) {
     const strip = document.getElementById('analytics-snippets-summary-strip');
     const headerSub = document.getElementById('analytics-snippets-header-stats');
     if (!strip) return;
-    const snippetHistory = state.snippetHistory || [];
+    // Same filter as coding and notes: an attempt on a snippet that has since
+    // been deleted should not inflate the count or move the average.
+    const _liveSnip = new Set((state.snippets || []).map(x => x.id));
+    const snippetHistory = (state.snippetHistory || []).filter(h => h && _liveSnip.has(h.snippetId));
     const totalAttempts = snippetHistory.length;
     const perfectScores = snippetHistory.filter(h => h.score === 100).length;
-    const avgScore = totalAttempts > 0 ? Math.round(snippetHistory.reduce((sum, h) => sum + h.score, 0) / totalAttempts) : 0;
+    const avgScore = totalAttempts > 0 ? Math.round(snippetHistory.reduce((sum, h) => sum + (h.score || 0), 0) / totalAttempts) : 0;
     
     let snippetTracked = 0;
     if (typeof _snippetStatus === 'function') {
