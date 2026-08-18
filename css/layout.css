@@ -327,6 +327,20 @@
   pointer-events: auto;
   transform: translate(-50%, -50%) scale(1);
 }
+
+/* Touch has no hover, so on a touch device the arrow could never be revealed
+   and the panes could not be collapsed at all. There, it is simply always
+   visible — and big enough to hit. */
+@media (hover: none) {
+  .rz-collapse {
+    opacity: 0.75;
+    pointer-events: auto;
+    transform: translate(-50%, -50%) scale(1);
+    width: 24px;
+    height: 44px;
+  }
+  .rz-collapse:active { opacity: 1; }
+}
 .rz-collapse:hover {
   background: var(--color-primary);
   color: #fff;

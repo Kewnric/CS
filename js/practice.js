@@ -39,10 +39,21 @@ function initPractice() {
   // this exact challenge+variant (matching by filename alone restored code from
   // a different challenge's main.c into this one).
   const autoSavedRaw = getSessionParam('autoSavedFiles');
-  const autoSaved = (autoSavedRaw && autoSavedRaw.challengeId === challengeId && autoSavedRaw.variantId === variantId)
+  let autoSaved = (autoSavedRaw && autoSavedRaw.challengeId === challengeId && autoSavedRaw.variantId === variantId)
     ? autoSavedRaw.files
     : null;
   if (autoSavedRaw && !autoSaved) clearSessionParam('autoSavedFiles'); // stale, different attempt
+
+  // Nothing in this tab's session: the tab was closed, or the browser restarted.
+  // The disk copy is the only thing left, so use it and say so.
+  let _restoredFromDisk = null;
+  if (!autoSaved) {
+    const disk = _practiceReadDraft(challengeId, variantId);
+    if (disk && (disk.files || []).some(f => (f.userCode || '').trim())) {
+      autoSaved = disk.files;
+      _restoredFromDisk = disk;
+    }
+  }
   state.userFiles = variant.files.map(f => {
     const saved = autoSaved && autoSaved.find(s => s.name === f.name && s.ext === f.ext);
     return { ...f, userCode: saved ? saved.userCode : (f.starterCode || '') };
@@ -52,7 +63,18 @@ function initPractice() {
   _practiceSubmitted = false;
   state.timeLimit = timeLimit;
   // Resume the timer across accidental reloads of the same attempt; otherwise start fresh.
-  const savedStart = autoSaved ? parseInt(getSessionParam('practiceStartTime')) : null;
+  const savedStart = autoSaved
+    ? (parseInt(getSessionParam('practiceStartTime')) || (_restoredFromDisk && _restoredFromDisk.startTime) || null)
+    : null;
+  if (_restoredFromDisk) {
+    const mins = Math.max(1, Math.round((Date.now() - (_restoredFromDisk.savedAt || Date.now())) / 60000));
+    setTimeout(() => {
+      if (typeof toast === 'function') {
+        toast('Restored the code you had open ' + mins + ' minute' + (mins !== 1 ? 's' : '') + ' ago. Retry starts fresh.',
+          { type: 'info', duration: 7000 });
+      }
+    }, 700);
+  }
   state.sessionData = { startTime: savedStart || Date.now(), timeLimit: timeLimit, attemptsThisSession: 1, paused: false, pausedAt: null, hintsUsed: 0 };
   setSessionParam('practiceStartTime', state.sessionData.startTime);
 
@@ -117,6 +139,19 @@ function initPractice() {
   // Auto-save: persist user code every 30 s so a tab close doesn't lose work
   if (_autoSaveInterval) clearInterval(_autoSaveInterval);
   _autoSaveInterval = setInterval(_practiceAutoSave, 30000);
+
+  // 30 seconds is a long time to lose. Also write when the page is hidden or
+  // closed, which is exactly when the sessionStorage copy is about to vanish.
+  if (!window._practiceDraftFlush) {
+    window._practiceDraftFlush = function () {
+      if (_practiceSubmitted) return;
+      try { _practiceAutoSave(); } catch (e) { /* leaving anyway */ }
+    };
+    window.addEventListener('pagehide', window._practiceDraftFlush);
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'hidden') window._practiceDraftFlush();
+    });
+  }
 
   // Keyboard shortcuts. Ctrl+Enter is CHECK on both this page and the
   // practice-set page — it used to submit here and check there, so the same
@@ -240,9 +275,43 @@ function _practiceApplyJump() {
 
 /** Persist the in-progress attempt (keyed by challenge+variant so it can never
     be restored into a different program that happens to share filenames). */
+/* The draft used to live only in sessionStorage, which the browser throws away
+   when the tab closes. A refresh kept your work; a closed tab, a crash or a
+   reboot did not — on the screen where you type the most. It is mirrored to
+   localStorage now, keyed by challenge+variant, and cleared when the attempt is
+   graded. */
+const PRACTICE_DRAFT_KEY = 'ssp.practiceDraft';
+
+function _practiceWriteDraft() {
+  try {
+    if (!state.activeChallenge || !state.activeVariant) return;
+    localStorage.setItem(PRACTICE_DRAFT_KEY, JSON.stringify({
+      challengeId: state.activeChallenge.id,
+      variantId: state.activeVariant.id,
+      title: state.activeChallenge.title || '',
+      savedAt: Date.now(),
+      startTime: (state.sessionData || {}).startTime || Date.now(),
+      files: (state.userFiles || []).map(f => ({ name: f.name, ext: f.ext, userCode: f.userCode || '' }))
+    }));
+  } catch (e) { /* quota — the session copy still covers a reload */ }
+}
+
+function _practiceReadDraft(challengeId, variantId) {
+  try {
+    const d = JSON.parse(localStorage.getItem(PRACTICE_DRAFT_KEY) || 'null');
+    if (!d || d.challengeId !== challengeId || d.variantId !== variantId) return null;
+    return d;
+  } catch (e) { return null; }
+}
+
+function _practiceClearDraft() {
+  try { localStorage.removeItem(PRACTICE_DRAFT_KEY); } catch (e) { /* nothing to clear */ }
+}
+
 function _practiceAutoSave() {
   if (!state.userFiles || !state.activeChallenge || !state.activeVariant) return;
   savePracticeFileCode();
+  _practiceWriteDraft();
   setSessionParam('autoSavedFiles', {
     challengeId: state.activeChallenge.id,
     variantId: state.activeVariant.id,
@@ -1016,6 +1085,7 @@ async function submitCode() {
 
   state.history.unshift(historyEntry);
   state.activeAttempts[state.activeChallenge.id] = isPerfect ? 0 : attemptCounter;
+  _practiceClearDraft();   // graded: the draft is not wanted on the next visit
   // Spaced-repetition: schedule the next review based on this attempt's score.
   if (typeof recordReview === 'function') recordReview('challenge', state.activeChallenge.id, finalPercentage);
   // Quest penalties: a verified completion (≥ threshold) auto-clears matching penalties.
