@@ -168,7 +168,7 @@ function csBlockText(b) {
     case 'code': return [b.name, b.code, b.caption].filter(Boolean).join(' ');
     case 'text': case 'callout': return b.text || '';
     case 'check': return (b.items || []).map(i => i.text).join(' ');
-    case 'table': return (b.cells || []).map(r => r.join(' ')).join(' ');
+    case 'table': return (b.cells || []).map(r => r.map(c => (c && typeof c === 'object') ? (c.t || '') : (c || '')).join(' ')).join(' ');
     case 'image': return b.caption || '';
     case 'link': return [b.label, b.url].filter(Boolean).join(' ');
     default: return '';
@@ -711,13 +711,24 @@ function csBlockHTML(b, i, ro) {
       ${ro ? '' : `<div class="cs-callout-kinds">${Object.keys(CS_CALLOUTS).map(k =>
       `<button class="cs-mini ${k === kind ? 'on' : ''}" onclick="csCalloutKind(${i},'${k}')">${CS_CALLOUTS[k].label}</button>`).join('')}</div>`}`;
   } else if (b.type === 'table') {
-    body = `<table class="cs-table"><tbody>${(b.cells || []).map((row, ri) => `<tr>${row.map((cell, ci) =>
-      `<td ${ce} data-b="${i}" data-r="${ri}" data-c="${ci}" data-f="cell">${csEsc(cell)}</td>`).join('')}</tr>`).join('')}</tbody></table>
+    _csTableNorm(b);
+    const rows = b.cells.map((row, ri) => {
+      const tds = row.map((cell, ci) => {
+        if (cell.sp) return '';                       // covered by someone's span
+        const tag = (b.header && ri === 0) ? 'th' : 'td';
+        const span = (cell.cs > 1 ? ` colspan="${cell.cs}"` : '') + (cell.rs > 1 ? ` rowspan="${cell.rs}"` : '');
+        const menu = ro ? '' : ` oncontextmenu="csTableMenu(event,${i},${ri},${ci});return false;"`;
+        return `<${tag} ${ce} data-b="${i}" data-r="${ri}" data-c="${ci}" data-f="cell"${span}${menu}>${csEsc(cell.t || '')}</${tag}>`;
+      }).join('');
+      return `<tr>${tds}</tr>`;
+    }).join('');
+    body = `<table class="cs-table${b.header ? ' has-header' : ''}"><tbody>${rows}</tbody></table>
       ${ro ? '' : `<div class="cs-tabletools">
         <button class="cs-mini" onclick="csTableRow(${i},1)"><i data-lucide="plus"></i> Row</button>
         <button class="cs-mini" onclick="csTableCol(${i},1)"><i data-lucide="plus"></i> Column</button>
         <button class="cs-mini" onclick="csTableRow(${i},-1)"><i data-lucide="minus"></i> Row</button>
         <button class="cs-mini" onclick="csTableCol(${i},-1)"><i data-lucide="minus"></i> Column</button>
+        <span class="cs-tabletools-hint">Right-click a cell for insert, delete and merge</span>
       </div>`}`;
   } else if (b.type === 'image') {
     body = b.src
@@ -1100,17 +1111,222 @@ window.csMoveBlock = function (i, d) {
 };
 window.csAddTerm = function (i) { csPage().blocks[i].rows.push({ term: '', def: '' }); csTouch(); csRender(); };
 window.csDelTerm = function (i, ri) { csPage().blocks[i].rows.splice(ri, 1); csTouch(); csRender(); };
+/* ============================================================
+   TABLES
+   ------------------------------------------------------------
+   Cells were plain strings in a rectangular array and the only operations were
+   "append a row" and "append a column". That cannot express a table whose first
+   row has two cells and whose second has three — the thing merge is for.
+
+   A cell is now { t, cs, rs }: text, colspan, rowspan. The grid stays
+   rectangular; a cell covered by another's span is marked { sp: true } and is
+   not rendered. Sheets saved as plain strings are converted on read, so nothing
+   needs migrating.
+   ============================================================ */
+function _csCell(v) {
+  if (v && typeof v === 'object') return { t: v.t || '', cs: v.cs || 1, rs: v.rs || 1, sp: !!v.sp };
+  return { t: v == null ? '' : String(v), cs: 1, rs: 1, sp: false };
+}
+
+function _csTableNorm(b) {
+  if (!Array.isArray(b.cells) || !b.cells.length) b.cells = [['', ''], ['', '']];
+  b.cells = b.cells.map(r => (Array.isArray(r) ? r : [r]).map(_csCell));
+  const w = Math.max.apply(null, b.cells.map(r => r.length));
+  b.cells.forEach(r => { while (r.length < w) r.push(_csCell('')); });
+  return b;
+}
+
+/** Where a span-covered cell's real owner lives. */
+function _csOwner(b, r, c) {
+  if (!b.cells[r] || !b.cells[r][c]) return { r: 0, c: 0 };
+  if (!b.cells[r][c].sp) return { r: r, c: c };
+  for (let rr = r; rr >= 0; rr--) {
+    for (let cc = c; cc >= 0; cc--) {
+      const cell = b.cells[rr][cc];
+      if (cell && !cell.sp && rr + cell.rs > r && cc + cell.cs > c) return { r: rr, c: cc };
+    }
+  }
+  return { r: r, c: c };
+}
+
+/** Recompute every `sp` flag from the spans actually declared. */
+function _csReflow(b) {
+  const H = b.cells.length, W = b.cells[0].length;
+  for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) b.cells[r][c].sp = false;
+  for (let r = 0; r < H; r++) {
+    for (let c = 0; c < W; c++) {
+      const cell = b.cells[r][c];
+      if (cell.sp) continue;
+      cell.cs = Math.max(1, Math.min(cell.cs || 1, W - c));
+      cell.rs = Math.max(1, Math.min(cell.rs || 1, H - r));
+      for (let rr = r; rr < r + cell.rs; rr++) {
+        for (let cc = c; cc < c + cell.cs; cc++) {
+          if (rr === r && cc === c) continue;
+          b.cells[rr][cc] = { t: '', cs: 1, rs: 1, sp: true };
+        }
+      }
+    }
+  }
+}
+
+window.csTableInsertRow = function (i, at) {
+  const b = csPage().blocks[i];
+  _csTableNorm(b);
+  const W = b.cells[0].length;
+  at = Math.max(0, Math.min(at, b.cells.length));
+  // A row pushed through a vertical span grows that span rather than splitting it.
+  for (let c = 0; c < W; c++) {
+    for (let r = 0; r < at; r++) {
+      const cell = b.cells[r][c];
+      if (!cell.sp && cell.rs > 1 && r + cell.rs > at) cell.rs++;
+    }
+  }
+  b.cells.splice(at, 0, Array.from({ length: W }, () => _csCell('')));
+  _csReflow(b);
+  csTouch(); csRender();
+};
+
+window.csTableInsertCol = function (i, at) {
+  const b = csPage().blocks[i];
+  _csTableNorm(b);
+  at = Math.max(0, Math.min(at, b.cells[0].length));
+  b.cells.forEach(function (row) {
+    for (let c = 0; c < at; c++) {
+      const cell = row[c];
+      if (!cell.sp && cell.cs > 1 && c + cell.cs > at) cell.cs++;
+    }
+    row.splice(at, 0, _csCell(''));
+  });
+  _csReflow(b);
+  csTouch(); csRender();
+};
+
+window.csTableDeleteRow = function (i, r) {
+  const b = csPage().blocks[i];
+  _csTableNorm(b);
+  if (b.cells.length <= 1) return;
+  b.cells.splice(r, 1);
+  const H = b.cells.length;
+  b.cells.forEach(function (row, rr) {
+    row.forEach(function (cell) { if (!cell.sp && rr + cell.rs > H) cell.rs = H - rr; });
+  });
+  _csReflow(b);
+  csTouch(); csRender();
+};
+
+window.csTableDeleteCol = function (i, c) {
+  const b = csPage().blocks[i];
+  _csTableNorm(b);
+  if (b.cells[0].length <= 1) return;
+  b.cells.forEach(function (row) { row.splice(c, 1); });
+  const W = b.cells[0].length;
+  b.cells.forEach(function (row) {
+    row.forEach(function (cell, cc) { if (!cell.sp && cc + cell.cs > W) cell.cs = W - cc; });
+  });
+  _csReflow(b);
+  csTouch(); csRender();
+};
+
+/** Merge with the neighbour right or below. Text is joined, never dropped. */
+window.csTableMerge = function (i, r, c, dir) {
+  const b = csPage().blocks[i];
+  _csTableNorm(b);
+  const own = _csOwner(b, r, c);
+  const cell = b.cells[own.r][own.c];
+  if (dir === 'right') {
+    const nc = own.c + cell.cs;
+    if (nc >= b.cells[0].length) return;
+    const nb = b.cells[own.r][nc];
+    if (nb.rs !== cell.rs) return;          // a ragged merge would corrupt the grid
+    if (nb.t) cell.t = (cell.t ? cell.t + ' ' : '') + nb.t;
+    cell.cs += nb.cs;
+  } else {
+    const nr = own.r + cell.rs;
+    if (nr >= b.cells.length) return;
+    const nb = b.cells[nr][own.c];
+    if (nb.cs !== cell.cs) return;
+    if (nb.t) cell.t = (cell.t ? cell.t + ' ' : '') + nb.t;
+    cell.rs += nb.rs;
+  }
+  _csReflow(b);
+  csTouch(); csRender();
+};
+
+window.csTableSplit = function (i, r, c) {
+  const b = csPage().blocks[i];
+  _csTableNorm(b);
+  const own = _csOwner(b, r, c);
+  const cell = b.cells[own.r][own.c];
+  if (cell.cs === 1 && cell.rs === 1) return;
+  cell.cs = 1; cell.rs = 1;
+  _csReflow(b);
+  csTouch(); csRender();
+};
+
+window.csTableHeader = function (i) {
+  const b = csPage().blocks[i];
+  b.header = !b.header;
+  csTouch(); csRender();
+};
+
+/* The right-click menu: everything the two buttons could do, plus what they
+   could not — insert in the middle, delete one row, merge, header row. */
+window.csTableMenu = function (ev, i, r, c) {
+  ev.preventDefault();
+  ev.stopPropagation();
+  const old = document.getElementById('cs-table-menu');
+  if (old) old.remove();
+
+  const b = csPage().blocks[i];
+  _csTableNorm(b);
+  const own = _csOwner(b, r, c);
+  const cell = b.cells[own.r][own.c];
+  const merged = cell.cs > 1 || cell.rs > 1;
+
+  const item = function (icon, label, call, danger) {
+    return '<button type="button" class="cs-tm-item' + (danger ? ' danger' : '') + '" onclick="' + call +
+      ';var m=document.getElementById(\'cs-table-menu\');if(m)m.remove();"><i data-lucide="' + icon + '"></i>' + label + '</button>';
+  };
+
+  const el = document.createElement('div');
+  el.id = 'cs-table-menu';
+  el.className = 'cs-table-menu';
+  el.innerHTML =
+    item('arrow-up', 'Insert row above', 'csTableInsertRow(' + i + ',' + own.r + ')') +
+    item('arrow-down', 'Insert row below', 'csTableInsertRow(' + i + ',' + (own.r + cell.rs) + ')') +
+    item('arrow-left', 'Insert column left', 'csTableInsertCol(' + i + ',' + own.c + ')') +
+    item('arrow-right', 'Insert column right', 'csTableInsertCol(' + i + ',' + (own.c + cell.cs) + ')') +
+    '<div class="cs-tm-sep"></div>' +
+    item('chevrons-left-right', 'Merge right', 'csTableMerge(' + i + ',' + own.r + ',' + own.c + ",'right')") +
+    item('chevrons-up-down', 'Merge down', 'csTableMerge(' + i + ',' + own.r + ',' + own.c + ",'down')") +
+    (merged ? item('split', 'Split cell', 'csTableSplit(' + i + ',' + own.r + ',' + own.c + ')') : '') +
+    '<div class="cs-tm-sep"></div>' +
+    item('heading', b.header ? 'Remove header row' : 'Make first row a header', 'csTableHeader(' + i + ')') +
+    '<div class="cs-tm-sep"></div>' +
+    item('trash-2', 'Delete row', 'csTableDeleteRow(' + i + ',' + own.r + ')', true) +
+    item('trash-2', 'Delete column', 'csTableDeleteCol(' + i + ',' + own.c + ')', true);
+  document.body.appendChild(el);
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: el });
+
+  const box = el.getBoundingClientRect();
+  el.style.left = Math.max(8, Math.min(ev.clientX, window.innerWidth - box.width - 8)) + 'px';
+  el.style.top = Math.max(8, Math.min(ev.clientY, window.innerHeight - box.height - 8)) + 'px';
+  setTimeout(function () {
+    document.addEventListener('click', function () { const m = document.getElementById('cs-table-menu'); if (m) m.remove(); }, { once: true });
+  }, 0);
+};
+
 window.csTableRow = function (i, d) {
   const b = csPage().blocks[i];
-  if (d > 0) b.cells.push(new Array(b.cells[0].length).fill(''));
-  else if (b.cells.length > 1) b.cells.pop();
-  csTouch(); csRender();
+  _csTableNorm(b);
+  if (d > 0) csTableInsertRow(i, b.cells.length);
+  else csTableDeleteRow(i, b.cells.length - 1);
 };
 window.csTableCol = function (i, d) {
   const b = csPage().blocks[i];
-  if (d > 0) b.cells.forEach(r => r.push(''));
-  else if (b.cells[0].length > 1) b.cells.forEach(r => r.pop());
-  csTouch(); csRender();
+  _csTableNorm(b);
+  if (d > 0) csTableInsertCol(i, b.cells[0].length);
+  else csTableDeleteCol(i, b.cells[0].length - 1);
 };
 window.csFormatCode = function (i) {
   const b = csPage().blocks[i];
@@ -1191,7 +1407,12 @@ function csBindSheet(host) {
       const b = p.blocks[Number(el.dataset.b)];
       if (!b) return;
       const v = el.tagName === 'TEXTAREA' ? el.value : el.textContent;
-      if (el.dataset.f === 'cell') b.cells[Number(el.dataset.r)][Number(el.dataset.c)] = v;
+      if (el.dataset.f === 'cell') {
+        // Cells are objects now; writing the string back would drop the span.
+        _csTableNorm(b);
+        const _cell = b.cells[Number(el.dataset.r)][Number(el.dataset.c)];
+        if (_cell) _cell.t = v;
+      }
       else if (el.dataset.r !== undefined && b.type === 'check') b.items[Number(el.dataset.r)].text = v;
       else if (el.dataset.r !== undefined) b.rows[Number(el.dataset.r)][el.dataset.f] = v;
       else b[el.dataset.f] = v;

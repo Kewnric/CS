@@ -590,3 +590,47 @@ body.cheat-open .tree-ctx { z-index: 10150; }
   #cs-print .cs-table td { border-color: #999; background: #fff; }
   #cs-print .cs-note { box-shadow: none; border: 1px solid #ccc; }
 }
+
+/* ── Table: right-click menu, header row, merged cells ─────────────────── */
+.cs-table-menu {
+  position: fixed;
+  z-index: 100001;            /* above the cheat sheet overlay (10000) */
+  min-width: 210px;
+  padding: 0.25rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--bg-elevated);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.5);
+}
+.cs-tm-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.4rem 0.55rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  text-align: left;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.cs-tm-item:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+.cs-tm-item.danger:hover { color: var(--color-danger); }
+.cs-tm-item i, .cs-tm-item svg { width: 14px; height: 14px; flex-shrink: 0; }
+.cs-tm-sep { height: 1px; margin: 0.25rem 0.4rem; background: var(--border-color); }
+
+.cs-table th {
+  background: var(--bg-surface-hover);
+  font-weight: 700;
+  text-align: left;
+}
+.cs-table td, .cs-table th { vertical-align: top; }
+.cs-tabletools-hint {
+  font-size: 0.65rem;
+  color: var(--text-tertiary);
+  margin-left: 0.35rem;
+  align-self: center;
+}
