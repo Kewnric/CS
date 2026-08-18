@@ -1163,3 +1163,158 @@ body.tree-dragging [data-tree-ns] {
   overflow-x: hidden;
 }
 body.tree-dragging [data-tree-ns]::-webkit-scrollbar { width: 0; height: 0; }
+
+/* ============================================================
+   ADMIN CARD BROWSER
+   ------------------------------------------------------------
+   The admin's second pane can now show a collection as cards, the way the
+   libraries do, instead of only ever holding the edit form behind a "select
+   something on the left" placeholder.
+   ============================================================ */
+.admin-card-browser {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+  height: 100%;
+  overflow-y: auto;
+}
+.admin-card-browser.hidden { display: none; }
+
+.admin-cards-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.admin-cards-back { flex-shrink: 0; padding: 0.3rem 0.6rem; font-size: 0.75rem; }
+.admin-cards-titles { flex: 1; min-width: 140px; }
+.admin-cards-titles h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.admin-cards-titles p { margin: 0.1rem 0 0; font-size: 0.75rem; color: var(--text-tertiary); }
+.admin-cards-search { max-width: 220px; flex: 1 1 160px; }
+
+.admin-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 0.75rem;
+  align-items: stretch;
+}
+
+.admin-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
+  padding: 0.85rem;
+  min-height: 128px;
+  text-align: left;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), transform var(--transition-fast),
+              box-shadow var(--transition-fast);
+}
+.admin-card:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md, 0 8px 20px rgba(0,0,0,0.25));
+}
+.admin-card:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+.admin-card-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  margin-bottom: 0.2rem;
+}
+.admin-card-chip svg { width: 17px; height: 17px; }
+
+.admin-card-title {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  line-height: 1.3;
+  /* Two lines, then an ellipsis: a long title must not stretch one card
+     taller than the rest of the row. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+.admin-card-sub {
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+.admin-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-top: 0.4rem;
+  font-size: 0.68rem;
+  color: var(--text-tertiary);
+}
+.admin-card-meta span { display: inline-flex; align-items: center; gap: 0.2rem; }
+.admin-card-meta svg { width: 11px; height: 11px; }
+
+/* The dashed card is the one that makes a new thing. */
+.admin-card-add {
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  border: 2px dashed var(--border-color);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-align: center;
+}
+.admin-card-add:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+.admin-card-add svg { width: 22px; height: 22px; }
+
+.admin-cards-none { font-size: 0.78rem; color: var(--text-tertiary); margin: 0; }
+
+/* The section whose cards are on screen, marked in pane 1. */
+.admin-panel.is-showing > summary {
+  background: var(--color-primary-subtle);
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+/* Back sits beside the editor's close button. */
+.af-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.3rem 0.55rem;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .admin-cards-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  .admin-cards-search { max-width: none; }
+}

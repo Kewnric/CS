@@ -377,7 +377,7 @@ function _renderSavedState() {
   if (!_bossSavedAt) { el.textContent = ''; return; }
   const secs = Math.round((Date.now() - _bossSavedAt) / 1000);
   const when = secs < 5 ? 'just now' : secs < 60 ? secs + 's ago' : Math.round(secs / 60) + 'm ago';
-  el.innerHTML = `<i data-lucide="cloud-check" style="width:12px;height:12px;"></i> Saved ${when}`;
+  el.innerHTML = `<i data-lucide="check-circle-2" style="width:12px;height:12px;"></i> Saved ${when}`;
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: el });
 }
 

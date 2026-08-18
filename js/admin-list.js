@@ -242,6 +242,11 @@ function _adminRememberGroups() {
 }
 
 function renderAdmin() {
+  // The counts on the collapsed section headers, for whichever admin this is.
+  if (typeof adminSyncPanelCounts === 'function') adminSyncPanelCounts();
+  // Cards already on screen are showing data that just changed.
+  if (typeof adminRenderCards === 'function' && _adminCollection) adminRenderCards();
+
   if (window.currentAdminMode === 'study') {
     if (currentAdminStudyTab === 'snippets') return renderStudyAdmin();
     return renderNotebookAdmin();

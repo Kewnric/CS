@@ -1911,7 +1911,7 @@ function brainPaintSaved() {
   if (el.dataset.label === label) return;
   el.dataset.label = label;
   if (!el.querySelector('.brain-saved-text')) {
-    el.innerHTML = '<i data-lucide="cloud-check" style="width:11px;height:11px;"></i><span class="brain-saved-text"></span>';
+    el.innerHTML = '<i data-lucide="check-circle-2" style="width:11px;height:11px;"></i><span class="brain-saved-text"></span>';
     if (typeof lucide !== 'undefined') lucide.createIcons({ root: el });
   }
   el.classList.toggle('is-empty', !label);

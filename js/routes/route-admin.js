@@ -15,6 +15,7 @@ function getAdminFormHTML() {
           </div>
           <span class="af-save-status" id="admin-save-status" aria-live="polite"></span>
         </div>
+        ${adminFormBackButtonHTML()}
         <button onclick="confirmCloseAdminForm(closeAdminForm, saveAdminForm)" class="btn btn-ghost af-close-btn" id="close-form-btn" aria-label="Close form" title="Close (Esc)">
           <i data-lucide="x" style="width:20px;height:20px;" aria-hidden="true"></i>
         </button>
@@ -139,6 +140,7 @@ function getNotebookFormHTML() {
           </div>
           <span class="af-save-status" id="notebook-save-status" aria-live="polite"></span>
         </div>
+        ${adminFormBackButtonHTML()}
         <button onclick="confirmCloseAdminForm(closeNotebookForm, saveNotebookForm)" class="btn btn-ghost af-close-btn" aria-label="Close form" title="Close (Esc)">
           <i data-lucide="x" style="width:20px;height:20px;" aria-hidden="true"></i>
         </button>
@@ -252,6 +254,7 @@ function getSnippetFormHTML() {
           </div>
           <span class="af-save-status" id="study-save-status" aria-live="polite"></span>
         </div>
+        ${adminFormBackButtonHTML()}
         <button onclick="confirmCloseAdminForm(closeStudyForm, saveStudyForm)" class="btn btn-ghost af-close-btn" aria-label="Close form" title="Close (Esc)">
           <i data-lucide="x" style="width:20px;height:20px;" aria-hidden="true"></i>
         </button>
@@ -522,8 +525,8 @@ function adminCodingTemplate() {
             <!-- Programs -->
             <!-- Programs: the full list, grouped by folder. It used to show two
                  and hide the rest behind a "Show N more…" disclosure. -->
-            <details class="admin-panel admin-panel-programs" open>
-              <summary>
+            <details class="admin-panel admin-panel-programs" data-collection="programs" open>
+              <summary onclick="adminSectionClick(event)">
                 <i data-lucide="chevron-right" class="admin-panel-chev"></i>
                 <i data-lucide="code" style="color:var(--color-primary);width:16px;height:16px;"></i>
                 <span class="admin-panel-name">Programs</span>
@@ -552,8 +555,8 @@ function adminCodingTemplate() {
 
             <!-- Practice Sets. Programs is what you come here for, so everything
                  below it is collapsed by default rather than sharing the scroll. -->
-            <details class="admin-panel">
-              <summary>
+            <details class="admin-panel" data-collection="sets">
+              <summary onclick="adminSectionClick(event)">
                 <i data-lucide="chevron-right" class="admin-panel-chev"></i>
                 <i data-lucide="layout-grid" style="color:var(--color-accent);width:16px;height:16px;"></i>
                 <span class="admin-panel-name">Practice Sets</span>
@@ -569,8 +572,8 @@ function adminCodingTemplate() {
             </details>
 
             <!-- Categories -->
-            <details class="admin-panel">
-              <summary>
+            <details class="admin-panel" data-collection="cats">
+              <summary onclick="adminSectionClick(event)">
                 <i data-lucide="chevron-right" class="admin-panel-chev"></i>
                 <i data-lucide="folder" style="color:var(--color-warning);width:16px;height:16px;"></i>
                 <span class="admin-panel-name">Categories</span>
@@ -603,8 +606,8 @@ function adminCodingTemplate() {
             </details>
 
             <!-- Skill Tree Locks -->
-            <details class="admin-panel">
-              <summary>
+            <details class="admin-panel" data-collection="locks">
+              <summary onclick="adminSectionClick(event)">
                 <i data-lucide="chevron-right" class="admin-panel-chev"></i>
                 <i data-lucide="lock" style="color:var(--text-tertiary);width:16px;height:16px;"></i>
                 <span class="admin-panel-name">Skill Tree Locks</span>
@@ -631,6 +634,7 @@ function adminCodingTemplate() {
       </main>
       <div class="resizer-divider" onmousedown="initResizerDrag(event, this)"></div>
       <section class="messenger-pane-2">
+        <div id="admin-card-browser" class="admin-card-browser hidden"></div>
         <div id="admin-empty-state" class="admin-empty-state">
           <div class="admin-empty-content">
             <div class="admin-empty-icon">
@@ -711,30 +715,52 @@ function adminNotesTemplate() {
         </div>
         <div class="pane-1-content">
           <div id="admin-study-wrapper">
-            <div class="admin-panel-tools" style="justify-content:flex-end; margin-bottom:0.4rem;">
-              <button class="admin-tool-btn" id="nb-select-all-btn" onclick="nbSelectAllVisible()"
-                      title="Select or deselect every notebook shown (Ctrl+A)" aria-label="Select all notebooks">
-                <i data-lucide="check-square" class="admin-tool-ic"></i>
-                <span>Select all</span>
-              </button>
-            </div>
-            <!-- Only present while something is selected (see _nbRenderSelectionBar). -->
-            <div id="nb-selection-bar" class="admin-selection-bar hidden" role="toolbar" aria-label="Bulk actions"></div>
-            <div style="display:flex; flex-direction:column; gap:0.25rem;" id="notebook-table-body"></div>
-            
-            <div class="card-flat" style="margin-top: 2rem; padding: 1.25rem;" id="notebook-category-container">
-              <h2 style="font-weight:700; font-size:1.1rem; margin-bottom:1rem;">Notebook Categories</h2>
-              <ul id="notebook-category-list" style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom:1rem; list-style:none; padding: 0;"></ul>
-              <div style="display:flex; gap:0.5rem;">
-                <input id="new-notebook-category-input" placeholder="New Category" onkeydown="if(event.key==='Enter') addNotebookCategory()" class="form-input" style="flex:1;" />
-                <button onclick="addNotebookCategory()" class="btn btn-secondary btn-icon" title="Add Category"><i data-lucide="plus" style="width:18px;height:18px;"></i></button>
+            <!-- Same collapsible panels as the Coding admin, so the three
+                 admins read the same way. Clicking a header shows that
+                 collection as cards in the second pane. -->
+            <details class="admin-panel" data-collection="notebooks" open>
+              <summary onclick="adminSectionClick(event)">
+                <i data-lucide="chevron-right" class="admin-panel-chev"></i>
+                <i data-lucide="book-open" style="color:var(--color-primary);width:16px;height:16px;"></i>
+                <span class="admin-panel-name">Notebooks</span>
+                <span class="admin-panel-count" id="admin-notebooks-count">0</span>
+                <span class="admin-panel-tools">
+                  <button class="admin-tool-btn" id="nb-select-all-btn"
+                          onclick="event.preventDefault(); event.stopPropagation(); nbSelectAllVisible();"
+                          title="Select or deselect every notebook shown (Ctrl+A)" aria-label="Select all notebooks">
+                    <i data-lucide="check-square" class="admin-tool-ic"></i>
+                    <span>Select all</span>
+                  </button>
+                </span>
+              </summary>
+              <div class="admin-panel-body">
+                <!-- Only present while something is selected (see _nbRenderSelectionBar). -->
+                <div id="nb-selection-bar" class="admin-selection-bar hidden" role="toolbar" aria-label="Bulk actions"></div>
+                <div style="display:flex; flex-direction:column; gap:0.25rem;" id="notebook-table-body"></div>
               </div>
-            </div>
+            </details>
+
+            <details class="admin-panel" data-collection="cats" id="notebook-category-container">
+              <summary onclick="adminSectionClick(event)">
+                <i data-lucide="chevron-right" class="admin-panel-chev"></i>
+                <i data-lucide="folder" style="color:var(--color-warning);width:16px;height:16px;"></i>
+                <span class="admin-panel-name">Categories</span>
+                <span class="admin-panel-count" id="admin-nb-cats-count">0</span>
+              </summary>
+              <div class="admin-panel-body">
+                <ul id="notebook-category-list" style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom:1rem; list-style:none; padding: 0;"></ul>
+                <div style="display:flex; gap:0.5rem;">
+                  <input id="new-notebook-category-input" placeholder="New Category" onkeydown="if(event.key==='Enter') addNotebookCategory()" class="form-input" style="flex:1;" />
+                  <button onclick="addNotebookCategory()" class="btn btn-secondary btn-icon" title="Add Category"><i data-lucide="plus" style="width:18px;height:18px;"></i></button>
+                </div>
+              </div>
+            </details>
           </div>
         </div>
       </main>
       <div class="resizer-divider" onmousedown="initResizerDrag(event, this)"></div>
       <section class="messenger-pane-2">
+        <div id="admin-card-browser" class="admin-card-browser hidden"></div>
         <div id="admin-empty-state" class="admin-empty-state">
           <div class="admin-empty-content">
             <div class="admin-empty-icon">
@@ -819,21 +845,39 @@ function adminSnippetsTemplate() {
         </div>
         <div class="pane-1-content">
           <div id="admin-study-wrapper">
-            <div style="display:flex; flex-direction:column; gap:0.25rem;" id="study-table-body"></div>
-            
-            <div class="card-flat" style="margin-top: 2rem; padding: 1.25rem;" id="study-category-container">
-              <h2 style="font-weight:700; font-size:1.1rem; margin-bottom:1rem;">Snippet Categories</h2>
-              <ul id="study-category-list" style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom:1rem; list-style:none; padding: 0;"></ul>
-              <div style="display:flex; gap:0.5rem;">
-                <input id="new-study-category-input" placeholder="New Category" onkeydown="if(event.key==='Enter') addStudyCategory()" class="form-input" style="flex:1;" />
-                <button onclick="addStudyCategory()" class="btn btn-secondary btn-icon" title="Add Category"><i data-lucide="plus" style="width:18px;height:18px;"></i></button>
+            <details class="admin-panel" data-collection="snippets" open>
+              <summary onclick="adminSectionClick(event)">
+                <i data-lucide="chevron-right" class="admin-panel-chev"></i>
+                <i data-lucide="code" style="color:var(--color-accent);width:16px;height:16px;"></i>
+                <span class="admin-panel-name">Snippets</span>
+                <span class="admin-panel-count" id="admin-snippets-count">0</span>
+              </summary>
+              <div class="admin-panel-body">
+                <div style="display:flex; flex-direction:column; gap:0.25rem;" id="study-table-body"></div>
               </div>
-            </div>
+            </details>
+
+            <details class="admin-panel" data-collection="cats" id="study-category-container">
+              <summary onclick="adminSectionClick(event)">
+                <i data-lucide="chevron-right" class="admin-panel-chev"></i>
+                <i data-lucide="folder" style="color:var(--color-warning);width:16px;height:16px;"></i>
+                <span class="admin-panel-name">Categories</span>
+                <span class="admin-panel-count" id="admin-snip-cats-count">0</span>
+              </summary>
+              <div class="admin-panel-body">
+                <ul id="study-category-list" style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom:1rem; list-style:none; padding: 0;"></ul>
+                <div style="display:flex; gap:0.5rem;">
+                  <input id="new-study-category-input" placeholder="New Category" onkeydown="if(event.key==='Enter') addStudyCategory()" class="form-input" style="flex:1;" />
+                  <button onclick="addStudyCategory()" class="btn btn-secondary btn-icon" title="Add Category"><i data-lucide="plus" style="width:18px;height:18px;"></i></button>
+                </div>
+              </div>
+            </details>
           </div>
         </div>
       </main>
       <div class="resizer-divider" onmousedown="initResizerDrag(event, this)"></div>
       <section class="messenger-pane-2">
+        <div id="admin-card-browser" class="admin-card-browser hidden"></div>
         <div id="admin-empty-state" class="admin-empty-state">
           <div class="admin-empty-content">
             <div class="admin-empty-icon">
