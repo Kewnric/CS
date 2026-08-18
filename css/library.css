@@ -37,8 +37,13 @@
   transition: border-color var(--transition-fast), color var(--transition-fast);
 }
 .lib-filter-toggle:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
-.lib-filter-toggle.open,
+.lib-filter-shell.open > .lib-filter-head > .lib-filter-toggle,
 .lib-filter-toggle.has-active { border-color: var(--color-primary); color: var(--color-primary); }
+/* One chevron that turns over, instead of swapping the icon on every toggle. */
+.lib-filter-chev { transition: transform 0.22s ease; }
+.lib-filter-shell.open .lib-filter-chev { transform: rotate(180deg); }
+/* The summary of what's on is only useful while the panel that sets it is shut. */
+.lib-filter-shell.open > .lib-filter-head > .lib-filter-active { display: none; }
 .lib-filter-count {
   min-width: 16px;
   padding: 0 4px;
@@ -84,6 +89,18 @@
   height: auto;
   width: auto;
 }
+/* A grid row that goes 0fr -> 1fr collapses to exactly the content's height
+   without anyone having to guess a max-height, and it animates. The clip layer
+   is what actually hides the overflow while the track is short. */
+.lib-filter-panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.22s ease, opacity 0.16s ease;
+}
+.lib-filter-shell.open > .lib-filter-panel { grid-template-rows: 1fr; opacity: 1; }
+.lib-filter-clip { overflow: hidden; min-height: 0; }
+
 .lib-filter-body {
   display: flex;
   flex-direction: column;
@@ -93,11 +110,10 @@
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--bg-surface);
-  animation: libFilterOpen 0.16s ease-out;
 }
-@keyframes libFilterOpen {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .lib-filter-panel, .lib-filter-chev { transition: none; }
 }
 .lib-filter-body .lib-chip-row:empty { display: none; }
 .lib-filter-body .lib-active-clear { align-self: flex-start; margin-top: 0.15rem; }
@@ -122,33 +138,121 @@
 .lib-view > summary::-webkit-details-marker { display: none; }
 .lib-view > summary:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
 .lib-view[open] > summary { border-color: var(--color-primary); color: var(--color-primary); }
+.lib-view[open] > summary .lib-view-chev { transform: rotate(180deg); }
+.lib-view-chev { transition: transform 0.18s ease; }
 .lib-view-pop {
   position: absolute;
   right: 0;
   top: calc(100% + 6px);
   z-index: 30;
-  min-width: 250px;
+  min-width: 268px;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.7rem 0.8rem;
+  padding: 0.35rem;
   border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--bg-surface);
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45);
+  /* A short window used to cut the menu off with no way to reach the rest. */
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+  animation: libViewOpen 0.14s ease-out;
 }
+@keyframes libViewOpen {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.lib-view-title {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  padding: 0.3rem 0.5rem 0.35rem;
+}
+
+/* Label on the left, control on the right, the way a settings menu reads. The
+   markup is <input><span>, so the row is reversed rather than reordered in
+   every library that builds one. */
 .lib-view-row {
   display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
+  flex-direction: row-reverse;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   font-size: 0.78rem;
   color: var(--text-secondary);
   cursor: pointer;
+  padding: 0.45rem 0.5rem;
+  border-radius: var(--radius-md);
+  transition: background-color var(--transition-fast);
 }
-.lib-view-row input[type="checkbox"] { margin-top: 2px; width: 14px; height: 14px; accent-color: var(--color-primary); cursor: pointer; }
+.lib-view-row:hover { background: var(--bg-surface-hover); }
+.lib-view-row > span:last-child { min-width: 0; }
 .lib-view-row strong { display: block; color: var(--text-primary); font-weight: 700; font-size: 0.78rem; }
-.lib-view-row em { display: block; font-style: normal; font-size: 0.7rem; color: var(--text-tertiary); margin-top: 1px; }
-.lib-view-seg { align-items: center; justify-content: space-between; cursor: default; }
+.lib-view-row em { display: block; font-style: normal; font-size: 0.7rem; color: var(--text-tertiary); margin-top: 1px; line-height: 1.35; }
+
+/* A 14px tickbox for an on/off layout choice was easy to miss and hard to hit.
+   Same input, drawn as a switch — no library needed a markup change. */
+.lib-view-row input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 19px;
+  margin: 0;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  /* The knob is painted by the input's own background rather than an ::after.
+     Chrome generates the pseudo-element on an appearance:none input but does
+     not restyle it when :checked flips — measured here: the track recoloured
+     and the knob stayed put. background-position is on the element itself, so
+     it responds, and it animates. */
+  background-color: var(--bg-surface-hover);
+  background-image: radial-gradient(circle closest-side, var(--text-tertiary) 100%, transparent 100%);
+  background-repeat: no-repeat;
+  background-size: 13px 13px;
+  background-position: 2px center;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast),
+              background-position 0.18s ease;
+}
+.lib-view-row input[type="checkbox"]:checked {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  background-image: radial-gradient(circle closest-side, #fff 100%, transparent 100%);
+  background-position: 17px center;
+}
+.lib-view-row input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Reversing the row puts the control on the right for the <input><span> rows,
+   but this one is <span><span> and was already in that order. */
+.lib-view-seg { flex-direction: row; cursor: default; }
+.lib-view-seg:hover { background: transparent; }
+/* Segmented, so the three options read as one control with one choice made. */
+.lib-view-seg .lib-kind-toggle {
+  gap: 0;
+  padding: 2px;
+  border-radius: 999px;
+  background: var(--bg-surface-hover);
+  border: 1px solid var(--border-color);
+}
+.lib-view-seg .lib-kind-toggle .lib-chip {
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+}
+.lib-view-seg .lib-kind-toggle .lib-chip.active {
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+}
+
+.lib-view-sep { height: 1px; margin: 0.3rem 0.5rem; background: var(--border-color); }
 
 /* --- Filter chips --- */
 .lib-chip {

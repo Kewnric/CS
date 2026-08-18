@@ -289,8 +289,19 @@ function libClearCommonFilters(ns) {
 function libFiltersOpen(ns) { return !!getLibPref(ns + '.filtersOpen', false); }
 
 function libToggleFilters(ns) {
-  setLibPref(ns + '.filtersOpen', !libFiltersOpen(ns));
-  const a = LIB_ADAPTERS[ns];
+  const next = !libFiltersOpen(ns);
+  setLibPref(ns + '.filtersOpen', next);
+  // Re-rendering the pane just to reveal a few rows of chips rebuilt every card
+  // on the page, so the whole list blinked. The panel is always in the DOM now
+  // and opening it is a class change, which the browser can animate on its own.
+  const shell = document.querySelector('.lib-filter-shell[data-ns="' + ns + '"]');
+  if (shell) {
+    shell.classList.toggle('open', next);
+    const btn = shell.querySelector('.lib-filter-toggle');
+    if (btn) btn.setAttribute('aria-expanded', String(next));
+    return;
+  }
+  const a = LIB_ADAPTERS[ns];   // shell not on screen yet: fall back to a redraw
   if (a) a.rerender();
 }
 
@@ -317,30 +328,38 @@ function libFilterShellHTML(o) {
        </div>`
     : '';
 
+  // The body is always rendered; `open` on the shell is what shows it. The
+  // chevron is one icon that rotates rather than two that swap, so the state
+  // change never has to re-run the icon library.
   return `
-    <div class="lib-filter-shell">
+    <div class="lib-filter-shell${open ? ' open' : ''}" data-ns="${o.ns}">
       <div class="lib-filter-head">
-        <button class="lib-filter-toggle${open ? ' open' : ''}${active.length ? ' has-active' : ''}"
+        <button class="lib-filter-toggle${active.length ? ' has-active' : ''}"
                 onclick="libToggleFilters('${o.ns}')" aria-expanded="${open}">
           <i data-lucide="sliders-horizontal" style="width:13px;height:13px;"></i>
           Filters${active.length ? `<span class="lib-filter-count">${active.length}</span>` : ''}
-          <i data-lucide="chevron-${open ? 'up' : 'down'}" style="width:13px;height:13px;"></i>
+          <i data-lucide="chevron-down" class="lib-filter-chev" style="width:13px;height:13px;"></i>
         </button>
-        ${open ? '' : summary}
+        ${summary}
         <div class="lib-filter-tail">
           <span class="lib-filter-count-label">${o.countLabel || ''}</span>
           ${o.view ? `
           <details class="lib-view">
-            <summary title="How the list is laid out"><i data-lucide="layout-grid" style="width:13px;height:13px;"></i> View <i data-lucide="chevron-down" style="width:12px;height:12px;"></i></summary>
-            <div class="lib-view-pop">${o.view}</div>
+            <summary title="How the list is laid out"><i data-lucide="layout-grid" style="width:13px;height:13px;"></i> View <i data-lucide="chevron-down" class="lib-view-chev" style="width:12px;height:12px;"></i></summary>
+            <div class="lib-view-pop">
+              <div class="lib-view-title">Layout</div>
+              ${o.view}
+            </div>
           </details>` : ''}
           ${o.sort || ''}
         </div>
       </div>
-      ${open ? `<div class="lib-filter-body">
-        ${groups.map(g => `<div class="lib-chip-row${g.wrap ? ' lib-chip-row-wrap' : ''}">${g.icon ? `<i data-lucide="${g.icon}" style="width:13px;height:13px;color:var(--text-tertiary);"></i>` : ''}${g.chips}</div>`).join('')}
-        ${active.length ? `<button class="lib-active-clear" onclick="${o.onClear}">Clear all filters</button>` : ''}
-      </div>` : ''}
+      <div class="lib-filter-panel"><div class="lib-filter-clip">
+        <div class="lib-filter-body">
+          ${groups.map(g => `<div class="lib-chip-row${g.wrap ? ' lib-chip-row-wrap' : ''}">${g.icon ? `<i data-lucide="${g.icon}" style="width:13px;height:13px;color:var(--text-tertiary);"></i>` : ''}${g.chips}</div>`).join('')}
+          ${active.length ? `<button class="lib-active-clear" onclick="${o.onClear}">Clear all filters</button>` : ''}
+        </div>
+      </div></div>
     </div>`;
 }
 
