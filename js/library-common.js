@@ -609,9 +609,16 @@ function libCycleRootMode(ns) {
  */
 function libRootItems(ns, all, sets) {
   const pool = (all || []).concat(sets || []);
-  return libRootMode(ns) === 'favorites'
-    ? pool.filter(libIsFavorite)
-    : pool.filter(x => (x.parentId || null) === null);
+  if (libRootMode(ns) === 'favorites') return pool.filter(libIsFavorite);
+  // An item whose folder no longer exists used to match neither "in a folder"
+  // nor "uncategorized", so it vanished from every view while still sitting in
+  // state, counting toward totals and taking up storage. A parent that does not
+  // resolve is treated as no parent, so the item stays reachable.
+  const folders = new Set((state.nodes || []).map(n => n.id));
+  return pool.filter(x => {
+    const pid = x.parentId || null;
+    return pid === null || !folders.has(pid);
+  });
 }
 
 /**

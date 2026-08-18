@@ -369,6 +369,7 @@ function chooseLocalMode() {
   hideStorageModePicker();
   _flushAllInMemoryDomains();
   loadData();
+  if (typeof repairDataIntegrity === 'function') repairDataIntegrity();
   // Restore viz & brain canvas state from localStorage so that
   // _rerenderActiveRoute() → vizAutoPopulate() sees the existing nodes
   // (with their saved positions) instead of an empty array.
@@ -519,6 +520,7 @@ async function loadFromFirestore(uid) {
         }
       }
 
+      if (typeof repairDataIntegrity === 'function') repairDataIntegrity();
       _cacheAllToLocalStorage();
       _cloudIsDirty = false;
       _lastCloudSaveAt = Date.now();
@@ -1444,6 +1446,7 @@ async function bootApp() {
   if (savedMode === 'local') {
     storageMode = 'local';
     loadData();
+    if (typeof repairDataIntegrity === 'function') repairDataIntegrity();
     finishBoot();
     return;
   }

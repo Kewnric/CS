@@ -693,6 +693,113 @@ function hasPendingShare() {
  * user when that's likely so they can fall back to an exported backup file.
  * @param {string} url @returns {boolean} true if a warning was shown
  */
+/* ============================================================
+   DATA INTEGRITY
+   ------------------------------------------------------------
+   Nothing validated the shape of what was loaded. Feeding the app deliberately
+   broken data showed it would not crash — it would just quietly carry the
+   damage:
+
+     - a program whose folder was deleted disappeared from every view while
+       still occupying storage and counting toward totals
+     - two items could share an id, so editing one edited both
+     - a practice set could point at a program that no longer exists
+     - categoryRequirements could lock a folder behind a deleted program,
+       leaving it permanently locked
+
+   This runs once after load, fixes what it safely can, and says what it did.
+   It never deletes user content: orphans are recovered to Uncategorized rather
+   than dropped.
+   ============================================================ */
+function repairDataIntegrity() {
+  const report = { orphans: 0, duplicateIds: 0, deadSetProblems: 0, deadLocks: 0, emptyVariants: 0 };
+  if (!state) return report;
+
+  const folderIds = new Set((state.nodes || []).filter(n => n && n.type === 'folder').map(n => n.id));
+
+  // Orphans -> Uncategorized, so they are visible and can be filed or deleted.
+  ['challenges', 'snippets', 'notebooks', 'codingSets'].forEach(key => {
+    (state[key] || []).forEach(item => {
+      if (item && item.parentId && !folderIds.has(item.parentId)) {
+        item.parentId = null;
+        report.orphans++;
+      }
+    });
+  });
+  // A folder whose own parent is gone becomes a root folder.
+  (state.nodes || []).forEach(n => {
+    if (n && n.parentId && !folderIds.has(n.parentId)) { n.parentId = null; report.orphans++; }
+  });
+
+  // Duplicate ids: the later copy is renumbered, so both survive and are
+  // editable independently.
+  const seen = new Set();
+  ['challenges', 'snippets', 'notebooks', 'codingSets', 'nodes'].forEach(key => {
+    (state[key] || []).forEach(item => {
+      if (!item) return;
+      if (!item.id) { item.id = generateId(); report.duplicateIds++; return; }
+      if (seen.has(item.id)) {
+        item.id = generateId();
+        report.duplicateIds++;
+      }
+      seen.add(item.id);
+    });
+  });
+
+  // Practice sets pointing at programs that are gone.
+  const liveChallenges = new Set((state.challenges || []).map(c => c.id));
+  (state.codingSets || []).forEach(set => {
+    const before = (set.problems || []).length;
+    set.problems = (set.problems || []).filter(pr =>
+      pr && (pr.source !== 'library' || liveChallenges.has(pr.challengeId)));
+    report.deadSetProblems += before - set.problems.length;
+  });
+
+  // Prerequisites naming deleted programs would lock a folder forever.
+  const req = state.categoryRequirements || {};
+  Object.keys(req).forEach(nodeId => {
+    const r = req[nodeId];
+    if (!r) { delete req[nodeId]; return; }
+    if (!folderIds.has(nodeId)) { delete req[nodeId]; report.deadLocks++; return; }
+    if (Array.isArray(r.requiredChallengeIds)) {
+      const kept = r.requiredChallengeIds.filter(id => liveChallenges.has(id));
+      if (kept.length !== r.requiredChallengeIds.length) {
+        report.deadLocks += r.requiredChallengeIds.length - kept.length;
+        r.requiredChallengeIds = kept;
+      }
+      if (!kept.length && !r.reqNodeId) delete req[nodeId];
+    }
+    if (r && r.reqNodeId && !folderIds.has(r.reqNodeId)) { delete req[nodeId]; report.deadLocks++; }
+  });
+
+  // A program with no version cannot be attempted; give it an empty one so it
+  // is editable rather than a dead row.
+  (state.challenges || []).forEach(c => {
+    if (!Array.isArray(c.variants) || !c.variants.length) {
+      c.variants = [{ id: generateId(), name: 'Version 1', description: '', code: '', starterCode: '',
+        files: [{ id: generateId(), name: 'main', ext: '.c', code: '', starterCode: '' }],
+        samples: [], tests: [] }];
+      report.emptyVariants++;
+    }
+  });
+
+  const total = Object.values(report).reduce((a, b) => a + b, 0);
+  if (total > 0) {
+    saveData();
+    const bits = [];
+    if (report.orphans) bits.push(report.orphans + ' item' + (report.orphans !== 1 ? 's' : '') + ' recovered to Uncategorized');
+    if (report.duplicateIds) bits.push(report.duplicateIds + ' duplicate id' + (report.duplicateIds !== 1 ? 's' : '') + ' renumbered');
+    if (report.deadSetProblems) bits.push(report.deadSetProblems + ' set problem' + (report.deadSetProblems !== 1 ? 's' : '') + ' dropped');
+    if (report.deadLocks) bits.push(report.deadLocks + ' stale prerequisite' + (report.deadLocks !== 1 ? 's' : '') + ' cleared');
+    if (report.emptyVariants) bits.push(report.emptyVariants + ' program' + (report.emptyVariants !== 1 ? 's' : '') + ' given a version');
+    console.warn('[Repair]', bits.join('; '));
+    if (typeof toast === 'function') {
+      toast('Fixed some damaged data: ' + bits.join('; ') + '.', { type: 'warning', duration: 8000 });
+    }
+  }
+  return report;
+}
+
 function warnIfShareUrlTooLong(url) {
   if (url && url.length > 8000) {
     if (typeof showMessage === 'function') {
