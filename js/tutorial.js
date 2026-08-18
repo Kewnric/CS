@@ -58,8 +58,8 @@ const GuidedTutorial = (function () {
       { selector: '#admin-toggles', message: "Choose whether you are editing 'Notes Mode' notebooks/snippets or 'Coding Mode' challenges.", title: 'Mode Toggle' },
       { selector: '#new-program-btn', message: "Starting a new item? Click here to open the creation form.", title: 'New Item', action: () => { 
         if(window.currentAdminMode === 'practice' && window.openAdminForm) window.openAdminForm();
-        else if(window.currentAdminMode === 'study' && window.currentAdminStudyTab === 'snippets' && window.openStudyForm) window.openStudyForm();
-        else if(window.currentAdminMode === 'study' && window.currentAdminStudyTab === 'notes' && window.openNotebookForm) window.openNotebookForm();
+        else if(window.currentAdminMode === 'study' && currentAdminStudyTab === 'snippets' && window.openStudyForm) window.openStudyForm();
+        else if(window.currentAdminMode === 'study' && currentAdminStudyTab === 'notes' && window.openNotebookForm) window.openNotebookForm();
       } },
       { selector: '#admin-title', message: "Give your challenge a name and assign it to a folder to organize your library.", title: 'Title & Category', optional: true },
       { selector: '#admin-tag-input', message: "Add tags like 'Easy' or 'Recursion' to help users filter the library efficiently.", title: 'Tags Input', optional: true },

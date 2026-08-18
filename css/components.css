@@ -2955,6 +2955,19 @@
   animation: float 4s ease-in-out infinite;
 }
 
+/* Both `.empty-state svg` rules are DESCENDANT selectors, so they also caught
+   the icon inside an empty state's own button — "Clear filters" got a 48px
+   icon slot, 0.4 opacity, a 16px bottom margin that inflated the button to
+   44px, and the float animation, so its little x drifted up and down beside
+   the big one. An icon inside a control is part of the control. */
+.empty-state button svg, .empty-state button i,
+.empty-state a svg, .empty-state a i,
+.empty-state .btn svg, .empty-state .btn i {
+  animation: none;
+  margin: 0;
+  opacity: 1;
+}
+
 /* --- Table Row Hover Slide --- */
 .table tbody tr {
   transition: background-color var(--transition-fast), transform var(--transition-fast);

@@ -755,7 +755,11 @@ function adminNotesTemplate() {
 
 function adminNotesInit() {
   window.currentAdminMode = 'study';
-  window.currentAdminStudyTab = 'notes';
+  // NOT window.currentAdminStudyTab: admin-core declares it with `let`, which
+  // makes a lexical binding rather than a window property, so assigning through
+  // window created a second variable that renderAdmin() never reads. The
+  // snippets page dispatched to renderNotebookAdmin() and drew nothing.
+  currentAdminStudyTab = 'notes';
   renderAdmin();
 
   // Populate dynamic header stats
@@ -850,7 +854,7 @@ function adminSnippetsTemplate() {
 
 function adminSnippetsInit() {
   window.currentAdminMode = 'study';
-  window.currentAdminStudyTab = 'snippets';
+  currentAdminStudyTab = 'snippets';   // see adminNotesInit: must be the binding, not window
   renderAdmin();
 
   // Populate dynamic header stats
