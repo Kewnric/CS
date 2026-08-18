@@ -179,7 +179,7 @@ function getNotebookFormHTML() {
           <div class="af-row-2" style="gap:0.75rem;">
             <div class="af-field" style="flex:1;">
               <label class="form-label"><i data-lucide="signal" class="af-label-icon"></i>Difficulty</label>
-              <select id="notebook-difficulty" class="form-select" onchange="if(notebookAdminState) { notebookAdminState.difficulty = this.value || null; window.notebookIsDirty = true; setSaveStatus('notebook-save-status','unsaved'); }">
+              <select id="notebook-difficulty" class="form-select" aria-label="Notebook difficulty" onchange="if(notebookAdminState) { notebookAdminState.difficulty = this.value || null; window.notebookIsDirty = true; setSaveStatus('notebook-save-status','unsaved'); }">
                 <option value="">None</option>
                 <option value="easy">Easy</option>
                 <option value="medium">Medium</option>
@@ -325,7 +325,7 @@ function getSnippetFormHTML() {
           <div class="af-field">
             <label class="form-label">Link a related program</label>
             <div style="display:flex;gap:0.5rem;">
-              <select id="study-challenge-select" class="form-select" style="flex:1;"></select>
+              <select id="study-challenge-select" class="form-select" aria-label="Related coding program" title="Related coding program" style="flex:1;"></select>
               <button onclick="addStudyRelatedChallenge()" class="btn btn-secondary btn-sm" style="white-space:nowrap;"><i data-lucide="link" style="width:13px;height:13px;"></i> Link</button>
             </div>
           </div>

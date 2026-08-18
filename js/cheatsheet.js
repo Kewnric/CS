@@ -414,7 +414,7 @@ function csLibraryHTML() {
           <input type="text" class="search-input" placeholder="Search sheets and their contents…"
                  value="${csEsc(cs.query)}" oninput="csSetQuery(this.value)">
         </div>
-        <select class="cs-select" onchange="csSetSort(this.value)">
+        <select class="cs-select" aria-label="Sort sheets" title="Sort sheets" onchange="csSetSort(this.value)">
           <option value="recent" ${cs.sort === 'recent' ? 'selected' : ''}>Recently edited</option>
           <option value="created" ${cs.sort === 'created' ? 'selected' : ''}>Newest</option>
           <option value="title" ${cs.sort === 'title' ? 'selected' : ''}>A–Z</option>

@@ -12,7 +12,40 @@ const SpaRouter = (() => {
     // config = { title, templateFn, initFn, destroyFn, sidebarVisible, navId }
   }
 
-  // --- Navigate ---
+  /**
+   * Gives the page an <h1> if its template did not. Visually hidden, because
+   * these pages already show their name in their own styling — this is for the
+   * accessibility tree and the document outline, not the design.
+   */
+  function _spaEnsureHeading(host, routeConfig, hash) {
+    // One deferred re-check for routes that finish rendering asynchronously.
+    // Deliberately not a loop: a page that never grows an h1 would otherwise
+    // re-run this every frame forever.
+    if (host && !host._headingChecked) {
+      host._headingChecked = true;
+      setTimeout(() => {
+        host._headingChecked = false;
+        if (host.isConnected && !host.querySelector('h1')) _spaEnsureHeading(host, routeConfig, hash);
+      }, 250);
+    }
+    if (!host) return;
+    const existing = host.querySelector('h1');
+    if (existing) {
+      // A page with its own heading keeps it; drop any we added earlier.
+      const ours = host.querySelector('h1[data-spa-heading]');
+      if (ours && ours !== existing) ours.remove();
+      return;
+    }
+    // "StudySession Pro — Coding Library" reads better as just "Coding Library".
+    const raw = (routeConfig && routeConfig.title) || hash || 'StudySession Pro';
+    const name = raw.split('\u2014').pop().split(' - ').pop().trim() || raw;
+    const h = document.createElement('h1');
+    h.className = 'sr-only';
+    h.setAttribute('data-spa-heading', '1');
+    h.textContent = name;
+    host.insertBefore(h, host.firstChild);
+  }
+
   function navigate(route, params) {
     if (params) {
       // Store params in sessionStorage for cross-route data
@@ -150,9 +183,13 @@ const SpaRouter = (() => {
       }
 
       // Run init
+      if (!routeConfig.initFn) _spaEnsureHeading(spaContent, routeConfig, hash);
       if (routeConfig.initFn) {
         try {
           routeConfig.initFn();
+          // AFTER init: most routes re-render the container in initFn, so a
+          // heading inserted before it would be thrown away.
+          _spaEnsureHeading(spaContent, routeConfig, hash);
         } catch (e) {
           console.error('[Router] Init error on route "' + hash + '":', e);
           // Show a visible fallback so the user isn't left with a blank page

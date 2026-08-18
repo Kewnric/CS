@@ -169,7 +169,8 @@ function renderAdminFolderList(folders, scope, depth) {
               <i data-lucide="folder" style="width:16px;height:16px;color:var(--color-accent);flex-shrink:0;"></i>
               <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHTML(folder.name)}</span>
               ${tierBadge}
-              <select class="tier-select" onclick="event.stopPropagation()" onchange="updateFolderTier('${folder.id}', this.value)">
+              <select class="tier-select" aria-label="Tier for ${escapeHTML(folder.name)}" title="Difficulty tier"
+                      onclick="event.stopPropagation()" onchange="updateFolderTier('${folder.id}', this.value)">
                 ${tierOptions}
               </select>
               <span style="font-size:0.65rem; color:var(--text-tertiary);">${childCount}</span>
