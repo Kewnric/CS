@@ -522,6 +522,7 @@ function saveSetBuilder() {
   saveData();
   closeSetBuilder();
   renderAdminSets();
+  if (typeof adminRefreshCardsIfOpen === 'function') adminRefreshCardsIfOpen();
   if (typeof toast === 'function') toast('Practice set saved', { type: 'success' });
   else if (typeof showMessage === 'function') showMessage('Saved', 'Practice set saved.');
 }

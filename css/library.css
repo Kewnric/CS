@@ -1496,6 +1496,12 @@ body.tree-dragging [data-tree-ns]::-webkit-scrollbar { width: 0; height: 0; }
   cursor: pointer;
 }
 .admin-gen-item:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+.admin-gen-item.current {
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  font-weight: 700;
+}
+.admin-gen-item.current svg { opacity: 1; }
 .admin-gen-item svg { width: 13px; height: 13px; flex-shrink: 0; opacity: 0.75; }
 
 .admin-gen-empty {

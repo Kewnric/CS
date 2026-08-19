@@ -385,12 +385,46 @@ function _adminGenSummaryClick(e, folderId) {
 function _adminGenItemHTML(item, depth) {
   const c = _adminCollectionSet()[0].card(item);
   const id = escapeHTML(String(item.id));
+  // Marking what the editor currently holds, so the tree says where you are
+  // rather than leaving the open form unattributed.
+  const editing = _adminEditingId() === String(item.id);
   return `
-    <button class="admin-gen-item" style="padding-left:${1.35 + (depth || 0) * 0.75}rem;"
-            title="${escapeHTML(c.title)}" onclick="adminOpenFromCard('${id}')">
+    <button class="admin-gen-item${editing ? ' current' : ''}" style="padding-left:${1.35 + (depth || 0) * 0.75}rem;"
+            title="${escapeHTML(c.title)}"${editing ? ' aria-current="true"' : ''} onclick="adminOpenItem('${id}')">
       <i data-lucide="${escapeHTML(c.icon || 'file')}"></i>
       <span class="admin-gen-name">${escapeHTML(c.title)}</span>
     </button>`;
+}
+
+/**
+ * Open an item's editor from the first pane's tree. adminOpenFromCard() reads
+ * whichever collection the second pane is showing and gives up when there is
+ * none — but this tree is on screen whether or not the browser was ever
+ * opened, so its rows did nothing at all until something else was clicked
+ * first. The collection is implied here, and Back is pointed at the folder the
+ * item actually lives in.
+ */
+function adminOpenItem(id) {
+  const col = _adminCollectionSet()[0];
+  if (!col) return;
+  const item = (col.items() || []).find(x => String(x.id) === String(id));
+  _adminCollection = 'general';
+  _adminNavFolderId = item && item.parentId ? item.parentId : (item ? ADMIN_UNCAT : _adminNavFolderId);
+  const host = document.getElementById('admin-card-browser');
+  if (host) host.classList.add('hidden');
+  col.open(id);
+  _adminMarkActiveSection('general');
+  _adminRenderGeneralNav();
+}
+
+/** The record the open editor is holding, whichever admin this is. */
+function _adminEditingId() {
+  const st = window.currentAdminMode === 'study'
+    ? (currentAdminStudyTab === 'snippets'
+        ? (typeof studyModeState !== 'undefined' ? studyModeState : null)
+        : (typeof notebookAdminState !== 'undefined' ? notebookAdminState : null))
+    : (typeof adminState !== 'undefined' ? adminState : null);
+  return st && st.id && st.id !== 'new' ? String(st.id) : null;
 }
 
 /** Open a collection as cards in pane 2. Called by the pane-1 section headers. */
@@ -495,6 +529,7 @@ function adminOpenFromCard(id) {
   const host = document.getElementById('admin-card-browser');
   if (host && !overlays) host.classList.add('hidden');
   col.open(id);
+  _adminRenderGeneralNav();   // mark the row the editor is now holding
 }
 
 function adminCreateFromCard() {
@@ -526,6 +561,15 @@ function _adminPlaceNewInOpenFolder() {
   if (typeof adminState !== 'undefined' && adminState) adminState.parentId = target || null;
   if (typeof notebookAdminState !== 'undefined' && notebookAdminState) notebookAdminState.parentId = target || null;
   if (typeof studyModeState !== 'undefined' && studyModeState) studyModeState.parentId = target || null;
+}
+
+/**
+ * Redraw the card browser if it happens to be on screen. Practice sets and
+ * locks are edited in modals that open OVER the cards, so their save paths
+ * finish with the stale grid still visible behind them.
+ */
+function adminRefreshCardsIfOpen() {
+  if (_adminCollection) adminRenderCards();
 }
 
 /** The editor's Back button: return to the cards it was opened from. */

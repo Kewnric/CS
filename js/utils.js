@@ -255,6 +255,10 @@ function saveLockPicker() {
   if (typeof renderBrowse === 'function') renderBrowse();
   if (typeof renderStudy === 'function') renderStudy();
   if (typeof renderNotes === 'function') renderNotes();
+  // The lock picker is also reachable from the admin, where the lock badge and
+  // the Skill Tree Locks grid both show what was just changed.
+  if (typeof renderAdmin === 'function' && document.getElementById('admin-card-browser')) renderAdmin();
+  if (typeof adminRefreshCardsIfOpen === 'function') adminRefreshCardsIfOpen();
 }
 
 function closeLockPicker() {
