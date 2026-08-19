@@ -352,9 +352,10 @@
   justify-content: space-between;
   align-items: center;
   margin: 0 -2.5rem 1.5rem;
-  padding: 1rem 2.5rem 1.25rem;
-  border-bottom: 1px solid var(--border-color);
-  background: var(--bg-surface);
+  padding: 1rem 2.5rem 1.5rem;
+  /* Fades out at its lower edge rather than ruling a line, matching
+     .admin-form-footer at the other end of the form. */
+  background: linear-gradient(to top, transparent, var(--bg-surface) 30%, var(--bg-surface) 100%);
   gap: 1rem;
 }
 

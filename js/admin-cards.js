@@ -828,7 +828,6 @@ function _adminNavFolderCardHTML(f) {
   const sc = _adminScope();
   const direct = _adminFolderCount(f.id, sc.scope);
   const subs = _adminChildFolders(f.id).length;
-  const total = direct + subs;
   const locked = !!(state.categoryRequirements || {})[f.id];
   const cover = typeof libCoverFallbackHTML === 'function'
     ? libCoverFallbackHTML(f.name || 'Folder', f.icon || 'folder')
@@ -839,7 +838,6 @@ function _adminNavFolderCardHTML(f) {
       ${locked ? '<div class="admin-nav-lock" title="This category has prerequisites"><i data-lucide="lock"></i></div>' : ''}
       <div class="admin-nav-head">
         <h3>${escapeHTML(f.name || 'Untitled folder')}</h3>
-        <span class="version-pill">${total} item${total !== 1 ? 's' : ''}</span>
       </div>
       <p class="admin-nav-sub">${direct} ${sc.noun}${direct !== 1 ? 's' : ''} &middot; ${subs} subfolder${subs !== 1 ? 's' : ''}</p>
       <div class="admin-nav-actions">
@@ -873,7 +871,6 @@ function _adminUncatCardHTML() {
       ${cover}
       <div class="admin-nav-head">
         <h3>Uncategorized</h3>
-        <span class="version-pill">${n} item${n !== 1 ? 's' : ''}</span>
       </div>
       <p class="admin-nav-sub">${noun.charAt(0).toUpperCase() + noun.slice(1)}s that are not filed in any category.</p>
       <div class="admin-nav-actions">
@@ -890,7 +887,6 @@ function _adminNavItemCardHTML(item, n) {
   const id = escapeHTML(String(item.id));
   const cover = typeof libCoverFallbackHTML === 'function'
     ? libCoverFallbackHTML(c.title, c.icon) : '';
-  const tags = (item.tags || []).slice(0, 3);
 
   // Outside ordering there is no number on the card at all: the grid is
   // already in order, so stamping every card with one was noise.
@@ -905,7 +901,6 @@ function _adminNavItemCardHTML(item, n) {
       <div class="admin-nav-head">
         <h3>${escapeHTML(c.title)}</h3>
       </div>
-      ${tags.length ? `<div class="card-tag-row">${tags.map(t => `<span class="badge">${escapeHTML(t)}</span>`).join('')}</div>` : ''}
       <p class="admin-nav-sub">${escapeHTML(c.sub || '')}</p>
       <div class="card-stat-row">
         ${(c.meta || []).map(m => `<span class="card-stat"><i data-lucide="${m.icon}"></i>${escapeHTML(String(m.text))}</span>`).join('')}
