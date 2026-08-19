@@ -268,16 +268,43 @@ function _adminRenderGeneralNav() {
   const host = document.getElementById('admin-general-nav');
   if (!host) return;
   _adminValidateNav();
-  const loose = _adminItemsIn(ADMIN_UNCAT);
+  const q = _adminGenQuery();
+  const loose = _adminItemsIn(ADMIN_UNCAT).filter(it => _adminGenItemMatches(it, q));
 
-  host.innerHTML =
-    _adminGenBranch(null, 0) +
+  const body = _adminGenBranch(null, 0) +
     (loose.length ? _adminGenGroupHTML(ADMIN_UNCAT, 'Uncategorized', 'inbox', loose.length,
-      loose.map(it => _adminGenItemHTML(it)).join(''), 0) : '') +
-    (!_adminChildFolders(null).length && !loose.length
-      ? '<p class="admin-gen-empty">No categories yet.</p>' : '');
+      loose.map(it => _adminGenItemHTML(it)).join(''), 0) : '');
 
+  host.innerHTML = body ||
+    `<p class="admin-gen-empty">${q ? 'Nothing matches that search.' : 'No categories yet.'}</p>`;
   if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
+}
+
+/** Whatever is typed in the first pane's search box. */
+function _adminGenQuery() {
+  const el = document.getElementById('admin-search-input');
+  return (el ? el.value : '').trim().toLowerCase();
+}
+
+function _adminGenItemTitle(item) {
+  return String(_adminCollectionSet()[0].card(item).title || '');
+}
+
+function _adminGenItemMatches(item, q) {
+  return !q || _adminGenItemTitle(item).toLowerCase().includes(q);
+}
+
+/**
+ * A folder survives a search if it matches by name, holds a matching item, or
+ * has a descendant that does — otherwise narrowing the list would hide the very
+ * branch the match sits in.
+ */
+function _adminGenBranchMatches(folderId, q) {
+  if (!q) return true;
+  const f = (state.nodes || []).find(n => n.id === folderId);
+  if (f && String(f.name || '').toLowerCase().includes(q)) return true;
+  if (_adminItemsIn(folderId).some(it => _adminGenItemMatches(it, q))) return true;
+  return _adminChildFolders(folderId).some(c => _adminGenBranchMatches(c.id, q));
 }
 
 /**
@@ -285,24 +312,34 @@ function _adminRenderGeneralNav() {
  * subfolders first and then the items filed directly in it, so the panel
  * mirrors the shape of the library rather than flattening it.
  */
-function _adminGenBranch(parentId, depth) {
-  return _adminChildFolders(parentId).map(f => {
-    const subs = _adminChildFolders(f.id);
-    const items = _adminItemsIn(f.id);
-    const body = _adminGenBranch(f.id, depth + 1) + items.map(it => _adminGenItemHTML(it, depth + 1)).join('') +
-      (!subs.length && !items.length ? '<p class="admin-gen-empty">Empty</p>' : '');
-    return _adminGenGroupHTML(f.id, f.name || 'Untitled', f.icon || 'folder',
-      items.length + subs.length, body, depth);
-  }).join('');
-}
-
-/** Expansion is remembered, so the tree does not reset on every rerender. */
+function _adminGenBranch(parentId, depth, showAll) {
+  // Matching a folder BY NAME used to still filter everything inside it, so the
+  // folder you searched for appeared labelled "Empty". Once a branch matches on
+  // its own name, its whole subtree is shown.
+  const q = showAll ? '' : _adminGenQuery();
+  return _adminChildFolders(parentId)
+    .filter(f => _adminGenBranchMatches(f.id, q))
+    .map(f => {
+      const byName = !!q && String(f.name || '').toLowerCase().includes(q);
+      const inner = showAll || byName;
+      const subs = _adminChildFolders(f.id).filter(c => inner || _adminGenBranchMatches(c.id, q));
+      const items = _adminItemsIn(f.id).filter(it => inner || _adminGenItemMatches(it, q));
+      const body = _adminGenBranch(f.id, depth + 1, inner) +
+        items.map(it => _adminGenItemHTML(it, depth + 1)).join('') +
+        (!subs.length && !items.length ? '<p class="admin-gen-empty">Empty</p>' : '');
+      return _adminGenGroupHTML(f.id, f.name || 'Untitled', f.icon || 'folder',
+        items.length + subs.length, body, depth);
+    }).join('');
+}/** Expansion is remembered, so the tree does not reset on every rerender. */
 function _adminGenOpen(id) {
   try { return (JSON.parse(localStorage.getItem('adminGenOpen') || '[]')).includes(id); }
   catch (e) { return false; }
 }
 
 function _adminGenRemember() {
+  // Everything is force-opened during a search; recording that would wipe what
+  // the user had actually expanded.
+  if (_adminGenQuery()) return;
   const open = [...document.querySelectorAll('#admin-general-nav details.admin-gen-group[open]')]
     .map(d => d.getAttribute('data-folder'));
   try { localStorage.setItem('adminGenOpen', JSON.stringify(open)); } catch (e) { /* quota */ }
@@ -310,9 +347,13 @@ function _adminGenRemember() {
 
 function _adminGenGroupHTML(id, name, icon, count, body, depth) {
   const showing = _adminCollection === 'general' && String(_adminNavFolderId) === String(id);
+  // A search result inside a collapsed branch is a search result you cannot
+  // see, so searching forces every surviving branch open. The stored open set
+  // is left untouched and comes back when the box is cleared.
+  const open = _adminGenQuery() ? true : _adminGenOpen(id);
   return `
     <details class="admin-group admin-gen-group${showing ? ' current' : ''}"
-             data-folder="${escapeHTML(String(id))}"${_adminGenOpen(id) ? ' open' : ''}>
+             data-folder="${escapeHTML(String(id))}"${open ? ' open' : ''}>
       <summary style="padding-left:${0.3 + depth * 0.75}rem;" onclick="_adminGenSummaryClick(event, '${escapeHTML(String(id))}')">
         <i data-lucide="chevron-right" class="admin-group-chev"></i>
         <i data-lucide="${escapeHTML(icon)}" style="width:14px;height:14px;"></i>
