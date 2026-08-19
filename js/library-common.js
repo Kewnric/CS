@@ -205,6 +205,39 @@ function libChipHTML(active, onclick, label, title) {
   return `<button onclick="${onclick}" class="lib-chip${active ? ' active' : ''}"${title ? ` title="${escapeHTML(title)}"` : ''}>${label}</button>`;
 }
 
+/* ── Sort direction ───────────────────────────────────────────
+   The sort menu offered orders but no way to flip one, so reading a list
+   backwards meant picking a different sort entirely — and there was no
+   one-click "alphabetical" at all. These sit in the filter panel beside the
+   other chips, and apply on top of whichever sort is chosen. */
+
+function libSortDir(ns) { return getLibPref(ns + '.sortDir', 'asc'); }
+
+function libSetSortDir(ns, dir) {
+  setLibPref(ns + '.sortDir', dir);
+  const a = LIB_ADAPTERS[ns];
+  if (a) a.rerender();
+}
+
+/** Apply the chosen direction to an already-sorted list. */
+function libApplySortDir(ns, list) {
+  return libSortDir(ns) === 'desc' ? list.slice().reverse() : list;
+}
+
+/**
+ * @param {string} ns       library namespace
+ * @param {string} setSort  name of that library's sort setter, e.g. 'setBrowseSort'
+ * @param {string} curSort  the sort currently chosen
+ */
+function libSortChipsHTML(ns, setSort, curSort) {
+  const dir = libSortDir(ns);
+  return [
+    libChipHTML(dir === 'asc', `libSetSortDir('${ns}','asc')`, 'Ascending', 'First to last in the chosen order'),
+    libChipHTML(dir === 'desc', `libSetSortDir('${ns}','desc')`, 'Descending', 'Reverse the chosen order'),
+    libChipHTML(curSort === 'title', `${setSort}('title')`, 'Alphabetical', 'Sort by title')
+  ].join('');
+}
+
 /** The Favourites / Due pair every library now carries. */
 function libCommonChipsHTML(ns, reviewType, pool) {
   const fav = getLibPref(ns + '.fav', false);

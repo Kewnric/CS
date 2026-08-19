@@ -454,6 +454,10 @@ function _applySnippetFilterSort(list) {
     const overdue = s => { const r = _snippetReviewRec(s); return (r && r.due) ? _revDaysBetween(r.due, _revToday()) : -Infinity; };
     out.sort((a, b) => overdue(b) - overdue(a));
   }
+  // Direction is applied before favourites float, so starring something keeps
+  // it on top whichever way the list is running.
+  out = libApplySortDir('snippet', out);
+
   out.sort((a, b) => (libIsFavorite(b) ? 1 : 0) - (libIsFavorite(a) ? 1 : 0));
   return out;
 }
@@ -496,6 +500,7 @@ function _renderSnippetFilterBar(total, shown, pool) {
       { icon: 'filter', chips },
       langChips ? { icon: 'code', chips: langChips } : null,
       { icon: 'star', chips: libCommonChipsHTML('snippet', 'snippet', pool) },
+      { icon: 'arrow-up-down', chips: libSortChipsHTML('snippet', 'setSnippetSort', sort) },
       { icon: 'tag', chips: _libTagChipsOnly('snippet', pool) },
     ]
   });

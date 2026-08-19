@@ -723,6 +723,10 @@ function _applyBrowseFilterSort(list) {
   else if (sort === 'level') out.sort((a, b) => (getProgramLevel(a) ?? Infinity) - (getProgramLevel(b) ?? Infinity));
   // 'default' preserves the folder/search order.
 
+  // Direction is applied before favourites float, so starring something keeps
+  // it on top whichever way the list is running.
+  out = libApplySortDir('browse', out);
+
   // Favourites always float to the top of whatever order was chosen.
   out.sort((a, b) => (libIsFavorite(b) ? 1 : 0) - (libIsFavorite(a) ? 1 : 0));
   return out;
@@ -810,6 +814,7 @@ function _renderBrowseFilterBar(total, shown, pool) {
       { icon: 'bar-chart-2', chips: diffChips },
       levelChips ? { icon: 'swords', chips: levelChips } : null,
       { icon: 'star', chips: libCommonChipsHTML('browse', 'challenge', pool) },
+      { icon: 'arrow-up-down', chips: libSortChipsHTML('browse', 'setBrowseSort', sort) },
       // Tags are unbounded, so this row folds after the first handful.
       { icon: 'tag', chips: libFoldChips(_libTagChipsOnly('browse', pool), 8), wrap: true },
     ]

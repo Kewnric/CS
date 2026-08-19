@@ -237,14 +237,23 @@ function _adminFindCollection(key) {
  * the section rather than collapsing it out from under the click.
  */
 function adminSectionClick(e) {
-  if (e.target.closest('.admin-panel-chev') || e.target.closest('.admin-panel-tools')) return;
+  if (e.target.closest('.admin-panel-tools')) return;
   const det = e.currentTarget.closest('details.admin-panel');
   if (!det) return;
+
+  // <details> is left permanently open and collapsing is done with a class:
+  // a closed <details> sets display:none on its content, which cannot be
+  // transitioned, so the panel could never slide. preventDefault stops the
+  // element toggling itself back.
+  e.preventDefault();
+
+  if (e.target.closest('.admin-panel-chev')) {
+    det.classList.toggle('collapsed');
+    return;
+  }
+  det.classList.remove('collapsed');
   const key = det.getAttribute('data-collection');
-  if (!key) return;
-  e.preventDefault();          // do not let the header toggle itself shut
-  if (!det.open) det.open = true;
-  adminShowCollection(key);
+  if (key) adminShowCollection(key);
 }
 
 /** Keep the panel counts honest for the sections the other admins now have. */
@@ -428,6 +437,7 @@ function adminRenderCards() {
     host.innerHTML = _adminGeneralHTML();
     host.classList.remove('hidden');
     if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
+    _adminStaggerCards(host);
     return;
   }
 
@@ -478,6 +488,20 @@ function adminRenderCards() {
   `;
   host.classList.remove('hidden');
   if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
+  _adminStaggerCards(host);
+}
+
+/**
+ * Stagger the cards in, in reading order. The delay is written per element
+ * rather than baked into CSS so it can be capped: a folder of sixty items
+ * should not spend three seconds arriving.
+ */
+function _adminStaggerCards(host) {
+  const cards = host.querySelectorAll('.admin-cards-grid > *, .admin-nav-grid > *');
+  const step = cards.length > 24 ? 12 : 34;
+  cards.forEach((c, i) => {
+    c.style.setProperty('--card-in-delay', Math.min(i * step, 420) + 'ms');
+  });
 }
 
 /** Re-rendering replaces the box being typed in, so the caret is put back. */
@@ -594,6 +618,8 @@ function adminFormBack() {
 
 const ADMIN_UNCAT = '__uncat__';    // the pseudo-folder holding parentless items
 let _adminNavFolderId = null;       // null = the top level
+let _adminOrderMode = false;        // placing cards by clicking them, in order
+let _adminOrderSeq = [];            // ids in the order they were clicked
 
 /** Which library this admin edits, as the tree's scope + the state key. */
 function _adminScope() {
@@ -643,6 +669,9 @@ function _adminParentOf(folderId) {
 }
 
 function adminNavTo(folderId) {
+  // An unfinished arrangement belongs to the folder it was started in.
+  _adminOrderMode = false;
+  _adminOrderSeq = [];
   _adminNavFolderId = (folderId === null || folderId === 'null' || folderId === '') ? null : folderId;
   adminShowCollection('general');
 }
@@ -665,46 +694,89 @@ function _adminValidateNav() {
    A number can be typed instead; it moves the item among its siblings, so
    every "Folder order" sort in the app reflects it. */
 
-function _adminSetNumber(id) {
+function _adminOrderStart() {
+  _adminOrderMode = true;
+  _adminOrderSeq = [];
+  adminRenderCards();
+}
+
+function _adminOrderCancel() {
+  _adminOrderMode = false;
+  _adminOrderSeq = [];
+  adminRenderCards();
+}
+
+/**
+ * Clicking a card places it next in the sequence; clicking one already placed
+ * takes it back out, and everything after it moves up. Nothing is written
+ * until Done, so a half-finished ordering can be abandoned.
+ */
+function _adminOrderPick(id) {
+  const at = _adminOrderSeq.indexOf(id);
+  if (at === -1) _adminOrderSeq.push(id);
+  else _adminOrderSeq.splice(at, 1);
+  adminRenderCards();
+}
+
+/**
+ * Write the sequence back. Cards clicked keep their click order; anything left
+ * unplaced follows, in the order it already had, rather than being shuffled.
+ */
+function _adminOrderApply() {
   const key = _adminScope().key;
   const arr = state[key] || [];
-  const item = arr.find(x => x.id === id);
-  if (!item) return;
-  const parent = item.parentId || null;
-  const siblings = arr.filter(x => (x.parentId || null) === parent);
-  const total = siblings.length;
-  const current = siblings.findIndex(x => x.id === id) + 1;
+  const here = _adminNavFolderId === ADMIN_UNCAT ? null : (_adminNavFolderId || null);
+  const siblings = arr.filter(x => (x.parentId || null) === here);
+  if (!siblings.length || !_adminOrderSeq.length) return _adminOrderCancel();
 
-  showInputDialog('Set number',
-    'Where this sits among the ' + total + ' item' + (total !== 1 ? 's' : '') + ' in this folder.',
-    'Number 1-' + total, String(current), (v) => {
-      let target = parseInt(String(v).trim(), 10);
-      if (!isFinite(target)) return;
-      target = Math.max(1, Math.min(total, target));
-      if (target === current) return;
+  const placed = _adminOrderSeq
+    .map(id => siblings.find(x => String(x.id) === String(id)))
+    .filter(Boolean);
+  const rest = siblings.filter(x => !_adminOrderSeq.includes(String(x.id)));
+  _adminWriteSiblingOrder(arr, here, placed.concat(rest));
 
-      // Pull it out, then put it back in front of whoever now holds that slot.
-      arr.splice(arr.indexOf(item), 1);
-      const rest = arr.filter(x => (x.parentId || null) === parent);
-      if (target > rest.length) {
-        const last = rest[rest.length - 1];
-        arr.splice(last ? arr.indexOf(last) + 1 : arr.length, 0, item);
-      } else {
-        arr.splice(arr.indexOf(rest[target - 1]), 0, item);
-      }
-      saveData();
-      if (typeof renderAdmin === 'function') renderAdmin();
-      adminRenderCards();
-      if (typeof toast === 'function') toast('Moved to #' + target + '.', { type: 'success' });
-    });
+  saveData();
+  _adminOrderMode = false;
+  _adminOrderSeq = [];
+  if (typeof renderAdmin === 'function') renderAdmin();
+  adminRenderCards();
+  if (typeof toast === 'function') toast('Order saved.', { type: 'success' });
 }
 
-function _adminNumbersHelp() {
-  if (typeof toast === 'function') {
-    toast('Click the # on any card to move it to that position. That order is what "Folder order" sorts by everywhere else.',
-      { type: 'info', duration: 7000 });
-  }
+/** Put `ordered` back into `arr`, leaving every other folder's items alone. */
+function _adminWriteSiblingOrder(arr, parentId, ordered) {
+  const slots = [];
+  arr.forEach((x, i) => { if ((x.parentId || null) === parentId) slots.push(i); });
+  slots.forEach((slot, i) => { arr[slot] = ordered[i]; });
 }
+
+/** The sort choices in the Order menu. */
+function _adminOrderSort(kind) {
+  const sc = _adminScope();
+  const arr = state[sc.key] || [];
+  const here = _adminNavFolderId === ADMIN_UNCAT ? null : (_adminNavFolderId || null);
+  const siblings = arr.filter(x => (x.parentId || null) === here);
+  if (siblings.length < 2) return;
+
+  const title = (x) => String(_adminCollectionSet()[0].card(x).title || '').toLowerCase();
+  const made = (x) => x.createdAt || 0;
+  const sorted = siblings.slice();
+  if (kind === 'az') sorted.sort((a, b) => title(a).localeCompare(title(b)));
+  else if (kind === 'za') sorted.sort((a, b) => title(b).localeCompare(title(a)));
+  else if (kind === 'new') sorted.sort((a, b) => made(b) - made(a));
+  else if (kind === 'old') sorted.sort((a, b) => made(a) - made(b));
+  else if (kind === 'reverse') sorted.reverse();
+  else return;
+
+  _adminWriteSiblingOrder(arr, here, sorted);
+  saveData();
+  if (typeof renderAdmin === 'function') renderAdmin();
+  adminRenderCards();
+  const label = { az: 'A to Z', za: 'Z to A', 'new': 'newest first',
+                  old: 'oldest first', reverse: 'reversed' }[kind];
+  if (typeof toast === 'function') toast('Ordered ' + label + '.', { type: 'success' });
+}
+
 
 /* ── the cards ────────────────────────────────────────────── */
 
@@ -769,17 +841,23 @@ function _adminUncatCardHTML() {
 }
 
 function _adminNavItemCardHTML(item, n) {
-  const col = _adminCollectionSet()[0];       // programs / notebooks / snippets
+  const col = _adminCollectionSet()[0];
   const c = col.card(item);
   const id = escapeHTML(String(item.id));
   const cover = typeof libCoverFallbackHTML === 'function'
     ? libCoverFallbackHTML(c.title, c.icon) : '';
   const tags = (item.tags || []).slice(0, 3);
-  return `
-    <div class="card card-enhanced has-cover admin-nav-card" onclick="adminOpenFromCard('${id}')" style="cursor:pointer;">
+
+  // Outside ordering there is no number on the card at all: the grid is
+  // already in order, so stamping every card with one was noise.
+  const place = _adminOrderMode ? _adminOrderSeq.indexOf(String(item.id)) : -1;
+  const badge = _adminOrderMode
+    ? `<span class="admin-nav-number${place === -1 ? ' unplaced' : ''}">${place === -1 ? '' : place + 1}</span>`
+    : '';
+
+  const body = `
       ${cover}
-      <button class="admin-nav-number" title="Position in this folder — click to change"
-              onclick="event.stopPropagation(); _adminSetNumber('${id}')">#${n}</button>
+      ${badge}
       <div class="admin-nav-head">
         <h3>${escapeHTML(c.title)}</h3>
       </div>
@@ -787,14 +865,22 @@ function _adminNavItemCardHTML(item, n) {
       <p class="admin-nav-sub">${escapeHTML(c.sub || '')}</p>
       <div class="card-stat-row">
         ${(c.meta || []).map(m => `<span class="card-stat"><i data-lucide="${m.icon}"></i>${escapeHTML(String(m.text))}</span>`).join('')}
-      </div>
+      </div>`;
+
+  if (_adminOrderMode) {
+    return `
+      <div class="card card-enhanced has-cover admin-nav-card admin-nav-ordering${place > -1 ? ' placed' : ''}"
+           onclick="_adminOrderPick('${id}')" title="${place > -1 ? 'Click to unplace' : 'Click to place next'}">
+        ${body}
+      </div>`;
+  }
+
+  return `
+    <div class="card card-enhanced has-cover admin-nav-card" onclick="adminOpenFromCard('${id}')" style="cursor:pointer;">
+      ${body}
       <div class="admin-nav-actions">
         <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); adminOpenFromCard('${id}')">
           <i data-lucide="pencil"></i> Edit
-        </button>
-        <button class="btn btn-ghost btn-sm" title="Set this item's number in the folder"
-                onclick="event.stopPropagation(); _adminSetNumber('${id}')">
-          <i data-lucide="hash"></i>
         </button>
         <button class="btn btn-ghost btn-sm" title="Move to another category"
                 onclick="event.stopPropagation(); adminMoveItem('${id}')">
@@ -803,7 +889,6 @@ function _adminNavItemCardHTML(item, n) {
       </div>
     </div>`;
 }
-
 /** Prerequisites live on the folder; which picker depends on the library. */
 function adminEditPrereqs(folderId) {
   const sc = _adminScope().scope;
@@ -890,10 +975,11 @@ function _adminGeneralHTML() {
     rootUncat ? rootUncat + ' uncategorized' : ''
   ].filter(Boolean).join(' · ');
 
-  const cards =
-    folders.map(_adminNavFolderCardHTML).join('') +
-    (here === null && rootUncat ? _adminUncatCardHTML() : '') +
-    items.map((it, i) => _adminNavItemCardHTML(it, i + 1)).join('');
+  const cards = _adminOrderMode
+    ? items.map((it, i) => _adminNavItemCardHTML(it, i + 1)).join('')
+    : folders.map(_adminNavFolderCardHTML).join('') +
+      (here === null && rootUncat ? _adminUncatCardHTML() : '') +
+      items.map((it, i) => _adminNavItemCardHTML(it, i + 1)).join('');
 
   const empty = !folders.length && !items.length && !rootUncat;
 
@@ -911,17 +997,56 @@ function _adminGeneralHTML() {
         <p>${counts || 'Empty'}</p>
       </div>
       <div class="admin-nav-tools">
-        <button class="btn btn-ghost btn-sm" onclick="_adminNumbersHelp()" title="How numbering works">
-          <i data-lucide="hash"></i> Numbering
-        </button>
+        ${items.length > 1 ? `
+        <details class="lib-view admin-order-menu">
+          <summary title="How the ${escapeHTML(sc.noun)}s in this folder are ordered">
+            <i data-lucide="arrow-up-down" style="width:13px;height:13px;"></i> Order
+            <i data-lucide="chevron-down" class="lib-view-chev" style="width:12px;height:12px;"></i>
+          </summary>
+          <div class="lib-view-pop">
+            <div class="lib-view-title">Order</div>
+            <button class="admin-order-opt" onclick="_adminOrderStart()">
+              <i data-lucide="mouse-pointer-click"></i>
+              <span><strong>Arrange by hand</strong><em>Click the cards one by one, in the order you want</em></span>
+            </button>
+            <div class="lib-view-sep"></div>
+            <button class="admin-order-opt" onclick="_adminOrderSort('az')">
+              <i data-lucide="arrow-down-a-z"></i><span><strong>A to Z</strong></span>
+            </button>
+            <button class="admin-order-opt" onclick="_adminOrderSort('za')">
+              <i data-lucide="arrow-up-a-z"></i><span><strong>Z to A</strong></span>
+            </button>
+            <button class="admin-order-opt" onclick="_adminOrderSort('new')">
+              <i data-lucide="clock"></i><span><strong>Newest first</strong></span>
+            </button>
+            <button class="admin-order-opt" onclick="_adminOrderSort('old')">
+              <i data-lucide="history"></i><span><strong>Oldest first</strong></span>
+            </button>
+            <div class="lib-view-sep"></div>
+            <button class="admin-order-opt" onclick="_adminOrderSort('reverse')">
+              <i data-lucide="flip-vertical-2"></i><span><strong>Reverse</strong></span>
+            </button>
+          </div>
+        </details>` : ''}
         <button class="btn btn-secondary btn-sm" onclick="_adminNewFolderIn()">
           <i data-lucide="folder-plus"></i> New category
         </button>
       </div>
     </div>
+    ${_adminOrderMode ? `
+    <div class="admin-order-bar" role="status">
+      <i data-lucide="mouse-pointer-click"></i>
+      <span class="admin-order-msg">
+        <strong>Click the cards in the order you want.</strong>
+        ${_adminOrderSeq.length} of ${items.length} placed
+      </span>
+      <button class="btn btn-ghost btn-sm" onclick="_adminOrderCancel()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="_adminOrderApply()"
+              ${_adminOrderSeq.length ? '' : 'disabled'}>Done</button>
+    </div>` : ''}
     <div class="admin-nav-grid">
       ${cards}
-      ${here !== null ? `<button class="admin-card admin-card-add" onclick="adminCreateFromCard()" title="New ${escapeHTML(sc.noun)}">
+      ${here !== null && !_adminOrderMode ? `<button class="admin-card admin-card-add" onclick="adminCreateFromCard()" title="New ${escapeHTML(sc.noun)}">
         <i data-lucide="plus"></i><span>New ${escapeHTML(sc.noun)}</span>
       </button>` : ''}
     </div>

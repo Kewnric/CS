@@ -797,8 +797,11 @@
 }
 .admin-panel > summary::-webkit-details-marker { display: none; }
 .admin-panel > summary:hover { background: var(--bg-surface-hover); }
-.admin-panel-chev { width: 14px; height: 14px; color: var(--text-tertiary); flex-shrink: 0; transition: transform 0.18s ease; }
-.admin-panel[open] > summary .admin-panel-chev { transform: rotate(90deg); }
+.admin-panel-chev {
+  width: 14px; height: 14px; color: var(--text-tertiary); flex-shrink: 0;
+  transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.admin-panel:not(.collapsed) > summary .admin-panel-chev { transform: rotate(90deg); }
 .admin-panel-name { flex: 1; min-width: 0; }
 .admin-panel-count {
   flex-shrink: 0;
@@ -811,7 +814,38 @@
   font-weight: 800;
   text-align: center;
 }
-.admin-panel-body { padding: 0 0.85rem 0.95rem; border-top: 1px solid var(--border-color); padding-top: 0.85rem; }
+/* The panel is a two-row grid: the header, then a body row that goes 1fr -> 0fr.
+   The body's own padding and border animate away alongside it, so the box
+   really reaches zero rather than leaving a padded strip behind. */
+.admin-panel {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  transition: grid-template-rows 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.admin-panel.collapsed { grid-template-rows: auto 0fr; }
+
+.admin-panel-body {
+  padding: 0.85rem 0.85rem 0.95rem;
+  border-top: 1px solid var(--border-color);
+  overflow: hidden;
+  min-height: 0;
+  transition: padding 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+              border-top-width 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.35s ease 0.05s;
+}
+.admin-panel.collapsed > .admin-panel-body {
+  padding-top: 0;
+  padding-bottom: 0;
+  border-top-width: 0;
+  opacity: 0;
+  transition: padding 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+              border-top-width 0.45s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.25s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-panel, .admin-panel-body, .admin-panel-chev { transition: none !important; }
+}
 
 /* ============================================================
    PROGRAM DETAIL — structured stats, tags, paged attempts
@@ -1429,24 +1463,88 @@ body.tree-dragging [data-tree-ns]::-webkit-scrollbar { width: 0; height: 0; }
 .admin-nav-actions svg { width: 14px; height: 14px; }
 .admin-nav-danger:hover { color: var(--color-danger); }
 
-/* The position badge doubles as the control that changes it. */
+/* ── Arranging by hand ──────────────────────────────────────
+   The number only exists while an order is being set. Outside that the grid
+   is already in order, so stamping every card with one was noise. */
 .admin-nav-number {
   position: absolute;
-  top: 0.5rem;
-  left: 0.5rem;
-  z-index: 2;
-  min-width: 30px;
-  padding: 0.15rem 0.4rem;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 999px;
-  background: rgba(15, 23, 42, 0.75);
+  top: 0.6rem;
+  left: 0.6rem;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, var(--color-primary), var(--color-accent));
   color: #fff;
-  font-size: 0.72rem;
+  font-size: 0.85rem;
   font-weight: 800;
-  cursor: pointer;
-  backdrop-filter: blur(4px);
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  animation: adminNumberPop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.admin-nav-number:hover { background: var(--color-primary); border-color: var(--color-primary); }
+/* Not yet placed: an empty socket showing where a number will land. */
+.admin-nav-number.unplaced {
+  background: rgba(15, 23, 42, 0.55);
+  border: 2px dashed var(--border-color);
+  box-shadow: none;
+  animation: none;
+}
+@keyframes adminNumberPop {
+  from { transform: scale(0.4); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+.admin-nav-ordering { cursor: pointer; }
+.admin-nav-ordering:hover { border-color: var(--color-primary); }
+.admin-nav-ordering.placed {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary) inset;
+}
+/* A placed card steps back so the ones still to pick stand out. */
+.admin-nav-ordering.placed .nb-card-cover { opacity: 0.45; }
+
+.admin-order-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-subtle);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+}
+.admin-order-bar > svg { width: 16px; height: 16px; color: var(--color-primary); flex-shrink: 0; }
+.admin-order-msg { flex: 1; min-width: 0; }
+.admin-order-msg strong { display: block; font-weight: 700; }
+.admin-order-bar .btn { flex-shrink: 0; }
+
+/* The Order menu reuses the View dropdown's shell. */
+.admin-order-opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.45rem 0.5rem;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  text-align: left;
+  cursor: pointer;
+}
+.admin-order-opt:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+.admin-order-opt svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px; }
+.admin-order-opt strong { display: block; color: var(--text-primary); font-weight: 700; }
+.admin-order-opt em {
+  display: block; font-style: normal; font-size: 0.7rem;
+  color: var(--text-tertiary); margin-top: 1px; line-height: 1.35;
+}
+.admin-order-menu > summary { font-size: 0.75rem; }
 
 .admin-nav-lock {
   position: absolute;
@@ -1556,10 +1654,7 @@ body.tree-dragging [data-tree-ns]::-webkit-scrollbar { width: 0; height: 0; }
 }
 
 /* The section whose cards are on screen, marked in pane 1. */
-.admin-panel.is-showing > summary {
-  background: var(--color-primary-subtle);
-  box-shadow: inset 3px 0 0 var(--color-primary);
-}
+
 
 /* Back sits beside the editor's close button. */
 .af-back-btn {
@@ -1772,4 +1867,39 @@ body.tree-dragging [data-tree-ns]::-webkit-scrollbar { width: 0; height: 0; }
 
 @media (max-width: 640px) {
   .admin-nav-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+}
+
+
+/* ============================================================
+   PANE 2 — cards loading in
+   ------------------------------------------------------------
+   Every time the second pane changes what it is showing, the cards arrive in
+   reading order rather than appearing all at once, so it reads as the pane
+   filling up. The delay is set per card from JS and capped, because a folder
+   with sixty items should not take three seconds to finish arriving.
+   ============================================================ */
+@keyframes adminCardIn {
+  from { opacity: 0; transform: translate3d(-10px, 8px, 0) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+.admin-cards-grid > *,
+.admin-nav-grid > * {
+  animation: adminCardIn 0.34s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+  animation-delay: var(--card-in-delay, 0ms);
+}
+
+/* The header above them leads, so the pane does not start mid-list. */
+.admin-cards-head,
+.admin-nav-bar,
+.admin-nav-title {
+  animation: adminCardIn 0.28s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-cards-grid > *,
+  .admin-nav-grid > *,
+  .admin-cards-head,
+  .admin-nav-bar,
+  .admin-nav-title { animation: none !important; }
 }

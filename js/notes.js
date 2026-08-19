@@ -658,6 +658,10 @@ function _applyNotebookFilterSort(list) {
     const overdue = nb => { const r = libReviewRec('notebook', nb.id); return (r && r.due) ? _revDaysBetween(r.due, _revToday()) : -Infinity; };
     out.sort((a, b) => overdue(b) - overdue(a));
   }
+  // Direction is applied before favourites float, so starring something keeps
+  // it on top whichever way the list is running.
+  out = libApplySortDir('notebook', out);
+
   out.sort((a, b) => (libIsFavorite(b) ? 1 : 0) - (libIsFavorite(a) ? 1 : 0));
   return out;
 }
@@ -699,6 +703,7 @@ function _renderNotebookFilterBar(total, shown, pool) {
       { icon: 'filter', chips },
       diffChips ? { icon: 'bar-chart-2', chips: diffChips } : null,
       { icon: 'star', chips: libCommonChipsHTML('notebook', 'notebook', pool) },
+      { icon: 'arrow-up-down', chips: libSortChipsHTML('notebook', 'setNotebookSort', sort) },
       { icon: 'tag', chips: _libTagChipsOnly('notebook', pool) },
     ]
   });

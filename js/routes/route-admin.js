@@ -573,7 +573,7 @@ function adminCodingTemplate() {
 
             <!-- Practice Sets. Programs is what you come here for, so everything
                  below it is collapsed by default rather than sharing the scroll. -->
-            <details class="admin-panel" data-collection="sets">
+            <details class="admin-panel collapsed" data-collection="sets" open>
               <summary onclick="adminSectionClick(event)">
                 <i data-lucide="chevron-right" class="admin-panel-chev"></i>
                 <i data-lucide="layout-grid" style="color:var(--color-accent);width:16px;height:16px;"></i>
@@ -590,7 +590,7 @@ function adminCodingTemplate() {
             </details>
 
             <!-- Categories -->
-            <details class="admin-panel" data-collection="cats">
+            <details class="admin-panel collapsed" data-collection="cats" open>
               <summary onclick="adminSectionClick(event)">
                 <i data-lucide="chevron-right" class="admin-panel-chev"></i>
                 <i data-lucide="folder" style="color:var(--color-warning);width:16px;height:16px;"></i>
@@ -624,7 +624,7 @@ function adminCodingTemplate() {
             </details>
 
             <!-- Skill Tree Locks -->
-            <details class="admin-panel" data-collection="locks">
+            <details class="admin-panel collapsed" data-collection="locks" open>
               <summary onclick="adminSectionClick(event)">
                 <i data-lucide="chevron-right" class="admin-panel-chev"></i>
                 <i data-lucide="lock" style="color:var(--text-tertiary);width:16px;height:16px;"></i>
@@ -770,7 +770,7 @@ function adminNotesTemplate() {
               </div>
             </details>
 
-            <details class="admin-panel" data-collection="cats" id="notebook-category-container">
+            <details class="admin-panel collapsed" data-collection="cats" id="notebook-category-container" open>
               <summary onclick="adminSectionClick(event)">
                 <i data-lucide="chevron-right" class="admin-panel-chev"></i>
                 <i data-lucide="folder" style="color:var(--color-warning);width:16px;height:16px;"></i>
@@ -902,7 +902,7 @@ function adminSnippetsTemplate() {
               </div>
             </details>
 
-            <details class="admin-panel" data-collection="cats" id="study-category-container">
+            <details class="admin-panel collapsed" data-collection="cats" id="study-category-container" open>
               <summary onclick="adminSectionClick(event)">
                 <i data-lucide="chevron-right" class="admin-panel-chev"></i>
                 <i data-lucide="folder" style="color:var(--color-warning);width:16px;height:16px;"></i>
