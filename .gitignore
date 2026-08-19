@@ -4,3 +4,7 @@
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Local dev-server config for the in-editor preview. It is tooling, not part of
+# the published site.
+.claude/

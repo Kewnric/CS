@@ -383,7 +383,7 @@ function showListPickerDialog(title, message, options, onConfirm) {
             onmouseenter="this.style.background='var(--bg-surface-hover)'"
             onmouseleave="this.style.background=''">
             ${i === 0 ? '<i data-lucide="home" style="width:12px;height:12px;flex-shrink:0;"></i>' : '<i data-lucide="folder" style="width:12px;height:12px;flex-shrink:0;"></i>'}
-            ${o.label}
+            ${typeof escapeHTML === 'function' ? escapeHTML(o.label) : o.label}
           </div>
         `).join('')}
       </div>

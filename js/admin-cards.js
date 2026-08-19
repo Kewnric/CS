@@ -214,7 +214,9 @@ function _adminPickFolderToLock(scope) {
     if (typeof toast === 'function') toast('Every category already has a lock.', { type: 'info' });
     return;
   }
-  openLockPicker(free[0].id, scope);
+  showListPickerDialog('Lock a category', 'Which category should require something first?',
+    free.map(f => ({ value: f.id, label: f.name || 'Untitled' })),
+    (id) => { if (id) adminEditPrereqs(id); });
 }
 
 /* ── the browser itself ───────────────────────────────────── */
@@ -252,12 +254,42 @@ function adminSyncPanelCounts() {
   put('admin-nb-cats-count', _adminFolders('notebook').length);
   put('admin-snippets-count', (state.snippets || []).length);
   put('admin-snip-cats-count', _adminFolders('snippet').length);
+
+  // General counts the top level: the categories you can open, plus
+  // Uncategorized when anything is sitting in it.
+  const tops = _adminChildFolders(null).length;
+  const loose = _adminItemsIn(ADMIN_UNCAT).length ? 1 : 0;
+  put('admin-general-count', tops + loose);
+  _adminRenderGeneralNav();
+}
+
+/** A shortcut list of the top-level categories, in the General panel body. */
+function _adminRenderGeneralNav() {
+  const host = document.getElementById('admin-general-nav');
+  if (!host) return;
+  _adminValidateNav();
+  const sc = _adminScope();
+  const tops = _adminChildFolders(null);
+  const loose = _adminItemsIn(ADMIN_UNCAT).length;
+  const row = (id, icon, name, count) => `
+    <button class="admin-gen-row${_adminCollection === 'general' && String(_adminNavFolderId) === String(id) ? ' current' : ''}"
+            onclick="adminNavTo(${id === null ? 'null' : "'" + id + "'"})">
+      <i data-lucide="${icon}"></i>
+      <span class="admin-gen-name">${escapeHTML(name)}</span>
+      <span class="admin-gen-count">${count}</span>
+    </button>`;
+
+  host.innerHTML =
+    row(null, 'home', 'All categories', tops.length + (loose ? 1 : 0)) +
+    tops.map(f => row(f.id, f.icon || 'folder', f.name || 'Untitled',
+      _adminFolderCount(f.id, sc.scope) + _adminChildFolders(f.id).length)).join('') +
+    (loose ? row(ADMIN_UNCAT, 'inbox', 'Uncategorized', loose) : '');
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
 }
 
 /** Open a collection as cards in pane 2. Called by the pane-1 section headers. */
 function adminShowCollection(key) {
-  const col = _adminFindCollection(key);
-  if (!col) return;
+  if (key !== 'general' && !_adminFindCollection(key)) return;
   _adminCollection = key;
 
   // The editor and the browser are alternatives, not layers.
@@ -281,6 +313,15 @@ function _adminMarkActiveSection(key) {
 function adminRenderCards() {
   const host = document.getElementById('admin-card-browser');
   if (!host) return;
+
+  // General navigates folders instead of listing one flat collection.
+  if (_adminCollection === 'general') {
+    host.innerHTML = _adminGeneralHTML();
+    host.classList.remove('hidden');
+    if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
+    return;
+  }
+
   const col = _adminFindCollection(_adminCollection);
   if (!col) { host.classList.add('hidden'); return; }
 
@@ -339,7 +380,7 @@ function _adminCardsFilter(value) {
 }
 
 function adminOpenFromCard(id) {
-  const col = _adminFindCollection(_adminCollection);
+  const col = _adminCollection === 'general' ? _adminCollectionSet()[0] : _adminFindCollection(_adminCollection);
   if (!col) return;
   // Practice sets and locks open in their own modal over pane 2, so the cards
   // stay behind them; the rest replace the pane with a form.
@@ -350,12 +391,34 @@ function adminOpenFromCard(id) {
 }
 
 function adminCreateFromCard() {
-  const col = _adminFindCollection(_adminCollection);
+  // Inside General the collection is implied: it is whatever this admin edits.
+  const col = _adminCollection === 'general' ? _adminCollectionSet()[0] : _adminFindCollection(_adminCollection);
   if (!col) return;
   const overlays = col.key === 'sets' || col.key === 'locks' || col.key === 'cats';
   const host = document.getElementById('admin-card-browser');
   if (host && !overlays) host.classList.add('hidden');
   col.create();
+  _adminPlaceNewInOpenFolder();
+}
+
+/**
+ * A new item opened from inside a folder defaults to the first folder in the
+ * tree, which is rarely the one being looked at. Point it at the open folder
+ * instead — both the form's picker and the state behind it.
+ */
+function _adminPlaceNewInOpenFolder() {
+  if (_adminCollection !== 'general') return;
+  const target = (_adminNavFolderId === ADMIN_UNCAT) ? '' : (_adminNavFolderId || '');
+  const sel = document.querySelector(
+    '#admin-form-container:not(.hidden) #admin-category,' +
+    '#notebook-form-container:not(.hidden) #notebook-category,' +
+    '#study-form-container:not(.hidden) #study-category');
+  if (sel) sel.value = target;
+  // These are top-level `let` bindings, so they are lexical, not properties of
+  // window — they have to be named directly.
+  if (typeof adminState !== 'undefined' && adminState) adminState.parentId = target || null;
+  if (typeof notebookAdminState !== 'undefined' && notebookAdminState) notebookAdminState.parentId = target || null;
+  if (typeof studyModeState !== 'undefined' && studyModeState) studyModeState.parentId = target || null;
 }
 
 /** The editor's Back button: return to the cards it was opened from. */
@@ -369,6 +432,7 @@ function adminBackToCards() {
 function adminCardsExit() {
   _adminCollection = null;
   _adminCardQuery = '';
+  _adminNavFolderId = null;
   const host = document.getElementById('admin-card-browser');
   if (host) { host.classList.add('hidden'); host.innerHTML = ''; }
   const empty = document.getElementById('admin-empty-state');
@@ -398,4 +462,363 @@ function adminFormBack() {
     closeFn();
     done();
   }
+}
+
+/* ============================================================
+   GENERAL — the navigable folder browser
+   ------------------------------------------------------------
+   The collections above are flat: one list of everything, wherever it lives.
+   General is the admin's version of the library's own view — categories as
+   cards you can open, Uncategorized among them, and the items inside a folder
+   shown the way the library shows them, with the admin's actions on each card.
+   ============================================================ */
+
+const ADMIN_UNCAT = '__uncat__';    // the pseudo-folder holding parentless items
+let _adminNavFolderId = null;       // null = the top level
+
+/** Which library this admin edits, as the tree's scope + the state key. */
+function _adminScope() {
+  if (window.currentAdminMode === 'practice') return { scope: 'challenge', key: 'challenges', noun: 'program' };
+  return currentAdminStudyTab === 'snippets'
+    ? { scope: 'snippet', key: 'snippets', noun: 'snippet' }
+    : { scope: 'notebook', key: 'notebooks', noun: 'notebook' };
+}
+
+function _adminItems() {
+  return state[_adminScope().key] || [];
+}
+
+/** Folders directly inside `parentId` (null for the top level). */
+function _adminChildFolders(parentId) {
+  const sc = _adminScope().scope;
+  return (state.nodes || []).filter(n =>
+    n && n.type === 'folder' && n.scope === sc && (n.parentId || null) === (parentId || null));
+}
+
+/** Items directly inside `parentId`, in the array order the libraries sort by. */
+function _adminItemsIn(parentId) {
+  const want = parentId === ADMIN_UNCAT ? null : (parentId || null);
+  return _adminItems().filter(x => (x.parentId || null) === want);
+}
+
+/** Root -> ... -> here, for the breadcrumb. */
+function _adminNavTrail(folderId) {
+  if (folderId === ADMIN_UNCAT) return [{ id: ADMIN_UNCAT, name: 'Uncategorized' }];
+  const trail = [];
+  let id = folderId;
+  const guard = new Set();          // a cycle in parentId must not hang the page
+  while (id && !guard.has(id)) {
+    guard.add(id);
+    const f = (state.nodes || []).find(n => n.id === id);
+    if (!f) break;
+    trail.unshift({ id: f.id, name: f.name || 'Untitled folder' });
+    id = f.parentId || null;
+  }
+  return trail;
+}
+
+function _adminParentOf(folderId) {
+  if (folderId === ADMIN_UNCAT) return null;
+  const f = (state.nodes || []).find(n => n.id === folderId);
+  return (f && f.parentId) ? f.parentId : null;
+}
+
+function adminNavTo(folderId) {
+  _adminNavFolderId = (folderId === null || folderId === 'null' || folderId === '') ? null : folderId;
+  adminShowCollection('general');
+}
+
+/**
+ * Every library's folders share one state.nodes, so a folder id left over from
+ * a different admin still resolves — it just belongs to another tree, and
+ * nothing here would ever be inside it. Switching admins therefore opened a
+ * folder by name with no contents. Anything out of scope drops back to root.
+ */
+function _adminValidateNav() {
+  if (!_adminNavFolderId || _adminNavFolderId === ADMIN_UNCAT) return;
+  const f = (state.nodes || []).find(n => n.id === _adminNavFolderId);
+  if (!f || f.scope !== _adminScope().scope) _adminNavFolderId = null;
+}
+
+/* ── numbering ────────────────────────────────────────────────
+   Order inside a folder was only ever changeable by dragging in the tree,
+   which is awkward past a handful of items and impossible to do precisely.
+   A number can be typed instead; it moves the item among its siblings, so
+   every "Folder order" sort in the app reflects it. */
+
+function _adminSetNumber(id) {
+  const key = _adminScope().key;
+  const arr = state[key] || [];
+  const item = arr.find(x => x.id === id);
+  if (!item) return;
+  const parent = item.parentId || null;
+  const siblings = arr.filter(x => (x.parentId || null) === parent);
+  const total = siblings.length;
+  const current = siblings.findIndex(x => x.id === id) + 1;
+
+  showInputDialog('Set number',
+    'Where this sits among the ' + total + ' item' + (total !== 1 ? 's' : '') + ' in this folder.',
+    'Number 1-' + total, String(current), (v) => {
+      let target = parseInt(String(v).trim(), 10);
+      if (!isFinite(target)) return;
+      target = Math.max(1, Math.min(total, target));
+      if (target === current) return;
+
+      // Pull it out, then put it back in front of whoever now holds that slot.
+      arr.splice(arr.indexOf(item), 1);
+      const rest = arr.filter(x => (x.parentId || null) === parent);
+      if (target > rest.length) {
+        const last = rest[rest.length - 1];
+        arr.splice(last ? arr.indexOf(last) + 1 : arr.length, 0, item);
+      } else {
+        arr.splice(arr.indexOf(rest[target - 1]), 0, item);
+      }
+      saveData();
+      if (typeof renderAdmin === 'function') renderAdmin();
+      adminRenderCards();
+      if (typeof toast === 'function') toast('Moved to #' + target + '.', { type: 'success' });
+    });
+}
+
+function _adminNumbersHelp() {
+  if (typeof toast === 'function') {
+    toast('Click the # on any card to move it to that position. That order is what "Folder order" sorts by everywhere else.',
+      { type: 'info', duration: 7000 });
+  }
+}
+
+/* ── the cards ────────────────────────────────────────────── */
+
+function _adminNavFolderCardHTML(f) {
+  const sc = _adminScope();
+  const direct = _adminFolderCount(f.id, sc.scope);
+  const subs = _adminChildFolders(f.id).length;
+  const total = direct + subs;
+  const locked = !!(state.categoryRequirements || {})[f.id];
+  const cover = typeof libCoverFallbackHTML === 'function'
+    ? libCoverFallbackHTML(f.name || 'Folder', f.icon || 'folder')
+    : '';
+  return `
+    <div class="card card-enhanced has-cover admin-nav-card" onclick="adminNavTo('${f.id}')" style="cursor:pointer;">
+      ${cover}
+      ${locked ? '<div class="admin-nav-lock" title="This category has prerequisites"><i data-lucide="lock"></i></div>' : ''}
+      <div class="admin-nav-head">
+        <h3>${escapeHTML(f.name || 'Untitled folder')}</h3>
+        <span class="version-pill">${total} item${total !== 1 ? 's' : ''}</span>
+      </div>
+      <p class="admin-nav-sub">${direct} ${sc.noun}${direct !== 1 ? 's' : ''} &middot; ${subs} subfolder${subs !== 1 ? 's' : ''}</p>
+      <div class="admin-nav-actions">
+        <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); adminNavTo('${f.id}')">
+          <i data-lucide="folder-open"></i> Open
+        </button>
+        <button class="btn btn-ghost btn-sm" title="Rename this category"
+                onclick="event.stopPropagation(); _adminRenameFolder('${f.id}')">
+          <i data-lucide="pencil"></i>
+        </button>
+        <button class="btn btn-ghost btn-sm" title="Prerequisites — what must be finished before this unlocks"
+                onclick="event.stopPropagation(); adminEditPrereqs('${f.id}')">
+          <i data-lucide="lock"></i>
+        </button>
+        <button class="btn btn-ghost btn-sm admin-nav-danger" title="Delete this category"
+                onclick="event.stopPropagation(); adminDeleteFolder('${f.id}')">
+          <i data-lucide="trash-2"></i>
+        </button>
+      </div>
+    </div>`;
+}
+
+/** The Uncategorized tile: a place items live, but not a real folder. */
+function _adminUncatCardHTML() {
+  const noun = _adminScope().noun;
+  const n = _adminItemsIn(ADMIN_UNCAT).length;
+  const cover = typeof libCoverFallbackHTML === 'function'
+    ? libCoverFallbackHTML('Uncategorized', 'inbox') : '';
+  return `
+    <div class="card card-enhanced has-cover admin-nav-card" onclick="adminNavTo('${ADMIN_UNCAT}')" style="cursor:pointer;">
+      ${cover}
+      <div class="admin-nav-head">
+        <h3>Uncategorized</h3>
+        <span class="version-pill">${n} item${n !== 1 ? 's' : ''}</span>
+      </div>
+      <p class="admin-nav-sub">${noun.charAt(0).toUpperCase() + noun.slice(1)}s that are not filed in any category.</p>
+      <div class="admin-nav-actions">
+        <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); adminNavTo('${ADMIN_UNCAT}')">
+          <i data-lucide="folder-open"></i> Open
+        </button>
+      </div>
+    </div>`;
+}
+
+function _adminNavItemCardHTML(item, n) {
+  const col = _adminCollectionSet()[0];       // programs / notebooks / snippets
+  const c = col.card(item);
+  const id = escapeHTML(String(item.id));
+  const cover = typeof libCoverFallbackHTML === 'function'
+    ? libCoverFallbackHTML(c.title, c.icon) : '';
+  const tags = (item.tags || []).slice(0, 3);
+  return `
+    <div class="card card-enhanced has-cover admin-nav-card" onclick="adminOpenFromCard('${id}')" style="cursor:pointer;">
+      ${cover}
+      <button class="admin-nav-number" title="Position in this folder — click to change"
+              onclick="event.stopPropagation(); _adminSetNumber('${id}')">#${n}</button>
+      <div class="admin-nav-head">
+        <h3>${escapeHTML(c.title)}</h3>
+      </div>
+      ${tags.length ? `<div class="card-tag-row">${tags.map(t => `<span class="badge">${escapeHTML(t)}</span>`).join('')}</div>` : ''}
+      <p class="admin-nav-sub">${escapeHTML(c.sub || '')}</p>
+      <div class="card-stat-row">
+        ${(c.meta || []).map(m => `<span class="card-stat"><i data-lucide="${m.icon}"></i>${escapeHTML(String(m.text))}</span>`).join('')}
+      </div>
+      <div class="admin-nav-actions">
+        <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation(); adminOpenFromCard('${id}')">
+          <i data-lucide="pencil"></i> Edit
+        </button>
+        <button class="btn btn-ghost btn-sm" title="Set this item's number in the folder"
+                onclick="event.stopPropagation(); _adminSetNumber('${id}')">
+          <i data-lucide="hash"></i>
+        </button>
+        <button class="btn btn-ghost btn-sm" title="Move to another category"
+                onclick="event.stopPropagation(); adminMoveItem('${id}')">
+          <i data-lucide="folder-input"></i>
+        </button>
+      </div>
+    </div>`;
+}
+
+/** Prerequisites live on the folder; which picker depends on the library. */
+function adminEditPrereqs(folderId) {
+  const sc = _adminScope().scope;
+  if (sc === 'challenge' && typeof openPrereqPicker === 'function') return openPrereqPicker(folderId);
+  if (typeof openLockPicker === 'function') return openLockPicker(folderId, sc);
+}
+
+/** Delete a category, keeping everything that was inside it. */
+function adminDeleteFolder(id) {
+  const f = (state.nodes || []).find(n => n.id === id);
+  if (!f) return;
+  const sc = _adminScope();
+  const n = _adminFolderCount(id, sc.scope);
+  const kids = _adminChildFolders(id).length;
+  const detail = (n || kids)
+    ? 'The ' + [n ? n + ' ' + sc.noun + (n !== 1 ? 's' : '') : '', kids ? kids + ' subfolder' + (kids !== 1 ? 's' : '') : '']
+        .filter(Boolean).join(' and ') + ' inside move up a level.'
+    : 'It is empty.';
+  showConfirm('Delete "' + (f.name || 'category') + '"?', detail, () => {
+    const up = f.parentId || null;
+    (state.nodes || []).forEach(c => { if (c.parentId === id) c.parentId = up; });
+    (state[sc.key] || []).forEach(x => { if (x.parentId === id) x.parentId = up; });
+    delete (state.categoryRequirements || {})[id];
+    state.nodes = (state.nodes || []).filter(x => x.id !== id);
+    if (_adminNavFolderId === id) _adminNavFolderId = up;
+    saveData();
+    if (typeof renderAdmin === 'function') renderAdmin();
+    adminRenderCards();
+  });
+}
+
+/** Refile one item without opening its whole editor. */
+function adminMoveItem(id) {
+  const sc = _adminScope();
+  const item = (state[sc.key] || []).find(x => x.id === id);
+  if (!item) return;
+  // showListPickerDialog supplies its own "Root (no parent)" entry, which is
+  // Uncategorized here, so this list is folders only.
+  const opts = [];
+  (function walk(pid, depth) {
+    (state.nodes || []).filter(n => n.type === 'folder' && n.scope === sc.scope && (n.parentId || null) === pid)
+      .forEach(f => {
+        opts.push({ value: f.id, label: ' '.repeat(depth * 3) + (f.name || 'Untitled') });
+        walk(f.id, depth + 1);
+      });
+  })(null, 0);
+
+  showListPickerDialog('Move ' + (item.title || 'item'), 'Which category should it live in?', opts, (v) => {
+    item.parentId = v || null;
+    saveData();
+    if (typeof renderAdmin === 'function') renderAdmin();
+    adminRenderCards();
+    if (typeof toast === 'function') {
+      toast('Moved to ' + (v ? (_adminFolderName(v) || 'that category') : 'Uncategorized') + '.', { type: 'success' });
+    }
+  });
+}
+
+function _adminGeneralHTML() {
+  _adminValidateNav();
+  const sc = _adminScope();
+  const here = _adminNavFolderId;
+  const trail = _adminNavTrail(here);
+  const folders = here === ADMIN_UNCAT ? [] : _adminChildFolders(here);
+  const items = here === null ? [] : _adminItemsIn(here);
+  const rootUncat = here === null ? _adminItemsIn(ADMIN_UNCAT).length : 0;
+
+  const crumbs = `
+    <nav class="admin-nav-crumbs" aria-label="Breadcrumb">
+      <button class="admin-crumb" onclick="adminNavTo(null)" title="All categories" aria-label="All categories">
+        <i data-lucide="home"></i>
+      </button>
+      ${trail.map((t, i) => `<span class="admin-crumb-sep">/</span>
+        <button class="admin-crumb${i === trail.length - 1 ? ' current' : ''}" onclick="adminNavTo('${t.id}')">${escapeHTML(t.name)}</button>`).join('')}
+    </nav>`;
+
+  const title = here === null ? 'All categories' : (trail.length ? trail[trail.length - 1].name : 'Folder');
+  const upTarget = here === null ? null : _adminParentOf(here);
+  const backCall = here === null ? 'adminCardsExit()' : 'adminNavTo(' + (upTarget ? "'" + upTarget + "'" : 'null') + ')';
+
+  const counts = [
+    folders.length ? folders.length + ' categor' + (folders.length !== 1 ? 'ies' : 'y') : '',
+    here === null ? '' : items.length + ' ' + sc.noun + (items.length !== 1 ? 's' : ''),
+    rootUncat ? rootUncat + ' uncategorized' : ''
+  ].filter(Boolean).join(' · ');
+
+  const cards =
+    folders.map(_adminNavFolderCardHTML).join('') +
+    (here === null && rootUncat ? _adminUncatCardHTML() : '') +
+    items.map((it, i) => _adminNavItemCardHTML(it, i + 1)).join('');
+
+  const empty = !folders.length && !items.length && !rootUncat;
+
+  return `
+    <div class="admin-cards-head admin-nav-bar">
+      <button class="btn-back-dark admin-cards-back" onclick="${backCall}"
+              title="${here === null ? 'Back to the editor pane' : 'Up one level'}">
+        <i data-lucide="chevron-left" style="width:14px;height:14px;"></i> Back
+      </button>
+      ${crumbs}
+    </div>
+    <div class="admin-nav-title">
+      <div>
+        <h2>${escapeHTML(title)}</h2>
+        <p>${counts || 'Empty'}</p>
+      </div>
+      <div class="admin-nav-tools">
+        <button class="btn btn-ghost btn-sm" onclick="_adminNumbersHelp()" title="How numbering works">
+          <i data-lucide="hash"></i> Numbering
+        </button>
+        <button class="btn btn-secondary btn-sm" onclick="_adminNewFolderIn()">
+          <i data-lucide="folder-plus"></i> New category
+        </button>
+      </div>
+    </div>
+    <div class="admin-nav-grid">
+      ${cards}
+      ${here !== null ? `<button class="admin-card admin-card-add" onclick="adminCreateFromCard()" title="New ${escapeHTML(sc.noun)}">
+        <i data-lucide="plus"></i><span>New ${escapeHTML(sc.noun)}</span>
+      </button>` : ''}
+    </div>
+    ${empty ? '<p class="admin-cards-none">Nothing here yet. Add a category above, or a ' + escapeHTML(sc.noun) + ' with the dashed card.</p>' : ''}`;
+}
+
+/** New category, created inside whatever folder is open. */
+function _adminNewFolderIn() {
+  const sc = _adminScope().scope;
+  const parent = (_adminNavFolderId === ADMIN_UNCAT) ? null : _adminNavFolderId;
+  showInputDialog('New category', null, 'Category name', '', (v) => {
+    const name = (v || '').trim();
+    if (!name || typeof createNode !== 'function') return;
+    createNode(name, 'folder', parent, sc);
+    saveData();
+    if (typeof renderAdmin === 'function') renderAdmin();
+    adminRenderCards();
+  });
 }

@@ -6,6 +6,8 @@ function getAdminFormHTML() {
       <!-- Header -->
       <div class="admin-form-header">
         <div class="af-header-left">
+          ${adminFormBackButtonHTML()}
+          
           <div class="af-header-badge" style="background:var(--color-primary-subtle);">
             <i data-lucide="code-2" style="width:18px;height:18px;color:var(--color-primary);" aria-hidden="true"></i>
           </div>
@@ -15,7 +17,6 @@ function getAdminFormHTML() {
           </div>
           <span class="af-save-status" id="admin-save-status" aria-live="polite"></span>
         </div>
-        ${adminFormBackButtonHTML()}
         <button onclick="confirmCloseAdminForm(closeAdminForm, saveAdminForm)" class="btn btn-ghost af-close-btn" id="close-form-btn" aria-label="Close form" title="Close (Esc)">
           <i data-lucide="x" style="width:20px;height:20px;" aria-hidden="true"></i>
         </button>
@@ -131,6 +132,8 @@ function getNotebookFormHTML() {
     <div id="notebook-form-container" class="admin-form-panel">
       <div class="admin-form-header">
         <div class="af-header-left">
+          ${adminFormBackButtonHTML()}
+          
           <div class="af-header-badge" style="background:rgba(245,158,11,0.12);">
             <i data-lucide="book-open" style="width:18px;height:18px;color:var(--color-warning);"></i>
           </div>
@@ -140,7 +143,6 @@ function getNotebookFormHTML() {
           </div>
           <span class="af-save-status" id="notebook-save-status" aria-live="polite"></span>
         </div>
-        ${adminFormBackButtonHTML()}
         <button onclick="confirmCloseAdminForm(closeNotebookForm, saveNotebookForm)" class="btn btn-ghost af-close-btn" aria-label="Close form" title="Close (Esc)">
           <i data-lucide="x" style="width:20px;height:20px;" aria-hidden="true"></i>
         </button>
@@ -245,6 +247,8 @@ function getSnippetFormHTML() {
       <!-- Header -->
       <div class="admin-form-header">
         <div class="af-header-left">
+          ${adminFormBackButtonHTML()}
+          
           <div class="af-header-badge" style="background:rgba(6,182,212,0.12);">
             <i data-lucide="code" style="width:18px;height:18px;color:var(--color-accent);" aria-hidden="true"></i>
           </div>
@@ -254,7 +258,6 @@ function getSnippetFormHTML() {
           </div>
           <span class="af-save-status" id="study-save-status" aria-live="polite"></span>
         </div>
-        ${adminFormBackButtonHTML()}
         <button onclick="confirmCloseAdminForm(closeStudyForm, saveStudyForm)" class="btn btn-ghost af-close-btn" aria-label="Close form" title="Close (Esc)">
           <i data-lucide="x" style="width:20px;height:20px;" aria-hidden="true"></i>
         </button>
@@ -522,6 +525,21 @@ function adminCodingTemplate() {
         </div>
         <div class="pane-1-content">
           <div id="admin-practice-wrapper">
+            <!-- General: browse the library the way the library does, by
+                 opening categories rather than reading one flat list. -->
+            <details class="admin-panel admin-panel-general" data-collection="general" open>
+              <summary onclick="adminSectionClick(event)">
+                <i data-lucide="chevron-right" class="admin-panel-chev"></i>
+                <i data-lucide="compass" style="color:var(--color-accent);width:16px;height:16px;"></i>
+                <span class="admin-panel-name">General</span>
+                <span class="admin-panel-count" id="admin-general-count">0</span>
+              </summary>
+              <div class="admin-panel-body">
+                <p style="font-size:0.75rem; color:var(--text-tertiary); margin-bottom:0.6rem;">Open a category to see what is inside it, set the order programs run in, and lock categories behind prerequisites.</p>
+                <div id="admin-general-nav" class="admin-gen-list"></div>
+              </div>
+            </details>
+
             <!-- Programs -->
             <!-- Programs: the full list, grouped by folder. It used to show two
                  and hide the rest behind a "Show N more…" disclosure. -->
@@ -715,9 +733,21 @@ function adminNotesTemplate() {
         </div>
         <div class="pane-1-content">
           <div id="admin-study-wrapper">
-            <!-- Same collapsible panels as the Coding admin, so the three
-                 admins read the same way. Clicking a header shows that
-                 collection as cards in the second pane. -->
+            <!-- General: browse the library the way the library does, by
+                 opening categories rather than reading one flat list. -->
+            <details class="admin-panel admin-panel-general" data-collection="general" open>
+              <summary onclick="adminSectionClick(event)">
+                <i data-lucide="chevron-right" class="admin-panel-chev"></i>
+                <i data-lucide="compass" style="color:var(--color-accent);width:16px;height:16px;"></i>
+                <span class="admin-panel-name">General</span>
+                <span class="admin-panel-count" id="admin-general-count">0</span>
+              </summary>
+              <div class="admin-panel-body">
+                <p style="font-size:0.75rem; color:var(--text-tertiary); margin-bottom:0.6rem;">Open a category to see what is inside it, and set the order notebooks run in.</p>
+                <div id="admin-general-nav" class="admin-gen-list"></div>
+              </div>
+            </details>
+
             <details class="admin-panel" data-collection="notebooks" open>
               <summary onclick="adminSectionClick(event)">
                 <i data-lucide="chevron-right" class="admin-panel-chev"></i>
@@ -845,6 +875,21 @@ function adminSnippetsTemplate() {
         </div>
         <div class="pane-1-content">
           <div id="admin-study-wrapper">
+            <!-- General: browse the library the way the library does, by
+                 opening categories rather than reading one flat list. -->
+            <details class="admin-panel admin-panel-general" data-collection="general" open>
+              <summary onclick="adminSectionClick(event)">
+                <i data-lucide="chevron-right" class="admin-panel-chev"></i>
+                <i data-lucide="compass" style="color:var(--color-accent);width:16px;height:16px;"></i>
+                <span class="admin-panel-name">General</span>
+                <span class="admin-panel-count" id="admin-general-count">0</span>
+              </summary>
+              <div class="admin-panel-body">
+                <p style="font-size:0.75rem; color:var(--text-tertiary); margin-bottom:0.6rem;">Open a category to see what is inside it, and set the order snippets appear in.</p>
+                <div id="admin-general-nav" class="admin-gen-list"></div>
+              </div>
+            </details>
+
             <details class="admin-panel" data-collection="snippets" open>
               <summary onclick="adminSectionClick(event)">
                 <i data-lucide="chevron-right" class="admin-panel-chev"></i>
