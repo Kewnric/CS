@@ -263,23 +263,26 @@ function adminSyncPanelCounts() {
   _adminRenderGeneralNav();
 }
 
-/** A shortcut list of the top-level categories, in the General panel body. */
+/** The category tree in the General panel's body. */
 function _adminRenderGeneralNav() {
   const host = document.getElementById('admin-general-nav');
   if (!host) return;
   _adminValidateNav();
   const q = _adminGenQuery();
-  const loose = _adminItemsIn(ADMIN_UNCAT).filter(it => _adminGenItemMatches(it, q));
 
-  const body = _adminGenBranch(null, 0) +
-    (loose.length ? _adminGenGroupHTML(ADMIN_UNCAT, 'Uncategorized', 'inbox', loose.length,
-      loose.map(it => _adminGenItemHTML(it)).join(''), 0) : '');
+  // Categories only. Listing every program under every folder as well turned a
+  // seven-item library into a wall of rows in a 300px pane, and the items are
+  // already one click away as cards in the second pane.
+  const body = _adminGenBranch(null) +
+    (_adminItemsIn(ADMIN_UNCAT).filter(it => _adminGenItemMatches(it, q)).length
+      ? _adminGenNodeHTML(ADMIN_UNCAT, 'Uncategorized', 'inbox',
+          _adminItemsIn(ADMIN_UNCAT).length, '')
+      : '');
 
   host.innerHTML = body ||
     `<p class="admin-gen-empty">${q ? 'Nothing matches that search.' : 'No categories yet.'}</p>`;
   if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
 }
-
 /** Whatever is typed in the first pane's search box. */
 function _adminGenQuery() {
   const el = document.getElementById('admin-search-input');
@@ -307,124 +310,89 @@ function _adminGenBranchMatches(folderId, q) {
   return _adminChildFolders(folderId).some(c => _adminGenBranchMatches(c.id, q));
 }
 
-/**
- * One level of the tree, and everything under it. A folder's body holds its
- * subfolders first and then the items filed directly in it, so the panel
- * mirrors the shape of the library rather than flattening it.
- */
-function _adminGenBranch(parentId, depth, showAll) {
-  // Matching a folder BY NAME used to still filter everything inside it, so the
-  // folder you searched for appeared labelled "Empty". Once a branch matches on
-  // its own name, its whole subtree is shown.
+/** One level of the tree, and every category nested under it. */
+function _adminGenBranch(parentId, showAll) {
+  // Matching a folder BY NAME shows its whole subtree; otherwise a branch is
+  // kept only while it, or something under it, matches.
   const q = showAll ? '' : _adminGenQuery();
   return _adminChildFolders(parentId)
     .filter(f => _adminGenBranchMatches(f.id, q))
     .map(f => {
       const byName = !!q && String(f.name || '').toLowerCase().includes(q);
       const inner = showAll || byName;
-      const subs = _adminChildFolders(f.id).filter(c => inner || _adminGenBranchMatches(c.id, q));
-      const items = _adminItemsIn(f.id).filter(it => inner || _adminGenItemMatches(it, q));
-      const body = _adminGenBranch(f.id, depth + 1, inner) +
-        items.map(it => _adminGenItemHTML(it, depth + 1)).join('') +
-        (!subs.length && !items.length ? '<p class="admin-gen-empty">Empty</p>' : '');
-      return _adminGenGroupHTML(f.id, f.name || 'Untitled', f.icon || 'folder',
-        items.length + subs.length, body, depth);
+      const kids = _adminGenBranch(f.id, inner);
+      // The count still reports what is inside, including the items the tree
+      // no longer lists — it is the reason to open the folder.
+      const n = _adminFolderCount(f.id, _adminScope().scope) + _adminChildFolders(f.id).length;
+      return _adminGenNodeHTML(f.id, f.name || 'Untitled', f.icon || 'folder', n, kids);
     }).join('');
-}/** Expansion is remembered, so the tree does not reset on every rerender. */
+}
+/** Expansion is remembered, so the tree does not reset on every rerender. */
 function _adminGenOpen(id) {
-  try { return (JSON.parse(localStorage.getItem('adminGenOpen') || '[]')).includes(id); }
+  try { return (JSON.parse(localStorage.getItem('adminGenOpen') || '[]')).includes(String(id)); }
   catch (e) { return false; }
 }
 
 function _adminGenRemember() {
   // Everything is force-opened during a search; recording that would wipe what
-  // the user had actually expanded.
+  // the reader had actually expanded.
   if (_adminGenQuery()) return;
-  const open = [...document.querySelectorAll('#admin-general-nav details.admin-gen-group[open]')]
-    .map(d => d.getAttribute('data-folder'));
+  const open = [...document.querySelectorAll('#admin-general-nav .admin-gen-node')]
+    .filter(n => {
+      const kids = n.querySelector(':scope > .admin-gen-children');
+      return kids && !kids.classList.contains('collapsed');
+    })
+    .map(n => n.getAttribute('data-folder'));
   try { localStorage.setItem('adminGenOpen', JSON.stringify(open)); } catch (e) { /* quota */ }
 }
-
-function _adminGenGroupHTML(id, name, icon, count, body, depth) {
+function _adminGenNodeHTML(id, name, icon, count, kids) {
   const showing = _adminCollection === 'general' && String(_adminNavFolderId) === String(id);
-  // A search result inside a collapsed branch is a search result you cannot
-  // see, so searching forces every surviving branch open. The stored open set
-  // is left untouched and comes back when the box is cleared.
+  // Searching forces every surviving branch open: a result inside a collapsed
+  // branch is a result you cannot see. The stored set is left untouched.
   const open = _adminGenQuery() ? true : _adminGenOpen(id);
+  const sid = escapeHTML(String(id));
   return `
-    <details class="admin-group admin-gen-group${showing ? ' current' : ''}"
-             data-folder="${escapeHTML(String(id))}"${open ? ' open' : ''}>
-      <summary style="padding-left:${0.3 + depth * 0.75}rem;" onclick="_adminGenSummaryClick(event, '${escapeHTML(String(id))}')">
-        <i data-lucide="chevron-right" class="admin-group-chev"></i>
-        <i data-lucide="${escapeHTML(icon)}" style="width:14px;height:14px;"></i>
-        <span class="admin-group-name">${escapeHTML(name)}</span>
+    <div class="admin-gen-node" data-folder="${sid}">
+      <div class="admin-gen-row${showing ? ' current' : ''}" onclick="_adminGenRowClick(event, '${sid}')">
+        ${kids
+          ? `<button class="admin-gen-chev${open ? ' open' : ''}" aria-expanded="${open}"
+                     aria-label="Expand ${escapeHTML(name)}" onclick="_adminGenToggle(event, '${sid}')">
+               <i data-lucide="chevron-right"></i>
+             </button>`
+          : '<span class="admin-gen-chev-spacer"></span>'}
+        <i data-lucide="${escapeHTML(icon)}" class="admin-gen-icon"></i>
+        <span class="admin-gen-name">${escapeHTML(name)}</span>
         <span class="admin-group-count">${count}</span>
-      </summary>
-      <div class="admin-group-body">${body}</div>
-    </details>`;
+      </div>
+      ${kids ? `<div class="admin-gen-children${open ? '' : ' collapsed'}">
+        <div class="admin-gen-children-inner">${kids}</div>
+      </div>` : ''}
+    </div>`;
+}
+
+/** Expand or collapse one branch, without disturbing the second pane. */
+function _adminGenToggle(e, folderId) {
+  e.preventDefault();
+  e.stopPropagation();
+  const node = e.currentTarget.closest('.admin-gen-node');
+  const kids = node && node.querySelector(':scope > .admin-gen-children');
+  if (!kids) return;
+  const nowOpen = kids.classList.toggle('collapsed') === false;
+  e.currentTarget.classList.toggle('open', nowOpen);
+  e.currentTarget.setAttribute('aria-expanded', String(nowOpen));
+  _adminGenRemember();
 }
 
 /**
- * The chevron expands the branch; the name opens that folder in the second
- * pane. Two jobs on one row, split the same way the section headers are.
+ * The chevron expands the branch; the rest of the row opens that folder in the
+ * second pane. Two jobs on one row, split the way the section headers are.
  */
-function _adminGenSummaryClick(e, folderId) {
-  // The chevron is the plain <details> toggle; `open` only changes after the
-  // event, so the new state has to be read on the next tick.
-  if (e.target.closest('.admin-group-chev')) { setTimeout(_adminGenRemember, 0); return; }
-
-  e.preventDefault();
-  const det = e.currentTarget.closest('details');
-  if (det && !det.open) det.open = true;
+function _adminGenRowClick(e, folderId) {
+  if (e.target.closest('.admin-gen-chev')) return;   // the chevron handles itself
   // Navigating rebuilds this tree from the stored open set, so the set has to
-  // be written first — otherwise the branch just expanded would come back shut.
+  // be written first, or a branch just expanded would come back shut.
   _adminGenRemember();
   adminNavTo(folderId);
-}
-
-function _adminGenItemHTML(item, depth) {
-  const c = _adminCollectionSet()[0].card(item);
-  const id = escapeHTML(String(item.id));
-  // Marking what the editor currently holds, so the tree says where you are
-  // rather than leaving the open form unattributed.
-  const editing = _adminEditingId() === String(item.id);
-  return `
-    <button class="admin-gen-item${editing ? ' current' : ''}" style="padding-left:${1.35 + (depth || 0) * 0.75}rem;"
-            title="${escapeHTML(c.title)}"${editing ? ' aria-current="true"' : ''} onclick="adminOpenItem('${id}')">
-      <i data-lucide="${escapeHTML(c.icon || 'file')}"></i>
-      <span class="admin-gen-name">${escapeHTML(c.title)}</span>
-    </button>`;
-}
-
-/**
- * Open an item's editor from the first pane's tree. adminOpenFromCard() reads
- * whichever collection the second pane is showing and gives up when there is
- * none — but this tree is on screen whether or not the browser was ever
- * opened, so its rows did nothing at all until something else was clicked
- * first. The collection is implied here, and Back is pointed at the folder the
- * item actually lives in.
- */
-function adminOpenItem(id) {
-  const col = _adminCollectionSet()[0];
-  if (!col) return;
-  const item = (col.items() || []).find(x => String(x.id) === String(id));
-  _adminCollection = 'general';
-  _adminNavFolderId = item && item.parentId ? item.parentId : (item ? ADMIN_UNCAT : _adminNavFolderId);
-  const host = document.getElementById('admin-card-browser');
-  if (host) host.classList.add('hidden');
-  col.open(id);
-  _adminMarkActiveSection('general');
-  _adminRenderGeneralNav();
-}
-
-/** The record the open editor is holding, whichever admin this is. */
-function _adminEditingId() {
-  const st = window.currentAdminMode === 'study'
-    ? (currentAdminStudyTab === 'snippets'
-        ? (typeof studyModeState !== 'undefined' ? studyModeState : null)
-        : (typeof notebookAdminState !== 'undefined' ? notebookAdminState : null))
-    : (typeof adminState !== 'undefined' ? adminState : null);
-  return st && st.id && st.id !== 'new' ? String(st.id) : null;
 }
 
 /** Open a collection as cards in pane 2. Called by the pane-1 section headers. */

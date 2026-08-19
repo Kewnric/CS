@@ -126,14 +126,27 @@ function initTheme() {
     }
   }
 
-  // 4. Re-enable transitions and animations after first paint
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      if (sidebar) sidebar.classList.remove('no-transition');
-      document.body.classList.remove('no-entry-animation');
-      initSidebarBottom();
-    });
-  });
+  // 4. Re-enable transitions and animations after first paint.
+  //
+  // This handoff used to sit in nested requestAnimationFrame alone. A hidden
+  // tab never paints, so rAF never runs there — and a page first opened in a
+  // background tab (ctrl+click, or a restored session) kept
+  // .no-entry-animation on <body> forever. That rule sets
+  // transition-duration: 0s !important on every element in the app, so every
+  // transition on the site stayed dead and initSidebarBottom() never ran, until
+  // the page was reloaded while visible. The timeout guarantees the handoff;
+  // rAF still wins when the tab is actually on screen, keeping the original
+  // after-first-paint timing.
+  let entryAnimationsEnabled = false;
+  const enableEntryAnimations = () => {
+    if (entryAnimationsEnabled) return;
+    entryAnimationsEnabled = true;
+    if (sidebar) sidebar.classList.remove('no-transition');
+    document.body.classList.remove('no-entry-animation');
+    initSidebarBottom();
+  };
+  requestAnimationFrame(() => requestAnimationFrame(enableEntryAnimations));
+  setTimeout(enableEntryAnimations, 120);
 }
 
 // --- Nav Active State ---
