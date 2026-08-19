@@ -2,7 +2,7 @@
    Online: always serves fresh from the network (so live edits show up and
    nothing goes stale). Offline: falls back to the last cached copy, and to
    the cached app shell for navigations. Bump CACHE to invalidate. */
-const CACHE = 'ssp-v1';
+const CACHE = 'ssp-v2';
 const SHELL = ['./index.html', './manifest.json'];
 
 self.addEventListener('install', (event) => {
@@ -30,8 +30,19 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // let CDNs pass through
 
+  // Network-first still went through the browser's own HTTP cache, which may
+  // hold a script or stylesheet for as long as its max-age allows — ten
+  // minutes on GitHub Pages. That reads as "my change did not deploy". Asking
+  // for revalidation makes an updated file land on the very next load and
+  // costs only a 304 when nothing changed. Navigations are left alone: a
+  // Request in navigate mode cannot be reconstructed.
+  let hit = req;
+  if (req.mode !== 'navigate' && /\.(?:js|css)$/.test(url.pathname)) {
+    try { hit = new Request(req, { cache: 'no-cache' }); } catch (e) { hit = req; }
+  }
+
   event.respondWith(
-    fetch(req)
+    fetch(hit)
       .then((res) => {
         if (res && res.ok) {
           const copy = res.clone();
