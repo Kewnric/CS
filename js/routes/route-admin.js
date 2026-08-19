@@ -534,10 +534,10 @@ function adminCodingTemplate() {
                 <span class="admin-panel-name">General</span>
                 <span class="admin-panel-count" id="admin-general-count">0</span>
               </summary>
-              <div class="admin-panel-body">
+              <div class="admin-panel-slot"><div class="admin-panel-body">
                 <p style="font-size:0.75rem; color:var(--text-tertiary); margin-bottom:0.6rem;">Open a category to see what is inside it, set the order programs run in, and lock categories behind prerequisites.</p>
                 <div id="admin-general-nav" class="admin-gen-list"></div>
-              </div>
+              </div></div>
             </details>
 
             <!-- Programs -->
@@ -564,11 +564,11 @@ function adminCodingTemplate() {
                   </button>
                 </span>
               </summary>
-              <div class="admin-panel-body">
+              <div class="admin-panel-slot"><div class="admin-panel-body">
                 <!-- Only present while something is selected (see _adminRenderSelectionBar). -->
                 <div id="admin-selection-bar" class="admin-selection-bar hidden" role="toolbar" aria-label="Bulk actions"></div>
                 <div id="admin-table-body-preview"></div>
-              </div>
+              </div></div>
             </details>
 
             <!-- Practice Sets. Programs is what you come here for, so everything
@@ -580,13 +580,13 @@ function adminCodingTemplate() {
                 <span class="admin-panel-name">Practice Sets</span>
                 <span class="admin-panel-count" id="admin-sets-count">0</span>
               </summary>
-              <div class="admin-panel-body">
+              <div class="admin-panel-slot"><div class="admin-panel-body">
                 <p style="font-size:0.75rem; color:var(--text-tertiary); margin-bottom:1rem;">Bundle several problems into one session.</p>
                 <div id="admin-sets-list" style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom:0.75rem;"></div>
                 <button onclick="openSetBuilder('new')" class="btn btn-secondary" style="width:100%;">
                   <i data-lucide="plus" style="width:16px;height:16px;"></i> New Practice Set
                 </button>
-              </div>
+              </div></div>
             </details>
 
             <!-- Categories -->
@@ -597,7 +597,7 @@ function adminCodingTemplate() {
                 <span class="admin-panel-name">Categories</span>
                 <span class="admin-panel-count" id="admin-cats-count">0</span>
               </summary>
-              <div class="admin-panel-body">
+              <div class="admin-panel-slot"><div class="admin-panel-body">
               <ul id="admin-category-list-preview" style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom:0.5rem; list-style:none; padding:0;"></ul>
               
               <div class="tree-node" id="admin-categories-dropdown-wrapper" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
@@ -620,7 +620,7 @@ function adminCodingTemplate() {
                 <input id="new-category-input-fallback" placeholder="New Category" onkeydown="if(event.key==='Enter') { document.getElementById('new-category-input').value = this.value; addCategory(); this.value=''; }" class="form-input" style="flex:1;" />
                 <button onclick="document.getElementById('new-category-input').value = document.getElementById('new-category-input-fallback').value; addCategory(); document.getElementById('new-category-input-fallback').value='';" class="btn btn-secondary btn-icon" title="Add Category"><i data-lucide="plus" style="width:18px;height:18px;"></i></button>
               </div>
-              </div>
+              </div></div>
             </details>
 
             <!-- Skill Tree Locks -->
@@ -631,7 +631,7 @@ function adminCodingTemplate() {
                 <span class="admin-panel-name">Skill Tree Locks</span>
                 <span class="admin-panel-count" id="admin-locks-count">0</span>
               </summary>
-              <div class="admin-panel-body">
+              <div class="admin-panel-slot"><div class="admin-panel-body">
                 <div style="display:flex; flex-direction:column; gap:0.75rem; margin-bottom: 0.5rem;" id="admin-lock-rules-preview"></div>
 
                 <div class="tree-node" id="admin-locks-dropdown-wrapper" style="background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-md);">
@@ -645,7 +645,7 @@ function adminCodingTemplate() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </div></div>
             </details>
           </div>
         </div>
@@ -742,10 +742,10 @@ function adminNotesTemplate() {
                 <span class="admin-panel-name">General</span>
                 <span class="admin-panel-count" id="admin-general-count">0</span>
               </summary>
-              <div class="admin-panel-body">
+              <div class="admin-panel-slot"><div class="admin-panel-body">
                 <p style="font-size:0.75rem; color:var(--text-tertiary); margin-bottom:0.6rem;">Open a category to see what is inside it, and set the order notebooks run in.</p>
                 <div id="admin-general-nav" class="admin-gen-list"></div>
-              </div>
+              </div></div>
             </details>
 
             <details class="admin-panel" data-collection="notebooks" open>
@@ -763,11 +763,11 @@ function adminNotesTemplate() {
                   </button>
                 </span>
               </summary>
-              <div class="admin-panel-body">
+              <div class="admin-panel-slot"><div class="admin-panel-body">
                 <!-- Only present while something is selected (see _nbRenderSelectionBar). -->
                 <div id="nb-selection-bar" class="admin-selection-bar hidden" role="toolbar" aria-label="Bulk actions"></div>
                 <div style="display:flex; flex-direction:column; gap:0.25rem;" id="notebook-table-body"></div>
-              </div>
+              </div></div>
             </details>
 
             <details class="admin-panel collapsed" data-collection="cats" id="notebook-category-container" open>
@@ -777,13 +777,13 @@ function adminNotesTemplate() {
                 <span class="admin-panel-name">Categories</span>
                 <span class="admin-panel-count" id="admin-nb-cats-count">0</span>
               </summary>
-              <div class="admin-panel-body">
+              <div class="admin-panel-slot"><div class="admin-panel-body">
                 <ul id="notebook-category-list" style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom:1rem; list-style:none; padding: 0;"></ul>
                 <div style="display:flex; gap:0.5rem;">
                   <input id="new-notebook-category-input" placeholder="New Category" onkeydown="if(event.key==='Enter') addNotebookCategory()" class="form-input" style="flex:1;" />
                   <button onclick="addNotebookCategory()" class="btn btn-secondary btn-icon" title="Add Category"><i data-lucide="plus" style="width:18px;height:18px;"></i></button>
                 </div>
-              </div>
+              </div></div>
             </details>
           </div>
         </div>
@@ -884,10 +884,10 @@ function adminSnippetsTemplate() {
                 <span class="admin-panel-name">General</span>
                 <span class="admin-panel-count" id="admin-general-count">0</span>
               </summary>
-              <div class="admin-panel-body">
+              <div class="admin-panel-slot"><div class="admin-panel-body">
                 <p style="font-size:0.75rem; color:var(--text-tertiary); margin-bottom:0.6rem;">Open a category to see what is inside it, and set the order snippets appear in.</p>
                 <div id="admin-general-nav" class="admin-gen-list"></div>
-              </div>
+              </div></div>
             </details>
 
             <details class="admin-panel" data-collection="snippets" open>
@@ -897,9 +897,9 @@ function adminSnippetsTemplate() {
                 <span class="admin-panel-name">Snippets</span>
                 <span class="admin-panel-count" id="admin-snippets-count">0</span>
               </summary>
-              <div class="admin-panel-body">
+              <div class="admin-panel-slot"><div class="admin-panel-body">
                 <div style="display:flex; flex-direction:column; gap:0.25rem;" id="study-table-body"></div>
-              </div>
+              </div></div>
             </details>
 
             <details class="admin-panel collapsed" data-collection="cats" id="study-category-container" open>
@@ -909,13 +909,13 @@ function adminSnippetsTemplate() {
                 <span class="admin-panel-name">Categories</span>
                 <span class="admin-panel-count" id="admin-snip-cats-count">0</span>
               </summary>
-              <div class="admin-panel-body">
+              <div class="admin-panel-slot"><div class="admin-panel-body">
                 <ul id="study-category-list" style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom:1rem; list-style:none; padding: 0;"></ul>
                 <div style="display:flex; gap:0.5rem;">
                   <input id="new-study-category-input" placeholder="New Category" onkeydown="if(event.key==='Enter') addStudyCategory()" class="form-input" style="flex:1;" />
                   <button onclick="addStudyCategory()" class="btn btn-secondary btn-icon" title="Add Category"><i data-lucide="plus" style="width:18px;height:18px;"></i></button>
                 </div>
-              </div>
+              </div></div>
             </details>
           </div>
         </div>

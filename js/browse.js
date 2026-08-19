@@ -814,7 +814,8 @@ function _renderBrowseFilterBar(total, shown, pool) {
       { icon: 'bar-chart-2', chips: diffChips },
       levelChips ? { icon: 'swords', chips: levelChips } : null,
       { icon: 'star', chips: libCommonChipsHTML('browse', 'challenge', pool) },
-      { icon: 'arrow-up-down', chips: libSortChipsHTML('browse', 'setBrowseSort', sort) },
+      { icon: 'list-ordered', chips: libSortTypeChipsHTML('browse', 'setBrowseSort', sort, 'recent') },
+      { icon: 'arrow-up-down', chips: libSortDirChipsHTML('browse') },
       // Tags are unbounded, so this row folds after the first handful.
       { icon: 'tag', chips: libFoldChips(_libTagChipsOnly('browse', pool), 8), wrap: true },
     ]

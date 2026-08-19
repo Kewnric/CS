@@ -225,16 +225,35 @@ function libApplySortDir(ns, list) {
 }
 
 /**
+ * What the list is ordered BY. Direction is a separate control, because
+ * "Alphabetical" sitting between "Ascending" and "Descending" read as a third
+ * direction rather than a different ordering.
+ *
  * @param {string} ns       library namespace
  * @param {string} setSort  name of that library's sort setter, e.g. 'setBrowseSort'
  * @param {string} curSort  the sort currently chosen
+ * @param {string} chrono   that library's value for "by date" — snippets track
+ *                          reviews rather than attempts, so it is not the same
+ *                          option everywhere
  */
-function libSortChipsHTML(ns, setSort, curSort) {
+function libSortTypeChipsHTML(ns, setSort, curSort, chrono) {
+  const c = chrono || 'recent';
+  return [
+    // 'default' keeps the folder's own order, which is exactly the order set by
+    // Arrange by hand in the admin — there is no separate app-imposed default.
+    libChipHTML(curSort === 'default', `${setSort}('default')`, 'Custom',
+      'The order you arranged in Admin'),
+    libChipHTML(curSort === 'title', `${setSort}('title')`, 'Alphabetical', 'By title'),
+    libChipHTML(curSort === c, `${setSort}('${c}')`, 'Chronological', 'By most recent activity')
+  ].join('');
+}
+
+/** Which way round that ordering runs. */
+function libSortDirChipsHTML(ns) {
   const dir = libSortDir(ns);
   return [
-    libChipHTML(dir === 'asc', `libSetSortDir('${ns}','asc')`, 'Ascending', 'First to last in the chosen order'),
-    libChipHTML(dir === 'desc', `libSetSortDir('${ns}','desc')`, 'Descending', 'Reverse the chosen order'),
-    libChipHTML(curSort === 'title', `${setSort}('title')`, 'Alphabetical', 'Sort by title')
+    libChipHTML(dir === 'asc', `libSetSortDir('${ns}','asc')`, 'Ascending', 'First to last'),
+    libChipHTML(dir === 'desc', `libSetSortDir('${ns}','desc')`, 'Descending', 'Last to first')
   ].join('');
 }
 

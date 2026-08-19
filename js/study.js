@@ -500,7 +500,8 @@ function _renderSnippetFilterBar(total, shown, pool) {
       { icon: 'filter', chips },
       langChips ? { icon: 'code', chips: langChips } : null,
       { icon: 'star', chips: libCommonChipsHTML('snippet', 'snippet', pool) },
-      { icon: 'arrow-up-down', chips: libSortChipsHTML('snippet', 'setSnippetSort', sort) },
+      { icon: 'list-ordered', chips: libSortTypeChipsHTML('snippet', 'setSnippetSort', sort, 'reviewed') },
+      { icon: 'arrow-up-down', chips: libSortDirChipsHTML('snippet') },
       { icon: 'tag', chips: _libTagChipsOnly('snippet', pool) },
     ]
   });

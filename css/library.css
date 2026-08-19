@@ -814,15 +814,17 @@
   font-weight: 800;
   text-align: center;
 }
-/* The panel is a two-row grid: the header, then a body row that goes 1fr -> 0fr.
-   The body's own padding and border animate away alongside it, so the box
-   really reaches zero rather than leaving a padded strip behind. */
-.admin-panel {
+/* The body sits in its own single-track grid, exactly like the tree's children.
+   Putting the grid on the <details> itself with `auto 0fr` did not work: with a
+   fixed `auto` track alongside it, the flexible track kept resolving to its
+   content height and the panel never closed — forcing `auto 0fr` inline still
+   measured 154px. One track on a plain wrapper collapses properly. */
+.admin-panel-slot {
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: 1fr;
   transition: grid-template-rows 0.45s cubic-bezier(0.4, 0, 0.2, 1);
 }
-.admin-panel.collapsed { grid-template-rows: auto 0fr; }
+.admin-panel.collapsed > .admin-panel-slot { grid-template-rows: 0fr; }
 
 .admin-panel-body {
   padding: 0.85rem 0.85rem 0.95rem;
@@ -833,7 +835,7 @@
               border-top-width 0.45s cubic-bezier(0.4, 0, 0.2, 1),
               opacity 0.35s ease 0.05s;
 }
-.admin-panel.collapsed > .admin-panel-body {
+.admin-panel.collapsed .admin-panel-body {
   padding-top: 0;
   padding-bottom: 0;
   border-top-width: 0;
@@ -844,7 +846,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .admin-panel, .admin-panel-body, .admin-panel-chev { transition: none !important; }
+  .admin-panel-slot, .admin-panel-body, .admin-panel-chev { transition: none !important; }
 }
 
 /* ============================================================

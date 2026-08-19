@@ -703,7 +703,8 @@ function _renderNotebookFilterBar(total, shown, pool) {
       { icon: 'filter', chips },
       diffChips ? { icon: 'bar-chart-2', chips: diffChips } : null,
       { icon: 'star', chips: libCommonChipsHTML('notebook', 'notebook', pool) },
-      { icon: 'arrow-up-down', chips: libSortChipsHTML('notebook', 'setNotebookSort', sort) },
+      { icon: 'list-ordered', chips: libSortTypeChipsHTML('notebook', 'setNotebookSort', sort, 'recent') },
+      { icon: 'arrow-up-down', chips: libSortDirChipsHTML('notebook') },
       { icon: 'tag', chips: _libTagChipsOnly('notebook', pool) },
     ]
   });
