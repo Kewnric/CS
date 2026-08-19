@@ -1465,36 +1465,45 @@ body.tree-dragging [data-tree-ns]::-webkit-scrollbar { width: 0; height: 0; }
 }
 .admin-nav-lock svg { width: 13px; height: 13px; }
 
-/* The shortcut list inside the General panel in pane 1. */
-.admin-gen-list { display: flex; flex-direction: column; gap: 0.15rem; }
-.admin-gen-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: 100%;
-  padding: 0.4rem 0.55rem;
-  border: none;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 0.82rem;
-  text-align: left;
-  cursor: pointer;
-}
-.admin-gen-row:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
-.admin-gen-row.current {
+/* The tree inside the General panel in pane 1. It reuses .admin-group, so a
+   branch reads exactly like the Programs panel's folder headers, but nests:
+   a folder's body holds its subfolders and then its own items. */
+.admin-gen-list { display: flex; flex-direction: column; }
+.admin-gen-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Nested branches drop the divider, which at three levels deep read as a
+   stack of unrelated sections rather than one tree. */
+.admin-gen-group .admin-gen-group { border-bottom: none; }
+.admin-gen-group > .admin-group-body { display: block; }
+.admin-gen-group.current > summary {
   background: var(--color-primary-subtle);
   color: var(--color-primary);
   font-weight: 700;
 }
-.admin-gen-row svg { width: 15px; height: 15px; flex-shrink: 0; }
-.admin-gen-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.admin-gen-count {
-  font-size: 0.7rem;
+
+.admin-gen-item {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.32rem 0.4rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  text-align: left;
+  cursor: pointer;
+}
+.admin-gen-item:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+.admin-gen-item svg { width: 13px; height: 13px; flex-shrink: 0; opacity: 0.75; }
+
+.admin-gen-empty {
+  margin: 0;
+  padding: 0.3rem 0.4rem 0.3rem 1.4rem;
+  font-size: 0.72rem;
   color: var(--text-tertiary);
-  background: var(--bg-surface-hover);
-  border-radius: 999px;
-  padding: 0.05rem 0.4rem;
+  font-style: italic;
 }
 
 @media (max-width: 640px) {

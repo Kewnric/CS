@@ -268,23 +268,88 @@ function _adminRenderGeneralNav() {
   const host = document.getElementById('admin-general-nav');
   if (!host) return;
   _adminValidateNav();
-  const sc = _adminScope();
-  const tops = _adminChildFolders(null);
-  const loose = _adminItemsIn(ADMIN_UNCAT).length;
-  const row = (id, icon, name, count) => `
-    <button class="admin-gen-row${_adminCollection === 'general' && String(_adminNavFolderId) === String(id) ? ' current' : ''}"
-            onclick="adminNavTo(${id === null ? 'null' : "'" + id + "'"})">
-      <i data-lucide="${icon}"></i>
-      <span class="admin-gen-name">${escapeHTML(name)}</span>
-      <span class="admin-gen-count">${count}</span>
-    </button>`;
+  const loose = _adminItemsIn(ADMIN_UNCAT);
 
   host.innerHTML =
-    row(null, 'home', 'All categories', tops.length + (loose ? 1 : 0)) +
-    tops.map(f => row(f.id, f.icon || 'folder', f.name || 'Untitled',
-      _adminFolderCount(f.id, sc.scope) + _adminChildFolders(f.id).length)).join('') +
-    (loose ? row(ADMIN_UNCAT, 'inbox', 'Uncategorized', loose) : '');
+    _adminGenBranch(null, 0) +
+    (loose.length ? _adminGenGroupHTML(ADMIN_UNCAT, 'Uncategorized', 'inbox', loose.length,
+      loose.map(it => _adminGenItemHTML(it)).join(''), 0) : '') +
+    (!_adminChildFolders(null).length && !loose.length
+      ? '<p class="admin-gen-empty">No categories yet.</p>' : '');
+
   if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
+}
+
+/**
+ * One level of the tree, and everything under it. A folder's body holds its
+ * subfolders first and then the items filed directly in it, so the panel
+ * mirrors the shape of the library rather than flattening it.
+ */
+function _adminGenBranch(parentId, depth) {
+  return _adminChildFolders(parentId).map(f => {
+    const subs = _adminChildFolders(f.id);
+    const items = _adminItemsIn(f.id);
+    const body = _adminGenBranch(f.id, depth + 1) + items.map(it => _adminGenItemHTML(it, depth + 1)).join('') +
+      (!subs.length && !items.length ? '<p class="admin-gen-empty">Empty</p>' : '');
+    return _adminGenGroupHTML(f.id, f.name || 'Untitled', f.icon || 'folder',
+      items.length + subs.length, body, depth);
+  }).join('');
+}
+
+/** Expansion is remembered, so the tree does not reset on every rerender. */
+function _adminGenOpen(id) {
+  try { return (JSON.parse(localStorage.getItem('adminGenOpen') || '[]')).includes(id); }
+  catch (e) { return false; }
+}
+
+function _adminGenRemember() {
+  const open = [...document.querySelectorAll('#admin-general-nav details.admin-gen-group[open]')]
+    .map(d => d.getAttribute('data-folder'));
+  try { localStorage.setItem('adminGenOpen', JSON.stringify(open)); } catch (e) { /* quota */ }
+}
+
+function _adminGenGroupHTML(id, name, icon, count, body, depth) {
+  const showing = _adminCollection === 'general' && String(_adminNavFolderId) === String(id);
+  return `
+    <details class="admin-group admin-gen-group${showing ? ' current' : ''}"
+             data-folder="${escapeHTML(String(id))}"${_adminGenOpen(id) ? ' open' : ''}>
+      <summary style="padding-left:${0.3 + depth * 0.75}rem;" onclick="_adminGenSummaryClick(event, '${escapeHTML(String(id))}')">
+        <i data-lucide="chevron-right" class="admin-group-chev"></i>
+        <i data-lucide="${escapeHTML(icon)}" style="width:14px;height:14px;"></i>
+        <span class="admin-group-name">${escapeHTML(name)}</span>
+        <span class="admin-group-count">${count}</span>
+      </summary>
+      <div class="admin-group-body">${body}</div>
+    </details>`;
+}
+
+/**
+ * The chevron expands the branch; the name opens that folder in the second
+ * pane. Two jobs on one row, split the same way the section headers are.
+ */
+function _adminGenSummaryClick(e, folderId) {
+  // The chevron is the plain <details> toggle; `open` only changes after the
+  // event, so the new state has to be read on the next tick.
+  if (e.target.closest('.admin-group-chev')) { setTimeout(_adminGenRemember, 0); return; }
+
+  e.preventDefault();
+  const det = e.currentTarget.closest('details');
+  if (det && !det.open) det.open = true;
+  // Navigating rebuilds this tree from the stored open set, so the set has to
+  // be written first — otherwise the branch just expanded would come back shut.
+  _adminGenRemember();
+  adminNavTo(folderId);
+}
+
+function _adminGenItemHTML(item, depth) {
+  const c = _adminCollectionSet()[0].card(item);
+  const id = escapeHTML(String(item.id));
+  return `
+    <button class="admin-gen-item" style="padding-left:${1.35 + (depth || 0) * 0.75}rem;"
+            title="${escapeHTML(c.title)}" onclick="adminOpenFromCard('${id}')">
+      <i data-lucide="${escapeHTML(c.icon || 'file')}"></i>
+      <span class="admin-gen-name">${escapeHTML(c.title)}</span>
+    </button>`;
 }
 
 /** Open a collection as cards in pane 2. Called by the pane-1 section headers. */
@@ -302,6 +367,7 @@ function adminShowCollection(key) {
 
   adminRenderCards();
   _adminMarkActiveSection(key);
+  _adminRenderGeneralNav();   // the tree highlights the folder now on screen
 }
 
 function _adminMarkActiveSection(key) {
