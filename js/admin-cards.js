@@ -497,13 +497,22 @@ function adminRenderCards() {
  * should not spend three seconds arriving.
  */
 function _adminStaggerCards(host) {
+  // Cards load in when the pane starts showing something else — a different
+  // collection, or a different folder. Replaying it on every redraw made
+  // entering arrange mode, or placing a single card, flash the whole grid.
+  const key = String(_adminCollection) + '|' + String(_adminNavFolderId);
+  if (key === _adminViewKey) return;
+  _adminViewKey = key;
+
+  host.classList.add('admin-cards-animate');
   const cards = host.querySelectorAll('.admin-cards-grid > *, .admin-nav-grid > *');
   const step = cards.length > 24 ? 12 : 34;
   cards.forEach((c, i) => {
     c.style.setProperty('--card-in-delay', Math.min(i * step, 420) + 'ms');
   });
+  clearTimeout(_adminAnimTimer);
+  _adminAnimTimer = setTimeout(() => host.classList.remove('admin-cards-animate'), 900);
 }
-
 /** Re-rendering replaces the box being typed in, so the caret is put back. */
 function _adminCardsFilter(value) {
   _adminCardQuery = value;
@@ -576,6 +585,7 @@ function adminCardsExit() {
   _adminCollection = null;
   _adminCardQuery = '';
   _adminNavFolderId = null;
+  _adminViewKey = null;
   const host = document.getElementById('admin-card-browser');
   if (host) { host.classList.add('hidden'); host.innerHTML = ''; }
   const empty = document.getElementById('admin-empty-state');
@@ -620,6 +630,8 @@ const ADMIN_UNCAT = '__uncat__';    // the pseudo-folder holding parentless item
 let _adminNavFolderId = null;       // null = the top level
 let _adminOrderMode = false;        // placing cards by clicking them, in order
 let _adminOrderSeq = [];            // ids in the order they were clicked
+let _adminViewKey = null;           // what the pane last showed, so the load-in
+let _adminAnimTimer = null;         // only plays when that actually changes
 
 /** Which library this admin edits, as the tree's scope + the state key. */
 function _adminScope() {
@@ -715,9 +727,41 @@ function _adminOrderPick(id) {
   const at = _adminOrderSeq.indexOf(id);
   if (at === -1) _adminOrderSeq.push(id);
   else _adminOrderSeq.splice(at, 1);
-  adminRenderCards();
+  // Rebuilding the grid for one click threw away every card and replayed the
+  // load-in, which read as a flash. Only the badges and the counter change.
+  _adminOrderRefresh();
 }
 
+/** Re-label the cards from the sequence, without touching the DOM structure. */
+function _adminOrderRefresh() {
+  const host = document.getElementById('admin-card-browser');
+  if (!host) return;
+  const cards = [...host.querySelectorAll('.admin-nav-card[data-item-id]')];
+  cards.forEach(card => {
+    const place = _adminOrderSeq.indexOf(card.getAttribute('data-item-id'));
+    const wasPlaced = card.classList.contains('placed');
+    card.classList.toggle('placed', place > -1);
+    card.title = place > -1 ? 'Click to unplace' : 'Click to place next';
+    const badge = card.querySelector('.admin-nav-number');
+    if (!badge) return;
+    badge.textContent = place > -1 ? String(place + 1) : '';
+    badge.classList.toggle('unplaced', place === -1);
+    // Replay the pop only for a card that has just been placed; assigning
+    // textContent alone does not restart a CSS animation.
+    if (place > -1 && !wasPlaced) {
+      badge.style.animation = 'none';
+      void badge.offsetWidth;
+      badge.style.animation = '';
+    }
+  });
+  const msg = host.querySelector('.admin-order-msg');
+  if (msg) {
+    msg.innerHTML = '<strong>Click the cards in the order you want.</strong> ' +
+      _adminOrderSeq.length + ' of ' + cards.length + ' placed';
+  }
+  const done = host.querySelector('.admin-order-bar .btn-primary');
+  if (done) done.disabled = !_adminOrderSeq.length;
+}
 /**
  * Write the sequence back. Cards clicked keep their click order; anything left
  * unplaced follows, in the order it already had, rather than being shuffled.
@@ -870,6 +914,7 @@ function _adminNavItemCardHTML(item, n) {
   if (_adminOrderMode) {
     return `
       <div class="card card-enhanced has-cover admin-nav-card admin-nav-ordering${place > -1 ? ' placed' : ''}"
+           data-item-id="${id}"
            onclick="_adminOrderPick('${id}')" title="${place > -1 ? 'Click to unplace' : 'Click to place next'}">
         ${body}
       </div>`;

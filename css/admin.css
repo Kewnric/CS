@@ -167,7 +167,12 @@
 
 @keyframes formPanelEnter {
   from { opacity: 0; transform: translateX(28px) scale(0.98); }
-  to { opacity: 1; transform: translateX(0) scale(1); }
+  /* `none`, not translateX(0) scale(1): those compute to a matrix, and this
+     animation is fill:both, so the panel kept a transform forever after it
+     finished. Any transform other than none makes the element a containing
+     block, which stopped the sticky form header pinning — it crept upward as
+     you scrolled instead of holding. */
+  to { opacity: 1; transform: none; }
 }
 
 /* Apply stagger to actual list containers (preview + rest) */
@@ -334,14 +339,27 @@
 }
 
 /* Form header */
+/* The form is long and the only way out of it — Back, and the close X — sat at
+   the very top, so leaving meant scrolling all the way back up. The header
+   follows instead. It scrolls inside .messenger-pane-2, so `top: 0` pins it to
+   that pane; the negative side margins let the opaque background reach the
+   pane's edges rather than leaving the form's 2.5rem padding showing through. */
 .admin-form-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
-  padding-bottom: 1.25rem;
+  margin: 0 -2.5rem 1.5rem;
+  padding: 1rem 2.5rem 1.25rem;
   border-bottom: 1px solid var(--border-color);
+  background: var(--bg-surface);
   gap: 1rem;
+}
+
+@media (max-width: 640px) {
+  .admin-form-header { margin-inline: -1rem; padding-inline: 1rem; }
 }
 
 .af-header-left {

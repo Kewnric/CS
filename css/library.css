@@ -1217,11 +1217,21 @@ body.tree-dragging [data-tree-ns]::-webkit-scrollbar { width: 0; height: 0; }
 }
 .admin-card-browser.hidden { display: none; }
 
+/* Back and the breadcrumbs stay reachable however far down the grid you are.
+   .admin-card-browser is the scroller, so `top: 0` pins this to it; the
+   negative margins let the background span the browser's 1.25rem padding. */
 .admin-cards-head {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
+  margin: -1.25rem -1.25rem 0;
+  padding: 1rem 1.25rem 0.75rem;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-color);
 }
 .admin-cards-back { flex-shrink: 0; padding: 0.3rem 0.6rem; font-size: 0.75rem; }
 .admin-cards-titles { flex: 1; min-width: 140px; }
@@ -1885,23 +1895,26 @@ body.tree-dragging [data-tree-ns]::-webkit-scrollbar { width: 0; height: 0; }
   to   { opacity: 1; transform: none; }
 }
 
-.admin-cards-grid > *,
-.admin-nav-grid > * {
+/* Gated on a class the renderer only adds when the pane starts showing
+   something else. Without that, every redraw — placing one card while
+   arranging, for instance — replayed the whole load-in as a flash. */
+.admin-cards-animate .admin-cards-grid > *,
+.admin-cards-animate .admin-nav-grid > * {
   animation: adminCardIn 0.34s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
   animation-delay: var(--card-in-delay, 0ms);
 }
 
 /* The header above them leads, so the pane does not start mid-list. */
-.admin-cards-head,
-.admin-nav-bar,
-.admin-nav-title {
+.admin-cards-animate .admin-cards-head,
+.admin-cards-animate .admin-nav-bar,
+.admin-cards-animate .admin-nav-title {
   animation: adminCardIn 0.28s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .admin-cards-grid > *,
-  .admin-nav-grid > *,
-  .admin-cards-head,
-  .admin-nav-bar,
-  .admin-nav-title { animation: none !important; }
+  .admin-cards-animate .admin-cards-grid > *,
+  .admin-cards-animate .admin-nav-grid > *,
+  .admin-cards-animate .admin-cards-head,
+  .admin-cards-animate .admin-nav-bar,
+  .admin-cards-animate .admin-nav-title { animation: none !important; }
 }
