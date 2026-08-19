@@ -242,6 +242,12 @@
   grid-template-columns: 3fr 2fr;
   gap: 1.25rem;
 }
+/* A grid item's min-width defaults to auto, so a column will not shrink below
+   its widest content. The heatmap inside declares min-width:max-content — some
+   894px of week columns — so on a phone the column grew to match instead of
+   the heatmap scrolling, and .home-content quietly clipped the overflow.
+   Allowing the columns to shrink lets .home-heatmap's own overflow-x work. */
+.home-two-col > * { min-width: 0; }
 
 /* ======================== HEATMAP CARD ======================== */
 .home-heatmap {

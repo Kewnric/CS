@@ -200,6 +200,31 @@ function renderHomeHeatmap() {
       <div class="heatmap-grid">${cells}</div>
     </div>
   `;
+
+  // A year of weeks is wider than the card, and the scrollbar is deliberately
+  // hidden, so the strip opened on the oldest week with today off the right-hand
+  // edge and nothing to suggest it scrolled at all. Recent activity is the point
+  // of this card, so it starts at the end.
+  //
+  // The card can still be laying out when this runs — scrollWidth equals
+  // clientWidth and setting scrollLeft does nothing — so this retries a few
+  // times and then gives up rather than polling forever. It stops as soon as
+  // the strip is scrollable, and leaves it alone if the reader already moved it.
+  //
+  // setTimeout rather than requestAnimationFrame: a hidden tab never paints, so
+  // rAF would not run at all and the dashboard would come back unscrolled.
+  const strip = container.querySelector('.home-heatmap');
+  if (!strip) return;
+  let tries = 0;
+  const toEnd = () => {
+    if (!strip.isConnected || tries++ > 6) return;
+    if (strip.scrollWidth > strip.clientWidth) {
+      if (strip.scrollLeft === 0) strip.scrollLeft = strip.scrollWidth;
+      return;
+    }
+    setTimeout(toEnd, 60);
+  };
+  setTimeout(toEnd, 0);
 }
 
 /* ======================== QUICK ACTIONS ======================== */
