@@ -1606,9 +1606,12 @@ function brainCtxDeleteNode() {
 }
 
 function brainCtxEditColor(color) {
-  brainPushUndo();
-  if (!brain.contextNodeId) return;
+  // The guard has to come first: pushing undo and then bailing left an entry
+  // on the stack representing no change, so the next Ctrl+Z did nothing.
+  if (!brain.contextNodeId) { brainHideAllMenus(); return; }
   const node = brain.nodes.find(n => n.id === brain.contextNodeId);
+  if (!node) { brainHideAllMenus(); return; }
+  brainPushUndo();
   if (node) { node.color = color; brainRenderCanvas(); brainSaveCurrentVersion(); }
   brainHideAllMenus();
 }
@@ -1619,9 +1622,10 @@ function brainCtxDeleteLink() {
 }
 
 function brainCtxEditLinkColor(color) {
-  brainPushUndo();
-  if (!brain.contextLinkId) return;
+  if (!brain.contextLinkId) { brainHideAllMenus(); return; }
   const link = brain.links.find(l => l.id === brain.contextLinkId);
+  if (!link) { brainHideAllMenus(); return; }
+  brainPushUndo();
   if (link) { link.color = color; brainRenderCanvas(); brainSaveCurrentVersion(); }
   brainHideAllMenus();
 }

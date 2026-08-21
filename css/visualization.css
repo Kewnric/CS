@@ -767,7 +767,18 @@
   transform: scale(1.03);
 }
 
-/* Node color overrides */
+/* Node color overrides.
+   The variables are what the comment/brain slab reads; the border-color rules
+   below cover the plain nodes on the other canvases. */
+.viz-node[data-color="red"]    { --viz-node-accent: #ef4444; --viz-node-accent-strong: #ef4444; }
+.viz-node[data-color="orange"] { --viz-node-accent: #f97316; --viz-node-accent-strong: #f97316; }
+.viz-node[data-color="yellow"] { --viz-node-accent: #eab308; --viz-node-accent-strong: #eab308; }
+.viz-node[data-color="green"]  { --viz-node-accent: #22c55e; --viz-node-accent-strong: #22c55e; }
+.viz-node[data-color="blue"]   { --viz-node-accent: #3b82f6; --viz-node-accent-strong: #3b82f6; }
+.viz-node[data-color="purple"] { --viz-node-accent: #a855f7; --viz-node-accent-strong: #a855f7; }
+.viz-node[data-color="pink"]   { --viz-node-accent: #ec4899; --viz-node-accent-strong: #ec4899; }
+.viz-node[data-color="cyan"]   { --viz-node-accent: #06b6d4; --viz-node-accent-strong: #06b6d4; }
+
 .viz-node[data-color="red"] .viz-node-inner {
   border-color: #ef4444 !important;
 }
@@ -2995,7 +3006,12 @@
    below it so it sits ABOVE the grid rather than being printed on it. */
 .viz-node[data-type="comment"] .viz-node-inner {
   border-radius: 0 !important;
-  border: 1px solid rgba(245, 158, 11, 0.45) !important;
+  /* The accent comes from a variable so a chosen node colour can override it.
+     This used to hard-code amber in a `border` SHORTHAND with !important, at
+     the same specificity as the .viz-node[data-color=...] rules but later in
+     the file — so it always won, and colouring a brain node did nothing
+     visible even though the colour was stored correctly. */
+  border: 1px solid var(--viz-node-accent, rgba(245, 158, 11, 0.45)) !important;
   background:
     linear-gradient(158deg,
       rgba(255, 255, 255, 0.055) 0%,
@@ -3024,7 +3040,7 @@
 
 /* Raised further on hover — the slab lifts and its shadow lengthens. */
 .viz-node[data-type="comment"]:hover .viz-node-inner {
-  border-color: rgba(245, 158, 11, 0.8) !important;
+  border-color: var(--viz-node-accent-strong, rgba(245, 158, 11, 0.8)) !important;
   transform: translate(-2px, -2px);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.2),
