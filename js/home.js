@@ -132,9 +132,11 @@ function renderStatsRow() {
     <div class="home-stat-card" id="home-stat-best"><div class="stat-face"></div></div>
     <button class="home-stat-card is-clickable${risk.risk ? ' at-risk' : ''}" onclick="homeOpenStreakCalendar()"
             title="${risk.risk ? 'Practise today to keep this streak' : 'See which days you practised'}">
-      <div class="stat-icon"><i data-lucide="flame"></i></div>
-      <div class="stat-value">${streak}</div>
-      <div class="stat-label">${risk.risk ? 'Practise today!' : 'Day Streak'}</div>
+      <div class="stat-face">
+        <div class="stat-icon"><i data-lucide="flame"></i></div>
+        <div class="stat-value">${streak}</div>
+        <div class="stat-label">${risk.risk ? 'Practise today!' : 'Day Streak'}</div>
+      </div>
       <div class="stat-goal" title="${doneToday} of ${goal} today">
         <span class="stat-goal-bar"><span style="width:${goalPct}%"></span></span>
         <span class="stat-goal-txt">${doneToday}/${goal} today</span>
@@ -142,9 +144,11 @@ function renderStatsRow() {
     </button>
     <button class="home-stat-card is-clickable" onclick="homeOpenBadges()"
             title="See every badge and how close you are">
-      <div class="stat-icon"><i data-lucide="award"></i></div>
-      <div class="stat-value">${earned}</div>
-      <div class="stat-label">Badges</div>
+      <div class="stat-face">
+        <div class="stat-icon"><i data-lucide="award"></i></div>
+        <div class="stat-value">${earned}</div>
+        <div class="stat-label">Badges</div>
+      </div>
     </button>
   `;
   lucide.createIcons({ root: container });
@@ -468,11 +472,16 @@ function renderHomeContinue() {
   const items = _homeUnfinished();
   if (!items.length) { host.innerHTML = ''; return; }
 
-  host.innerHTML = items.map(u => `
-    <div class="home-continue-card">
+  // One card. Several half-finished attempts stacked up pushed the whole page
+  // down, so the rest live behind a count you can open.
+  const lead = items[0];
+  const rest = items.slice(1);
+
+  const row = (u, compact) => `
+    <div class="hc-row${compact ? ' compact' : ''}">
       <div class="hc-icon"><i data-lucide="${u.icon}"></i></div>
       <div class="hc-text">
-        <div class="hc-eyebrow">Pick up where you left off · ${u.label}</div>
+        <div class="hc-eyebrow">Pick up where you left off &middot; ${u.label}</div>
         <div class="hc-title">${escapeHTML(u.title)}</div>
         <div class="hc-meta">${u.ts ? 'Left ' + getTimeAgo(u.ts) : 'In progress'}</div>
       </div>
@@ -480,9 +489,37 @@ function renderHomeContinue() {
         <i data-lucide="play"></i> Continue
       </button>
       <button class="btn btn-ghost hc-dismiss" title="Discard this draft"
-              onclick="homeDiscardDraft('${u.kind}')"><i data-lucide="x"></i></button>
-    </div>`).join('');
+              onclick="event.stopPropagation(); homeDiscardDraft('${u.kind}')"><i data-lucide="x"></i></button>
+    </div>`;
+
+  host.innerHTML = `
+    <div class="home-continue-card" id="home-continue-card">
+      ${row(lead)}
+      ${rest.length ? `
+      <details class="hc-more">
+        <summary>${rest.length} more unfinished <i data-lucide="chevron-down"></i></summary>
+        <div class="hc-more-body">${rest.map(u => row(u, true)).join('')}</div>
+      </details>` : ''}
+      <div class="hc-timer" aria-hidden="true"><span></span></div>
+    </div>`;
   if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
+
+  // The bar IS the timer. Running it as a CSS animation means hovering can
+  // pause it with animation-play-state and the two can never drift apart the
+  // way a separate setTimeout would.
+  const bar = host.querySelector('.hc-timer > span');
+  if (!bar) return;
+  bar.addEventListener('animationend', () => {
+    const card = document.getElementById('home-continue-card');
+    if (!card) return;
+    card.classList.add('is-leaving');
+    setTimeout(() => { if (host.contains(card)) host.innerHTML = ''; }, 260);
+  });
+  // Opening the dropdown means you are reading it; stop the clock for good.
+  const more = host.querySelector('.hc-more');
+  if (more) more.addEventListener('toggle', () => {
+    if (more.open) host.querySelector('.home-continue-card').classList.add('is-held');
+  });
 }
 
 /** Throw away a saved draft, with a confirm — it is unrecoverable. */

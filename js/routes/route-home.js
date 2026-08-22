@@ -20,11 +20,10 @@ function homeTemplate() {
             </button>
           </div>
         </section>
-        <!-- Only present when something was left unfinished. The thing you were
-             last doing is the thing you most often want on opening the app, and
-             it was buried at the bottom of Recent Activity. -->
-        <section id="home-continue"></section>
         <section class="home-stats-grid stagger-children" id="home-stats"></section>
+        <!-- Only present when something was left unfinished, and only until its
+             countdown runs out. Sits under the stats so the numbers stay put. -->
+        <section id="home-continue"></section>
         <!-- Quick Actions is a fixed list of six links, so it is sized to its
              content and the heatmap and carousel take the rest — they are the
              two things on this page that actually benefit from width. -->

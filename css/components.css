@@ -775,6 +775,12 @@
 }
 
 /* --- Modals --- */
+/* The shared prompt sits above any window that opened it — asking for a daily
+   goal from inside the streak calendar put the input behind the calendar,
+   because both are .modal-overlay at the same z-index and the calendar is
+   appended later. */
+#dialog-modal { z-index: 1200; }
+
 .modal-overlay {
   position: fixed;
   inset: 0;

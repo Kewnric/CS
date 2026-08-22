@@ -1898,6 +1898,21 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
   transition: transform var(--transition-base), border-color var(--transition-base),
               box-shadow var(--transition-base);
   position: relative;
+  /* Stated outright rather than left to the element type. A <button> centres
+     its content vertically and a <div> does not, so the completion card sat 7px
+     above the streak and badge cards; the first card only looked right because
+     its dots happened to fill the slack. One in-flow child, centred, in all
+     four — the dots and the goal are taken out of flow below. */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+.home-stat-card > .stat-face { width: 100%; }
+
+.stat-dots {
+  position: absolute;
+  left: 0; right: 0; bottom: 0.55rem;
 }
 .home-stat-card.is-clickable,
 .home-stat-card.is-cycling {
@@ -1920,6 +1935,9 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
 
 /* The face is what swaps when the library changes; it fades and lifts rather
    than snapping to the next set of numbers. */
+/* Every card wraps its icon/value/label in this, so all four lay out
+   identically — two of them used to hold those three as direct flex children,
+   which spaced them differently and left the values 7px out of line. */
 .stat-face { transition: opacity 0.18s ease, transform 0.18s ease; }
 .stat-face.is-swapping { opacity: 0; transform: translateY(-6px); }
 
@@ -1927,7 +1945,6 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
   display: flex;
   justify-content: center;
   gap: 4px;
-  margin-top: 0.5rem;
 }
 .stat-dot {
   width: 5px; height: 5px;
@@ -2024,14 +2041,66 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
 
 /* ── Continue where you left off ──────────────────────────── */
 .home-continue-card {
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
-  padding: 0.9rem 1.1rem;
+  position: relative;
   margin-bottom: 1rem;
   border: 1px solid var(--color-warning);
   border-radius: var(--radius-xl);
   background: linear-gradient(120deg, rgba(245, 158, 11, 0.12), transparent 60%), var(--bg-surface);
+  overflow: hidden;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.home-continue-card.is-leaving { opacity: 0; transform: translateY(-6px); }
+
+.hc-row {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.9rem 1.1rem;
+}
+.hc-row.compact { padding: 0.6rem 1.1rem; border-top: 1px solid var(--border-color); }
+.hc-row.compact .hc-icon { width: 30px; height: 30px; }
+.hc-row.compact .hc-title { font-size: 0.88rem; }
+
+/* The bar is the countdown — five seconds, draining right to left, and it is
+   what fires the dismissal. Running it in CSS rather than beside a setTimeout
+   means pausing it pauses the clock exactly, with nothing to keep in sync. */
+.hc-timer {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 3px;
+  background: rgba(245, 158, 11, 0.15);
+}
+.hc-timer > span {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transform-origin: right center;
+  background: var(--color-warning);
+  animation: hcDrain 5s linear forwards;
+}
+@keyframes hcDrain {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+/* Hovering, focusing, or opening the list holds it. */
+.home-continue-card:hover .hc-timer > span,
+.home-continue-card:focus-within .hc-timer > span,
+.home-continue-card.is-held .hc-timer > span { animation-play-state: paused; }
+
+.hc-more { border-top: 1px solid var(--border-color); }
+.hc-more > summary {
+  display: flex; align-items: center; gap: 0.35rem;
+  padding: 0.5rem 1.1rem;
+  font-size: 0.72rem; font-weight: 700; color: var(--text-tertiary);
+  cursor: pointer; list-style: none;
+}
+.hc-more > summary::-webkit-details-marker { display: none; }
+.hc-more > summary:hover { color: var(--text-primary); }
+.hc-more > summary svg { width: 12px; height: 12px; transition: transform 0.2s ease; }
+.hc-more[open] > summary svg { transform: rotate(180deg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .hc-timer > span { animation-duration: 12s; }
 }
 .hc-icon {
   display: inline-flex; align-items: center; justify-content: center;
@@ -2057,7 +2126,23 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
 /* ── Streak card: goal and the at-risk state ──────────────── */
 .home-stat-card.at-risk { border-color: var(--color-warning); }
 .home-stat-card.at-risk .stat-label { color: var(--color-warning); font-weight: 800; }
-.stat-goal { margin-top: 0.5rem; }
+/* Absolutely positioned so revealing it cannot grow the card: the four cards
+   share a grid row, so anything that changed the streak card's height pushed
+   all four and left its icon, value and label out of line with the rest. */
+.stat-goal {
+  position: absolute;
+  left: 0.9rem; right: 0.9rem; bottom: 0.55rem;
+  opacity: 0;
+  transform: translateY(5px);
+  pointer-events: none;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+.home-stat-card:hover .stat-goal,
+.home-stat-card:focus-within .stat-goal,
+.home-stat-card.at-risk .stat-goal {
+  opacity: 1;
+  transform: none;
+}
 .stat-goal-bar {
   display: block; height: 4px; border-radius: 999px;
   background: var(--bg-surface-hover); overflow: hidden;
