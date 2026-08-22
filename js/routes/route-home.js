@@ -40,5 +40,9 @@ function homeInit() {
 }
 
 function homeDestroy() {
-  // No persistent intervals to clean
+  // The stat card cycles on a 4s interval; leaving it running would keep
+  // re-rendering a pane that is no longer on screen.
+  if (typeof homeStopStatCycle === 'function') homeStopStatCycle();
+  if (typeof homeCloseStreakCalendar === 'function') homeCloseStreakCalendar();
+  if (typeof homeCloseBadges === 'function') homeCloseBadges();
 }

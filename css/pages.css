@@ -1890,3 +1890,134 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
   background: var(--color-warning);
   color: #fff;
 }
+
+/* ── Stat cards ───────────────────────────────────────────────
+   Two of these are now buttons and the first pair cycles through the three
+   libraries, so they need a hover affordance and a swap transition. */
+.home-stat-card {
+  transition: transform var(--transition-base), border-color var(--transition-base),
+              box-shadow var(--transition-base);
+  position: relative;
+}
+.home-stat-card.is-clickable,
+.home-stat-card.is-cycling {
+  cursor: pointer;
+  font: inherit;
+  text-align: center;
+  width: 100%;
+}
+.home-stat-card.is-clickable:hover,
+.home-stat-card.is-cycling:hover {
+  transform: translateY(-3px);
+  border-color: var(--stat-accent, var(--color-primary));
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.28);
+}
+.home-stat-card.is-clickable:focus-visible,
+.home-stat-card.is-cycling:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* The face is what swaps when the library changes; it fades and lifts rather
+   than snapping to the next set of numbers. */
+.stat-face { transition: opacity 0.18s ease, transform 0.18s ease; }
+.stat-face.is-swapping { opacity: 0; transform: translateY(-6px); }
+
+.stat-dots {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 0.5rem;
+}
+.stat-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--border-color);
+  transition: background-color var(--transition-fast), width var(--transition-fast);
+}
+.stat-dot.active { width: 14px; border-radius: 999px; background: var(--stat-accent, var(--color-primary)); }
+
+/* ── Streak calendar ───────────────────────────────────────── */
+.hcal-modal, .hbadge-modal {
+  max-width: 520px;
+  width: min(92vw, 520px);
+  max-height: 86vh;
+  overflow-y: auto;
+  padding: 1.25rem;
+}
+.hcal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+.hcal-head h2 {
+  display: flex; align-items: center; gap: 0.45rem;
+  margin: 0; font-size: 1.1rem; font-weight: 800; color: var(--text-primary);
+}
+.hcal-head h2 svg { width: 18px; height: 18px; color: var(--color-warning); }
+.hcal-head p { margin: 0.15rem 0 0; font-size: 0.78rem; color: var(--text-tertiary); }
+
+.hcal-nav { display: flex; align-items: center; justify-content: center; gap: 0.3rem; margin-bottom: 0.7rem; }
+.hcal-title { flex: 1; text-align: center; font-weight: 700; font-size: 0.9rem; color: var(--text-primary); }
+
+.hcal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.hcal-dow { margin-bottom: 4px; }
+.hcal-dow-cell { text-align: center; font-size: 0.65rem; font-weight: 700; color: var(--text-tertiary); }
+.hcal-cell {
+  position: relative;
+  aspect-ratio: 1;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-hover);
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+}
+.hcal-cell.empty { background: transparent; }
+.hcal-cell.today { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.hcal-cell.active { color: #fff; font-weight: 700; }
+.hcal-cell.lvl-1 { background: rgba(245, 158, 11, 0.35); }
+.hcal-cell.lvl-2 { background: rgba(245, 158, 11, 0.6); }
+.hcal-cell.lvl-3 { background: rgba(245, 158, 11, 0.9); }
+.hcal-flame {
+  position: absolute; top: 2px; right: 2px;
+  width: 9px; height: 9px; color: #fff; opacity: 0.85;
+}
+.hcal-note { margin: 0.8rem 0 0; font-size: 0.72rem; color: var(--text-tertiary); }
+
+/* ── Badge overview ───────────────────────────────────────── */
+.hbadge-section {
+  display: flex; align-items: center; gap: 0.4rem;
+  margin: 1rem 0 0.5rem; font-size: 0.7rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-tertiary);
+}
+.hbadge-section span {
+  padding: 0 6px; border-radius: 999px;
+  background: var(--bg-surface-hover); color: var(--text-secondary); font-size: 0.65rem;
+}
+.hbadge-list { display: flex; flex-direction: column; gap: 0.4rem; }
+.hbadge {
+  display: flex; align-items: center; gap: 0.7rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+.hbadge.earned { border-color: var(--color-success); }
+.hbadge.locked { opacity: 0.62; }
+.hbadge-ic {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; flex-shrink: 0;
+  border-radius: 50%; background: var(--bg-surface-hover); color: var(--text-tertiary);
+}
+.hbadge.earned .hbadge-ic { background: var(--color-success); color: #fff; }
+.hbadge.partial .hbadge-ic { color: var(--color-warning); }
+.hbadge-ic svg { width: 17px; height: 17px; }
+.hbadge-body { flex: 1; min-width: 0; }
+.hbadge-name { font-weight: 700; font-size: 0.84rem; color: var(--text-primary); }
+.hbadge-hint { font-size: 0.72rem; color: var(--text-tertiary); margin-bottom: 0.3rem; }
+.hbadge-bar { display: block; height: 4px; border-radius: 999px; background: var(--bg-surface-hover); overflow: hidden; }
+.hbadge-bar span { display: block; height: 100%; border-radius: 999px; background: var(--color-primary); }
+.hbadge.earned .hbadge-bar span { background: var(--color-success); }
+.hbadge-count { flex-shrink: 0; font-size: 0.72rem; font-weight: 800; color: var(--text-secondary); }

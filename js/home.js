@@ -99,46 +99,35 @@ function renderStatsRow() {
   const container = document.getElementById('home-stats');
   if (!container) return;
 
-  const totalChallenges = state.challenges.length;
-  const bestScore = state.history.length > 0
-    ? Math.max(...state.history.map(h => h.score))
-    : 0;
-
-  // Streak: count consecutive days with activity ending today
-  const streak = calculateStreak();
-  const badgeCount = (state.badges || []).length;
+  const streak = homeStreakAllLibraries();
+  const badges = typeof anBadgeState === 'function' ? anBadgeState() : [];
+  const earned = badges.filter(b => b.earned).length;
 
   container.innerHTML = `
-    <div class="home-stat-card">
-      <div class="stat-icon"><i data-lucide="code"></i></div>
-      <div class="stat-value" id="stat-challenges">0</div>
-      <div class="stat-label">Programs</div>
-    </div>
-    <div class="home-stat-card">
-      <div class="stat-icon"><i data-lucide="target"></i></div>
-      <div class="stat-value" id="stat-best" data-suffix="%">0</div>
-      <div class="stat-label">Best Score</div>
-    </div>
-    <div class="home-stat-card">
+    <button class="home-stat-card is-cycling" id="home-stat-lib" onclick="homeCycleStatLib()"
+            title="Click to switch library">
+      <div class="stat-face"></div>
+      <div class="stat-dots">
+        ${HOME_STAT_LIBS.map((l, i) => `<span class="stat-dot${i === 0 ? ' active' : ''}"></span>`).join('')}
+      </div>
+    </button>
+    <div class="home-stat-card" id="home-stat-best"><div class="stat-face"></div></div>
+    <button class="home-stat-card is-clickable" onclick="homeOpenStreakCalendar()"
+            title="See which days you practised">
       <div class="stat-icon"><i data-lucide="flame"></i></div>
-      <div class="stat-value" id="stat-streak">0</div>
+      <div class="stat-value">${streak}</div>
       <div class="stat-label">Day Streak</div>
-    </div>
-    <div class="home-stat-card">
+    </button>
+    <button class="home-stat-card is-clickable" onclick="homeOpenBadges()"
+            title="See every badge and how close you are">
       <div class="stat-icon"><i data-lucide="award"></i></div>
-      <div class="stat-value" id="stat-badges">0</div>
+      <div class="stat-value">${earned}</div>
       <div class="stat-label">Badges</div>
-    </div>
+    </button>
   `;
   lucide.createIcons({ root: container });
-
-  // Animate counters after a short delay
-  setTimeout(() => {
-    animateCounter(document.getElementById('stat-challenges'), totalChallenges, 900);
-    animateCounter(document.getElementById('stat-best'), bestScore, 1100);
-    animateCounter(document.getElementById('stat-streak'), streak, 800);
-    animateCounter(document.getElementById('stat-badges'), badgeCount, 700);
-  }, 400);
+  homeApplyStatLib(false);
+  homeStartStatCycle();
 }
 
 function calculateStreak() {
