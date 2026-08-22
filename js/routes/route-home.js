@@ -15,8 +15,11 @@ function homeTemplate() {
             style="margin-top: 1rem; font-style: italic; color: var(--text-tertiary); max-width: 600px;"></div>
         </section>
         <section class="home-stats-grid stagger-children" id="home-stats"></section>
-        <section class="home-two-col">
-          <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <!-- Quick Actions is a fixed list of six links, so it is sized to its
+             content and the heatmap and carousel take the rest — they are the
+             two things on this page that actually benefit from width. -->
+        <section class="home-two-col home-two-col-wide">
+          <div style="display: flex; flex-direction: column; gap: 1.5rem; min-width: 0;">
             <div class="home-card" id="home-heatmap"></div>
             <div id="home-notebook-carousel"></div>
           </div>

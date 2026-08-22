@@ -332,39 +332,153 @@ function renderHomeSRS() {
 }
 
 /* ======================== RECENT ACTIVITY ======================== */
+/* ── Recent activity ──────────────────────────────────────────
+   This read state.history only, and looked the program up by challengeId to
+   get a name — so a deleted program, or a set problem entered by hand (which
+   stores challengeId: null), rendered as "Unknown", and notebook and snippet
+   attempts never appeared at all since they live in their own arrays. Every
+   record already carries its own title; that is what gets used now. */
+
+/** The three histories in one shape, newest first. */
+function _homeRecentEntries() {
+  const out = [];
+
+  (state.history || []).forEach(h => {
+    if (h.isArchived) return;
+    out.push({
+      kind: 'coding', label: 'Coding', icon: 'code-2',
+      title: h.challengeTitle || 'Untitled program',
+      score: typeof h.score === 'number' ? h.score : 0,
+      ts: h.submitTime || h.startTime || 0,
+      itemId: h.challengeId || null
+    });
+  });
+
+  (state.notebookHistory || []).forEach(h => {
+    if (h.isArchived) return;
+    // A notebook's score is not stored; it is the sum of its sections.
+    let correct = 0, total = 0;
+    (h.sections || []).forEach(sec => { correct += sec.correct || 0; total += sec.total || 0; });
+    out.push({
+      kind: 'notebook', label: 'Notebook', icon: 'book-open',
+      title: h.notebookTitle || 'Untitled notebook',
+      score: total ? Math.round((correct / total) * 100) : 0,
+      ts: h.submitTime || 0,
+      itemId: h.notebookId || null
+    });
+  });
+
+  (state.snippetHistory || []).forEach(h => {
+    if (h.isArchived) return;
+    out.push({
+      kind: 'snippet', label: 'Snippet', icon: 'file-code',
+      title: h.snippetTitle || 'Untitled snippet',
+      score: typeof h.score === 'number' ? h.score : 0,
+      // Snippet records keep a display date and time rather than a number.
+      ts: h.submitTime || Date.parse((h.date || '') + ' ' + (h.time || '')) || 0,
+      itemId: h.snippetId || null
+    });
+  });
+
+  return out.sort((x, y) => y.ts - x.ts);
+}
+
+/** Attempts left part-finished, read from the same keys that resume them. */
+function _homeUnfinished() {
+  const out = [];
+  try {
+    const d = JSON.parse(localStorage.getItem('ssp.practiceDraft') || 'null');
+    if (d && d.challengeId && (d.files || []).some(f => (f.userCode || '').trim())) {
+      out.push({ kind: 'coding', label: 'Coding', icon: 'code-2',
+        title: d.title || 'Untitled program', ts: d.savedAt || 0, itemId: d.challengeId });
+    }
+  } catch (e) { /* nothing saved */ }
+  try {
+    const n = JSON.parse(localStorage.getItem('npAttemptInProgress') || 'null');
+    if (n && n.notebookId) {
+      out.push({ kind: 'notebook', label: 'Notebook', icon: 'book-open',
+        title: n.title || 'Untitled notebook', ts: n.savedAt || 0, itemId: n.notebookId });
+    }
+  } catch (e) { /* nothing saved */ }
+  return out;
+}
+
+/** Pick up where an unfinished attempt left off. */
+window.homeResumeAttempt = function (kind, itemId) {
+  if (kind === 'coding') {
+    if (typeof browseResume === 'function') return browseResume(itemId);
+    setSessionParam('browseActiveProgram', itemId);
+    return spaNavigate('browse');
+  }
+  if (kind === 'notebook') {
+    setSessionParam('activeNotebook', itemId);
+    clearSessionParam('notebookDrill');
+    return spaNavigate('notes-practice');
+  }
+};
+
+/** Open that item's own history, on the analytics page that owns it. */
+window.homeOpenAttemptHistory = function (kind, itemId) {
+  if (!itemId) return;
+  const route = kind === 'coding' ? 'analytics-coding'
+    : kind === 'notebook' ? 'analytics-notes' : 'analytics-snippets';
+  spaNavigate(route);
+  // The route renders before its detail view exists, so this waits a beat.
+  setTimeout(() => {
+    const fn = kind === 'coding' ? window.showHistoryDetail
+      : kind === 'notebook' ? window.showNotebookHistoryDetail : window.showSnippetHistoryDetail;
+    if (typeof fn === 'function') fn(itemId);
+  }, 260);
+};
+
 function renderRecentActivity() {
   const container = document.getElementById('home-activity');
   if (!container) return;
 
-  const recent = state.history.slice(0, 6);
+  const unfinished = _homeUnfinished();
+  const done = _homeRecentEntries().slice(0, unfinished.length ? 5 : 6);
 
-  let itemsHtml;
-  if (recent.length === 0) {
-    itemsHtml = `<div style="color:var(--text-tertiary); font-size:0.8125rem; text-align:center; padding:1rem;">No activity yet. Start practicing!</div>`;
-  } else {
-    itemsHtml = recent.map((log, i) => {
-      const ch = state.challenges.find(c => c.id === log.challengeId);
-      const title = ch ? ch.title : 'Unknown';
-      const dotClass = log.score >= 100 ? 'perfect' : log.score >= 50 ? 'partial' : 'low';
-      const scoreClass = dotClass;
-      const timeAgo = getTimeAgo(log.startTime);
-      return `
-        <div class="home-activity-item" style="animation-delay:${i * 0.08}s">
-          <div class="activity-dot ${dotClass}"></div>
-          <div class="activity-info">
-            <div class="activity-title">${escapeHTML(title)}</div>
-            <div class="activity-meta">${timeAgo}</div>
-          </div>
-          <div class="activity-score ${scoreClass}">${log.score}%</div>
+  const unfinishedHtml = unfinished.map((u, i) => `
+    <div class="home-activity-item is-unfinished" style="animation-delay:${i * 0.08}s">
+      <div class="activity-dot unfinished" title="Unfinished"></div>
+      <div class="activity-info">
+        <div class="activity-title">${escapeHTML(u.title)}</div>
+        <div class="activity-meta">
+          <span class="activity-kind ${u.kind}"><i data-lucide="${u.icon}"></i>${u.label}</span>
+          <span>In progress${u.ts ? ' · ' + getTimeAgo(u.ts) : ''}</span>
         </div>
-      `;
-    }).join('');
-  }
+      </div>
+      <button class="activity-action resume" onclick="homeResumeAttempt('${u.kind}','${u.itemId}')">
+        <i data-lucide="play"></i> Continue
+      </button>
+    </div>`).join('');
 
+  const doneHtml = done.map((e, i) => {
+    const dot = e.score >= 100 ? 'perfect' : e.score >= 50 ? 'partial' : 'low';
+    return `
+      <div class="home-activity-item" style="animation-delay:${(unfinished.length + i) * 0.08}s">
+        <div class="activity-dot ${dot}"></div>
+        <div class="activity-info">
+          <div class="activity-title">${escapeHTML(e.title)}</div>
+          <div class="activity-meta">
+            <span class="activity-kind ${e.kind}"><i data-lucide="${e.icon}"></i>${e.label}</span>
+            <span>${e.ts ? getTimeAgo(e.ts) : 'Earlier'}</span>
+          </div>
+        </div>
+        <div class="activity-score ${dot}">${e.score}%</div>
+        ${e.itemId ? `<button class="activity-action" title="See this item's attempts"
+          onclick="homeOpenAttemptHistory('${e.kind}','${e.itemId}')"><i data-lucide="history"></i></button>` : ''}
+      </div>`;
+  }).join('');
+
+  const empty = !unfinished.length && !done.length;
   container.innerHTML = `
     <div class="home-card-header"><i data-lucide="activity"></i> Recent Activity</div>
-    ${itemsHtml}
+    ${empty
+      ? '<div style="color:var(--text-tertiary); font-size:0.8125rem; text-align:center; padding:1rem;">No activity yet. Start practicing!</div>'
+      : unfinishedHtml + doneHtml}
   `;
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: container });
 }
 
 function getTimeAgo(timestamp) {
@@ -384,7 +498,7 @@ function getTimeAgo(timestamp) {
 /* ======================== CAROUSEL ======================== */
 let notebookCarouselIndex = 0;
 // Switchable source: 'notebooks' | 'coding' (persisted across visits)
-let homeCarouselSource = sessionStorage.getItem('homeCarouselSource') || 'notebooks';
+let homeCarouselSource = sessionStorage.getItem('homeCarouselSource') || 'coding';
 
 // Stable hue (0–359) derived from a string so each cover-less notebook gets a
 // distinct, consistent gradient.
@@ -394,9 +508,20 @@ function _notebookHue(str) {
   return h;
 }
 
+/* The three libraries the carousel can show, in the order they are offered. */
+const HOME_CAROUSEL_SOURCES = [
+  { key: 'coding',    label: 'Coding Library', icon: 'code-2',    items: () => state.challenges || [] },
+  { key: 'notebooks', label: 'Notebooks',      icon: 'book-open', items: () => state.notebooks || [] },
+  { key: 'snippets',  label: 'Snippet Library', icon: 'file-code', items: () => state.snippets || [] }
+];
+
+function _carouselSource() {
+  return HOME_CAROUSEL_SOURCES.find(x => x.key === homeCarouselSource) || HOME_CAROUSEL_SOURCES[0];
+}
+
 /** Items for the active carousel source. */
 function _carouselItems() {
-  return homeCarouselSource === 'coding' ? (state.challenges || []) : (state.notebooks || []);
+  return _carouselSource().items();
 }
 
 window.setCarouselSource = function (src) {
@@ -409,14 +534,14 @@ window.setCarouselSource = function (src) {
   if (container && typeof lucide !== 'undefined') lucide.createIcons({ root: container });
 };
 
-function _buildCarouselSlide(item, isCoding) {
+function _buildCarouselSlide(item, srcKey) {
   const hue = _notebookHue(item.title || item.id || '');
   const hasCover = !!item.coverImage;
   const bgStyle = hasCover
     ? `background-image:url('${item.coverImage}');`
     : `background-image:linear-gradient(135deg, hsl(${hue} 70% 48%) 0%, hsl(${(hue + 45) % 360} 72% 38%) 100%);`;
 
-  if (isCoding) {
+  if (srcKey === 'coding') {
     const vCount = (item.variants || []).length;
     const logs = (state.history || []).filter(h => h.challengeId === item.id && !h.isArchived);
     const best = logs.length ? Math.max(...logs.map(l => l.score)) : null;
@@ -433,6 +558,32 @@ function _buildCarouselSlide(item, isCoding) {
             ${best !== null ? `<span><i data-lucide="target"></i> Best ${best}%</span>` : `<span><i data-lucide="sparkles"></i> Not attempted</span>`}
           </div>
           <div class="carousel-open-cta">Open program <i data-lucide="arrow-right"></i></div>
+        </div>
+      </div>
+    `;
+  }
+
+  if (srcKey === 'snippets') {
+    const logs = (state.snippetHistory || []).filter(h => h.snippetId === item.id && !h.isArchived);
+    const best = logs.length ? Math.max(...logs.map(l => l.score || 0)) : null;
+    const tagCount = (item.tags || []).length;
+    const sIcon = item.icon || 'file-code';
+    return `
+      <div class="carousel-slide" onclick="selectSnippetFromCarousel('${item.id}')" style="--nb-hue:${hue};">
+        <div class="carousel-slide-bg ${hasCover ? 'has-cover' : 'no-cover'}" style="${bgStyle}"></div>
+        ${hasCover ? '' : `<i class="carousel-slide-watermark" data-lucide="${sIcon}" aria-hidden="true"></i>`}
+        <div class="carousel-slide-scrim"></div>
+        <div class="carousel-badge"><i data-lucide="${sIcon}"></i> Snippet</div>
+        <div class="carousel-slide-content">
+          <div class="carousel-item-title">${escapeHTML(item.title || 'Untitled snippet')}</div>
+          <div class="carousel-item-subtitle">
+            <span><i data-lucide="terminal"></i> ${escapeHTML(item.language || 'plain')}</span>
+            ${best !== null
+              ? `<span><i data-lucide="target"></i> Best ${best}%</span>`
+              : (tagCount ? `<span><i data-lucide="tag"></i> ${tagCount} tag${tagCount !== 1 ? 's' : ''}</span>`
+                          : `<span><i data-lucide="sparkles"></i> Not attempted</span>`)}
+          </div>
+          <div class="carousel-open-cta">Open snippet <i data-lucide="arrow-right"></i></div>
         </div>
       </div>
     `;
@@ -463,17 +614,15 @@ function renderNotebookCarousel() {
   const container = document.getElementById('home-notebook-carousel');
   if (!container) return;
 
-  const isCoding = homeCarouselSource === 'coding';
   const items = _carouselItems();
 
   const switcherHTML = `
     <div class="carousel-source-toggle" role="group" aria-label="Carousel content">
-      <button class="carousel-source-btn ${!isCoding ? 'active' : ''}" onclick="setCarouselSource('notebooks')" aria-pressed="${!isCoding}">
-        <i data-lucide="book-open"></i> Notebooks
-      </button>
-      <button class="carousel-source-btn ${isCoding ? 'active' : ''}" onclick="setCarouselSource('coding')" aria-pressed="${isCoding}">
-        <i data-lucide="code-2"></i> Coding Library
-      </button>
+      ${HOME_CAROUSEL_SOURCES.map(src => `
+      <button class="carousel-source-btn ${src.key === homeCarouselSource ? 'active' : ''}"
+              onclick="setCarouselSource('${src.key}')" aria-pressed="${src.key === homeCarouselSource}">
+        <i data-lucide="${src.icon}"></i> ${src.label}
+      </button>`).join('')}
     </div>`;
 
   if (!items || items.length === 0) {
@@ -481,12 +630,12 @@ function renderNotebookCarousel() {
       <div class="premium-carousel-container">
         <div class="carousel-title-main">
           <i data-lucide="sparkles" style="width:16px;height:16px;color:var(--color-primary);"></i>
-          ${isCoding ? 'Coding Library' : 'Notebooks'}
+          ${_carouselSource().label}
           <i data-lucide="sparkles" style="width:16px;height:16px;color:var(--color-primary);"></i>
         </div>
         ${switcherHTML}
         <div style="text-align:center;color:var(--text-tertiary);font-size:0.8125rem;padding:2rem 1rem;">
-          No ${isCoding ? 'programs' : 'notebooks'} yet — create some in the Admin panel.
+          No ${_carouselSource().label.toLowerCase().replace(' library', '')} yet — create some in the Admin panel.
         </div>
       </div>`;
     if (typeof lucide !== 'undefined') lucide.createIcons({ root: container });
@@ -498,7 +647,7 @@ function renderNotebookCarousel() {
 
   // Positioning (active/side/depth) is applied by _positionCarouselSlides()
   // so the slides persist in the DOM and CSS transitions animate the rotation.
-  const slidesHTML = items.map(item => _buildCarouselSlide(item, isCoding)).join('');
+  const slidesHTML = items.map(item => _buildCarouselSlide(item, homeCarouselSource)).join('');
 
   const dotsHTML = items.map((_, idx) => `
     <div class="carousel-dot ${idx === notebookCarouselIndex ? 'active' : ''}" onclick="jumpToNotebookCarousel(${idx})"></div>
@@ -508,7 +657,7 @@ function renderNotebookCarousel() {
     <div class="premium-carousel-container">
       <div class="carousel-title-main">
         <i data-lucide="sparkles" style="width:16px;height:16px;color:var(--color-primary);"></i>
-        ${isCoding ? 'Coding Library' : 'Notebooks'}
+        ${_carouselSource().label}
         <i data-lucide="sparkles" style="width:16px;height:16px;color:var(--color-primary);"></i>
       </div>
       ${switcherHTML}
@@ -618,5 +767,10 @@ window.selectNotebookFromCarousel = function(id) {
 window.selectChallengeFromCarousel = function(id) {
   setSessionParam('browseActiveProgram', id);
   spaNavigate('browse');
+};
+
+window.selectSnippetFromCarousel = function(id) {
+  setSessionParam('activeSnippetId', id);
+  spaNavigate('snippets');
 };
 
