@@ -52,34 +52,55 @@ const HOME_STAT_LIBS = [
   {
     key: 'coding', label: 'Programs', icon: 'code', accent: 'var(--color-primary)',
     count: () => (state.challenges || []).length,
-    best: () => {
-      const l = (state.history || []).filter(h => !h.isArchived);
-      return l.length ? Math.max(...l.map(h => h.score || 0)) : 0;
-    }
+    done: () => homeCountDone('coding'),
+    doneNoun: 'programs'
   },
   {
     key: 'notebooks', label: 'Notebooks', icon: 'book-open', accent: 'var(--color-warning)',
     count: () => (state.notebooks || []).length,
-    best: () => {
-      let best = 0;
-      (state.notebookHistory || []).forEach(h => {
-        if (h.isArchived) return;
-        let c = 0, t = 0;
-        (h.sections || []).forEach(s => { c += s.correct || 0; t += s.total || 0; });
-        if (t) best = Math.max(best, Math.round((c / t) * 100));
-      });
-      return best;
-    }
+    done: () => homeCountDone('notebooks'),
+    doneNoun: 'notebooks'
   },
   {
     key: 'snippets', label: 'Snippets', icon: 'file-code', accent: 'var(--color-accent)',
     count: () => (state.snippets || []).length,
-    best: () => {
-      const l = (state.snippetHistory || []).filter(h => !h.isArchived);
-      return l.length ? Math.max(...l.map(h => h.score || 0)) : 0;
-    }
+    done: () => homeCountDone('snippets'),
+    doneNoun: 'snippets'
   }
 ];
+
+/**
+ * How many items of a library are finished. "Finished" is a best score of 100,
+ * the same rule the Coding Library's own To-do / In-progress / Completed filter
+ * uses, so the dashboard and the library never disagree.
+ */
+function homeCountDone(key) {
+  if (key === 'coding') {
+    const best = {};
+    (state.history || []).forEach(h => {
+      if (h.isArchived || !h.challengeId) return;
+      best[h.challengeId] = Math.max(best[h.challengeId] || 0, h.score || 0);
+    });
+    return (state.challenges || []).filter(c => best[c.id] === 100).length;
+  }
+  if (key === 'notebooks') {
+    const best = {};
+    (state.notebookHistory || []).forEach(h => {
+      if (h.isArchived || !h.notebookId) return;
+      let c = 0, t = 0;
+      (h.sections || []).forEach(sec => { c += sec.correct || 0; t += sec.total || 0; });
+      const pct = t ? Math.round((c / t) * 100) : 0;
+      best[h.notebookId] = Math.max(best[h.notebookId] || 0, pct);
+    });
+    return (state.notebooks || []).filter(n => best[n.id] === 100).length;
+  }
+  const best = {};
+  (state.snippetHistory || []).forEach(h => {
+    if (h.isArchived || !h.snippetId) return;
+    best[h.snippetId] = Math.max(best[h.snippetId] || 0, h.score || 0);
+  });
+  return (state.snippets || []).filter(sn => best[sn.id] === 100).length;
+}
 
 let _homeStatLibIdx = 0;
 let _homeStatTimer = null;
@@ -102,10 +123,16 @@ function homeApplyStatLib(animate) {
     <div class="stat-icon" style="color:${lib.accent};"><i data-lucide="${lib.icon}"></i></div>
     <div class="stat-value">${lib.count()}</div>
     <div class="stat-label">${lib.label}</div>`);
+  // Completion of the whole library, not one lucky attempt: "best score" was
+  // 100% the moment a single program was finished, which said nothing about
+  // how far through anything you were.
+  const total = lib.count();
+  const done = lib.done();
+  const pct = total ? Math.round((done / total) * 100) : 0;
   swap(bestCard.querySelector('.stat-face'), `
-    <div class="stat-icon" style="color:${lib.accent};"><i data-lucide="target"></i></div>
-    <div class="stat-value">${lib.best()}%</div>
-    <div class="stat-label">Best · ${lib.label}</div>`);
+    <div class="stat-icon" style="color:${lib.accent};"><i data-lucide="circle-check-big"></i></div>
+    <div class="stat-value">${pct}%</div>
+    <div class="stat-label">${done}/${total} ${escapeHTML(lib.doneNoun)} done</div>`);
 
   card.style.setProperty('--stat-accent', lib.accent);
   bestCard.style.setProperty('--stat-accent', lib.accent);
@@ -167,21 +194,56 @@ window.homeCalShift = function (deltaMonths, deltaYears) {
   _homeCalYear += (deltaYears || 0);
   while (_homeCalMonth < 0) { _homeCalMonth += 12; _homeCalYear--; }
   while (_homeCalMonth > 11) { _homeCalMonth -= 12; _homeCalYear++; }
-  homeRenderStreakCalendar();
+  homeRenderCalMonth();
 };
 
 function homeRenderStreakCalendar() {
   const ov = document.getElementById('home-streak-modal');
   if (!ov) return;
+  ov.innerHTML = `
+    <div class="modal-content hcal-modal" onclick="event.stopPropagation()">
+      <div class="hcal-head">
+        <div>
+          <h2><i data-lucide="flame"></i> Practice streak</h2>
+          <p id="hcal-sub"></p>
+        </div>
+        <button class="btn btn-ghost" onclick="homeCloseStreakCalendar()" aria-label="Close">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="hcal-nav">
+        <button class="btn btn-ghost btn-sm" onclick="homeCalShift(0,-1)" title="Previous year"><i data-lucide="chevrons-left"></i></button>
+        <button class="btn btn-ghost btn-sm" onclick="homeCalShift(-1,0)" title="Previous month"><i data-lucide="chevron-left"></i></button>
+        <span class="hcal-title" id="hcal-title"></span>
+        <button class="btn btn-ghost btn-sm" onclick="homeCalShift(1,0)" title="Next month"><i data-lucide="chevron-right"></i></button>
+        <button class="btn btn-ghost btn-sm" onclick="homeCalShift(0,1)" title="Next year"><i data-lucide="chevrons-right"></i></button>
+      </div>
+      <div class="hcal-grid hcal-dow">
+        ${['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => `<div class="hcal-dow-cell">${d}</div>`).join('')}
+      </div>
+      <div class="hcal-grid" id="hcal-grid"></div>
+      <p class="hcal-note">Counts attempts from every library — programs, notebooks and snippets.</p>
+    </div>`;
+  ov.onclick = () => homeCloseStreakCalendar();
+  homeRenderCalMonth();
+}
+
+/**
+ * Only the month heading and the day grid. Rebuilding the whole dialog on every
+ * arrow press replayed its entrance animation, so paging through months made
+ * the window flicker in and out rather than the dates simply changing.
+ */
+function homeRenderCalMonth() {
+  const grid = document.getElementById('hcal-grid');
+  if (!grid) return;
   const counts = homeActivityByDay();
   const y = _homeCalYear, m = _homeCalMonth;
   const first = new Date(y, m, 1);
   const daysInMonth = new Date(y, m + 1, 0).getDate();
-  const lead = first.getDay();
   const todayKey = _toLocalDate(new Date());
 
   let cells = '';
-  for (let i = 0; i < lead; i++) cells += '<div class="hcal-cell empty"></div>';
+  for (let i = 0; i < first.getDay(); i++) cells += '<div class="hcal-cell empty"></div>';
   let monthActive = 0;
   for (let d = 1; d <= daysInMonth; d++) {
     const key = _toLocalDate(new Date(y, m, d));
@@ -195,34 +257,17 @@ function homeRenderStreakCalendar() {
         ${n ? '<i data-lucide="flame" class="hcal-flame"></i>' : ''}
       </div>`;
   }
+  grid.innerHTML = cells;
 
-  const monthName = first.toLocaleString(undefined, { month: 'long' });
-  ov.innerHTML = `
-    <div class="modal-content hcal-modal" onclick="event.stopPropagation()">
-      <div class="hcal-head">
-        <div>
-          <h2><i data-lucide="flame"></i> Practice streak</h2>
-          <p>${homeStreakAllLibraries()} day streak · ${monthActive} active day${monthActive !== 1 ? 's' : ''} this month</p>
-        </div>
-        <button class="btn btn-ghost" onclick="homeCloseStreakCalendar()" aria-label="Close">
-          <i data-lucide="x"></i>
-        </button>
-      </div>
-      <div class="hcal-nav">
-        <button class="btn btn-ghost btn-sm" onclick="homeCalShift(0,-1)" title="Previous year"><i data-lucide="chevrons-left"></i></button>
-        <button class="btn btn-ghost btn-sm" onclick="homeCalShift(-1,0)" title="Previous month"><i data-lucide="chevron-left"></i></button>
-        <span class="hcal-title">${monthName} ${y}</span>
-        <button class="btn btn-ghost btn-sm" onclick="homeCalShift(1,0)" title="Next month"><i data-lucide="chevron-right"></i></button>
-        <button class="btn btn-ghost btn-sm" onclick="homeCalShift(0,1)" title="Next year"><i data-lucide="chevrons-right"></i></button>
-      </div>
-      <div class="hcal-grid hcal-dow">
-        ${['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => `<div class="hcal-dow-cell">${d}</div>`).join('')}
-      </div>
-      <div class="hcal-grid">${cells}</div>
-      <p class="hcal-note">Counts attempts from every library — programs, notebooks and snippets.</p>
-    </div>`;
-  ov.onclick = () => homeCloseStreakCalendar();
-  if (typeof lucide !== 'undefined') lucide.createIcons({ el: ov });
+  const title = document.getElementById('hcal-title');
+  if (title) title.textContent = first.toLocaleString(undefined, { month: 'long' }) + ' ' + y;
+  const sub = document.getElementById('hcal-sub');
+  if (sub) {
+    sub.textContent = homeStreakAllLibraries() + ' day streak \u00b7 ' +
+      monthActive + ' active day' + (monthActive !== 1 ? 's' : '') + ' this month';
+  }
+  const ov = document.getElementById('home-streak-modal');
+  if (ov && typeof lucide !== 'undefined') lucide.createIcons({ el: ov });
 }
 
 /* ── Badge overview ───────────────────────────────────────── */
@@ -252,7 +297,7 @@ window.homeOpenBadges = function () {
         <div class="hbadge-hint">${escapeHTML(b.hint)}</div>
         <div class="hbadge-bar"><span style="width:${b.earned ? 100 : b.pct}%"></span></div>
       </div>
-      <div class="hbadge-count">${b.earned ? 'Earned' : b.have + '/' + b.goal}</div>
+      <div class="hbadge-count">${typeof badgeProgressLabel === 'function' ? badgeProgressLabel(b) : (b.have + '/' + b.goal)}</div>
     </div>`;
 
   const section = (title, arr) => arr.length

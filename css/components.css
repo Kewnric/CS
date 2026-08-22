@@ -804,7 +804,31 @@
   width: 100%;
   padding: var(--space-xl);
   text-align: center;
-  animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* scaleIn used cubic-bezier(0.34, 1.56, 0.64, 1) — the 1.56 is an overshoot,
+     so every dialog in the app bounced past its size and settled back, which
+     read as a clunky pop. This rises and settles instead: a short travel, a
+     small scale, and an expo-out curve that decelerates hard at the end. */
+  animation: modalRise 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes modalRise {
+  from { opacity: 0; transform: translateY(12px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* The scrim arrives with it rather than snapping on. */
+.modal-overlay::before { animation: modalScrim 0.28s ease-out both; }
+@keyframes modalScrim {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Re-rendering the inside of an open dialog — paging a calendar, say — must
+   not replay its entrance. */
+.modal-content.no-entry { animation: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-content, .modal-overlay::before { animation: none; }
 }
 
 .modal-content-lg {
@@ -2887,9 +2911,13 @@
   animation: smoothReveal 0.35s ease-out backwards;
 }
 
-/* --- Modal Overlay Enhanced Animation --- */
+/* --- Modal Overlay Entrance ---
+   A second .modal-content rule further down the same file was overriding the
+   one above with bounceIn, so every dialog overshot its size and sprang back.
+   Both now use the same rise-and-settle; keeping this one so the intent stays
+   where someone would look for it. */
 .modal-content {
-  animation: bounceIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: modalRise 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* --- Badge Hover Lift --- */
@@ -3020,9 +3048,9 @@
   background: var(--color-primary-subtle);
 }
 
-/* --- Mindmap Panel Enhanced Entrance --- */
+/* --- Mindmap Panel Entrance --- */
 .mindmap-panel {
-  animation: bounceIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: modalRise 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* --- Tag Hover Lift --- */

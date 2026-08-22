@@ -215,41 +215,25 @@ function anSrsDue(limit) {
    These were bare strings in state.badges with no criteria and no progress, so
    "Night Owl" told you nothing about how it was earned or what was next. */
 
-const AN_BADGES = [
-  { id: 'first', icon: 'flag', name: 'First Steps', hint: 'Finish one program',
-    goal: 1, get: () => anByProgram('all').filter(p => p.solved).length },
-  { id: 'flawless', icon: 'sparkles', name: 'Flawless', hint: 'Score 100% on the first try',
-    goal: 1, get: () => anByProgram('all').filter(p => p.firstTry).length },
-  { id: 'persistent', icon: 'repeat', name: 'Persistent', hint: '25 attempts logged',
-    goal: 25, get: () => anAttempts({ range: 'all' }).length },
-  { id: 'streak', icon: 'flame', name: 'On a Roll', hint: 'Practise 5 days in a row',
-    goal: 5, get: () => anStreaks().longest },
-  { id: 'nightowl', icon: 'moon', name: 'Night Owl', hint: 'An attempt after midnight',
-    goal: 1, get: () => anAttempts({ range: 'all' }).filter(h => {
-      const hr = new Date(h.submitTime || h.startTime || 0).getHours();
-      return hr >= 0 && hr < 5;
-    }).length },
-  { id: 'speed', icon: 'zap', name: 'Quick Draw', hint: 'Solve one in under two minutes',
-    goal: 1, get: () => anAttempts({ range: 'all' }).filter(h => h.score === 100 && anDuration(h) > 0 && anDuration(h) < 120).length },
-  { id: 'tenner', icon: 'trophy', name: 'Ten Down', hint: 'Finish ten programs',
-    goal: 10, get: () => anByProgram('all').filter(p => p.solved).length }
-];
+/* The seven badges that used to live here were all about the coding library,
+   so notebooks and snippets earned nothing. They are part of the fifty in
+   badges.js now, and both this page and the dashboard read that one list. */
 
 function anBadgeState() {
-  return AN_BADGES.map(b => {
-    let have = 0;
-    try { have = b.get() || 0; } catch (e) { have = 0; }
-    return { ...b, have, pct: Math.min(100, Math.round((have / b.goal) * 100)), earned: have >= b.goal };
-  });
+  return typeof badgeState === 'function' ? badgeState() : [];
 }
 
 function anBadgesHTML() {
-  const list = anBadgeState().sort((a, b) => (b.earned - a.earned) || (b.pct - a.pct));
+  // Fifty tiles is a wall. The earned ones and whatever is closest come first,
+  // and the rest are a click away in the dashboard's badge window.
+  const list = anBadgeState()
+    .sort((a, b) => (b.earned - a.earned) || (b.pct - a.pct))
+    .slice(0, 12);
   return `<div class="an-badges">${list.map(b => `
     <div class="an-badge ${b.earned ? 'earned' : ''}" title="${_an_esc(b.hint)} — ${b.have}/${b.goal}">
       <i data-lucide="${b.icon}"></i>
       <span class="an-badge-name">${_an_esc(b.name)}</span>
-      <span class="an-badge-meta">${b.earned ? 'Earned' : b.have + '/' + b.goal}</span>
+      <span class="an-badge-meta">${typeof badgeProgressLabel === 'function' ? badgeProgressLabel(b) : (b.earned ? 'Earned' : b.have + '/' + b.goal)}</span>
       ${b.earned ? '' : `<span class="an-badge-bar"><span style="width:${b.pct}%"></span></span>`}
     </div>`).join('')}</div>`;
 }
