@@ -1910,9 +1910,16 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
 }
 .home-stat-card > .stat-face { width: 100%; }
 
-.stat-dots {
+/* Room under the centred face for whatever sits at the bottom — the cycling
+   dots on the first card, the goal on the streak card. Reserved on all four so
+   the faces stay level with each other, and so revealing the goal has somewhere
+   to go instead of being drawn over the label. */
+.home-stat-card { padding-bottom: 2.1rem; }
+
+.stat-dots,
+.stat-goal {
   position: absolute;
-  left: 0; right: 0; bottom: 0.55rem;
+  left: 0.9rem; right: 0.9rem; bottom: 0.6rem;
 }
 .home-stat-card.is-clickable,
 .home-stat-card.is-cycling {
@@ -2045,7 +2052,7 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
   margin-bottom: 1rem;
   border: 1px solid var(--color-warning);
   border-radius: var(--radius-xl);
-  background: linear-gradient(120deg, rgba(245, 158, 11, 0.12), transparent 60%), var(--bg-surface);
+  background: var(--bg-surface);
   overflow: hidden;
   transition: opacity 0.25s ease, transform 0.25s ease;
 }
@@ -2064,20 +2071,31 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
 /* The bar is the countdown — five seconds, draining right to left, and it is
    what fires the dismissal. Running it in CSS rather than beside a setTimeout
    means pausing it pauses the clock exactly, with nothing to keep in sync. */
+/* The wash across the card IS the countdown, rather than a separate hairline:
+   it fills the card at the start and retreats leftwards as the time runs out,
+   so the colour draining away is the clock. Sits behind the content. */
 .hc-timer {
   position: absolute;
-  left: 0; right: 0; bottom: 0;
-  height: 3px;
-  background: rgba(245, 158, 11, 0.15);
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
 }
 .hc-timer > span {
   display: block;
   height: 100%;
   width: 100%;
-  transform-origin: right center;
-  background: var(--color-warning);
+  /* Origin left, so the right-hand edge is what recedes. */
+  transform-origin: left center;
+  background: linear-gradient(90deg,
+    rgba(245, 158, 11, 0.26) 0%,
+    rgba(245, 158, 11, 0.14) 55%,
+    rgba(245, 158, 11, 0.05) 100%);
+  border-right: 2px solid rgba(245, 158, 11, 0.75);
   animation: hcDrain 5s linear forwards;
 }
+/* The rows sit above the wash. */
+.hc-row, .hc-more { position: relative; z-index: 1; }
 @keyframes hcDrain {
   from { transform: scaleX(1); }
   to   { transform: scaleX(0); }
@@ -2130,8 +2148,6 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
    share a grid row, so anything that changed the streak card's height pushed
    all four and left its icon, value and label out of line with the rest. */
 .stat-goal {
-  position: absolute;
-  left: 0.9rem; right: 0.9rem; bottom: 0.55rem;
   opacity: 0;
   transform: translateY(5px);
   pointer-events: none;
