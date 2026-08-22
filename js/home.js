@@ -18,6 +18,9 @@ async function renderHomeDashboard() {
   renderNotebookCarousel();
   renderHomeSRS();
   renderRecentActivity();
+  renderHomeContinue();
+  renderHomeWeakSpots();
+  renderHomeDayPanel();
   const homeRoot = document.getElementById('home-view') || document.getElementById('main-content');
   lucide.createIcons(homeRoot ? { root: homeRoot } : undefined);
 
@@ -59,6 +62,15 @@ function renderHeroSection() {
   const subEl   = document.getElementById('hero-subtitle');
   const dateEl  = document.getElementById('hero-date');
   const verseEl = document.getElementById('hero-verse');
+  // Hidden is a preference, not a one-off: it stays hidden until asked back.
+  if (verseEl) {
+    const hidden = localStorage.getItem('ssp.hideVerse') === '1';
+    verseEl.classList.toggle('is-hidden', hidden);
+    const toggle = document.getElementById('hero-verse-toggle');
+    if (toggle) toggle.innerHTML = hidden
+      ? '<i data-lucide="quote"></i> Show verse'
+      : '<i data-lucide="shuffle"></i> Another verse';
+  }
 
   if (dateEl) dateEl.textContent = dateStr;
 
@@ -99,9 +111,15 @@ function renderStatsRow() {
   const container = document.getElementById('home-stats');
   if (!container) return;
 
-  const streak = homeStreakAllLibraries();
+  const risk = homeStreakAtRisk();
+  const streak = risk.risk ? risk.length : homeStreakAllLibraries();
   const badges = typeof anBadgeState === 'function' ? anBadgeState() : [];
   const earned = badges.filter(b => b.earned).length;
+
+  // The day's target, and how much of it is done.
+  const goal = homeDailyGoal();
+  const doneToday = homeActivityByDay().get(_toLocalDate(new Date())) || 0;
+  const goalPct = Math.min(100, Math.round((doneToday / goal) * 100));
 
   container.innerHTML = `
     <button class="home-stat-card is-cycling" id="home-stat-lib" onclick="homeCycleStatLib()"
@@ -112,11 +130,15 @@ function renderStatsRow() {
       </div>
     </button>
     <div class="home-stat-card" id="home-stat-best"><div class="stat-face"></div></div>
-    <button class="home-stat-card is-clickable" onclick="homeOpenStreakCalendar()"
-            title="See which days you practised">
+    <button class="home-stat-card is-clickable${risk.risk ? ' at-risk' : ''}" onclick="homeOpenStreakCalendar()"
+            title="${risk.risk ? 'Practise today to keep this streak' : 'See which days you practised'}">
       <div class="stat-icon"><i data-lucide="flame"></i></div>
       <div class="stat-value">${streak}</div>
-      <div class="stat-label">Day Streak</div>
+      <div class="stat-label">${risk.risk ? 'Practise today!' : 'Day Streak'}</div>
+      <div class="stat-goal" title="${doneToday} of ${goal} today">
+        <span class="stat-goal-bar"><span style="width:${goalPct}%"></span></span>
+        <span class="stat-goal-txt">${doneToday}/${goal} today</span>
+      </div>
     </button>
     <button class="home-stat-card is-clickable" onclick="homeOpenBadges()"
             title="See every badge and how close you are">
@@ -155,11 +177,11 @@ function renderHomeHeatmap() {
   const container = document.getElementById('home-heatmap');
   if (!container) return;
 
+  // This counted state.history alone — coding attempts — while the streak card
+  // and its calendar count all three libraries, so a day of notebook work lit
+  // the streak and left the heatmap blank for the same date. One source now.
   const activityMap = {};
-  state.history.forEach(log => {
-    const d = _toLocalDate(log.startTime);
-    activityMap[d] = (activityMap[d] || 0) + 1;
-  });
+  homeActivityByDay().forEach((n, day) => { activityMap[day] = n; });
 
   const today = new Date();
   const oneYearAgo = new Date(today);
@@ -180,7 +202,10 @@ function renderHomeHeatmap() {
     else if (c === 2) lv = 2;
     else if (c >= 3 && c <= 4) lv = 3;
     else if (c > 4) lv = 4;
-    cells += `<div class="heatmap-cell" data-level="${lv}" title="${ds}: ${c} submissions"></div>`;
+    // Clickable: the per-day data was already here, it just had nowhere to go.
+    cells += `<div class="heatmap-cell${c ? ' has-work' : ''}" data-level="${lv}"
+      title="${ds}: ${c} attempt${c !== 1 ? 's' : ''}${c ? ' — click to see them' : ''}"
+      onclick="homeShowDay('${ds}')"></div>`;
   }
 
   container.innerHTML = `
@@ -216,58 +241,72 @@ function renderHomeHeatmap() {
   setTimeout(toEnd, 0);
 }
 
+/** Shuffle to another verse, or bring it back if it was put away. */
+window.homeVerseAction = function () {
+  const hidden = localStorage.getItem('ssp.hideVerse') === '1';
+  if (hidden) {
+    try { localStorage.removeItem('ssp.hideVerse'); } catch (e) { /* quota */ }
+  }
+  renderHeroSection();
+};
+
+window.homeHideVerse = function () {
+  try { localStorage.setItem('ssp.hideVerse', '1'); } catch (e) { /* quota */ }
+  renderHeroSection();
+};
+
 /* ======================== QUICK ACTIONS ======================== */
+/* ── Quick Actions ────────────────────────────────────────────
+   Six links in a fixed order, however you actually work. They are declared
+   once now and sorted by how recently each was opened, so the ones you use
+   rise to the top on their own. */
+
+const HOME_ACTIONS = [
+  { key: 'library',   href: '#/library',   icon: 'library',      label: 'Library',         desc: 'All collections in one place' },
+  { key: 'browse',    href: '#/browse',    icon: 'layout-grid',  label: 'Coding Library',  desc: 'Explore challenge programs' },
+  { key: 'notes',     href: '#/study',     icon: 'book-open',    label: 'Notes Library',   desc: 'Notebooks & quizzes' },
+  { key: 'snippets',  href: '#/snippets',  icon: 'code-2',       label: 'Snippet Library', desc: 'Reference & try-coding' },
+  { key: 'analytics', href: '#/analytics', icon: 'bar-chart-2',  label: 'Analytics',       desc: 'View your history' },
+  { key: 'admin',     href: '#/admin',     icon: 'settings',     label: 'Admin Panel',     desc: 'Manage content' }
+];
+
+const HOME_ACTION_USE_KEY = 'ssp.actionUse';
+
+function _homeActionUse() {
+  try { return JSON.parse(localStorage.getItem(HOME_ACTION_USE_KEY) || '{}') || {}; }
+  catch (e) { return {}; }
+}
+
+window.homeNoteActionUse = function (key) {
+  const use = _homeActionUse();
+  use[key] = Date.now();
+  try { localStorage.setItem(HOME_ACTION_USE_KEY, JSON.stringify(use)); } catch (e) { /* quota */ }
+};
+
 function renderQuickActions() {
   const container = document.getElementById('home-actions');
   if (!container) return;
 
+  const use = _homeActionUse();
+  // Anything opened recently floats up; anything never opened keeps its
+  // declared order below, so the list stays predictable on a fresh install.
+  const ordered = HOME_ACTIONS.map((a, i) => ({ ...a, last: use[a.key] || 0, i }))
+    .sort((x, y) => (y.last - x.last) || (x.i - y.i));
+
   container.innerHTML = `
     <div class="home-card-header"><i data-lucide="zap"></i> Quick Actions</div>
     <div class="home-quick-actions">
-      <a href="#/library" class="quick-action-card">
-        <div class="quick-action-icon"><i data-lucide="library"></i></div>
-        <div>
-          <div class="quick-action-label">Library</div>
-          <div class="quick-action-desc">All collections in one place</div>
-        </div>
-      </a>
-      <a href="#/browse" class="quick-action-card">
-        <div class="quick-action-icon"><i data-lucide="layout-template"></i></div>
-        <div>
-          <div class="quick-action-label">Coding Library</div>
-          <div class="quick-action-desc">Explore challenge programs</div>
-        </div>
-      </a>
-      <a href="#/study" class="quick-action-card">
-        <div class="quick-action-icon"><i data-lucide="book-open"></i></div>
-        <div>
-          <div class="quick-action-label">Notes Library</div>
-          <div class="quick-action-desc">Notebooks & quizzes</div>
-        </div>
-      </a>
-      <a href="#/snippets" class="quick-action-card">
-        <div class="quick-action-icon"><i data-lucide="code"></i></div>
-        <div>
-          <div class="quick-action-label">Snippet Library</div>
-          <div class="quick-action-desc">Reference & try-coding</div>
-        </div>
-      </a>
-      <a href="#/analytics" class="quick-action-card">
-        <div class="quick-action-icon"><i data-lucide="bar-chart-3"></i></div>
-        <div>
-          <div class="quick-action-label">Analytics</div>
-          <div class="quick-action-desc">View your history</div>
-        </div>
-      </a>
-      <a href="#/admin" class="quick-action-card">
-        <div class="quick-action-icon"><i data-lucide="settings"></i></div>
-        <div>
-          <div class="quick-action-label">Admin Panel</div>
-          <div class="quick-action-desc">Manage content</div>
-        </div>
-      </a>
+      ${ordered.map(a => `
+        <a href="${a.href}" class="quick-action-card" onclick="homeNoteActionUse('${a.key}')">
+          <div class="quick-action-icon"><i data-lucide="${a.icon}"></i></div>
+          <div>
+            <div class="quick-action-label">${a.label}</div>
+            <div class="quick-action-desc">${a.desc}</div>
+          </div>
+        </a>`).join('')}
     </div>
   `;
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: container });
 }
 
 /* ======================== SRS (Spaced Repetition) ======================== */
@@ -420,6 +459,138 @@ window.homeOpenAttemptHistory = function (kind, itemId) {
   }, 260);
 };
 
+/* ── Continue where you left off ──────────────────────────────
+   _homeUnfinished() already knows what was abandoned; this puts it where it is
+   actually useful rather than at the bottom of the activity list. */
+function renderHomeContinue() {
+  const host = document.getElementById('home-continue');
+  if (!host) return;
+  const items = _homeUnfinished();
+  if (!items.length) { host.innerHTML = ''; return; }
+
+  host.innerHTML = items.map(u => `
+    <div class="home-continue-card">
+      <div class="hc-icon"><i data-lucide="${u.icon}"></i></div>
+      <div class="hc-text">
+        <div class="hc-eyebrow">Pick up where you left off · ${u.label}</div>
+        <div class="hc-title">${escapeHTML(u.title)}</div>
+        <div class="hc-meta">${u.ts ? 'Left ' + getTimeAgo(u.ts) : 'In progress'}</div>
+      </div>
+      <button class="btn btn-primary hc-go" onclick="homeResumeAttempt('${u.kind}','${u.itemId}')">
+        <i data-lucide="play"></i> Continue
+      </button>
+      <button class="btn btn-ghost hc-dismiss" title="Discard this draft"
+              onclick="homeDiscardDraft('${u.kind}')"><i data-lucide="x"></i></button>
+    </div>`).join('');
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
+}
+
+/** Throw away a saved draft, with a confirm — it is unrecoverable. */
+window.homeDiscardDraft = function (kind) {
+  showConfirm('Discard this draft?', 'The unfinished work in it cannot be recovered.', () => {
+    try {
+      localStorage.removeItem(kind === 'coding' ? 'ssp.practiceDraft' : 'npAttemptInProgress');
+    } catch (e) { /* nothing to remove */ }
+    renderHomeContinue();
+    renderRecentActivity();
+  });
+};
+
+/* ── Weak spots ───────────────────────────────────────────────
+   Best and worst per item are computed for the badges anyway; the lowest of
+   them is the most useful thing on this page and was shown nowhere. */
+function renderHomeWeakSpots() {
+  const host = document.getElementById('home-weak');
+  if (!host) return;
+
+  const rows = [];
+  const bestC = {};
+  (state.history || []).forEach(h => {
+    if (h.isArchived || !h.challengeId) return;
+    bestC[h.challengeId] = Math.max(bestC[h.challengeId] ?? -1, h.score || 0);
+  });
+  (state.challenges || []).forEach(c => {
+    if (bestC[c.id] === undefined || bestC[c.id] >= 100) return;
+    rows.push({ kind: 'coding', icon: 'code-2', id: c.id, title: c.title || 'Untitled', pct: bestC[c.id] });
+  });
+
+  const bestN = {};
+  (state.notebookHistory || []).forEach(h => {
+    if (h.isArchived || !h.notebookId) return;
+    let c = 0, t = 0;
+    (h.sections || []).forEach(sec => { c += sec.correct || 0; t += sec.total || 0; });
+    bestN[h.notebookId] = Math.max(bestN[h.notebookId] ?? -1, t ? Math.round((c / t) * 100) : 0);
+  });
+  (state.notebooks || []).forEach(n => {
+    if (bestN[n.id] === undefined || bestN[n.id] >= 100) return;
+    rows.push({ kind: 'notebook', icon: 'book-open', id: n.id, title: n.title || 'Untitled', pct: bestN[n.id] });
+  });
+
+  rows.sort((a, b) => a.pct - b.pct);
+  const top = rows.slice(0, 5);
+
+  host.innerHTML = `
+    <div class="home-card-header"><i data-lucide="target"></i> Weakest scores</div>
+    ${top.length ? top.map(r => `
+      <div class="home-weak-row">
+        <span class="weak-kind"><i data-lucide="${r.icon}"></i></span>
+        <span class="weak-title">${escapeHTML(r.title)}</span>
+        <span class="weak-bar"><span style="width:${r.pct}%"></span></span>
+        <span class="weak-pct">${r.pct}%</span>
+        <button class="activity-action" title="Practise this again"
+                onclick="homeResumeAttempt('${r.kind}','${r.id}')"><i data-lucide="play"></i></button>
+      </div>`).join('')
+      : '<div style="color:var(--text-tertiary); font-size:0.8125rem; text-align:center; padding:1rem;">Nothing below 100% yet — finish an attempt to see where to focus.</div>'}
+  `;
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
+}
+
+/* ── One day's work, from clicking the heatmap ────────────── */
+let _homeDayKey = null;
+
+window.homeShowDay = function (dayKey) {
+  _homeDayKey = dayKey;
+  renderHomeDayPanel();
+  const el = document.getElementById('home-day');
+  if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
+
+function renderHomeDayPanel() {
+  const host = document.getElementById('home-day');
+  if (!host) return;
+  if (!_homeDayKey) {
+    host.innerHTML = `
+      <div class="home-card-header"><i data-lucide="calendar-search"></i> A day's work</div>
+      <div style="color:var(--text-tertiary); font-size:0.8125rem; text-align:center; padding:1rem;">
+        Click a square on the heatmap to see what you did that day.
+      </div>`;
+    if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
+    return;
+  }
+
+  const rows = _homeRecentEntries().filter(e => e.ts && _toLocalDate(e.ts) === _homeDayKey);
+  host.innerHTML = `
+    <div class="home-card-header"><i data-lucide="calendar-search"></i> ${_homeDayKey}</div>
+    ${rows.length ? rows.map(e => {
+      const dot = e.score >= 100 ? 'perfect' : e.score >= 50 ? 'partial' : 'low';
+      return `
+        <div class="home-activity-item">
+          <div class="activity-dot ${dot}"></div>
+          <div class="activity-info">
+            <div class="activity-title">${escapeHTML(e.title)}</div>
+            <div class="activity-meta">
+              <span class="activity-kind ${e.kind}"><i data-lucide="${e.icon}"></i>${e.label}</span>
+              <span>${new Date(e.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
+          </div>
+          <div class="activity-score ${dot}">${e.score}%</div>
+        </div>`;
+    }).join('')
+    : '<div style="color:var(--text-tertiary); font-size:0.8125rem; text-align:center; padding:1rem;">Nothing recorded on this day.</div>'}
+  `;
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
+}
+
 function renderRecentActivity() {
   const container = document.getElementById('home-activity');
   if (!container) return;
@@ -487,7 +658,9 @@ function getTimeAgo(timestamp) {
 /* ======================== CAROUSEL ======================== */
 let notebookCarouselIndex = 0;
 // Switchable source: 'notebooks' | 'coding' (persisted across visits)
-let homeCarouselSource = sessionStorage.getItem('homeCarouselSource') || 'coding';
+// localStorage, not session: the tab you read from is a preference, and it
+// used to reset every time the tab was closed.
+let homeCarouselSource = localStorage.getItem('homeCarouselSource') || 'coding';
 
 // Stable hue (0–359) derived from a string so each cover-less notebook gets a
 // distinct, consistent gradient.
@@ -504,8 +677,16 @@ const HOME_CAROUSEL_SOURCES = [
   { key: 'snippets',  label: 'Snippet Library', icon: 'file-code', items: () => state.snippets || [] }
 ];
 
+/** Only the libraries that actually hold something. */
+function _carouselAvailable() {
+  const live = HOME_CAROUSEL_SOURCES.filter(x => (x.items() || []).length > 0);
+  // Everything empty: keep the first so the panel still explains itself.
+  return live.length ? live : [HOME_CAROUSEL_SOURCES[0]];
+}
+
 function _carouselSource() {
-  return HOME_CAROUSEL_SOURCES.find(x => x.key === homeCarouselSource) || HOME_CAROUSEL_SOURCES[0];
+  const avail = _carouselAvailable();
+  return avail.find(x => x.key === homeCarouselSource) || avail[0];
 }
 
 /** Items for the active carousel source. */
@@ -516,7 +697,7 @@ function _carouselItems() {
 window.setCarouselSource = function (src) {
   if (src === homeCarouselSource) return;
   homeCarouselSource = src;
-  sessionStorage.setItem('homeCarouselSource', src);
+  try { localStorage.setItem('homeCarouselSource', src); } catch (e) { /* quota */ }
   notebookCarouselIndex = 0;
   renderNotebookCarousel();
   const container = document.getElementById('home-notebook-carousel');
@@ -602,12 +783,20 @@ function _buildCarouselSlide(item, srcKey) {
 function renderNotebookCarousel() {
   const container = document.getElementById('home-notebook-carousel');
   if (!container) return;
+  // Emptying a library while it was the one on screen would otherwise leave
+  // the carousel pointing at nothing.
+  if (!_carouselAvailable().some(x => x.key === homeCarouselSource)) {
+    homeCarouselSource = _carouselAvailable()[0].key;
+  }
 
   const items = _carouselItems();
 
-  const switcherHTML = `
+  const avail = _carouselAvailable();
+  // A tab that leads to "nothing here yet" is not worth a tab; with only one
+  // library filled there is nothing to switch between at all.
+  const switcherHTML = avail.length < 2 ? '' : `
     <div class="carousel-source-toggle" role="group" aria-label="Carousel content">
-      ${HOME_CAROUSEL_SOURCES.map(src => `
+      ${avail.map(src => `
       <button class="carousel-source-btn ${src.key === homeCarouselSource ? 'active' : ''}"
               onclick="setCarouselSource('${src.key}')" aria-pressed="${src.key === homeCarouselSource}">
         <i data-lucide="${src.icon}"></i> ${src.label}

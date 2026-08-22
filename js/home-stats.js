@@ -153,16 +153,72 @@ function homeCycleStatLib(idx) {
   });
 }
 
+let _homeStatPaused = false;
+
 function homeStartStatCycle() {
   homeStopStatCycle();
   // setInterval rather than rAF: a background tab never paints, and coming
   // back to a card frozen on whichever library it started on looks broken.
-  _homeStatTimer = setInterval(() => homeCycleStatLib(), 4000);
+  _homeStatTimer = setInterval(() => { if (!_homeStatPaused) homeCycleStatLib(); }, 4000);
+
+  // Rotating out from under someone mid-read is the one thing a cycling card
+  // must not do.
+  const card = document.getElementById('home-stat-lib');
+  const best = document.getElementById('home-stat-best');
+  [card, best].forEach(el => {
+    if (!el) return;
+    el.addEventListener('mouseenter', () => { _homeStatPaused = true; });
+    el.addEventListener('mouseleave', () => { _homeStatPaused = false; });
+    el.addEventListener('focusin', () => { _homeStatPaused = true; });
+    el.addEventListener('focusout', () => { _homeStatPaused = false; });
+  });
 }
 
 function homeStopStatCycle() {
   if (_homeStatTimer) { clearInterval(_homeStatTimer); _homeStatTimer = null; }
+  _homeStatPaused = false;
 }
+
+/**
+ * Whether today still has nothing on it. A streak needs activity today, so at
+ * one minute past midnight a long run silently reads 0 — the warning is worth
+ * more than the number, and it is the one thing the card never said.
+ */
+function homeStreakAtRisk() {
+  const days = [...homeActivityByDay().keys()].sort();
+  if (!days.length) return { risk: false, length: 0 };
+  const today = _toLocalDate(new Date());
+  if (days[days.length - 1] === today) return { risk: false, length: homeStreakAllLibraries() };
+  // Yesterday counted, today has not: the run is still alive until midnight.
+  const yesterday = _toLocalDate(new Date(Date.now() - 86400000));
+  if (days[days.length - 1] !== yesterday) return { risk: false, length: 0 };
+  let n = 1;
+  for (let i = days.length - 2; i >= 0; i--) {
+    if ((new Date(days[i + 1]) - new Date(days[i])) / 86400000 === 1) n++; else break;
+  }
+  return { risk: true, length: n };
+}
+
+/* ── Daily goal ───────────────────────────────────────────── */
+
+const HOME_GOAL_KEY = 'ssp.dailyGoal';
+
+/** Attempts aimed at per day. Three unless you have said otherwise. */
+function homeDailyGoal() {
+  const n = parseInt(localStorage.getItem(HOME_GOAL_KEY), 10);
+  return Number.isFinite(n) && n > 0 ? n : 3;
+}
+
+window.homeSetDailyGoal = function () {
+  showInputDialog('Daily goal', 'How many attempts a day are you aiming for?',
+    'Attempts per day', String(homeDailyGoal()), (v) => {
+      const n = parseInt(String(v).trim(), 10);
+      if (!Number.isFinite(n) || n < 1) return;
+      try { localStorage.setItem(HOME_GOAL_KEY, String(Math.min(n, 99))); } catch (e) { /* quota */ }
+      if (typeof renderStatsRow === 'function') renderStatsRow();
+      if (typeof toast === 'function') toast('Daily goal set to ' + Math.min(n, 99) + '.', { type: 'success' });
+    });
+};
 
 /* ── Streak calendar ──────────────────────────────────────── */
 
@@ -223,6 +279,9 @@ function homeRenderStreakCalendar() {
       </div>
       <div class="hcal-grid" id="hcal-grid"></div>
       <p class="hcal-note">Counts attempts from every library — programs, notebooks and snippets.</p>
+      <button class="btn btn-secondary btn-sm hcal-goal" onclick="homeSetDailyGoal()">
+        <i data-lucide="target"></i> Daily goal: <strong id="hcal-goal-n"></strong> per day
+      </button>
     </div>`;
   ov.onclick = () => homeCloseStreakCalendar();
   homeRenderCalMonth();
@@ -266,6 +325,8 @@ function homeRenderCalMonth() {
     sub.textContent = homeStreakAllLibraries() + ' day streak \u00b7 ' +
       monthActive + ' active day' + (monthActive !== 1 ? 's' : '') + ' this month';
   }
+  const goalN = document.getElementById('hcal-goal-n');
+  if (goalN) goalN.textContent = homeDailyGoal();
   const ov = document.getElementById('home-streak-modal');
   if (ov && typeof lucide !== 'undefined') lucide.createIcons({ el: ov });
 }

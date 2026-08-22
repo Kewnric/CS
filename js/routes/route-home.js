@@ -13,7 +13,17 @@ function homeTemplate() {
           <div class="hero-date" id="hero-date"></div>
           <div class="hero-verse" id="hero-verse"
             style="margin-top: 1rem; font-style: italic; color: var(--text-tertiary); max-width: 600px;"></div>
+          <div class="hero-verse-tools">
+            <button class="hero-verse-btn" id="hero-verse-toggle" onclick="homeVerseAction()"></button>
+            <button class="hero-verse-btn" onclick="homeHideVerse()" title="Hide the verse">
+              <i data-lucide="eye-off"></i>
+            </button>
+          </div>
         </section>
+        <!-- Only present when something was left unfinished. The thing you were
+             last doing is the thing you most often want on opening the app, and
+             it was buried at the bottom of Recent Activity. -->
+        <section id="home-continue"></section>
         <section class="home-stats-grid stagger-children" id="home-stats"></section>
         <!-- Quick Actions is a fixed list of six links, so it is sized to its
              content and the heatmap and carousel take the rest — they are the
@@ -28,6 +38,10 @@ function homeTemplate() {
         <section class="home-two-col">
           <div class="home-card" id="home-srs"></div>
           <div class="home-card" id="home-activity"></div>
+        </section>
+        <section class="home-two-col">
+          <div class="home-card" id="home-weak"></div>
+          <div class="home-card" id="home-day"></div>
         </section>
       </div>
     </div>

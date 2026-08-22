@@ -2021,3 +2021,83 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
 .hbadge-bar span { display: block; height: 100%; border-radius: 999px; background: var(--color-primary); }
 .hbadge.earned .hbadge-bar span { background: var(--color-success); }
 .hbadge-count { flex-shrink: 0; font-size: 0.72rem; font-weight: 800; color: var(--text-secondary); }
+
+/* ── Continue where you left off ──────────────────────────── */
+.home-continue-card {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(120deg, rgba(245, 158, 11, 0.12), transparent 60%), var(--bg-surface);
+}
+.hc-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; flex-shrink: 0;
+  border-radius: var(--radius-md);
+  background: rgba(245, 158, 11, 0.18); color: var(--color-warning);
+}
+.hc-icon svg { width: 20px; height: 20px; }
+.hc-text { flex: 1; min-width: 0; }
+.hc-eyebrow {
+  font-size: 0.65rem; font-weight: 800; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--color-warning);
+}
+.hc-title {
+  font-size: 1rem; font-weight: 700; color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.hc-meta { font-size: 0.72rem; color: var(--text-tertiary); }
+.hc-go { flex-shrink: 0; }
+.hc-dismiss { flex-shrink: 0; padding: 0.4rem; color: var(--text-tertiary); }
+.hc-dismiss:hover { color: var(--color-danger); }
+
+/* ── Streak card: goal and the at-risk state ──────────────── */
+.home-stat-card.at-risk { border-color: var(--color-warning); }
+.home-stat-card.at-risk .stat-label { color: var(--color-warning); font-weight: 800; }
+.stat-goal { margin-top: 0.5rem; }
+.stat-goal-bar {
+  display: block; height: 4px; border-radius: 999px;
+  background: var(--bg-surface-hover); overflow: hidden;
+}
+.stat-goal-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--color-warning); }
+.stat-goal-txt { display: block; margin-top: 0.25rem; font-size: 0.62rem; color: var(--text-tertiary); }
+.hcal-goal { margin-top: 0.6rem; width: 100%; justify-content: center; }
+
+/* ── Heatmap: days are now a way in ───────────────────────── */
+.heatmap-cell.has-work { cursor: pointer; }
+.heatmap-cell.has-work:hover { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+
+/* ── Weakest scores ───────────────────────────────────────── */
+.home-weak-row {
+  display: flex; align-items: center; gap: 0.55rem;
+  padding: 0.45rem 0.2rem;
+}
+.weak-kind { color: var(--text-tertiary); display: inline-flex; }
+.weak-kind svg { width: 14px; height: 14px; }
+.weak-title {
+  flex: 1; min-width: 0; font-size: 0.82rem; color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.weak-bar {
+  width: 70px; flex-shrink: 0; height: 5px; border-radius: 999px;
+  background: var(--bg-surface-hover); overflow: hidden;
+}
+.weak-bar > span { display: block; height: 100%; border-radius: 999px; background: var(--color-danger); }
+.weak-pct { flex-shrink: 0; font-size: 0.72rem; font-weight: 800; color: var(--text-secondary); min-width: 30px; text-align: right; }
+
+/* ── Verse controls ───────────────────────────────────────── */
+.hero-verse.is-hidden { display: none; }
+.hero-verse-tools { display: flex; gap: 0.4rem; margin-top: 0.6rem; }
+.hero-verse-btn {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--border-color); border-radius: 999px;
+  background: transparent; color: var(--text-tertiary);
+  font-size: 0.68rem; font-weight: 600; cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+.hero-verse-btn:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
+.hero-verse-btn svg { width: 12px; height: 12px; }
