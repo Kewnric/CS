@@ -92,7 +92,18 @@ function practiceTemplate() {
             <h1 class="practice-program-title" id="practice-program-title"></h1>
             <span class="practice-program-version" id="practice-program-version"></span>
           </header>
-          <div><h2>Description</h2><p id="practice-desc"></p></div>
+          <div>
+            <div class="practice-desc-head">
+              <h2>Description</h2>
+              <button class="practice-desc-edit" onclick="practiceEditDescription()"
+                      title="Edit this description" aria-label="Edit this description">
+                <i data-lucide="pencil"></i>
+              </button>
+            </div>
+            <!-- A div, not a p: a description can hold lists and code blocks now,
+                 and neither is legal inside a paragraph. -->
+            <div id="practice-desc" class="practice-desc-body"></div>
+          </div>
           <div id="practice-samples-container" style="display:flex; flex-direction:column; gap:1rem;"></div>
           <div id="practice-hints-container"></div>
           <div class="practice-footer">

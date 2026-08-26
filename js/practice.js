@@ -472,13 +472,19 @@ function practiceConfirmExit() {
 /** Finish button / Ctrl+Shift+Enter — confirm, then grade. */
 function confirmFinishAttempt() {
   if (_submitInProgress || _practiceSubmitted) return;
-  if (typeof showConfirm !== 'function') { submitCode(); return; }
+  if (typeof showAlertDialog !== 'function' && typeof showConfirm !== 'function') { submitCode(); return; }
   const chk = _practiceCheck;
   const fresh = chk && chk.codeKey != null && chk.codeKey === _buildSubmissionSource();
   const detail = fresh
     ? `Your last check scored ${chk.passed}/${chk.total} and still matches this code — it'll be used as your result.`
     : 'You haven\'t checked this code yet, so it will be graded on how closely it matches the reference solution.';
-  showConfirm('Finish attempt?', detail + ' This records the attempt and stops the timer.', () => submitCode());
+  const body = detail + ' This records the attempt and stops the timer.';
+  if (typeof showAlertDialog === 'function') {
+    showAlertDialog('Finish attempt?', body, () => submitCode(),
+      { confirmLabel: 'Finish the attempt', cancelLabel: 'Keep working' });
+  } else {
+    showConfirm('Finish attempt?', body, () => submitCode());
+  }
 }
 
 /** Pull the stdin out of a sample's "Input: … Output: …" body. */
@@ -3502,3 +3508,102 @@ function getDifficultyBadgeHTML(challenge) {
   return `<span class="difficulty-badge" style="--diff-color:${colors[diff]};">${labels[diff]}</span>`;
 }
 
+
+/* ── Editing the description mid-attempt ──────────────────────
+   A description that turns out to be wrong, or missing the one constraint that
+   matters, used to mean abandoning the attempt, going to the admin form, fixing
+   it and starting again. The same editor the admin form uses opens over the
+   attempt instead. It writes to the program itself, so the correction is there
+   next time too — that is the point of fixing it rather than noting it. */
+
+let _pdQuill = null;
+
+window.practiceEditDescription = function () {
+  const variant = state.activeVariant;
+  if (!variant) return;
+
+  let ov = document.getElementById('practice-desc-modal');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'practice-desc-modal';
+    ov.className = 'modal-overlay';
+    document.body.appendChild(ov);
+  }
+  ov.classList.remove('hidden');
+  // af-rich-block carries the editor's chrome and its toolbar tooltips, so the
+  // control looks and behaves the same here as in the admin form.
+  ov.innerHTML = `
+    <div class="modal-content pd-modal af-rich-block" onclick="event.stopPropagation()">
+      <div class="pd-head">
+        <h2><i data-lucide="pencil"></i> Edit description</h2>
+        <button class="btn btn-ghost pd-close" onclick="practiceCloseDescription()" aria-label="Close">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="af-rich" id="practice-desc-editor"></div>
+      <p class="pd-note">
+        <i data-lucide="info"></i>
+        Saved to the program, so the correction is there on your next attempt too.
+      </p>
+      <div class="pd-actions">
+        <button class="btn btn-secondary" onclick="practiceCloseDescription()">Cancel</button>
+        <button class="btn btn-primary" onclick="practiceSaveDescription()">
+          <i data-lucide="check"></i> Save description
+        </button>
+      </div>
+    </div>`;
+
+  ov.onclick = () => practiceCloseDescription();
+
+  if (window.Quill) {
+    const q = new Quill('#practice-desc-editor', {
+      theme: 'snow',
+      placeholder: 'What should this program do?',
+      modules: { toolbar: typeof AF_DESC_TOOLBAR !== 'undefined' ? AF_DESC_TOOLBAR : true }
+    });
+    _pdQuill = q;
+    const current = variant.description || (state.activeChallenge && state.activeChallenge.description) || '';
+    q.clipboard.dangerouslyPasteHTML(
+      typeof afDescToHTML === 'function' ? afDescToHTML(current) : current, 'silent');
+    if (typeof afLabelToolbar === 'function') afLabelToolbar(q.getModule('toolbar').container);
+    q.focus();
+  }
+
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: ov });
+};
+
+window.practiceSaveDescription = function () {
+  const variant = state.activeVariant;
+  if (!variant) { practiceCloseDescription(); return; }
+  if (_pdQuill) {
+    // Same rule as the admin form: an empty Quill document is "<p><br></p>",
+    // which would read as a description that exists and says nothing.
+    variant.description = _pdQuill.getText().trim() ? _pdQuill.root.innerHTML : '';
+  }
+  if (typeof saveData === 'function') saveData();
+
+  const el = document.getElementById('practice-desc');
+  if (el) {
+    el.innerHTML = (typeof formatRichText === 'function'
+      ? formatRichText(variant.description)
+      : escapeHTML(variant.description)) || 'No description provided.';
+  }
+  practiceCloseDescription();
+  if (typeof toast === 'function') toast('Description updated.', { type: 'success' });
+};
+
+window.practiceCloseDescription = function () {
+  const ov = document.getElementById('practice-desc-modal');
+  _pdQuill = null;
+  if (ov) { ov.classList.add('hidden'); ov.innerHTML = ''; ov.onclick = null; }
+};
+
+/* Escape closes this before anything else on the practice screen acts on it —
+   otherwise it would fall through to zen mode or the terminal. */
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const ov = document.getElementById('practice-desc-modal');
+  if (!ov || ov.classList.contains('hidden')) return;
+  e.stopPropagation();
+  practiceCloseDescription();
+}, true);

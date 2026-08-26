@@ -242,18 +242,31 @@
   font-size: 0.875rem;
 }
 
+/* Frosted glass rather than a flat black chip. The clock is the one thing on
+   the topbar that is always moving, and as a solid panel it read as another
+   button in the row. Translucent, with a lit top edge and a shadow under it, it
+   sits above the bar instead of in it — and the blur picks up whatever is
+   behind, so it belongs to the screen rather than to the toolbar. */
 .timer-display {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  background: #0d1117;
-  padding: 0.375rem 0.75rem;
-  border-radius: var(--radius-md);
-  border: 1px solid #21262d;
+  padding: 0.375rem 0.8rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  /* Top lip catching light, bottom edge in shadow, and a soft drop under the
+     whole pill — the three things that make a surface read as glass. */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.22),
+    0 2px 12px rgba(0, 0, 0, 0.3);
 }
 
 .timer-display svg {
-  color: var(--color-primary);
+  color: rgba(255, 255, 255, 0.82);
   width: 16px;
   height: 16px;
 }
@@ -262,8 +275,11 @@
   font-family: var(--font-mono);
   font-size: 0.875rem;
   font-weight: 600;
-  color: #e6edf3;
+  color: #f5f8fc;
   letter-spacing: 0.05em;
+  /* Light text on a translucent panel needs its own contrast — the panel can
+     sit over anything. */
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 
 /* Millisecond field on the count-up clock. Smaller and dimmer than the
@@ -272,7 +288,7 @@
    the row from shuffling as the digits change. */
 #practice-timer .timer-ms {
   font-size: 0.72em;
-  color: #8b949e;
+  color: rgba(255, 255, 255, 0.6);
   letter-spacing: 0;
   font-variant-numeric: tabular-nums;
   display: inline-block;
@@ -1687,7 +1703,6 @@ mark.diff-hit.current {
      the editor's line-mark cyan (#22d3ee, see .line-mark) so the topbar and the
      gutter read as lit by the same UI, not two competing accents. Bare channels
      so alpha can vary per stop. */
-  --sao-spill: 34, 211, 238;
   position: relative;
   display: flex;
   align-items: center;
@@ -1786,17 +1801,11 @@ mark.diff-hit.current {
   width: 10px;
   height: var(--sao-h);
   /* Flat, same slab colour as the plate (see .sao-plate) — no top-to-bottom
-     ramp, so the bracket and the plate read as one continuous frame. It is the
-     piece nearest the crystal, though, so it takes the strongest spill: without
-     it the bracket read as a grey chip floating between a glowing gem and a lit
-     plate. The tint sits ON the flat colour, left→right, so it adds no vertical
-     banding. The gem stays red; what it throws onto the frame is the editor's
-     line-mark cyan (see --sao-spill), so the topbar answers the gutter. */
+     ramp, so the bracket and the plate read as one continuous frame. It used to
+     carry a cyan wash meant to read as the crystal casting light onto it, but
+     the tint sat on the frame as a blue highlight rather than as light, so the
+     frame is now the one flat colour it is elsewhere. */
   background-color: var(--sao-frame);
-  background-image: linear-gradient(90deg,
-    rgba(var(--sao-spill), 0.38) 0%,
-    rgba(var(--sao-spill), 0.25) 55%,
-    rgba(var(--sao-spill), 0.15) 100%);
   clip-path: polygon(
     0 0,
     100% 0,
@@ -1825,23 +1834,6 @@ mark.diff-hit.current {
      tone reads as a solid piece of the UI at every height. */
   background-color: var(--sao-frame);
   clip-path: polygon(0 0, 100% 0, calc(100% - var(--sao-chamfer)) 100%, 0 100%);
-}
-
-/* Crystal spill only: a wash at the far-left edge so the crystal reads as
-   casting light onto the frame rather than floating beside it. Runs left→right,
-   so it doesn't reintroduce the top-lighter/bottom-darker banding. */
-.sao-plate::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background: linear-gradient(90deg,
-    rgba(var(--sao-spill), 0.17) 0%,
-    rgba(var(--sao-spill), 0.09) 3%,
-    rgba(var(--sao-spill), 0.035) 8%,
-    rgba(var(--sao-spill), 0.012) 13%,
-    transparent 19%);
 }
 
 .sao-plate-lv {
@@ -2173,7 +2165,7 @@ mark.diff-hit.current {
 .btn-pause-timer {
   background: none;
   border: none;
-  color: #8b949e;
+  color: rgba(255, 255, 255, 0.65);
   cursor: pointer;
   padding: 2px;
   margin-left: 4px;
@@ -2184,8 +2176,8 @@ mark.diff-hit.current {
 }
 
 .btn-pause-timer:hover {
-  color: #e6edf3;
-  background: rgba(255,255,255,0.08);
+  color: #ffffff;
+  background: rgba(255,255,255,0.14);
 }
 
 .timer-paused {
@@ -3457,3 +3449,228 @@ body.is-resizing .practice-panel { transition: none; }
 .practice-layout.hide-left .practice-editor-area,
 .practice-layout.hide-right .practice-editor-area { min-width: 0; }
 @media (max-width: 1000px) { .practice-editor-area { min-width: 0; } }
+
+/* ── Editing the description mid-attempt ────────────────────── */
+
+.practice-desc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+/* The heading carries the rule under it, so the button has to sit above that
+   line rather than push it down. */
+.practice-desc-head h2 { flex: 1 1 auto; }
+
+.practice-desc-edit {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-bottom: 0.625rem;
+  padding: 0;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: #6e7681;
+  cursor: pointer;
+  /* Dim rather than hidden. A control you have to find by hovering the right
+     few pixels is not a control anyone knows is there — it stays visible, just
+     quiet enough not to compete with the description it sits beside. */
+  opacity: 0.5;
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.practice-desc-edit svg { width: 14px; height: 14px; }
+
+.practice-desc-head:hover .practice-desc-edit,
+.practice-desc-edit:focus-visible { opacity: 1; }
+
+.practice-desc-edit:hover {
+  color: #e6edf3;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: #30363d;
+}
+
+/* The description body was a <p> with pre-wrap, which is right for plain text
+   and wrong for the lists, quotes and code blocks it can hold now — every
+   newline between two tags became a blank line on screen. */
+.practice-desc-body {
+  color: #b1bac4;
+  font-size: 0.875rem;
+  line-height: 1.65;
+  white-space: normal;
+}
+
+.practice-desc-body p { margin: 0 0 0.5rem; }
+.practice-desc-body p:last-child { margin-bottom: 0; }
+.practice-desc-body ol,
+.practice-desc-body ul { padding-left: 1.6em; margin: 0.4rem 0; }
+.practice-desc-body li { margin: 0.15rem 0; }
+.practice-desc-body .ql-indent-1 { padding-left: 3em; }
+.practice-desc-body .ql-indent-2 { padding-left: 6em; }
+.practice-desc-body .ql-indent-3 { padding-left: 9em; }
+.practice-desc-body blockquote {
+  border-left: 3px solid var(--color-primary);
+  margin: 0.5rem 0;
+  padding: 0.1rem 0 0.1rem 0.75rem;
+  color: #8b949e;
+}
+.practice-desc-body pre.ql-syntax {
+  background: #0d1117;
+  border: 1px solid #21262d;
+  color: #c9d1d9;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  border-radius: var(--radius-md);
+  padding: 0.6rem 0.75rem;
+  white-space: pre-wrap;
+  margin: 0.5rem 0;
+}
+
+/* --- The editor popup --- */
+.pd-modal {
+  width: min(720px, 92vw);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.1rem 1.2rem 1.2rem;
+}
+
+.pd-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.pd-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  margin: 0;
+  border: none;
+  padding: 0;
+}
+
+.pd-head h2 svg { width: 17px; height: 17px; color: var(--color-primary); }
+.pd-close { padding: 0.3rem; }
+.pd-close svg { width: 16px; height: 16px; }
+
+.pd-note {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}
+
+.pd-note svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+.pd-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* Roomier than the admin form's copy — this one is the only thing on screen.
+   Both classes are needed: admin.css loads after this file, so the plain
+   .af-rich-block .ql-editor rule there wins at equal specificity. */
+.pd-modal.af-rich-block .ql-editor { min-height: 240px; max-height: 46vh; }
+
+/* ── Alert dialog ─────────────────────────────────────────────
+   Three bands: the title on a lit panel, the reason on a recessed grey one, and
+   the two answers on white below. Deliberately unlike every other dialog in the
+   app, because it is the one that ends an attempt. */
+
+.alrt-box {
+  width: min(520px, 92vw);
+  padding: 0;
+  overflow: hidden;
+  border: none;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.alrt-head {
+  padding: 1.5rem 1.25rem 1.6rem;
+  text-align: center;
+  background: linear-gradient(180deg, #fdfdfd 0%, #f6f6f6 45%, #ededed 100%);
+}
+
+.alrt-head h2 {
+  margin: 0;
+  padding: 0;
+  border: none;
+  font-size: 2.1rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: #454545;
+  letter-spacing: 0.02em;
+}
+
+/* Recessed: darker at both edges so the panel reads as set into the card
+   rather than painted on it. This is where the message goes. */
+.alrt-body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 132px;
+  padding: 1.5rem 1.75rem;
+  background: linear-gradient(180deg,
+    #a6a6a6 0%,
+    #c4c4c4 5%,
+    #d5d5d5 18%,
+    #d5d5d5 82%,
+    #bcbcbc 95%,
+    #9d9d9d 100%);
+}
+
+.alrt-body p {
+  margin: 0;
+  text-align: center;
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  color: #383838;
+}
+
+.alrt-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+  gap: 1rem;
+  padding: 1.5rem 1.5rem 1.7rem;
+  background: #ffffff;
+}
+
+.alrt-btn {
+  width: 76px;
+  height: 76px;
+  padding: 0;
+  border: none;
+  background: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.13s ease, filter 0.13s ease;
+}
+
+.alrt-btn svg { display: block; width: 100%; height: 100%; }
+.alrt-btn:hover { transform: scale(1.06); filter: brightness(1.06); }
+.alrt-btn:active { transform: scale(0.97); }
+
+.alrt-btn:focus-visible {
+  outline: 3px solid #3b7fc0;
+  outline-offset: 4px;
+}
+.alrt-btn.alrt-no:focus-visible { outline-color: #c9265d; }
+
+@media (prefers-reduced-motion: reduce) {
+  .alrt-btn { transition: filter 0.13s ease; }
+  .alrt-btn:hover, .alrt-btn:active { transform: none; }
+}
