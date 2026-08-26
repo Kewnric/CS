@@ -2066,3 +2066,51 @@ textarea.af-grow { overflow: hidden; resize: vertical; }
   font-size: 0.72rem;
   color: var(--text-tertiary);
 }
+
+/* ── Plain-text fields that hold code or output ───────────────
+   Sample bodies, test stdin and expected stdout are all read character by
+   character against a program's output, so they belong on the same dark ground
+   as the editor rather than looking like prose boxes. No file tab — these are
+   one value each, not a set of files. */
+.af-code-field {
+  background: #0d1117 !important;
+  border-color: #21262d !important;
+  color: #c9d1d9 !important;
+  font-family: var(--font-mono) !important;
+  font-size: 0.75rem !important;
+  line-height: 1.6;
+  padding: 0.55rem 0.65rem !important;
+  border-radius: var(--radius-md);
+  /* Output is compared exactly, so it must not be re-wrapped visually. */
+  white-space: pre;
+  overflow-x: auto;
+}
+.af-code-field:focus { border-color: var(--color-primary) !important; }
+.af-code-field::placeholder { color: #484f58; }
+
+/* ── Switching editors from inside full screen ────────────── */
+.af-editor-title { display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+.af-editor-nav { display: inline-flex; gap: 2px; flex-shrink: 0; }
+.af-editor-nav button {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+.af-editor-nav button:hover:not(:disabled) {
+  color: var(--text-primary); border-color: var(--text-tertiary); background: var(--bg-surface-hover);
+}
+.af-editor-nav button:disabled { opacity: 0.3; cursor: not-allowed; }
+.af-editor-nav svg { width: 14px; height: 14px; }
+.af-editor-count {
+  flex-shrink: 0;
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--bg-surface-hover);
+  color: var(--text-tertiary);
+  font-size: 0.68rem;
+  font-weight: 700;
+}

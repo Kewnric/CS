@@ -99,7 +99,7 @@ function renderAdminVariantForm() {
           <div class="sample-item">
             <div style="flex:1; display:flex; flex-direction:column; gap:0.5rem;">
               <input value="${escapeHTML(s.title || '')}" oninput="updateSampleField(${sampleIdx}, 'title', this.value)" placeholder="Sample Title" class="form-input" style="font-weight:600; font-size:0.8125rem; padding:0.375rem 0.5rem;" />
-              <textarea rows="2" oninput="updateSampleField(${sampleIdx}, 'content', this.value)" placeholder="Sample content..." class="form-textarea af-grow" style="font-family:var(--font-mono); font-size:0.75rem; min-height:40px; padding:0.375rem 0.5rem;">${escapeHTML(s.content || '')}</textarea>
+              <textarea rows="2" oninput="updateSampleField(${sampleIdx}, 'content', this.value)" placeholder="Sample content..." class="form-textarea af-grow af-code-field" style="min-height:40px;">${escapeHTML(s.content || '')}</textarea>
             </div>
             <button onclick="deleteAdminSample(${sampleIdx})" class="btn btn-ghost" style="padding:0.25rem;" title="Delete Sample">
               <i data-lucide="trash-2" style="width:16px;height:16px;color:var(--color-danger);"></i>
@@ -178,11 +178,11 @@ function renderAdminVariantForm() {
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem;">
               <div style="display:flex; flex-direction:column; gap:0.2rem;">
                 <span style="font-size:0.68rem; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.03em;">Stdin (input)</span>
-                <textarea rows="3" oninput="updateTestField(${ti}, 'stdin', this.value)" placeholder="(optional)" class="form-textarea" style="font-family:var(--font-mono); font-size:0.72rem; min-height:54px; padding:0.375rem 0.5rem;">${escapeHTML(t.stdin || '')}</textarea>
+                <textarea rows="3" oninput="updateTestField(${ti}, 'stdin', this.value)" placeholder="(optional)" class="form-textarea af-grow af-code-field" style="min-height:54px;">${escapeHTML(t.stdin || '')}</textarea>
               </div>
               <div style="display:flex; flex-direction:column; gap:0.2rem;">
                 <span style="font-size:0.68rem; color:var(--color-success); text-transform:uppercase; letter-spacing:0.03em;">Expected stdout</span>
-                <textarea rows="3" oninput="updateTestField(${ti}, 'expected', this.value)" placeholder="Exact expected output" class="form-textarea" style="font-family:var(--font-mono); font-size:0.72rem; min-height:54px; padding:0.375rem 0.5rem;">${escapeHTML(t.expected || '')}</textarea>
+                <textarea rows="3" oninput="updateTestField(${ti}, 'expected', this.value)" placeholder="Exact expected output" class="form-textarea af-grow af-code-field" style="min-height:54px;">${escapeHTML(t.expected || '')}</textarea>
               </div>
             </div>
           </div>
@@ -682,8 +682,14 @@ window.afDuplicateVariant = function () {
    step, the existing one is MOVED into the overlay and moved back on close —
    one editor, one value, nothing to synchronise. */
 
+const AF_EDITORS = [
+  { key: 'starter', label: 'Starter Code', icon: 'file-code' },
+  { key: 'target',  label: 'Target Code',  icon: 'shield-check' }
+];
+
 let _afExpandedFrom = null;   // where the editor was taken from
 let _afExpandedEl = null;     // the editor itself
+let _afExpandedKey = null;    // which one is up
 
 window.afExpandEditor = function (which) {
   if (_afExpandedEl) return;
@@ -699,11 +705,28 @@ window.afExpandEditor = function (which) {
     document.body.appendChild(ov);
   }
   ov.classList.remove('hidden');
+  const order = AF_EDITORS.map(e => e.key);
+  const at = order.indexOf(which);
+  const meta = AF_EDITORS[at];
+
   ov.innerHTML = `
     <div class="modal-content af-editor-modal" onclick="event.stopPropagation()">
       <div class="af-editor-head">
-        <h2><i data-lucide="${which === 'target' ? 'shield-check' : 'file-code'}"></i>
-          ${which === 'target' ? 'Target Code' : 'Starter Code'}</h2>
+        <div class="af-editor-title">
+          <!-- Switching without leaving full screen: writing the solution means
+               looking at the starter constantly, and exiting to swap made that
+               two clicks and a scroll each way. -->
+          <span class="af-editor-nav">
+            <button onclick="afSwapEditor(-1)" ${at === 0 ? 'disabled' : ''}
+                    title="${at === 0 ? 'Nothing before this' : 'Show ' + AF_EDITORS[at - 1].label}"
+                    aria-label="Previous editor"><i data-lucide="chevron-left"></i></button>
+            <button onclick="afSwapEditor(1)" ${at === order.length - 1 ? 'disabled' : ''}
+                    title="${at === order.length - 1 ? 'Nothing after this' : 'Show ' + AF_EDITORS[at + 1].label}"
+                    aria-label="Next editor"><i data-lucide="chevron-right"></i></button>
+          </span>
+          <h2><i data-lucide="${meta.icon}"></i> ${meta.label}</h2>
+          <span class="af-editor-count">${at + 1} of ${order.length}</span>
+        </div>
         <button class="btn btn-ghost" onclick="afCollapseEditor()" aria-label="Close full screen">
           <i data-lucide="minimize-2"></i> Exit full screen
         </button>
@@ -719,6 +742,7 @@ window.afExpandEditor = function (which) {
   _afExpandedFrom = marker;
   _afExpandedEl = container;
 
+  _afExpandedKey = which;
   container.classList.add('af-editor-expanded');
   document.getElementById('af-editor-slot').appendChild(container);
   ov.onclick = () => afCollapseEditor();
@@ -726,6 +750,20 @@ window.afExpandEditor = function (which) {
 
   const ta = container.querySelector('textarea');
   if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+};
+
+/**
+ * Move to the editor either side. The current one goes home first, so the
+ * move-in/move-out invariant holds and there is never more than one editor out
+ * of the form.
+ */
+window.afSwapEditor = function (delta) {
+  const order = AF_EDITORS.map(e => e.key);
+  const at = order.indexOf(_afExpandedKey);
+  const to = at + delta;
+  if (at === -1 || to < 0 || to >= order.length) return;
+  afCollapseEditor();
+  afExpandEditor(order[to]);
 };
 
 window.afCollapseEditor = function () {
@@ -737,6 +775,7 @@ window.afCollapseEditor = function () {
   }
   _afExpandedEl = null;
   _afExpandedFrom = null;
+  _afExpandedKey = null;
   if (ov) { ov.classList.add('hidden'); ov.innerHTML = ''; }
 };
 
