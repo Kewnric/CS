@@ -369,11 +369,22 @@ function renderSnippetDetail() {
         </div>
 
         <div style="display: flex; gap: 1rem; flex-wrap: wrap; background: var(--bg-surface-hover); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-          ${(((snippet.sqlPractice && snippet.sqlPractice.cases) || []).filter(c => (c.answer || '').trim()).length) ? `
-          <button class="btn btn-primary" onclick="sqaStart('${snippet.id}')" id="sql-attempt-btn">
-            <i data-lucide="play" style="width: 16px; height: 16px;"></i>
-            Start attempt (${((snippet.sqlPractice.cases) || []).filter(c => (c.answer || '').trim()).length} cases)
-          </button>` : ''}
+          ${(() => {
+            const n = (((snippet.sqlPractice && snippet.sqlPractice.cases) || [])
+              .filter(c => (c.answer || '').trim())).length;
+            // With a set: start it. Without one: say the feature exists and go
+            // straight to where it is built. A snippet that simply showed
+            // nothing left no way to find out there was anything to find.
+            return n
+              ? `<button class="btn btn-primary" onclick="sqaStart('${snippet.id}')" id="sql-attempt-btn">
+                   <i data-lucide="play" style="width: 16px; height: 16px;"></i>
+                   Start attempt (${n} case${n !== 1 ? 's' : ''})
+                 </button>`
+              : `<button class="btn btn-ghost" onclick="snippetSetupSql('${snippet.id}')" id="sql-setup-btn"
+                         title="Write SQL questions for this snippet, then attempt them here">
+                   <i data-lucide="database" style="width: 16px; height: 16px;"></i> Set up SQL practice
+                 </button>`;
+          })()}
           <button class="btn btn-primary" onclick="openExamplesModal()" id="view-examples-btn">
             <i data-lucide="code" style="width: 16px; height: 16px;"></i> View Examples (${(snippet.examples || []).length})
           </button>
@@ -1430,3 +1441,20 @@ async function snippetCtxChangeIcon() {
   saveData();
   renderSnippetList();
 }
+
+/**
+ * Jump from a snippet straight to its own admin form, at the SQL Practice
+ * section. Finding it otherwise means Admin, then Snippets, then locating the
+ * same snippet again in a different list.
+ */
+window.snippetSetupSql = function (id) {
+  spaNavigate('admin-snippets');
+  setTimeout(() => {
+    if (typeof openStudyForm !== 'function') return;
+    openStudyForm(id);
+    setTimeout(() => {
+      const sec = document.getElementById('sql-cases-list');
+      if (sec && sec.scrollIntoView) sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 350);
+  }, 320);
+};
