@@ -864,6 +864,8 @@ window.afInitDescEditor = function () {
   // program would mark it unsaved before anything had been touched.
   q.clipboard.dangerouslyPasteHTML(afDescToHTML(hidden.value), 'silent');
 
+  afLabelToolbar(q.getModule('toolbar').container);
+
   q.on('text-change', (delta, oldDelta, source) => {
     // An empty Quill document is "<p><br></p>" — a non-empty string that says
     // nothing. Stored as-is, the asterisk and the step rail would both report
@@ -876,3 +878,53 @@ window.afInitDescEditor = function () {
     if (typeof afRenderRail === 'function') afRenderRail();
   });
 };
+
+
+/* ── Naming the toolbar ───────────────────────────────────────
+   Quill ships its toolbar as bare icons carrying no label of any kind — no
+   title, no aria-label — so each control is a guess until you click it and
+   look at what changed. Every one is named here, on hover and to a screen
+   reader both. */
+
+const AF_TOOL_LABELS = [
+  ['.ql-header',                'Heading level'],
+  ['.ql-bold',                  'Bold'],
+  ['.ql-italic',                'Italic'],
+  ['.ql-underline',             'Underline'],
+  ['.ql-strike',                'Strikethrough'],
+  ['.ql-color',                 'Text colour'],
+  ['.ql-background',            'Highlight colour'],
+  ['.ql-list[value="ordered"]', 'Numbered list'],
+  ['.ql-list[value="bullet"]',  'Bulleted list'],
+  ['.ql-indent[value="-1"]',    'Decrease indent'],
+  ['.ql-indent[value="+1"]',    'Increase indent'],
+  ['.ql-blockquote',            'Quote block'],
+  ['.ql-code',                  'Inline code'],
+  ['.ql-code-block',            'Code block'],
+  ['.ql-link',                  'Insert link'],
+  ['.ql-clean',                 'Clear formatting']
+];
+
+function afLabelToolbar(toolbarEl) {
+  if (!toolbarEl) return;
+  AF_TOOL_LABELS.forEach(pair => {
+    toolbarEl.querySelectorAll(pair[0]).forEach(el => {
+      // Quill builds each dropdown from a <select> and leaves the original in
+      // the DOM, hidden. Labelling that too put an aria-label on a control
+      // nobody can reach and a tooltip on a box with no position.
+      if (el.tagName === 'SELECT') return;
+      el.classList.add('af-tip');
+      el.setAttribute('data-tip', pair[1]);
+      el.setAttribute('aria-label', pair[1]);
+    });
+  });
+
+  // The two colour dropdowns are grids of unlabelled squares, where the value
+  // is the only thing identifying one. The heading dropdown already writes its
+  // own item labels, so it is left alone.
+  toolbarEl.querySelectorAll('.ql-color .ql-picker-item, .ql-background .ql-picker-item')
+    .forEach(item => {
+      const v = item.getAttribute('data-value');
+      item.setAttribute('title', v || 'Default');
+    });
+}

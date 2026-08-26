@@ -2211,3 +2211,53 @@ textarea.af-grow { overflow: hidden; resize: vertical; }
   resize: vertical;
   min-height: 90px;
 }
+
+/* ── Toolbar tooltips ─────────────────────────────────────────
+   The native `title` takes about a second to appear and is drawn in OS chrome,
+   so an unlabelled icon stays unlabelled for as long as anyone is willing to
+   hover. Same instant tooltip the visualization toolbar uses. */
+
+.af-rich-block .ql-toolbar.ql-snow { overflow: visible; }
+
+.af-rich-block .af-tip { position: relative; }
+
+.af-rich-block .af-tip::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  z-index: 400;
+  padding: 0.28rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated, var(--bg-surface));
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.45));
+  opacity: 0;
+  transform: translateX(-50%) translateY(-3px);
+  pointer-events: none;
+  transition: opacity 0.12s ease 0.2s, transform 0.12s ease 0.2s;
+}
+
+.af-rich-block .af-tip:hover::after,
+.af-rich-block .af-tip:focus-visible::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* An open colour or heading dropdown lands exactly where the tooltip sits. */
+.af-rich-block .af-tip.ql-expanded::after { opacity: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .af-rich-block .af-tip::after {
+    transition: opacity 0.12s ease 0.2s;
+    transform: translateX(-50%);
+  }
+  .af-rich-block .af-tip:hover::after,
+  .af-rich-block .af-tip:focus-visible::after { transform: translateX(-50%); }
+}
