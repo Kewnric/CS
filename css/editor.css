@@ -21,8 +21,9 @@
 }
 
 .editor-container:focus-within {
+  /* Border only — the glow that used to sit here framed the whole code box. */
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px var(--color-primary-glow);
+  box-shadow: none;
 }
 
 .editor-pre {

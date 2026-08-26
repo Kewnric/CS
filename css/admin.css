@@ -501,10 +501,9 @@
   transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
 }
 
-.af-section:focus-within {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 2px var(--color-primary-glow);
-}
+/* Removed: focusing one field lit up the whole section with a 2px glow ring,
+   so typing a title outlined the entire Basic Info panel. The field itself
+   still shows focus — a panel does not need to. */
 
 .af-section-header {
   display: flex;
