@@ -1684,3 +1684,86 @@ function vizSyncModuleTools() {
   const newBtn = document.getElementById('brain-new-btn');
   if (newBtn) newBtn.classList.toggle('hidden', !isBrain);
 }
+
+/* ── The shortcuts, on request ────────────────────────────────
+   These lived in a strip pinned to the bottom of the canvas: permanently in
+   the way, permanently selectable, and still only half the list — P and Escape
+   were never on it. Behind a button they can be complete, and the canvas gets
+   its corner back. */
+
+const VIZ_SHORTCUTS = {
+  Keyboard: [
+    [['F'], 'Fit the whole graph on screen'],
+    [['L'], 'Link mode — click two nodes to connect them'],
+    [['P'], 'Force layout on or off'],
+    [['+'], 'Zoom in'],
+    [['−'], 'Zoom out'],
+    [['Del'], 'Delete the selected node'],
+    [['Esc'], 'Cancel a link, close any menu'],
+    [['Ctrl', 'Z'], 'Undo']
+  ],
+  Mouse: [
+    [['Drag'], 'Pan the canvas'],
+    [['Scroll'], 'Zoom towards the pointer'],
+    [['Double-click'], 'Add a node where you clicked'],
+    [['Right-click'], 'Node and canvas menus'],
+    [['Click map'], 'Jump to that part of the graph']
+  ]
+};
+
+window.vizShowShortcuts = function () {
+  let ov = document.getElementById('viz-shortcuts-modal');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'viz-shortcuts-modal';
+    ov.className = 'modal-overlay';
+    document.body.appendChild(ov);
+  }
+  ov.classList.remove('hidden');
+  ov.style.opacity = '';
+
+  const group = (name) => `
+    <section class="vsk-group">
+      <h3>${name}</h3>
+      <dl>
+        ${VIZ_SHORTCUTS[name].map(row => `
+          <div class="vsk-row">
+            <dt>${row[0].map(k => '<kbd>' + escapeHTML(k) + '</kbd>').join('')}</dt>
+            <dd>${escapeHTML(row[1])}</dd>
+          </div>`).join('')}
+      </dl>
+    </section>`;
+
+  ov.innerHTML = `
+    <div class="modal-content vsk-modal" role="dialog" aria-modal="true" aria-label="Keyboard shortcuts">
+      <div class="vsk-head">
+        <h2><i data-lucide="keyboard"></i> Shortcuts</h2>
+        <button class="btn btn-ghost vsk-close" onclick="vizCloseShortcuts()" aria-label="Close">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="vsk-body">
+        ${group('Keyboard')}
+        ${group('Mouse')}
+      </div>
+    </div>`;
+
+  ov.onclick = (e) => { if (e.target === ov) vizCloseShortcuts(); };
+  document.addEventListener('keydown', _vizShortcutsKey, true);
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: ov });
+};
+
+function _vizShortcutsKey(e) {
+  if (e.key !== 'Escape') return;
+  const ov = document.getElementById('viz-shortcuts-modal');
+  if (!ov || ov.classList.contains('hidden')) return;
+  // Escape also cancels linking and closes canvas menus, so it must stop here.
+  e.stopPropagation();
+  vizCloseShortcuts();
+}
+
+window.vizCloseShortcuts = function () {
+  const ov = document.getElementById('viz-shortcuts-modal');
+  document.removeEventListener('keydown', _vizShortcutsKey, true);
+  if (ov) { ov.classList.add('hidden'); ov.innerHTML = ''; ov.onclick = null; }
+};

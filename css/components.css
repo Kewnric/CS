@@ -3101,6 +3101,11 @@
    the panel's Finish button). */
 body.route-focused .settings-fab { display: none; }
 
+/* The canvas runs to the corners of the pane, and the FAB sat on top of the
+   minimap and the toolbar's own controls. The router writes the route onto
+   <body>, so this needs nothing from the view itself. */
+body[data-route="visualization"] .settings-fab { display: none; }
+
 .settings-fab {
   position: fixed;
   right: 20px;

@@ -169,6 +169,9 @@ function vizTemplate() {
                 <button class="viz-zoom-btn" onclick="vizZoomReset()" title="Fit (F)"><i data-lucide="maximize-2"></i></button>
               </div>
               <div class="viz-toolbar-sep"></div>
+              <button class="viz-zoom-btn" onclick="vizShowShortcuts()" title="Keyboard shortcuts" aria-label="Keyboard shortcuts">
+                <i data-lucide="keyboard"></i>
+              </button>
               <button class="viz-zoom-btn" id="viz-toolbar-collapse-btn" onclick="vizToggleCanvasToolbar()" title="Hide toolbar">
                 <i data-lucide="chevron-up" id="viz-toolbar-chevron"></i>
               </button>
@@ -217,14 +220,6 @@ function vizTemplate() {
               <span class="viz-legend-item" data-scope="challenge"><i></i> Programs</span>
               <span class="viz-legend-item" data-scope="snippet"><i></i> Snippets</span>
               <span class="viz-legend-item" data-scope="notebook"><i></i> Notebooks</span>
-            </div>
-            <!-- Keyboard shortcuts hint -->
-            <div class="viz-shortcuts-hint" aria-hidden="true">
-              <kbd>F</kbd> Fit &nbsp;<span class="viz-shortcuts-sep">|</span>&nbsp;
-              <kbd>L</kbd> Link &nbsp;<span class="viz-shortcuts-sep">|</span>&nbsp;
-              <kbd>Del</kbd> Delete &nbsp;<span class="viz-shortcuts-sep">|</span>&nbsp;
-              <kbd>+</kbd><kbd>-</kbd> Zoom &nbsp;<span class="viz-shortcuts-sep">|</span>&nbsp;
-              <kbd>Ctrl</kbd><kbd>Z</kbd> Undo
             </div>
           </div>
         </div>
