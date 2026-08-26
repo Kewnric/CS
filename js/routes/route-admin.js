@@ -36,7 +36,7 @@ function getAdminFormHTML() {
           <div class="af-row-2">
             <div class="af-field af-field-wide">
               <label class="form-label" for="admin-title"><i data-lucide="type" class="af-label-icon"></i>Program Title <span class="af-req" title="Required">*</span></label>
-              <input id="admin-title" required aria-required="true" oninput="adminState.title = this.value; afRenderRail();" placeholder="e.g. Basic Math Operations" class="form-input af-input-bold" />
+              <input id="admin-title" required aria-required="true" oninput="if (adminState) { adminState.title = this.value; afRenderRail(); }" placeholder="e.g. Basic Math Operations" class="form-input af-input-bold" />
             </div>
             <div class="af-field">
               <label class="form-label"><i data-lucide="folder" class="af-label-icon"></i>Category</label>
@@ -47,7 +47,7 @@ function getAdminFormHTML() {
 
           <div class="af-field">
             <label class="form-label" for="admin-cover-desc"><i data-lucide="align-left" class="af-label-icon"></i>Cover Description <span class="af-label-hint">(shown in Browse)</span></label>
-            <textarea id="admin-cover-desc" oninput="adminState.coverDescription = this.value; afRenderRail();" rows="2" class="form-textarea af-grow" placeholder="Brief overview of the program..."></textarea>
+            <textarea id="admin-cover-desc" oninput="if (adminState) { adminState.coverDescription = this.value; afRenderRail(); }" rows="2" class="form-textarea af-grow" placeholder="Brief overview of the program..."></textarea>
           </div>
 
           <div class="af-field">
@@ -115,7 +115,7 @@ function getAdminFormHTML() {
         </div>
         <div class="af-section-body" style="padding-top:0.5rem;">
           <div id="admin-variant-tabs" class="variant-tabs"></div>
-          <div id="admin-variant-content" style="flex:1;display:flex;flex-direction:column;gap:1rem;margin-top:0.75rem;"></div>
+          <div id="admin-variant-content" style="flex:1;display:flex;flex-direction:column;gap:1rem;"></div>
         </div>
       </div>
 

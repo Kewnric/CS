@@ -177,6 +177,8 @@ function confirmCloseAdminForm(closeFn, saveFn) {
 }
 
 function closeAdminForm() {
+  // Put an expanded editor home first, or it is destroyed inside the overlay.
+  if (typeof afCollapseEditor === 'function') afCollapseEditor();
   const el = document.getElementById('admin-form-container');
   if (el) el.classList.add('hidden');
 

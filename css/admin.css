@@ -1998,3 +1998,62 @@ textarea.af-grow { overflow: hidden; resize: vertical; }
   font-size: 0.72rem;
   font-weight: 600;
 }
+
+/* ── Full-screen code editors ─────────────────────────────────
+   The editor is MOVED into the overlay rather than duplicated, so there is
+   only ever one of it and nothing to keep in step. */
+.af-expand-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px; height: 26px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast),
+              background-color var(--transition-fast);
+}
+.af-expand-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-tertiary);
+  background: var(--bg-surface-hover);
+}
+.af-expand-btn svg { width: 14px; height: 14px; }
+
+.af-editor-modal {
+  max-width: none;
+  width: min(96vw, 1200px);
+  height: min(92vh, 900px);
+  display: flex;
+  flex-direction: column;
+  padding: 1rem 1.1rem 0.9rem;
+  text-align: left;
+}
+.af-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+.af-editor-head h2 {
+  display: flex; align-items: center; gap: 0.45rem;
+  margin: 0; font-size: 1rem; font-weight: 800; color: var(--text-primary);
+}
+.af-editor-head h2 svg { width: 17px; height: 17px; color: var(--color-accent); }
+
+.af-editor-slot { flex: 1; min-height: 0; display: flex; }
+.editor-container.af-editor-expanded {
+  flex: 1;
+  min-height: 0;
+  border-radius: var(--radius-md) !important;
+  border-top: 1px solid var(--border-color) !important;
+}
+.af-editor-note {
+  margin: 0.6rem 0 0;
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+}

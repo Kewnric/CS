@@ -4,6 +4,10 @@
 
 function renderAdminVariantForm() {
   if (!adminState || !adminState.variants) return;
+  // An expanded editor lives in the overlay, not in the form. Redrawing without
+  // putting it back left the old node orphaned there while a fresh one appeared
+  // in the form — two elements sharing an id, and typing in the wrong one.
+  if (typeof afCollapseEditor === 'function') afCollapseEditor();
 
   const tabsContainer = document.getElementById('admin-variant-tabs');
   tabsContainer.innerHTML = adminState.variants.map((v, i) => `
@@ -50,6 +54,10 @@ function renderAdminVariantForm() {
       <div data-step="2" style="display:flex; flex-direction:column; flex:1; min-height:220px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
           <label class="form-label" style="color:var(--color-accent); margin-bottom:0;">Starter Code <span style="font-weight:400; font-size:0.75rem; opacity:0.7;">(pre-filled for user)</span></label>
+          <button type="button" class="af-expand-btn" onclick="afExpandEditor('starter')"
+                  title="Open this editor full screen" aria-label="Expand Starter Code">
+            <i data-lucide="maximize-2"></i>
+          </button>
         </div>
         ${fileTabsHTML('starter')}
         <div class="editor-container" style="flex:1; border-color:var(--color-accent); border-top:none; border-radius:0 0 var(--radius-md) var(--radius-md);">
@@ -61,6 +69,10 @@ function renderAdminVariantForm() {
       <div data-step="2" style="display:flex; flex-direction:column; flex:1; min-height:240px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
           <label class="form-label" style="color:var(--color-success); margin-bottom:0;">Target Code <span style="font-weight:400; font-size:0.75rem; opacity:0.7;">(hidden solution)</span></label>
+          <button type="button" class="af-expand-btn" onclick="afExpandEditor('target')"
+                  title="Open this editor full screen" aria-label="Expand Target Code">
+            <i data-lucide="maximize-2"></i>
+          </button>
         </div>
         ${fileTabsHTML('target')}
         <div class="editor-container" style="flex:1; border-color:var(--color-success); border-top:none; border-radius:0 0 var(--radius-md) var(--radius-md);">
@@ -661,3 +673,78 @@ window.afDuplicateVariant = function () {
   renderAdminVariantForm();
   if (typeof toast === 'function') toast('Version duplicated.', { type: 'success' });
 };
+
+
+/* ── Editors, full screen ─────────────────────────────────────
+   A 220px box is a poor place to write a solution in, and the form around it
+   is not much bigger. Rather than build a second editor and keep the two in
+   step, the existing one is MOVED into the overlay and moved back on close —
+   one editor, one value, nothing to synchronise. */
+
+let _afExpandedFrom = null;   // where the editor was taken from
+let _afExpandedEl = null;     // the editor itself
+
+window.afExpandEditor = function (which) {
+  if (_afExpandedEl) return;
+  const box = document.getElementById('admin-' + which + '-pre');
+  const container = box ? box.closest('.editor-container') : null;
+  if (!container) return;
+
+  let ov = document.getElementById('af-editor-modal');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'af-editor-modal';
+    ov.className = 'modal-overlay';
+    document.body.appendChild(ov);
+  }
+  ov.classList.remove('hidden');
+  ov.innerHTML = `
+    <div class="modal-content af-editor-modal" onclick="event.stopPropagation()">
+      <div class="af-editor-head">
+        <h2><i data-lucide="${which === 'target' ? 'shield-check' : 'file-code'}"></i>
+          ${which === 'target' ? 'Target Code' : 'Starter Code'}</h2>
+        <button class="btn btn-ghost" onclick="afCollapseEditor()" aria-label="Close full screen">
+          <i data-lucide="minimize-2"></i> Exit full screen
+        </button>
+      </div>
+      <div class="af-editor-slot" id="af-editor-slot"></div>
+      <p class="af-editor-note">Edits here are the same field — closing puts it straight back.</p>
+    </div>`;
+
+  // Leave a marker so it goes back exactly where it came from.
+  const marker = document.createElement('div');
+  marker.id = 'af-editor-placeholder';
+  container.parentNode.insertBefore(marker, container);
+  _afExpandedFrom = marker;
+  _afExpandedEl = container;
+
+  container.classList.add('af-editor-expanded');
+  document.getElementById('af-editor-slot').appendChild(container);
+  ov.onclick = () => afCollapseEditor();
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: ov });
+
+  const ta = container.querySelector('textarea');
+  if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+};
+
+window.afCollapseEditor = function () {
+  const ov = document.getElementById('af-editor-modal');
+  if (_afExpandedEl && _afExpandedFrom && _afExpandedFrom.parentNode) {
+    _afExpandedEl.classList.remove('af-editor-expanded');
+    _afExpandedFrom.parentNode.insertBefore(_afExpandedEl, _afExpandedFrom);
+    _afExpandedFrom.remove();
+  }
+  _afExpandedEl = null;
+  _afExpandedFrom = null;
+  if (ov) { ov.classList.add('hidden'); ov.innerHTML = ''; }
+};
+
+/* Escape closes it, and the editor must go home before the form is torn down —
+   otherwise it would be destroyed inside the overlay and the field would be
+   gone when the step was next drawn. */
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && _afExpandedEl) {
+    e.stopPropagation();
+    afCollapseEditor();
+  }
+}, true);
