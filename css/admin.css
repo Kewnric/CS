@@ -2114,3 +2114,100 @@ textarea.af-grow { overflow: hidden; resize: vertical; }
   font-size: 0.68rem;
   font-weight: 700;
 }
+
+/* ── Rich instruction editor ──────────────────────────────────
+   Quill ships a light theme from the CDN, which against this form looked like a
+   white card dropped into a dark panel. The chrome is restyled to the same
+   tokens every other field uses so it reads as one control: a labelled box with
+   a toolbar on top, not a third-party widget sitting on the page. */
+
+.af-rich-block .ql-toolbar.ql-snow {
+  border: 1px solid var(--border-color);
+  border-bottom: none;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: var(--bg-elevated, var(--bg-surface));
+  padding: 0.4rem 0.5rem;
+}
+
+.af-rich-block .ql-container.ql-snow {
+  border: 1px solid var(--border-color);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  background: var(--bg-surface);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  color: var(--text-primary);
+}
+
+/* Tall enough to write a real instruction in, capped so it cannot push the
+   code editors below off the step. */
+.af-rich-block .ql-editor {
+  min-height: 130px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 0.625rem 0.75rem;
+  line-height: 1.6;
+}
+
+.af-rich-block .ql-editor.ql-blank::before {
+  color: var(--text-tertiary);
+  font-style: normal;
+  left: 0.75rem;
+  right: 0.75rem;
+}
+
+/* The toolbar's icons and labels are drawn with stroke/fill, so they need the
+   theme's colours explicitly or they stay near-black on a dark bar. */
+.af-rich-block .ql-snow .ql-stroke { stroke: var(--text-secondary); }
+.af-rich-block .ql-snow .ql-fill,
+.af-rich-block .ql-snow .ql-stroke.ql-fill { fill: var(--text-secondary); }
+.af-rich-block .ql-snow .ql-picker-label { color: var(--text-secondary); }
+
+.af-rich-block .ql-snow button:hover .ql-stroke,
+.af-rich-block .ql-snow button.ql-active .ql-stroke,
+.af-rich-block .ql-snow .ql-picker-label:hover,
+.af-rich-block .ql-snow .ql-picker-label.ql-active { stroke: var(--color-primary); color: var(--color-primary); }
+.af-rich-block .ql-snow button:hover .ql-fill,
+.af-rich-block .ql-snow button.ql-active .ql-fill { fill: var(--color-primary); }
+
+/* The colour and heading dropdowns render as floating panels that inherit
+   nothing, so they need their own surface or they open as white on dark. */
+.af-rich-block .ql-snow .ql-picker-options {
+  background: var(--bg-elevated, var(--bg-surface));
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0, 0, 0, 0.45));
+}
+.af-rich-block .ql-snow .ql-picker-item { color: var(--text-secondary); }
+.af-rich-block .ql-snow .ql-picker-item:hover { color: var(--color-primary); }
+
+/* Code inside the instruction should look like code, here and in practice. */
+.af-rich-block .ql-editor pre.ql-syntax,
+#practice-desc pre.ql-syntax,
+#pset-desc pre.ql-syntax {
+  background: #0d1117;
+  border: 1px solid #21262d;
+  color: #c9d1d9;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  border-radius: var(--radius-md);
+  padding: 0.6rem 0.75rem;
+  white-space: pre-wrap;
+}
+
+/* The saved value. Present for the asterisk and the save path to read, and
+   only ever seen if the Quill CDN failed to load. */
+.af-rich-value { display: none; }
+.af-rich-value.af-rich-fallback {
+  display: block;
+  width: 100%;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.625rem 0.75rem;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  outline: none;
+  resize: vertical;
+  min-height: 90px;
+}

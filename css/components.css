@@ -3573,3 +3573,34 @@ body.route-focused .settings-fab { display: none; }
   justify-content: flex-end;
   margin-top: 1.1rem;
 }
+
+/* ── Rich instructions, as the student sees them ──────────────
+   The instruction is written in Quill and rendered here. Quill scopes its
+   indent classes to .ql-editor, so a nested list authored in the admin form
+   arrived in practice completely flat. These carry the same steps across. */
+
+/* The global `*` reset zeroes padding on everything, which leaves a list's
+   markers drawn outside its own box — an authored numbered list reached the
+   student with no numbers at all. */
+#practice-desc ol, #pset-desc ol,
+#practice-desc ul, #pset-desc ul {
+  padding-left: 1.6em;
+  margin: 0.4rem 0;
+}
+#practice-desc li, #pset-desc li { margin: 0.15rem 0; }
+
+#practice-desc .ql-indent-1, #pset-desc .ql-indent-1 { padding-left: 3em; }
+#practice-desc .ql-indent-2, #pset-desc .ql-indent-2 { padding-left: 6em; }
+#practice-desc .ql-indent-3, #pset-desc .ql-indent-3 { padding-left: 9em; }
+#practice-desc .ql-indent-4, #pset-desc .ql-indent-4 { padding-left: 12em; }
+
+#practice-desc blockquote, #pset-desc blockquote {
+  border-left: 3px solid var(--color-primary);
+  margin: 0.5rem 0;
+  padding: 0.1rem 0 0.1rem 0.75rem;
+  color: var(--text-secondary);
+}
+
+/* Quill writes an empty paragraph for a blank line; without a height it
+   collapses and the spacing the author put in is lost. */
+#practice-desc p:empty, #pset-desc p:empty { min-height: 1em; }

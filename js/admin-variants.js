@@ -46,9 +46,16 @@ function renderAdminVariantForm() {
         <label class="form-label">Version Name <span class="af-req" data-req-for="admin-variant-name">*</span></label>
         <input id="admin-variant-name" value="${escapeHTML(activeVar.name)}" oninput="updateActiveVariantField('name', this.value)" class="form-input" />
       </div>
-      <div data-step="2">
+      <div data-step="2" class="af-rich-block">
         <label class="form-label-inline"><span>Instruction / Description <span class="af-req" data-req-for="admin-variant-desc">*</span></span></label>
-        <textarea id="admin-variant-desc" rows="3" oninput="updateActiveVariantField('description', this.value)" class="form-textarea af-grow">${escapeHTML(activeVar.description || '')}</textarea>
+        <div class="af-rich" id="admin-variant-desc-editor"></div>
+        <!-- The value that is actually saved. Everything else in this form finds
+             a field by id and reads .value, so the editor writes through to a
+             real field rather than teaching every one of those places about
+             Quill. It is also the fallback if the Quill CDN has not loaded. -->
+        <textarea id="admin-variant-desc" class="af-rich-value" rows="3"
+                  oninput="updateActiveVariantField('description', this.value)"
+                  >${escapeHTML(activeVar.description || '')}</textarea>
       </div>
 
       <div data-step="2" style="display:flex; flex-direction:column; flex:1; min-height:220px;">
@@ -212,6 +219,7 @@ function renderAdminVariantForm() {
   if (typeof afGoToStep === 'function' && typeof _afStep !== 'undefined') afGoToStep(_afStep);
   if (typeof afUpdateRequiredMarks === 'function') afUpdateRequiredMarks();
   if (typeof afAutosizeAll === 'function') afAutosizeAll(document.getElementById('admin-variant-content'));
+  afInitDescEditor();
 
   // Initialize Target Code Editor for active file
   const targetTA = document.getElementById('admin-target-ta');
@@ -788,3 +796,83 @@ document.addEventListener('keydown', (e) => {
     afCollapseEditor();
   }
 }, true);
+
+
+/* ── The instruction, written properly ────────────────────────
+   An exercise instruction is not a flat paragraph. It has emphasis, terms the
+   student must type exactly, ordered steps, and things worth colouring —
+   and this was a bare textarea, so all of it had to be imagined. Quill is
+   already loaded for the snippet study editor, so the same one is used here
+   rather than adding a second way of writing rich text to the app.
+
+   It writes through to the hidden textarea as well as to adminState, so
+   saving, the required asterisk and the step rail all keep reading a field by
+   id exactly as they did when this was a plain textarea. */
+
+let afDescQuill = null;
+
+const AF_DESC_TOOLBAR = [
+  [{ header: [2, 3, false] }],
+  ['bold', 'italic', 'underline', 'strike'],
+  [{ color: [] }, { background: [] }],
+  [{ list: 'ordered' }, { list: 'bullet' }, { indent: '-1' }, { indent: '+1' }],
+  ['blockquote', 'code', 'code-block', 'link'],
+  ['clean']
+];
+
+/**
+ * Every instruction written so far is plain text. Pasted into an HTML editor
+ * as-is, its line breaks would collapse into one run-on paragraph and any "<"
+ * would be swallowed as a tag — so anything that is not already markup is
+ * escaped and split into paragraphs before it is loaded.
+ */
+function afDescToHTML(value) {
+  const raw = String(value == null ? '' : value);
+  if (!raw.trim()) return '';
+  if (/<(p|br|ol|ul|li|h[1-6]|strong|em|u|s|span|pre|blockquote|div)\b/i.test(raw)) return raw;
+  return raw.split(/\n/)
+    .map(line => (line.trim() ? '<p>' + escapeHTML(line) + '</p>' : '<p><br></p>'))
+    .join('');
+}
+
+window.afInitDescEditor = function () {
+  const host = document.getElementById('admin-variant-desc-editor');
+  const hidden = document.getElementById('admin-variant-desc');
+  if (!host || !hidden) return;
+
+  // Offline before the CDN has been cached: show the plain textarea instead of
+  // an empty box that swallows everything typed into it.
+  if (!window.Quill) {
+    host.style.display = 'none';
+    hidden.classList.add('af-rich-fallback');
+    return;
+  }
+
+  // renderAdminVariantForm rebuilds this whole block, so a surviving instance
+  // points at detached DOM: its writes would go nowhere and the editor on
+  // screen would be dead. The snippet editor hit exactly this.
+  if (afDescQuill && afDescQuill.root && host.contains(afDescQuill.root)) return;
+
+  const q = new Quill(host, {
+    theme: 'snow',
+    placeholder: 'What should the student write? Steps, constraints, and anything they must match exactly.',
+    modules: { toolbar: AF_DESC_TOOLBAR }
+  });
+  afDescQuill = q;
+
+  // 'silent' — loading the saved value must not read as typing, or opening a
+  // program would mark it unsaved before anything had been touched.
+  q.clipboard.dangerouslyPasteHTML(afDescToHTML(hidden.value), 'silent');
+
+  q.on('text-change', (delta, oldDelta, source) => {
+    // An empty Quill document is "<p><br></p>" — a non-empty string that says
+    // nothing. Stored as-is, the asterisk and the step rail would both report
+    // the instruction as written while the box sat blank.
+    const html = q.getText().trim() ? q.root.innerHTML : '';
+    hidden.value = html;
+    if (source !== 'user') return;
+    updateActiveVariantField('description', html);
+    if (typeof afUpdateRequiredMarks === 'function') afUpdateRequiredMarks();
+    if (typeof afRenderRail === 'function') afRenderRail();
+  });
+};

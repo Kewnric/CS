@@ -17,8 +17,8 @@ function openAdminForm(id) {
   window.adminIsDirty = false;
   window.saveCurrentAdminForm = saveAdminForm;
   setSaveStatus('admin-save-status', '');
-  // The step shell is set up after adminState exists, since which step is
-  // remembered and what each one still needs are both read off it.
+  // The step shell is set up after adminState exists, since what each step
+  // still needs is read off it.
   setTimeout(() => {
     if (typeof afResetSteps === 'function') afResetSteps();
     if (typeof afAutosizeAll === 'function') afAutosizeAll(document.getElementById('admin-form-container'));

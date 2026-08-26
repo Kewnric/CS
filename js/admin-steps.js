@@ -20,9 +20,6 @@ const AF_STEPS = [
 
 let _afStep = 1;
 
-/** Where each program was last left, so reopening does not always start at 1. */
-function _afLastStepKey(id) { return 'ssp.afStep.' + id; }
-
 /* ── What each step still needs ───────────────────────────────
    Read straight off adminState rather than off the inputs, so a step you have
    never opened is still judged on its real contents. */
@@ -41,7 +38,7 @@ function afStepIssues() {
     return out;
   }
   if (!(v.name || '').trim()) out[2].push('Version needs a name');
-  if (!(v.description || '').trim()) out[2].push('No instruction for this version');
+  if (!afPlainText(v.description)) out[2].push('No instruction for this version');
 
   const files = v.files || [];
   const target = files.length ? (files[0].code || '') : (v.code || '');
@@ -51,6 +48,21 @@ function afStepIssues() {
   if (!(v.tests || []).length) out[3].push('No test cases — the attempt cannot be scored');
   return out;
 }
+
+/**
+ * The readable text inside a value that may be rich HTML. An empty Quill
+ * document is "<p><br></p>" — a non-empty string that says nothing — so a plain
+ * .trim() would report the instruction as written when the box is blank, and
+ * the asterisk and the step rail would both quietly lie.
+ */
+function afPlainText(value) {
+  const raw = String(value == null ? '' : value);
+  if (raw.indexOf('<') === -1) return raw.trim();
+  const el = document.createElement('div');
+  el.innerHTML = raw;
+  return (el.textContent || '').replace(/ /g, ' ').trim();
+}
+window.afPlainText = afPlainText;
 
 function afStepIsClean(n) {
   const issues = afStepIssues();
@@ -82,10 +94,6 @@ window.afGoToStep = function (n) {
   afRenderRail();
   afUpdateStepButtons();
 
-  const st = (typeof adminState !== 'undefined' && adminState) ? adminState : null;
-  if (st && st.id && st.id !== 'new') {
-    try { localStorage.setItem(_afLastStepKey(st.id), String(_afStep)); } catch (e) { /* quota */ }
-  }
   afTidySeparators(panel);
   afUpdateRequiredMarks();
   // A hidden textarea reports scrollHeight 0, so sizing one before its step is
@@ -140,7 +148,7 @@ function afTidySeparators(panel) {
 window.afUpdateRequiredMarks = function () {
   document.querySelectorAll('.af-req[data-req-for]').forEach(mark => {
     const el = document.getElementById(mark.getAttribute('data-req-for'));
-    const filled = !!(el && String(el.value || '').trim());
+    const filled = !!(el && afPlainText(el.value));
     mark.classList.toggle('is-filled', filled);
     mark.setAttribute('title', filled ? 'Filled in' : 'Required');
   });
@@ -162,15 +170,15 @@ document.addEventListener('input', (e) => {
 window.afNextStep = function () { afGoToStep(_afStep + 1); };
 window.afPrevStep = function () { afGoToStep(_afStep - 1); };
 
-/** Called when the editor opens. */
+/**
+ * Called when the editor opens. Always Basics: reopening a program used to drop
+ * you back on whichever step you left it on, which meant opening a program to
+ * check its title landed you in the middle of its tests with no sense of having
+ * moved. The first step is the one that says what you are looking at.
+ */
 window.afResetSteps = function () {
-  const st = (typeof adminState !== 'undefined' && adminState) ? adminState : null;
-  let start = 1;
-  if (st && st.id && st.id !== 'new') {
-    const saved = parseInt(localStorage.getItem(_afLastStepKey(st.id)), 10);
-    if (Number.isFinite(saved) && saved >= 1 && saved <= AF_STEPS.length) start = saved;
-  }
-  afGoToStep(start);
+  _afStep = 1;
+  afGoToStep(1);
 };
 
 /* ── The rail ─────────────────────────────────────────────── */
