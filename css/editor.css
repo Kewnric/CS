@@ -3532,12 +3532,25 @@ body.is-resizing .practice-panel { transition: none; }
 }
 
 /* --- The editor popup --- */
+/* .modal-content caps every dialog at 420px, so setting width alone left this
+   one at dialog size no matter what it asked for — max-width has to be lifted
+   too. Writing a description is the whole task while this is open, so it takes
+   the screen rather than a corner of it. */
 .pd-modal {
-  width: min(720px, 92vw);
+  width: min(1040px, 94vw);
+  max-width: min(1040px, 94vw);
+  /* A definite height, not just a ceiling: with max-height alone the box only
+     grew to fit its contents, so it sat at two thirds of the room available and
+     the editor got whatever was left. Now the editor takes the space. */
+  height: min(88vh, 860px);
+  max-height: 88vh;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  padding: 1.1rem 1.2rem 1.2rem;
+  gap: 0.85rem;
+  padding: 1.25rem 1.4rem 1.4rem;
+  /* .modal-content centres its text, which is right for a short confirm and
+     wrong for a page of prose. */
+  text-align: left;
 }
 
 .pd-head {
@@ -3568,6 +3581,7 @@ body.is-resizing .practice-panel { transition: none; }
   margin: 0;
   font-size: 0.75rem;
   color: var(--text-tertiary);
+  text-align: left;
 }
 
 .pd-note svg { width: 13px; height: 13px; flex-shrink: 0; }
@@ -3578,10 +3592,22 @@ body.is-resizing .practice-panel { transition: none; }
   gap: 0.5rem;
 }
 
-/* Roomier than the admin form's copy — this one is the only thing on screen.
-   Both classes are needed: admin.css loads after this file, so the plain
+/* Quill replaces the div it is handed with its own container and inserts the
+   toolbar as a sibling before it, so the container is the child that has to
+   grow — the editor then fills whatever height the modal has left rather than
+   sitting in a fixed box with dead space under it. */
+.pd-modal .ql-container.ql-snow {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Both classes are needed: admin.css loads after this file, so the plain
    .af-rich-block .ql-editor rule there wins at equal specificity. */
-.pd-modal.af-rich-block .ql-editor { min-height: 240px; max-height: 46vh; }
+.pd-modal.af-rich-block .ql-editor {
+  min-height: 320px;
+  max-height: none;
+  height: 100%;
+}
 
 /* ── Alert dialog ─────────────────────────────────────────────
    Three bands: the title on a lit panel, the reason on a recessed grey one, and
