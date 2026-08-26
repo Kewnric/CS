@@ -1906,8 +1906,18 @@
   background: var(--border-color);
 }
 
-/* A field that genuinely cannot be left blank. */
-.af-req { color: var(--color-danger); font-weight: 800; }
+/* A field that genuinely cannot be left blank — and only while it is blank.
+   A permanent asterisk beside a filled box says nothing; this one disappears
+   the moment there is something in the field. Optional fields carry none. */
+.af-req {
+  color: var(--color-danger);
+  font-weight: 800;
+  transition: opacity 0.18s ease;
+}
+.af-req.is-filled { display: none; }
+
+/* Separators are only drawn between two visible blocks. */
+.af-sep-hidden { display: none !important; }
 
 /* ── Review step ──────────────────────────────────────────── */
 .af-review-score {

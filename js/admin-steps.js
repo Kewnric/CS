@@ -61,7 +61,12 @@ function afStepIsClean(n) {
 
 window.afGoToStep = function (n) {
   const max = AF_STEPS.length;
-  _afStep = Math.max(1, Math.min(max, n));
+  const target = Math.max(1, Math.min(max, n));
+  // Re-applying the same step is a redraw, not navigation. Reordering a test
+  // calls through here to restore visibility, and scrolling to the top each
+  // time threw you back to the tabs on every click of an arrow.
+  const changed = target !== _afStep;
+  _afStep = target;
 
   const panel = document.getElementById('admin-form-container');
   if (!panel) return;
@@ -81,10 +86,73 @@ window.afGoToStep = function (n) {
   if (st && st.id && st.id !== 'new') {
     try { localStorage.setItem(_afLastStepKey(st.id), String(_afStep)); } catch (e) { /* quota */ }
   }
-  // A step change is a new page as far as reading goes.
-  const scroller = panel.closest('.messenger-pane-2') || panel;
-  scroller.scrollTop = 0;
+  afTidySeparators(panel);
+  afUpdateRequiredMarks();
+
+  // A step change is a new page as far as reading goes; a redraw is not.
+  if (changed) {
+    const scroller = panel.closest('.messenger-pane-2') || panel;
+    scroller.scrollTop = 0;
+  }
 };
+
+/**
+ * A separator only means something between two things. Once a step hides the
+ * blocks around them, the dividers left behind became a stray rule under the
+ * version tab and a gap at the foot of the step.
+ */
+function afTidySeparators(panel) {
+  const groups = panel.querySelectorAll('#admin-variant-content > div');
+  groups.forEach(group => {
+    const kids = [...group.children].filter(c => !c.classList.contains('af-step-hidden'));
+    let seenContent = false;
+    let lastContent = null;
+    kids.forEach(k => {
+      const isDiv = k.classList.contains('divider');
+      if (isDiv) {
+        // Leading, or following another divider: nothing to separate yet.
+        k.classList.toggle('af-sep-hidden', !seenContent);
+      } else {
+        seenContent = true;
+        lastContent = k;
+      }
+    });
+    // Anything after the last real block is trailing.
+    let trailing = true;
+    for (let i = kids.length - 1; i >= 0; i--) {
+      const k = kids[i];
+      if (k === lastContent) trailing = false;
+      if (trailing && k.classList.contains('divider')) k.classList.add('af-sep-hidden');
+    }
+  });
+}
+
+/**
+ * The asterisk is a state, not a decoration: it appears while a required field
+ * is empty and goes when it is filled. Only fields the step rail actually
+ * complains about carry one, so the two never disagree.
+ */
+window.afUpdateRequiredMarks = function () {
+  document.querySelectorAll('.af-req[data-req-for]').forEach(mark => {
+    const el = document.getElementById(mark.getAttribute('data-req-for'));
+    const filled = !!(el && String(el.value || '').trim());
+    mark.classList.toggle('is-filled', filled);
+    mark.setAttribute('title', filled ? 'Filled in' : 'Required');
+  });
+};
+
+/* One listener rather than a handler on every required field. The rail is
+   refreshed from the same event, so the asterisk beside a field and the dot on
+   its step can never disagree — emptying the target code used to raise the
+   mark while the step still claimed to be complete. This runs on the bubble,
+   after the field's own handler has written to adminState. */
+document.addEventListener('input', (e) => {
+  if (!e.target || !e.target.matches) return;
+  if (e.target.matches('#admin-form-container input, #admin-form-container textarea')) {
+    afUpdateRequiredMarks();
+    if (typeof afRenderRail === 'function') afRenderRail();
+  }
+});
 
 window.afNextStep = function () { afGoToStep(_afStep + 1); };
 window.afPrevStep = function () { afGoToStep(_afStep - 1); };

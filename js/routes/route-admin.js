@@ -35,7 +35,7 @@ function getAdminFormHTML() {
         <div class="af-section-body">
           <div class="af-row-2">
             <div class="af-field af-field-wide">
-              <label class="form-label" for="admin-title"><i data-lucide="type" class="af-label-icon"></i>Program Title <span class="af-req" title="Required">*</span></label>
+              <label class="form-label" for="admin-title"><i data-lucide="type" class="af-label-icon"></i>Program Title <span class="af-req" data-req-for="admin-title">*</span></label>
               <input id="admin-title" required aria-required="true" oninput="if (adminState) { adminState.title = this.value; afRenderRail(); }" placeholder="e.g. Basic Math Operations" class="form-input af-input-bold" />
             </div>
             <div class="af-field">
@@ -46,7 +46,7 @@ function getAdminFormHTML() {
           </div>
 
           <div class="af-field">
-            <label class="form-label" for="admin-cover-desc"><i data-lucide="align-left" class="af-label-icon"></i>Cover Description <span class="af-label-hint">(shown in Browse)</span></label>
+            <label class="form-label" for="admin-cover-desc"><i data-lucide="align-left" class="af-label-icon"></i>Cover Description <span class="af-req" data-req-for="admin-cover-desc">*</span> <span class="af-label-hint">(shown in Browse)</span></label>
             <textarea id="admin-cover-desc" oninput="if (adminState) { adminState.coverDescription = this.value; afRenderRail(); }" rows="2" class="form-textarea af-grow" placeholder="Brief overview of the program..."></textarea>
           </div>
 

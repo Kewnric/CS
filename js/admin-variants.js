@@ -43,12 +43,12 @@ function renderAdminVariantForm() {
   contentContainer.innerHTML = `
     <div style="display:flex; flex-direction:column; gap:1rem;">
       <div data-step="2">
-        <label class="form-label">Version Name</label>
-        <input value="${escapeHTML(activeVar.name)}" oninput="updateActiveVariantField('name', this.value)" class="form-input" />
+        <label class="form-label">Version Name <span class="af-req" data-req-for="admin-variant-name">*</span></label>
+        <input id="admin-variant-name" value="${escapeHTML(activeVar.name)}" oninput="updateActiveVariantField('name', this.value)" class="form-input" />
       </div>
       <div data-step="2">
-        <label class="form-label-inline"><span>Instruction / Description</span></label>
-        <textarea rows="3" oninput="updateActiveVariantField('description', this.value)" class="form-textarea">${escapeHTML(activeVar.description || '')}</textarea>
+        <label class="form-label-inline"><span>Instruction / Description <span class="af-req" data-req-for="admin-variant-desc">*</span></span></label>
+        <textarea id="admin-variant-desc" rows="3" oninput="updateActiveVariantField('description', this.value)" class="form-textarea af-grow">${escapeHTML(activeVar.description || '')}</textarea>
       </div>
 
       <div data-step="2" style="display:flex; flex-direction:column; flex:1; min-height:220px;">
@@ -68,7 +68,7 @@ function renderAdminVariantForm() {
 
       <div data-step="2" style="display:flex; flex-direction:column; flex:1; min-height:240px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
-          <label class="form-label" style="color:var(--color-success); margin-bottom:0;">Target Code <span style="font-weight:400; font-size:0.75rem; opacity:0.7;">(hidden solution)</span></label>
+          <label class="form-label" style="color:var(--color-success); margin-bottom:0;">Target Code <span class="af-req" data-req-for="admin-target-ta">*</span> <span style="font-weight:400; font-size:0.75rem; opacity:0.7;">(hidden solution)</span></label>
           <button type="button" class="af-expand-btn" onclick="afExpandEditor('target')"
                   title="Open this editor full screen" aria-label="Expand Target Code">
             <i data-lucide="maximize-2"></i>
@@ -210,6 +210,7 @@ function renderAdminVariantForm() {
   // Redrawing rebuilds the step-tagged blocks, so whichever step is open has
   // to be re-applied or every block would come back visible at once.
   if (typeof afGoToStep === 'function' && typeof _afStep !== 'undefined') afGoToStep(_afStep);
+  if (typeof afUpdateRequiredMarks === 'function') afUpdateRequiredMarks();
   if (typeof afAutosizeAll === 'function') afAutosizeAll(document.getElementById('admin-variant-content'));
 
   // Initialize Target Code Editor for active file
