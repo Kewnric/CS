@@ -1964,3 +1964,37 @@ textarea.af-grow { overflow: hidden; resize: vertical; }
   .af-step-rail { margin-inline: -1rem; padding-inline: 1rem; }
   .af-step-label { display: none; }
 }
+
+/* ── Test cards: order, outcome, and invisible differences ──── */
+.af-move { display: inline-flex; flex-direction: column; gap: 1px; flex-shrink: 0; }
+.af-move button {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 14px; padding: 0;
+  border: none; border-radius: 3px;
+  background: transparent; color: var(--text-tertiary); cursor: pointer;
+}
+.af-move button:hover:not(:disabled) { background: var(--bg-surface-hover); color: var(--text-primary); }
+.af-move button:disabled { opacity: 0.25; cursor: default; }
+.af-move svg { width: 11px; height: 11px; }
+
+/* Set by Verify, so the outcome sits beside the thing you would edit. */
+.sample-item.test-pass { box-shadow: inset 3px 0 0 var(--color-success); }
+.sample-item.test-fail { box-shadow: inset 3px 0 0 var(--color-danger); }
+
+/* Trailing spaces and line ends, which are otherwise invisible in a <pre>
+   and are the usual reason a correct-looking solution fails. */
+.af-ws {
+  color: var(--color-warning);
+  opacity: 0.75;
+  background: rgba(245, 158, 11, 0.12);
+  border-radius: 2px;
+}
+.af-ws-note {
+  margin-top: 0.4rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--color-warning);
+  font-size: 0.72rem;
+  font-weight: 600;
+}

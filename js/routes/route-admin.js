@@ -106,6 +106,9 @@ function getAdminFormHTML() {
         <div class="af-section-header" style="color:var(--color-accent);">
           <i data-lucide="layers" class="af-section-icon" style="color:var(--color-accent);"></i>
           <span>Versions / Variants</span>
+          <button onclick="afDuplicateVariant()" class="btn btn-ghost btn-sm af-section-action" title="Copy this version, its code and its tests">
+            <i data-lucide="copy" style="width:14px;height:14px;"></i> Duplicate
+          </button>
           <button onclick="addAdminVariant()" class="btn btn-ghost btn-sm af-section-action" id="add-variant-btn" style="color:var(--color-accent);">
             <i data-lucide="plus-circle" style="width:13px;height:13px;"></i> Add Version
           </button>

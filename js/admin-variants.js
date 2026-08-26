@@ -129,7 +129,10 @@ function renderAdminVariantForm() {
           <span style="font-weight:400; font-size:0.72rem; opacity:0.7;">(run on Submit — score becomes pass rate)</span>
         </label>
         <div style="display:flex; gap:0.4rem; align-items:center;">
-          <button onclick="adminVerifySolution()" id="admin-verify-btn" class="btn btn-ghost btn-sm" style="color:var(--color-success); font-weight:600;" title="Compile & run the Target Code against every test case to catch authoring mistakes before students see them.">
+          <button onclick="afBulkAddTests()" class="btn btn-ghost btn-sm" style="color:var(--color-primary); font-weight:600;" title="Paste several tests at once">
+          <i data-lucide="clipboard-paste" style="width:14px;height:14px;"></i> Paste tests
+        </button>
+        <button onclick="adminVerifySolution()" id="admin-verify-btn" class="btn btn-ghost btn-sm" style="color:var(--color-success); font-weight:600;" title="Compile & run the Target Code against every test case to catch authoring mistakes before students see them.">
             <i data-lucide="shield-check" style="width:14px;height:14px;"></i> Verify Solution
           </button>
           <button onclick="addAdminTest()" class="btn btn-ghost btn-sm" style="color:var(--color-primary); font-weight:600;">
@@ -140,12 +143,19 @@ function renderAdminVariantForm() {
       <div id="admin-verify-results"></div>
       <div id="admin-tests-list" data-step="3" style="display:flex; flex-direction:column; gap:0.75rem;">
         ${(activeVar.tests || []).map((t, ti) => `
-          <div class="sample-item" style="flex-direction:column; align-items:stretch; gap:0.5rem;">
+          <div class="sample-item" data-test-idx="${ti}" style="flex-direction:column; align-items:stretch; gap:0.5rem;">
             <div style="display:flex; gap:0.5rem; align-items:center;">
+              <span class="af-move">
+                <button onclick="afMoveTest(${ti}, -1)" ${ti === 0 ? 'disabled' : ''} title="Move up"><i data-lucide="chevron-up"></i></button>
+                <button onclick="afMoveTest(${ti}, 1)" ${ti === (activeVar.tests || []).length - 1 ? 'disabled' : ''} title="Move down"><i data-lucide="chevron-down"></i></button>
+              </span>
               <input value="${escapeHTML(t.name || '')}" oninput="updateTestField(${ti}, 'name', this.value)" placeholder="Test name (e.g. Case 1)" class="form-input" style="font-weight:600; font-size:0.8125rem; padding:0.375rem 0.5rem; flex:1;" />
               <label style="display:flex; align-items:center; gap:0.3rem; font-size:0.72rem; color:var(--text-tertiary); white-space:nowrap; cursor:pointer;" title="Hidden tests still count toward the score, but the student doesn't see their input/expected output.">
                 <input type="checkbox" ${t.hidden ? 'checked' : ''} onchange="updateTestField(${ti}, 'hidden', this.checked)" /> Hidden
               </label>
+              <button onclick="afDuplicateTest(${ti})" class="btn btn-ghost" style="padding:0.25rem;" title="Duplicate this test">
+                <i data-lucide="copy" style="width:15px;height:15px;color:var(--text-tertiary);"></i>
+              </button>
               <button onclick="adminAutofillExpected(${ti})" class="btn btn-ghost" style="padding:0.25rem;" title="Auto-fill: run the Target Code with this test's stdin and use its output as the expected stdout.">
                 <i data-lucide="wand-2" style="width:16px;height:16px;color:var(--color-accent);"></i>
               </button>
@@ -450,6 +460,22 @@ async function adminVerifySolution() {
 
   const passed = results.filter(r => r.passed).length;
   const allPass = passed === results.length;
+
+  // Recorded so the Review step can say whether this program has ever been
+  // checked against its own solution.
+  adminState._verifiedAt = allPass ? Date.now() : null;
+  adminState._verifiedPassed = passed;
+  adminState._verifiedTotal = results.length;
+  if (typeof afRenderRail === 'function') afRenderRail();
+
+  // Stamp the outcome onto the test cards themselves, so the answer is beside
+  // the thing you would edit rather than only in a list further down.
+  results.forEach((r, i) => {
+    const card = document.querySelector('#admin-tests-list .sample-item[data-test-idx="' + i + '"]');
+    if (!card) return;
+    card.classList.toggle('test-pass', !!r.passed);
+    card.classList.toggle('test-fail', !r.passed);
+  });
   let html = '<div class="admin-verify-banner ' + (allPass ? 'pass' : 'fail') + '">' +
     (allPass ? '✓ Solution passes all ' + results.length + ' tests — safe to save.'
              : '✗ Solution passes ' + passed + '/' + results.length + ' tests. Fix the Target Code or the expected outputs below.') +
@@ -461,13 +487,52 @@ async function adminVerifySolution() {
     if (!r.passed) {
       row += '<div class="admin-verify-detail">' +
         (r.error ? '<div><strong>Error:</strong> ' + escapeHTML(r.error) + '</div>' : '') +
-        '<div><strong>Expected:</strong><pre>' + escapeHTML(r.expected || '(empty)') + '</pre></div>' +
-        '<div><strong>Solution printed:</strong><pre>' + escapeHTML(r.actual || '(no output)') + '</pre></div>' +
+        '<div><strong>Expected:</strong><pre>' + _afShowWhitespace(r.expected) + '</pre></div>' +
+        '<div><strong>Solution printed:</strong><pre>' + _afShowWhitespace(r.actual) + '</pre></div>' +
+        _afWhitespaceNote(r.expected, r.actual) +
       '</div>';
     }
     return row + '</div>';
   }).join('');
   resultsEl.innerHTML = html;
+}
+
+/**
+ * Trailing spaces and a missing final newline are the classic authoring bug,
+ * and in a plain <pre> the two sides look identical. Spaces become middle dots
+ * and line ends become a visible mark, but only where it matters — every space
+ * dotted would be unreadable, so only runs at the end of a line are shown.
+ */
+function _afShowWhitespace(text) {
+  if (text === undefined || text === null || text === '') return '<em>(empty)</em>';
+  return String(text)
+    .split('\n')
+    .map(line => {
+      const m = line.match(/[ \t]+$/);
+      const body = escapeHTML(m ? line.slice(0, -m[0].length) : line);
+      const tail = m ? '<span class="af-ws">' + m[0].replace(/ /g, '\u00b7').replace(/\t/g, '\u2192') + '</span>' : '';
+      return body + tail;
+    })
+    .join('<span class="af-ws">\u00b6</span>\n');
+}
+
+/** Say it in words when the only difference is invisible. */
+function _afWhitespaceNote(expected, actual) {
+  const e = String(expected === undefined || expected === null ? '' : expected);
+  const a = String(actual === undefined || actual === null ? '' : actual);
+  if (e === a) return '';
+  if (e.trim() === a.trim()) {
+    const eNl = e.endsWith('\n'), aNl = a.endsWith('\n');
+    if (eNl !== aNl) {
+      return '<div class="af-ws-note">Only difference: the ' + (aNl ? 'solution prints' : 'expected value has') +
+             ' a trailing newline and the other does not.</div>';
+    }
+    return '<div class="af-ws-note">Only difference is whitespace — leading or trailing spaces.</div>';
+  }
+  if (e.replace(/\s+/g, '') === a.replace(/\s+/g, '')) {
+    return '<div class="af-ws-note">Same characters, different spacing or line breaks.</div>';
+  }
+  return '';
 }
 
 /** Run the Target Code with one test's stdin and fill its expected stdout from the result. */
@@ -505,3 +570,94 @@ async function adminAutofillExpected(idx) {
   const el = document.getElementById('admin-verify-results');
   if (el) el.innerHTML = '<div class="admin-verify-banner pass">✓ Expected output for “' + escapeHTML(v.tests[idx].name || 'Case ' + (idx + 1)) + '” filled from the solution’s actual output.</div>';
 }
+
+
+/* ── Managing tests and versions ──────────────────────────────
+   Reordering meant deleting and retyping, and a second test that differed by
+   one character meant typing the whole thing again. */
+
+function _afActiveVariant() {
+  if (typeof adminState === 'undefined' || !adminState) return null;
+  return (adminState.variants || [])[adminState.activeVariantIndex] || (adminState.variants || [])[0] || null;
+}
+
+window.afMoveTest = function (idx, delta) {
+  const v = _afActiveVariant();
+  if (!v || !v.tests) return;
+  const to = idx + delta;
+  if (to < 0 || to >= v.tests.length) return;
+  const [row] = v.tests.splice(idx, 1);
+  v.tests.splice(to, 0, row);
+  window.adminIsDirty = true;
+  if (typeof setSaveStatus === 'function') setSaveStatus('admin-save-status', 'unsaved');
+  renderAdminVariantForm();
+};
+
+window.afDuplicateTest = function (idx) {
+  const v = _afActiveVariant();
+  if (!v || !v.tests || !v.tests[idx]) return;
+  const copy = JSON.parse(JSON.stringify(v.tests[idx]));
+  copy.id = typeof generateId === 'function' ? generateId() : String(Date.now());
+  copy.name = (copy.name || 'Test') + ' (copy)';
+  v.tests.splice(idx + 1, 0, copy);
+  window.adminIsDirty = true;
+  if (typeof setSaveStatus === 'function') setSaveStatus('admin-save-status', 'unsaved');
+  renderAdminVariantForm();
+};
+
+/**
+ * Several tests from one block of text. Each test is stdin, then `=>` or `--`,
+ * then the expected output; blank lines separate them. Anything unparseable is
+ * reported rather than silently dropped.
+ */
+window.afBulkAddTests = function () {
+  const v = _afActiveVariant();
+  if (!v) return;
+  if (!v.tests) v.tests = [];
+  showInputDialog('Paste tests',
+    'One test per block, separated by a blank line. Put => on its own line between the input and the expected output.',
+    '5 3\n=>\n8\n\n2 2\n=>\n4', '', (raw) => {
+      const text = String(raw || '').replace(/\r\n/g, '\n').trim();
+      if (!text) return;
+      let added = 0, skipped = 0;
+      text.split(/\n\s*\n/).forEach(block => {
+        const parts = block.split(/^\s*(?:=>|--)\s*$/m);
+        if (parts.length !== 2) { skipped++; return; }
+        v.tests.push({
+          id: typeof generateId === 'function' ? generateId() : String(Date.now() + added),
+          name: 'Test ' + (v.tests.length + 1),
+          stdin: parts[0].replace(/^\n+|\n+$/g, ''),
+          expected: parts[1].replace(/^\n+|\n+$/g, ''),
+          hidden: false
+        });
+        added++;
+      });
+      window.adminIsDirty = true;
+      if (typeof setSaveStatus === 'function') setSaveStatus('admin-save-status', 'unsaved');
+      renderAdminVariantForm();
+      if (typeof toast === 'function') {
+        toast(added + ' test' + (added !== 1 ? 's' : '') + ' added' +
+          (skipped ? ', ' + skipped + ' block' + (skipped !== 1 ? 's' : '') + ' skipped — no => separator' : '') + '.',
+          { type: skipped ? 'warning' : 'success', duration: skipped ? 6000 : 3500 });
+      }
+    });
+};
+
+window.afDuplicateVariant = function () {
+  if (typeof adminState === 'undefined' || !adminState) return;
+  const v = _afActiveVariant();
+  if (!v) return;
+  const copy = JSON.parse(JSON.stringify(v));
+  copy.id = typeof generateId === 'function' ? generateId() : String(Date.now());
+  copy.name = (copy.name || 'Version') + ' (copy)';
+  (copy.files || []).forEach(f => { f.id = typeof generateId === 'function' ? generateId() : String(Math.random()); });
+  (copy.tests || []).forEach(t => { t.id = typeof generateId === 'function' ? generateId() : String(Math.random()); });
+  adminState.variants.push(copy);
+  adminState.activeVariantIndex = adminState.variants.length - 1;
+  window.adminIsDirty = true;
+  if (typeof setSaveStatus === 'function') setSaveStatus('admin-save-status', 'unsaved');
+  // renderAdminVariantForm redraws the tab strip itself; there is no separate
+  // tabs renderer to call.
+  renderAdminVariantForm();
+  if (typeof toast === 'function') toast('Version duplicated.', { type: 'success' });
+};
