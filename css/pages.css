@@ -2054,19 +2054,28 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
 .home-continue-card {
   position: relative;
   margin-bottom: 1rem;
-  /* FF7's boxes are barely rounded — the corner is a chamfer, not a pill. */
-  border-radius: 5px;
-  border: 2px solid rgba(150, 194, 255, 0.5);
-  background: linear-gradient(180deg,
-    rgba(16, 42, 104, 0.94) 0%,
-    rgba(8, 20, 58, 0.95) 55%,
-    rgba(4, 10, 34, 0.96) 100%);
-  /* A lit top lip, an inner blue bloom, and a hard shadow beneath: the three
-     things that give the menu box its depth on the field. */
+  /* The same corner as the stat cards it sits under, rather than the game's own
+     chamfer — the point is to belong to this page. --radius-xl is 24px, which
+     is rounder than its neighbours, not the same as them. */
+  border-radius: var(--radius-lg);
+  /* Was a near-opaque blue slab: a 2px bright frame around 0.95-alpha fill,
+     which made it the loudest thing on a page of quiet translucent surfaces.
+     The frame survives as a single lit edge on the left — the side the cursor
+     points from — and the fill is now glass the page shows through. */
+  border: 1px solid rgba(126, 172, 240, 0.24);
+  border-left: 2px solid rgba(150, 194, 255, 0.5);
+  background:
+    linear-gradient(100deg,
+      rgba(58, 118, 228, 0.20) 0%,
+      rgba(32, 68, 152, 0.11) 34%,
+      rgba(16, 34, 84, 0.045) 64%,
+      rgba(10, 20, 52, 0) 100%),
+    rgba(15, 23, 43, 0.5);
+  backdrop-filter: blur(10px) saturate(135%);
+  -webkit-backdrop-filter: blur(10px) saturate(135%);
   box-shadow:
-    inset 0 1px 0 rgba(198, 224, 255, 0.4),
-    inset 0 0 26px rgba(44, 96, 200, 0.22),
-    0 4px 18px rgba(0, 0, 0, 0.5);
+    inset 0 1px 0 rgba(190, 220, 255, 0.14),
+    0 2px 14px rgba(0, 0, 0, 0.28);
   overflow: hidden;
   transition: opacity 0.25s ease, transform 0.25s ease;
 }
@@ -2080,7 +2089,7 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
 }
 .hc-row.compact {
   padding: 0.4rem 0.75rem;
-  border-top: 1px solid rgba(150, 194, 255, 0.18);
+  border-top: 1px solid rgba(150, 194, 255, 0.14);
 }
 
 /* The cursor. In FF7 it sits to the left of the highlighted entry and bobs. */
@@ -2112,11 +2121,11 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
               filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7)); }
 .hc-orb-coding {
   background: radial-gradient(circle at 34% 28%, #b9ffd0 0%, #3fd77f 34%, #12854a 68%, #06331d 100%);
-  box-shadow: 0 0 11px rgba(63, 215, 127, 0.55), inset 0 0 7px rgba(255, 255, 255, 0.4);
+  box-shadow: 0 0 9px rgba(63, 215, 127, 0.4), inset 0 0 7px rgba(255, 255, 255, 0.35);
 }
 .hc-orb-notebook {
   background: radial-gradient(circle at 34% 28%, #cbe9ff 0%, #4aa8ec 34%, #14589e 68%, #062845 100%);
-  box-shadow: 0 0 11px rgba(74, 168, 236, 0.55), inset 0 0 7px rgba(255, 255, 255, 0.4);
+  box-shadow: 0 0 9px rgba(74, 168, 236, 0.4), inset 0 0 7px rgba(255, 255, 255, 0.35);
 }
 
 .hc-text { flex: 1; min-width: 0; }
@@ -2145,8 +2154,8 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
   display: inline-flex; align-items: center; gap: 0.35rem;
   padding: 0.34rem 0.7rem;
   border-radius: 3px;
-  border: 1px solid rgba(170, 210, 255, 0.55);
-  background: linear-gradient(180deg, rgba(38, 84, 168, 0.95), rgba(12, 32, 82, 0.95));
+  border: 1px solid rgba(160, 202, 255, 0.42);
+  background: linear-gradient(180deg, rgba(70, 128, 224, 0.34), rgba(28, 60, 140, 0.3));
   color: #eaf4ff;
   font-size: 0.72rem;
   font-weight: 700;
@@ -2188,15 +2197,16 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
   z-index: 2;
   pointer-events: none;
   overflow: hidden;
-  background: rgba(4, 10, 34, 0.7);
+  background: rgba(140, 180, 240, 0.1);
 }
 .hc-timer > span {
   display: block;
   height: 100%;
   width: 100%;
   transform-origin: left center;
-  background: linear-gradient(90deg, #2b6fd6 0%, #57b6f5 60%, #b8e4ff 100%);
-  box-shadow: 0 0 8px rgba(87, 182, 245, 0.8);
+  background: linear-gradient(90deg,
+    rgba(43, 111, 214, 0.75) 0%, rgba(87, 182, 245, 0.9) 60%, rgba(184, 228, 255, 0.95) 100%);
+  box-shadow: 0 0 7px rgba(87, 182, 245, 0.55);
   animation: hcDrain 5s linear forwards;
 }
 /* A faint wash still recedes with it, so the card itself visibly empties. */
@@ -2217,7 +2227,7 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
 .home-continue-card:focus-within .hc-timer > span,
 .home-continue-card.is-held .hc-timer > span { animation-play-state: paused; }
 
-.hc-more { border-top: 1px solid rgba(150, 194, 255, 0.2); }
+.hc-more { border-top: 1px solid rgba(150, 194, 255, 0.16); }
 .hc-more > summary {
   display: flex; align-items: center; gap: 0.35rem;
   padding: 0.35rem 0.75rem;
