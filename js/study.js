@@ -369,6 +369,11 @@ function renderSnippetDetail() {
         </div>
 
         <div style="display: flex; gap: 1rem; flex-wrap: wrap; background: var(--bg-surface-hover); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+          ${(((snippet.sqlPractice && snippet.sqlPractice.cases) || []).filter(c => (c.answer || '').trim()).length) ? `
+          <button class="btn btn-primary" onclick="sqaStart('${snippet.id}')" id="sql-attempt-btn">
+            <i data-lucide="play" style="width: 16px; height: 16px;"></i>
+            Start attempt (${((snippet.sqlPractice.cases) || []).filter(c => (c.answer || '').trim()).length} cases)
+          </button>` : ''}
           <button class="btn btn-primary" onclick="openExamplesModal()" id="view-examples-btn">
             <i data-lucide="code" style="width: 16px; height: 16px;"></i> View Examples (${(snippet.examples || []).length})
           </button>
@@ -637,6 +642,10 @@ function renderSnippetFolderOverview(container) {
             // Quill stores rich HTML — strip tags for a plain-text preview
             const descText = (s.description || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
             const canTry = (s.tryCodingTargetIndices || []).length > 0 || (s.examples || []).some(e => (e.code || '').trim());
+            // A snippet only offers an attempt once it has a case with an answer
+            // to compare against — an empty set would grade every answer wrong.
+            const sqlCount = ((s.sqlPractice && s.sqlPractice.cases) || []).filter(c => (c.answer || '').trim()).length;
+            const hasSql = sqlCount > 0;
             const attempts = _snippetAttempts(s).length;
             const best = _snippetBestPct(s);
             const scoreClass = best === 100 ? 'score-perfect' : best >= 50 ? 'score-partial' : best >= 0 ? 'score-low' : '';
@@ -660,6 +669,7 @@ function renderSnippetFolderOverview(container) {
                   ${attempts ? `<span class="badge badge-neutral"><i data-lucide="rotate-ccw" style="width:12px;height:12px;margin-right:2px;"></i> ${attempts} Attempt${attempts !== 1 ? 's' : ''}</span>` : ''}
                   ${best >= 0 ? `<span class="badge ${scoreClass}"><i data-lucide="target" style="width:12px;height:12px;margin-right:2px;"></i> Best: ${best}%</span>` : ''}
                   ${canTry ? '<span class="badge badge-neutral"><i data-lucide="terminal" style="width:12px;height:12px;margin-right:2px;"></i> Try Coding</span>' : ''}
+                  ${hasSql ? `<span class="badge badge-neutral"><i data-lucide="database" style="width:12px;height:12px;margin-right:2px;"></i> ${sqlCount} SQL case${sqlCount !== 1 ? 's' : ''}</span>` : ''}
                   ${linkedCount > 0 ? `<span class="badge badge-neutral"><i data-lucide="link-2" style="width:12px;height:12px;margin-right:2px;"></i> ${linkedCount} Linked</span>` : ''}
                   ${tHtml}
                 </div>
@@ -671,6 +681,11 @@ function renderSnippetFolderOverview(container) {
                   <button onclick="event.stopPropagation(); selectSnippet('${s.id}')" class="btn btn-practice" style="flex:1;">
                     <i data-lucide="book-open" style="width:16px;height:16px;"></i> Study
                   </button>
+                  ${hasSql ? `
+                  <button onclick="event.stopPropagation(); sqaStart('${s.id}')" class="btn btn-primary" style="flex:1;"
+                          title="Answer this snippet's ${sqlCount} SQL question${sqlCount !== 1 ? 's' : ''}">
+                    <i data-lucide="play" style="width:16px;height:16px;"></i> Start attempt
+                  </button>` : ''}
                   <button class="btn btn-ghost" title="Copy the code" onclick="event.stopPropagation(); copySnippetCode('${s.id}', this)" style="padding:0.5rem;">
                     <i data-lucide="copy" style="width:16px;height:16px;"></i>
                   </button>

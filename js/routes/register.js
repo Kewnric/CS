@@ -20,6 +20,7 @@ function registerAllRoutes() {
   SpaRouter.register('quests', { title: 'StudySession Pro — Quest Board', templateFn: questTemplate, initFn: questInit, destroyFn: questDestroy, sidebarVisible: true, navId: 'nav-quests' });
   SpaRouter.register('practice', { title: 'StudySession Pro — Practice', templateFn: practiceTemplate, initFn: practiceInit, destroyFn: practiceDestroy, sidebarVisible: false, navId: null });
   SpaRouter.register('practice-set', { title: 'StudySession Pro — Multi-Problem Session', templateFn: practiceSetTemplate, initFn: practiceSetInit, destroyFn: practiceSetDestroy, sidebarVisible: false, navId: null });
+  SpaRouter.register('snippet-attempt', { title: 'SQL Practice — StudySession Pro', templateFn: snippetAttemptTemplate, initFn: snippetAttemptInit, destroyFn: snippetAttemptDestroy, sidebarVisible: false, navId: null });
   SpaRouter.register('solution', { title: 'StudySession Pro — Solution', templateFn: solutionTemplate, initFn: solutionInit, destroyFn: solutionDestroy, sidebarVisible: false, navId: null });
   SpaRouter.register('notes-practice', { title: 'Notebook Session — StudySession Pro', templateFn: notesPracticeTemplate, initFn: notesPracticeInit, destroyFn: notesPracticeDestroy, sidebarVisible: false, navId: null });
   SpaRouter.register('notes-solution', { title: 'Notebook Results — StudySession Pro', templateFn: notesSolutionTemplate, initFn: notesSolutionInit, destroyFn: notesSolutionDestroy, sidebarVisible: false, navId: null });

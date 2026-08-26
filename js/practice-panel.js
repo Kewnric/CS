@@ -99,9 +99,12 @@ function renderPracticePanel() {
     </div>
     <div class="pp-tab-body" id="pp-tab-body"></div>
     <div class="pp-footer">
-      <button class="btn btn-run-code pp-runcode-btn" id="pp-runcode-btn" onclick="runCodeWithPiston()"
-              title="Run this code in the terminal">
-        <i data-lucide="play" style="width:15px;height:15px;"></i> Run Code
+      <button class="btn btn-run-code pp-runcode-btn${_ppCtx.runDisabled ? ' is-unavailable' : ''}"
+              id="pp-runcode-btn"
+              onclick="${_ppCtx.runDisabled ? 'ppRunUnavailable()' : 'runCodeWithPiston()'}"
+              ${_ppCtx.runDisabled ? 'aria-disabled="true"' : ''}
+              title="${_ppCtx.runDisabled ? escapeHTML(_ppCtx.runDisabled) : 'Run this code in the terminal'}">
+        <i data-lucide="${_ppCtx.runDisabled ? 'lock' : 'play'}" style="width:15px;height:15px;"></i> Run Code
       </button>
       <button class="btn btn-primary pp-finish-btn" id="pp-finish-btn" onclick="ppFinish()">
         <i data-lucide="flag" style="width:15px;height:15px;"></i> ${escapeHTML(_ppCtx.finishLabel || 'Finish attempt…')}
@@ -315,6 +318,10 @@ function _ppExecHtml() {
 /** Top-bar "Check Code" → run all minimum requirements + test cases for the current problem. */
 async function ppRunAllChecks() {
   if (!_ppCtx) return;
+  // A mode whose answers are not compiled brings its own checker. SQL practice
+  // compares text against a reference answer; there is nothing to build and
+  // nothing to run, so none of the machinery below applies to it.
+  if (_ppCtx.runChecks) return _ppCtx.runChecks();
   const codeNow = _ppCtx.code();
   if (!codeNow || !codeNow.trim()) {
     if (typeof toast === 'function') toast('Write some code first.', { type: 'warning' });
@@ -572,3 +579,15 @@ function ppClearFx() {
   const layer = document.getElementById('pp-fx');
   if (layer) layer.remove();
 }
+
+
+/**
+ * Run Code where there is no engine behind it. Left visible rather than hidden:
+ * the button not being there reads as a layout that forgot it, whereas a locked
+ * one says the feature is known about and is not ready.
+ */
+function ppRunUnavailable() {
+  const why = (_ppCtx && _ppCtx.runDisabled) || 'Running is not available here yet.';
+  if (typeof toast === 'function') toast(why, { type: 'info', duration: 6000 });
+}
+window.ppRunUnavailable = ppRunUnavailable;

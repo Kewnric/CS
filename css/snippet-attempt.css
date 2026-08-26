@@ -1,0 +1,227 @@
+/* ============================================================
+   SNIPPET-ATTEMPT.CSS — the SQL answer boxes
+   ------------------------------------------------------------
+   Only the editor region. Everything else on this screen is the practice
+   layout's own CSS, reused as-is.
+   ============================================================ */
+
+.sqa-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.9rem 1rem 2rem;
+  background: var(--editor-bg, #0d1117);
+}
+
+.sqa-scroll.hidden { display: none; }
+
+/* ── One test case ─────────────────────────────────────────── */
+
+.sqa-case + .sqa-case { margin-top: 1.1rem; }
+
+.sqa-case-head {
+  margin: 0 0 0.2rem;
+  padding: 0;
+  border: none;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #e6edf3;
+}
+
+.sqa-case-prompt {
+  margin: 0 0 0.45rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: #8b949e;
+}
+
+/* The box itself: a gutter and the code, sharing one border. */
+.sqa-box {
+  display: flex;
+  align-items: stretch;
+  background: #161b22;
+  border: 1px solid #21262d;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+
+.sqa-box:focus-within { border-color: var(--color-primary); }
+
+/* Numbers for every line, so an answer that runs to several is still readable
+   as a statement rather than a paragraph. */
+.sqa-lines {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 0.5rem 0.5rem 0.5rem 0.65rem;
+  background: #0d1117;
+  border-right: 1px solid #21262d;
+  user-select: none;
+  text-align: right;
+  min-width: 2.4rem;
+}
+
+.sqa-lines span {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: #484f58;
+}
+
+/* The code column. The highlighted <pre> and the transparent <textarea> are
+   stacked and must agree on every metric, or the caret drifts from the glyphs.
+   Same trick the main editor uses. */
+.sqa-code-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.sqa-pre,
+.sqa-ta {
+  margin: 0;
+  padding: 0.5rem 0.65rem;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  white-space: pre;
+  overflow-wrap: normal;
+  tab-size: 2;
+  border: none;
+}
+
+.sqa-pre {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  color: #c9d1d9;
+}
+
+.sqa-ta {
+  position: relative;
+  display: block;
+  width: 100%;
+  background: transparent;
+  /* Transparent text over the highlighted copy beneath; the caret stays. */
+  color: transparent;
+  caret-color: #58a6ff;
+  resize: none;
+  outline: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.sqa-ta::selection { background: rgba(88, 166, 255, 0.32); }
+.sqa-ta::placeholder { color: #484f58; }
+
+/* ── The dialect chip on the tab row ───────────────────────── */
+
+.sqa-dialect {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid #21262d;
+  border-radius: var(--radius-full, 999px);
+  background: #0d1117;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #8b949e;
+  flex-shrink: 0;
+}
+
+.sqa-dialect svg { width: 12px; height: 12px; color: var(--color-primary); }
+
+/* ── File tabs ─────────────────────────────────────────────── */
+
+.sqa-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.8rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: #8b949e;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.sqa-tab:hover { color: #e6edf3; }
+
+.sqa-tab.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+.sqa-tab-lock { width: 11px; height: 11px; color: var(--color-warning); }
+
+/* ── The read-only schema tab ──────────────────────────────── */
+
+.sqa-init-pre {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: #c9d1d9;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+/* ── Run Code, locked ──────────────────────────────────────── */
+
+/* Kept in place and legible rather than dimmed to nothing: it has to read as
+   "not yet", not as a broken button. */
+.pp-runcode-btn.is-unavailable {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: grayscale(0.6);
+}
+
+.pp-runcode-btn.is-unavailable:hover { opacity: 0.7; }
+
+/* ── Authoring the set, in the snippets admin ──────────────── */
+
+.sqladm-top {
+  display: flex;
+  gap: 0.9rem;
+  align-items: flex-start;
+}
+
+.sqladm-top > div:first-child { flex: 0 0 150px; }
+
+.sqladm-num {
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-primary);
+}
+
+.sqladm-case + .sqladm-case { margin-top: 0.6rem; }
+
+.sqladm-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 1.4rem 1rem;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.sqladm-empty svg { width: 22px; height: 22px; opacity: 0.6; }
+.sqladm-empty p { margin: 0; font-size: 0.8125rem; }
+
+@media (max-width: 720px) {
+  .sqladm-top { flex-direction: column; }
+  .sqladm-top > div:first-child { flex: 1 1 auto; width: 100%; }
+}

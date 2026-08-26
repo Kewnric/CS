@@ -208,6 +208,8 @@ function openStudyForm(id) {
   if (studyQuillEditor) studyQuillEditor.clipboard.dangerouslyPasteHTML(studyModeState.description || '', 'silent');
   if (studyCommentsQuillEditor) studyCommentsQuillEditor.clipboard.dangerouslyPasteHTML(studyModeState.comments || '', 'silent');
 
+  if (typeof loadSqlPracticeForm === 'function') loadSqlPracticeForm();
+
   // Setup Global Starter Code
   const gStarterTA = document.getElementById('study-global-starter-textarea');
   const gStarterPre = document.getElementById('study-global-starter-code');
@@ -271,6 +273,15 @@ function saveStudyForm(opts = {}) {
   if (Array.isArray(studyModeState.tryCodingTargetIndices)) {
     studyModeState.tryCodingTargetIndices = studyModeState.tryCodingTargetIndices
       .filter(i => studyModeState.examples[i] && (studyModeState.examples[i].code || '').trim() !== '');
+  }
+
+  // A case with no reference answer would mark the student wrong whatever they
+  // wrote, and a set of nothing but empty cases should not offer an attempt at
+  // all — same reasoning as the Try Coding targets above.
+  if (studyModeState.sqlPractice) {
+    const sp = studyModeState.sqlPractice;
+    sp.cases = (sp.cases || []).filter(c => (c.prompt || '').trim() || (c.answer || '').trim());
+    if (!sp.cases.length && !(sp.initSql || '').trim()) delete studyModeState.sqlPractice;
   }
 
   if (studyModeState.id === 'new') studyModeState.id = generateId();
@@ -560,3 +571,155 @@ function updateStudyExampleField(field, value) {
     }
   }
 }
+
+/* ── Authoring a SQL practice set ─────────────────────────────
+   The same shape the coding library's test cases use — a numbered list of
+   cards you can add to, reorder, duplicate and delete — so the two editors
+   behave the same way. Each case is a question and the reference answer that
+   Check Code compares against.
+
+   It hangs off the snippet rather than being its own entity: a snippet is
+   already the thing that carries a schema, an explanation and examples, and a
+   practice set for it is one more facet of the same subject. */
+
+function _sqlState() {
+  if (typeof studyModeState === 'undefined' || !studyModeState) return null;
+  if (!studyModeState.sqlPractice) {
+    studyModeState.sqlPractice = { dialect: 'MySQL', initSql: '', cases: [] };
+  }
+  if (!Array.isArray(studyModeState.sqlPractice.cases)) studyModeState.sqlPractice.cases = [];
+  return studyModeState.sqlPractice;
+}
+
+function _sqlDirty() {
+  window.adminIsDirty = true;
+  if (typeof setSaveStatus === 'function') setSaveStatus('study-save-status', 'unsaved');
+}
+
+window.sqlSetDialect = function (v) {
+  const p = _sqlState(); if (!p) return;
+  p.dialect = v; _sqlDirty();
+};
+
+window.sqlSetInit = function (v) {
+  const p = _sqlState(); if (!p) return;
+  p.initSql = v; _sqlDirty();
+};
+
+window.sqlAddCase = function () {
+  const p = _sqlState(); if (!p) return;
+  p.cases.push({
+    id: typeof generateId === 'function' ? generateId() : String(Date.now()),
+    prompt: '', answer: ''
+  });
+  _sqlDirty();
+  renderSqlCases();
+};
+
+window.sqlDeleteCase = function (i) {
+  const p = _sqlState(); if (!p || !p.cases[i]) return;
+  const go = () => { p.cases.splice(i, 1); _sqlDirty(); renderSqlCases(); };
+  // Only worth confirming once something would actually be lost.
+  const filled = (p.cases[i].prompt || '').trim() || (p.cases[i].answer || '').trim();
+  if (filled && typeof showConfirm === 'function') {
+    showConfirm('Delete case ' + (i + 1) + '?', 'Its question and answer will be removed.', go);
+  } else { go(); }
+};
+
+window.sqlMoveCase = function (i, delta) {
+  const p = _sqlState(); if (!p) return;
+  const to = i + delta;
+  if (to < 0 || to >= p.cases.length) return;
+  const [row] = p.cases.splice(i, 1);
+  p.cases.splice(to, 0, row);
+  _sqlDirty();
+  renderSqlCases();
+};
+
+window.sqlDuplicateCase = function (i) {
+  const p = _sqlState(); if (!p || !p.cases[i]) return;
+  const copy = JSON.parse(JSON.stringify(p.cases[i]));
+  copy.id = typeof generateId === 'function' ? generateId() : String(Date.now());
+  p.cases.splice(i + 1, 0, copy);
+  _sqlDirty();
+  renderSqlCases();
+};
+
+window.sqlUpdateCase = function (i, field, v) {
+  const p = _sqlState(); if (!p || !p.cases[i]) return;
+  p.cases[i][field] = v;
+  _sqlDirty();
+};
+
+function renderSqlCases() {
+  const host = document.getElementById('sql-cases-list');
+  const p = _sqlState();
+  if (!host || !p) return;
+
+  if (!p.cases.length) {
+    host.innerHTML = `
+      <div class="sqladm-empty">
+        <i data-lucide="database"></i>
+        <p>No cases yet. Each one becomes a numbered answer box in the attempt.</p>
+      </div>`;
+    if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
+    return;
+  }
+
+  host.innerHTML = p.cases.map((c, i) => `
+    <div class="sample-item sqladm-case" data-case-idx="${i}" style="flex-direction:column; align-items:stretch; gap:0.5rem;">
+      <div style="display:flex; gap:0.5rem; align-items:center;">
+        <span class="af-move">
+          <button onclick="sqlMoveCase(${i}, -1)" ${i === 0 ? 'disabled' : ''} title="Move up"><i data-lucide="chevron-up"></i></button>
+          <button onclick="sqlMoveCase(${i}, 1)" ${i === p.cases.length - 1 ? 'disabled' : ''} title="Move down"><i data-lucide="chevron-down"></i></button>
+        </span>
+        <span class="sqladm-num">Test Case ${i + 1}</span>
+        <span style="flex:1;"></span>
+        <button onclick="sqlDuplicateCase(${i})" class="btn btn-ghost" style="padding:0.25rem;" title="Duplicate this case">
+          <i data-lucide="copy" style="width:15px;height:15px;color:var(--text-tertiary);"></i>
+        </button>
+        <button onclick="sqlDeleteCase(${i})" class="btn btn-ghost" style="padding:0.25rem;" title="Delete this case">
+          <i data-lucide="trash-2" style="width:15px;height:15px;color:var(--color-danger);"></i>
+        </button>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:0.2rem;">
+        <label class="form-label" style="margin-bottom:0;">Question <span class="af-req${(c.prompt || '').trim() ? ' is-filled' : ''}">*</span></label>
+        <textarea rows="2" class="form-textarea af-grow" style="min-height:44px;"
+                  placeholder="What should the student write? e.g. Show all suspects never mentioned in transcripts"
+                  oninput="sqlUpdateCase(${i}, 'prompt', this.value); afAutosize(this); sqlMarkReq(this)">${escapeHTML(c.prompt || '')}</textarea>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:0.2rem;">
+        <label class="form-label" style="margin-bottom:0;">Reference answer <span class="af-req${(c.answer || '').trim() ? ' is-filled' : ''}">*</span></label>
+        <textarea rows="3" class="form-textarea af-grow af-code-field" style="min-height:54px;"
+                  placeholder="SELECT ..."
+                  oninput="sqlUpdateCase(${i}, 'answer', this.value); afAutosize(this); sqlMarkReq(this)">${escapeHTML(c.answer || '')}</textarea>
+      </div>
+    </div>`).join('');
+
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
+  if (typeof afAutosizeAll === 'function') afAutosizeAll(host);
+}
+window.renderSqlCases = renderSqlCases;
+
+/* The asterisks here are per-field rather than driven by afUpdateRequiredMarks,
+   which keys off element ids — these boxes are a repeating list and have none. */
+window.sqlMarkReq = function (el) {
+  const wrap = el && el.parentElement;
+  const mark = wrap && wrap.querySelector('.af-req');
+  if (mark) mark.classList.toggle('is-filled', !!el.value.trim());
+};
+
+/** Fill the section from the snippet being edited. */
+function loadSqlPracticeForm() {
+  const p = _sqlState();
+  if (!p) return;
+  const d = document.getElementById('sql-dialect');
+  if (d) d.value = p.dialect || 'MySQL';
+  const init = document.getElementById('sql-init');
+  if (init) {
+    init.value = p.initSql || '';
+    if (typeof afAutosize === 'function') afAutosize(init);
+  }
+  renderSqlCases();
+}
+window.loadSqlPracticeForm = loadSqlPracticeForm;

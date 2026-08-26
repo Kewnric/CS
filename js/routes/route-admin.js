@@ -400,6 +400,41 @@ function getSnippetFormHTML() {
         </div>
       </div>
 
+      <!-- Section: SQL practice — the set behind Start attempt -->
+      <div class="af-section">
+        <div class="af-section-header" style="color:var(--color-primary);">
+          <i data-lucide="database" class="af-section-icon" style="color:var(--color-primary);"></i>
+          <span>SQL Practice</span>
+          <button onclick="sqlAddCase()" class="btn btn-ghost btn-sm af-section-action" style="color:var(--color-primary);">
+            <i data-lucide="plus-circle" style="width:13px;height:13px;"></i> Add Case
+          </button>
+        </div>
+        <div class="af-section-body" style="padding-top:0.5rem;">
+          <div class="sqladm-top">
+            <div>
+              <label class="form-label">Dialect</label>
+              <select id="sql-dialect" class="form-select" onchange="sqlSetDialect(this.value)">
+                <option>MySQL</option>
+                <option>PostgreSQL</option>
+                <option>SQLite</option>
+                <option>SQL Server</option>
+                <option>Oracle</option>
+              </select>
+            </div>
+            <div style="flex:1;min-width:0;">
+              <label class="form-label">
+                Schema — shown to the student in a locked <code>init.sql</code> tab
+              </label>
+              <textarea id="sql-init" rows="4" class="form-textarea af-grow af-code-field"
+                        placeholder="CREATE TABLE Suspects (...);"
+                        oninput="sqlSetInit(this.value)"></textarea>
+            </div>
+          </div>
+          <div class="divider"></div>
+          <div id="sql-cases-list"></div>
+        </div>
+      </div>
+
       <div class="admin-form-footer">
         <div class="af-footer-hint"><kbd>Ctrl</kbd>+<kbd>S</kbd> save · <kbd>Esc</kbd> close</div>
         <div class="af-footer-actions">
