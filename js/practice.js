@@ -472,19 +472,13 @@ function practiceConfirmExit() {
 /** Finish button / Ctrl+Shift+Enter — confirm, then grade. */
 function confirmFinishAttempt() {
   if (_submitInProgress || _practiceSubmitted) return;
-  if (typeof showAlertDialog !== 'function' && typeof showConfirm !== 'function') { submitCode(); return; }
+  if (typeof showConfirm !== 'function') { submitCode(); return; }
   const chk = _practiceCheck;
   const fresh = chk && chk.codeKey != null && chk.codeKey === _buildSubmissionSource();
   const detail = fresh
     ? `Your last check scored ${chk.passed}/${chk.total} and still matches this code — it'll be used as your result.`
     : 'You haven\'t checked this code yet, so it will be graded on how closely it matches the reference solution.';
-  const body = detail + ' This records the attempt and stops the timer.';
-  if (typeof showAlertDialog === 'function') {
-    showAlertDialog('Finish attempt?', body, () => submitCode(),
-      { confirmLabel: 'Finish the attempt', cancelLabel: 'Keep working' });
-  } else {
-    showConfirm('Finish attempt?', body, () => submitCode());
-  }
+  showConfirm('Finish attempt?', detail + ' This records the attempt and stops the timer.', () => submitCode());
 }
 
 /** Pull the stdin out of a sample's "Input: … Output: …" body. */
