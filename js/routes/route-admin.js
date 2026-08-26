@@ -22,8 +22,12 @@ function getAdminFormHTML() {
         </button>
       </div>
 
+      <!-- Four steps rather than four screens of scrolling. The rail is the
+           only way to see where you are and what is still missing. -->
+      <nav class="af-step-rail" id="af-step-rail" aria-label="Program editor steps"></nav>
+
       <!-- Section: Identity -->
-      <div class="af-section">
+      <div class="af-section" data-step="1">
         <div class="af-section-header">
           <i data-lucide="info" class="af-section-icon" style="color:var(--color-primary);"></i>
           <span>Basic Info</span>
@@ -31,8 +35,8 @@ function getAdminFormHTML() {
         <div class="af-section-body">
           <div class="af-row-2">
             <div class="af-field af-field-wide">
-              <label class="form-label" for="admin-title"><i data-lucide="type" class="af-label-icon"></i>Program Title</label>
-              <input id="admin-title" oninput="adminState.title = this.value" placeholder="e.g. Basic Math Operations" class="form-input af-input-bold" />
+              <label class="form-label" for="admin-title"><i data-lucide="type" class="af-label-icon"></i>Program Title <span class="af-req" title="Required">*</span></label>
+              <input id="admin-title" required aria-required="true" oninput="adminState.title = this.value; afRenderRail();" placeholder="e.g. Basic Math Operations" class="form-input af-input-bold" />
             </div>
             <div class="af-field">
               <label class="form-label"><i data-lucide="folder" class="af-label-icon"></i>Category</label>
@@ -43,7 +47,7 @@ function getAdminFormHTML() {
 
           <div class="af-field">
             <label class="form-label" for="admin-cover-desc"><i data-lucide="align-left" class="af-label-icon"></i>Cover Description <span class="af-label-hint">(shown in Browse)</span></label>
-            <textarea id="admin-cover-desc" oninput="adminState.coverDescription = this.value" rows="2" class="form-textarea" placeholder="Brief overview of the program..."></textarea>
+            <textarea id="admin-cover-desc" oninput="adminState.coverDescription = this.value; afRenderRail();" rows="2" class="form-textarea af-grow" placeholder="Brief overview of the program..."></textarea>
           </div>
 
           <div class="af-field">
@@ -98,7 +102,7 @@ function getAdminFormHTML() {
       </div>
 
       <!-- Section: Variants -->
-      <div class="af-section">
+      <div class="af-section" data-step="2 3">
         <div class="af-section-header" style="color:var(--color-accent);">
           <i data-lucide="layers" class="af-section-icon" style="color:var(--color-accent);"></i>
           <span>Versions / Variants</span>
@@ -112,9 +116,27 @@ function getAdminFormHTML() {
         </div>
       </div>
 
+      <div class="af-section" data-step="4">
+        <div class="af-section-header">
+          <i data-lucide="clipboard-check" class="af-section-icon" style="color:var(--color-success);"></i>
+          <span>Review</span>
+        </div>
+        <div class="af-section-body" id="af-review-body"></div>
+      </div>
+
       <div class="admin-form-footer">
-        <div class="af-footer-hint"><kbd>Ctrl</kbd>+<kbd>S</kbd> save · <kbd>Esc</kbd> close</div>
+        <div class="af-footer-hint">
+          <span id="af-step-of">Step 1 of 4</span>
+        </div>
         <div class="af-footer-actions">
+          <!-- Arrows, not shortcuts. -->
+          <button onclick="afPrevStep()" class="btn btn-secondary af-step-btn" id="af-prev-btn" title="Previous step">
+            <i data-lucide="chevron-left" style="width:16px;height:16px;"></i> Back
+          </button>
+          <button onclick="afNextStep()" class="btn btn-secondary af-step-btn" id="af-next-btn" title="Next step">
+            Next <i data-lucide="chevron-right" style="width:16px;height:16px;"></i>
+          </button>
+          <span class="af-footer-sep"></span>
           <button onclick="confirmCloseAdminForm(closeAdminForm, saveAdminForm)" class="btn btn-secondary">
             <i data-lucide="x" style="width:15px;height:15px;"></i> Discard
           </button>

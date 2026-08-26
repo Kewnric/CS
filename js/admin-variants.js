@@ -38,16 +38,16 @@ function renderAdminVariantForm() {
 
   contentContainer.innerHTML = `
     <div style="display:flex; flex-direction:column; gap:1rem;">
-      <div>
+      <div data-step="2">
         <label class="form-label">Version Name</label>
         <input value="${escapeHTML(activeVar.name)}" oninput="updateActiveVariantField('name', this.value)" class="form-input" />
       </div>
-      <div>
+      <div data-step="2">
         <label class="form-label-inline"><span>Instruction / Description</span></label>
         <textarea rows="3" oninput="updateActiveVariantField('description', this.value)" class="form-textarea">${escapeHTML(activeVar.description || '')}</textarea>
       </div>
 
-      <div style="display:flex; flex-direction:column; flex:1; min-height:220px;">
+      <div data-step="2" style="display:flex; flex-direction:column; flex:1; min-height:220px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
           <label class="form-label" style="color:var(--color-accent); margin-bottom:0;">Starter Code <span style="font-weight:400; font-size:0.75rem; opacity:0.7;">(pre-filled for user)</span></label>
         </div>
@@ -58,7 +58,7 @@ function renderAdminVariantForm() {
         </div>
       </div>
 
-      <div style="display:flex; flex-direction:column; flex:1; min-height:240px;">
+      <div data-step="2" style="display:flex; flex-direction:column; flex:1; min-height:240px;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.25rem;">
           <label class="form-label" style="color:var(--color-success); margin-bottom:0;">Target Code <span style="font-weight:400; font-size:0.75rem; opacity:0.7;">(hidden solution)</span></label>
         </div>
@@ -69,25 +69,25 @@ function renderAdminVariantForm() {
         </div>
       </div>
 
-      <div>
+      <div data-step="2">
         <label class="form-label">Hints <span style="font-weight:400; font-size:0.75rem; opacity:0.7;">(one per line, revealed progressively during practice, -5% each)</span></label>
         <textarea rows="3" oninput="updateActiveVariantField('hints', this.value.split('\\n').filter(h => h.trim()))" class="form-textarea" style="font-size:0.8125rem;" placeholder="First hint...\nSecond hint...\nThird hint...">${escapeHTML((activeVar.hints || []).join('\n'))}</textarea>
       </div>
 
-      <div class="divider"></div>
+      <div class="divider" data-step="3"></div>
 
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+      <div data-step="3" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
         <label class="form-label" style="margin-bottom:0;">Sample Outputs</label>
         <button onclick="addAdminSample()" class="btn btn-ghost btn-sm" style="color:var(--color-primary); font-weight:600;">
           <i data-lucide="plus-circle" style="width:14px;height:14px;"></i> Add Sample
         </button>
       </div>
-      <div id="admin-samples-list" style="display:flex; flex-direction:column; gap:0.75rem;">
+      <div id="admin-samples-list" data-step="3" style="display:flex; flex-direction:column; gap:0.75rem;">
         ${activeVar.samples.map((s, sampleIdx) => `
           <div class="sample-item">
             <div style="flex:1; display:flex; flex-direction:column; gap:0.5rem;">
               <input value="${escapeHTML(s.title || '')}" oninput="updateSampleField(${sampleIdx}, 'title', this.value)" placeholder="Sample Title" class="form-input" style="font-weight:600; font-size:0.8125rem; padding:0.375rem 0.5rem;" />
-              <textarea rows="2" oninput="updateSampleField(${sampleIdx}, 'content', this.value)" placeholder="Sample content..." class="form-textarea" style="font-family:var(--font-mono); font-size:0.75rem; min-height:40px; padding:0.375rem 0.5rem;">${escapeHTML(s.content || '')}</textarea>
+              <textarea rows="2" oninput="updateSampleField(${sampleIdx}, 'content', this.value)" placeholder="Sample content..." class="form-textarea af-grow" style="font-family:var(--font-mono); font-size:0.75rem; min-height:40px; padding:0.375rem 0.5rem;">${escapeHTML(s.content || '')}</textarea>
             </div>
             <button onclick="deleteAdminSample(${sampleIdx})" class="btn btn-ghost" style="padding:0.25rem;" title="Delete Sample">
               <i data-lucide="trash-2" style="width:16px;height:16px;color:var(--color-danger);"></i>
@@ -96,9 +96,9 @@ function renderAdminVariantForm() {
         `).join('') + (activeVar.samples.length === 0 ? '<p style="font-size:0.75rem; color:var(--text-tertiary); font-style:italic;">No samples added.</p>' : '')}
       </div>
 
-      <div class="divider"></div>
+      <div class="divider" data-step="3"></div>
 
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+      <div data-step="3" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
         <label class="form-label" style="margin-bottom:0; display:flex; align-items:center; gap:0.4rem;">
           <i data-lucide="list-checks" style="width:14px;height:14px;color:var(--color-warning);"></i> Minimum Requirements
           <span style="font-weight:400; font-size:0.72rem; opacity:0.7;">(constructs the student's code must use)</span>
@@ -107,7 +107,7 @@ function renderAdminVariantForm() {
           <i data-lucide="plus-circle" style="width:14px;height:14px;"></i> Add Requirement
         </button>
       </div>
-      <div id="admin-minreq-list" style="display:flex; flex-direction:column; gap:0.5rem;">
+      <div id="admin-minreq-list" data-step="3" style="display:flex; flex-direction:column; gap:0.5rem;">
         ${(activeVar.minRequirements || []).map((r, ri) => `
           <div class="sample-item" style="align-items:center; gap:0.5rem;">
             <i data-lucide="circle-dot" style="width:14px;height:14px;color:var(--color-warning);flex-shrink:0;"></i>
@@ -121,9 +121,9 @@ function renderAdminVariantForm() {
         `).join('') + ((activeVar.minRequirements || []).length === 0 ? '<p style="font-size:0.75rem; color:var(--text-tertiary); font-style:italic;">No requirements — the student can solve it any way. Add one to require a specific construct.</p>' : '')}
       </div>
 
-      <div class="divider"></div>
+      <div class="divider" data-step="3"></div>
 
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+      <div data-step="3" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
         <label class="form-label" style="margin-bottom:0; display:flex; align-items:center; gap:0.4rem;">
           <i data-lucide="check-circle" style="width:14px;height:14px;color:var(--color-success);"></i> Test Cases
           <span style="font-weight:400; font-size:0.72rem; opacity:0.7;">(run on Submit — score becomes pass rate)</span>
@@ -138,7 +138,7 @@ function renderAdminVariantForm() {
         </div>
       </div>
       <div id="admin-verify-results"></div>
-      <div id="admin-tests-list" style="display:flex; flex-direction:column; gap:0.75rem;">
+      <div id="admin-tests-list" data-step="3" style="display:flex; flex-direction:column; gap:0.75rem;">
         ${(activeVar.tests || []).map((t, ti) => `
           <div class="sample-item" style="flex-direction:column; align-items:stretch; gap:0.5rem;">
             <div style="display:flex; gap:0.5rem; align-items:center;">
@@ -184,6 +184,11 @@ function renderAdminVariantForm() {
   if (typeof setupSpecificEditor === 'function') {
     setupSpecificEditor('admin-starter-ta', 'admin-starter-pre', 'admin-starter-code', false, null);
   }
+
+  // Redrawing rebuilds the step-tagged blocks, so whichever step is open has
+  // to be re-applied or every block would come back visible at once.
+  if (typeof afGoToStep === 'function' && typeof _afStep !== 'undefined') afGoToStep(_afStep);
+  if (typeof afAutosizeAll === 'function') afAutosizeAll(document.getElementById('admin-variant-content'));
 
   // Initialize Target Code Editor for active file
   const targetTA = document.getElementById('admin-target-ta');

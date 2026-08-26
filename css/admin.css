@@ -1838,3 +1838,129 @@
   text-underline-offset: 2px;
 }
 .nb-fmt-link:hover { color: var(--text-primary); }
+
+/* ============================================================
+   PROGRAM EDITOR — STEPS
+   ------------------------------------------------------------
+   The editor measured 3053px in a 702px pane: four screens of scrolling with
+   no way to see where you were or what was missing. Steps are hidden, never
+   unmounted, so every field is still in the document when Ctrl+S fires.
+   ============================================================ */
+.af-step-hidden { display: none !important; }
+
+.af-step-rail {
+  display: flex;
+  gap: 0.35rem;
+  margin: 0 -2.5rem 1.25rem;
+  padding: 0 2.5rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.af-step-rail::-webkit-scrollbar { display: none; }
+
+.af-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast),
+              background-color var(--transition-fast);
+}
+.af-step:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
+.af-step.current {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+.af-step-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px; height: 17px;
+  border-radius: 50%;
+  background: var(--bg-surface-hover);
+  color: var(--text-tertiary);
+}
+.af-step-dot svg { width: 11px; height: 11px; }
+.af-step.ok .af-step-dot { background: var(--color-success); color: #fff; }
+.af-step.warn .af-step-dot { background: var(--color-warning); color: #fff; }
+/* The dot keeps saying whether the step is complete even while it is the one
+   you are on; `current` is carried by the pill, not the dot. */
+.af-step.current.ok .af-step-dot { background: var(--color-success); color: #fff; }
+.af-step.current.warn .af-step-dot { background: var(--color-warning); color: #fff; }
+.af-step.current:not(.ok):not(.warn) .af-step-dot { background: var(--color-primary); color: #fff; }
+
+.af-step-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.af-footer-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 0 0.35rem;
+  background: var(--border-color);
+}
+
+/* A field that genuinely cannot be left blank. */
+.af-req { color: var(--color-danger); font-weight: 800; }
+
+/* ── Review step ──────────────────────────────────────────── */
+.af-review-score {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.af-review-ring {
+  --pct: 0;
+  position: relative;
+  width: 68px; height: 68px; flex-shrink: 0;
+  border-radius: 50%;
+  background: conic-gradient(var(--color-success) calc(var(--pct) * 1%), var(--bg-surface-hover) 0);
+  display: flex; align-items: center; justify-content: center;
+}
+.af-review-ring::after {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+}
+.af-review-ring > span {
+  position: relative; z-index: 1;
+  font-weight: 800; font-size: 1.05rem; color: var(--text-primary);
+}
+.af-review-ring small { font-size: 0.7rem; color: var(--text-tertiary); }
+.af-review-score h4 { margin: 0; font-size: 1rem; font-weight: 800; color: var(--text-primary); }
+.af-review-score p { margin: 0.15rem 0 0; font-size: 0.8rem; color: var(--text-tertiary); }
+
+.af-review-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.af-review-list li {
+  display: flex; align-items: flex-start; gap: 0.55rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  font-size: 0.82rem;
+}
+.af-review-list li svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px; }
+.af-review-list li.ok svg { color: var(--color-success); }
+.af-review-list li.missing { opacity: 0.75; }
+.af-review-list li.missing svg { color: var(--text-tertiary); }
+.af-review-list strong { display: block; color: var(--text-primary); font-weight: 700; }
+.af-review-list em {
+  display: block; font-style: normal; font-size: 0.72rem;
+  color: var(--text-tertiary); margin-top: 1px;
+}
+
+/* Boxes that fit what is typed into them. */
+textarea.af-grow { overflow: hidden; resize: vertical; }
+
+@media (max-width: 640px) {
+  .af-step-rail { margin-inline: -1rem; padding-inline: 1rem; }
+  .af-step-label { display: none; }
+}
