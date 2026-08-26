@@ -477,18 +477,22 @@ function renderHomeContinue() {
   const lead = items[0];
   const rest = items.slice(1);
 
+  // Three lines of text, a 40px tile and a full-size button made this the
+  // tallest thing on the page for the smallest amount of information on it.
+  // The eyebrow said "Pick up where you left off" directly above a button
+  // reading Continue, and the timestamp had a row to itself.
   const row = (u, compact) => `
     <div class="hc-row${compact ? ' compact' : ''}">
-      <div class="hc-icon"><i data-lucide="${u.icon}"></i></div>
+      <span class="hc-cursor" aria-hidden="true"></span>
+      <span class="hc-orb hc-orb-${u.kind}" aria-hidden="true"><i data-lucide="${u.icon}"></i></span>
       <div class="hc-text">
-        <div class="hc-eyebrow">Pick up where you left off &middot; ${u.label}</div>
         <div class="hc-title">${escapeHTML(u.title)}</div>
-        <div class="hc-meta">${u.ts ? 'Left ' + getTimeAgo(u.ts) : 'In progress'}</div>
+        <div class="hc-sub">${u.label}${u.ts ? ' &middot; left ' + getTimeAgo(u.ts) : ' &middot; in progress'}</div>
       </div>
-      <button class="btn btn-primary hc-go" onclick="homeResumeAttempt('${u.kind}','${u.itemId}')">
-        <i data-lucide="play"></i> Continue
+      <button class="hc-go" onclick="homeResumeAttempt('${u.kind}','${u.itemId}')">
+        <i data-lucide="play"></i><span>Continue</span>
       </button>
-      <button class="btn btn-ghost hc-dismiss" title="Discard this draft"
+      <button class="hc-dismiss" title="Discard this draft" aria-label="Discard this draft"
               onclick="event.stopPropagation(); homeDiscardDraft('${u.kind}')"><i data-lucide="x"></i></button>
     </div>`;
 
