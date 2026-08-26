@@ -88,6 +88,11 @@ window.afGoToStep = function (n) {
   }
   afTidySeparators(panel);
   afUpdateRequiredMarks();
+  // A hidden textarea reports scrollHeight 0, so sizing one before its step is
+  // shown set every box to 2px and left it at whatever min-height it had —
+  // which is why the sample and test boxes never grew. Size them once they are
+  // on screen and can actually be measured.
+  afAutosizeAll(panel);
 
   // A step change is a new page as far as reading goes; a redraw is not.
   if (changed) {
@@ -255,8 +260,14 @@ function afRenderReview() {
    sample showed two lines and a scrollbar. */
 window.afAutosize = function (el) {
   if (!el) return;
+  // Nothing measurable while it is off screen; leave it for when the step opens.
+  // getClientRects is used rather than offsetParent because the latter is also
+  // null inside a position:fixed ancestor — an expanded editor is exactly that.
+  if (!el.getClientRects().length) return;
   el.style.height = 'auto';
-  el.style.height = Math.min(el.scrollHeight + 2, 420) + 'px';
+  const h = el.scrollHeight;
+  if (!h) return;
+  el.style.height = Math.min(h + 2, 420) + 'px';
 };
 
 window.afAutosizeAll = function (root) {

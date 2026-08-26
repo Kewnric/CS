@@ -115,7 +115,7 @@ function getAdminFormHTML() {
         </div>
         <div class="af-section-body" style="padding-top:0.5rem;">
           <div id="admin-variant-tabs" class="variant-tabs"></div>
-          <div id="admin-variant-content" style="flex:1;display:flex;flex-direction:column;gap:1rem;"></div>
+          <div id="admin-variant-content" style="flex:1;display:flex;flex-direction:column;gap:0.875rem;"></div>
         </div>
       </div>
 

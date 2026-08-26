@@ -883,6 +883,14 @@
   margin: var(--space-md) 0;
 }
 
+/* Inside the variant form the divider is a flex item, so its margin stacks on
+   top of the column gap instead of collapsing into it — 16 + 16 made every
+   section break 32px against Basics' 14. A section break should still read as
+   bigger than the rhythm around it, just not by double. */
+#admin-variant-content .divider {
+  margin: 0.25rem 0;
+}
+
 /* --- pulse Highlight Effect (Feature 3) --- */
 @keyframes pulseHighlight {
   0% {
@@ -1305,9 +1313,13 @@
   overflow-x: auto;
   /* The strip's own padding, its margin, and the content's top margin were
      stacking to 36px of blank between the version tab and the first field.
-     The content margin is gone and this is halved. */
-  padding-bottom: 0.5rem;
-  margin-bottom: var(--space-sm);
+     The column this sits in already spaces its children, so the strip carries
+     none of its own — the tab now sits the same 14px above the first field
+     that every gap in Basics uses. An overflowing strip still gets its
+     scrollbar; `auto` gives that its own layout space rather than overlaying
+     the pills. */
+  padding-bottom: 0;
+  margin-bottom: 0;
 }
 
 .variant-tab {

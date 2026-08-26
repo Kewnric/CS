@@ -41,7 +41,7 @@ function renderAdminVariantForm() {
   const contentContainer = document.getElementById('admin-variant-content');
 
   contentContainer.innerHTML = `
-    <div style="display:flex; flex-direction:column; gap:1rem;">
+    <div style="display:flex; flex-direction:column; gap:0.875rem;">
       <div data-step="2">
         <label class="form-label">Version Name <span class="af-req" data-req-for="admin-variant-name">*</span></label>
         <input id="admin-variant-name" value="${escapeHTML(activeVar.name)}" oninput="updateActiveVariantField('name', this.value)" class="form-input" />
@@ -88,7 +88,7 @@ function renderAdminVariantForm() {
 
       <div class="divider" data-step="3"></div>
 
-      <div data-step="3" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+      <div data-step="3" style="display:flex; justify-content:space-between; align-items:center;">
         <label class="form-label" style="margin-bottom:0;">Sample Outputs</label>
         <button onclick="addAdminSample()" class="btn btn-ghost btn-sm" style="color:var(--color-primary); font-weight:600;">
           <i data-lucide="plus-circle" style="width:14px;height:14px;"></i> Add Sample
@@ -110,7 +110,7 @@ function renderAdminVariantForm() {
 
       <div class="divider" data-step="3"></div>
 
-      <div data-step="3" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+      <div data-step="3" style="display:flex; justify-content:space-between; align-items:center;">
         <label class="form-label" style="margin-bottom:0; display:flex; align-items:center; gap:0.4rem;">
           <i data-lucide="list-checks" style="width:14px;height:14px;color:var(--color-warning);"></i> Minimum Requirements
           <span style="font-weight:400; font-size:0.72rem; opacity:0.7;">(constructs the student's code must use)</span>
@@ -135,7 +135,7 @@ function renderAdminVariantForm() {
 
       <div class="divider" data-step="3"></div>
 
-      <div data-step="3" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+      <div data-step="3" style="display:flex; justify-content:space-between; align-items:center;">
         <label class="form-label" style="margin-bottom:0; display:flex; align-items:center; gap:0.4rem;">
           <i data-lucide="check-circle" style="width:14px;height:14px;color:var(--color-success);"></i> Test Cases
           <span style="font-weight:400; font-size:0.72rem; opacity:0.7;">(run on Submit — score becomes pass rate)</span>
