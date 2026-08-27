@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="App dashboard" description="StudySession Pro app shell — icon rail, greeting hero, KPI tiles and dashboard panels." -->
+<helmet>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<script src="https://unpkg.com/lucide@0.408.0/dist/umd/lucide.min.js"></script>
+<script src="./ds-base.js"></script>
+<script>document.documentElement.setAttribute('data-theme','dark')</script>
+<style>html,body{margin:0;height:100%}body{overflow:hidden}@keyframes floatOrb{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}</style>
+</helmet>
+<div style="display:flex;height:100vh;width:100vw;overflow:hidden;background:var(--bg-body);font-family:var(--font-sans);color:var(--text-primary)" data-screen-label="Dashboard">
+<nav style="width:260px;min-width:260px;background:var(--bg-nav-solid);border-right:1px solid var(--border-color);display:flex;flex-direction:column;overflow:hidden">
+<div style="height:72px;display:flex;align-items:center;gap:10px;padding:0 20px;border-bottom:1px solid rgba(255,255,255,0.05);flex-shrink:0">
+<x-import component-from-global-scope="StudySessionProDesignSystem_f5d02b.Icon" name="code-2" size="24" color="var(--color-primary)" hint-size="24px,24px"></x-import>
+<span style="font-size:1.1rem;font-weight:800;letter-spacing:-0.02em;background:linear-gradient(135deg,#e2e8f0,#a5b4fc);-webkit-background-clip:text;-webkit-text-fill-color:transparent">StudySession</span>
+</div>
+<div style="flex:1;overflow-y:auto;padding:16px 8px;display:flex;flex-direction:column;gap:8px">
+<x-import component-from-global-scope="StudySessionProDesignSystem_f5d02b.SidebarLink" icon="home" label="Home" active="{{ true }}" expanded="{{ true }}" hint-size="100%,48px"></x-import>
+<x-import component-from-global-scope="StudySessionProDesignSystem_f5d02b.SidebarLink" icon="library" label="Library" expanded="{{ true }}" hint-size="100%,48px"></x-import>
+<x-import component-from-global-scope="StudySessionProDesignSystem_f5d02b.SidebarLink" icon="bar-chart-3" label="Analytics" expanded="{{ true }}" hint-size="100%,48px"></x-import>
+<x-import component-from-global-scope="StudySessionProDesignSystem_f5d02b.SidebarLink" icon="scroll-text" label="Quest Board" expanded="{{ true }}" hint-size="100%,48px"></x-import>
+<x-import component-from-global-scope="StudySessionProDesignSystem_f5d02b.SidebarLink" icon="search" label="Search" expanded="{{ true }}" hint-size="100%,48px"></x-import>
+</div>
+</nav>
+<main style="flex:1;min-width:0;overflow-y:auto;padding:12px">
+<div style="max-width:1200px;margin:0 auto;padding:24px 32px 48px;display:flex;flex-direction:column;gap:20px">
+<section style="position:relative;overflow:hidden;padding:44px 40px 36px;border-radius:var(--radius-xl);border:1px solid var(--border-color);background:linear-gradient(135deg,rgba(99,102,241,0.10) 0%,rgba(6,182,212,0.07) 50%,rgba(16,185,129,0.05) 100%)">
+<span style="position:absolute;top:-40%;right:-15%;width:360px;height:360px;border-radius:50%;pointer-events:none;background:radial-gradient(circle,rgba(99,102,241,0.13) 0%,transparent 70%);animation:floatOrb 8s ease-in-out infinite"></span>
+<h1 style="position:relative;z-index:1;font-size:2.25rem;font-weight:800;letter-spacing:-0.03em;line-height:1.2;margin:0 0 8px;background:linear-gradient(135deg,var(--text-primary) 30%,var(--color-primary) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent">Good evening, Kenric</h1>
+<p style="position:relative;z-index:1;margin:0;font-size:1rem;color:var(--text-secondary)">You have 6 cards due for review and one unfinished session.</p>
+<p style="position:relative;z-index:1;margin:12px 0 0;font-size:0.8125rem;font-weight:500;color:var(--text-tertiary)">Friday, 28 August</p>
+</section>
+<section style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px">
+<x-import component-from-global-scope="StudySessionProDesignSystem_f5d02b.StatCard" icon="flame" value="12" label="Day streak" accent="indigo" hint-size="100%,150px"></x-import>
+<x-import component-from-global-scope="StudySessionProDesignSystem_f5d02b.StatCard" icon="check-circle-2" value="87" label="Solved" accent="green" hint-size="100%,150px"></x-import>
+<x-import component-from-global-scope="StudySessionProDesignSystem_f5d02b.StatCard" icon="target" value="94%" label="Accuracy" accent="amber" hint-size="100%,150px"></x-import>
+<x-import component-from-global-scope="StudySessionProDesignSystem_f5d02b.StatCard" icon="clock" value="6.2h" label="This week" accent="cyan" hint-size="100%,150px"></x-import>
+</section>
+<section style="display:grid;grid-template-columns:minmax(0,1fr) clamp(230px,24%,300px);gap:20px">
+<x-import component-from-global-scope="StudySessionProDesignSystem_f5d02b.PanelCard" icon="calendar-days" title="Practice activity" hint-size="100%,220px">
+<x-import component-from-global-scope="StudySessionProDesignSystem_f5d02b.Heatmap" weeks="26" hint-size="100%,130px"></x-import>
+</x-import>
+<x-import component-from-global-scope="StudySessionProDesignSystem_f5d02b.PanelCard" icon="zap" title="Quick actions" hint-size="100%,220px">
+<div style="display:flex;flex-direction:column;gap:8px">
+<x-import component-from-global-scope="StudySessionProDesignSystem_f5d02b.QuickActionCard" index="{{ 0 }}" icon="play" label="Resume practice" description="Bubble Sort, 4 min left" hint-size="100%,64px"></x-import>
+<x-import component-from-global-scope="StudySessionProDesignSystem_f5d02b.QuickActionCard" index="{{ 1 }}" icon="library" label="Browse library" description="87 programs" hint-size="100%,64px"></x-import>
+<x-import component-from-global-scope="StudySessionProDesignSystem_f5d02b.QuickActionCard" index="{{ 2 }}" icon="scroll-text" label="Quest board" description="3 active" hint-size="100%,64px"></x-import>
+</div>
+</x-import>
+</section>
+</div>
+</main>
+</div>
+
+</x-dc>
+</body>
+</html>

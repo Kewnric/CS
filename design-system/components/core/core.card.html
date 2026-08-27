@@ -1,0 +1,52 @@
+<!-- @dsCard group="Components" viewport="700x330" name="Core" subtitle="Buttons, cards, badges, tiers" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/lucide@0.408.0/dist/umd/lucide.min.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>html{background:var(--bg-body)}body{padding:16px;font-family:var(--font-sans);color:var(--text-primary)}.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.col{display:flex;flex-direction:column;gap:12px}.cap{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-tertiary)}</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { Button, Card, Badge, Tag, TierBadge, ScoreBadge, Divider } = window.StudySessionProDesignSystem_f5d02b;
+function Demo(){return (
+  <div className="col">
+    <div className="row">
+      <Button variant="primary" icon="play">Start</Button>
+      <Button variant="secondary">Cancel</Button>
+      <Button variant="danger" icon="trash-2">Reset</Button>
+      <Button variant="ghost" icon="settings">Settings</Button>
+      <Button variant="ghost" iconOnly icon="x" aria-label="Close" />
+      <Button variant="primary" size="sm" icon="upload">Import</Button>
+      <Button variant="secondary" size="sm" disabled>Disabled</Button>
+    </div>
+    <div className="row">
+      <Badge tone="primary">Primary</Badge>
+      <Badge tone="success">Solved</Badge>
+      <Badge tone="warning">Due today</Badge>
+      <Badge tone="danger">Failed</Badge>
+      <Badge tone="neutral">12</Badge>
+      <Tag onRemove={()=>{}}>pointers</Tag>
+      <Tag>recursion</Tag>
+      <TierBadge tier="S" /><TierBadge tier="A" /><TierBadge tier="B" />
+      <TierBadge tier="C" /><TierBadge tier="D" /><TierBadge tier="E" />
+      <ScoreBadge perfect>18 / 18</ScoreBadge>
+      <ScoreBadge>14 / 18</ScoreBadge>
+    </div>
+    <Divider style={{margin:'2px 0'}} />
+    <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:12}}>
+      <Card><div style={{fontWeight:700,fontSize:14}}>Reverse a list</div><div style={{fontSize:11,color:'var(--text-tertiary)',marginTop:4}}>Default — tinted, lifts on hover</div></Card>
+      <Card variant="glass"><div style={{fontWeight:700,fontSize:14}}>Glass</div><div style={{fontSize:11,color:'var(--text-tertiary)',marginTop:4}}>Frosted, for stat tiles</div></Card>
+      <Card variant="flat"><div style={{fontWeight:700,fontSize:14}}>Flat</div><div style={{fontSize:11,color:'var(--text-tertiary)',marginTop:4}}>Plain surface, no hover</div></Card>
+    </div>
+  </div>);} 
+ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+</script>
+</body>
+</html>

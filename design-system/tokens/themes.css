@@ -1,0 +1,89 @@
+/* THEMES — four theme scopes, cycled by the Settings sheet.
+   DARK is the product default (index.html writes data-theme="dark" on <html>
+   before first paint). Design against dark first. */
+[data-theme="dark"] {
+  --bg-body: #0b1120;
+  --bg-surface: #131c31;
+  --bg-surface-hover: #1a2744;
+  --bg-elevated: #182236;
+  --bg-nav: linear-gradient(135deg, #080e1e 0%, #111827 100%);
+  --bg-nav-solid: #080e1e;
+
+  --border-color: #1e3050;
+  --border-color-subtle: #162340;
+
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-tertiary: #64748b;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.35);
+  --shadow-xl: 0 20px 30px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 30px rgba(99, 102, 241, 0.15);
+
+  --glass-bg: rgba(19, 28, 49, 0.8);
+  --glass-border: rgba(30, 48, 80, 0.5);
+}
+
+[data-theme="purple"] {
+  --bg-body: #1e1b4b;
+  --bg-surface: #312e81;
+  --bg-surface-hover: #3730a3;
+  --bg-elevated: #28246d;
+  --bg-nav: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+  --bg-nav-solid: #1e1b4b;
+
+  --border-color: #4338ca;
+  --border-color-subtle: #3730a3;
+
+  --text-primary: #e0e7ff;
+  --text-secondary: #a5b4fc;
+  --text-tertiary: #818cf8;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.45);
+  --shadow-xl: 0 20px 30px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 30px rgba(167, 139, 250, 0.2);
+
+  --glass-bg: rgba(49, 46, 129, 0.8);
+  --glass-border: rgba(67, 56, 202, 0.5);
+
+  --color-primary: #a855f7;
+  --color-primary-hover: #d8b4fe;
+  --color-primary-dark: #9333ea;
+  --color-primary-glow: rgba(168, 85, 247, 0.25);
+  --color-primary-subtle: rgba(168, 85, 247, 0.15);
+}
+
+[data-theme="green"] {
+  --bg-body: #064e3b;
+  --bg-surface: #065f46;
+  --bg-surface-hover: #047857;
+  --bg-elevated: #022c22;
+  --bg-nav: linear-gradient(135deg, #064e3b 0%, #065f46 100%);
+  --bg-nav-solid: #064e3b;
+
+  --border-color: #059669;
+  --border-color-subtle: #047857;
+
+  --text-primary: #ecfdf5;
+  --text-secondary: #a7f3d0;
+  --text-tertiary: #6ee7b7;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.45);
+  --shadow-xl: 0 20px 30px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 30px rgba(16, 185, 129, 0.2);
+
+  --glass-bg: rgba(6, 95, 70, 0.8);
+  --glass-border: rgba(5, 150, 105, 0.5);
+
+  --color-primary: #10b981;
+  --color-primary-hover: #34d399;
+  --color-primary-dark: #059669;
+  --color-primary-glow: rgba(16, 185, 129, 0.25);
+  --color-primary-subtle: rgba(16, 185, 129, 0.15);
+}

@@ -1,0 +1,19 @@
+/* SHADOWS + GLASS — two systems.
+   1. Neutral elevation (--shadow-sm…xl), theme-aware.
+   2. Coloured glow (--shadow-glow, --color-primary-glow), used on hover/focus
+      and on anything "active" or gamified. */
+:root {
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.07), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.06);
+  --shadow-glow: 0 0 20px var(--color-primary-glow);
+
+  /* Inner top highlight — sits on every .card, reads as a lit bevel */
+  --shadow-inset-hairline: inset 0 1px 1px rgba(255, 255, 255, 0.03);
+
+  /* Frosted glass */
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.3);
+  --glass-blur: 12px;
+}

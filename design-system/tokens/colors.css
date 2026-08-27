@@ -1,0 +1,58 @@
+/* COLORS — base palette + light-theme neutrals.
+   The app ships DARK by default; see tokens/themes.css. */
+:root {
+  /* Primary — indigo */
+  --color-primary: #6366f1;
+  --color-primary-hover: #818cf8;
+  --color-primary-dark: #4f46e5;
+  --color-primary-glow: rgba(99, 102, 241, 0.25);
+  --color-primary-subtle: rgba(99, 102, 241, 0.08);
+
+  /* Accent — cyan. Used for active-state rails, folder icons, file tabs. */
+  --color-accent: #06b6d4;
+  --color-accent-hover: #22d3ee;
+
+  /* Semantic */
+  --color-success: #10b981;
+  --color-success-bg: rgba(16, 185, 129, 0.1);
+  --color-success-subtle: rgba(16, 185, 129, 0.15);
+  --color-warning: #f59e0b;
+  --color-warning-bg: rgba(245, 158, 11, 0.1);
+  --color-warning-subtle: rgba(245, 158, 11, 0.15);
+  --color-danger: #ef4444;
+  --color-danger-hover: #dc2626;
+  --color-danger-bg: rgba(239, 68, 68, 0.1);
+  --color-danger-subtle: rgba(239, 68, 68, 0.15);
+
+  /* Neutrals — LIGHT theme */
+  --bg-body: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-surface-hover: #f1f5f9;
+  --bg-elevated: #ffffff;
+  --bg-nav: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  --bg-nav-solid: #0f172a;
+
+  --border-color: #e2e8f0;
+  --border-color-subtle: #f1f5f9;
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary: #94a3b8;
+  --text-on-dark: #f8fafc;
+  --text-on-primary: #ffffff;
+
+  /* Terminal / run-code panel — always dark, regardless of app theme */
+  --term-bg: #0d1117;
+  --term-surface: #161b22;
+  --term-border: #30363d;
+  --term-text: #e6edf3;
+  --term-text-muted: #8b949e;
+
+  /* Difficulty tiers (S is best) */
+  --tier-s-from: #FFD700; --tier-s-to: #FFA500;
+  --tier-a-from: #EF4444; --tier-a-to: #DC2626;
+  --tier-b-from: #F97316; --tier-b-to: #EA580C;
+  --tier-c-from: #3B82F6; --tier-c-to: #2563EB;
+  --tier-d-from: #8B5CF6; --tier-d-to: #7C3AED;
+  --tier-e-from: #94A3B8; --tier-e-to: #64748B;
+}

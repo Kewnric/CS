@@ -1,0 +1,8 @@
+/* RADIUS — generous. Panels and modals are 24px; nothing is square. */
+:root {
+  --radius-sm: 6px;    /* tags, score badges, tiny controls */
+  --radius-md: 10px;   /* buttons, inputs, list rows */
+  --radius-lg: 16px;   /* cards */
+  --radius-xl: 24px;   /* panes, modals, page containers */
+  --radius-full: 9999px; /* pills, search field, badges */
+}

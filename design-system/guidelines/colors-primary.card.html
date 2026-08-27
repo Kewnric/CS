@@ -1,0 +1,27 @@
+<!-- @dsCard group="Colors" viewport="700x150" name="Primary — indigo" subtitle="The brand colour. Gradients always run 135deg from primary to primary-dark." -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>html{background:var(--bg-body)}body{padding:16px;font-family:var(--font-sans);color:var(--text-primary);font-size:12px}
+.sw{display:flex;gap:10px;flex-wrap:wrap}
+.s{display:flex;flex-direction:column;gap:6px;min-width:88px}
+.chip{height:44px;border-radius:var(--radius-md);border:1px solid rgba(255,255,255,.06)}
+.n{font-size:10px;font-weight:700;letter-spacing:.02em}
+.v{font-size:9px;font-family:var(--font-mono);color:var(--text-tertiary)}
+.rowline{display:flex;align-items:baseline;gap:14px}
+.lbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-tertiary);min-width:96px}
+</style>
+</head>
+<body>
+<div class="sw">
+<div class="s"><div class="chip" style="background:#6366f1"></div><div class="n">primary</div><div class="v">#6366f1</div></div>
+<div class="s"><div class="chip" style="background:#818cf8"></div><div class="n">primary-hover</div><div class="v">#818cf8</div></div>
+<div class="s"><div class="chip" style="background:#4f46e5"></div><div class="n">primary-dark</div><div class="v">#4f46e5</div></div>
+<div class="s"><div class="chip" style="background:rgba(99,102,241,0.08)"></div><div class="n">primary-subtle</div><div class="v">8% indigo</div></div>
+<div class="s"><div class="chip" style="background:linear-gradient(135deg,#6366f1,#4f46e5)"></div><div class="n">gradient</div><div class="v">135deg p→dark</div></div>
+<div class="s"><div class="chip" style="background:rgba(99,102,241,0.25)"></div><div class="n">glow</div><div class="v">25% indigo</div></div>
+</div>
+</body>
+</html>

@@ -1,0 +1,32 @@
+/* TYPOGRAPHY — the app sets sizes per-component rather than on a named ramp.
+   These aliases name the sizes that actually recur across the source CSS. */
+:root {
+  /* Body + UI */
+  --text-xs: 0.6875rem;   /* 11px — form labels, badges, card eyebrows */
+  --text-sm: 0.75rem;     /* 12px — tags, meta, descriptions */
+  --text-base: 0.875rem;  /* 14px — the app's real body size: buttons, inputs, table cells */
+  --text-md: 0.9375rem;   /* 15px — tree labels, list titles */
+  --text-lg: 1.125rem;    /* 18px — h3, panel headers */
+  --text-xl: 1.25rem;     /* 20px — h2 */
+  --text-2xl: 1.5rem;     /* 24px — modal titles */
+  --text-3xl: 1.875rem;   /* 30px — h1, page titles */
+  --text-4xl: 2.25rem;    /* 36px — hero greeting, analytics page title */
+
+  /* Weights — the brand runs heavy: 700 is the default for anything titular */
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --weight-extrabold: 800;
+  --weight-black: 900;
+
+  --leading-tight: 1.2;
+  --leading-heading: 1.3;
+  --leading-body: 1.6;
+
+  /* Tracking — negative on large display text, wide on uppercase eyebrows */
+  --tracking-display: -0.03em;
+  --tracking-title: -0.02em;
+  --tracking-eyebrow: 0.06em;
+  --tracking-tier: 0.08em;
+}

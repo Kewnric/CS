@@ -1,0 +1,92 @@
+<!-- @dsCard group="StudySession Pro" viewport="1280x820" name="App — Home dashboard" subtitle="Click-through shell: home, library, practice editor, quest board, analytics" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<title>StudySession Pro — UI kit</title>
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/lucide@0.408.0/dist/umd/lucide.min.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>html,body{height:100%;overflow:hidden}#root{height:100vh}</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="AppShell.jsx"></script>
+<script type="text/babel" src="HomeScreen.jsx"></script>
+<script type="text/babel" src="LibraryScreen.jsx"></script>
+<script type="text/babel" src="PracticeScreen.jsx"></script>
+<script type="text/babel" src="QuestBoardScreen.jsx"></script>
+<script type="text/babel" src="AnalyticsScreen.jsx"></script>
+<script type="text/babel" src="StorageModePicker.jsx"></script>
+<script type="text/babel" src="SettingsSheet.jsx"></script>
+<script type="text/babel" data-presets="react">
+const { EmptyState, Button, Modal } = window.StudySessionProDesignSystem_f5d02b;
+const THEMES = ['dark', 'purple', 'green', 'light'];
+
+function App() {
+  const [booted, setBooted] = React.useState(!new URLSearchParams(location.search).has('launch'));
+  const [route, setRoute] = React.useState('home');
+  const [settings, setSettings] = React.useState(false);
+  const [confirmReset, setConfirmReset] = React.useState(false);
+  const [theme, setTheme] = React.useState(0);
+
+  React.useEffect(() => {
+    document.documentElement.setAttribute('data-theme', THEMES[theme]);
+  }, [theme]);
+
+  const go = (r) => { setRoute(r); setSettings(false); };
+
+  if (!booted) return <StorageModePicker onChoose={() => setBooted(true)} />;
+
+  let screen;
+  if (route === 'home') screen = <HomeScreen go={go} />;
+  else if (route === 'library') screen = <LibraryScreen go={go} />;
+  else if (route === 'practice') screen = <PracticeScreen go={go} />;
+  else if (route === 'quests') screen = <QuestBoardScreen />;
+  else if (route === 'analytics') screen = <AnalyticsScreen />;
+  else screen = (
+    <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <EmptyState
+        icon={route === 'search' ? 'search' : route === 'admin' ? 'settings' : 'git-branch'}
+        title={route === 'admin' ? 'Admin panel' : route === 'visualize' ? 'Hierarchy visualization' : 'Global search'}
+        description="Not recreated in this kit — see the source repository for this surface."
+        action={<Button variant="secondary" size="sm" onClick={() => go('home')}>Back to Home</Button>}
+      />
+    </div>
+  );
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'row', height: '100vh', width: '100vw', overflow: 'hidden', background: 'var(--bg-body)', position: 'relative' }}>
+      <Sidebar route={route} go={go} />
+      <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', minWidth: 0 }}>
+        {screen}
+      </main>
+      <SettingsFab onClick={() => setSettings(true)} />
+      <SettingsSheet
+        open={settings}
+        onClose={() => setSettings(false)}
+        onCycleTheme={() => setTheme((theme + 1) % THEMES.length)}
+        onReset={() => { setSettings(false); setConfirmReset(true); }}
+      />
+      <Modal
+        open={confirmReset}
+        icon="trash-2" iconColor="var(--color-danger)"
+        title="Reset Data"
+        description="Wipe everything and restore defaults? This cannot be undone."
+        onDismiss={() => setConfirmReset(false)}
+        actions={<>
+          <Button variant="secondary" style={{ flex: 1 }} onClick={() => setConfirmReset(false)}>Cancel</Button>
+          <Button variant="danger" style={{ flex: 1 }} onClick={() => setConfirmReset(false)}>Reset</Button>
+        </>}
+      />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

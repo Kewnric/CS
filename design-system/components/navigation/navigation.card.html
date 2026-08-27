@@ -1,0 +1,44 @@
+<!-- @dsCard group="Components" viewport="700x360" name="Navigation" subtitle="Sidebar, tabs, tree, file tabs, pagination" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/lucide@0.408.0/dist/umd/lucide.min.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>html{background:var(--bg-body)}body{padding:16px;font-family:var(--font-sans);color:var(--text-primary)}.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.col{display:flex;flex-direction:column;gap:12px}.cap{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-tertiary)}</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { SidebarLink, Tabs, Breadcrumb, TreeNode, FileTab, Pagination } = window.StudySessionProDesignSystem_f5d02b;
+function Demo(){const [tab,setTab]=React.useState('Programs');const [pg,setPg]=React.useState(3);return (
+  <div style={{display:'grid',gridTemplateColumns:'200px 1fr',gap:16}}>
+    <div style={{background:'var(--bg-nav-solid)',borderRadius:12,padding:'8px 6px',display:'flex',flexDirection:'column',gap:4}}>
+      <SidebarLink icon="home" label="Home" active expanded />
+      <SidebarLink icon="library" label="Library" expanded />
+      <SidebarLink icon="bar-chart-3" label="Analytics" expanded />
+      <SidebarLink icon="scroll-text" label="Quest Board" expanded />
+    </div>
+    <div className="col">
+      <Tabs value={tab} onChange={setTab} items={[{label:'Programs',icon:'code-2'},{label:'Snippets',icon:'scissors'},{label:'Notes',icon:'notebook-pen'}]} />
+      <Breadcrumb items={['Library','Arrays','2D Arrays']} style={{margin:0}} />
+      <div>
+        <TreeNode label="Arrays" kind="folder" level={0} expanded count={12}>
+          <TreeNode label="Bubble Sort" kind="item" level={1} active />
+          <TreeNode label="Matrix Transpose" kind="item" level={1} locked />
+        </TreeNode>
+      </div>
+      <div style={{display:'flex',background:'var(--term-bg)',borderBottom:'1px solid var(--border-color)',minHeight:38,borderRadius:'6px 6px 0 0',overflow:'hidden'}}>
+        <FileTab name="main.c" active /><FileTab name="helpers.h" dirty /><FileTab name="input.txt" />
+      </div>
+      <Pagination page={pg} pageCount={12} onChange={setPg} style={{marginTop:0}} />
+    </div>
+  </div>);} 
+ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+</script>
+</body>
+</html>

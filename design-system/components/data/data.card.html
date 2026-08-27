@@ -1,0 +1,43 @@
+<!-- @dsCard group="Components" viewport="700x400" name="Data" subtitle="Stat tiles, panels, quick actions, heatmap, table" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/lucide@0.408.0/dist/umd/lucide.min.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>html{background:var(--bg-body)}body{padding:16px;font-family:var(--font-sans);color:var(--text-primary)}.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.col{display:flex;flex-direction:column;gap:12px}.cap{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-tertiary)}</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { StatCard, PanelCard, QuickActionCard, Heatmap, DataTable, Badge, TierBadge, ScoreBadge } = window.StudySessionProDesignSystem_f5d02b;
+const rows=[{name:'Bubble Sort',tier:'C',score:'18 / 18',perfect:true},{name:'Linked List Reversal',tier:'A',score:'14 / 18',perfect:false},{name:'Matrix Transpose',tier:'B',score:'16 / 18',perfect:false}];
+function Demo(){return (
+  <div className="col">
+    <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:'0.875rem'}}>
+      <StatCard icon="flame" value="12" label="Day streak" accent="indigo" />
+      <StatCard icon="check-circle-2" value="87" label="Solved" accent="green" />
+      <StatCard icon="target" value="94%" label="Accuracy" accent="amber" />
+      <StatCard icon="clock" value="6.2h" label="This week" accent="cyan" />
+    </div>
+    <div style={{display:'grid',gridTemplateColumns:'3fr 2fr',gap:'1.25rem'}}>
+      <PanelCard icon="calendar-days" title="Practice activity" action={<Badge tone="neutral">26w</Badge>}>
+        <Heatmap weeks={22} />
+      </PanelCard>
+      <PanelCard icon="zap" title="Quick actions">
+        <div style={{display:'flex',flexDirection:'column',gap:'0.5rem'}}>
+          <QuickActionCard index={0} icon="play" label="Resume practice" description="Bubble Sort, 4 min left" />
+          <QuickActionCard index={1} icon="library" label="Browse library" description="87 programs" />
+        </div>
+      </PanelCard>
+    </div>
+    <DataTable rows={rows} columns={[{key:'name',label:'Program'},{label:'Tier',render:r=><TierBadge tier={r.tier} />},{label:'Score',align:'right',render:r=><ScoreBadge perfect={r.perfect}>{r.score}</ScoreBadge>}]} />
+  </div>);} 
+ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+</script>
+</body>
+</html>

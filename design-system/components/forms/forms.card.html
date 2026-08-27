@@ -1,0 +1,43 @@
+<!-- @dsCard group="Components" viewport="700x340" name="Forms" subtitle="Inputs, select, search, answer bubbles" -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../../styles.css">
+<script src="https://unpkg.com/lucide@0.408.0/dist/umd/lucide.min.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>html{background:var(--bg-body)}body{padding:16px;font-family:var(--font-sans);color:var(--text-primary)}.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.col{display:flex;flex-direction:column;gap:12px}.cap{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-tertiary)}</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { FormLabel, Input, Select, Textarea, SearchInput, AnswerBubble } = window.StudySessionProDesignSystem_f5d02b;
+function Demo(){const [pick,setPick]=React.useState('B');return (
+  <div className="col">
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+      <div><FormLabel>Program title</FormLabel><Input placeholder="e.g. Reverse a linked list" /></div>
+      <div><FormLabel aside="v2">Version</FormLabel><Select defaultValue="v2"><option value="v1">Version 1</option><option value="v2">Version 2</option></Select></div>
+    </div>
+    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+      <div><FormLabel style={{textAlign:'center'}}>Hours</FormLabel><Input type="number" align="center" defaultValue={0} /></div>
+      <div><FormLabel style={{textAlign:'center'}}>Mins</FormLabel><Input type="number" align="center" defaultValue={25} /></div>
+      <div><FormLabel style={{textAlign:'center'}}>Secs</FormLabel><Input type="number" align="center" defaultValue={0} /></div>
+    </div>
+    <div><FormLabel>Answer key</FormLabel><Textarea mono rows={2} defaultValue={"1. B\n2. A"} /></div>
+    <div className="row" style={{justifyContent:'space-between'}}>
+      <SearchInput width={300} placeholder="Search programs, snippets…" />
+      <div className="row" style={{gap:6}}>
+        {['A','B','C','D'].map(k=><AnswerBubble key={k} state={k===pick?'selected':'default'} onClick={()=>setPick(k)}>{k}</AnswerBubble>)}
+        <AnswerBubble state="correct">A</AnswerBubble>
+        <AnswerBubble state="wrong">C</AnswerBubble>
+        <AnswerBubble state="expected">D</AnswerBubble>
+      </div>
+    </div>
+  </div>);} 
+ReactDOM.createRoot(document.getElementById('root')).render(<Demo />);
+</script>
+</body>
+</html>

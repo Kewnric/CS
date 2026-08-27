@@ -1,0 +1,11 @@
+/* SPACING — rem scale on a 4px base. Component padding in the source is
+   often expressed in raw rem (0.625rem / 0.875rem) rather than snapped to
+   this scale; keep those literals when recreating a component. */
+:root {
+  --space-xs: 0.25rem;  /* 4px */
+  --space-sm: 0.5rem;   /* 8px */
+  --space-md: 1rem;     /* 16px */
+  --space-lg: 1.5rem;   /* 24px */
+  --space-xl: 2rem;     /* 32px */
+  --space-2xl: 3rem;    /* 48px */
+}

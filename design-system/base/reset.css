@@ -1,0 +1,61 @@
+/* RESET + BASE — box model, body, headings, scrollbar, selection.
+   Also the app-wide ligature kill: JetBrains Mono fuses <= >= -> != == into
+   single glyphs, and in a C-learning app students must see the characters
+   they typed. Applied universally so no mono context is missed. */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+*, *::before, *::after {
+  font-variant-ligatures: none !important;
+  font-feature-settings: "liga" 0, "calt" 0, "dlig" 0 !important;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-body);
+  color: var(--text-primary);
+  line-height: var(--leading-body);
+  min-height: 100vh;
+  transition: background-color var(--transition-base), color var(--transition-base);
+}
+
+a { color: var(--color-primary); text-decoration: none; }
+a:hover { color: var(--color-primary-hover); }
+
+img { max-width: 100%; display: block; }
+
+h1, h2, h3, h4, h5, h6 {
+  line-height: var(--leading-heading);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+}
+h1 { font-size: var(--text-3xl); }
+h2 { font-size: var(--text-xl); }
+h3 { font-size: var(--text-lg); }
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--text-tertiary); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-secondary); }
+* { scrollbar-width: thin; scrollbar-color: var(--text-tertiary) transparent; }
+
+::selection { background: var(--color-primary); color: #fff; }
+
+/* Focus ring — one treatment everywhere */
+a:focus-visible, button:focus-visible, [role='button']:focus-visible,
+input:focus-visible, select:focus-visible, textarea:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Kill the 300ms mobile tap delay on everything interactive */
+button, a, [role="button"] { touch-action: manipulation; }
+
+svg { flex-shrink: 0; }

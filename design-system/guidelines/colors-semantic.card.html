@@ -1,0 +1,28 @@
+<!-- @dsCard group="Colors" viewport="700x190" name="Semantic" subtitle="Success, warning, danger. Each has a 10% background pair for badges." -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>html{background:var(--bg-body)}body{padding:16px;font-family:var(--font-sans);color:var(--text-primary);font-size:12px}
+.sw{display:flex;gap:10px;flex-wrap:wrap}
+.s{display:flex;flex-direction:column;gap:6px;min-width:88px}
+.chip{height:44px;border-radius:var(--radius-md);border:1px solid rgba(255,255,255,.06)}
+.n{font-size:10px;font-weight:700;letter-spacing:.02em}
+.v{font-size:9px;font-family:var(--font-mono);color:var(--text-tertiary)}
+.rowline{display:flex;align-items:baseline;gap:14px}
+.lbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-tertiary);min-width:96px}
+</style>
+</head>
+<body>
+<div class="sw">
+<div class="s"><div class="chip" style="background:#10b981"></div><div class="n">success</div><div class="v">#10b981</div></div>
+<div class="s"><div class="chip" style="background:rgba(16,185,129,0.1)"></div><div class="n">success-bg</div><div class="v">10%</div></div>
+<div class="s"><div class="chip" style="background:#f59e0b"></div><div class="n">warning</div><div class="v">#f59e0b</div></div>
+<div class="s"><div class="chip" style="background:rgba(245,158,11,0.1)"></div><div class="n">warning-bg</div><div class="v">10%</div></div>
+<div class="s"><div class="chip" style="background:#ef4444"></div><div class="n">danger</div><div class="v">#ef4444</div></div>
+<div class="s"><div class="chip" style="background:rgba(239,68,68,0.1)"></div><div class="n">danger-bg</div><div class="v">10%</div></div>
+<div class="s"><div class="chip" style="background:#dc2626"></div><div class="n">danger-hover</div><div class="v">#dc2626</div></div>
+</div>
+</body>
+</html>

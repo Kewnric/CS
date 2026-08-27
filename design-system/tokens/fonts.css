@@ -1,0 +1,13 @@
+/* FONTS — StudySession Pro loads all three families from Google Fonts,
+   exactly as the source app does. No local binaries exist upstream.
+   Inter        — UI / all body and heading text
+   JetBrains Mono — code editors, terminals, stat numerals
+   Orbitron     — Quest Board only (gamified HUD surface) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap');
+
+:root {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  --font-display: 'Orbitron', var(--font-sans);
+}

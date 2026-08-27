@@ -1,0 +1,58 @@
+/* ANIMATIONS — the shared keyframe vocabulary and its utility classes.
+   Every effect collapses to static under prefers-reduced-motion. */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideInRight { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes slideInLeft { from { opacity: 0; transform: translateX(-24px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes scaleIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+@keyframes smoothReveal { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes popIn { 0% { opacity: 0; transform: scale(0.6); } 80% { transform: scale(1.05); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes bounceIn { 0% { opacity: 0; transform: scale(0.3); } 50% { opacity: 1; transform: scale(1.08); } 70% { transform: scale(0.95); } 100% { transform: scale(1); } }
+@keyframes shake { 0%,100% { transform: translateX(0); } 15% { transform: translateX(-6px); } 30% { transform: translateX(5px); } 45% { transform: translateX(-4px); } 60% { transform: translateX(3px); } 75% { transform: translateX(-2px); } }
+@keyframes gentlePulse { 0%,100% { opacity: 1; } 50% { opacity: 0.65; } }
+@keyframes glowPulse { 0%,100% { box-shadow: 0 0 6px var(--color-primary-glow); } 50% { box-shadow: 0 0 18px var(--color-primary-glow), 0 0 30px rgba(99, 102, 241, 0.1); } }
+@keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+@keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes modalRise { from { opacity: 0; transform: translateY(12px) scale(0.985); } to { opacity: 1; transform: none; } }
+@keyframes routeEnter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+.fade-in { animation: fadeIn var(--transition-base) ease-out; }
+.fade-in-up { animation: fadeInUp 0.4s ease-out; }
+.slide-in-right { animation: slideInRight 0.35s ease-out; }
+.slide-in-left { animation: slideInLeft 0.35s ease-out; }
+.scale-in { animation: scaleIn 0.3s var(--ease-spring); }
+.smooth-reveal { animation: smoothReveal 0.35s ease-out; }
+.pop-in { animation: popIn 0.3s var(--ease-spring); }
+.bounce-in { animation: bounceIn 0.5s var(--ease-spring); }
+.shake { animation: shake 0.5s ease-in-out; }
+.gentle-pulse { animation: gentlePulse 2s ease-in-out infinite; }
+.glow-pulse { animation: glowPulse 2s ease-in-out infinite; }
+.route-enter { animation: routeEnter 200ms ease-out; }
+
+/* Staggered entrance — used on the home stats grid and quick-action lists */
+.stagger-children > * { opacity: 0; animation: fadeInUp 0.4s ease-out forwards; }
+.stagger-children > *:nth-child(1) { animation-delay: 0.05s; }
+.stagger-children > *:nth-child(2) { animation-delay: 0.1s; }
+.stagger-children > *:nth-child(3) { animation-delay: 0.15s; }
+.stagger-children > *:nth-child(4) { animation-delay: 0.2s; }
+.stagger-children > *:nth-child(5) { animation-delay: 0.25s; }
+.stagger-children > *:nth-child(6) { animation-delay: 0.3s; }
+.stagger-children > *:nth-child(7) { animation-delay: 0.35s; }
+.stagger-children > *:nth-child(8) { animation-delay: 0.4s; }
+
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.text-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hidden { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .fade-in-up, .slide-in-right, .slide-in-left, .scale-in, .bounce-in,
+  .smooth-reveal, .pop-in, .stagger-children > * {
+    animation: none !important; opacity: 1 !important; transform: none !important;
+  }
+}

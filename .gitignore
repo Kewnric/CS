@@ -7,4 +7,11 @@ desktop.ini
 
 # Local dev-server config for the in-editor preview. It is tooling, not part of
 # the published site.
-.claude/
+# Contents rather than the directory itself: git does not descend into an
+# excluded directory, so `.claude/` would make the exception below unreachable.
+.claude/*
+
+# Skills are that exception. They are project knowledge — how this app is meant
+# to be built — and are worth versioning with it, so they reach every clone and
+# every session rather than living on one machine.
+!.claude/skills/

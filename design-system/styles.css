@@ -1,0 +1,14 @@
+/* StudySession Pro — global CSS entry point.
+   Consumers link this one file. Import list only; no rules here. */
+@import url('tokens/fonts.css');
+@import url('tokens/colors.css');
+@import url('tokens/typography.css');
+@import url('tokens/spacing.css');
+@import url('tokens/radius.css');
+@import url('tokens/shadows.css');
+@import url('tokens/motion.css');
+/* themes.css last: its [data-theme=…] scopes have the same specificity as :root,
+   so it must win on order to override the light-theme defaults above. */
+@import url('tokens/themes.css');
+@import url('base/reset.css');
+@import url('base/animations.css');

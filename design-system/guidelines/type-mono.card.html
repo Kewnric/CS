@@ -1,0 +1,25 @@
+<!-- @dsCard group="Type" viewport="700x190" name="Mono — JetBrains Mono" subtitle="Code, terminals and every numeral that must not jitter. Ligatures are force-disabled app-wide." -->
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<link rel="stylesheet" href="../styles.css">
+<style>html{background:var(--bg-body)}body{padding:16px;font-family:var(--font-sans);color:var(--text-primary);font-size:12px}
+.sw{display:flex;gap:10px;flex-wrap:wrap}
+.s{display:flex;flex-direction:column;gap:6px;min-width:88px}
+.chip{height:44px;border-radius:var(--radius-md);border:1px solid rgba(255,255,255,.06)}
+.n{font-size:10px;font-weight:700;letter-spacing:.02em}
+.v{font-size:9px;font-family:var(--font-mono);color:var(--text-tertiary)}
+.rowline{display:flex;align-items:baseline;gap:14px}
+.lbl{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-tertiary);min-width:96px}
+</style>
+</head>
+<body>
+<div style="display:flex;flex-direction:column;gap:10px">
+<div><div class="lbl">stat value 28 / 800</div><div style="font-family:var(--font-mono);font-size:1.75rem;font-weight:800;line-height:1">12 · 94% · 6.2h</div></div>
+<div><div class="lbl">code 13 / 1.6</div><pre style="font-family:var(--font-mono);font-size:.8125rem;line-height:1.6;margin:0;color:var(--text-secondary)">for (int i = 0; i &lt;= n; i++) {
+    if (a[i] != b[i]) return -1;   /* no ligatures: &lt;= != -&gt; stay literal */
+}</pre></div>
+</div>
+</body>
+</html>
