@@ -112,3 +112,19 @@ window.swShouldWelcome = function () {
 window.swMarkWelcomed = function () {
   try { localStorage.setItem(SW_SEEN_KEY, '1'); } catch (e) { /* quota */ }
 };
+
+/**
+ * Play the opening again, now.
+ *
+ * Useful because the sequence is meant to be seen once: without this the only
+ * way back to it is clearing a localStorage key by hand.
+ */
+window.swReplayWelcome = function () {
+  try { localStorage.removeItem(SW_SEEN_KEY); } catch (e) { /* ignore */ }
+  const popup = document.getElementById('storage-mode-popup');
+  if (popup) popup.classList.add('sw-holding');
+  swRunWelcome(() => {
+    swMarkWelcomed();
+    if (popup) { popup.classList.remove('sw-holding'); popup.classList.add('sw-revealed'); }
+  });
+};

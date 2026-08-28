@@ -271,18 +271,6 @@ let _pickerOnlineHandler = null;
 
 function showStorageModePicker() {
   const popup = document.getElementById('storage-mode-popup');
-
-  // The opening runs in front of the picker the first time only: black, a
-  // message, then the card. The card is built and laid out underneath while
-  // the veil is up, so it is finished by the time the veil lifts rather than
-  // assembling itself in front of you.
-  if (typeof swRunWelcome === 'function' && typeof swShouldWelcome === 'function' && swShouldWelcome()) {
-    swMarkWelcomed();
-    swRunWelcome(() => { if (popup) popup.classList.add('sw-revealed'); });
-  } else if (popup) {
-    popup.classList.add('sw-revealed');
-  }
-
   if (popup) popup.classList.remove('hidden');
   const appLayout = document.querySelector('.app-layout');
   if (appLayout) { appLayout.style.visibility = 'hidden'; appLayout.setAttribute('aria-hidden', 'true'); }
@@ -1491,6 +1479,35 @@ async function bootApp() {
     return;
   }
 
-  // First visit — show picker
+  // First visit — the opening, then the picker.
+  //
+  // This is the ONLY call site that gets it. showStorageModePicker also runs
+  // when an online session is being restored and after a sign-in redirect,
+  // where the picker is shown in a loading state and hidden again moments
+  // later — hooking the shared function meant the opening could fire behind a
+  // card that was already going away, and mark itself seen for good.
   showStorageModePicker();
+  swMaybeWelcome();
 }
+
+/**
+ * Run the opening if it is owed, holding the picker card back while it plays.
+ *
+ * The card is revealed by default and only hidden while the veil is actually
+ * up: if anything here fails, the failure is that the opening is skipped, not
+ * that the picker is invisible behind nothing.
+ */
+function swMaybeWelcome() {
+  const popup = document.getElementById('storage-mode-popup');
+  if (typeof swRunWelcome !== 'function' || typeof swShouldWelcome !== 'function') return;
+  if (!swShouldWelcome()) return;
+
+  if (popup) popup.classList.add('sw-holding');
+  swRunWelcome(() => {
+    // Marked seen on completion, not on start. A run that was interrupted, or
+    // never made it to the screen, should not spend the one showing.
+    swMarkWelcomed();
+    if (popup) { popup.classList.remove('sw-holding'); popup.classList.add('sw-revealed'); }
+  });
+}
+window.swMaybeWelcome = swMaybeWelcome;

@@ -741,9 +741,12 @@
   .sw-btn:hover, .sw-btn:active { transform: translateX(-50%); }
 }
 
-/* The picker is built under the veil and revealed with it, so it is not seen
-   assembling itself. Without this it painted in front of the black. */
-.smp-overlay:not(.sw-revealed) .smp-card {
+/* Held back only while the veil is actually up, so the card is built under it
+   rather than seen assembling in front of the black. Written as an opt-IN
+   hold rather than requiring an opt-in reveal: if the opening never runs, the
+   card should still be there, and the previous rule made it invisible until
+   something explicitly said otherwise. */
+.smp-overlay.sw-holding .smp-card {
   opacity: 0;
   pointer-events: none;
 }
