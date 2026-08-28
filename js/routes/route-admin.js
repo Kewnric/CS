@@ -329,6 +329,26 @@ function getSnippetFormHTML() {
             <div id="study-tag-suggestions" class="af-tag-suggestions"></div>
             <div id="study-tags-list" class="af-tags-list"></div>
           </div>
+          <div class="af-row-2" style="gap:0.75rem;">
+            <div class="af-field" style="flex:1;">
+              <label class="form-label"><i data-lucide="signal" class="af-label-icon"></i>Difficulty</label>
+              <select id="study-difficulty" class="form-select" aria-label="Snippet difficulty" onchange="if(studyModeState) { studyModeState.difficulty = this.value || null; window.adminIsDirty = true; setSaveStatus('study-save-status','unsaved'); }">
+                <option value="">None</option>
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+            </div>
+            <div class="af-field" style="flex:1;">
+              <label class="form-label"><i data-lucide="trending-up" class="af-label-icon"></i>Level <span class="af-label-hint">(1–100 — orders the Library grid)</span></label>
+              <input id="study-level" type="number" min="1" max="100" step="1" class="form-input" placeholder="1–100"
+                     oninput="if(studyModeState) { const v = parseInt(this.value, 10); studyModeState.level = (v > 0 ? Math.min(v, 100) : null); window.adminIsDirty = true; setSaveStatus('study-save-status','unsaved'); }" />
+            </div>
+          </div>
+          <div class="af-field">
+            <label class="form-label"><i data-lucide="image" class="af-label-icon"></i>Cover Image <span class="af-label-hint">(optional — shown on the Library card and Home carousel)</span></label>
+            <div id="study-cover-field" class="nb-cover-field"></div>
+          </div>
         </div>
       </div>
 

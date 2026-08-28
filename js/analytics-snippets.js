@@ -51,9 +51,13 @@ function _snWhen(entry) {
   if (typeof entry.ts === 'number' && isFinite(entry.ts)) return entry.ts;
   const d = String(entry.date || '').trim();
   if (!d) return 0;
-  // The date alone is enough to order across days, which is the resolution the
-  // list is read at. entry.time is a locale string and not reliably parseable.
-  const t = Date.parse(d + 'T00:00:00');
+  // Two writers, two formats. SQL practice stores an ISO date; Try Coding
+  // stores toLocaleDateString(), e.g. "8/29/2026" — and 8/29/2026T00:00:00 is
+  // not a date, so every Try Coding record used to resolve to 0 and sort to
+  // the bottom regardless of when it happened. Try ISO first because it is
+  // unambiguous, then let Date have the locale form.
+  let t = Date.parse(d + 'T00:00:00');
+  if (!isFinite(t)) t = Date.parse(d);
   return isFinite(t) ? t : 0;
 }
 

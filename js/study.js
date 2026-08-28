@@ -356,11 +356,42 @@ function renderSnippetDetail() {
   }
   breadcrumbHtml += `</nav>`;
 
+  // The same record the other two libraries put at the head of an item's page.
+  const dAttempts = _snippetAttemptsSorted(snippet);
+  const dBest = _snippetBestPct(snippet);
+  const dLast = _snippetLastPct(snippet);
+  const dLastDate = _snippetLastDate(snippet);
+  const dScoreClass = dBest === 100 ? 'score-perfect' : dBest >= 50 ? 'score-partial' : dBest >= 0 ? 'score-low' : '';
+  const dLv = getSnippetLevel(snippet);
+  const dDiff = getSnippetDifficulty(snippet);
+  const dLang = getSnippetLanguage(snippet);
+  const dDue = typeof agDeadlineTextHTML === 'function' ? agDeadlineTextHTML('snippet', snippet.id) : '';
+  const dStat = (icon, label, value, cls) => `
+    <div class="prog-stat${cls ? ' ' + cls : ''}">
+      <i data-lucide="${icon}" style="width:13px;height:13px;"></i>
+      <span class="prog-stat-body"><em>${label}</em><strong>${value}</strong></span>
+    </div>`;
+
   container.innerHTML = `
     <div class="snippet-detail animate-fade-in">
       <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 1.5rem; margin-bottom: 1.5rem;">
         ${breadcrumbHtml}
-        <h2 style="font-size: 1.75rem; font-weight: 800; color: var(--text-primary); margin-bottom: 0.75rem;">${escapeHTML(snippet.title)}</h2>
+        <div style="display:flex; align-items:flex-start; gap:1rem;">
+          <h2 style="font-size: 1.75rem; font-weight: 800; color: var(--text-primary); margin-bottom: 0.75rem; flex:1; min-width:0; display:flex; align-items:center; gap:0.5rem; flex-wrap:wrap;">
+            <span>${escapeHTML(snippet.title)}</span>
+            ${dLv ? `<span class="level-badge" title="Level ${dLv}">LV.${dLv}</span>` : ''}
+            ${dDiff ? `<span class="difficulty-badge" style="--diff-color:${{ easy: '#10b981', medium: '#f59e0b', hard: '#ef4444' }[dDiff]};">${dDiff[0].toUpperCase() + dDiff.slice(1)}</span>` : ''}
+            ${dLang ? `<span class="lib-lang-badge">${escapeHTML(dLang.toUpperCase())}</span>` : ''}
+          </h2>
+          ${dDue ? `<div class="prog-detail-due">${dDue}</div>` : ''}
+        </div>
+        <div class="prog-stats">
+          ${dStat('code', 'Examples', (snippet.examples || []).length)}
+          ${dStat('rotate-ccw', 'Attempts', dAttempts.length)}
+          ${dBest >= 0 ? dStat(dBest === 100 ? 'check-circle' : 'target', 'Best', dBest + '%', dScoreClass) : ''}
+          ${dLast >= 0 ? dStat('activity', 'Last score', dLast + '%') : ''}
+          ${dLastDate ? dStat('clock', 'Last attempt', escapeHTML(dLastDate)) : ''}
+        </div>
         <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
           ${(snippet.tags || []).map(t => `<span class="badge badge-primary">${escapeHTML(t)}</span>`).join('')}
         </div>
@@ -395,6 +426,10 @@ function renderSnippetDetail() {
                 .filter(c => (c.answer || '').trim())).length;
               return n ? ` (${n} case${n !== 1 ? 's' : ''})` : '';
             })()}
+          </button>
+          <button class="btn btn-secondary" onclick="agOpenDeadlineModal('snippet', '${snippet.id}')"
+                  title="${dDue ? 'Change or clear the deadline on this snippet' : 'Put a due date on this snippet'}">
+            <i data-lucide="flag" style="width:16px;height:16px;"></i> ${dDue ? 'Deadline' : 'Set Deadline'}
           </button>
           <button class="btn btn-primary" onclick="openExamplesModal()" id="view-examples-btn">
             <i data-lucide="code" style="width: 16px; height: 16px;"></i> View Examples (${(snippet.examples || []).length})
@@ -449,6 +484,45 @@ function _snippetBestPct(s) {
   const a = _snippetAttempts(s);
   return a.length ? Math.max(...a.map(x => x.score || 0)) : -1;
 }
+
+/**
+ * Attempts newest-first.
+ *
+ * snippetHistory is written by two paths that disagree: Try Coding unshifts a
+ * record with a locale date string, SQL practice pushes one with an epoch ts.
+ * Position in the array is therefore not order, which is the same trap the
+ * snippet analytics hit — so it uses the same reader.
+ */
+function _snippetAttemptsSorted(s) {
+  const when = (h) => (typeof _snWhen === 'function' ? _snWhen(h) : (h.ts || 0));
+  return _snippetAttempts(s).slice().sort((a, b) => when(b) - when(a));
+}
+
+function _snippetLastPct(s) {
+  const a = _snippetAttemptsSorted(s);
+  return a.length ? (a[0].score || 0) : -1;
+}
+
+/**
+ * The date of the most recent attempt, in ONE format.
+ *
+ * The two writers store different shapes — an ISO date from SQL practice, a
+ * locale string from Try Coding — so showing the record's own string put
+ * "2026-08-20" and "8/29/2026" side by side in the same grid.
+ */
+function _snippetLastDate(s) {
+  const a = _snippetAttemptsSorted(s);
+  if (!a.length) return null;
+  const raw = a[0].date || null;
+  if (typeof _snWhen !== 'function' || typeof agFmtDate !== 'function' || typeof agDateStr !== 'function') return raw;
+  const ts = _snWhen(a[0]);
+  return ts ? agFmtDate(agDateStr(new Date(ts))) : raw;
+}
+
+/* Level and difficulty, matching the notebook library's accessors exactly so
+   the three libraries answer the same question the same way. */
+function getSnippetLevel(s) { const n = parseInt(s && s.level, 10); return n > 0 ? Math.min(n, 100) : null; }
+function getSnippetDifficulty(s) { return (s && s.difficulty) || null; }
 
 function snippetPage(page) {
   const totalItems = (state.snippets || []).length;
@@ -674,15 +748,31 @@ function renderSnippetFolderOverview(container) {
             const scoreClass = best === 100 ? 'score-perfect' : best >= 50 ? 'score-partial' : best >= 0 ? 'score-low' : '';
             const lang = getSnippetLanguage(s);
             const selecting = libSelectMode('snippet');
+            const isPerfect = best === 100;
+            const lastPct = _snippetLastPct(s);
+            const slipped = lastPct >= 0 && best >= 0 && lastPct < best;
+            const lastAttempt = _snippetLastDate(s);
+            const lv = getSnippetLevel(s);
+            const diff = getSnippetDifficulty(s);
+            // The other two libraries have had a cover — with a generated
+            // fallback when there is no image — since they were built. Without
+            // one the snippet grid was the odd shape out on the Library page.
+            const coverHtml = s.coverImage
+              ? `<div class="nb-card-cover"><img src="${s.coverImage}" alt="" loading="lazy" /></div>`
+              : (typeof libCoverFallbackHTML === 'function' ? libCoverFallbackHTML(s.title, 'code') : '');
             return `
-              <div class="card card-enhanced${libIsSelected('snippet', s.id) ? ' lib-selected' : ''}"
+              <div class="card card-enhanced has-cover${libIsSelected('snippet', s.id) ? ' lib-selected' : ''}"
                    onclick="${selecting ? `libToggleSelect('snippet','${s.id}')` : `selectSnippet('${s.id}')`}" style="cursor: pointer;">
+                ${coverHtml}
                 ${libSelectBoxHTML('snippet', s.id)}
+                ${isPerfect ? '<div class="card-completed-badge"><i data-lucide="check" style="width:10px;height:10px;"></i></div>' : ''}
                 ${libFavButtonHTML('snippet', s)}
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.5rem; gap:0.5rem;">
                   <h3 style="font-weight:700; font-size:1.1rem; color:var(--text-primary); flex:1; display:flex; align-items:center; gap:0.5rem; min-width:0;">
                     <i data-lucide="code" style="width:18px;height:18px;color:var(--color-accent);flex-shrink:0;"></i>
                     <span style="overflow:hidden;text-overflow:ellipsis;">${escapeHTML(s.title)}</span>
+                    ${lv ? `<span class="level-badge" title="Level ${lv}">LV.${lv}</span>` : ''}
+                    ${diff ? `<span class="difficulty-badge" style="--diff-color:${{ easy: '#10b981', medium: '#f59e0b', hard: '#ef4444' }[diff]};">${diff[0].toUpperCase() + diff.slice(1)}</span>` : ''}
                     ${lang ? `<span class="lib-lang-badge">${escapeHTML(lang.toUpperCase())}</span>` : ''}
                   </h3>
                   <span class="version-pill">${exCount} example${exCount !== 1 ? 's' : ''}</span>
@@ -690,7 +780,8 @@ function renderSnippetFolderOverview(container) {
                 <div style="display:flex; flex-wrap:wrap; gap:0.375rem; margin-bottom:0.75rem;">
                   ${libReviewChipHTML('snippet', s.id)}
                   ${attempts ? `<span class="badge badge-neutral"><i data-lucide="rotate-ccw" style="width:12px;height:12px;margin-right:2px;"></i> ${attempts} Attempt${attempts !== 1 ? 's' : ''}</span>` : ''}
-                  ${best >= 0 ? `<span class="badge ${scoreClass}"><i data-lucide="target" style="width:12px;height:12px;margin-right:2px;"></i> Best: ${best}%</span>` : ''}
+                  ${best >= 0 ? `<span class="badge ${scoreClass}"><i data-lucide="${isPerfect ? 'trophy' : 'target'}" style="width:12px;height:12px;margin-right:2px;"></i> Best: ${best}%</span>` : ''}
+                  ${slipped ? `<span class="badge lib-last-badge" title="Your most recent attempt scored lower than your best">Last: ${lastPct}%</span>` : ''}
                   ${canTry ? '<span class="badge badge-neutral"><i data-lucide="terminal" style="width:12px;height:12px;margin-right:2px;"></i> Try Coding</span>' : ''}
                   ${hasSql ? `<span class="badge badge-neutral"><i data-lucide="database" style="width:12px;height:12px;margin-right:2px;"></i> ${sqlCount} SQL case${sqlCount !== 1 ? 's' : ''}</span>` : ''}
                   ${linkedCount > 0 ? `<span class="badge badge-neutral"><i data-lucide="link-2" style="width:12px;height:12px;margin-right:2px;"></i> ${linkedCount} Linked</span>` : ''}
@@ -700,6 +791,7 @@ function renderSnippetFolderOverview(container) {
                   ${escapeHTML(descText || 'No description.')}
                 </p>
                 ${best >= 0 ? `<div class="card-score-bar"><div class="card-score-fill ${scoreClass}" style="width:${best}%;"></div></div>` : ''}
+                ${lastAttempt ? `<div class="card-last-attempt"><i data-lucide="clock" style="width:11px;height:11px;"></i> Last: ${escapeHTML(lastAttempt)}</div>` : ''}
                 <div style="margin-top:auto; display:flex; flex-wrap:wrap; gap:0.5rem; padding-top:0.5rem;">
                   <button onclick="event.stopPropagation(); selectSnippet('${s.id}')" class="btn btn-practice" style="flex:1 1 auto; min-width:0;">
                     <i data-lucide="book-open" style="width:16px;height:16px;"></i> Study

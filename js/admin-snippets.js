@@ -187,6 +187,10 @@ function openStudyForm(id) {
   document.getElementById('study-category').value = studyModeState.parentId || '';
   const langEl = document.getElementById('study-language');
   if (langEl) langEl.value = studyModeState.language || '';
+  const sDiff = document.getElementById('study-difficulty');
+  if (sDiff) sDiff.value = studyModeState.difficulty || '';
+  const sLevel = document.getElementById('study-level');
+  if (sLevel) sLevel.value = studyModeState.level != null ? studyModeState.level : '';
   document.getElementById('study-tag-input').value = '';
 
   // Render custom category dropdown
@@ -229,10 +233,67 @@ function openStudyForm(id) {
   if (typeof renderTagSuggestions === 'function') renderTagSuggestions('study', 'snippet');
   renderStudyRelatedChallenges();
   renderStudyExamplesForm();
+  renderStudyCover();
 
   if (id === 'new') {
     setTimeout(() => document.getElementById('study-title')?.focus(), 60);
   }
+}
+
+/* ---- Snippet cover image (a downscaled data URL, as the notebooks do) ----
+   Deliberately the same three functions and the same markup: two libraries
+   already had this and a third variant of it would only be a third thing to
+   keep in step. _downscaleImage is shared. */
+function renderStudyCover() {
+  const host = document.getElementById('study-cover-field');
+  if (!host || !studyModeState) return;
+  const img = studyModeState.coverImage;
+  host.innerHTML = `
+    <input type="file" id="study-cover-input" accept="image/*" class="hidden" onchange="handleStudyCoverUpload(this)" />
+    ${img ? `
+      <div class="nb-cover-preview">
+        <img src="${img}" alt="Cover preview" />
+        <div class="nb-cover-actions">
+          <button type="button" class="btn btn-sm" onclick="document.getElementById('study-cover-input').click()"><i data-lucide="repeat" style="width:13px;height:13px;"></i> Replace</button>
+          <button type="button" class="btn btn-sm nb-cover-remove" onclick="removeStudyCover()"><i data-lucide="trash-2" style="width:13px;height:13px;"></i> Remove</button>
+        </div>
+      </div>
+    ` : `
+      <button type="button" class="nb-cover-drop" onclick="document.getElementById('study-cover-input').click()">
+        <i data-lucide="image-plus"></i>
+        <span>Upload a cover image</span>
+        <small>PNG / JPG — automatically resized to keep your data small</small>
+      </button>
+    `}
+  `;
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: host });
+}
+
+function handleStudyCoverUpload(input) {
+  const file = input.files && input.files[0];
+  if (!file || !studyModeState) return;
+  if (!/^image\//.test(file.type)) {
+    if (typeof showMessage === 'function') showMessage('Error', 'Please choose an image file.', true);
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    _downscaleImage(e.target.result, 960, 0.82, (dataUrl) => {
+      studyModeState.coverImage = dataUrl;
+      window.adminIsDirty = true;
+      if (typeof setSaveStatus === 'function') setSaveStatus('study-save-status', 'unsaved');
+      renderStudyCover();
+    });
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeStudyCover() {
+  if (!studyModeState) return;
+  delete studyModeState.coverImage;
+  window.adminIsDirty = true;
+  if (typeof setSaveStatus === 'function') setSaveStatus('study-save-status', 'unsaved');
+  renderStudyCover();
 }
 
 function closeStudyForm() {
@@ -255,6 +316,10 @@ function saveStudyForm(opts = {}) {
   if (titleEl) studyModeState.title = titleEl.value;
   if (catEl) studyModeState.parentId = catEl.value || null;
   if (langSaveEl) studyModeState.language = langSaveEl.value.trim() || null;
+  const diffEl = document.getElementById('study-difficulty');
+  if (diffEl) studyModeState.difficulty = diffEl.value || null;
+  const lvEl = document.getElementById('study-level');
+  if (lvEl) { const lv = parseInt(lvEl.value, 10); studyModeState.level = lv > 0 ? Math.min(lv, 100) : null; }
 
   if (studyQuillEditor) studyModeState.description = studyQuillEditor.root.innerHTML;
   if (studyCommentsQuillEditor) studyModeState.comments = studyCommentsQuillEditor.root.innerHTML;

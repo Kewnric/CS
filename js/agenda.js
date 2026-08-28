@@ -502,6 +502,9 @@ function agRefresh() {
   if (typeof notesRenderDetail === 'function' && document.getElementById('notes-sections-area')) {
     notesRenderDetail();
   }
+  if (typeof renderSnippetDetail === 'function' && document.getElementById('snippet-detail-container')) {
+    renderSnippetDetail();
+  }
 }
 
 function agTogglePanel() { agPanelOpen ? agClosePanel() : agOpenPanel(); }
