@@ -46,11 +46,10 @@ function swSetSound(on) {
 window.swSetSound = swSetSound;
 
 window.swToggleSound = function () {
-  const on = !swSoundOn();
-  swSetSound(on);
-  // Turning it ON plays the sound, so the switch proves itself. Turning it off
-  // stays silent, which is the whole point.
-  if (on) swPlaySound();
+  // Silent either way. Playing the sound to confirm the switch made the switch
+  // itself a source of the noise it exists to control — the point is that
+  // nothing sounds until you press the blue button.
+  swSetSound(!swSoundOn());
 };
 
 /** Repaint the toggle inside the welcome window, if it is on screen. */
@@ -61,8 +60,10 @@ function swPaintSoundToggle() {
   btn.classList.toggle('is-on', on);
   btn.setAttribute('aria-pressed', String(on));
   btn.setAttribute('aria-label', on ? 'Sound on' : 'Sound off');
-  btn.innerHTML = '<i data-lucide="' + (on ? 'volume-2' : 'volume-x') + '"></i>' +
-                  '<span>' + (on ? 'SOUND ON' : 'SOUND OFF') + '</span>';
+  // Icon alone. The label was as wide as the button it sat beside, and the
+  // state is already carried by the icon, the fill and the title.
+  btn.innerHTML = '<i data-lucide="' + (on ? 'volume-2' : 'volume-x') + '"></i>';
+  btn.title = on ? 'Sound on — the button will play' : 'Sound off — the button will be silent';
   if (typeof lucide !== 'undefined') lucide.createIcons({ el: btn });
 }
 window.swPaintSoundToggle = swPaintSoundToggle;

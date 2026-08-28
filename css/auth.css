@@ -743,21 +743,22 @@
    alone because this is the one place the sound actually plays — you can turn
    it on and hear it on the very next press, instead of finding out it was off
    after the moment has gone. */
+/* Top left of the frame, out of the answers' way — beside them it crowded the
+   blue button and read as a third choice rather than a setting. */
 .sw-sound {
   position: absolute;
-  left: 5%;
-  top: 78%;
+  left: 4%;
+  top: 5%;
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.15rem 0.4rem;
-  border: 1px solid rgba(70, 80, 92, 0.3);
-  border-radius: 999px;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid rgba(70, 80, 92, 0.28);
+  border-radius: 50%;
   background: rgba(255, 255, 255, 0.5);
   color: #59626d;
-  font-family: 'sao_uiregular', var(--font-sans), sans-serif;
-  font-size: 0.6rem;
-  letter-spacing: 0.05em;
   cursor: pointer;
   transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
 }
