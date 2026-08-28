@@ -456,96 +456,153 @@ function updateTryCodingTargets(cb) {
 // === Examples Form ===
 function renderStudyExamplesForm() {
   if (!studyModeState) return;
+  const p = _sqlState();
+  if (!p) return;
 
-  const tabsContainer = document.getElementById('study-examples-tabs');
-  tabsContainer.innerHTML = studyModeState.examples.map((ex, i) => `
-    <div onclick="switchStudyExampleTab(${i})" class="variant-tab ${i === studyModeState.activeExampleIndex ? 'active' : ''}">
-      ${escapeHTML(ex.name || 'Unnamed')}
-      <span onclick="event.stopPropagation(); removeStudyExample(${i})" class="variant-tab-close"><i data-lucide="x" style="width:12px;height:12px;"></i></span>
-    </div>
-  `).join('');
+  // The tab strip is the coding admin's, meaning something else here: a tab is
+  // a test case, not a version. Numbered rather than named — the student sees
+  // "Answer for Test Case 3", so the author should be looking at the same
+  // number while writing it.
+  const active = Math.min(studyModeState.activeExampleIndex || 0, Math.max(0, p.cases.length - 1));
+  studyModeState.activeExampleIndex = active;
 
-  const targetsContainer = document.getElementById('try-coding-targets-container');
-  if (targetsContainer) {
-    let targetIndices = studyModeState.tryCodingTargetIndices || [0];
-    targetsContainer.innerHTML = studyModeState.examples.map((ex, i) => `
-      <label class="af-try-target-pill">
-        <input type="checkbox" value="${i}" onchange="updateTryCodingTargets(this)" ${targetIndices.includes(i) ? 'checked' : ''} />
-        <span>${escapeHTML(ex.name || 'Example ' + (i + 1))}</span>
-      </label>
-    `).join('');
+  const tabs = document.getElementById('study-examples-tabs');
+  if (tabs) {
+    tabs.innerHTML = p.cases.map((c, i) => `
+      <div onclick="switchStudyExampleTab(${i})" class="variant-tab ${i === active ? 'active' : ''}"
+           title="${escapeHTML((c.prompt || '').slice(0, 80) || 'No question yet')}">
+        Case ${i + 1}${(c.answer || '').trim() ? '' : ' •'}
+        <span onclick="event.stopPropagation(); removeStudyExample(${i})" class="variant-tab-close"><i data-lucide="x" style="width:12px;height:12px;"></i></span>
+      </div>`).join('');
   }
 
-  const activeIdx = studyModeState.activeExampleIndex;
-  const activeEx = studyModeState.examples[activeIdx];
-  const contentContainer = document.getElementById('study-examples-content');
+  const hint = document.getElementById('sql-lang-hint');
+  if (hint) hint.textContent = _sqlLangNote(p.dialect);
 
-  if (!activeEx) {
-    contentContainer.innerHTML = '<p class="empty-state">No examples added.</p>';
+  const host = document.getElementById('study-examples-content');
+  if (!host) return;
+
+  const c = p.cases[active];
+  if (!c) {
+    host.innerHTML = `
+      <div class="sqladm-empty">
+        <i data-lucide="list-checks"></i>
+        <p>No cases yet. Each one becomes a numbered answer box in the attempt.</p>
+      </div>`;
+    if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
     return;
   }
 
-  contentContainer.innerHTML = `
-    <div class="af-row-2">
-      <div class="af-field af-field-wide">
-        <label class="form-label">Example Name</label>
-        <input value="${escapeHTML(activeEx.name)}" oninput="updateStudyExampleField('name', this.value)" class="form-input" />
-      </div>
-      <div class="af-field">
-        <label class="form-label" title="Format: '3', '2-5', '1,4'">Highlight Lines</label>
-        <input value="${escapeHTML(activeEx.highlightLines || '')}" oninput="updateStudyExampleField('highlightLines', this.value)" class="form-input" placeholder="e.g. 2-4" />
-      </div>
+  host.innerHTML = `
+    <div style="display:flex; align-items:center; gap:0.5rem;">
+      <span class="sqladm-num">Test Case ${active + 1}</span>
+      <span style="flex:1;"></span>
+      <span class="af-move">
+        <button onclick="sqlMoveCase(${active}, -1)" ${active === 0 ? 'disabled' : ''} title="Move earlier"><i data-lucide="chevron-left"></i></button>
+        <button onclick="sqlMoveCase(${active}, 1)" ${active === p.cases.length - 1 ? 'disabled' : ''} title="Move later"><i data-lucide="chevron-right"></i></button>
+      </span>
+      <button onclick="sqlDuplicateCase(${active})" class="btn btn-ghost" style="padding:0.25rem;" title="Duplicate this case">
+        <i data-lucide="copy" style="width:15px;height:15px;color:var(--text-tertiary);"></i>
+      </button>
     </div>
 
-    <div style="display:flex; flex-direction:column; flex:1; min-height:220px;">
-      <label class="form-label" style="color:var(--color-success);">Target Correct Code <span class="af-label-hint">(hidden solution)</span></label>
-      <div class="editor-container" style="flex:1; border-color:var(--color-success);">
-        <pre id="study-example-target-pre" class="editor-pre"><code id="study-example-target-code"></code></pre>
-        <textarea id="study-example-target-textarea" spellcheck="false" class="editor-textarea" placeholder="function() { ... }"></textarea>
-      </div>
+    <div style="display:flex; flex-direction:column; gap:0.2rem;">
+      <label class="form-label" style="margin-bottom:0;">
+        Question <span class="af-req${(c.prompt || '').trim() ? ' is-filled' : ''}">*</span>
+        <span class="af-label-hint">shown above the answer box</span>
+      </label>
+      <textarea rows="2" class="form-textarea af-grow" style="min-height:44px;"
+                placeholder="e.g. Show all suspects never mentioned in transcripts"
+                oninput="sqlUpdateCase(${active}, 'prompt', this.value); afAutosize(this); sqlMarkReq(this); renderStudyExampleTabsOnly()">${escapeHTML(c.prompt || '')}</textarea>
     </div>
-  `;
 
-  const targetTA = document.getElementById('study-example-target-textarea');
-  const targetPre = document.getElementById('study-example-target-code');
-  targetTA.value = activeEx.code || '';
-  targetPre.innerHTML = syntaxHighlight(activeEx.code || '') + '<br/>';
-  if (typeof setupSpecificEditor === 'function') {
-    setupSpecificEditor('study-example-target-textarea', 'study-example-target-pre', 'study-example-target-code', false);
-  }
-  const finalTargetTA = document.getElementById('study-example-target-textarea') || targetTA;
-  finalTargetTA.addEventListener('input', (e) => updateStudyExampleField('code', e.target.value));
+    <div style="display:flex; flex-direction:column; gap:0.2rem;">
+      <label class="form-label" style="margin-bottom:0; color:var(--color-success);">
+        Reference answer <span class="af-req${(c.answer || '').trim() ? ' is-filled' : ''}">*</span>
+        <span class="af-label-hint">what Check Code compares against</span>
+      </label>
+      <textarea rows="4" class="form-textarea af-grow af-code-field" style="min-height:72px;"
+                placeholder="${escapeHTML(_sqlPlaceholder(p.dialect))}"
+                oninput="sqlUpdateCase(${active}, 'answer', this.value); afAutosize(this); sqlMarkReq(this); renderStudyExampleTabsOnly()">${escapeHTML(c.answer || '')}</textarea>
+    </div>
 
-  lucide.createIcons();
+    <p class="sqladm-hint">
+      Comparison ignores keyword case, spacing and a trailing semicolon. It does
+      not ignore what is inside quotes.
+    </p>`;
+
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
+  if (typeof afAutosizeAll === 'function') afAutosizeAll(host);
 }
 
+/** Repaint just the strip, so typing a question does not rebuild the field. */
+function renderStudyExampleTabsOnly() {
+  const p = _sqlState();
+  const tabs = document.getElementById('study-examples-tabs');
+  if (!p || !tabs) return;
+  const active = studyModeState.activeExampleIndex || 0;
+  tabs.innerHTML = p.cases.map((c, i) => `
+    <div onclick="switchStudyExampleTab(${i})" class="variant-tab ${i === active ? 'active' : ''}"
+         title="${escapeHTML((c.prompt || '').slice(0, 80) || 'No question yet')}">
+      Case ${i + 1}${(c.answer || '').trim() ? '' : ' •'}
+      <span onclick="event.stopPropagation(); removeStudyExample(${i})" class="variant-tab-close"><i data-lucide="x" style="width:12px;height:12px;"></i></span>
+    </div>`).join('');
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: tabs });
+}
+window.renderStudyExampleTabsOnly = renderStudyExampleTabsOnly;
+
+/** Honest about which languages actually get highlighting. */
+function _sqlLangNote(lang) {
+  if (/SQL|MySQL|Postgre|SQLite/i.test(lang || '')) return 'Highlighted as SQL.';
+  if (/^C$/i.test(lang || '')) return 'Highlighted as C.';
+  return 'No highlighting for ' + (lang || 'this language') + ' yet — answers show as plain text.';
+}
+
+function _sqlPlaceholder(lang) {
+  if (/^C$/i.test(lang || '')) return 'printf("%d", x);';
+  if (/JavaScript/i.test(lang || '')) return 'arr.filter(x => x > 3)';
+  if (/HTML/i.test(lang || '')) return '<ul><li>Item</li></ul>';
+  if (/CSS/i.test(lang || '')) return '.card { display: flex; }';
+  return 'SELECT ...';
+}
+
+/* These three keep their names because the section keeps its shape — the tab
+   strip, the add button and the close X are the same controls. What a tab
+   holds is what changed: a test case, not a version. */
+
 function switchStudyExampleTab(idx) {
+  if (!studyModeState) return;
   studyModeState.activeExampleIndex = idx;
   renderStudyExamplesForm();
 }
 
 function addStudyExample() {
-  studyModeState.examples.push({ id: generateId(), name: 'Example ' + (studyModeState.examples.length + 1), code: '', highlightLines: '' });
-  studyModeState.activeExampleIndex = studyModeState.examples.length - 1;
+  const p = _sqlState();
+  if (!p) return;
+  p.cases.push({
+    id: typeof generateId === 'function' ? generateId() : String(Date.now()),
+    prompt: '', answer: ''
+  });
+  studyModeState.activeExampleIndex = p.cases.length - 1;
   renderStudyExamplesForm();
-  window.adminIsDirty = true;
-  if (typeof setSaveStatus === 'function') setSaveStatus('study-save-status', 'unsaved');
+  _sqlDirty();
 }
 
 function removeStudyExample(idx) {
-  if (studyModeState.examples.length <= 1) {
-    showMessage('Cannot remove', 'A snippet must have at least one example.', true);
-    return;
-  }
-  studyModeState.examples.splice(idx, 1);
-  studyModeState.activeExampleIndex = Math.max(0, studyModeState.activeExampleIndex - 1);
-  if (studyModeState.tryCodingTargetIndices) {
-    studyModeState.tryCodingTargetIndices = studyModeState.tryCodingTargetIndices
-      .filter(i => i !== idx).map(i => i > idx ? i - 1 : i);
-  }
-  renderStudyExamplesForm();
-  window.adminIsDirty = true;
-  if (typeof setSaveStatus === 'function') setSaveStatus('study-save-status', 'unsaved');
+  const p = _sqlState();
+  if (!p || !p.cases[idx]) return;
+  const go = () => {
+    p.cases.splice(idx, 1);
+    studyModeState.activeExampleIndex = Math.max(0, Math.min(idx, p.cases.length - 1));
+    renderStudyExamplesForm();
+    _sqlDirty();
+  };
+  // The last case may go. A snippet is allowed to have no practice set, and
+  // refusing the delete left no way back to a plain snippet.
+  const filled = (p.cases[idx].prompt || '').trim() || (p.cases[idx].answer || '').trim();
+  if (filled && typeof showConfirm === 'function') {
+    showConfirm('Delete case ' + (idx + 1) + '?', 'Its question and reference answer go with it.', go);
+  } else { go(); }
 }
 
 function updateStudyExampleField(field, value) {
@@ -598,7 +655,12 @@ function _sqlDirty() {
 
 window.sqlSetDialect = function (v) {
   const p = _sqlState(); if (!p) return;
-  p.dialect = v; _sqlDirty();
+  p.dialect = v;
+  _sqlDirty();
+  // The language decides the note under the picker and the example in the
+  // answer placeholder, so the section has to be redrawn for the change to
+  // mean anything on screen.
+  renderStudyExamplesForm();
 };
 
 window.sqlSetInit = function (v) {
@@ -613,18 +675,9 @@ window.sqlAddCase = function () {
     prompt: '', answer: ''
   });
   _sqlDirty();
-  renderSqlCases();
+  renderStudyExamplesForm();
 };
 
-window.sqlDeleteCase = function (i) {
-  const p = _sqlState(); if (!p || !p.cases[i]) return;
-  const go = () => { p.cases.splice(i, 1); _sqlDirty(); renderSqlCases(); };
-  // Only worth confirming once something would actually be lost.
-  const filled = (p.cases[i].prompt || '').trim() || (p.cases[i].answer || '').trim();
-  if (filled && typeof showConfirm === 'function') {
-    showConfirm('Delete case ' + (i + 1) + '?', 'Its question and answer will be removed.', go);
-  } else { go(); }
-};
 
 window.sqlMoveCase = function (i, delta) {
   const p = _sqlState(); if (!p) return;
@@ -632,8 +685,11 @@ window.sqlMoveCase = function (i, delta) {
   if (to < 0 || to >= p.cases.length) return;
   const [row] = p.cases.splice(i, 1);
   p.cases.splice(to, 0, row);
+  // Follow the case. Without this the strip renumbers under you and the tab
+  // that stays open is whichever case moved into the old slot.
+  studyModeState.activeExampleIndex = to;
   _sqlDirty();
-  renderSqlCases();
+  renderStudyExamplesForm();
 };
 
 window.sqlDuplicateCase = function (i) {
@@ -641,8 +697,10 @@ window.sqlDuplicateCase = function (i) {
   const copy = JSON.parse(JSON.stringify(p.cases[i]));
   copy.id = typeof generateId === 'function' ? generateId() : String(Date.now());
   p.cases.splice(i + 1, 0, copy);
+  // Open the copy — it is the one you are about to edit.
+  studyModeState.activeExampleIndex = i + 1;
   _sqlDirty();
-  renderSqlCases();
+  renderStudyExamplesForm();
 };
 
 window.sqlUpdateCase = function (i, field, v) {
@@ -651,55 +709,6 @@ window.sqlUpdateCase = function (i, field, v) {
   _sqlDirty();
 };
 
-function renderSqlCases() {
-  const host = document.getElementById('sql-cases-list');
-  const p = _sqlState();
-  if (!host || !p) return;
-
-  if (!p.cases.length) {
-    host.innerHTML = `
-      <div class="sqladm-empty">
-        <i data-lucide="database"></i>
-        <p>No cases yet. Each one becomes a numbered answer box in the attempt.</p>
-      </div>`;
-    if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
-    return;
-  }
-
-  host.innerHTML = p.cases.map((c, i) => `
-    <div class="sample-item sqladm-case" data-case-idx="${i}" style="flex-direction:column; align-items:stretch; gap:0.5rem;">
-      <div style="display:flex; gap:0.5rem; align-items:center;">
-        <span class="af-move">
-          <button onclick="sqlMoveCase(${i}, -1)" ${i === 0 ? 'disabled' : ''} title="Move up"><i data-lucide="chevron-up"></i></button>
-          <button onclick="sqlMoveCase(${i}, 1)" ${i === p.cases.length - 1 ? 'disabled' : ''} title="Move down"><i data-lucide="chevron-down"></i></button>
-        </span>
-        <span class="sqladm-num">Test Case ${i + 1}</span>
-        <span style="flex:1;"></span>
-        <button onclick="sqlDuplicateCase(${i})" class="btn btn-ghost" style="padding:0.25rem;" title="Duplicate this case">
-          <i data-lucide="copy" style="width:15px;height:15px;color:var(--text-tertiary);"></i>
-        </button>
-        <button onclick="sqlDeleteCase(${i})" class="btn btn-ghost" style="padding:0.25rem;" title="Delete this case">
-          <i data-lucide="trash-2" style="width:15px;height:15px;color:var(--color-danger);"></i>
-        </button>
-      </div>
-      <div style="display:flex; flex-direction:column; gap:0.2rem;">
-        <label class="form-label" style="margin-bottom:0;">Question <span class="af-req${(c.prompt || '').trim() ? ' is-filled' : ''}">*</span></label>
-        <textarea rows="2" class="form-textarea af-grow" style="min-height:44px;"
-                  placeholder="What should the student write? e.g. Show all suspects never mentioned in transcripts"
-                  oninput="sqlUpdateCase(${i}, 'prompt', this.value); afAutosize(this); sqlMarkReq(this)">${escapeHTML(c.prompt || '')}</textarea>
-      </div>
-      <div style="display:flex; flex-direction:column; gap:0.2rem;">
-        <label class="form-label" style="margin-bottom:0;">Reference answer <span class="af-req${(c.answer || '').trim() ? ' is-filled' : ''}">*</span></label>
-        <textarea rows="3" class="form-textarea af-grow af-code-field" style="min-height:54px;"
-                  placeholder="SELECT ..."
-                  oninput="sqlUpdateCase(${i}, 'answer', this.value); afAutosize(this); sqlMarkReq(this)">${escapeHTML(c.answer || '')}</textarea>
-      </div>
-    </div>`).join('');
-
-  if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
-  if (typeof afAutosizeAll === 'function') afAutosizeAll(host);
-}
-window.renderSqlCases = renderSqlCases;
 
 /* The asterisks here are per-field rather than driven by afUpdateRequiredMarks,
    which keys off element ids — these boxes are a repeating list and have none. */
@@ -720,6 +729,6 @@ function loadSqlPracticeForm() {
     init.value = p.initSql || '';
     if (typeof afAutosize === 'function') afAutosize(init);
   }
-  renderSqlCases();
+  renderStudyExamplesForm();
 }
 window.loadSqlPracticeForm = loadSqlPracticeForm;

@@ -180,6 +180,23 @@ function sqaExtension(dialect) {
 }
 window.sqaExtension = sqaExtension;
 
+/**
+ * The painter for a set's language. Only SQL and C have one; the rest render
+ * as escaped plain text rather than being painted with the wrong grammar,
+ * which is worse than no colour — a JS answer run through the SQL highlighter
+ * gets `IN`, `AS` and `END` lit up as keywords they are not.
+ */
+function sqaPaintCode(text) {
+  const lang = (_sqa && _sqa.dialect) || '';
+  if (/SQL|MySQL|Postgre|SQLite|Oracle/i.test(lang)) {
+    return typeof sqlHighlight === 'function' ? sqlHighlight(text) : escapeHTML(text);
+  }
+  if (/^C(\s|$)|^C programming$/i.test(lang)) {
+    return typeof syntaxHighlight === 'function' ? syntaxHighlight(text) : escapeHTML(text);
+  }
+  return escapeHTML(text);
+}
+
 window.sqaSwitchTab = function (key) {
   if (!_sqa) return;
   _sqa.activeTab = key;
@@ -194,9 +211,7 @@ window.sqaSwitchTab = function (key) {
 function sqaRenderSchema() {
   const host = document.getElementById('sqa-init-code');
   if (!host || !_sqa) return;
-  host.innerHTML = typeof sqlHighlight === 'function'
-    ? sqlHighlight(_sqa.initSql)
-    : escapeHTML(_sqa.initSql);
+  host.innerHTML = sqaPaintCode(_sqa.initSql);
 }
 
 /* ── The answer boxes ─────────────────────────────────────── */
@@ -260,7 +275,7 @@ function sqaPaint(i) {
 
   const val = ta.value;
   // The trailing break keeps the last line visible when the value ends in \n.
-  hl.innerHTML = (typeof sqlHighlight === 'function' ? sqlHighlight(val) : escapeHTML(val)) + '<br/>';
+  hl.innerHTML = sqaPaintCode(val) + '<br/>';
 
   // The gutter is the editor's, not a column of digits: each row can be
   // marked, the way you flag a line to come back to. Marks are held per case

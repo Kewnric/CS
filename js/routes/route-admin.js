@@ -364,66 +364,40 @@ function getSnippetFormHTML() {
         </div>
       </div>
 
-      <!-- Section: Code -->
-      <div class="af-section">
-        <div class="af-section-header" style="color:var(--color-accent);">
-          <i data-lucide="terminal" class="af-section-icon" style="color:var(--color-accent);"></i>
-          <span>Global Starter Code</span>
-        </div>
-        <div class="af-section-body">
-          <div class="af-field" style="min-height:180px;display:flex;flex-direction:column;">
-            <label class="form-label" style="color:var(--color-accent);">Pre-filled code for Try Coding</label>
-            <div class="editor-container" style="flex:1;border-color:var(--color-accent);">
-              <pre id="study-global-starter-pre" class="editor-pre"><code id="study-global-starter-code"></code></pre>
-              <textarea id="study-global-starter-textarea" spellcheck="false" class="editor-textarea" placeholder="// Add starter boilerplate here..."></textarea>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      <!-- Section: Examples -->
+      <!-- Section: Test Cases
+           The coding library's tab strip means versions of one program. Here the
+           same strip means test cases: one tab is one question the student
+           answers, and one answer box on the attempt. A snippet has no single
+           solution to hold in one big editor, which is why the target-code and
+           starter-code boxes that shape made necessary are gone. -->
       <div class="af-section">
         <div class="af-section-header" style="color:var(--color-success);">
-          <i data-lucide="play-circle" class="af-section-icon" style="color:var(--color-success);"></i>
-          <span>Code Examples</span>
+          <i data-lucide="list-checks" class="af-section-icon" style="color:var(--color-success);"></i>
+          <span>Test Cases</span>
           <button onclick="addStudyExample()" class="btn btn-ghost btn-sm af-section-action" style="color:var(--color-success);">
-            <i data-lucide="plus-circle" style="width:13px;height:13px;"></i> Add Example
-          </button>
-        </div>
-        <div class="af-section-body" style="padding-top:0.5rem;">
-          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;font-size:0.8125rem;flex-wrap:wrap;">
-            <span style="color:var(--text-tertiary);font-weight:700;text-transform:uppercase;letter-spacing:0.04em;font-size:0.6875rem;">Try Coding Targets:</span>
-            <div id="try-coding-targets-container" style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;"></div>
-          </div>
-          <div id="study-examples-tabs" class="variant-tabs"></div>
-          <div id="study-examples-content" style="flex:1;display:flex;flex-direction:column;gap:1rem;margin-top:0.75rem;"></div>
-        </div>
-      </div>
-
-      <!-- Section: SQL practice — the set behind Start attempt -->
-      <div class="af-section">
-        <div class="af-section-header" style="color:var(--color-primary);">
-          <i data-lucide="database" class="af-section-icon" style="color:var(--color-primary);"></i>
-          <span>SQL Practice</span>
-          <button onclick="sqlAddCase()" class="btn btn-ghost btn-sm af-section-action" style="color:var(--color-primary);">
             <i data-lucide="plus-circle" style="width:13px;height:13px;"></i> Add Case
           </button>
         </div>
         <div class="af-section-body" style="padding-top:0.5rem;">
           <div class="sqladm-top">
             <div>
-              <label class="form-label">Dialect</label>
+              <label class="form-label">Language</label>
               <select id="sql-dialect" class="form-select" onchange="sqlSetDialect(this.value)">
                 <option>MySQL</option>
                 <option>PostgreSQL</option>
                 <option>SQLite</option>
-                <option>SQL Server</option>
-                <option>Oracle</option>
+                <option>C</option>
+                <option>JavaScript</option>
+                <option>HTML</option>
+                <option>CSS</option>
               </select>
+              <p class="sqladm-hint" id="sql-lang-hint"></p>
             </div>
             <div style="flex:1;min-width:0;">
               <label class="form-label">
-                Schema — shown to the student in a locked <code>init.sql</code> tab
+                Setup shown to the student in a locked <code>init</code> tab
+                <span class="af-label-hint">(optional)</span>
               </label>
               <textarea id="sql-init" rows="4" class="form-textarea af-grow af-code-field"
                         placeholder="CREATE TABLE Suspects (...);"
@@ -431,7 +405,8 @@ function getSnippetFormHTML() {
             </div>
           </div>
           <div class="divider"></div>
-          <div id="sql-cases-list"></div>
+          <div id="study-examples-tabs" class="variant-tabs"></div>
+          <div id="study-examples-content" style="flex:1;display:flex;flex-direction:column;gap:0.875rem;"></div>
         </div>
       </div>
 

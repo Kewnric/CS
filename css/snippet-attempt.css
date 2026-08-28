@@ -350,3 +350,14 @@
 
 .sqa-box.is-expanded .sqa-ta,
 .sqa-box.is-expanded .sqa-pre { font-size: 0.875rem; }
+
+/* The language note and the comparison note under the case fields. */
+.sqladm-hint {
+  margin: 0.3rem 0 0;
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+}
+
+/* Left/right, because the cases run along a tab strip rather than down a list. */
+.af-move button svg { width: 11px; height: 11px; }
