@@ -1800,12 +1800,14 @@ mark.diff-hit.current {
   flex: 0 0 auto;
   width: 10px;
   height: var(--sao-h);
-  /* Flat, same slab colour as the plate (see .sao-plate) — no top-to-bottom
-     ramp, so the bracket and the plate read as one continuous frame. It used to
-     carry a cyan wash meant to read as the crystal casting light onto it, but
-     the tint sat on the frame as a blue highlight rather than as light, so the
-     frame is now the one flat colour it is elsewhere. */
+  /* Same slab colour as the plate, so the bracket and the plate read as one
+     continuous frame. Depth comes from the EDGES, not from a ramp across the
+     face — a full-height gradient here is what used to wash the boss name out.
+     A lit top lip and a dark under-edge is how a real bevel reads anyway. */
   background-color: var(--sao-frame);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55);
   clip-path: polygon(
     0 0,
     100% 0,
@@ -1828,12 +1830,24 @@ mark.diff-hit.current {
   align-items: center;
   gap: 5px;
   padding: 0 calc(var(--sao-chamfer) + 3px) 0 6px;
-  /* Flat slab, no vertical ramp. The old brushed-metal gradient ran from near
-     white at the top lip to near black at the bottom, which made the frame look
-     lit from above and washed out the boss name sitting on it. One constant
-     tone reads as a solid piece of the UI at every height. */
+  /* One constant tone across the face — the old brushed-metal ramp ran near
+     white at the top lip to near black at the bottom and washed out the name
+     sitting on it. The depth is all at the edges instead: a lit top lip, a
+     dark under-edge, and a soft darkening in the bottom corners so the slab
+     has thickness without anything crossing the middle where the text is. */
   background-color: var(--sao-frame);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.6),
+    inset 0 -7px 9px -7px rgba(0, 0, 0, 0.45);
   clip-path: polygon(0 0, 100% 0, calc(100% - var(--sao-chamfer)) 100%, 0 100%);
+}
+
+/* The whole assembly sits ON the topbar rather than being painted into it.
+   clip-path crops a box-shadow, so the drop shadow is a filter on the wrapper
+   — the only way to get one that follows the chamfer. */
+.sao-boss {
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
 }
 
 .sao-plate-lv {
@@ -1895,7 +1909,10 @@ mark.diff-hit.current {
 .sao-well {
   position: absolute;
   inset: 1px;
-  background: #0d0d0d;
+  /* Darker at the top than the bottom: light falls into a channel from above,
+     so the near wall is the shaded one. Without this the bar looked painted on
+     the plate rather than set into it. */
+  background: linear-gradient(180deg, #050505 0%, #101010 55%, #171717 100%);
   clip-path: polygon(
     0 0,
     100% 0,
@@ -1905,6 +1922,23 @@ mark.diff-hit.current {
     0 100%
   );
   overflow: hidden;
+}
+
+/* The shadow the channel's top lip casts down onto whatever is in it. Drawn
+   over the fill rather than under it, so it darkens the bar too — that is what
+   makes the bar read as sitting INSIDE the groove. */
+.sao-well::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(180deg,
+    rgba(0, 0, 0, 0.34) 0%,
+    rgba(0, 0, 0, 0.10) 14%,
+    rgba(0, 0, 0, 0) 30%,
+    rgba(0, 0, 0, 0) 74%,
+    rgba(0, 0, 0, 0.22) 100%);
 }
 
 /* The HP that was just lost: left standing in red where the bar used to reach,
@@ -1933,11 +1967,21 @@ mark.diff-hit.current {
   left: 0;
   bottom: 0;
   width: 100%;
+  /* Body only. The surface highlight belongs to .sao-gloss, which already
+     covers the whole track — adding a second one here stacked two speculars on
+     the same pixels and hazed the top of the bar. The hard stop at 58/59% is
+     the seam between the two tones and stays: it is what reads as SAO rather
+     than as a generic progress bar. */
   background: linear-gradient(180deg,
     hsl(var(--sao-hue) 76% 57%) 0%,
     hsl(var(--sao-hue) 78% 52%) 58%,
     hsl(var(--sao-hue) 82% 42%) 59%,
     hsl(var(--sao-hue) 80% 39%) 100%);
+  /* Emissive: a health bar is lit, so it spills a little of its own hue into
+     the channel around it. Tied to --sao-hue, so it turns red as HP drops. */
+  box-shadow:
+    inset 0 1px 0 hsla(var(--sao-hue), 90%, 78%, 0.55),
+    0 0 7px hsla(var(--sao-hue), 85%, 50%, 0.4);
   /* The leading edge is cut on the diagonal, like the SAO party bars — a flat
      vertical edge read as a progress bar rather than an HP gauge. */
   clip-path: polygon(0 0, 100% 0, calc(100% - 7px) 100%, 0 100%);
@@ -1957,9 +2001,12 @@ mark.diff-hit.current {
      below would otherwise notch the bar on an arbitrary scale for one frame. */
   display: none;
   background-repeat: repeat-x;
+  /* Each notch is a dark groove with a lit edge beside it rather than a single
+     white line — two pixels is all it takes to read as cut into the bar
+     instead of drawn over it. */
   background-image:
-    linear-gradient(90deg, transparent calc(100% - 1px), rgba(255, 255, 255, 0.5) calc(100% - 1px)),
-    linear-gradient(90deg, transparent calc(100% - 1px), rgba(255, 255, 255, 0.19) calc(100% - 1px));
+    linear-gradient(90deg, transparent calc(100% - 2px), rgba(0, 0, 0, 0.45) calc(100% - 2px), rgba(255, 255, 255, 0.55) calc(100% - 1px)),
+    linear-gradient(90deg, transparent calc(100% - 2px), rgba(0, 0, 0, 0.3) calc(100% - 2px), rgba(255, 255, 255, 0.22) calc(100% - 1px));
   background-size: var(--sao-seg-major, 25%) 100%, var(--sao-seg, 5%) 100%;
 }
 
@@ -1992,15 +2039,19 @@ mark.diff-hit.current {
 }
 
 /* Just a soft sheen along the top edge — the reference bar is nearly flat. */
+/* The bar's surface highlight — one layer for the whole track, so the lit and
+   unlit halves are lit the same way. Carries a little more than it used to now
+   that it is not competing with a second gloss on the fill. */
 .sao-gloss {
   position: absolute;
   inset: 0;
   pointer-events: none;
   background: linear-gradient(180deg,
-    rgba(255, 255, 255, 0.18) 0%,
-    rgba(255, 255, 255, 0.04) 40%,
-    rgba(0, 0, 0, 0.05) 60%,
-    rgba(0, 0, 0, 0.16) 100%);
+    rgba(255, 255, 255, 0.26) 0%,
+    rgba(255, 255, 255, 0.10) 32%,
+    rgba(255, 255, 255, 0) 52%,
+    rgba(0, 0, 0, 0.08) 62%,
+    rgba(0, 0, 0, 0.22) 100%);
 }
 
 /* ---------- HP / percent readout ---------- */
@@ -3135,7 +3186,9 @@ body.is-resizing .practice-panel { transition: none; }
   background: #ffd76e;
   box-shadow: 0 0 6px rgba(255, 190, 60, 0.85);
   pointer-events: none;
-  z-index: 3;
+  /* Above the channel lighting. At the same z-index as .sao-well::after this
+     lost to it on DOM order and the marker came out dimmed. */
+  z-index: 4;
 }
 
 .sao-lv { cursor: pointer; }
