@@ -305,3 +305,20 @@ window.snAnalyticsOpen = function (id) {
   spaNavigate('snippets');
   setTimeout(() => { if (typeof selectSnippet === 'function') selectSnippet(id); }, 320);
 };
+
+
+/* ── Staying current ──────────────────────────────────────────
+   Everything that edits snippet history calls renderSnippetAnalytics — the
+   old tree renderer, which quietly does nothing on this page because its DOM
+   is not here. So deleting an attempt left the dashboard showing counts that
+   were no longer true. Wrap it: the original still runs for the old view, and
+   this one repaints when the dashboard is what is actually on screen. */
+(function () {
+  const prev = window.renderSnippetAnalytics;
+  window.renderSnippetAnalytics = function () {
+    if (typeof prev === 'function') {
+      try { prev.apply(this, arguments); } catch (e) { /* old view not mounted */ }
+    }
+    if (document.getElementById('an-sn-body')) renderSnippetAnalyticsDashboard();
+  };
+})();

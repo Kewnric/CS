@@ -141,7 +141,13 @@ function snippetAttemptInit() {
       onRestore: (snap) => {
         if (!_sqa || !snap) return;
         (snap.answers || []).forEach((v, i) => { if (_sqa.cases[i]) _sqa.cases[i].user = v; });
+        // The panel's result belongs to the answers it was run against, not to
+        // the ones just put back. Clearing it returns the panel to "not checked
+        // yet" rather than letting it report a score for other work.
+        _sqa.check = null;
         sqaRenderAnswers();
+        if (typeof renderPracticePanel === 'function') renderPracticePanel();
+        sqaUpdateBoss(_sqaBossCase);
       },
       onFinish: () => sqaFinish()
     });
@@ -388,7 +394,7 @@ window.sqaCheckAll = function () {
   const total = results.length;
   _sqa.check = {
     ts: Date.now(),
-    codeKey: _sqa.cases.map(c => c.user).join('\n'),
+    codeKey: sqaCurrentKey(),
     reqs: [],
     tests: results,
     passed: passed,
@@ -417,14 +423,34 @@ window.sqaCheckAll = function () {
 
 /* ── Finishing ────────────────────────────────────────────── */
 
+/** What is in the boxes right now, as one string. */
+function sqaCurrentKey() {
+    // JSON rather than a delimiter: no separator is safe when the values are
+  // free text, and a false match here would silently accept a stale score.
+  return _sqa ? JSON.stringify(_sqa.cases.map(c => c.user)) : '';
+}
+
+/** Does the stored check still describe what is on screen? */
+function sqaCheckIsFresh() {
+  return !!(_sqa && _sqa.check && _sqa.check.codeKey === sqaCurrentKey());
+}
+window.sqaCheckIsFresh = sqaCheckIsFresh;
+
 window.sqaFinish = function () {
   if (!_sqa || _sqa.submitted) return;
+  const fresh = sqaCheckIsFresh();
   const chk = _sqa.check;
-  const detail = chk
-    ? `Your last check scored ${chk.passed}/${chk.total}.`
-    : 'You have not checked these answers yet, so they will be compared when you finish.';
+  // The check carries the answers it was run against. Without comparing them
+  // you could check, score well, rewrite every answer, finish, and have the
+  // old score recorded — which is what happened.
+  const detail = fresh
+    ? `Your last check scored ${chk.passed}/${chk.total} and still matches what you have written.`
+    : (chk
+        ? 'You have changed your answers since the last check, so they will be compared again as you finish.'
+        : 'You have not checked these answers yet, so they will be compared when you finish.');
   const go = () => {
-    if (!_sqa.check) sqaCheckAll();
+    // Always grade what is actually written, never a stale result.
+    if (!sqaCheckIsFresh()) sqaCheckAll();
     _sqa.submitted = true;
     sqaRecord();
     sqaClearDraft();
@@ -525,9 +551,18 @@ function sqaSaveDraftSoon() {
 function sqaSaveDraft() {
   if (!_sqa || _sqa.submitted) return;
   try {
+    // Keyed by case id, not position. The attempt only shows cases that have a
+    // reference answer, so the list shifts the moment the author fills one in —
+    // and a positional draft then restored an answer under a different
+    // question, which is worse than losing it.
+    const answers = {};
+    _sqa.cases.forEach(c => { if ((c.user || '').trim()) answers[c.id] = c.user; });
+    const marks = {};
+    _sqa.cases.forEach(c => { if (c.marks && Object.keys(c.marks).length) marks[c.id] = c.marks; });
     localStorage.setItem(SQA_DRAFT_KEY, JSON.stringify({
       snippetId: _sqa.snippetId,
-      answers: _sqa.cases.map(c => c.user),
+      answers: answers,
+      marks: marks,
       startTime: _sqa.startTime,
       savedAt: Date.now()
     }));
@@ -538,7 +573,19 @@ function sqaRestoreDraft() {
   try {
     const d = JSON.parse(localStorage.getItem(SQA_DRAFT_KEY) || 'null');
     if (!d || d.snippetId !== _sqa.snippetId) return;
-    (d.answers || []).forEach((v, i) => { if (_sqa.cases[i]) _sqa.cases[i].user = v || ''; });
+
+    const a = d.answers;
+    if (Array.isArray(a)) {
+      // A draft written before this was keyed by id. Its positions cannot be
+      // trusted against the current case list, and guessing would put an
+      // answer under the wrong question — so it is dropped rather than
+      // misapplied. Only ever affects a draft left open across this change.
+      return;
+    }
+    _sqa.cases.forEach(c => {
+      if (a && Object.prototype.hasOwnProperty.call(a, c.id)) c.user = a[c.id] || '';
+      if (d.marks && d.marks[c.id]) c.marks = d.marks[c.id];
+    });
     if (d.startTime) _sqa.startTime = d.startTime;
   } catch (e) { /* nothing saved */ }
 }
