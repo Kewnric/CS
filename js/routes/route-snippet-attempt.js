@@ -24,7 +24,7 @@ function snippetAttemptTemplate() {
           ${bossBarTemplate()}
         </div>
         <div class="practice-topbar-right">
-          <button class="btn btn-ghost practice-icon-btn" onclick="psetToggleBoss()" title="Toggle Boss Health Bar" id="boss-bar-toggle-btn" aria-label="Toggle Boss Health Bar">
+          <button class="btn btn-ghost practice-icon-btn" onclick="sqaToggleBoss()" title="Toggle Boss Health Bar" id="boss-bar-toggle-btn" aria-label="Toggle Boss Health Bar">
             <i data-lucide="swords" style="width:16px;height:16px;" aria-hidden="true"></i>
           </button>
           <button class="btn btn-ghost practice-icon-btn" onclick="toggleFullscreen()" title="Full screen" id="fullscreen-toggle-btn" aria-label="Full screen" aria-pressed="false">

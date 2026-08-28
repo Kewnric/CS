@@ -688,21 +688,23 @@ function renderSnippetFolderOverview(container) {
                   ${escapeHTML(descText || 'No description.')}
                 </p>
                 ${best >= 0 ? `<div class="card-score-bar"><div class="card-score-fill ${scoreClass}" style="width:${best}%;"></div></div>` : ''}
-                <div style="margin-top:auto; display:flex; gap:0.5rem; padding-top:0.5rem;">
-                  <button onclick="event.stopPropagation(); selectSnippet('${s.id}')" class="btn btn-practice" style="flex:1;">
+                <div style="margin-top:auto; display:flex; flex-wrap:wrap; gap:0.5rem; padding-top:0.5rem;">
+                  <button onclick="event.stopPropagation(); selectSnippet('${s.id}')" class="btn btn-practice" style="flex:1 1 auto; min-width:0;">
                     <i data-lucide="book-open" style="width:16px;height:16px;"></i> Study
                   </button>
-                  ${hasSql ? `
-                  <button onclick="event.stopPropagation(); sqaStart('${s.id}')" class="btn btn-primary" style="flex:1;"
-                          title="Answer this snippet's ${sqlCount} SQL question${sqlCount !== 1 ? 's' : ''}">
-                    <i data-lucide="play" style="width:16px;height:16px;"></i> Start attempt
-                  </button>` : ''}
+
                   <button class="btn btn-ghost" title="Copy the code" onclick="event.stopPropagation(); copySnippetCode('${s.id}', this)" style="padding:0.5rem;">
                     <i data-lucide="copy" style="width:16px;height:16px;"></i>
                   </button>
                   <button class="btn btn-ghost" title="Share Link" onclick="event.stopPropagation(); shareSnippet('${s.id}')" style="padding:0.5rem;">
                     <i data-lucide="share-2" style="width:16px;height:16px;"></i>
                   </button>
+                  ${hasSql ? `
+                  <button onclick="event.stopPropagation(); sqaStart('${s.id}')" class="btn btn-primary"
+                          style="flex:1 1 auto; min-width:0;"
+                          title="Answer this snippet's ${sqlCount} SQL question${sqlCount !== 1 ? 's' : ''}">
+                    <i data-lucide="play" style="width:16px;height:16px;"></i> Start attempt
+                  </button>` : ''}
                 </div>
               </div>
             `;

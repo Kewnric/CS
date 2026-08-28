@@ -90,6 +90,17 @@ function snippetAttemptInit() {
   sqaRenderAnswers();
   sqaStartTimer();
 
+  // The bar is hidden until a screen turns it on — practice-set does this on
+  // its own init. Without it the wrapper stays display:none and every attempt
+  // to paint bails out, which is why the bar sat at a flat 100%.
+  const bossOn = sessionStorage.getItem('bossBarEnabled') !== 'false';
+  if (typeof bossSetVisible === 'function') bossSetVisible(bossOn);
+  const bossBtn = document.getElementById('boss-bar-toggle-btn');
+  if (bossBtn) bossBtn.style.color = bossOn ? 'var(--color-warning)' : 'var(--text-tertiary)';
+
+  // The bar starts on the first question rather than empty.
+  sqaFocusCase(0);
+
   // The panel is the coding attempt's, unchanged — it just gets its data from
   // here. runChecks is the one hook: there is nothing to compile.
   if (typeof setPracticePanelCtx === 'function') {
@@ -126,6 +137,9 @@ function snippetAttemptInit() {
 }
 
 function snippetAttemptDestroy() {
+  // An expanded box lives in an overlay outside this route's DOM. Leaving it
+  // there would destroy the textarea with the overlay and lose the answer.
+  if (typeof sqaCollapse === 'function') sqaCollapse();
   sqaStopTimer();
   sqaSaveDraft();
   _sqa = null;
@@ -133,18 +147,38 @@ function snippetAttemptDestroy() {
 
 /* ── The file tabs ────────────────────────────────────────── */
 
+/* The coding attempt's own .file-tab markup, not a lookalike. The first pass
+   invented .sqa-tab, which drifted from it on every metric — indigo instead of
+   the accent cyan, no divider between tabs, no active wash, a different height.
+   Reusing the class means it cannot drift again. Extensions come from the
+   dialect, so a JavaScript set reads main.js rather than main.sql. */
 function sqaRenderTabs() {
   const host = document.getElementById('sqa-file-tabs');
   if (!host || !_sqa) return;
-  const tab = (key, label, locked) => `
-    <button class="sqa-tab${_sqa.activeTab === key ? ' active' : ''}" onclick="sqaSwitchTab('${key}')">
-      ${escapeHTML(label)}${locked ? '<i data-lucide="lock" class="sqa-tab-lock"></i>' : ''}
-    </button>`;
+  const ext = sqaExtension(_sqa.dialect);
+  const tab = (key, name, locked) => `
+    <div class="file-tab${_sqa.activeTab === key ? ' active' : ''}" onclick="sqaSwitchTab('${key}')"
+         title="${locked ? 'Provided for you — read only' : 'Your answers'}">
+      <span class="file-tab-name">${escapeHTML(name + ext)}</span>
+      ${locked ? '<i data-lucide="lock" class="sqa-tab-lock" aria-label="Read only"></i>' : ''}
+    </div>`;
   host.innerHTML =
-    (_sqa.initSql.trim() ? tab('init', 'init.sql', true) : '') +
-    tab('main', 'main.sql', false);
+    (_sqa.initSql.trim() ? tab('init', 'init', true) : '') +
+    tab('main', 'main', false);
   if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
 }
+
+/* One place deciding what a set's files are called. */
+const SQA_EXTENSIONS = {
+  'MySQL': '.sql', 'PostgreSQL': '.sql', 'SQLite': '.sql',
+  'SQL Server': '.sql', 'Oracle': '.sql',
+  'JavaScript': '.js', 'HTML': '.html', 'CSS': '.css',
+  'C': '.c', 'C programming': '.c', 'Python': '.py'
+};
+function sqaExtension(dialect) {
+  return SQA_EXTENSIONS[dialect] || '.txt';
+}
+window.sqaExtension = sqaExtension;
 
 window.sqaSwitchTab = function (key) {
   if (!_sqa) return;
@@ -173,16 +207,22 @@ function sqaRenderAnswers() {
 
   host.innerHTML = _sqa.cases.map((c, i) => `
     <section class="sqa-case" data-case="${i}">
-      <h3 class="sqa-case-head">Answer for Test Case ${i + 1}:</h3>
+      <div class="sqa-case-top">
+        <h3 class="sqa-case-head">Answer for Test Case ${i + 1}:</h3>
+        <button type="button" class="sqa-expand" onclick="sqaExpand(${i})"
+                title="Open this answer full screen" aria-label="Expand answer ${i + 1}">
+          <i data-lucide="maximize-2"></i>
+        </button>
+      </div>
       <p class="sqa-case-prompt">${escapeHTML(c.prompt)}</p>
       <div class="sqa-box" id="sqa-box-${i}">
-        <div class="sqa-lines" id="sqa-lines-${i}"><span>1</span></div>
+        <div class="sqa-lines" id="sqa-lines-${i}"></div>
         <div class="sqa-code-wrap">
           <pre class="sqa-pre"><code id="sqa-hl-${i}"></code></pre>
           <textarea id="sqa-ta-${i}" class="sqa-ta" spellcheck="false" rows="1"
                     aria-label="Answer for test case ${i + 1}"
                     oninput="sqaOnInput(${i})" onscroll="sqaSyncScroll(${i})"
-                    onkeydown="sqaKeydown(event, ${i})">${escapeHTML(c.user)}</textarea>
+                    onfocus="sqaFocusCase(${i})" onkeydown="sqaKeydown(event, ${i})">${escapeHTML(c.user)}</textarea>
         </div>
       </div>
     </section>`).join('');
@@ -196,6 +236,7 @@ window.sqaOnInput = function (i) {
   if (!ta) return;
   _sqa.cases[i].user = ta.value;
   sqaPaint(i);
+  sqaUpdateBoss(i);
   sqaSaveDraftSoon();
 };
 
@@ -221,12 +262,19 @@ function sqaPaint(i) {
   // The trailing break keeps the last line visible when the value ends in \n.
   hl.innerHTML = (typeof sqlHighlight === 'function' ? sqlHighlight(val) : escapeHTML(val)) + '<br/>';
 
+  // The gutter is the editor's, not a column of digits: each row can be
+  // marked, the way you flag a line to come back to. Marks are held per case
+  // so a repaint does not lose them.
   const lines = val.split('\n').length;
-  if (ln.children.length !== lines) {
-    let out = '';
-    for (let n = 1; n <= lines; n++) out += '<span>' + n + '</span>';
-    ln.innerHTML = out;
+  const marks = _sqa.cases[i].marks || (_sqa.cases[i].marks = {});
+  let out = '';
+  for (let n = 1; n <= lines; n++) {
+    out += '<span class="sqa-line-num' + (marks[n] ? ' marked' : '') + '" data-line="' + n + '"'
+        +  ' onclick="sqaToggleMark(' + i + ',' + n + ')" title="Mark this line">'
+        +  '<span class="sqa-mark-col">' + (marks[n] ? '<span class="sqa-line-mark"></span>' : '') + '</span>'
+        +  '<span class="sqa-ln-no">' + n + '</span></span>';
   }
+  ln.innerHTML = out;
 
   // Grow with the content. height:auto first, or scrollHeight can only ever
   // report the height it already has.
@@ -458,3 +506,149 @@ function sqaRestoreDraft() {
 function sqaClearDraft() {
   try { localStorage.removeItem(SQA_DRAFT_KEY); } catch (e) { /* ignore */ }
 }
+
+/* ── Marking a line ───────────────────────────────────────────
+   Same gesture as the code editor's gutter: click a number to flag the line.
+   On an answer that has grown to a dozen rows it is the only way to keep your
+   place while reading the schema in the other tab. */
+window.sqaToggleMark = function (i, n) {
+  if (!_sqa || !_sqa.cases[i]) return;
+  const marks = _sqa.cases[i].marks || (_sqa.cases[i].marks = {});
+  if (marks[n]) delete marks[n]; else marks[n] = true;
+  sqaPaint(i);
+};
+
+/* ── One answer, full screen ──────────────────────────────────
+   The box is MOVED into the overlay and moved back on close rather than
+   copied — one textarea, one value, nothing to keep in sync. The same approach
+   the admin form's expanded editor uses. */
+
+let _sqaExpandedFrom = null;
+let _sqaExpandedEl = null;
+let _sqaExpandedIdx = null;
+
+window.sqaExpand = function (i) {
+  if (_sqaExpandedEl || !_sqa || !_sqa.cases[i]) return;
+  const box = document.getElementById('sqa-box-' + i);
+  if (!box) return;
+
+  let ov = document.getElementById('sqa-expand-modal');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'sqa-expand-modal';
+    ov.className = 'modal-overlay';
+    document.body.appendChild(ov);
+  }
+  ov.classList.remove('hidden');
+  ov.style.opacity = '';
+  ov.innerHTML = `
+    <div class="modal-content sqa-expand-modal" onclick="event.stopPropagation()">
+      <div class="sqa-expand-head">
+        <div class="sqa-expand-title">
+          <h2>Answer for Test Case ${i + 1}</h2>
+          <p>${escapeHTML(_sqa.cases[i].prompt)}</p>
+        </div>
+        <button class="btn btn-ghost" onclick="sqaCollapse()" aria-label="Close full screen">
+          <i data-lucide="minimize-2"></i> Exit full screen
+        </button>
+      </div>
+      <div class="sqa-expand-slot" id="sqa-expand-slot"></div>
+    </div>`;
+
+  const marker = document.createElement('div');
+  marker.id = 'sqa-expand-placeholder';
+  box.parentNode.insertBefore(marker, box);
+  _sqaExpandedFrom = marker;
+  _sqaExpandedEl = box;
+  _sqaExpandedIdx = i;
+
+  box.classList.add('is-expanded');
+  document.getElementById('sqa-expand-slot').appendChild(box);
+  ov.onclick = () => sqaCollapse();
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: ov });
+
+  const ta = document.getElementById('sqa-ta-' + i);
+  if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+  sqaPaint(i);
+};
+
+window.sqaCollapse = function () {
+  const ov = document.getElementById('sqa-expand-modal');
+  const i = _sqaExpandedIdx;
+  if (_sqaExpandedEl && _sqaExpandedFrom && _sqaExpandedFrom.parentNode) {
+    _sqaExpandedEl.classList.remove('is-expanded');
+    _sqaExpandedFrom.parentNode.insertBefore(_sqaExpandedEl, _sqaExpandedFrom);
+    _sqaExpandedFrom.remove();
+  }
+  _sqaExpandedEl = null;
+  _sqaExpandedFrom = null;
+  _sqaExpandedIdx = null;
+  if (ov) { ov.classList.add('hidden'); ov.innerHTML = ''; ov.onclick = null; }
+  if (i != null) sqaPaint(i);
+};
+
+/* Escape closes it before anything else on this screen acts on the key, and
+   the box must go home before the route is torn down — otherwise it would be
+   destroyed inside the overlay and the answer lost with it. */
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && _sqaExpandedEl) {
+    e.stopPropagation();
+    sqaCollapse();
+  }
+}, true);
+
+
+/* ── The boss bar, per question ───────────────────────────────
+   One question is one fight. The bar belongs to whichever answer box has the
+   cursor and measures that answer against its own reference — so moving to
+   case 3 shows case 3's health, not an average across the set. Averaging was
+   the wrong reading anyway: a set is not one enemy, it is several.
+
+   Same painter, normaliser and green-to-red ramp the coding attempt uses. */
+
+let _sqaBossCase = 0;
+
+window.sqaFocusCase = function (i) {
+  if (!_sqa || !_sqa.cases[i]) return;
+  _sqaBossCase = i;
+  if (typeof bossSetName === 'function') {
+    bossSetName('Test Case ' + (i + 1));
+  }
+  sqaUpdateBoss(i);
+};
+
+/** Repaint only when the change belongs to the case the bar is showing. */
+function sqaUpdateBoss(i) {
+  if (!_sqa || (i != null && i !== _sqaBossCase)) return;
+  const wrap = document.getElementById('boss-health-wrapper');
+  const bar = document.getElementById('boss-health-bar');
+  if (!wrap || !bar || wrap.style.display === 'none') return;
+
+  const c = _sqa.cases[_sqaBossCase];
+  if (!c) return;
+  const target = (c.answer || '').trim();
+  if (!target) {
+    if (typeof _bossBarNoTarget === 'function') _bossBarNoTarget();
+    return;
+  }
+
+  const norm = (t) => (typeof _bossNormalize === 'function')
+    ? _bossNormalize(t) : String(t || '').replace(/\s+/g, '');
+  const cur = norm(c.user), tgt = norm(target);
+  let sim = 0;
+  if (typeof calculateSimilarity === 'function') sim = calculateSimilarity(cur, tgt);
+  else sim = cur === tgt ? 1 : 0;
+
+  if (typeof _bossBarPaint === 'function') {
+    _bossBarPaint(Math.max(0, 100 - sim * 100), { maxHp: tgt.length });
+  }
+}
+window.sqaUpdateBoss = sqaUpdateBoss;
+
+
+/** The topbar toggle. It pointed at practice-set's handler, which reads _pset —
+    null on this route, so the button toggled the bar and then left it blank. */
+window.sqaToggleBoss = function () {
+  if (typeof toggleBossHealthBar === 'function') toggleBossHealthBar();
+  sqaUpdateBoss(_sqaBossCase);
+};
