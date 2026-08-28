@@ -83,7 +83,12 @@ function agFmtTime(time) {
  *
  * Granularity follows the entry: something set for a date only is answered in
  * days, because "in 14h" is a false precision for a deadline the user wrote
- * as "Friday". Only once a clock time is given does the answer count hours.
+ * as "Friday".
+ *
+ * Today is the exception, and the reason is that "Today" is not an answer.
+ * The one day you need the hours is the day the thing is actually due, so an
+ * entry landing today drops to the clock and counts down to the end of it —
+ * the same countdown a timed entry gets, from the same code below.
  */
 function agTimeLeft(entry) {
   const now = Date.now();
@@ -93,11 +98,12 @@ function agTimeLeft(entry) {
 
   if (!entry.time) {
     const days = agDaysBetween(agToday(), entry.date);
-    if (days === 0) return past ? 'Today' : 'Today';
     if (days === 1) return 'Tomorrow';
-    if (days === -1) return '1 day overdue';
     if (days > 1) return 'in ' + days + ' days';
-    return Math.abs(days) + ' days overdue';
+    if (days === -1) return '1 day overdue';
+    if (days < -1) return Math.abs(days) + ' days overdue';
+    // days === 0 falls through: ts is the end of today, so the clock below
+    // reads as the hours and minutes left in the day.
   }
 
   const mins = Math.floor(abs / 60000);
@@ -306,6 +312,7 @@ function agMountFlag() {
          aria-label="Agenda" hidden></div>`;
   document.body.appendChild(root);
   agPaintFlag();
+  agStartTicker();
   if (typeof lucide !== 'undefined') lucide.createIcons({ root });
 
   // Clicking away closes it. Bound once, on the document, rather than a
@@ -364,7 +371,6 @@ function agOpenPanel() {
   agCalMonth = now.getMonth();
   agSelectedDay = null;
   agRenderPanel();
-  agStartTicker();
 }
 
 function agClosePanel() {
@@ -375,7 +381,6 @@ function agClosePanel() {
   if (flag) flag.setAttribute('aria-expanded', 'false');
   const root = document.getElementById('ag-flag-root');
   if (root) root.classList.remove('is-open');
-  agStopTicker();
 }
 
 let _agTicker = null;
@@ -390,28 +395,44 @@ function agStopTicker() {
 }
 
 /**
- * Keep "in 4h 12m" honest while the panel sits open.
+ * Keep every countdown honest, once a minute.
  *
- * Patches the countdown chips in place rather than re-rendering: a full
- * repaint every minute would throw away the list's scroll position and blink
- * the row the pointer is on.
+ * Runs from mount rather than only while the panel is open, because the chip
+ * on a program's own page now counts down too — a page you leave sitting for
+ * an hour would otherwise still claim four hours left when there is one.
+ *
+ * Panel rows are patched in place rather than re-rendered: a full repaint
+ * every minute would throw away the list's scroll position and blink the row
+ * the pointer is on.
  */
 function agTick() {
-  if (!agPanelOpen) { agStopTicker(); return; }
   agPaintFlag();
-  const panel = document.getElementById('ag-panel');
-  if (!panel) return;
   const byKey = {};
-  agEntries().forEach(e => { byKey[e.key] = e; });
-  panel.querySelectorAll('.ag-row').forEach(row => {
-    const e = byKey[row.getAttribute('data-ag-key')];
-    if (!e) return;
-    const chip = row.querySelector('.ag-row-left');
-    if (chip) {
-      chip.textContent = agTimeLeft(e);
-      chip.classList.toggle('is-overdue', e.overdue);
-    }
-    row.classList.toggle('is-overdue', e.overdue);
+  const entries = agEntries();
+  entries.forEach(e => { byKey[e.key] = e; });
+
+  const panel = document.getElementById('ag-panel');
+  if (agPanelOpen && panel) {
+    panel.querySelectorAll('.ag-row').forEach(row => {
+      const e = byKey[row.getAttribute('data-ag-key')];
+      if (!e) return;
+      const chip = row.querySelector('.ag-row-left');
+      if (chip) {
+        chip.textContent = agTimeLeft(e);
+        chip.classList.toggle('is-overdue', e.overdue);
+      }
+      row.classList.toggle('is-overdue', e.overdue);
+    });
+  }
+
+  document.querySelectorAll('.ag-deadline-chip[data-ag-dl]').forEach(chip => {
+    const [type, id] = chip.getAttribute('data-ag-dl').split(':');
+    const d = agGetDeadline(type, id);
+    if (!d) return;
+    const entry = { date: d.date, time: d.time, ts: agTs(d.date, d.time) };
+    const left = chip.querySelector('em');
+    if (left) left.textContent = agTimeLeft(entry);
+    chip.classList.toggle('is-overdue', entry.ts < Date.now());
   });
 }
 
@@ -588,6 +609,25 @@ function agSelectDay(dateStr) {
 
 function agFindEntry(key) { return agEntries().find(e => e.key === key) || null; }
 
+/**
+ * Go to a route that may be the one already on screen.
+ *
+ * spaNavigate only assigns location.hash, and assigning the hash it already
+ * holds fires no hashchange — so the router never re-runs and the page does
+ * not move. Every other caller of these routes navigates from somewhere else,
+ * so it never came up; the agenda opens over whatever page you are on, and
+ * clicking a program row from the Library did nothing at all. Re-firing the
+ * event puts the router through its normal cycle, which re-reads the session
+ * param the caller just set.
+ */
+function agNavigateEvenIfHere(route, go) {
+  if (document.body.dataset.route === route) {
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+  } else {
+    go();
+  }
+}
+
 function agGoToEntry(key) {
   const e = agFindEntry(key);
   if (!e) return;
@@ -595,9 +635,13 @@ function agGoToEntry(key) {
   agClosePanel();
   if (e.sourceType === 'challenge') {
     setSessionParam('browseActiveProgram', e.sourceId);
-    spaNavigate('browse');
-  } else if (typeof reviewNavigateTo === 'function') {
-    reviewNavigateTo(e.sourceType, e.sourceId);
+    agNavigateEvenIfHere('browse', () => spaNavigate('browse'));
+  } else if (e.sourceType === 'snippet') {
+    setSessionParam('activeSnippetId', e.sourceId);
+    agNavigateEvenIfHere('snippets', () => spaNavigate('snippets'));
+  } else if (e.sourceType === 'notebook') {
+    setSessionParam('activeNotebook', e.sourceId);
+    agNavigateEvenIfHere('study', () => spaNavigate('study'));
   }
 }
 
@@ -798,7 +842,8 @@ function agDeadlineChipHTML(type, id) {
   const entry = { date: d.date, time: d.time, ts: agTs(d.date, d.time) };
   const overdue = entry.ts < Date.now();
   return `
-    <span class="ag-deadline-chip${overdue ? ' is-overdue' : ''}" title="${escapeHTML(d.note || 'Deadline')}">
+    <span class="ag-deadline-chip${overdue ? ' is-overdue' : ''}" data-ag-dl="${type}:${id}"
+          title="${escapeHTML(d.note || 'Deadline')}">
       <i data-lucide="flag" style="width:12px;height:12px;" aria-hidden="true"></i>
       ${escapeHTML(agFmtDate(d.date))}${d.time ? ' · ' + escapeHTML(agFmtTime(d.time)) : ''}
       <em>${escapeHTML(agTimeLeft(entry))}</em>
