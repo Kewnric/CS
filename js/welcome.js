@@ -28,6 +28,45 @@ const SW_ASSETS = 'assets/sao/';
 
 /* ── Sound ────────────────────────────────────────────────── */
 
+const SW_SOUND_KEY = 'ssp.soundOn';
+
+/** Off unless explicitly turned on: an app should not make noise uninvited. */
+function swSoundOn() {
+  try { return localStorage.getItem(SW_SOUND_KEY) === '1'; } catch (e) { return false; }
+}
+window.swSoundOn = swSoundOn;
+
+function swSetSound(on) {
+  try { localStorage.setItem(SW_SOUND_KEY, on ? '1' : '0'); } catch (e) { /* quota */ }
+  // Both places that show this preference stay in step, wherever it was
+  // changed from.
+  swPaintSoundToggle();
+  if (typeof swPaintSoundSetting === 'function') swPaintSoundSetting();
+}
+window.swSetSound = swSetSound;
+
+window.swToggleSound = function () {
+  const on = !swSoundOn();
+  swSetSound(on);
+  // Turning it ON plays the sound, so the switch proves itself. Turning it off
+  // stays silent, which is the whole point.
+  if (on) swPlaySound();
+};
+
+/** Repaint the toggle inside the welcome window, if it is on screen. */
+function swPaintSoundToggle() {
+  const btn = document.getElementById('sw-sound');
+  if (!btn) return;
+  const on = swSoundOn();
+  btn.classList.toggle('is-on', on);
+  btn.setAttribute('aria-pressed', String(on));
+  btn.setAttribute('aria-label', on ? 'Sound on' : 'Sound off');
+  btn.innerHTML = '<i data-lucide="' + (on ? 'volume-2' : 'volume-x') + '"></i>' +
+                  '<span>' + (on ? 'SOUND ON' : 'SOUND OFF') + '</span>';
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: btn });
+}
+window.swPaintSoundToggle = swPaintSoundToggle;
+
 let _swSound = null;
 
 /**
@@ -38,6 +77,7 @@ let _swSound = null;
  * press is the gesture, which is where the source project plays it too.
  */
 function swPlaySound() {
+  if (!swSoundOn()) return;
   try {
     if (!_swSound) {
       _swSound = new Audio(SW_ASSETS + 'nervegear.mp3');
@@ -80,6 +120,8 @@ window.swRunWelcome = function (onDone) {
       <div class="sw-msg" id="sw-msg">Welcome to StudySession Pro !</div>
       <button class="sw-btn sw-ok" id="sw-ok" type="button" title="Continue" aria-label="Continue"></button>
       <button class="sw-btn sw-no" id="sw-no" type="button" title="Skip" aria-label="Skip"></button>
+      <button class="sw-sound" id="sw-sound" type="button" onclick="swToggleSound()"
+              title="Sound is off by default" aria-pressed="false" aria-label="Sound off"></button>
     </div>`;
 
   // Black first: the window is only faded up a beat later, so the page opens
@@ -108,6 +150,7 @@ window.swRunWelcome = function (onDone) {
     else if (e.key === 'Escape') { e.preventDefault(); close(false); }
   }
 
+  swPaintSoundToggle();
   veil.querySelector('#sw-ok').onclick = () => close(true);
   veil.querySelector('#sw-no').onclick = () => close(false);
   document.addEventListener('keydown', onKey, true);
@@ -138,3 +181,27 @@ window.swReplayWelcome = function () {
     if (popup) { popup.classList.remove('sw-holding'); popup.classList.add('sw-revealed'); }
   });
 };
+
+/**
+ * The same preference as it appears in Settings.
+ *
+ * Kept in step with the toggle inside the welcome window rather than being a
+ * second switch: both call swSetSound, and both are repainted from it.
+ */
+function swPaintSoundSetting() {
+  const item = document.getElementById('settings-sound-item');
+  if (!item) return;
+  const on = swSoundOn();
+  item.setAttribute('aria-pressed', String(on));
+  item.setAttribute('aria-label', on ? 'Sound on' : 'Sound off');
+  const desc = document.getElementById('settings-sound-desc');
+  if (desc) desc.textContent = on ? 'On — interface sounds play' : 'Off — no sounds play';
+  const icon = document.getElementById('settings-sound-icon');
+  if (icon && typeof _setLucideIcon === 'function') {
+    _setLucideIcon(icon, on ? 'volume-2' : 'volume-x');
+  } else if (icon) {
+    icon.setAttribute('data-lucide', on ? 'volume-2' : 'volume-x');
+    if (typeof lucide !== 'undefined') lucide.createIcons({ root: item });
+  }
+}
+window.swPaintSoundSetting = swPaintSoundSetting;
