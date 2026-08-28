@@ -13,7 +13,17 @@
    tied to its own page, which do not transplant.
    ============================================================ */
 
-const SW_SEEN_KEY = 'ssp.welcomeSeen';
+/* Version-suffixed on purpose.
+   The first build of this marked the opening seen on the way IN rather than on
+   completion, and fired from a code path where the picker was already being
+   dismissed. Anyone who loaded that build is carrying a flag saying they have
+   seen something that never reached the screen, and fixing the write does not
+   undo the write that already happened. A new key owes them the showing once.
+   The old one is cleared below so it is not left behind forever. */
+const SW_SEEN_KEY = 'ssp.welcomeSeen.v2';
+const SW_SEEN_KEY_LEGACY = 'ssp.welcomeSeen';
+
+try { localStorage.removeItem(SW_SEEN_KEY_LEGACY); } catch (e) { /* ignore */ }
 const SW_ASSETS = 'assets/sao/';
 
 /* ── Sound ────────────────────────────────────────────────── */
