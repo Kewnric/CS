@@ -156,11 +156,57 @@ function agSetDeadline(type, id, patch) {
   return rec;
 }
 
+/**
+ * Remove a deadline the user asked to remove — undoably.
+ *
+ * The row's trash button is one click with no confirmation, so this goes on
+ * the same undo stack as every other destructive action in the app rather
+ * than being the one thing you cannot take back.
+ */
 function agClearDeadline(type, id) {
   agStore();
-  delete state.deadlines[agDeadlineKey(type, id)];
+  const key = agDeadlineKey(type, id);
+  const rec = state.deadlines[key];
+  if (!rec) return;
+  const title = agItemTitle(type, id);
+  delete state.deadlines[key];
   saveData();
   agRefresh();
+  if (typeof pushUndo === 'function') {
+    pushUndo('Removed deadline' + (title ? ' on "' + title + '"' : ''), () => {
+      agAttachDeadline(rec);
+      saveData();
+      agRefresh();
+    });
+  }
+}
+
+/**
+ * Lift a deadline off an item WITHOUT its own undo entry, returning the record.
+ *
+ * For the delete paths: the item's own undo puts both back, and a second
+ * "deadline removed" toast for one action would be a second thing to undo.
+ * A deadline belongs to its item — it should not outlive it as an orphan
+ * record, nor fail to come back when the deletion is undone.
+ */
+function agDetachDeadline(type, id) {
+  agStore();
+  const key = agDeadlineKey(type, id);
+  const rec = state.deadlines[key];
+  if (!rec) return null;
+  delete state.deadlines[key];
+  agPaintFlag();
+  if (agPanelOpen) agRenderPanel();
+  return rec;
+}
+
+/** Put back exactly what agDetachDeadline took. Caller saves. */
+function agAttachDeadline(rec) {
+  if (!rec || !rec.type || !rec.id) return;
+  agStore();
+  state.deadlines[agDeadlineKey(rec.type, rec.id)] = rec;
+  agPaintFlag();
+  if (agPanelOpen) agRenderPanel();
 }
 
 function agEvents() { agStore(); return state.events; }
@@ -187,13 +233,22 @@ function agSaveEvent(ev) {
   return rec;
 }
 
+/** Delete an event — undoably, and back into the position it held. */
 function agDeleteEvent(id) {
   agStore();
   const i = state.events.findIndex(e => e.id === id);
   if (i === -1) return;
-  state.events.splice(i, 1);
+  const rec = state.events.splice(i, 1)[0];
   saveData();
   agRefresh();
+  if (typeof pushUndo === 'function') {
+    pushUndo('Deleted event "' + (rec.title || 'Untitled') + '"', () => {
+      agStore();
+      state.events.splice(Math.min(i, state.events.length), 0, rec);
+      saveData();
+      agRefresh();
+    });
+  }
 }
 
 /* ── Aggregation ──────────────────────────────────────────── */
@@ -745,8 +800,7 @@ function agSubmitDeadline(type, id, clear) {
   if (clear) {
     agClearDeadline(type, id);
     agCloseModal();
-    agToast('Deadline cleared');
-    return;
+    return;   // the undo toast already says so — two toasts for one click
   }
   const date = (document.getElementById('ag-dl-date') || {}).value || '';
   if (!date) {
@@ -819,8 +873,7 @@ function agSubmitEvent(eventId, del) {
   if (del) {
     agDeleteEvent(eventId);
     agCloseModal();
-    agToast('Event deleted');
-    return;
+    return;   // ditto — agDeleteEvent raises an undo toast
   }
   const title = ((document.getElementById('ag-ev-title') || {}).value || '').trim();
   const date = (document.getElementById('ag-ev-date') || {}).value || '';

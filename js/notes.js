@@ -1322,11 +1322,16 @@ registerTreeHost('notes', {
     }
     showConfirm('Delete notebook?', `Delete "${it.title}"? You can undo this.`, () => {
       const at = state.notebooks.indexOf(it);
+      const dl = typeof agDetachDeadline === 'function' ? agDetachDeadline('notebook', id) : null;
       state.notebooks = state.notebooks.filter(x => x.id !== id);
       saveData(); notesRenderSidebar();
       if (typeof toast === 'function') {
         toast(`Deleted "${it.title}".`, { type: 'info', duration: 8000,
-          action: { label: 'Undo', onClick: () => { state.notebooks.splice(Math.min(at, state.notebooks.length), 0, it); saveData(); notesRenderSidebar(); } } });
+          action: { label: 'Undo', onClick: () => {
+            state.notebooks.splice(Math.min(at, state.notebooks.length), 0, it);
+            if (dl && typeof agAttachDeadline === 'function') agAttachDeadline(dl);
+            saveData(); notesRenderSidebar();
+          } } });
       }
     });
   },

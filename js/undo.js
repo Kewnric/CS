@@ -102,11 +102,14 @@ function softDeleteChallenge(id, afterDelete) {
   const item = state.challenges.find(c => c.id === id);
   if (!item) return;
   const snapshot = JSON.parse(JSON.stringify(item));
+  // The deadline belongs to the item: it goes with it, and comes back with it.
+  const deadline = typeof agDetachDeadline === 'function' ? agDetachDeadline('challenge', id) : null;
   state.challenges = state.challenges.filter(c => c.id !== id);
   saveData();
   if (afterDelete) afterDelete();
   pushUndo('Deleted program "' + (snapshot.title || 'Untitled') + '"', () => {
     state.challenges.push(snapshot);
+    if (deadline && typeof agAttachDeadline === 'function') agAttachDeadline(deadline);
     saveData();
     if (afterDelete) afterDelete();
   });
@@ -117,11 +120,14 @@ function softDeleteSnippet(id, afterDelete) {
   const item = (state.snippets || []).find(s => s.id === id);
   if (!item) return;
   const snapshot = JSON.parse(JSON.stringify(item));
+  // The deadline belongs to the item: it goes with it, and comes back with it.
+  const deadline = typeof agDetachDeadline === 'function' ? agDetachDeadline('snippet', id) : null;
   state.snippets = state.snippets.filter(s => s.id !== id);
   saveData();
   if (afterDelete) afterDelete();
   pushUndo('Deleted snippet "' + (snapshot.title || 'Untitled') + '"', () => {
     state.snippets.push(snapshot);
+    if (deadline && typeof agAttachDeadline === 'function') agAttachDeadline(deadline);
     saveData();
     if (afterDelete) afterDelete();
   });
@@ -132,11 +138,14 @@ function softDeleteNotebook(id, afterDelete) {
   const item = (state.notebooks || []).find(n => n.id === id);
   if (!item) return;
   const snapshot = JSON.parse(JSON.stringify(item));
+  // The deadline belongs to the item: it goes with it, and comes back with it.
+  const deadline = typeof agDetachDeadline === 'function' ? agDetachDeadline('notebook', id) : null;
   state.notebooks = state.notebooks.filter(n => n.id !== id);
   saveData();
   if (afterDelete) afterDelete();
   pushUndo('Deleted notebook "' + (snapshot.title || 'Untitled') + '"', () => {
     state.notebooks.push(snapshot);
+    if (deadline && typeof agAttachDeadline === 'function') agAttachDeadline(deadline);
     saveData();
     if (afterDelete) afterDelete();
   });

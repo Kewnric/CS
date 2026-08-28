@@ -26,6 +26,11 @@ function vizDeleteNode(nodeId) {
   }
 
   if (node.dataId) {
+    // No undo on this path, so the deadline is simply dropped rather than
+    // left behind as a record pointing at an item that no longer exists.
+    if (node.type !== 'folder' && typeof agDetachDeadline === 'function') {
+      agDetachDeadline(node.type, node.dataId);
+    }
     if (node.type === 'folder') deleteNode(node.dataId);
     else if (node.type === 'challenge') state.challenges = state.challenges.filter(c => c.id !== node.dataId);
     else if (node.type === 'snippet') state.snippets = state.snippets.filter(s => s.id !== node.dataId);
