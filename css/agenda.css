@@ -629,3 +629,34 @@ body.route-focused .ag-root { display: none; }
 body[data-route="visualization"] .viz-topbar {
   padding-right: 80px;
 }
+
+/* ── Done ─────────────────────────────────────────────────────
+   Ticked off, not deleted: the row stays legible and stays on the calendar,
+   it just stops asking for attention. */
+
+.ag-row-done { opacity: 1; }
+.ag-row-done.is-on { color: var(--color-success); }
+.ag-row-done:hover { color: var(--color-success); }
+
+.ag-row.is-done .ag-row-title {
+  text-decoration: line-through;
+  color: var(--text-tertiary);
+}
+
+.ag-row.is-done .ag-row-kind { opacity: 0.5; }
+
+.ag-row-left.is-done {
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+
+.ag-dot-done { background: var(--color-success); opacity: 0.5; }
+
+.ag-done-note {
+  padding: 0.5rem 0.35rem 0.2rem;
+  font-size: 0.68rem;
+  color: var(--text-tertiary);
+  text-align: center;
+}
+
+.ag-deadline-text.is-done em { color: var(--color-success); }

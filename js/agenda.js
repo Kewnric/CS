@@ -134,6 +134,42 @@ function agStore() {
 
 function agDeadlineKey(type, id) { return type + ':' + id; }
 
+/* ── Validation ───────────────────────────────────────────────
+   The forms use <input type="date"> and a fixed <select>, so the UI cannot
+   produce bad values — but these functions are the store's public surface and
+   also the landing point for imported files and cloud round-trips. A junk date
+   used to be accepted and became an entry at the epoch: "20693 days overdue",
+   pinning the flag red with nothing the user could see to fix.
+   ------------------------------------------------------------ */
+
+const AG_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const AG_TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+const AG_KINDS = ['event', 'exam', 'reminder'];
+
+/** A real calendar date, or null. The round-trip rejects 2026-02-31, which
+    Date happily rolls forward to March 3rd. */
+function agNormDate(s) {
+  s = String(s == null ? '' : s);
+  if (!AG_DATE_RE.test(s)) return null;
+  const d = agParseDate(s);
+  return (d && agDateStr(d) === s) ? s : null;
+}
+
+function agNormTime(s) {
+  s = String(s == null ? '' : s);
+  return AG_TIME_RE.test(s) ? s : null;
+}
+
+/** Anything unrecognised becomes a plain event: the kind reaches a class name
+    on the calendar dot, so it is not a free-text field. */
+function agNormKind(k) {
+  return AG_KINDS.indexOf(k) > -1 ? k : 'event';
+}
+
+function agNormText(s, max) {
+  return String(s == null ? '' : s).trim().slice(0, max || 200);
+}
+
 function agGetDeadline(type, id) {
   agStore();
   return state.deadlines[agDeadlineKey(type, id)] || null;
@@ -141,14 +177,24 @@ function agGetDeadline(type, id) {
 
 function agSetDeadline(type, id, patch) {
   agStore();
-  if (!type || !id || !patch || !patch.date) return null;
+  if (!type || !id || !patch) return null;
+  const date = agNormDate(patch.date);
+  if (!date) return null;
   const key = agDeadlineKey(type, id);
+  const prev = state.deadlines[key];
+  const time = agNormTime(patch.time);
+  // Moving a completed deadline makes it outstanding again — a new date is a
+  // new commitment. Correcting the note is not, so that alone must not
+  // silently un-tick something already done.
+  const rescheduled = !prev || prev.date !== date || (prev.time || null) !== time;
   const rec = {
     type, id,
-    date: patch.date,
-    time: patch.time || null,
-    note: patch.note || '',
-    createdAt: (state.deadlines[key] && state.deadlines[key].createdAt) || Date.now()
+    date,
+    time,
+    note: agNormText(patch.note, 200),
+    done: rescheduled ? false : !!prev.done,
+    doneAt: rescheduled ? null : (prev.doneAt || null),
+    createdAt: (prev && prev.createdAt) || Date.now()
   };
   state.deadlines[key] = rec;
   saveData();
@@ -213,24 +259,57 @@ function agEvents() { agStore(); return state.events; }
 
 function agSaveEvent(ev) {
   agStore();
-  if (!ev || !ev.title || !ev.date) return null;
+  if (!ev) return null;
+  const title = agNormText(ev.title, 120);
+  const date = agNormDate(ev.date);
+  if (!title || !date) return null;   // a blank or whitespace title is not a title
+
+  const fields = {
+    title, date,
+    time: agNormTime(ev.time),
+    kind: agNormKind(ev.kind),
+    note: agNormText(ev.note, 200)
+  };
+
   if (ev.id) {
     const i = state.events.findIndex(e => e.id === ev.id);
-    if (i > -1) { state.events[i] = Object.assign({}, state.events[i], ev); saveData(); agRefresh(); return state.events[i]; }
+    // An id that is not there means the event was deleted under us — in
+    // another tab, or by an undo. Saving used to quietly mint a SECOND event
+    // with a new id, so the "edit" produced a duplicate. Refuse instead.
+    if (i === -1) return null;
+    state.events[i] = Object.assign({}, state.events[i], fields);
+    saveData();
+    agRefresh();
+    return state.events[i];
   }
-  const rec = {
-    id: generateId(),
-    title: ev.title,
-    date: ev.date,
-    time: ev.time || null,
-    kind: ev.kind || 'event',
-    note: ev.note || '',
-    createdAt: Date.now()
-  };
+
+  const rec = Object.assign({ id: generateId(), done: false, doneAt: null, createdAt: Date.now() }, fields);
   state.events.push(rec);
   saveData();
   agRefresh();
   return rec;
+}
+
+/**
+ * Tick something off.
+ *
+ * Without this the badge could only ever grow: an exam three weeks past sat in
+ * "due & upcoming" and counted toward the flag for ever, and the only way to
+ * be rid of it was to delete the record — which is not the same thing as
+ * having done it. Completed entries drop out of the count and the upcoming
+ * list but stay on the calendar, because they are still part of the history of
+ * that day.
+ */
+function agToggleDone(key) {
+  agStore();
+  let rec = null;
+  if (key.indexOf('d:') === 0) rec = state.deadlines[key.slice(2)];
+  else if (key.indexOf('e:') === 0) rec = state.events.find(e => e.id === key.slice(2));
+  if (!rec) return;                     // reviews clear themselves by practising
+  rec.done = !rec.done;
+  rec.doneAt = rec.done ? Date.now() : null;
+  saveData();
+  agRefresh();
 }
 
 /** Delete an event — undoably, and back into the position it held. */
@@ -282,38 +361,49 @@ function agEntries() {
   const out = [];
   const now = Date.now();
 
+  // Dates are re-checked on the way OUT as well as in: a record can arrive
+  // from an imported file or a cloud document that never passed through
+  // agSetDeadline, and one bad date should cost that one entry, not the panel.
   Object.values(state.deadlines).forEach(d => {
-    if (!d || !d.date) return;
+    if (!d || !agNormDate(d.date)) return;
     const title = agItemTitle(d.type, d.id);
     if (title === null) return;
     const ts = agTs(d.date, d.time);
     out.push({
       key: 'd:' + agDeadlineKey(d.type, d.id),
-      kind: 'deadline', title, date: d.date, time: d.time || null, ts,
-      note: d.note || '', sourceType: d.type, sourceId: d.id, overdue: ts < now
+      kind: 'deadline', title, date: d.date, time: agNormTime(d.time), ts,
+      note: d.note || '', sourceType: d.type, sourceId: d.id,
+      done: !!d.done, overdue: !d.done && ts < now
     });
   });
 
   state.events.forEach(e => {
-    if (!e || !e.date) return;
+    if (!e || !e.id || !agNormDate(e.date)) return;
     const ts = agTs(e.date, e.time);
     out.push({
       key: 'e:' + e.id,
-      kind: e.kind || 'event', title: e.title, date: e.date, time: e.time || null, ts,
-      note: e.note || '', sourceType: null, sourceId: e.id, overdue: ts < now, isEvent: true
+      kind: agNormKind(e.kind), title: e.title || 'Untitled', date: e.date, time: agNormTime(e.time), ts,
+      note: e.note || '', sourceType: null, sourceId: e.id,
+      done: !!e.done, overdue: !e.done && ts < now, isEvent: true
     });
   });
 
-  if (typeof getDueReviewItems === 'function') {
-    getDueReviewItems().forEach(r => {
-      const ts = agTs(r.due, null);
-      out.push({
-        key: 'r:' + r.type + ':' + r.id,
-        kind: 'review', title: r.title, date: r.due, time: null, ts,
-        note: '', sourceType: r.type, sourceId: r.id, overdue: r.daysOverdue > 0
-      });
+  // Read from state.review directly rather than getDueReviewItems(), which by
+  // design returns only what is due today or earlier. On a CALENDAR that meant
+  // a review scheduled for next Tuesday had no dot and no row — the one place
+  // you look to find out what is coming showed nothing until it was already
+  // late. Still read-only: review.js owns these records.
+  Object.values(state.review || {}).forEach(r => {
+    if (!r || !r.type || !r.id || !agNormDate(r.due)) return;
+    const title = agItemTitle(r.type, r.id);
+    if (title === null) return;         // the item was deleted
+    const ts = agTs(r.due, null);
+    out.push({
+      key: 'r:' + r.type + ':' + r.id,
+      kind: 'review', title, date: r.due, time: null, ts,
+      note: '', sourceType: r.type, sourceId: r.id, done: false, overdue: ts < now
     });
-  }
+  });
 
   out.sort((a, b) => a.ts - b.ts);
   return out;
@@ -336,6 +426,7 @@ function agCounts() {
   const now = Date.now();
   let overdue = 0, dueToday = 0, upcoming = 0;
   agEntries().forEach(e => {
+    if (e.done) return;                 // ticked off is not outstanding
     if (e.ts < now) overdue++;
     else if (e.date === today) dueToday++;
     else upcoming++;
@@ -478,10 +569,12 @@ function agTick() {
       if (!e) return;
       const chip = row.querySelector('.ag-row-left');
       if (chip) {
-        chip.textContent = agTimeLeft(e);
+        chip.textContent = e.done ? 'Done' : agTimeLeft(e);
         chip.classList.toggle('is-overdue', e.overdue);
+        chip.classList.toggle('is-done', !!e.done);
       }
       row.classList.toggle('is-overdue', e.overdue);
+      row.classList.toggle('is-done', !!e.done);
     });
   }
 
@@ -489,10 +582,11 @@ function agTick() {
     const [type, id] = chip.getAttribute('data-ag-dl').split(':');
     const d = agGetDeadline(type, id);
     if (!d) return;
-    const entry = { date: d.date, time: d.time, ts: agTs(d.date, d.time) };
+    const entry = { date: d.date, time: agNormTime(d.time), ts: agTs(d.date, d.time) };
     const left = chip.querySelector('em');
-    if (left) left.textContent = agTimeLeft(entry);
-    chip.classList.toggle('is-overdue', entry.ts < Date.now());
+    if (left) left.textContent = d.done ? 'Done' : agTimeLeft(entry);
+    chip.classList.toggle('is-overdue', !d.done && entry.ts < Date.now());
+    chip.classList.toggle('is-done', !!d.done);
   });
 }
 
@@ -559,7 +653,7 @@ function agCalendarHTML() {
     const list = byDate[ds] || [];
     const kinds = [];
     list.forEach(e => {
-      const k = e.overdue ? 'overdue' : e.kind;
+      const k = e.done ? 'done' : e.overdue ? 'overdue' : e.kind;
       if (kinds.indexOf(k) === -1) kinds.push(k);
     });
     const dots = kinds.slice(0, 3)
@@ -599,14 +693,19 @@ function agListHTML() {
   const all = agEntries();
   // Upcoming view keeps overdue items in it — the point of the list is what
   // still needs doing, and something a week late needs doing most of all.
-  const list = showingDay ? all.filter(e => e.date === agSelectedDay) : all.filter(e => e.date >= today || e.overdue);
+  // A day you clicked shows everything that happened on it, done included.
+  // "Due & upcoming" is a to-do list, so what is finished leaves it.
+  const list = showingDay
+    ? all.filter(e => e.date === agSelectedDay)
+    : all.filter(e => !e.done && (e.date >= today || e.overdue));
+  const doneCount = showingDay ? 0 : all.filter(e => e.done).length;
 
   const rows = list.map(e => {
     const meta = AG_KIND_META[e.kind] || AG_KIND_META.event;
-    const left = agTimeLeft(e);
+    const left = e.done ? 'Done' : agTimeLeft(e);
     const when = agFmtDate(e.date) + (e.time ? ' · ' + agFmtTime(e.time) : '');
     return `
-      <div class="ag-row${e.overdue ? ' is-overdue' : ''}" data-ag-key="${e.key}">
+      <div class="ag-row${e.overdue ? ' is-overdue' : ''}${e.done ? ' is-done' : ''}" data-ag-key="${e.key}">
         <div class="ag-row-kind ${meta.cls}" title="${meta.label}">
           <i data-lucide="${meta.icon}" aria-hidden="true"></i>
         </div>
@@ -615,8 +714,14 @@ function agListHTML() {
           <span class="ag-row-title">${escapeHTML(e.title)}</span>
           <span class="ag-row-when">${escapeHTML(when)}${e.note ? ' · ' + escapeHTML(e.note) : ''}</span>
         </button>
-        <span class="ag-row-left${e.overdue ? ' is-overdue' : ''}">${escapeHTML(left)}</span>
+        <span class="ag-row-left${e.overdue ? ' is-overdue' : ''}${e.done ? ' is-done' : ''}">${escapeHTML(left)}</span>
         ${e.kind === 'review' ? '' : `
+        <button class="ag-icon-btn ag-row-done${e.done ? ' is-on' : ''}" type="button"
+                onclick="agToggleDone('${e.key}')" aria-pressed="${e.done}"
+                aria-label="${e.done ? 'Mark as not done' : 'Mark as done'}"
+                title="${e.done ? 'Not done after all' : 'Mark done'}">
+          <i data-lucide="${e.done ? 'check-circle-2' : 'circle'}" aria-hidden="true"></i>
+        </button>
         <button class="ag-icon-btn ag-row-del" type="button" onclick="agRemoveEntry('${e.key}')"
                 aria-label="Remove" title="${e.isEvent ? 'Delete this event' : 'Clear this deadline'}">
           <i data-lucide="trash-2" aria-hidden="true"></i>
@@ -626,7 +731,8 @@ function agListHTML() {
 
   const emptyMsg = showingDay
     ? 'Nothing on ' + agFmtDate(agSelectedDay) + '.'
-    : 'Nothing due. Set a deadline on a program, or add an event.';
+    : (doneCount ? 'All clear — everything outstanding is ticked off.'
+                 : 'Nothing due. Set a deadline on a program, or add an event.');
 
   return `
     <div class="ag-list-head">
@@ -638,6 +744,7 @@ function agListHTML() {
     </div>
     <div class="ag-list">
       ${rows || `<div class="ag-empty"><i data-lucide="calendar-check" aria-hidden="true"></i><span>${escapeHTML(emptyMsg)}</span></div>`}
+      ${!rows && doneCount ? `<div class="ag-done-note">${doneCount} completed — still on the calendar, on their own days.</div>` : ''}
     </div>
     <div class="ag-foot">
       <button class="btn btn-secondary btn-sm" type="button" onclick="agOpenEventModal()">
@@ -807,11 +914,12 @@ function agSubmitDeadline(type, id, clear) {
     agToast('Pick a date first', 'error');
     return;
   }
-  agSetDeadline(type, id, {
+  const saved = agSetDeadline(type, id, {
     date,
     time: (document.getElementById('ag-dl-time') || {}).value || null,
     note: ((document.getElementById('ag-dl-note') || {}).value || '').trim()
   });
+  if (!saved) { agToast('That date could not be read', 'error'); return; }
   agCloseModal();
   agToast('Deadline set for ' + agFmtDate(date));
 }
@@ -879,7 +987,7 @@ function agSubmitEvent(eventId, del) {
   const date = (document.getElementById('ag-ev-date') || {}).value || '';
   if (!title) { agToast('Give the event a title', 'error'); return; }
   if (!date) { agToast('Pick a date first', 'error'); return; }
-  agSaveEvent({
+  const saved = agSaveEvent({
     id: eventId || null,
     title,
     date,
@@ -887,6 +995,13 @@ function agSubmitEvent(eventId, del) {
     kind: (document.getElementById('ag-ev-kind') || {}).value || 'event',
     note: ((document.getElementById('ag-ev-note') || {}).value || '').trim()
   });
+  // agSaveEvent refuses an edit whose event has gone — deleted in another tab,
+  // or undone — rather than silently minting a duplicate under a new id.
+  if (!saved) {
+    agToast(eventId ? 'That event no longer exists' : 'That date could not be read', 'error');
+    if (eventId) agCloseModal();
+    return;
+  }
   agCloseModal();
   agToast(eventId ? 'Event saved' : 'Event added');
 }
@@ -903,14 +1018,14 @@ function agSubmitEvent(eventId, del) {
  */
 function agDeadlineTextHTML(type, id) {
   const d = agGetDeadline(type, id);
-  if (!d) return '';
-  const entry = { date: d.date, time: d.time, ts: agTs(d.date, d.time) };
-  const overdue = entry.ts < Date.now();
+  if (!d || !agNormDate(d.date)) return '';
+  const entry = { date: d.date, time: agNormTime(d.time), ts: agTs(d.date, d.time) };
+  const overdue = !d.done && entry.ts < Date.now();
   return `
-    <span class="ag-deadline-text${overdue ? ' is-overdue' : ''}" data-ag-dl="${type}:${id}"
-          title="${escapeHTML(d.note || 'Deadline')}">
-      Due ${escapeHTML(agFmtDate(d.date))}${d.time ? ' · ' + escapeHTML(agFmtTime(d.time)) : ''}
-      <em>${escapeHTML(agTimeLeft(entry))}</em>
+    <span class="ag-deadline-text${overdue ? ' is-overdue' : ''}${d.done ? ' is-done' : ''}"
+          data-ag-dl="${type}:${id}" title="${escapeHTML(d.note || 'Deadline')}">
+      Due ${escapeHTML(agFmtDate(d.date))}${entry.time ? ' · ' + escapeHTML(agFmtTime(entry.time)) : ''}
+      <em>${escapeHTML(d.done ? 'Done' : agTimeLeft(entry))}</em>
     </span>`;
 }
 
