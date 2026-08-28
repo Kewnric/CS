@@ -34,6 +34,34 @@
   }
 }
 
+/* The sidebar is app chrome, not page content. It is the same element before
+   and after a navigation, so it has nothing to transition INTO — but the root
+   snapshot above covers the whole viewport, so the 8px slide was being applied
+   to the nav as well and it hopped on every click.
+
+   Naming it lifts it out of the root capture into a group of its own, and that
+   group is given no animation at all: the page still fades and slides, the
+   sidebar is drawn once, in place. */
+.app-sidebar {
+  view-transition-name: ssp-sidebar;
+}
+::view-transition-group(ssp-sidebar) {
+  animation: none;
+}
+::view-transition-old(ssp-sidebar),
+::view-transition-new(ssp-sidebar) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+/* Old and new sit stacked in the same group; with the cross-fade gone they
+   would both paint at full opacity and the translucent borders would double.
+   Only the incoming copy is kept. On the attempt screens, which hide the
+   sidebar outright, there IS no incoming copy and it simply goes — which is
+   what switching modes should look like. */
+::view-transition-old(ssp-sidebar) {
+  display: none;
+}
+
 /* ----------------------------------------------------------------
    2. SCROLL REVEAL — elements with [data-reveal] fade/slide in once
    they enter the viewport (driven by Motion.scan() + IntersectionObserver).
