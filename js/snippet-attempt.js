@@ -484,6 +484,9 @@ function sqaRecord() {
     // Per case, so analytics can say WHICH question keeps being missed rather
     // than only how many were.
     cases: (_sqa.check.tests || []).map((t, i) => ({
+      // The id travels with the result so analytics can follow one question
+      // across attempts even after its wording is edited.
+      id: (_sqa.cases[i] || {}).id || null,
       prompt: (_sqa.cases[i] || {}).prompt || t.name,
       passed: !!t.passed
     })),

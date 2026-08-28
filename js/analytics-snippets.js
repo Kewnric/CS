@@ -22,9 +22,39 @@
 
 /* ── Reading the log ──────────────────────────────────────── */
 
-/** Try Coding wrote snippetTitle; SQL practice writes both. Accept either. */
+/**
+ * What to call the snippet an entry is about.
+ *
+ * The live title first: a log stores the name the snippet had at the time, so
+ * after a rename the analytics listed a title that no longer exists anywhere
+ * in the library. Falls back to the stored name for entries whose snippet has
+ * since been deleted, which is the only record of what it was.
+ *
+ * Try Coding writes snippetTitle and SQL practice writes both, so either shape
+ * is accepted.
+ */
 function _snTitle(entry) {
+  const live = (state.snippets || []).find(s => s.id === entry.snippetId);
+  if (live && (live.title || '').trim()) return live.title;
   return entry.snippetTitle || entry.title || 'Untitled snippet';
+}
+
+/**
+ * A sortable instant for an entry, whichever shape it is.
+ *
+ * Only SQL practice records a ts. Try Coding writes a date string and a locale
+ * time, so treating a missing ts as 0 sorted every Try Coding attempt below
+ * every SQL one no matter which actually happened first — a July attempt sat
+ * above an August one in a list labelled most recent.
+ */
+function _snWhen(entry) {
+  if (typeof entry.ts === 'number' && isFinite(entry.ts)) return entry.ts;
+  const d = String(entry.date || '').trim();
+  if (!d) return 0;
+  // The date alone is enough to order across days, which is the resolution the
+  // list is read at. entry.time is a locale string and not reliably parseable.
+  const t = Date.parse(d + 'T00:00:00');
+  return isFinite(t) ? t : 0;
 }
 
 /** Entries older than the snippets they refer to are still worth counting. */
@@ -206,7 +236,9 @@ function _snHardestCases(d) {
   const tally = {};
   d.sqlRuns.forEach(run => {
     (run.cases || []).forEach(c => {
-      const key = (run.snippetId || '') + '|' + (c.prompt || '');
+      // Keyed by case id where the entry has one: keying on the prompt text
+      // meant editing a question started its miss count over as a second row.
+      const key = (run.snippetId || '') + '|' + (c.id || c.prompt || '');
       if (!tally[key]) {
         tally[key] = { prompt: c.prompt || 'Untitled case', snippet: _snTitle(run), seen: 0, missed: 0 };
       }
@@ -268,7 +300,9 @@ function _snUntouched(d) {
 /* ── The log itself ───────────────────────────────────────── */
 
 function _snRecent(d) {
-  const rows = d.log.slice().sort((a, b) => (b.ts || 0) - (a.ts || 0) || String(b.date || '').localeCompare(String(a.date || ''))).slice(0, 12);
+  const rows = d.log.slice()
+    .sort((a, b) => _snWhen(b) - _snWhen(a) || String(b.date || '').localeCompare(String(a.date || '')))
+    .slice(0, 12);
   if (!rows.length) {
     return `<section class="an-sn-card an-sn-wide">
       <h3><i data-lucide="history"></i> Recent attempts</h3>
