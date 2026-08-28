@@ -266,12 +266,12 @@ window.homeHideVerse = function () {
    rise to the top on their own. */
 
 const HOME_ACTIONS = [
-  { key: 'library',   href: '#/library',   icon: 'library',      label: 'Library',         desc: 'All collections in one place' },
-  { key: 'browse',    href: '#/browse',    icon: 'layout-grid',  label: 'Coding Library',  desc: 'Explore challenge programs' },
-  { key: 'notes',     href: '#/study',     icon: 'book-open',    label: 'Notes Library',   desc: 'Notebooks & quizzes' },
-  { key: 'snippets',  href: '#/snippets',  icon: 'code-2',       label: 'Snippet Library', desc: 'Reference & try-coding' },
-  { key: 'analytics', href: '#/analytics', icon: 'bar-chart-2',  label: 'Analytics',       desc: 'View your history' },
-  { key: 'admin',     href: '#/admin',     icon: 'settings',     label: 'Admin Panel',     desc: 'Manage content' }
+  { key: 'library',   route: 'library',    href: '#/library',   icon: 'library',      label: 'Library',         desc: 'All collections in one place' },
+  { key: 'browse',    route: 'browse',     href: '#/browse',    icon: 'layout-grid',  label: 'Coding Library',  desc: 'Explore challenge programs' },
+  { key: 'notes',     route: 'study',      href: '#/study',     icon: 'book-open',    label: 'Notes Library',   desc: 'Notebooks & quizzes' },
+  { key: 'snippets',  route: 'snippets',   href: '#/snippets',  icon: 'code-2',       label: 'Snippet Library', desc: 'Reference & try-coding' },
+  { key: 'analytics', route: 'analytics',  href: '#/analytics', icon: 'bar-chart-2',  label: 'Analytics',       desc: 'View your history' },
+  { key: 'admin',     route: 'admin',      href: '#/admin',     icon: 'settings',     label: 'Admin Panel',     desc: 'Manage content' }
 ];
 
 const HOME_ACTION_USE_KEY = 'ssp.actionUse';
@@ -301,7 +301,8 @@ function renderQuickActions() {
     <div class="home-card-header"><i data-lucide="zap"></i> Quick Actions</div>
     <div class="home-quick-actions">
       ${ordered.map(a => `
-        <a href="${a.href}" class="quick-action-card" onclick="homeNoteActionUse('${a.key}')">
+        <a class="quick-action-card" role="link" tabindex="0"
+           onclick="homeNoteActionUse('${a.key}'); spaNavigate('${a.route}')">
           <div class="quick-action-icon"><i data-lucide="${a.icon}"></i></div>
           <div>
             <div class="quick-action-label">${a.label}</div>

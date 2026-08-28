@@ -152,6 +152,20 @@ function initTheme() {
   setTimeout(enableEntryAnimations, 120);
 }
 
+/* The sidebar rows carry no href, so the browser stops previewing the route in
+   its status bar on every hover — the app is a hash-router SPA and that
+   preview was only ever noise. An anchor without href also stops being
+   keyboard-operable, so Enter is wired back here rather than repeated as an
+   attribute on each row. Space is deliberately not bound: these announce as
+   links, and Space is the button gesture. */
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const el = e.target && e.target.closest && e.target.closest('[role="link"][onclick]');
+  if (!el) return;
+  e.preventDefault();
+  el.click();
+});
+
 // --- Nav Active State ---
 function setActiveNav(page) {
   document.querySelectorAll('.sidebar-link').forEach(el => {

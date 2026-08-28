@@ -138,6 +138,14 @@
 }
 
 /* Sidebar Links */
+/* An <a> without href is not a link as far as the browser is concerned, so it
+   loses the pointer it used to get for free. The href went so hovering the nav
+   stops printing the route in the browser's status bar. */
+.sidebar-link,
+#brand-link {
+  cursor: pointer;
+}
+
 .sidebar-link {
   display: flex;
   align-items: center;
