@@ -206,6 +206,15 @@
           </span>
           <i data-lucide="chevron-right" class="settings-item-chevron" aria-hidden="true"></i>
         </button>
+        <button onclick="toggleFullscreen()" class="settings-item" type="button" id="settings-fullscreen-item"
+                aria-label="Full screen" aria-pressed="false">
+          <span class="settings-item-icon"><i data-lucide="maximize" id="settings-fullscreen-icon" aria-hidden="true"></i></span>
+          <span class="settings-item-info">
+            <span class="settings-item-label" id="settings-fullscreen-label">Full Screen</span>
+            <span class="settings-item-desc" id="settings-fullscreen-desc">Fill the display</span>
+          </span>
+          <i data-lucide="chevron-right" class="settings-item-chevron" aria-hidden="true"></i>
+        </button>
         <button onclick="handleDataExport()" class="settings-item" type="button" id="export-btn-sidebar" aria-label="Export data backup">
           <span class="settings-item-icon"><i data-lucide="download" aria-hidden="true"></i></span>
           <span class="settings-item-info">

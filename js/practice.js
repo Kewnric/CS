@@ -1887,21 +1887,51 @@ function toggleFullscreen() {
 
 /** Keep the button's icon and pressed state in step, including F11/Esc exits
     that never go through our click handler. */
+/**
+ * Point an already-rendered lucide icon at a different glyph.
+ *
+ * lucide replaces the <i> with an <svg> and adds a lucide-<name> class. Asking
+ * it to re-render the same element swaps the paths but leaves the old name
+ * class behind, so a minimize icon ends up also classed lucide-maximize. The
+ * drawing is right either way; the class is not, and anything selecting on it
+ * would pick the wrong element.
+ */
+function _setLucideIcon(el, name) {
+  if (!el) return;
+  [...el.classList].forEach(c => { if (c.indexOf('lucide-') === 0) el.classList.remove(c); });
+  el.setAttribute('data-lucide', name);
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: el.parentElement || el });
+}
+
 function _syncFullscreenBtn() {
-  const btn = document.getElementById('fullscreen-toggle-btn');
-  if (!btn) return;
   const on = isFullscreen();
   const label = on ? 'Exit full screen' : 'Full screen';
-  btn.title = label;
-  btn.setAttribute('aria-label', label);
-  btn.setAttribute('aria-pressed', String(on));
-  btn.style.color = on ? 'var(--color-primary)' : '';
-  const ic = btn.querySelector('[data-lucide], svg');
-  if (ic) {
-    ic.setAttribute('data-lucide', on ? 'minimize' : 'maximize');
-    if (typeof lucide !== 'undefined') lucide.createIcons({ root: btn });
+
+  const btn = document.getElementById('fullscreen-toggle-btn');
+  if (btn) {
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+    btn.setAttribute('aria-pressed', String(on));
+    btn.style.color = on ? 'var(--color-primary)' : '';
+    _setLucideIcon(btn.querySelector('[data-lucide], svg'), on ? 'minimize' : 'maximize');
+  }
+
+  // The same control in Settings, for the routes with no attempt topbar. Both
+  // are driven from here because F11 and Esc never reach a click handler, and
+  // a row still reading "Full Screen" while already full screen is worse than
+  // having no row at all.
+  const item = document.getElementById('settings-fullscreen-item');
+  if (item) {
+    item.setAttribute('aria-label', label);
+    item.setAttribute('aria-pressed', String(on));
+    const lab = document.getElementById('settings-fullscreen-label');
+    const desc = document.getElementById('settings-fullscreen-desc');
+    if (lab) lab.textContent = on ? 'Exit Full Screen' : 'Full Screen';
+    if (desc) desc.textContent = on ? 'Return to the windowed view' : 'Fill the display';
+    _setLucideIcon(document.getElementById('settings-fullscreen-icon'), on ? 'minimize' : 'maximize');
   }
 }
+window._syncFullscreenBtn = _syncFullscreenBtn;
 
 ['fullscreenchange', 'webkitfullscreenchange'].forEach(ev =>
   document.addEventListener(ev, _syncFullscreenBtn));

@@ -64,6 +64,9 @@ function openSettingsModal() {
   const modal = document.getElementById('settings-modal');
   if (!modal) return;
   modal.classList.remove('hidden');
+  // Full screen can have been entered or left with F11 while this was closed,
+  // so the row is brought up to date on open rather than only when toggled.
+  if (typeof _syncFullscreenBtn === 'function') _syncFullscreenBtn();
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: modal });
 }
 
