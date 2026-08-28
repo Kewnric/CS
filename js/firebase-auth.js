@@ -271,6 +271,18 @@ let _pickerOnlineHandler = null;
 
 function showStorageModePicker() {
   const popup = document.getElementById('storage-mode-popup');
+
+  // The opening runs in front of the picker the first time only: black, a
+  // message, then the card. The card is built and laid out underneath while
+  // the veil is up, so it is finished by the time the veil lifts rather than
+  // assembling itself in front of you.
+  if (typeof swRunWelcome === 'function' && typeof swShouldWelcome === 'function' && swShouldWelcome()) {
+    swMarkWelcomed();
+    swRunWelcome(() => { if (popup) popup.classList.add('sw-revealed'); });
+  } else if (popup) {
+    popup.classList.add('sw-revealed');
+  }
+
   if (popup) popup.classList.remove('hidden');
   const appLayout = document.querySelector('.app-layout');
   if (appLayout) { appLayout.style.visibility = 'hidden'; appLayout.setAttribute('aria-hidden', 'true'); }
