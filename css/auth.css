@@ -639,7 +639,10 @@
 
 .sw-window {
   position: relative;
-  width: min(560px, 84vw);
+  /* The frame's own 350px. Blown up to 560 the artwork was being interpolated
+     and the buttons with it; at native size every asset is 1:1 and the button
+     sits at exactly the proportion it was drawn for. */
+  width: min(350px, 88vw);
   /* Held back until the veil has painted, so the sequence reads black → window
      rather than both arriving together. */
   opacity: 0;
@@ -701,16 +704,18 @@
 /* Placed on the frame's lower band, at the quarter points the source project
    put them at. The hover art is a second image swapped in on :hover, which is
    why each is a background rather than an <img>. */
+/* Never bigger than the 40px source. The percentage only takes over below
+   native width, so the buttons shrink with the frame on a narrow screen and
+   are never interpolated upward on a wide one. */
 .sw-btn {
   position: absolute;
   top: 76%;
-  width: 11.5%;
+  width: min(40px, 11.5%);
   aspect-ratio: 1 / 1;
   padding: 0;
   border: none;
   background: transparent no-repeat center / contain;
   cursor: pointer;
-  transition: transform 0.13s ease;
 }
 
 .sw-ok {
@@ -729,16 +734,15 @@
 .sw-ok:hover, .sw-ok:focus-visible { background-image: url('../assets/sao/ok-hovered.png'); }
 .sw-no:hover, .sw-no:focus-visible { background-image: url('../assets/sao/cancel-hovered.png'); }
 
-.sw-btn:hover { transform: translateX(-50%) scale(1.08); }
-.sw-btn:active { transform: translateX(-50%) scale(0.95); }
+/* No scale on hover: the source ships ok-hovered/cancel-hovered for exactly
+   this, and scaling up would resample the very art it is swapping in. */
 
 .sw-btn:focus-visible { outline: 2px solid #3b7fc0; outline-offset: 3px; border-radius: 50%; }
 .sw-no:focus-visible { outline-color: #c9265d; }
 
 @media (prefers-reduced-motion: reduce) {
-  .sw-veil, .sw-window, .sw-btn { transition: none; }
+  .sw-veil, .sw-window { transition: none; }
   .sw-veil.is-open .sw-window { transition-delay: 0s; }
-  .sw-btn:hover, .sw-btn:active { transform: translateX(-50%); }
 }
 
 /* Held back only while the veil is actually up, so the card is built under it
