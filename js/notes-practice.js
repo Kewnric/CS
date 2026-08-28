@@ -90,7 +90,20 @@ function initNotesPracticeSession() {
 
   // An unfinished attempt on this notebook is offered back rather than
   // overwritten. Answering anything replaces it, so the offer has to come now.
-  if (_npResume && _npResume.notebookId === activeNotebook.id && !reviewRecord) {
+  // The library's own "Resume attempt" button has already put the question,
+  // so it says so and this dialog is skipped. Read once and cleared either
+  // way, so a later plain entry still gets asked.
+  const _npAutoResume = getSessionParam('npAutoResume');
+  if (_npAutoResume) clearSessionParam('npAutoResume');
+
+  if (_npResume && _npResume.notebookId === activeNotebook.id && !reviewRecord && _npAutoResume) {
+    if (npApplyProgress(_npResume)) {
+      initTimer();
+      renderSidebar();
+      renderQuestion();
+      npPaintFlagBtn();
+    }
+  } else if (_npResume && _npResume.notebookId === activeNotebook.id && !reviewRecord) {
     const mins = Math.max(1, Math.round((Date.now() - (_npResume.savedAt || Date.now())) / 60000));
     const answered = (_npResume.answers || []).reduce(
       (n, sec) => n + Object.values(sec || {}).filter(v => v != null && v !== '').length, 0);

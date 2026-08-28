@@ -344,99 +344,150 @@ function notesRenderDetail() {
 
   emptyState.classList.add('hidden');
 
-  const tagsHtml = (nb.tags || []).map(t => `<span class="tag">${escapeHTML(t)}</span>`).join('');
+  const folder = nb.parentId ? state.nodes.find(n => n.id === nb.parentId) : null;
+  const folderArg = folder ? `'${folder.id}'` : `'__root__'`;
+
+  const tagsHtml = (nb.tags || []).map(t => `<span class="badge badge-primary">${escapeHTML(t)}</span>`).join('');
 
   const totalQs = (nb.sections || []).reduce((sum, sec) => sum + (sec.questions ? sec.questions.length : 0), 0);
 
-  const isRoot = !nb.parentId;
-  let breadcrumbHtml = `<nav class="breadcrumb-nav" style="margin-bottom: 1rem;">`;
-  breadcrumbHtml += `<button class="breadcrumb-item" style="cursor:default;"><i data-lucide="home" style="width:12px;height:12px;"></i></button>`;
-  
-  if (isRoot) {
-    breadcrumbHtml += `<span class="breadcrumb-separator"><i data-lucide="chevron-right"></i></span>`;
-    breadcrumbHtml += `<span class="breadcrumb-current">Uncategorized</span>`;
-  } else {
-    const pathNodes = getBreadcrumbPath(nb.parentId);
-    pathNodes.forEach((node, idx) => {
+  // Attempt history, newest first (state.notebookHistory is unshifted).
+  const logs = _notebookAttemptLogs(nb);
+  const attemptsCount = logs.length;
+  const bestScore = logs.length ? Math.max(...logs.map(l => l.score)) : -1;
+  const lastScore = logs.length ? logs[0].score : -1;
+  const lastAttempt = logs.length ? logs[0].date : null;
+  const isPerfect = bestScore === 100;
+  const scoreClass = bestScore === 100 ? 'score-perfect' : bestScore >= 50 ? 'score-partial' : bestScore >= 0 ? 'score-low' : '';
+  const resumable = notesHasResumable(nb);
+  const noSections = (nb.sections || []).length === 0;
+  const dueText = typeof agDeadlineTextHTML === 'function' ? agDeadlineTextHTML('notebook', nb.id) : '';
+  const hasDeadline = !!dueText;
+
+  // Breadcrumbs: Back › Home › …folders… › Notebook. The crumbs used to only
+  // expand the tree in the sidebar; they navigate now, like the Coding
+  // Library's, and there is a Back control at the head of them.
+  let breadcrumbHtml = `<nav class="breadcrumb-nav">`;
+  breadcrumbHtml += `<button class="btn-back-dark browse-back-btn" onclick="selectNotebookFolder(${folderArg})" title="Back">` +
+    `<i data-lucide="chevron-left" style="width:15px;height:15px;"></i> Back</button>`;
+  breadcrumbHtml += `<button class="breadcrumb-item" onclick="selectNotebookFolder('__root__')" title="All notebooks">` +
+    `<i data-lucide="home" style="width:12px;height:12px;"></i></button>`;
+  if (folder) {
+    getBreadcrumbPath(folder.id).forEach(node => {
       breadcrumbHtml += `<span class="breadcrumb-separator"><i data-lucide="chevron-right"></i></span>`;
-      breadcrumbHtml += `<button class="breadcrumb-item" onclick="toggleNotebookFolder('${node.id}')">${escapeHTML(node.name)}</button>`;
+      breadcrumbHtml += `<button class="breadcrumb-item" onclick="selectNotebookFolder('${node.id}')">${escapeHTML(node.name)}</button>`;
     });
+  } else {
+    breadcrumbHtml += `<span class="breadcrumb-separator"><i data-lucide="chevron-right"></i></span>`;
+    breadcrumbHtml += `<button class="breadcrumb-item" onclick="selectNotebookFolder('__root__')">Uncategorized</button>`;
   }
-  breadcrumbHtml += `</nav>`;
+  breadcrumbHtml += `<span class="breadcrumb-separator"><i data-lucide="chevron-right"></i></span>`;
+  breadcrumbHtml += `<span class="breadcrumb-current">${escapeHTML(nb.title)}</span></nav>`;
+
+  const stat = (icon, label, value, cls) => `
+    <div class="prog-stat${cls ? ' ' + cls : ''}">
+      <i data-lucide="${icon}" style="width:13px;height:13px;"></i>
+      <span class="prog-stat-body"><em>${label}</em><strong>${value}</strong></span>
+    </div>`;
+
+  const sectionsHtml = (nb.sections || []).map((sec, idx) => {
+    // One overall best-% hid which section you actually keep failing.
+    const st = _notebookSectionStats(nb, idx);
+    const cls = st.pct < 0 ? '' : st.pct >= 80 ? 'score-perfect' : st.pct >= 50 ? 'score-partial' : 'score-low';
+    const qCount = (sec.questions || []).length;
+    return `
+      <div class="prog-variant-row">
+        <div class="prog-variant-num">${String(idx + 1).padStart(2, '0')}</div>
+        <div class="prog-variant-info">
+          <div class="prog-variant-name">${escapeHTML(sec.label)}</div>
+          <div class="prog-variant-meta">
+            <span><i data-lucide="help-circle" style="width:11px;height:11px;"></i> ${qCount} question${qCount !== 1 ? 's' : ''}</span>
+            <span><i data-lucide="list" style="width:11px;height:11px;"></i> ${sec.choices} choices (A-${String.fromCharCode(64 + sec.choices)})</span>
+          </div>
+        </div>
+        <div class="nb-section-stat">
+          ${st.pct < 0
+            ? '<span class="nb-section-untried">Not attempted</span>'
+            : `<span class="badge ${cls}">${st.pct}%</span>
+               <div class="nb-section-bar"><div class="nb-section-fill ${cls}" style="width:${st.pct}%;"></div></div>
+               <span class="nb-section-sub">best of ${st.runs} run${st.runs !== 1 ? 's' : ''}</span>`}
+        </div>
+      </div>`;
+  }).join('');
+
+  const drillHtml = (() => {
+    const wrong = _notebookWrongQuestions(nb);
+    if (!wrong.count) return '';
+    return `<div class="nb-drill-callout">
+      <div>
+        <strong>${wrong.count} question${wrong.count === 1 ? '' : 's'} you got wrong last time</strong>
+        <span>Run just those instead of the whole notebook.</span>
+      </div>
+      <button class="btn btn-secondary" onclick="notesStartDrill()">
+        <i data-lucide="target" style="width:16px;height:16px;"></i> Drill wrong answers
+      </button>
+    </div>`;
+  })();
 
   let html = `
-    <div class="animate-fade-in" style="max-width: 800px; margin: 0 auto;">
+    <div class="animate-fade-in prog-detail">
       ${breadcrumbHtml}
-      <div style="display:flex; align-items:flex-start; gap:1.5rem; margin-bottom:2rem;">
-        <div style="width:64px; height:64px; border-radius:var(--radius-md); background:var(--color-primary-subtle); color:var(--color-primary); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-          <i data-lucide="${nb.icon || 'book'}" style="width:32px; height:32px;"></i>
-        </div>
-        <div style="flex:1;">
-          <h1 style="font-size:2rem; font-weight:800; margin-bottom:0.5rem; color:var(--text-primary);">${escapeHTML(nb.title)}</h1>
-          <div style="display:flex; gap:1rem; color:var(--text-tertiary); font-size:0.875rem; margin-bottom:1rem;">
-            <span style="display:flex; align-items:center; gap:0.25rem;"><i data-lucide="layers" style="width:14px;height:14px;"></i> ${(nb.sections || []).length} Sections</span>
-            <span style="display:flex; align-items:center; gap:0.25rem;"><i data-lucide="help-circle" style="width:14px;height:14px;"></i> ${totalQs} Questions</span>
+      <div class="prog-detail-header">
+        <div class="prog-detail-icon"><i data-lucide="${escapeHTML(nb.icon || 'book')}"></i></div>
+        <div style="flex:1; min-width:0;">
+          <h1 class="prog-detail-title">${escapeHTML(nb.title)}</h1>
+          <div class="prog-stats">
+            ${stat('layers', 'Sections', (nb.sections || []).length)}
+            ${stat('help-circle', 'Questions', totalQs)}
+            ${stat('rotate-ccw', 'Attempts', attemptsCount)}
+            ${bestScore >= 0 ? stat(isPerfect ? 'check-circle' : 'target', 'Best', bestScore + '%', scoreClass) : ''}
+            ${lastScore >= 0 ? stat('activity', 'Last score', lastScore + '%') : ''}
+            ${lastAttempt ? stat('clock', 'Last attempt', escapeHTML(lastAttempt)) : ''}
+            ${resumable ? stat('play-circle', 'Status', 'In progress', 'prog-stat-live') : ''}
           </div>
-          ${tagsHtml ? `<div style="display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem;">${tagsHtml}</div>` : ''}
-          <p style="color:var(--text-secondary); line-height:1.6;">${escapeHTML(nb.description || 'No description provided.')}</p>
+          ${tagsHtml ? `<div class="prog-tags">
+            <i data-lucide="tag" style="width:12px;height:12px;"></i>${tagsHtml}
+          </div>` : ''}
         </div>
+        ${dueText ? `<div class="prog-detail-due">${dueText}</div>` : ''}
+        ${isPerfect ? '<div class="card-completed-badge" style="position:static;flex-shrink:0;"><i data-lucide="check" style="width:12px;height:12px;"></i></div>' : ''}
+      </div>
+
+      <p class="prog-detail-desc">${escapeHTML(nb.description || 'No description provided.')}</p>
+
+      <div class="prog-detail-actions">
+        ${resumable ? `
+        <button class="btn btn-practice btn-lg" onclick="notesResumeAttempt()" style="flex:1; max-width:280px;">
+          <i data-lucide="play" style="width:18px;height:18px;fill:currentColor;"></i> Resume attempt
+        </button>
+        <button class="btn btn-secondary btn-lg" onclick="notesStartOver()" title="Discard the unfinished attempt and begin again">
+          <i data-lucide="rotate-ccw" style="width:16px;height:16px;"></i> Start over
+        </button>` : `
+        <button class="btn btn-practice btn-lg" onclick="notesStartAttempt()" style="flex:1; max-width:280px;" ${noSections ? 'disabled' : ''}>
+          <i data-lucide="play" style="width:18px;height:18px;fill:currentColor;"></i> ${isPerfect ? 'Practice Again' : 'Start Attempt'}
+        </button>`}
+        <button class="btn btn-secondary" onclick="agOpenDeadlineModal('notebook', '${nb.id}')"
+                title="${hasDeadline ? 'Change or clear the deadline on this notebook' : 'Put a due date on this notebook'}">
+          <i data-lucide="flag" style="width:16px;height:16px;"></i> ${hasDeadline ? 'Deadline' : 'Set Deadline'}
+        </button>
+        <button class="btn btn-secondary" onclick="shareNotebook('${nb.id}')">
+          <i data-lucide="share-2" style="width:16px;height:16px;"></i> Share
+        </button>
+        <button class="btn btn-ghost" onclick="selectNotebookFolder(${folderArg})" title="Back to folder">
+          <i data-lucide="folder-open" style="width:16px;height:16px;"></i> ${escapeHTML(folder ? folder.name : 'Uncategorized')}
+        </button>
       </div>
 
       <div class="divider"></div>
 
-      <div style="margin-bottom:2rem;">
-        <h2 style="font-size:1.25rem; font-weight:700; margin-bottom:1rem;">Notebook Contents</h2>
-        <div style="display:flex; flex-direction:column; gap:0.5rem;">
-          ${(nb.sections || []).length === 0 ? '<div class="empty-state">No sections in this notebook.</div>' : ''}
-          ${(nb.sections || []).map((sec, idx) => {
-            // One overall best-% hid which section you actually keep failing.
-            const st = _notebookSectionStats(nb, idx);
-            const cls = st.pct < 0 ? '' : st.pct >= 80 ? 'score-perfect' : st.pct >= 50 ? 'score-partial' : 'score-low';
-            return `
-            <div class="card-flat nb-section-row">
-              <div style="min-width:0;">
-                <div style="font-weight:700; color:var(--text-primary); margin-bottom:0.25rem;">${escapeHTML(sec.label)}</div>
-                <div style="font-size:0.8125rem; color:var(--text-tertiary);">
-                  ${(sec.questions || []).length} Questions · ${sec.choices} Choices (A-${String.fromCharCode(64 + sec.choices)})
-                </div>
-              </div>
-              <div class="nb-section-stat">
-                ${st.pct < 0
-                  ? '<span class="nb-section-untried">Not attempted</span>'
-                  : `<span class="badge ${cls}">${st.pct}%</span>
-                     <div class="nb-section-bar"><div class="nb-section-fill ${cls}" style="width:${st.pct}%;"></div></div>
-                     <span class="nb-section-sub">best of ${st.runs} run${st.runs !== 1 ? 's' : ''}</span>`}
-              </div>
-              <div style="font-weight:800; color:var(--text-tertiary); font-size:1.5rem; opacity:0.3;">
-                ${String(idx + 1).padStart(2, '0')}
-              </div>
-            </div>`;
-          }).join('')}
-        </div>
-      </div>
+      <h2 class="prog-detail-section-title"><i data-lucide="layers"></i> Notebook Contents</h2>
+      <div class="prog-variant-list">${sectionsHtml || '<div class="empty-state">No sections in this notebook.</div>'}</div>
 
-      ${(() => {
-        const wrong = _notebookWrongQuestions(nb);
-        if (!wrong.count) return '';
-        return `<div class="nb-drill-callout">
-          <div>
-            <strong>${wrong.count} question${wrong.count === 1 ? '' : 's'} you got wrong last time</strong>
-            <span>Run just those instead of the whole notebook.</span>
-          </div>
-          <button class="btn btn-secondary" onclick="notesStartDrill()">
-            <i data-lucide="target" style="width:16px;height:16px;"></i> Drill wrong answers
-          </button>
-        </div>`;
-      })()}
+      ${drillHtml}
 
-      <div style="display:flex; justify-content:flex-end; gap: 1rem;">
-        <button class="btn btn-secondary btn-lg" onclick="shareNotebook('${nb.id}')">
-          <i data-lucide="share-2" style="width:20px;height:20px;"></i> Share
-        </button>
-        <button class="btn btn-primary btn-lg" onclick="notesStartAttempt()" ${(nb.sections || []).length === 0 ? 'disabled' : ''}>
-          <i data-lucide="play-circle" style="width:20px;height:20px;"></i> Start Attempt
-        </button>
-      </div>
+      ${attemptsCount ? `
+        <h2 class="prog-detail-section-title" style="margin-top:1.75rem;"><i data-lucide="history"></i> Recent Attempts</h2>
+        <div id="nb-attempt-block">${_nbAttemptsPageHTML(nb.id, logs)}</div>` : ''}
     </div>
   `;
 
@@ -1319,3 +1370,111 @@ registerTreeHost('notes', {
   // Moving between folders asks first; reordering inside one does not.
   confirmMove: true
 });
+
+/* ============================================================
+   NOTEBOOK DETAIL — attempts, resume, deadline
+   ------------------------------------------------------------
+   Brought into line with the Coding Library's program page, which had all of
+   this already: a back button, a stats strip, a due date, and the attempt
+   history. The notebook page was showing a title, a section list and two
+   buttons, and none of the record it had been keeping.
+   ============================================================ */
+
+/** Whole-notebook runs as score rows, newest first. Drills are excluded by
+    _notebookFullRecords — 40% on the three questions you missed is not a 40%
+    run at the notebook. */
+function _notebookAttemptLogs(nb) {
+  return _notebookFullRecords(nb).map(r => {
+    let correct = 0, total = 0;
+    (r.sections || []).forEach(s => { correct += s.correct || 0; total += s.total || 0; });
+    return {
+      id: r.id,
+      date: r.date || '',
+      correct, total,
+      score: total > 0 ? Math.round((correct / total) * 100) : 0
+    };
+  });
+}
+
+/* Paged for the same reason the coding library's list is: a notebook you have
+   drilled twenty times should not push everything else off the screen. */
+const NB_ATTEMPTS_PER_PAGE = 5;
+let _nbAttemptPage = {};
+
+function nbAttemptsGoTo(notebookId, page) {
+  _nbAttemptPage[notebookId] = page;
+  const nb = (state.notebooks || []).find(n => n.id === notebookId);
+  const host = document.getElementById('nb-attempt-block');
+  if (!nb || !host) return;
+  host.innerHTML = _nbAttemptsPageHTML(notebookId, _notebookAttemptLogs(nb));
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: host });
+}
+
+function _nbAttemptsPageHTML(notebookId, logs) {
+  if (!logs.length) return '';
+  const pages = Math.max(1, Math.ceil(logs.length / NB_ATTEMPTS_PER_PAGE));
+  const page = Math.min(Math.max(1, _nbAttemptPage[notebookId] || 1), pages);
+  const from = (page - 1) * NB_ATTEMPTS_PER_PAGE;
+  const slice = logs.slice(from, from + NB_ATTEMPTS_PER_PAGE);
+
+  const rows = slice.map((l, i) => {
+    const cls = l.score === 100 ? 'score-perfect' : l.score >= 50 ? 'score-partial' : 'score-low';
+    return `
+      <div class="prog-attempt-row">
+        <span class="prog-attempt-no">#${logs.length - (from + i)}</span>
+        <span class="prog-attempt-date">${escapeHTML(l.date)}</span>
+        <span class="prog-attempt-basis">${l.correct}/${l.total} correct</span>
+        <div class="card-score-bar" style="flex:1;"><div class="card-score-fill ${cls}" style="width:${l.score}%;"></div></div>
+        <span class="badge ${cls}">${l.score}%</span>
+      </div>`;
+  }).join('');
+
+  const pager = pages > 1 ? `
+    <div class="prog-attempt-pager">
+      <button class="prog-page-btn" ${page === 1 ? 'disabled' : ''}
+              onclick="nbAttemptsGoTo('${notebookId}', ${page - 1})" aria-label="Previous attempts">
+        <i data-lucide="chevron-left" style="width:14px;height:14px;"></i> Previous
+      </button>
+      <span class="prog-page-info">${from + 1}–${from + slice.length} of ${logs.length}</span>
+      <button class="prog-page-btn" ${page === pages ? 'disabled' : ''}
+              onclick="nbAttemptsGoTo('${notebookId}', ${page + 1})" aria-label="Next attempts">
+        Next <i data-lucide="chevron-right" style="width:14px;height:14px;"></i>
+      </button>
+    </div>` : '';
+
+  return `<div class="prog-attempt-list">${rows}</div>${pager}`;
+}
+
+/**
+ * Is there an unfinished attempt on THIS notebook?
+ *
+ * notes-practice keeps a single resume slot, not one per notebook, so the id
+ * has to be checked — otherwise every notebook would advertise a resume that
+ * belongs to a different one.
+ */
+function notesHasResumable(nb) {
+  if (typeof npReadProgress !== 'function' || !nb) return false;
+  const d = npReadProgress();
+  return !!(d && d.notebookId === nb.id);
+}
+
+/** Straight back into the saved attempt — the button already asked. */
+function notesResumeAttempt() {
+  if (!activeNotebookId) return;
+  clearSessionParam('notebookDrill');
+  setSessionParam('activeNotebook', activeNotebookId);
+  setSessionParam('npAutoResume', '1');
+  spaNavigate('notes-practice');
+}
+
+/** Discard the unfinished attempt, then set a time limit as usual. */
+function notesStartOver() {
+  if (!activeNotebookId) return;
+  showConfirm('Start over?',
+    'The unfinished attempt on this notebook will be discarded and you will begin again from the first question.',
+    () => {
+      if (typeof npClearProgress === 'function') npClearProgress();
+      notesRenderDetail();
+      notesStartAttempt();
+    });
+}

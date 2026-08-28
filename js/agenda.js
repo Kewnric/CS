@@ -347,9 +347,14 @@ function agPaintFlag() {
 function agRefresh() {
   agPaintFlag();
   if (agPanelOpen) agRenderPanel();
-  // The program page shows its own deadline chip.
+  // An item's own page carries its due date, so whichever library page is on
+  // screen has to be redrawn — setting a deadline from the program page and
+  // not seeing it appear is the same bug either way.
   if (typeof renderBrowseContent === 'function' && document.getElementById('browse-challenges-container')) {
     renderBrowseContent();
+  }
+  if (typeof notesRenderDetail === 'function' && document.getElementById('notes-sections-area')) {
+    notesRenderDetail();
   }
 }
 
@@ -425,7 +430,7 @@ function agTick() {
     });
   }
 
-  document.querySelectorAll('.ag-deadline-chip[data-ag-dl]').forEach(chip => {
+  document.querySelectorAll('[data-ag-dl]').forEach(chip => {
     const [type, id] = chip.getAttribute('data-ag-dl').split(':');
     const d = agGetDeadline(type, id);
     if (!d) return;
@@ -833,19 +838,25 @@ function agSubmitEvent(eventId, del) {
   agToast(eventId ? 'Event saved' : 'Event added');
 }
 
-/* ── Chip used on the program page ────────────────────────── */
+/* ── The due date on an item's own page ───────────────────── */
 
-/** The deadline as it appears inline on an item's own page. '' when unset. */
-function agDeadlineChipHTML(type, id) {
+/**
+ * The deadline as a line of text, for the top-right of an item's page. ''
+ * when unset.
+ *
+ * Text rather than a pill: a badge in the corner competes with the title for
+ * the eye, and this is a fact about the item, not a status to be decorated.
+ * The countdown carries the colour, since that is the part that changes.
+ */
+function agDeadlineTextHTML(type, id) {
   const d = agGetDeadline(type, id);
   if (!d) return '';
   const entry = { date: d.date, time: d.time, ts: agTs(d.date, d.time) };
   const overdue = entry.ts < Date.now();
   return `
-    <span class="ag-deadline-chip${overdue ? ' is-overdue' : ''}" data-ag-dl="${type}:${id}"
+    <span class="ag-deadline-text${overdue ? ' is-overdue' : ''}" data-ag-dl="${type}:${id}"
           title="${escapeHTML(d.note || 'Deadline')}">
-      <i data-lucide="flag" style="width:12px;height:12px;" aria-hidden="true"></i>
-      ${escapeHTML(agFmtDate(d.date))}${d.time ? ' · ' + escapeHTML(agFmtTime(d.time)) : ''}
+      Due ${escapeHTML(agFmtDate(d.date))}${d.time ? ' · ' + escapeHTML(agFmtTime(d.time)) : ''}
       <em>${escapeHTML(agTimeLeft(entry))}</em>
     </span>`;
 }

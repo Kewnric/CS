@@ -1200,8 +1200,8 @@ function _renderProgramDetail(container, c) {
   }).join('');
 
   const recentHtml = _progAttemptsPageHTML(c.id, logs);
-  const dlChip = typeof agDeadlineChipHTML === 'function' ? agDeadlineChipHTML('challenge', c.id) : '';
-  const hasDeadline = !!dlChip;
+  const dueText = typeof agDeadlineTextHTML === 'function' ? agDeadlineTextHTML('challenge', c.id) : '';
+  const hasDeadline = !!dueText;
 
   container.innerHTML = breadcrumbHtml + `
     <div class="animate-fade-in prog-detail">
@@ -1213,8 +1213,8 @@ function _renderProgramDetail(container, c) {
           ${_progStatsHTML(c, { attempts: attemptsCount, best: bestScore, lastScore: lastScore,
                                 lastAttempt: lastAttempt, scoreClass: scoreClass, resumable: resumable })}
           ${_progTagsHTML(c)}
-          ${dlChip ? `<div class="prog-deadline-row">${dlChip}</div>` : ''}
         </div>
+        ${dueText ? `<div class="prog-detail-due">${dueText}</div>` : ''}
         ${isPerfect ? '<div class="card-completed-badge" style="position:static;flex-shrink:0;"><i data-lucide="check" style="width:12px;height:12px;"></i></div>' : ''}
       </div>
 
