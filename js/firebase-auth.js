@@ -1479,35 +1479,6 @@ async function bootApp() {
     return;
   }
 
-  // First visit — the opening, then the picker.
-  //
-  // This is the ONLY call site that gets it. showStorageModePicker also runs
-  // when an online session is being restored and after a sign-in redirect,
-  // where the picker is shown in a loading state and hidden again moments
-  // later — hooking the shared function meant the opening could fire behind a
-  // card that was already going away, and mark itself seen for good.
+  // First visit: straight to the picker.
   showStorageModePicker();
-  swMaybeWelcome();
 }
-
-/**
- * Run the opening if it is owed, holding the picker card back while it plays.
- *
- * The card is revealed by default and only hidden while the veil is actually
- * up: if anything here fails, the failure is that the opening is skipped, not
- * that the picker is invisible behind nothing.
- */
-function swMaybeWelcome() {
-  const popup = document.getElementById('storage-mode-popup');
-  if (typeof swRunWelcome !== 'function' || typeof swShouldWelcome !== 'function') return;
-  if (!swShouldWelcome()) return;
-
-  if (popup) popup.classList.add('sw-holding');
-  swRunWelcome(() => {
-    // Marked seen on completion, not on start. A run that was interrupted, or
-    // never made it to the screen, should not spend the one showing.
-    swMarkWelcomed();
-    if (popup) { popup.classList.remove('sw-holding'); popup.classList.add('sw-revealed'); }
-  });
-}
-window.swMaybeWelcome = swMaybeWelcome;
