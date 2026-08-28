@@ -448,8 +448,19 @@ function sqaRecord() {
   state.snippetHistory.push({
     id: typeof generateId === 'function' ? generateId() : String(Date.now()),
     snippetId: _sqa.snippetId,
+    // Both keys: Try Coding writes snippetTitle and everything reading this
+    // log already expects it. Dropping one shape on top of another is how a
+    // history list ends up saying "Unknown Snippet".
+    snippetTitle: _sqa.snippet.title || 'SQL Practice',
     title: _sqa.snippet.title || 'SQL Practice',
     kind: 'sql',
+    language: _sqa.dialect,
+    // Per case, so analytics can say WHICH question keeps being missed rather
+    // than only how many were.
+    cases: (_sqa.check.tests || []).map((t, i) => ({
+      prompt: (_sqa.cases[i] || {}).prompt || t.name,
+      passed: !!t.passed
+    })),
     score: _sqa.check.testScore,
     passed: _sqa.check.passed,
     total: _sqa.check.total,

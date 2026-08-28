@@ -310,10 +310,14 @@ function getSnippetFormHTML() {
             <label class="form-label" for="study-language"><i data-lucide="code" class="af-label-icon"></i>Language <span class="af-label-hint">(optional — groups and filters the Snippet Library)</span></label>
             <input id="study-language" class="form-input" list="study-language-list" maxlength="16" placeholder="e.g. C, shell, sql"
                    oninput="if(studyModeState) { studyModeState.language = this.value.trim() || null; window.studyIsDirty = true; setSaveStatus('study-save-status','unsaved'); }" />
+            <!-- Kept in step with the Test Cases language picker: a snippet
+                 labelled MySQL there should be labelled MySQL here too. -->
             <datalist id="study-language-list">
               <option value="C"></option><option value="C++"></option><option value="Python"></option>
-              <option value="JavaScript"></option><option value="SQL"></option><option value="Shell"></option>
-              <option value="Java"></option><option value="Assembly"></option>
+              <option value="JavaScript"></option><option value="Java"></option><option value="Assembly"></option>
+              <option value="SQL"></option><option value="MySQL"></option><option value="PostgreSQL"></option>
+              <option value="SQLite"></option><option value="HTML"></option><option value="CSS"></option>
+              <option value="Shell"></option>
             </datalist>
           </div>
           <div class="af-field">

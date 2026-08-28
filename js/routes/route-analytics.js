@@ -258,73 +258,44 @@ function analyticsNotesDestroy() { }
 /* -------------------------------------------------------------
    SNIPPET LIBRARY ANALYTICS
    ------------------------------------------------------------- */
+/* The snippets route no longer borrows the coding library's tree-and-detail
+   shell. That shell answers "which attempt, what score" — the right questions
+   for one program, the wrong ones for a reference library, where what matters
+   is how much of it you have touched and what you have never opened. */
 function analyticsSnippetsTemplate() {
   return `
-    <div class="messenger-layout">
-      <main class="messenger-pane-1">
-        <div class="pane-1-header">
-          <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
-            <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0;">
-              <button onclick="spaNavigate('analytics')" class="btn-back-dark" style="margin-right: 0.5rem; padding: 0.25rem 0.5rem; font-size: 0.75rem; flex-shrink: 0;">
-                <i data-lucide="chevron-left" style="width:14px;height:14px;"></i> Back
-              </button>
-              <h2 class="section-header-animated" style="margin: 0; display: flex; align-items: center;">
-                <span class="section-header-icon-wrap analytics-icon-wrap" style="background:rgba(6,182,212,0.14); color:var(--color-accent);">
-                  <i data-lucide="code"></i>
-                  <span class="section-header-icon-ring"></span>
-                </span>
-                <span class="section-header-text">
-                  <span class="section-header-title">Snippet Analytics</span>
-                  <span class="section-header-subtitle" id="analytics-snippets-header-stats">Loading...</span>
-                </span>
-              </h2>
-            </div>
-            <div style="display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0;">
-              <button class="tutorial-trigger-btn" id="analytics-snippets-toggle-items-btn" onclick="toggleAnalyticsTreeItems()" title="Toggle file visibility">
-                <i data-lucide="${localStorage.getItem('analyticsHideItems') === 'true' ? 'eye-off' : 'eye'}" id="analytics-snippets-toggle-items-icon"></i>
-              </button>
-            </div>
-          </div>
-          <div class="analytics-summary-strip" id="analytics-snippets-summary-strip"></div>
-          <div class="search-container search-animated" style="width: 100%; margin-top: 0.75rem;">
-            <i data-lucide="search"></i>
-            <input type="text" id="analytics-search" oninput="debouncedAnalyticsSearch()" placeholder="Search snippet history..." class="search-input">
-          </div>
-        </div>
-        <div class="pane-1-content tree-container" id="analytics-snippets-sidebar-content"></div>
-      </main>
-      <div class="resizer-divider" onmousedown="initResizerDrag(event, this)"></div>
-      <section class="messenger-pane-2">
-        <div id="analytics-detail-container" style="height: 100%;"></div>
-      </section>
+    <div class="an-sn-page">
+      <header class="an-sn-head">
+        <button onclick="spaNavigate('analytics')" class="btn-back-dark" title="Back">
+          <i data-lucide="chevron-left" style="width:14px;height:14px;"></i> Back
+        </button>
+        <h2 class="section-header-animated" style="margin:0; display:flex; align-items:center;">
+          <span class="section-header-icon-wrap analytics-icon-wrap" style="background:rgba(6,182,212,0.14); color:var(--color-accent);">
+            <i data-lucide="code"></i>
+            <span class="section-header-icon-ring"></span>
+          </span>
+          <span class="section-header-text">
+            <span class="section-header-title">Snippet Analytics</span>
+            <span class="section-header-subtitle" id="an-sn-sub">Coverage, languages and the questions you keep missing</span>
+          </span>
+        </h2>
+      </header>
+      <div class="an-sn-body" id="an-sn-body"></div>
     </div>
   `;
 }
 
 function analyticsSnippetsInit() {
   activeAnalyticsTab = 'snippets';
-  bulkResetMode = false;
-  activeHistoryChallengeId = null;
-  activeHistorySetId = null;
-  activeNotebookHistoryId = null;
-
-  const container = document.getElementById('analytics-detail-container');
-  if (container) {
-    if (activeSnippetHistoryId && typeof renderSnippetHistoryDetailView === 'function') {
-      renderSnippetHistoryDetailView(activeSnippetHistoryId);
-    } else if (activeAnalyticsFolderId && activeAnalyticsFolderScope === 'snippet' && typeof renderAnalyticsFolderDetail === 'function') {
-      renderAnalyticsFolderDetail(activeAnalyticsFolderId, 'snippet');
-    } else if (typeof renderAnalyticsOverview === 'function') {
-      renderAnalyticsOverview(container);
-    }
+  if (typeof renderSnippetAnalyticsDashboard === 'function') renderSnippetAnalyticsDashboard();
+  const sub = document.getElementById('an-sn-sub');
+  if (sub) {
+    const n = (state.snippets || []).length;
+    const runs = (state.snippetHistory || []).length;
+    sub.textContent = n + (n === 1 ? ' snippet' : ' snippets') + ' · ' +
+      runs + (runs === 1 ? ' attempt' : ' attempts') + ' logged';
   }
-
-  renderSnippetAnalytics();
-
-  if (typeof window.restoreAnalyticsScrollPositions === 'function') {
-    window.restoreAnalyticsScrollPositions();
-    setTimeout(window.restoreAnalyticsScrollPositions, 0);
-  }
+  if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
 function analyticsSnippetsDestroy() { }
