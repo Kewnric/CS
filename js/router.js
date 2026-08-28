@@ -215,6 +215,10 @@ const SpaRouter = (() => {
         }
       }
 
+      // The agenda flag lives outside #spa-content, so nothing else would
+      // bring its badge up to date after data loads or changes.
+      if (typeof agPaintFlag === 'function') agPaintFlag();
+
       // Re-create Lucide icons globally safely
       if (typeof lucide !== 'undefined') {
         lucide.createIcons();

@@ -34,6 +34,8 @@ let state = {
   history: [],
   activeAttempts: {},
   review: {},            // Spaced-repetition state, keyed "<type>:<id>" (see review.js)
+  deadlines: {},         // User-set due dates, keyed "<type>:<id>" (see agenda.js)
+  events: [],            // Free-standing calendar entries (see agenda.js)
   activeChallenge: null,
   activeVariant: null,
   userCode: '',
@@ -173,6 +175,8 @@ function loadData() {
       state.history = parsed.history || [];
       state.activeAttempts = parsed.activeAttempts || {};
       state.review = parsed.review || {};
+      state.deadlines = parsed.deadlines || {};
+      state.events = parsed.events || [];
       state.expandedNodes = parsed.expandedNodes || [];
 
       // Tree migration: if nodes don't exist yet, migrate from flat categories
@@ -277,7 +281,9 @@ function _flushSaveData() {
     codingSets: state.codingSets || [],
     history: state.history,
     activeAttempts: state.activeAttempts,
-    review: state.review || {}
+    review: state.review || {},
+    deadlines: state.deadlines || {},
+    events: state.events || []
   };
   try {
     localStorage.setItem(getAppStorageKey(), JSON.stringify(dataToSave));

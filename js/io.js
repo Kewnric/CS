@@ -22,7 +22,9 @@ function handleDataExport() {
     codingSets: state.codingSets || [],
     history: state.history,
     activeAttempts: state.activeAttempts,
-    review: state.review || {}
+    review: state.review || {},
+    deadlines: state.deadlines || {},
+    events: state.events || []
   };
   if (typeof viz !== 'undefined') {
     data.viz = { nodes: viz.nodes, links: viz.links, pan: viz.pan, zoom: viz.zoom, fogEnabled: viz.fogEnabled, panesSwapped: viz.panesSwapped, tabsCollapsed: viz.tabsCollapsed, toolbarCollapsed: viz.toolbarCollapsed, flowyDragEnabled: viz.flowyDragEnabled, globeModeEnabled: viz.globeModeEnabled, snapEnabled: viz.snapEnabled, defaultLinkArrowType: viz.defaultLinkArrowType };
@@ -109,6 +111,8 @@ function handleDataImport(e) {
         state.history = parsed.history || [];
         state.activeAttempts = parsed.activeAttempts || {};
         state.review = parsed.review || {};
+        state.deadlines = parsed.deadlines || {};
+        state.events = parsed.events || [];
 
         if (parsed.nodes && parsed.nodes.length > 0) {
           state.nodes = parsed.nodes;
@@ -186,6 +190,8 @@ function handleDataReset() {
         history: seed.history,
         activeAttempts: seed.activeAttempts,
         review: seed.review || {},
+        deadlines: {},
+        events: [],
         activeChallenge: null,
         activeVariant: null,
         userCode: '',

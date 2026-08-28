@@ -1200,6 +1200,8 @@ function _renderProgramDetail(container, c) {
   }).join('');
 
   const recentHtml = _progAttemptsPageHTML(c.id, logs);
+  const dlChip = typeof agDeadlineChipHTML === 'function' ? agDeadlineChipHTML('challenge', c.id) : '';
+  const hasDeadline = !!dlChip;
 
   container.innerHTML = breadcrumbHtml + `
     <div class="animate-fade-in prog-detail">
@@ -1211,6 +1213,7 @@ function _renderProgramDetail(container, c) {
           ${_progStatsHTML(c, { attempts: attemptsCount, best: bestScore, lastScore: lastScore,
                                 lastAttempt: lastAttempt, scoreClass: scoreClass, resumable: resumable })}
           ${_progTagsHTML(c)}
+          ${dlChip ? `<div class="prog-deadline-row">${dlChip}</div>` : ''}
         </div>
         ${isPerfect ? '<div class="card-completed-badge" style="position:static;flex-shrink:0;"><i data-lucide="check" style="width:12px;height:12px;"></i></div>' : ''}
       </div>
@@ -1228,6 +1231,10 @@ function _renderProgramDetail(container, c) {
         <button class="btn btn-practice btn-lg" onclick="browseStartFresh('${c.id}')" style="flex:1; max-width:280px;">
           <i data-lucide="play" style="width:18px;height:18px;fill:currentColor;"></i> ${isPerfect ? 'Practice Again' : 'Start Practice'}
         </button>`}
+        <button class="btn btn-secondary" onclick="agOpenDeadlineModal('challenge', '${c.id}')"
+                title="${hasDeadline ? 'Change or clear the deadline on this program' : 'Put a due date on this program'}">
+          <i data-lucide="flag" style="width:16px;height:16px;"></i> ${hasDeadline ? 'Deadline' : 'Set Deadline'}
+        </button>
         <button class="btn btn-secondary" onclick="shareChallenge('${c.id}')">
           <i data-lucide="share-2" style="width:16px;height:16px;"></i> Share
         </button>
