@@ -25,8 +25,18 @@ let _sqa = null;
 /** From the snippet library's Start attempt button. */
 window.sqaStart = function (snippetId) {
   const s = (state.snippets || []).find(x => x.id === snippetId);
-  if (!s || !sqaHasPractice(s)) {
-    if (typeof toast === 'function') toast('That snippet has no SQL practice set yet.', { type: 'warning' });
+  if (!s) return;
+  // The button always says Start attempt, because that is what you came to do.
+  // With nothing to attempt it offers the one thing that would fix that,
+  // rather than being a button that quietly does nothing.
+  if (!sqaHasPractice(s)) {
+    if (typeof showConfirm === 'function') {
+      showConfirm('No test cases yet',
+        'This snippet has nothing to attempt. Open it in the admin form to write the questions and their reference answers?',
+        () => { if (typeof snippetSetupSql === 'function') snippetSetupSql(snippetId); });
+    } else if (typeof toast === 'function') {
+      toast('This snippet has no test cases yet.', { type: 'warning' });
+    }
     return;
   }
   setSessionParam('sqaSnippet', snippetId);
@@ -54,7 +64,11 @@ function snippetAttemptInit() {
     dialect: p.dialect || 'MySQL',
     initSql: p.initSql || '',
     activeTab: 'main',
-    cases: (p.cases || []).map((c, i) => ({
+    // Only cases that HAVE a reference answer. Check compares against that
+    // answer, so a case without one can never be passed no matter what the
+    // student writes — showing it would be asking a question with no right
+    // answer and then marking it wrong. The admin flags these instead.
+    cases: (p.cases || []).filter(c => (c.answer || '').trim()).map((c, i) => ({
       id: c.id || ('c' + i),
       prompt: c.prompt || ('Test Case ' + (i + 1)),
       answer: c.answer || '',

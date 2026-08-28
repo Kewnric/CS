@@ -399,7 +399,7 @@ function getSnippetFormHTML() {
                 Setup shown to the student in a locked <code>init</code> tab
                 <span class="af-label-hint">(optional)</span>
               </label>
-              <textarea id="sql-init" rows="4" class="form-textarea af-grow af-code-field"
+              <textarea id="sql-init" rows="3" class="form-textarea af-grow af-code-field"
                         placeholder="CREATE TABLE Suspects (...);"
                         oninput="sqlSetInit(this.value)"></textarea>
             </div>

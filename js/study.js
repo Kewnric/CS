@@ -295,6 +295,24 @@ function selectSnippet(id) {
   renderSnippetDetail();
 }
 
+/**
+ * The back control at the head of every breadcrumb here, matching the coding
+ * library's _browseBackBtn. This library had a breadcrumb you could click a
+ * folder in but nothing that simply went up a level.
+ * @param {string|null} folderId where back goes; null is the library root.
+ */
+function _snippetBackBtn(folderId) {
+  const arg = (folderId === null || folderId === undefined) ? 'null' : `'${folderId}'`;
+  return `<button class="btn-back-dark browse-back-btn" onclick="snippetGoBack(${arg})" title="Back">` +
+    `<i data-lucide="chevron-left" style="width:15px;height:15px;"></i> Back</button>`;
+}
+
+/** Up one level: to the named folder, or to the library root. */
+window.snippetGoBack = function (folderId) {
+  if (typeof selectSnippetFolder !== 'function') return;
+  selectSnippetFolder(folderId || '__root__');
+};
+
 function renderSnippetDetail() {
   const container = document.getElementById('snippet-detail-container');
   const snippet = (state.snippets || []).find(s => s.id === activeSnippetId);
@@ -323,6 +341,7 @@ function renderSnippetDetail() {
 
   const isRoot = !snippet.parentId;
   let breadcrumbHtml = `<nav class="breadcrumb-nav" style="margin-bottom: 1rem;">`;
+  breadcrumbHtml += _snippetBackBtn(snippet.parentId || null);
   breadcrumbHtml += `<button class="breadcrumb-item" style="cursor:default;"><i data-lucide="home" style="width:12px;height:12px;"></i></button>`;
 
   if (isRoot) {
@@ -369,22 +388,14 @@ function renderSnippetDetail() {
         </div>
 
         <div style="display: flex; gap: 1rem; flex-wrap: wrap; background: var(--bg-surface-hover); padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-          ${(() => {
-            const n = (((snippet.sqlPractice && snippet.sqlPractice.cases) || [])
-              .filter(c => (c.answer || '').trim())).length;
-            // With a set: start it. Without one: say the feature exists and go
-            // straight to where it is built. A snippet that simply showed
-            // nothing left no way to find out there was anything to find.
-            return n
-              ? `<button class="btn btn-primary" onclick="sqaStart('${snippet.id}')" id="sql-attempt-btn">
-                   <i data-lucide="play" style="width: 16px; height: 16px;"></i>
-                   Start attempt (${n} case${n !== 1 ? 's' : ''})
-                 </button>`
-              : `<button class="btn btn-ghost" onclick="snippetSetupSql('${snippet.id}')" id="sql-setup-btn"
-                         title="Write SQL questions for this snippet, then attempt them here">
-                   <i data-lucide="database" style="width: 16px; height: 16px;"></i> Set up SQL practice
-                 </button>`;
-          })()}
+          <button class="btn btn-primary" onclick="sqaStart('${snippet.id}')" id="sql-attempt-btn"
+                  title="Answer this snippet's test cases">
+            <i data-lucide="play" style="width: 16px; height: 16px;"></i> Start attempt${(() => {
+              const n = (((snippet.sqlPractice && snippet.sqlPractice.cases) || [])
+                .filter(c => (c.answer || '').trim())).length;
+              return n ? ` (${n} case${n !== 1 ? 's' : ''})` : '';
+            })()}
+          </button>
           <button class="btn btn-primary" onclick="openExamplesModal()" id="view-examples-btn">
             <i data-lucide="code" style="width: 16px; height: 16px;"></i> View Examples (${(snippet.examples || []).length})
           </button>
@@ -567,6 +578,7 @@ function renderSnippetFolderOverview(container) {
   const folder = isRoot ? null : state.nodes.find(n => n.id === activeSnippetFolderId);
 
   let breadcrumbHtml = `<nav class="breadcrumb-nav" style="margin-bottom: 1.5rem;">`;
+  breadcrumbHtml += _snippetBackBtn(folder && folder.parentId ? folder.parentId : null);
   breadcrumbHtml += `<button class="breadcrumb-item" onclick="selectSnippetFolder('__root__')"><i data-lucide="home" style="width:12px;height:12px;"></i></button>`;
 
   if (isRoot) {
@@ -699,12 +711,11 @@ function renderSnippetFolderOverview(container) {
                   <button class="btn btn-ghost" title="Share Link" onclick="event.stopPropagation(); shareSnippet('${s.id}')" style="padding:0.5rem;">
                     <i data-lucide="share-2" style="width:16px;height:16px;"></i>
                   </button>
-                  ${hasSql ? `
                   <button onclick="event.stopPropagation(); sqaStart('${s.id}')" class="btn btn-primary"
                           style="flex:1 1 auto; min-width:0;"
-                          title="Answer this snippet's ${sqlCount} SQL question${sqlCount !== 1 ? 's' : ''}">
+                          title="${hasSql ? `Answer this snippet's ${sqlCount} test case${sqlCount !== 1 ? 's' : ''}` : 'No test cases yet — set them up first'}">
                     <i data-lucide="play" style="width:16px;height:16px;"></i> Start attempt
-                  </button>` : ''}
+                  </button>
                 </div>
               </div>
             `;

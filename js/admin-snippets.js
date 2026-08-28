@@ -437,23 +437,6 @@ function removeStudyRelatedChallenge(id) {
 }
 
 // === Try Coding Target Manager ===
-function updateTryCodingTargets(cb) {
-  const idx = parseInt(cb.value);
-  if (!studyModeState.tryCodingTargetIndices) {
-    studyModeState.tryCodingTargetIndices = [studyModeState.tryCodingExampleIndex || 0];
-  }
-  if (cb.checked) {
-    if (!studyModeState.tryCodingTargetIndices.includes(idx)) {
-      studyModeState.tryCodingTargetIndices.push(idx);
-    }
-  } else {
-    studyModeState.tryCodingTargetIndices = studyModeState.tryCodingTargetIndices.filter(i => i !== idx);
-  }
-  window.adminIsDirty = true;
-  if (typeof setSaveStatus === 'function') setSaveStatus('study-save-status', 'unsaved');
-}
-
-// === Examples Form ===
 function renderStudyExamplesForm() {
   if (!studyModeState) return;
   const p = _sqlState();
@@ -525,6 +508,13 @@ function renderStudyExamplesForm() {
                 placeholder="${escapeHTML(_sqlPlaceholder(p.dialect))}"
                 oninput="sqlUpdateCase(${active}, 'answer', this.value); afAutosize(this); sqlMarkReq(this); renderStudyExampleTabsOnly()">${escapeHTML(c.answer || '')}</textarea>
     </div>
+
+    ${(c.answer || '').trim() ? '' : `
+    <p class="sqladm-warn">
+      <i data-lucide="alert-triangle"></i>
+      No reference answer, so this case is left out of the attempt — Check has
+      nothing to compare against, and showing it would mark every answer wrong.
+    </p>`}
 
     <p class="sqladm-hint">
       Comparison ignores keyword case, spacing and a trailing semicolon. It does
@@ -604,40 +594,6 @@ function removeStudyExample(idx) {
     showConfirm('Delete case ' + (idx + 1) + '?', 'Its question and reference answer go with it.', go);
   } else { go(); }
 }
-
-function updateStudyExampleField(field, value) {
-  if (studyModeState && studyModeState.examples[studyModeState.activeExampleIndex]) {
-    studyModeState.examples[studyModeState.activeExampleIndex][field] = value;
-    window.adminIsDirty = true;
-    if (typeof setSaveStatus === 'function') setSaveStatus('study-save-status', 'unsaved');
-    if (field === 'name') {
-      const tabs = document.getElementById('study-examples-tabs');
-      if (tabs && tabs.children[studyModeState.activeExampleIndex]) {
-        tabs.children[studyModeState.activeExampleIndex].childNodes[0].nodeValue = " " + value + " ";
-      }
-      const targetsContainer = document.getElementById('try-coding-targets-container');
-      if (targetsContainer) {
-        let targetIndices = studyModeState.tryCodingTargetIndices || [0];
-        targetsContainer.innerHTML = studyModeState.examples.map((ex, i) => `
-          <label class="af-try-target-pill">
-            <input type="checkbox" value="${i}" onchange="updateTryCodingTargets(this)" ${targetIndices.includes(i) ? 'checked' : ''} />
-            <span>${escapeHTML(ex.name || 'Example ' + (i + 1))}</span>
-          </label>
-        `).join('');
-      }
-    }
-  }
-}
-
-/* ── Authoring a SQL practice set ─────────────────────────────
-   The same shape the coding library's test cases use — a numbered list of
-   cards you can add to, reorder, duplicate and delete — so the two editors
-   behave the same way. Each case is a question and the reference answer that
-   Check Code compares against.
-
-   It hangs off the snippet rather than being its own entity: a snippet is
-   already the thing that carries a schema, an explanation and examples, and a
-   practice set for it is one more facet of the same subject. */
 
 function _sqlState() {
   if (typeof studyModeState === 'undefined' || !studyModeState) return null;

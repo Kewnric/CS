@@ -883,11 +883,14 @@
   margin: var(--space-md) 0;
 }
 
-/* Inside the variant form the divider is a flex item, so its margin stacks on
-   top of the column gap instead of collapsing into it — 16 + 16 made every
-   section break 32px against Basics' 14. A section break should still read as
-   bigger than the rhythm around it, just not by double. */
-#admin-variant-content .divider {
+/* A divider inside a flex column is a flex item, so its own margin ADDS to the
+   column gap instead of collapsing into it: 16 + 14 put 29px of blank above
+   and below a one-pixel rule, 58px in total to draw a hairline. A section break
+   should read as bigger than the rhythm around it, not as a hole in the form.
+   Written for any af-section-body, not just the variant form, because the same
+   16px margin lands the same way in every one of them. */
+#admin-variant-content .divider,
+.af-section-body > .divider {
   margin: 0.25rem 0;
 }
 

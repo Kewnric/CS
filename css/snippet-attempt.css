@@ -361,3 +361,27 @@
 
 /* Left/right, because the cases run along a tab strip rather than down a list. */
 .af-move button svg { width: 11px; height: 11px; }
+
+/* A case the attempt will skip. Amber rather than red: it is unfinished work,
+   not an error. */
+.sqladm-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0.5rem 0.6rem;
+  border-left: 3px solid var(--color-warning);
+  border-radius: var(--radius-sm);
+  background: rgba(245, 158, 11, 0.08);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.sqladm-warn svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: var(--color-warning);
+}
