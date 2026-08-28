@@ -2307,3 +2307,8 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
 }
 .hero-verse-btn:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
 .hero-verse-btn svg { width: 12px; height: 12px; }
+
+/* The Language Library's accent on the hub card, matching how each other
+   collection gets its own. */
+.lib-card-language { --lib-accent: #a855f7; }
+.lib-card-language .lib-card-icon { background: rgba(168, 85, 247, 0.14); color: #a855f7; }

@@ -24,7 +24,11 @@ function handleDataExport() {
     activeAttempts: state.activeAttempts,
     review: state.review || {},
     deadlines: state.deadlines || {},
-    events: state.events || []
+    events: state.events || [],
+    langWords: state.langWords || [],
+    langSets: state.langSets || [],
+    langScenarios: state.langScenarios || [],
+    langHistory: state.langHistory || []
   };
   if (typeof viz !== 'undefined') {
     data.viz = { nodes: viz.nodes, links: viz.links, pan: viz.pan, zoom: viz.zoom, fogEnabled: viz.fogEnabled, panesSwapped: viz.panesSwapped, tabsCollapsed: viz.tabsCollapsed, toolbarCollapsed: viz.toolbarCollapsed, flowyDragEnabled: viz.flowyDragEnabled, globeModeEnabled: viz.globeModeEnabled, snapEnabled: viz.snapEnabled, defaultLinkArrowType: viz.defaultLinkArrowType };
@@ -113,6 +117,10 @@ function handleDataImport(e) {
         state.review = parsed.review || {};
         state.deadlines = parsed.deadlines || {};
         state.events = parsed.events || [];
+        state.langWords = parsed.langWords || [];
+        state.langSets = parsed.langSets || [];
+        state.langScenarios = parsed.langScenarios || [];
+        state.langHistory = parsed.langHistory || [];
 
         if (parsed.nodes && parsed.nodes.length > 0) {
           state.nodes = parsed.nodes;
@@ -192,6 +200,10 @@ function handleDataReset() {
         review: seed.review || {},
         deadlines: {},
         events: [],
+        langWords: [],
+        langSets: [],
+        langScenarios: [],
+        langHistory: [],
         activeChallenge: null,
         activeVariant: null,
         userCode: '',

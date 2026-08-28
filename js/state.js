@@ -36,6 +36,10 @@ let state = {
   review: {},            // Spaced-repetition state, keyed "<type>:<id>" (see review.js)
   deadlines: {},         // User-set due dates, keyed "<type>:<id>" (see agenda.js)
   events: [],            // Free-standing calendar entries (see agenda.js)
+  langWords: [],         // Language Library dictionary (see language.js)
+  langSets: [],          // Language drill sets
+  langScenarios: [],     // Language scenario encounters
+  langHistory: [],       // Language drill / scenario runs
   activeChallenge: null,
   activeVariant: null,
   userCode: '',
@@ -177,6 +181,10 @@ function loadData() {
       state.review = parsed.review || {};
       state.deadlines = parsed.deadlines || {};
       state.events = parsed.events || [];
+      state.langWords = parsed.langWords || [];
+      state.langSets = parsed.langSets || [];
+      state.langScenarios = parsed.langScenarios || [];
+      state.langHistory = parsed.langHistory || [];
       state.expandedNodes = parsed.expandedNodes || [];
 
       // Tree migration: if nodes don't exist yet, migrate from flat categories
@@ -283,7 +291,11 @@ function _flushSaveData() {
     activeAttempts: state.activeAttempts,
     review: state.review || {},
     deadlines: state.deadlines || {},
-    events: state.events || []
+    events: state.events || [],
+    langWords: state.langWords || [],
+    langSets: state.langSets || [],
+    langScenarios: state.langScenarios || [],
+    langHistory: state.langHistory || []
   };
   try {
     localStorage.setItem(getAppStorageKey(), JSON.stringify(dataToSave));

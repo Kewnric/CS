@@ -3,7 +3,9 @@
    do: see what's due across all of them, and find something by name. */
 
 const LIBRARY_PLACEHOLDERS = [
-  { key: 'language',    name: 'Language Library',    icon: 'languages',    tagline: 'Vocabulary, grammar drills & phrases.' },
+  /* Language moved out of here and into Your collections — it is being built
+     rather than merely planned, and a wing you can add words to does not
+     belong under a heading that means "not yet". */
   { key: 'mindset',     name: 'Mindset Library',     icon: 'brain',        tagline: 'Mental models, attitudes & principles.' },
   { key: 'insights',    name: 'Insights Library',    icon: 'lightbulb',    tagline: 'Aha-moments and lessons worth keeping.' },
   { key: 'remembrance', name: 'Remembrance Library', icon: 'star',         tagline: 'Things you never want to forget.' },
@@ -139,7 +141,18 @@ function libraryInit() {
         'Your own reference book - terms, code you keep for looking at, tables and notes.',
         _libStatChip('book-marked', `${cheatCount} sheet${cheatCount !== 1 ? 's' : ''}`) +
         _libStatChip('layers', `${cheatPages} page${cheatPages !== 1 ? 's' : ''}`),
-        null, `${cheatCount} sheet${cheatCount !== 1 ? 's' : ''}`);
+        null, `${cheatCount} sheet${cheatCount !== 1 ? 's' : ''}`) +
+      (() => {
+        const words = (state.langWords || []).length;
+        const drills = (state.langSets || []).length;
+        const scenes = (state.langScenarios || []).length;
+        return card('language', 'lib-card-language', 'languages', 'Language Library',
+          'Your own dictionary across four languages, drills built from it, and scenario battles.',
+          _libStatChip('book-a', `${words} word${words !== 1 ? 's' : ''}`) +
+          _libStatChip('dumbbell', `${drills} drill${drills !== 1 ? 's' : ''}`) +
+          _libStatChip('swords', `${scenes} scenario${scenes !== 1 ? 's' : ''}`),
+          null, `${words} word${words !== 1 ? 's' : ''}`);
+      })();
   }
 
   const soon = document.getElementById('lib-hub-soon');
