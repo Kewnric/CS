@@ -82,16 +82,6 @@ function langSetRef(code) {
   langRefreshViews();
 }
 
-/** Move the study language on to the next one that is not the reference. */
-function langCycleStudy(dir) {
-  const cur = langStudy(), ref = langRef();
-  let i = LANG_CODES.indexOf(cur);
-  for (let n = 0; n < LANG_CODES.length; n++) {
-    i = (i + (dir < 0 ? -1 : 1) + LANG_CODES.length) % LANG_CODES.length;
-    if (LANG_CODES[i] !== ref) { langSetStudy(LANG_CODES[i]); return; }
-  }
-}
-
 /** Repaint whatever Language view is on screen after a change. */
 function langRefreshViews() {
   if (typeof renderLangLibrary === 'function' && document.getElementById('lang-lib-root')) renderLangLibrary();
@@ -481,4 +471,200 @@ function langShuffle(arr) {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+/* ============================================================
+   DRILLS BY TYPE
+   ------------------------------------------------------------
+   The library offers one card per puzzle type rather than only per authored
+   set, so "I want to practise arranging sentences" is one click instead of
+   hunting for a set that happens to contain some.
+   ============================================================ */
+
+/** What is stopping ONE question from being usable. */
+function langItemProblems(it) {
+  const out = [];
+  if (!it) return ['missing'];
+  if (it.type === 'choice') {
+    const filled = (it.options || []).filter(o => (o || '').trim());
+    if (filled.length < 2) out.push('needs at least two answers');
+    else if (!((it.options || [])[it.correctIndex] || '').trim()) out.push('no correct answer marked');
+  } else if (it.type === 'match') {
+    const pairs = (it.pairs || []).filter(p => (p.left || '').trim() && (p.right || '').trim());
+    if (pairs.length < 2) out.push('needs at least two complete pairs');
+  } else {
+    if (!(it.answer || '').trim()) out.push('no answer');
+    if (it.type === 'blank' && !/_{2,}|\{\}/.test(it.prompt || '')) out.push('no blank in the sentence');
+  }
+  return out;
+}
+
+/** Every question of one type, across every set, each tagged with its set. */
+function langItemsOfType(type) {
+  const out = [];
+  langSets().forEach(set => {
+    (set.items || []).forEach(it => {
+      if (it.type !== type) return;
+      // Only questions that are actually answerable — a half-written one would
+      // mark the learner wrong for something the author never finished.
+      if (langItemProblems(it).length) return;
+      out.push({ item: it, set });
+    });
+  });
+  return out;
+}
+
+function langTypeCount(type) { return langItemsOfType(type).length; }
+
+/* How each drill is played, in the learner's words. Shown before they start,
+   because a puzzle whose rules you have to infer from failing it is a bad
+   first impression. */
+const LANG_TYPE_RULES = {
+  arrange: {
+    how: ['You are given a sentence to say in the language you are learning.',
+          'Tap the word tiles in the right order to build it.',
+          'Tap a tile you have already placed to take it back.'],
+    wins: 'The words in the correct order. Punctuation and capitals are ignored.'
+  },
+  blank: {
+    how: ['A sentence appears with one word missing.',
+          'Tap the tile that belongs in the gap.',
+          'Tapping a different tile replaces your choice.'],
+    wins: 'The one missing word, exactly.'
+  },
+  choice: {
+    how: ['A prompt appears with up to four answers.',
+          'Tap the one that is right.',
+          'The answers are shuffled on every run.'],
+    wins: 'The correct option.'
+  },
+  translate: {
+    how: ['A prompt appears in one language.',
+          'Type the translation yourself — there are no tiles to lean on.',
+          'Press Enter to check.'],
+    wins: 'The right words. Case, spacing and punctuation are forgiven; spelling is not.'
+  },
+  match: {
+    how: ['Two columns of terms appear.',
+          'Tap one on the left, then its partner on the right.',
+          'Tap a completed pair again to undo it.'],
+    wins: 'Every pair matched correctly — it is all or nothing.'
+  }
+};
+
+/* ============================================================
+   THE ADVENTURE RUN
+   ------------------------------------------------------------
+   Stamina IS your health: walking costs it, a bad reply costs more, and a
+   good reply gets some back. The power gauge fills as you answer well and is
+   spent on the power-ups below. Beating someone raises your MAXIMUM stamina,
+   so the reward for a hard conversation is being able to walk further before
+   the next one.
+   ============================================================ */
+
+const LANG_RUN_STAMINA = 100;
+const LANG_RUN_STAMINA_GAIN = 10;    // added to the MAX per enemy beaten
+const LANG_RUN_STEP_COST = 6;        // stamina per leg of the run
+const LANG_ENCOUNTER_CHANCE = 0.45;  // per step
+
+/* Flavour while walking. Placeholders, as asked — they set the beat between
+   encounters without pretending to be finished writing. */
+const LANG_RUN_FLAVOUR = [
+  'A wind is too cold for you - placeholder',
+  'The street is quiet for once - placeholder',
+  'Someone is cooking nearby - placeholder',
+  'You pass a closed shutter - placeholder',
+  'Rain is starting, lightly - placeholder',
+  'A tricycle rattles past - placeholder'
+];
+
+const LANG_POWERUPS = [
+  { id: 'insight', name: 'Insight', icon: 'lightbulb', cost: 30,
+    desc: 'Strikes out one wrong reply on this turn.' },
+  { id: 'secondwind', name: 'Second Wind', icon: 'wind', cost: 50,
+    desc: 'Restores 30 stamina at once.' },
+  { id: 'silvertongue', name: 'Silver Tongue', icon: 'sparkles', cost: 70,
+    desc: 'Your next correct reply hits for double.' }
+];
+
+const LANG_POTIONS = [
+  { id: 'water', name: 'Water', icon: 'cup-soda', heal: 20, desc: 'Restores 20 stamina.' },
+  { id: 'snack', name: 'Snack', icon: 'apple', heal: 35, desc: 'Restores 35 stamina.' },
+  { id: 'coffee', name: 'Coffee', icon: 'coffee', heal: 50, desc: 'Restores 50 stamina.' }
+];
+
+function langPowerup(id) { return LANG_POWERUPS.find(p => p.id === id) || null; }
+function langPotion(id) { return LANG_POTIONS.find(p => p.id === id) || null; }
+
+/**
+ * Someone to run into.
+ *
+ * Prefers a written scenario, because those are the real conversations. With
+ * none written, one is built from the dictionary instead — the game has to be
+ * playable the moment there are words in it, not only once somebody has sat
+ * down and authored encounters.
+ */
+function langRandomEnemy() {
+  const ready = (e) => (e.line || '').trim() && (e.options || []).some(o => (o.text || '').trim() && o.correct);
+  const scs = langScenarios().filter(s => (s.encounters || []).some(ready));
+  if (scs.length) {
+    const sc = scs[Math.floor(Math.random() * scs.length)];
+    const usable = (sc.encounters || []).filter(ready);
+    return {
+      name: sc.npc || 'Stranger',
+      location: sc.location || 'street',
+      hp: sc.npcHp || 100,
+      hpMax: sc.npcHp || 100,
+      source: 'scenario',
+      turns: langShuffle(usable).map(e => ({
+        situation: e.situation || '',
+        line: e.line,
+        options: langShuffle((e.options || []).filter(o => (o.text || '').trim())),
+        damage: e.damage || 25,
+        backlash: e.backlash || 20
+      }))
+    };
+  }
+  return langEnemyFromWords();
+}
+
+/** A conversation built out of your own vocabulary. */
+function langEnemyFromWords() {
+  const study = langStudy(), ref = langRef();
+  const usable = langWords().filter(w =>
+    (w.forms[study] && w.forms[study].term.trim()) && (w.forms[ref] && w.forms[ref].term.trim()));
+  if (usable.length < 2) return null;
+
+  const picked = langShuffle(usable).slice(0, Math.min(4, usable.length));
+  const turns = picked.map(w => {
+    const wrong = langShuffle(usable.filter(x => x.id !== w.id)).slice(0, 3)
+      .map(x => ({ text: x.forms[study].term, correct: false, note: 'That one means "' + x.forms[ref].term + '".' }));
+    const right = { text: w.forms[study].term, correct: true, note: w.forms[study].definition || '' };
+    return {
+      situation: 'They are waiting for the word.',
+      line: w.forms[ref].term + '?',
+      options: langShuffle(wrong.concat([right])),
+      damage: 25,
+      backlash: 18
+    };
+  });
+  const names = ['Stranger', 'Classmate', 'Vendor', 'Neighbour', 'Tita', 'Kuya'];
+  return {
+    name: names[Math.floor(Math.random() * names.length)],
+    location: LANG_LOCATIONS[Math.floor(Math.random() * LANG_LOCATIONS.length)].key,
+    hp: 100, hpMax: 100, source: 'words',
+    turns
+  };
+}
+
+/** Can the adventure run at all? Returns a reason when it cannot. */
+function langRunBlocker() {
+  const study = langStudy(), ref = langRef();
+  const ready = (e) => (e.line || '').trim() && (e.options || []).some(o => (o.text || '').trim() && o.correct);
+  if (langScenarios().some(s => (s.encounters || []).some(ready))) return null;
+  const pairs = langWords().filter(w =>
+    (w.forms[study] && w.forms[study].term.trim()) && (w.forms[ref] && w.forms[ref].term.trim())).length;
+  if (pairs >= 2) return null;
+  return 'You need either a written scenario, or at least two words that have both a '
+    + langName(study) + ' and a ' + langName(ref) + ' term.';
 }

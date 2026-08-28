@@ -1,48 +1,46 @@
 /* ============================================================
    ROUTE-LANGUAGE.JS — the Language Library
    ------------------------------------------------------------
-   Two panes, like the other libraries: the word list on the left, the entry
-   on the right. What is different is the language pair in the header — every
-   view below it is drawn from "the one I am learning" and "the one I am
-   comparing against", and switching either redraws the page rather than
-   navigating anywhere.
+   Pane 1 is a board of cards rather than a list, because this wing does
+   several unrelated things — look a word up, drill one puzzle type, go on a
+   run — and a single scrolling list made you hunt for the one you wanted.
+   Picking a card fills pane 2.
+
+   Nothing here writes content. Words, drills and scenarios are authored in
+   Language Admin and only read from the library: two places to edit the same
+   record is how they drift apart.
    ============================================================ */
 
+let langView = 'dictionary';      // which card is open
+let langViewArg = null;           // its subject, when it has one
 let langActiveWordId = null;
 let langQuery = '';
 let langTagFilter = null;
-let langTab = 'words';   // words | drills | scenarios
+let langPosFilter = null;
 
 function languageTemplate() {
   return `
     <div class="messenger-layout" id="lang-lib-root">
       <main class="messenger-pane-1">
         <div class="pane-1-header">
-          <div style="display:flex; align-items:center; gap:0.5rem; width:100%; justify-content:space-between;">
-            <div style="display:flex; align-items:center; gap:0.5rem; flex:1; min-width:0;">
-              <button onclick="spaNavigate('library')" class="btn-back-dark" style="margin-right:0.5rem; padding:0.25rem 0.5rem; font-size:0.75rem; flex-shrink:0;">
-                <i data-lucide="chevron-left" style="width:14px;height:14px;"></i> Back
-              </button>
-              <h2 class="section-header-animated" style="margin:0; display:flex; align-items:center;">
-                <span class="section-header-icon-wrap">
-                  <i data-lucide="languages"></i>
-                  <span class="section-header-icon-ring"></span>
-                </span>
-                <span class="section-header-text">
-                  <span class="section-header-title">Language Library</span>
-                  <span class="section-header-subtitle" id="lang-header-stats">0 words</span>
-                </span>
-              </h2>
-            </div>
-          </div>
-          <div class="search-container search-animated" style="width:100%;">
-            <i data-lucide="search"></i>
-            <input type="text" id="lang-search" class="search-input" autocomplete="off"
-                   placeholder="Search every language…" oninput="langOnSearch(this.value)" />
+          <div style="display:flex; align-items:center; gap:0.5rem; width:100%;">
+            <button onclick="spaNavigate('library')" class="btn-back-dark" style="margin-right:0.5rem; padding:0.25rem 0.5rem; font-size:0.75rem; flex-shrink:0;">
+              <i data-lucide="chevron-left" style="width:14px;height:14px;"></i> Back
+            </button>
+            <h2 class="section-header-animated" style="margin:0; display:flex; align-items:center;">
+              <span class="section-header-icon-wrap">
+                <i data-lucide="languages"></i>
+                <span class="section-header-icon-ring"></span>
+              </span>
+              <span class="section-header-text">
+                <span class="section-header-title">Language Library</span>
+                <span class="section-header-subtitle" id="lang-header-stats"></span>
+              </span>
+            </h2>
           </div>
           <div id="lang-pair-bar"></div>
         </div>
-        <div class="pane-1-content" id="lang-list"></div>
+        <div class="pane-1-content" id="lang-board"></div>
       </main>
       <div class="resizer-divider" onmousedown="initResizerDrag(event, this)"></div>
       <section class="messenger-pane-2">
@@ -53,9 +51,10 @@ function languageTemplate() {
 
 function languageInit() {
   langStore();
+  langView = getSessionParam('langView') || 'dictionary';
+  langViewArg = getSessionParam('langViewArg') || null;
   const target = getSessionParam('langActiveWord');
   langActiveWordId = target && langFindWord(target) ? target : null;
-  langTab = getSessionParam('langTab') || 'words';
   renderLangLibrary();
 }
 
@@ -97,27 +96,12 @@ function langSwapPair() {
   langRefreshViews();
 }
 
-function langOnSearch(v) {
-  langQuery = (v || '').trim();
-  renderLangList();
-}
-
-function langSelectWord(id) {
-  langActiveWordId = id;
-  setSessionParam('langActiveWord', id);
+function langOpen(view, arg) {
+  langView = view;
+  langViewArg = arg || null;
+  setSessionParam('langView', view);
+  setSessionParam('langViewArg', langViewArg);
   renderLangLibrary();
-}
-
-function langSetTab(tab) {
-  langTab = tab;
-  setSessionParam('langTab', tab);
-  langActiveWordId = tab === 'words' ? langActiveWordId : null;
-  renderLangLibrary();
-}
-
-function langToggleTagFilter(tag) {
-  langTagFilter = langTagFilter === tag ? null : tag;
-  renderLangList();
 }
 
 /* ── Render ───────────────────────────────────────────────── */
@@ -125,175 +109,290 @@ function langToggleTagFilter(tag) {
 function renderLangLibrary() {
   const bar = document.getElementById('lang-pair-bar');
   if (bar) bar.innerHTML = langPairBarHTML();
-  renderLangList();
+  renderLangBoard();
   renderLangDetail();
   const stats = document.getElementById('lang-header-stats');
   if (stats) {
-    const n = langWords().length, sets = langSets().length, sc = langScenarios().length;
-    stats.textContent = `${n} word${n !== 1 ? 's' : ''} · ${sets} drill${sets !== 1 ? 's' : ''} · ${sc} scenario${sc !== 1 ? 's' : ''}`;
+    const n = langWords().length;
+    stats.textContent = `${n} word${n !== 1 ? 's' : ''} · ${langStudy().toUpperCase()} → ${langRef().toUpperCase()}`;
   }
   const root = document.getElementById('lang-lib-root');
   if (typeof lucide !== 'undefined' && root) lucide.createIcons({ root });
 }
 
-function renderLangList() {
-  const host = document.getElementById('lang-list');
+function langBoardCard(view, arg, icon, name, desc, chip, cls) {
+  const active = langView === view && String(langViewArg || '') === String(arg || '');
+  return `
+    <button class="lang-card${active ? ' is-active' : ''}${cls ? ' ' + cls : ''}" type="button"
+            onclick="langOpen('${view}'${arg ? `, '${arg}'` : ''})">
+      <span class="lang-card-icon"><i data-lucide="${icon}"></i></span>
+      <span class="lang-card-body">
+        <span class="lang-card-name">${escapeHTML(name)}</span>
+        <span class="lang-card-desc">${escapeHTML(desc)}</span>
+      </span>
+      ${chip ? `<span class="lang-card-chip">${chip}</span>` : ''}
+    </button>`;
+}
+
+function renderLangBoard() {
+  const host = document.getElementById('lang-board');
   if (!host) return;
-  const study = langStudy(), ref = langRef();
+  const words = langWords().length;
+  const sets = langSets().length;
+  const scenes = langScenarios().length;
 
-  const tabs = `
-    <div class="lang-tabs">
-      ${[['words', 'Words', 'book-a'], ['drills', 'Drills', 'dumbbell'], ['scenarios', 'Scenarios', 'swords']]
-        .map(([k, label, icon]) => `
-        <button class="lang-tab${langTab === k ? ' is-active' : ''}" type="button" onclick="langSetTab('${k}')">
-          <i data-lucide="${icon}"></i> ${label}
-        </button>`).join('')}
-    </div>`;
+  host.innerHTML = `
+    <div class="lang-board">
+      <h3 class="lang-board-title"><i data-lucide="book-a"></i> Dictionary</h3>
+      ${langBoardCard('dictionary', null, 'library-big', 'Dictionary',
+        'Every entry with its meaning, and its example sentences a tap away.', `${words}`)}
+      ${langBoardCard('compare', null, 'columns-2', 'Search & compare',
+        'Find a word and read it in two languages side by side.', '')}
 
-  if (langTab === 'drills') { host.innerHTML = tabs + langDrillListHTML(); if (typeof lucide !== 'undefined') lucide.createIcons({ root: host }); return; }
-  if (langTab === 'scenarios') { host.innerHTML = tabs + langScenarioListHTML(); if (typeof lucide !== 'undefined') lucide.createIcons({ root: host }); return; }
+      <h3 class="lang-board-title"><i data-lucide="dumbbell"></i> Drills</h3>
+      ${LANG_PUZZLE_TYPES.map(p => {
+        const n = langTypeCount(p.type);
+        return langBoardCard('drill', p.type, p.icon, p.name, p.hint, `${n}`, n ? '' : 'is-empty');
+      }).join('')}
+      ${langBoardCard('sets', null, 'layers', 'Your drill sets',
+        'The sets you have written, run start to finish.', `${sets}`)}
 
-  let words = langWords().filter(w => langMatches(w, langQuery));
-  if (langTagFilter) words = words.filter(w => (w.tags || []).includes(langTagFilter));
-  words = words.slice().sort((a, b) =>
-    langHeadword(a, study).localeCompare(langHeadword(b, study), undefined, { sensitivity: 'base' }));
-
-  const tags = langAllTags();
-  const tagBar = tags.length ? `
-    <div class="lang-tagbar">
-      ${tags.map(t => `
-        <button class="lang-tag-chip${langTagFilter === t.tag ? ' is-active' : ''}" type="button"
-                onclick="langToggleTagFilter('${escapeHTML(t.tag).replace(/'/g, "\\'")}')">
-          ${escapeHTML(t.tag)} <span>${t.count}</span>
-        </button>`).join('')}
-    </div>` : '';
-
-  const rows = words.map(w => {
-    const head = langHeadword(w, study);
-    const gloss = (w.forms[ref] && w.forms[ref].term) || '';
-    const filled = langFilledCount(w);
-    return `
-      <button class="lang-row${langActiveWordId === w.id ? ' is-active' : ''}" type="button"
-              onclick="langSelectWord('${w.id}')">
-        <span class="lang-row-main">
-          <span class="lang-row-term">${escapeHTML(head)}</span>
-          ${gloss ? `<span class="lang-row-gloss">${escapeHTML(gloss)}</span>` : ''}
-        </span>
-        <span class="lang-row-meta">
-          ${(w.forms[study] && w.forms[study].pos) ? `<span class="lang-pos">${escapeHTML(w.forms[study].pos)}</span>` : ''}
-          <span class="lang-fill" title="${filled} of ${LANG_CODES.length} languages filled in">${filled}/${LANG_CODES.length}</span>
-        </span>
-      </button>`;
-  }).join('');
-
-  host.innerHTML = tabs + tagBar + `
-    <div class="lang-list-actions">
-      <button class="btn btn-primary btn-sm" type="button" onclick="langNewWordInline()">
-        <i data-lucide="plus" style="width:14px;height:14px;"></i> New word
-      </button>
+      <h3 class="lang-board-title"><i data-lucide="swords"></i> Adventure</h3>
+      ${langBoardCard('run', null, 'footprints', 'Free run',
+        'Walk, meet people, and talk your way past them. Stamina is your health.', '')}
+      ${langBoardCard('scenarios', null, 'map', 'Scenarios',
+        'The encounters you have written, and who you meet in them.', `${scenes}`)}
     </div>
-    <div class="lang-rows">${rows || `<div class="lang-empty">${langQuery || langTagFilter ? 'No words match.' : 'No words yet — add your first.'}</div>`}</div>`;
+    <div class="lang-board-foot">
+      <button class="btn btn-secondary btn-sm" type="button" onclick="spaNavigate('admin-language')">
+        <i data-lucide="settings" style="width:14px;height:14px;"></i> Manage in Admin
+      </button>
+      <span class="lang-board-hint">Words, drills and scenarios are written in Admin.</span>
+    </div>`;
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: host });
 }
-
-/** Quick-add straight from the library: type a term, edit the rest after. */
-function langNewWordInline() {
-  const study = langStudy();
-  showInputDialog('New word', `The ${langName(study)} term — you can fill in the other languages next.`,
-    'e.g. kinsa', '', (val) => {
-      const term = (val || '').trim();
-      if (!term) return;
-      const w = langBlankWord();
-      w.forms[study].term = term;
-      const saved = langSaveWord(w);
-      if (saved) {
-        langActiveWordId = saved.id;
-        setSessionParam('langActiveWord', saved.id);
-        renderLangLibrary();
-        if (typeof toast === 'function') toast('Word added — fill in its meaning below.', { type: 'success' });
-      }
-    });
-}
-
-/* ── The word entry, side by side ─────────────────────────── */
 
 function renderLangDetail() {
   const host = document.getElementById('lang-detail');
   if (!host) return;
-
-  if (langTab === 'drills') { host.innerHTML = langDrillDetailHTML(); if (typeof lucide !== 'undefined') lucide.createIcons({ root: host }); return; }
-  if (langTab === 'scenarios') { host.innerHTML = langScenarioDetailHTML(); if (typeof lucide !== 'undefined') lucide.createIcons({ root: host }); return; }
-
-  const w = langActiveWordId ? langFindWord(langActiveWordId) : null;
-  if (!w) {
-    host.innerHTML = `
-      <div class="empty-state" style="height:100%; display:flex; align-items:center; justify-content:center; flex-direction:column;">
-        <div class="empty-state-icon-animated">
-          <i data-lucide="book-a" style="width:48px;height:48px;opacity:0.5;"></i>
-          <div class="empty-state-pulse-ring"></div>
-        </div>
-        <h2>Pick a word</h2>
-        <p style="font-size:0.875rem; color:var(--text-tertiary); margin-top:0.5rem;">
-          Choose one on the left, or add a new one.
-        </p>
-      </div>`;
-    if (typeof lucide !== 'undefined') lucide.createIcons({ root: host });
-    return;
-  }
-
-  const study = langStudy(), ref = langRef();
-  const due = typeof agDeadlineTextHTML === 'function' ? agDeadlineTextHTML('langword', w.id) : '';
-
-  host.innerHTML = `
-    <div class="animate-fade-in prog-detail lang-detail">
-      <nav class="breadcrumb-nav">
-        <button class="btn-back-dark browse-back-btn" onclick="langSelectWord(null)" title="Back">
-          <i data-lucide="chevron-left" style="width:15px;height:15px;"></i> Back
-        </button>
-        <button class="breadcrumb-item" onclick="spaNavigate('library')"><i data-lucide="home" style="width:12px;height:12px;"></i></button>
-        <span class="breadcrumb-separator"><i data-lucide="chevron-right"></i></span>
-        <span class="breadcrumb-current">${escapeHTML(langHeadword(w, study))}</span>
-      </nav>
-
-      <div class="prog-detail-header">
-        <div class="prog-detail-icon"><i data-lucide="book-a"></i></div>
-        <div style="flex:1; min-width:0;">
-          <h1 class="prog-detail-title">${escapeHTML(langHeadword(w, study))}</h1>
-          <div class="prog-stats">
-            <div class="prog-stat"><i data-lucide="languages" style="width:13px;height:13px;"></i>
-              <span class="prog-stat-body"><em>Filled in</em><strong>${langFilledCount(w)}/${LANG_CODES.length}</strong></span></div>
-            <div class="prog-stat"><i data-lucide="quote" style="width:13px;height:13px;"></i>
-              <span class="prog-stat-body"><em>Examples</em><strong>${LANG_CODES.reduce((n, c) => n + (w.forms[c].examples || []).length, 0)}</strong></span></div>
-          </div>
-          ${(w.tags || []).length ? `<div class="prog-tags"><i data-lucide="tag" style="width:12px;height:12px;"></i>
-            ${(w.tags || []).map(t => `<span class="badge badge-primary">${escapeHTML(t)}</span>`).join('')}</div>` : ''}
-        </div>
-        ${due ? `<div class="prog-detail-due">${due}</div>` : ''}
-      </div>
-
-      <div class="prog-detail-actions">
-        <button class="btn btn-practice" onclick="langEditWord('${w.id}')">
-          <i data-lucide="pencil" style="width:16px;height:16px;"></i> Edit entry
-        </button>
-        <button class="btn btn-secondary" onclick="agOpenDeadlineModal('langword', '${w.id}')">
-          <i data-lucide="flag" style="width:16px;height:16px;"></i> ${due ? 'Deadline' : 'Set Deadline'}
-        </button>
-        <button class="btn btn-ghost ag-danger-btn" onclick="langConfirmDeleteWord('${w.id}')">
-          <i data-lucide="trash-2" style="width:16px;height:16px;"></i> Delete
-        </button>
-      </div>
-
-      <div class="divider"></div>
-
-      <h2 class="prog-detail-section-title"><i data-lucide="columns-2"></i> ${escapeHTML(langName(study))} vs ${escapeHTML(langName(ref))}</h2>
-      <div class="lang-compare">
-        ${langFormColumnHTML(w, study, true)}
-        ${langFormColumnHTML(w, ref, false)}
-      </div>
-
-      ${langOtherLangsHTML(w, [study, ref])}
-    </div>`;
+  let html = '';
+  if (langView === 'dictionary') html = langDictionaryHTML();
+  else if (langView === 'compare') html = langCompareHTML();
+  else if (langView === 'drill') html = langDrillTypeHTML(langViewArg);
+  else if (langView === 'sets') html = langSetsHTML();
+  else if (langView === 'run') html = langRunHTML();
+  else if (langView === 'scenarios') html = langScenariosHTML();
+  host.innerHTML = html;
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: host });
+}
+
+/* ── Dictionary ───────────────────────────────────────────── */
+
+function langDictionaryHTML() {
+  const study = langStudy(), ref = langRef();
+  let list = langWords().filter(w => langMatches(w, langQuery));
+  if (langTagFilter) list = list.filter(w => (w.tags || []).includes(langTagFilter));
+  if (langPosFilter) list = list.filter(w => (w.forms[study] || {}).pos === langPosFilter);
+  list = list.slice().sort((a, b) =>
+    langHeadword(a, study).localeCompare(langHeadword(b, study), undefined, { sensitivity: 'base' }));
+
+  const rows = list.map(w => {
+    const f = w.forms[study] || langBlankForm();
+    const g = w.forms[ref] || langBlankForm();
+    const exCount = (f.examples || []).length + (g.examples || []).length;
+    return `
+      <div class="lang-entry">
+        <div class="lang-entry-main">
+          <div class="lang-entry-head">
+            <span class="lang-entry-term">${escapeHTML(langHeadword(w, study))}</span>
+            ${f.pos ? `<span class="lang-pos">${escapeHTML(f.pos)}</span>` : ''}
+            ${g.term ? `<span class="lang-entry-gloss">${escapeHTML(g.term)}</span>` : ''}
+          </div>
+          <div class="lang-entry-def">${escapeHTML(f.definition || g.definition || 'No definition recorded.')}</div>
+          ${f.restrictions ? `<div class="lang-entry-warn"><i data-lucide="alert-triangle"></i> ${escapeHTML(f.restrictions)}</div>` : ''}
+        </div>
+        <div class="lang-entry-tools">
+          <button class="ag-icon-btn" type="button" onclick="langShowExamples('${w.id}')"
+                  title="${exCount ? exCount + ' example sentence' + (exCount !== 1 ? 's' : '') : 'No examples recorded'}"
+                  ${exCount ? '' : 'disabled'}>
+            <i data-lucide="quote"></i>
+          </button>
+          <button class="ag-icon-btn" type="button" onclick="langShowNotes('${w.id}')"
+                  title="Notes and restrictions">
+            <i data-lucide="sticky-note"></i>
+          </button>
+          <button class="ag-icon-btn" type="button" onclick="langOpen('compare'); langActiveWordId='${w.id}'; renderLangDetail();"
+                  title="Compare side by side">
+            <i data-lucide="columns-2"></i>
+          </button>
+        </div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="animate-fade-in prog-detail">
+      <div class="prog-detail-header">
+        <div class="prog-detail-icon"><i data-lucide="library-big"></i></div>
+        <div style="flex:1; min-width:0;">
+          <h1 class="prog-detail-title">Dictionary</h1>
+          <div class="prog-stats">
+            <div class="prog-stat"><i data-lucide="book-a" style="width:13px;height:13px;"></i>
+              <span class="prog-stat-body"><em>Entries</em><strong>${langWords().length}</strong></span></div>
+            <div class="prog-stat"><i data-lucide="filter" style="width:13px;height:13px;"></i>
+              <span class="prog-stat-body"><em>Showing</em><strong>${list.length}</strong></span></div>
+            <div class="prog-stat"><i data-lucide="languages" style="width:13px;height:13px;"></i>
+              <span class="prog-stat-body"><em>Reading</em><strong>${escapeHTML(langShort(study))} / ${escapeHTML(langShort(ref))}</strong></span></div>
+          </div>
+        </div>
+      </div>
+      ${langFilterBarHTML()}
+      <div class="lang-entries">${rows || '<div class="lang-empty">No entries match. Words are added in Language Admin.</div>'}</div>
+    </div>`;
+}
+
+function langFilterBarHTML() {
+  const study = langStudy();
+  const tags = langAllTags();
+  const posUsed = [];
+  langWords().forEach(w => {
+    const p = (w.forms[study] || {}).pos;
+    if (p && posUsed.indexOf(p) === -1) posUsed.push(p);
+  });
+  return `
+    <div class="lang-filterbar">
+      <div class="search-container" style="flex:1; min-width:200px;">
+        <i data-lucide="search"></i>
+        <input type="text" class="search-input" id="lang-q" placeholder="Search every language…"
+               autocomplete="off" value="${escapeHTML(langQuery)}" oninput="langSetQuery(this.value)" />
+      </div>
+      ${posUsed.length ? `
+        <select class="form-select lang-filter-select" onchange="langSetPos(this.value)">
+          <option value="">Any part of speech</option>
+          ${posUsed.sort().map(p => `<option value="${p}"${langPosFilter === p ? ' selected' : ''}>${p}</option>`).join('')}
+        </select>` : ''}
+      ${(langQuery || langTagFilter || langPosFilter) ? `
+        <button class="btn btn-ghost btn-sm" onclick="langClearFilters()">
+          <i data-lucide="filter-x" style="width:14px;height:14px;"></i> Clear
+        </button>` : ''}
+    </div>
+    ${tags.length ? `<div class="lang-tagbar">
+      ${tags.map(t => `
+        <button class="lang-tag-chip${langTagFilter === t.tag ? ' is-active' : ''}" type="button"
+                onclick="langSetTag(${JSON.stringify(t.tag)})">${escapeHTML(t.tag)} <span>${t.count}</span></button>`).join('')}
+    </div>` : ''}`;
+}
+
+/* The query is kept out of the re-render: replacing the input while it has
+   focus would drop the caret to the end on every keystroke. */
+function langSetQuery(v) {
+  langQuery = (v || '').trim();
+  const host = document.querySelector('.lang-entries');
+  if (!host) { renderLangDetail(); return; }
+  const fresh = document.createElement('div');
+  fresh.innerHTML = langView === 'compare' ? langCompareHTML() : langDictionaryHTML();
+  const next = fresh.querySelector('.lang-entries') || fresh.querySelector('.lang-compare-results');
+  if (next) { host.innerHTML = next.innerHTML; if (typeof lucide !== 'undefined') lucide.createIcons({ root: host }); }
+}
+
+function langSetTag(tag) { langTagFilter = langTagFilter === tag ? null : tag; renderLangDetail(); }
+function langSetPos(p) { langPosFilter = p || null; renderLangDetail(); }
+function langClearFilters() { langQuery = ''; langTagFilter = null; langPosFilter = null; renderLangDetail(); }
+
+/** Example sentences, in a popup rather than crowding every row. */
+function langShowExamples(id) {
+  const w = langFindWord(id);
+  if (!w) return;
+  const body = LANG_CODES.map(c => {
+    const f = w.forms[c];
+    if (!f || !(f.examples || []).length) return '';
+    return `
+      <div class="lang-pop-lang">
+        <div class="lang-pop-head"><span class="lang-col-code">${escapeHTML(langShort(c))}</span> ${escapeHTML(langName(c))}</div>
+        <ul class="lang-examples">
+          ${f.examples.map(e => `<li>
+            <span class="lang-ex-text">${escapeHTML(e.text)}</span>
+            ${e.gloss ? `<span class="lang-ex-gloss">${escapeHTML(e.gloss)}</span>` : ''}
+          </li>`).join('')}
+        </ul>
+      </div>`;
+  }).join('');
+  langPopup('Examples — ' + langHeadword(w), 'quote', body || '<p class="lang-empty">No example sentences recorded.</p>');
+}
+
+function langShowNotes(id) {
+  const w = langFindWord(id);
+  if (!w) return;
+  const body = LANG_CODES.map(c => {
+    const f = w.forms[c];
+    if (!f || (!f.notes && !f.restrictions)) return '';
+    return `
+      <div class="lang-pop-lang">
+        <div class="lang-pop-head"><span class="lang-col-code">${escapeHTML(langShort(c))}</span> ${escapeHTML(langName(c))}</div>
+        ${f.notes ? `<div class="lang-block"><h4><i data-lucide="sticky-note"></i> Notes</h4><p>${escapeHTML(f.notes)}</p></div>` : ''}
+        ${f.restrictions ? `<div class="lang-block lang-block-warn"><h4><i data-lucide="alert-triangle"></i> Restrictions</h4><p>${escapeHTML(f.restrictions)}</p></div>` : ''}
+      </div>`;
+  }).join('');
+  langPopup('Notes — ' + langHeadword(w), 'sticky-note', body || '<p class="lang-empty">Nothing recorded.</p>');
+}
+
+/** One small modal, reused by both popups. */
+function langPopup(title, icon, bodyHtml) {
+  const old = document.getElementById('lang-popup');
+  if (old) old.remove();
+  const wrap = document.createElement('div');
+  wrap.id = 'lang-popup';
+  wrap.className = 'modal-overlay';
+  wrap.setAttribute('role', 'dialog');
+  wrap.setAttribute('aria-modal', 'true');
+  wrap.onclick = (e) => { if (e.target === wrap) wrap.remove(); };
+  wrap.innerHTML = `
+    <div class="modal-content ag-modal-content">
+      <div class="ag-modal-head">
+        <h2 class="modal-title ag-modal-title"><i data-lucide="${icon}"></i> ${escapeHTML(title)}</h2>
+        <button class="ag-icon-btn" type="button" onclick="this.closest('.modal-overlay').remove()" aria-label="Close">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <div class="lang-pop-body">${bodyHtml}</div>
+    </div>`;
+  document.body.appendChild(wrap);
+  wrap.addEventListener('keydown', (e) => { if (e.key === 'Escape') wrap.remove(); });
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: wrap });
+}
+
+/* ── Search & compare ─────────────────────────────────────── */
+
+function langCompareHTML() {
+  const study = langStudy(), ref = langRef();
+  let list = langWords().filter(w => langMatches(w, langQuery));
+  if (langTagFilter) list = list.filter(w => (w.tags || []).includes(langTagFilter));
+  const w = langActiveWordId ? langFindWord(langActiveWordId) : (list[0] || null);
+
+  return `
+    <div class="animate-fade-in prog-detail">
+      <div class="prog-detail-header">
+        <div class="prog-detail-icon"><i data-lucide="columns-2"></i></div>
+        <div style="flex:1; min-width:0;">
+          <h1 class="prog-detail-title">Search &amp; compare</h1>
+          <p class="prog-detail-desc" style="margin:0;">Reading ${escapeHTML(langName(study))} against ${escapeHTML(langName(ref))}.</p>
+        </div>
+      </div>
+      ${langFilterBarHTML()}
+      <div class="lang-compare-results">
+        <div class="lang-pickrow">
+          ${list.slice(0, 40).map(x => `
+            <button class="lang-pick${w && w.id === x.id ? ' is-active' : ''}" type="button"
+                    onclick="langActiveWordId='${x.id}'; renderLangDetail();">${escapeHTML(langHeadword(x, study))}</button>`).join('')
+            || '<span class="lang-empty">No matches.</span>'}
+        </div>
+        ${w ? `
+          <div class="lang-compare">
+            ${langFormColumnHTML(w, study, true)}
+            ${langFormColumnHTML(w, ref, false)}
+          </div>
+          ${langOtherLangsHTML(w, [study, ref])}` : ''}
+      </div>
+    </div>`;
 }
 
 function langFormColumnHTML(w, code, isStudy) {
@@ -304,7 +403,7 @@ function langFormColumnHTML(w, code, isStudy) {
       <div class="lang-col-head">
         <span class="lang-col-code">${escapeHTML(langShort(code))}</span>
         <span class="lang-col-name">${escapeHTML(langName(code))}</span>
-        ${isStudy ? '<span class="lang-col-role">learning</span>' : '<span class="lang-col-role">reference</span>'}
+        <span class="lang-col-role">${isStudy ? 'learning' : 'reference'}</span>
       </div>
       ${empty ? `<div class="lang-col-empty">Nothing recorded in ${escapeHTML(langName(code))} yet.</div>` : `
         <div class="lang-term">${escapeHTML(f.term)}${f.pos ? `<span class="lang-pos">${escapeHTML(f.pos)}</span>` : ''}</div>
@@ -313,11 +412,10 @@ function langFormColumnHTML(w, code, isStudy) {
           <div class="lang-block">
             <h4><i data-lucide="quote"></i> Examples</h4>
             <ul class="lang-examples">
-              ${f.examples.map(e => `
-                <li>
-                  <span class="lang-ex-text">${escapeHTML(e.text)}</span>
-                  ${e.gloss ? `<span class="lang-ex-gloss">${escapeHTML(e.gloss)}</span>` : ''}
-                </li>`).join('')}
+              ${f.examples.map(e => `<li>
+                <span class="lang-ex-text">${escapeHTML(e.text)}</span>
+                ${e.gloss ? `<span class="lang-ex-gloss">${escapeHTML(e.gloss)}</span>` : ''}
+              </li>`).join('')}
             </ul>
           </div>` : ''}
         ${f.notes ? `<div class="lang-block"><h4><i data-lucide="sticky-note"></i> Notes</h4><p>${escapeHTML(f.notes)}</p></div>` : ''}
@@ -326,218 +424,303 @@ function langFormColumnHTML(w, code, isStudy) {
     </div>`;
 }
 
-/** The two languages not currently in the pair, collapsed to a summary row. */
 function langOtherLangsHTML(w, shown) {
   const rest = LANG_CODES.filter(c => shown.indexOf(c) === -1);
   const filled = rest.filter(c => (w.forms[c].term || '').trim());
   if (!filled.length) return '';
   return `
-    <h2 class="prog-detail-section-title" style="margin-top:1.75rem;"><i data-lucide="languages"></i> Also recorded</h2>
+    <h2 class="prog-detail-section-title" style="margin-top:1.5rem;"><i data-lucide="languages"></i> Also recorded</h2>
     <div class="lang-other-row">
       ${filled.map(c => `
         <button class="lang-other" type="button" onclick="langSetStudy('${c}')" title="Switch to ${escapeHTML(langName(c))}">
           <span class="lang-col-code">${escapeHTML(langShort(c))}</span>
           <span class="lang-other-term">${escapeHTML(w.forms[c].term)}</span>
-          ${w.forms[c].definition ? `<span class="lang-other-def">${escapeHTML(w.forms[c].definition.slice(0, 70))}</span>` : ''}
         </button>`).join('')}
     </div>`;
 }
 
-function langConfirmDeleteWord(id) {
-  const w = langFindWord(id);
-  if (!w) return;
-  showConfirm('Delete word?', `Delete "${langHeadword(w)}" and everything recorded under it? You can undo this.`, () => {
-    langDeleteWord(id);
-    langActiveWordId = null;
-    setSessionParam('langActiveWord', null);
-    renderLangLibrary();
-  });
-}
+/* ── One drill type ───────────────────────────────────────── */
 
-/** Jump to the admin form for this word. */
-function langEditWord(id) {
-  setSessionParam('langAdminWord', id);
-  setSessionParam('langAdminTab', 'words');
-  spaNavigate('admin-language');
-}
+function langDrillTypeHTML(type) {
+  const meta = langPuzzleMeta(type);
+  const rules = LANG_TYPE_RULES[meta.type] || LANG_TYPE_RULES.arrange;
+  const pool = langItemsOfType(meta.type);
+  const runs = (state.langHistory || []).filter(h => h.kind === 'type' && h.refId === meta.type);
+  const best = runs.length ? Math.max(...runs.map(r => r.score || 0)) : -1;
+  const fromSets = [];
+  pool.forEach(p => { if (fromSets.indexOf(p.set.title) === -1) fromSets.push(p.set.title); });
 
-/* ── Drills tab ───────────────────────────────────────────── */
-
-function langDrillListHTML() {
-  const sets = langSets();
-  const rows = sets.map(s => {
-    const best = langBestPct('set', s.id);
-    const problems = langSetProblems(s);
-    return `
-      <button class="lang-row" type="button" onclick="langOpenSet('${s.id}')">
-        <span class="lang-row-main">
-          <span class="lang-row-term">${escapeHTML(s.title || 'Untitled set')}</span>
-          <span class="lang-row-gloss">${(s.items || []).length} question${(s.items || []).length !== 1 ? 's' : ''} · ${escapeHTML(langShort(s.lang))} → ${escapeHTML(langShort(s.refLang))}</span>
-        </span>
-        <span class="lang-row-meta">
-          ${problems.length ? '<span class="lang-warn" title="Not ready to run"><i data-lucide="alert-triangle"></i></span>' : ''}
-          ${best >= 0 ? `<span class="lang-fill">${best}%</span>` : ''}
-        </span>
-      </button>`;
-  }).join('');
-  return `
-    <div class="lang-list-actions">
-      <button class="btn btn-primary btn-sm" type="button" onclick="langGoAdmin('sets')">
-        <i data-lucide="plus" style="width:14px;height:14px;"></i> New drill set
-      </button>
-    </div>
-    <div class="lang-rows">${rows || '<div class="lang-empty">No drill sets yet — build one in Admin.</div>'}</div>`;
-}
-
-let langActiveSetId = null;
-function langOpenSet(id) { langActiveSetId = id; renderLangDetail(); }
-
-function langDrillDetailHTML() {
-  const s = langActiveSetId ? langFindSet(langActiveSetId) : null;
-  if (!s) return langPickPrompt('dumbbell', 'Pick a drill set', 'Choose a set on the left, or build one in Admin.');
-  const problems = langSetProblems(s);
-  const best = langBestPct('set', s.id);
-  const runs = langHistoryFor('set', s.id).length;
   return `
     <div class="animate-fade-in prog-detail">
       <div class="prog-detail-header">
-        <div class="prog-detail-icon"><i data-lucide="dumbbell"></i></div>
+        <div class="prog-detail-icon"><i data-lucide="${meta.icon}"></i></div>
         <div style="flex:1; min-width:0;">
-          <h1 class="prog-detail-title">${escapeHTML(s.title || 'Untitled set')}</h1>
+          <h1 class="prog-detail-title">${escapeHTML(meta.name)}</h1>
           <div class="prog-stats">
             <div class="prog-stat"><i data-lucide="list" style="width:13px;height:13px;"></i>
-              <span class="prog-stat-body"><em>Questions</em><strong>${(s.items || []).length}</strong></span></div>
+              <span class="prog-stat-body"><em>Questions ready</em><strong>${pool.length}</strong></span></div>
             <div class="prog-stat"><i data-lucide="rotate-ccw" style="width:13px;height:13px;"></i>
-              <span class="prog-stat-body"><em>Runs</em><strong>${runs}</strong></span></div>
+              <span class="prog-stat-body"><em>Runs</em><strong>${runs.length}</strong></span></div>
             ${best >= 0 ? `<div class="prog-stat"><i data-lucide="target" style="width:13px;height:13px;"></i>
               <span class="prog-stat-body"><em>Best</em><strong>${best}%</strong></span></div>` : ''}
-            <div class="prog-stat"><i data-lucide="languages" style="width:13px;height:13px;"></i>
-              <span class="prog-stat-body"><em>Pair</em><strong>${escapeHTML(langShort(s.lang))} → ${escapeHTML(langShort(s.refLang))}</strong></span></div>
           </div>
         </div>
       </div>
-      ${s.description ? `<p class="prog-detail-desc">${escapeHTML(s.description)}</p>` : ''}
-      ${problems.length ? `
-        <div class="lang-problems">
-          <strong><i data-lucide="alert-triangle"></i> Not ready to run</strong>
-          <ul>${problems.map(p => `<li>${escapeHTML(p)}</li>`).join('')}</ul>
-        </div>` : ''}
-      <div class="prog-detail-actions">
-        <button class="btn btn-practice btn-lg" onclick="langStartSet('${s.id}')" ${problems.length ? 'disabled' : ''}>
-          <i data-lucide="play" style="width:18px;height:18px;fill:currentColor;"></i> Start drill
-        </button>
-        <button class="btn btn-secondary" onclick="langGoAdmin('sets','${s.id}')">
-          <i data-lucide="pencil" style="width:16px;height:16px;"></i> Edit set
-        </button>
+
+      <p class="prog-detail-desc">${escapeHTML(meta.hint)}</p>
+
+      <div class="lang-rules">
+        <div class="lang-rules-block">
+          <h3><i data-lucide="list-ordered"></i> How to play</h3>
+          <ol>${rules.how.map(h => `<li>${escapeHTML(h)}</li>`).join('')}</ol>
+        </div>
+        <div class="lang-rules-block">
+          <h3><i data-lucide="trophy"></i> What counts as right</h3>
+          <p>${escapeHTML(rules.wins)}</p>
+          <h3 style="margin-top:0.85rem;"><i data-lucide="heart"></i> Hearts</h3>
+          <p>Three. A wrong answer or a skip costs one; at zero the run ends there.</p>
+        </div>
       </div>
-      <div class="divider"></div>
-      <h2 class="prog-detail-section-title"><i data-lucide="list"></i> Questions</h2>
-      <div class="prog-variant-list">
-        ${(s.items || []).map((it, i) => {
-          const meta = langPuzzleMeta(it.type);
+
+      ${pool.length ? `
+        <div class="prog-detail-actions" style="margin-top:1.25rem;">
+          <button class="btn btn-practice btn-lg" onclick="langPromptTimer('type', '${meta.type}')">
+            <i data-lucide="play" style="width:18px;height:18px;fill:currentColor;"></i> Start attempt
+          </button>
+          <button class="btn btn-secondary" onclick="langStartType('${meta.type}', 0)">
+            <i data-lucide="zap" style="width:16px;height:16px;"></i> Quick start (no timer)
+          </button>
+        </div>
+        <p class="lang-form-hint" style="margin-top:0.75rem;">
+          Drawn from ${fromSets.length} set${fromSets.length !== 1 ? 's' : ''}: ${escapeHTML(fromSets.slice(0, 4).join(', '))}${fromSets.length > 4 ? '…' : ''}
+        </p>`
+      : `
+        <div class="lang-problems" style="margin-top:1.25rem;">
+          <strong><i data-lucide="alert-triangle"></i> Nothing to practise yet</strong>
+          <ul><li>No finished ${escapeHTML(meta.name.toLowerCase())} questions exist in any of your sets.</li></ul>
+          <button class="btn btn-secondary btn-sm" style="margin-top:0.5rem;" onclick="spaNavigate('admin-language')">
+            <i data-lucide="plus" style="width:14px;height:14px;"></i> Write some in Admin
+          </button>
+        </div>`}
+    </div>`;
+}
+
+/* ── Authored sets ────────────────────────────────────────── */
+
+function langSetsHTML() {
+  const sets = langSets();
+  return `
+    <div class="animate-fade-in prog-detail">
+      <div class="prog-detail-header">
+        <div class="prog-detail-icon"><i data-lucide="layers"></i></div>
+        <div style="flex:1; min-width:0;">
+          <h1 class="prog-detail-title">Your drill sets</h1>
+          <p class="prog-detail-desc" style="margin:0;">Run a set exactly as you wrote it, in its own order.</p>
+        </div>
+      </div>
+      <div class="prog-variant-list" style="margin-top:1.25rem;">
+        ${sets.map((s, i) => {
+          const problems = langSetProblems(s);
+          const best = langBestPct('set', s.id);
           return `
           <div class="prog-variant-row">
             <div class="prog-variant-num">${String(i + 1).padStart(2, '0')}</div>
             <div class="prog-variant-info">
-              <div class="prog-variant-name">${escapeHTML(it.prompt || it.answer || '(empty)')}</div>
-              <div class="prog-variant-meta"><span><i data-lucide="${meta.icon}" style="width:11px;height:11px;"></i> ${escapeHTML(meta.name)}</span></div>
+              <div class="prog-variant-name">${escapeHTML(s.title || 'Untitled set')}</div>
+              <div class="prog-variant-meta">
+                <span><i data-lucide="list" style="width:11px;height:11px;"></i> ${(s.items || []).length} question${(s.items || []).length !== 1 ? 's' : ''}</span>
+                <span><i data-lucide="languages" style="width:11px;height:11px;"></i> ${escapeHTML(langShort(s.lang))} → ${escapeHTML(langShort(s.refLang))}</span>
+                ${best >= 0 ? `<span><i data-lucide="target" style="width:11px;height:11px;"></i> best ${best}%</span>` : ''}
+                ${problems.length ? `<span style="color:var(--color-warning);"><i data-lucide="alert-triangle" style="width:11px;height:11px;"></i> ${problems.length} to fix</span>` : ''}
+              </div>
             </div>
+            <button class="btn btn-practice btn-sm" onclick="langPromptTimer('set', '${s.id}')" ${problems.length ? 'disabled' : ''}>
+              <i data-lucide="play" style="width:14px;height:14px;fill:currentColor;"></i> Run
+            </button>
           </div>`;
-        }).join('') || '<div class="empty-state">No questions yet.</div>'}
+        }).join('') || '<div class="empty-state">No sets yet — write one in Language Admin.</div>'}
       </div>
     </div>`;
 }
 
-/* ── Scenarios tab ────────────────────────────────────────── */
+/* ── The run ──────────────────────────────────────────────── */
 
-function langScenarioListHTML() {
-  const rows = langScenarios().map(s => {
-    const loc = langLocation(s.location);
-    return `
-      <button class="lang-row" type="button" onclick="langOpenScenario('${s.id}')">
-        <span class="lang-row-main">
-          <span class="lang-row-term">${escapeHTML(s.title || 'Untitled scenario')}</span>
-          <span class="lang-row-gloss">${escapeHTML(loc.name)} · ${(s.encounters || []).length} encounter${(s.encounters || []).length !== 1 ? 's' : ''}</span>
-        </span>
-        <span class="lang-row-meta"><i data-lucide="${loc.icon}"></i></span>
-      </button>`;
-  }).join('');
-  return `
-    <div class="lang-list-actions">
-      <button class="btn btn-primary btn-sm" type="button" onclick="langGoAdmin('scenarios')">
-        <i data-lucide="plus" style="width:14px;height:14px;"></i> New scenario
-      </button>
-    </div>
-    <div class="lang-rows">${rows || '<div class="lang-empty">No scenarios yet — write one in Admin.</div>'}</div>`;
-}
-
-let langActiveScenarioId = null;
-function langOpenScenario(id) { langActiveScenarioId = id; renderLangDetail(); }
-
-function langScenarioDetailHTML() {
-  const s = langActiveScenarioId ? langFindScenario(langActiveScenarioId) : null;
-  if (!s) return langPickPrompt('swords', 'Pick a scenario', 'Choose one on the left, or write one in Admin.');
-  const loc = langLocation(s.location);
-  const ready = (s.encounters || []).length > 0;
+function langRunHTML() {
+  const blocker = langRunBlocker();
+  const runs = (state.langHistory || []).filter(h => h.kind === 'run');
+  const bestDist = runs.length ? Math.max(...runs.map(r => r.steps || 0)) : 0;
+  const bestBeat = runs.length ? Math.max(...runs.map(r => r.defeated || 0)) : 0;
   return `
     <div class="animate-fade-in prog-detail">
       <div class="prog-detail-header">
-        <div class="prog-detail-icon"><i data-lucide="${loc.icon}"></i></div>
+        <div class="prog-detail-icon"><i data-lucide="footprints"></i></div>
         <div style="flex:1; min-width:0;">
-          <h1 class="prog-detail-title">${escapeHTML(s.title || 'Untitled scenario')}</h1>
+          <h1 class="prog-detail-title">Free run</h1>
           <div class="prog-stats">
-            <div class="prog-stat"><i data-lucide="map-pin" style="width:13px;height:13px;"></i>
-              <span class="prog-stat-body"><em>Location</em><strong>${escapeHTML(loc.name)}</strong></span></div>
-            <div class="prog-stat"><i data-lucide="user" style="width:13px;height:13px;"></i>
-              <span class="prog-stat-body"><em>Opponent</em><strong>${escapeHTML(s.npc || 'Someone')}</strong></span></div>
-            <div class="prog-stat"><i data-lucide="messages-square" style="width:13px;height:13px;"></i>
-              <span class="prog-stat-body"><em>Encounters</em><strong>${(s.encounters || []).length}</strong></span></div>
+            <div class="prog-stat"><i data-lucide="flame" style="width:13px;height:13px;"></i>
+              <span class="prog-stat-body"><em>Stamina</em><strong>${LANG_RUN_STAMINA}</strong></span></div>
+            <div class="prog-stat"><i data-lucide="rotate-ccw" style="width:13px;height:13px;"></i>
+              <span class="prog-stat-body"><em>Runs</em><strong>${runs.length}</strong></span></div>
+            <div class="prog-stat"><i data-lucide="signpost" style="width:13px;height:13px;"></i>
+              <span class="prog-stat-body"><em>Furthest</em><strong>${bestDist}</strong></span></div>
+            <div class="prog-stat"><i data-lucide="swords" style="width:13px;height:13px;"></i>
+              <span class="prog-stat-body"><em>Most beaten</em><strong>${bestBeat}</strong></span></div>
           </div>
         </div>
       </div>
-      <div class="prog-detail-actions">
-        <button class="btn btn-practice btn-lg" onclick="langStartScenario('${s.id}')" ${ready ? '' : 'disabled'}>
-          <i data-lucide="play" style="width:18px;height:18px;fill:currentColor;"></i> Enter scenario
-        </button>
-        <button class="btn btn-secondary" onclick="langGoAdmin('scenarios','${s.id}')">
-          <i data-lucide="pencil" style="width:16px;height:16px;"></i> Edit scenario
-        </button>
+
+      <div class="lang-rules">
+        <div class="lang-rules-block">
+          <h3><i data-lucide="list-ordered"></i> How it goes</h3>
+          <ol>
+            <li>You start with ${LANG_RUN_STAMINA} stamina. Stamina is your health.</li>
+            <li>Choose <strong>Run</strong> to walk on. Each leg costs ${LANG_RUN_STEP_COST} stamina.</li>
+            <li>Sooner or later somebody stops you, and they speak first.</li>
+            <li>Reply well and you take no damage and get some stamina back. Reply badly and it drains.</li>
+            <li>Beat them and your <em>maximum</em> stamina rises by ${LANG_RUN_STAMINA_GAIN}.</li>
+            <li>Choose <strong>Go home</strong> whenever you like — that ends the run and keeps the score.</li>
+          </ol>
+        </div>
+        <div class="lang-rules-block">
+          <h3><i data-lucide="sparkles"></i> Power gauge</h3>
+          <p>Fills as you answer well. Spend it on:</p>
+          <ul class="lang-powerlist">
+            ${LANG_POWERUPS.map(p => `<li><i data-lucide="${p.icon}"></i> <strong>${escapeHTML(p.name)}</strong> <span>${p.cost}</span> — ${escapeHTML(p.desc)}</li>`).join('')}
+          </ul>
+          <h3 style="margin-top:0.85rem;"><i data-lucide="flask-round"></i> Potions</h3>
+          <p>${LANG_POTIONS.map(p => escapeHTML(p.name) + ' (+' + p.heal + ')').join(', ')} — you set off with one of each.</p>
+        </div>
       </div>
+
+      ${blocker ? `
+        <div class="lang-problems" style="margin-top:1.25rem;">
+          <strong><i data-lucide="alert-triangle"></i> Not enough to run on</strong>
+          <ul><li>${escapeHTML(blocker)}</li></ul>
+          <button class="btn btn-secondary btn-sm" style="margin-top:0.5rem;" onclick="spaNavigate('admin-language')">
+            <i data-lucide="plus" style="width:14px;height:14px;"></i> Add some in Admin
+          </button>
+        </div>`
+      : `<div class="prog-detail-actions" style="margin-top:1.25rem;">
+          <button class="btn btn-practice btn-lg" onclick="langStartRun()">
+            <i data-lucide="play" style="width:18px;height:18px;fill:currentColor;"></i> Set off
+          </button>
+        </div>`}
+
       <div class="lang-placeholder-note">
         <i data-lucide="construction"></i>
         <div>
           <strong>Placeholder art</strong>
-          <span>The battle runs and scores for real. Locations, sprites and the inventory are stand-ins for now.</span>
+          <span>The battle, stamina, power gauge and encounters all run for real. Backdrops and sprites are stand-ins.</span>
         </div>
       </div>
     </div>`;
 }
 
-function langPickPrompt(icon, title, sub) {
+function langScenariosHTML() {
+  const list = langScenarios();
   return `
-    <div class="empty-state" style="height:100%; display:flex; align-items:center; justify-content:center; flex-direction:column;">
-      <div class="empty-state-icon-animated">
-        <i data-lucide="${icon}" style="width:48px;height:48px;opacity:0.5;"></i>
-        <div class="empty-state-pulse-ring"></div>
+    <div class="animate-fade-in prog-detail">
+      <div class="prog-detail-header">
+        <div class="prog-detail-icon"><i data-lucide="map"></i></div>
+        <div style="flex:1; min-width:0;">
+          <h1 class="prog-detail-title">Scenarios</h1>
+          <p class="prog-detail-desc" style="margin:0;">The encounters you have written. A run draws its opponents from these.</p>
+        </div>
       </div>
-      <h2>${escapeHTML(title)}</h2>
-      <p style="font-size:0.875rem; color:var(--text-tertiary); margin-top:0.5rem;">${escapeHTML(sub)}</p>
+      <div class="prog-variant-list" style="margin-top:1.25rem;">
+        ${list.map((s, i) => {
+          const loc = langLocation(s.location);
+          const ready = (s.encounters || []).some(e => (e.line || '').trim() && (e.options || []).some(o => (o.text || '').trim() && o.correct));
+          return `
+          <div class="prog-variant-row">
+            <div class="prog-variant-num">${String(i + 1).padStart(2, '0')}</div>
+            <div class="prog-variant-info">
+              <div class="prog-variant-name">${escapeHTML(s.title || 'Untitled')}</div>
+              <div class="prog-variant-meta">
+                <span><i data-lucide="${loc.icon}" style="width:11px;height:11px;"></i> ${escapeHTML(loc.name)}</span>
+                <span><i data-lucide="user" style="width:11px;height:11px;"></i> ${escapeHTML(s.npc || 'Someone')}</span>
+                <span><i data-lucide="messages-square" style="width:11px;height:11px;"></i> ${(s.encounters || []).length}</span>
+                ${ready ? '' : '<span style="color:var(--color-warning);"><i data-lucide="alert-triangle" style="width:11px;height:11px;"></i> unfinished</span>'}
+              </div>
+            </div>
+            <button class="btn btn-practice btn-sm" onclick="langStartScenario('${s.id}')" ${ready ? '' : 'disabled'}>
+              <i data-lucide="swords" style="width:14px;height:14px;"></i> Fight
+            </button>
+          </div>`;
+        }).join('') || '<div class="empty-state">No scenarios yet — write one in Language Admin.</div>'}
+      </div>
     </div>`;
 }
 
-function langGoAdmin(tab, id) {
-  setSessionParam('langAdminTab', tab || 'words');
-  if (id) setSessionParam('langAdminEdit', id);
-  else setSessionParam('langAdminEdit', null);
-  spaNavigate('admin-language');
+/* ── Starting things ──────────────────────────────────────── */
+
+/** Reuses the app's shared timer modal, the way the notebooks do. */
+let _langPending = null;
+
+function langPromptTimer(kind, id) {
+  _langPending = { kind, id };
+  const modal = document.getElementById('timer-modal');
+  if (!modal) { langConfirmStart(); return; }
+  const sel = document.getElementById('timer-variant-select');
+  if (sel && sel.closest('div')) sel.closest('div').style.display = 'none';
+  const t = modal.querySelector('.modal-title');
+  const d = modal.querySelector('.modal-desc');
+  if (t) t.textContent = 'Start drill';
+  if (d) d.textContent = 'Set an optional time limit (0 for untimed).';
+  ['timer-h', 'timer-m', 'timer-s'].forEach(x => { const el = document.getElementById(x); if (el) el.value = '0'; });
+  const btn = modal.querySelector('.modal-actions .btn-primary');
+  if (btn) btn.setAttribute('onclick', 'langConfirmStart()');
+  modal.classList.remove('hidden');
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: modal });
 }
 
-function langStartSet(id) {
+function langConfirmStart() {
+  const modal = document.getElementById('timer-modal');
+  const num = (id) => Math.max(0, parseInt((document.getElementById(id) || {}).value, 10) || 0);
+  const secs = num('timer-h') * 3600 + num('timer-m') * 60 + num('timer-s');
+  if (modal) modal.classList.add('hidden');
+  const p = _langPending;
+  _langPending = null;
+  if (!p) return;
+  if (p.kind === 'set') langStartSet(p.id, secs);
+  else langStartType(p.id, secs);
+}
+
+function langStartSet(id, secs) {
   setSessionParam('langRunSet', id);
-  spaNavigate('lang-attempt');
+  setSessionParam('langRunType', null);
+  setSessionParam('langTimeLimit', secs || 0);
+  langGo('lang-attempt');
+}
+
+function langStartType(type, secs) {
+  setSessionParam('langRunType', type);
+  setSessionParam('langRunSet', null);
+  setSessionParam('langTimeLimit', secs || 0);
+  langGo('lang-attempt');
+}
+
+/**
+ * Go to a route that may be the one already on screen.
+ *
+ * spaNavigate only assigns location.hash, and assigning the hash it already
+ * holds fires no hashchange — so the router never re-runs and the session
+ * params just set are never read. Both game modes share one route, so
+ * starting a scenario from inside a run would otherwise do nothing at all.
+ */
+function langGo(route) {
+  if (document.body.dataset.route === route) window.dispatchEvent(new HashChangeEvent('hashchange'));
+  else spaNavigate(route);
 }
 
 function langStartScenario(id) {
   setSessionParam('langRunScenario', id);
-  spaNavigate('lang-quest');
+  setSessionParam('langRunMode', 'scenario');
+  langGo('lang-quest');
+}
+
+function langStartRun() {
+  setSessionParam('langRunScenario', null);
+  setSessionParam('langRunMode', 'run');
+  langGo('lang-quest');
 }

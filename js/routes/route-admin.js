@@ -487,7 +487,7 @@ function adminInit() {
   const totals = document.getElementById('admin-hub-totals');
   if (totals) {
     totals.innerHTML = `
-      ${_libStatChip('sliders', '3 active wings')}
+      ${_libStatChip('sliders', '4 active wings')}
       ${_libStatChip('file-code', `${challenges.length} programs`)}
       ${_libStatChip('book-open', `${notebooks.length} notebooks`)}
       ${_libStatChip('code', `${snippets.length} snippets`)}
@@ -518,7 +518,12 @@ function adminInit() {
         _libStatChip('book-open', `${notebooks.length} notebooks`) + _libStatChip('folder', `${notebookFolders} folders`)) +
       card('admin-snippets', 'lib-card-snippets', 'code', 'Snippet Library Admin',
         'Manage reference snippets, pre-filled code, rich text comments, and link related challenges.',
-        _libStatChip('code', `${snippets.length} snippets`) + _libStatChip('folder', `${snippetFolders} folders`));
+        _libStatChip('code', `${snippets.length} snippets`) + _libStatChip('folder', `${snippetFolders} folders`)) +
+      card('admin-language', 'lib-card-language', 'languages', 'Language Library Admin',
+        'Write dictionary entries across four languages, build drill puzzles, and script scenario encounters.',
+        _libStatChip('book-a', `${(state.langWords || []).length} words`) +
+        _libStatChip('dumbbell', `${(state.langSets || []).length} sets`) +
+        _libStatChip('swords', `${(state.langScenarios || []).length} scenarios`));
   }
 
   const soon = document.getElementById('admin-hub-soon');

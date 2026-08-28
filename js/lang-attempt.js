@@ -20,6 +20,7 @@ function langAttemptTemplate() {
           <i data-lucide="chevron-left" style="width:18px;height:18px;"></i> Back
         </button>
         <div class="la-progress"><div class="la-progress-fill" id="la-progress-fill"></div></div>
+        <span class="la-clock" id="la-clock"></span>
         <div class="la-hearts" id="la-hearts"></div>
       </header>
       <main class="la-body" id="la-body"></main>
@@ -30,16 +31,31 @@ function langAttemptTemplate() {
 function langAttemptInit() {
   langStore();
   const setId = getSessionParam('langRunSet');
-  const set = setId ? langFindSet(setId) : null;
-  if (!set || langSetProblems(set).length) {
-    spaNavigate('language');
-    return;
+  const type = getSessionParam('langRunType');
+  const limit = Math.max(0, parseInt(getSessionParam('langTimeLimit'), 10) || 0);
+
+  // Two ways in: a whole authored set, or every question of one puzzle type
+  // gathered from across the sets.
+  let set = null, queue = null;
+  if (type) {
+    const pool = langItemsOfType(type);
+    if (!pool.length) { spaNavigate('language'); return; }
+    set = { id: 'type:' + type, title: langPuzzleMeta(type).name, lang: langStudy(), refLang: langRef(), isType: true, type: type };
+    queue = langShuffle(pool.map(p => p.item));
+  } else {
+    set = setId ? langFindSet(setId) : null;
+    if (!set || langSetProblems(set).length) { spaNavigate('language'); return; }
+    queue = langShuffle((set.items || []).slice());
   }
+
   _la = {
     set,
+    limit,
+    remaining: limit,
+    timer: null,
     // A fresh order every run, so the third pass is not muscle memory for
     // "the answer to question 4".
-    queue: langShuffle((set.items || []).slice()),
+    queue,
     idx: 0,
     hearts: 3,
     correct: 0,
@@ -53,14 +69,44 @@ function langAttemptInit() {
     matchLeft: null,
     matchPairs: {}
   };
+  laStartTimer();
   laLoadQuestion();
 }
 
-function langAttemptDestroy() { _la = null; }
+function langAttemptDestroy() { laStopTimer(); _la = null; }
+
+/* ── The optional time limit ──────────────────────────────── */
+
+function laStartTimer() {
+  laStopTimer();
+  if (!_la || !_la.limit) return;
+  _la.timer = setInterval(function () {
+    if (!_la || _la.state === 'over') { laStopTimer(); return; }
+    _la.remaining--;
+    laPaintClock();
+    // Time up ends the run where it stands rather than discarding it — the
+    // questions already answered were still answered.
+    if (_la.remaining <= 0) { laStopTimer(); laFinish('time'); }
+  }, 1000);
+}
+
+function laStopTimer() {
+  if (_la && _la.timer) { clearInterval(_la.timer); _la.timer = null; }
+}
+
+function laPaintClock() {
+  const el = document.getElementById('la-clock');
+  if (!el || !_la) return;
+  if (!_la.limit) { el.textContent = ''; return; }
+  const s = Math.max(0, _la.remaining);
+  el.textContent = Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
+  el.classList.toggle('is-low', s <= 15);
+}
 
 function laExit() {
   if (!_la || _la.state === 'over') { spaNavigate('language'); return; }
   showConfirm('Leave the drill?', 'Your progress in this run will not be saved.', () => {
+    laStopTimer();
     _la = null;
     spaNavigate('language');
   });
@@ -111,6 +157,7 @@ function laRender() {
     hearts.innerHTML = [0, 1, 2].map(i =>
       `<i data-lucide="heart" class="la-heart${i < _la.hearts ? '' : ' is-lost'}"></i>`).join('');
   }
+  laPaintClock();
 
   if (_la.state === 'over') { body.innerHTML = laSummaryHTML(); foot.innerHTML = ''; laIcons(); return; }
 
@@ -339,16 +386,21 @@ function laAdvance() {
   laLoadQuestion();
 }
 
-function laFinish() {
+function laFinish(reason) {
   if (!_la || _la.state === 'over') return;
+  laStopTimer();
   _la.state = 'over';
+  _la.reason = reason || null;
   const total = _la.queue.length;
   const score = total ? Math.round((_la.correct / total) * 100) : 0;
   langRecordAttempt({
-    kind: 'set', refId: _la.set.id, title: _la.set.title,
+    kind: _la.set.isType ? 'type' : 'set',
+    refId: _la.set.isType ? _la.set.type : _la.set.id,
+    title: _la.set.title,
     score, correct: _la.correct, total,
     lang: _la.set.lang, refLang: _la.set.refLang,
     heartsLeft: _la.hearts,
+    endedBy: reason || 'finished',
     duration: Math.round((Date.now() - _la.startTime) / 1000)
   });
   laRender();
@@ -360,12 +412,13 @@ function laSummaryHTML() {
   const cls = score >= 80 ? 'score-perfect' : score >= 50 ? 'score-partial' : 'score-low';
   const wrong = _la.answered.filter(a => !a.ok);
   const outOfHearts = _la.hearts <= 0 && _la.answered.length < total;
+  const timedOut = _la.reason === 'time';
   return `
     <div class="la-summary">
-      <div class="la-summary-icon ${cls}"><i data-lucide="${score >= 80 ? 'trophy' : score >= 50 ? 'target' : 'refresh-cw'}"></i></div>
-      <h2>${outOfHearts ? 'Out of hearts' : score >= 80 ? 'Well done' : 'Run finished'}</h2>
+      <div class="la-summary-icon ${cls}"><i data-lucide="${timedOut ? 'timer-off' : score >= 80 ? 'trophy' : score >= 50 ? 'target' : 'refresh-cw'}"></i></div>
+      <h2>${timedOut ? 'Time up' : outOfHearts ? 'Out of hearts' : score >= 80 ? 'Well done' : 'Run finished'}</h2>
       <div class="la-summary-score ${cls}">${score}%</div>
-      <p>${_la.correct} of ${total} correct${outOfHearts ? ' — the run ended early.' : '.'}</p>
+      <p>${_la.correct} of ${total} correct${outOfHearts ? ' — the run ended early.' : timedOut ? ' — the clock beat you.' : '.'}</p>
       ${wrong.length ? `
         <div class="la-review">
           <h3>Worth another look</h3>
@@ -386,8 +439,7 @@ function laSummaryHTML() {
 }
 
 function laRetry() {
-  const id = _la && _la.set ? _la.set.id : getSessionParam('langRunSet');
+  laStopTimer();
   _la = null;
-  setSessionParam('langRunSet', id);
-  langAttemptInit();
+  langAttemptInit();   // the session params that started it are still set
 }
