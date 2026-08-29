@@ -1,15 +1,20 @@
 /* ============================================================
    WING.JS — the generic list library
    ------------------------------------------------------------
-   The Library hub advertised eight "coming soon" wings — Language, Mindset,
-   Insights, Remembrance, Diary, Collection, Progression, Roadmap — that did
-   nothing but raise a toast. They are all the same shape: titled entries with a
-   body, tags and folders. So there is ONE implementation and the eight are
-   configuration, sharing the folder system, the search, the favourites, the
-   tag filter and the bulk bar with every other library.
+   Seven wings — Mindset, Insights, Remembrance, Diary, Collection,
+   Progression, Roadmap — share one engine: titled entries with a body, tags
+   and folders, plus the folder system, the search, the favourites, the tag
+   filter and the bulk bar every other library uses.
 
-   Storage:  state.wings = { <key>: [ { id, title, body, tags[], parentId,
-                                        favorite, createdAt, updatedAt } ] }
+   What makes them different from each other is NOT here. A diary entry has a
+   date and a mood, a goal has steps you tick off, a collection item has a
+   medium and a rating; those live in wing-schemas.js as declarations, and
+   wing-views.js draws them. This file is the part they have in common, and it
+   asks the schema whenever the answer differs per wing.
+
+   Storage:  state.wings = { <key>: [ { id, title, body, data{}, tags[],
+                                        parentId, favorite, createdAt, updatedAt } ] }
+             `data` holds the schema fields — everything above it is shared.
    Folders:  ordinary state.nodes with scope 'wing:<key>'.
    ============================================================ */
 
@@ -112,7 +117,9 @@ function wingUpdateHeader() {
   const sub = document.getElementById('wing-header-stats');
   const icon = document.getElementById('wing-header-icon');
   if (title) title.textContent = cfg.name;
-  if (sub) sub.textContent = `${items.length} entr${items.length === 1 ? 'y' : 'ies'} across ${folders.length} folder${folders.length !== 1 ? 's' : ''}`;
+  const sc = wingSchema(_wingKey);
+  const noun = items.length === 1 ? sc.noun : sc.nounPlural;
+  if (sub) sub.textContent = `${items.length} ${noun} across ${folders.length} folder${folders.length !== 1 ? 's' : ''}`;
   if (icon) { icon.setAttribute('data-lucide', cfg.icon); if (typeof lucide !== 'undefined') lucide.createIcons({ root: icon.parentElement }); }
 
   const mini = document.getElementById('wing-mini-stats');
@@ -194,18 +201,23 @@ function wingRenderDetail() {
   if (query) pool = pool.filter(w => libMatches(w, query, 'wing'));
   else if (_wingFolderId !== null) pool = pool.filter(w => (w.parentId || null) === _wingFolderId);
 
+  const schema = wingSchema(_wingKey);
   const prefiltered = pool;
   let list = libApplyCommonFilters('wing', pool.slice(), null);
   const sort = getLibPref('wing.sort', 'recent');
+  // A wing with its own date sorts on THAT: a diary ordered by when you last
+  // touched an entry is not a diary, it is a list of recent edits.
   if (sort === 'title') list.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-  else if (sort === 'oldest') list.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
-  else list.sort((a, b) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+  else if (sort === 'oldest') list.sort((a, b) => wingSortStamp(a, schema) - wingSortStamp(b, schema));
+  else list.sort((a, b) => wingSortStamp(b, schema) - wingSortStamp(a, schema));
   list.sort((a, b) => (libIsFavorite(b) ? 1 : 0) - (libIsFavorite(a) ? 1 : 0));
 
   const folder = _wingFolderId ? state.nodes.find(n => n.id === _wingFolderId) : null;
   const heading = query ? `Search results for “${escapeHTML(query)}”` : (folder ? escapeHTML(folder.name) : 'All entries');
 
-  const sortOpts = [['recent', 'Recently updated'], ['oldest', 'Oldest first'], ['title', 'Title A–Z']];
+  const sortOpts = schema.sortKey
+    ? [['recent', 'Newest first'], ['oldest', 'Oldest first'], ['title', 'Title A–Z']]
+    : [['recent', 'Recently updated'], ['oldest', 'Oldest first'], ['title', 'Title A–Z']];
   const filterBar = prefiltered.length ? `
     <div style="display:flex;flex-wrap:wrap;align-items:center;gap:0.5rem;margin-bottom:1rem;">
       ${(() => { const c = libCommonChipsHTML('wing', null, prefiltered); return c ? `<div class="lib-chip-row">${c}</div>` : ''; })()}
@@ -229,17 +241,17 @@ function wingRenderDetail() {
         </div>
         <div class="browse-folder-actions">
           ${libSelectToggleHTML('wing')}
-          <button class="btn btn-primary" onclick="wingNewEntry()"><i data-lucide="plus" style="width:16px;height:16px;"></i> New entry</button>
+          <button class="btn btn-primary" onclick="wingNewEntry()"><i data-lucide="plus" style="width:16px;height:16px;"></i> New ${escapeHTML(schema.noun)}</button>
         </div>
       </div>
       ${filterBar}
-      ${list.length ? `<div class="card-grid stagger-children">${list.map(_wingCardHTML).join('')}</div>` : `
+      ${list.length ? _wingGroupedHTML(list, schema) : `
         <div class="empty-state" style="padding:3rem 1rem; text-align:center; display:flex; flex-direction:column; align-items:center;">
           <i data-lucide="${cfg.icon}" style="width:44px;height:44px;opacity:0.45;margin-bottom:0.75rem;"></i>
           <h3 style="font-weight:700;">${prefiltered.length ? 'Nothing matches these filters' : 'Nothing here yet'}</h3>
           <p style="font-size:0.85rem;color:var(--text-tertiary);margin-top:0.35rem;">${prefiltered.length ? '' : escapeHTML(cfg.tagline)}</p>
           <button class="btn btn-primary" style="margin-top:1rem;" onclick="${prefiltered.length ? `clearWingFilters()` : `wingNewEntry()`}">
-            <i data-lucide="${prefiltered.length ? 'x' : 'plus'}" style="width:15px;height:15px;"></i> ${prefiltered.length ? 'Clear filters' : 'Add the first entry'}
+            <i data-lucide="${prefiltered.length ? 'x' : 'plus'}" style="width:15px;height:15px;"></i> ${prefiltered.length ? 'Clear filters' : 'Add the first ' + escapeHTML(schema.noun)}
           </button>
         </div>`}
       ${libSelectionBarHTML('wing', list.map(w => w.id))}
@@ -249,6 +261,35 @@ function wingRenderDetail() {
 
 function clearWingFilters() { libClearCommonFilters('wing'); wingRenderDetail(); }
 
+/**
+ * The list, under its group headings.
+ *
+ * Grouping is what turns a pile into a museum, a rulebook or a chronology —
+ * the same entries under "Core / Settled / Working / Testing" read completely
+ * differently from the same entries in one undifferentiated grid.
+ */
+function _wingGroupedHTML(list, schema) {
+  const groups = wingGroupList(list, schema);
+  const wrap = wingIsRowLayout(schema) ? 'wing-rows' : 'card-grid stagger-children';
+  let counter = 0;
+  return groups.map(g => {
+    const body = g.items.map(w => {
+      counter++;
+      const html = wingEntryHTML(w, schema);
+      // The rulebook numbers itself, continuing across the groups so a rule
+      // has one number in the whole code rather than one per section.
+      return schema.layout === 'rulebook'
+        ? html.replace('<div class="wing-rule-body">',
+            '<span class="wing-rule-n">' + counter + '</span><div class="wing-rule-body">')
+        : html;
+    }).join('');
+    return (g.label
+      ? `<h3 class="wing-group-h"><span class="wing-group-name">${escapeHTML(g.label)}</span>
+           <span class="wing-group-count">${g.items.length}</span></h3>`
+      : '') + `<div class="${wrap}">${body}</div>`;
+  }).join('');
+}
+
 function _wingAfterRender(host) {
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: host });
 }
@@ -257,49 +298,27 @@ function _wingSnippet(body, n) {
   return String(body || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n || 160);
 }
 
-function _wingCardHTML(w) {
-  const selecting = libSelectMode('wing');
-  const when = w.updatedAt || w.createdAt;
-  return `
-    <div class="card card-enhanced${libIsSelected('wing', w.id) ? ' lib-selected' : ''}"
-         onclick="${selecting ? `libToggleSelect('wing','${w.id}')` : `wingOpen('${w.id}')`}" style="cursor:pointer;">
-      ${libSelectBoxHTML('wing', w.id)}
-      ${libFavButtonHTML('wing', w)}
-      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.5rem; gap:0.5rem;">
-        <h3 style="font-weight:700; font-size:1.05rem; color:var(--text-primary); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis;">
-          ${escapeHTML(w.title || 'Untitled')}
-        </h3>
-      </div>
-      ${(w.tags || []).length ? `<div style="display:flex; flex-wrap:wrap; gap:0.375rem; margin-bottom:0.75rem;">
-        ${(w.tags || []).map(t => libTagBadgeHTML('wing', t)).join('')}</div>` : ''}
-      <p class="line-clamp-2" style="font-size:0.875rem; color:var(--text-secondary); margin-bottom:0.75rem; min-height:2.5rem;">
-        ${escapeHTML(_wingSnippet(w.body) || 'No content yet.')}
-      </p>
-      ${when ? `<div class="card-last-attempt"><i data-lucide="clock" style="width:11px;height:11px;"></i> ${new Date(when).toLocaleDateString()}</div>` : ''}
-      <div style="margin-top:auto; display:flex; gap:0.5rem; padding-top:0.5rem;">
-        <button class="btn btn-practice" style="flex:1;" onclick="event.stopPropagation(); wingOpen('${w.id}')">
-          <i data-lucide="book-open" style="width:16px;height:16px;"></i> Read
-        </button>
-        <button class="btn btn-ghost" title="Edit" style="padding:0.5rem;" onclick="event.stopPropagation(); wingEdit('${w.id}')">
-          <i data-lucide="pencil" style="width:16px;height:16px;"></i>
-        </button>
-      </div>
-    </div>`;
-}
+/* The card itself is per-wing — see wingEntryHTML in wing-views.js. */
 
 function _wingReaderHTML(w) {
   const when = w.updatedAt || w.createdAt;
+  const schema = wingSchema(_wingKey);
+  const isMuseum = schema.layout === 'museum';
   return `
-    <div class="animate-fade-in" style="max-width:780px;margin:0 auto;">
+    <div class="animate-fade-in wing-reader wing-reader-${escapeHTML(schema.layout)}" style="max-width:780px;margin:0 auto;">
       <button class="btn btn-ghost btn-sm" onclick="wingBack()" style="margin-bottom:1rem;">
-        <i data-lucide="chevron-left" style="width:14px;height:14px;"></i> Back to entries
+        <i data-lucide="chevron-left" style="width:14px;height:14px;"></i> Back to ${escapeHTML(schema.nounPlural)}
       </button>
-      <h1 style="font-size:1.9rem;font-weight:800;color:var(--text-primary);margin-bottom:0.5rem;">${escapeHTML(w.title || 'Untitled')}</h1>
+      <h1 class="wing-reader-title${isMuseum ? ' wing-reader-statement' : ''}">${escapeHTML(w.title || 'Untitled')}</h1>
       <div style="display:flex;flex-wrap:wrap;gap:0.4rem;align-items:center;margin-bottom:1.25rem;">
         ${(w.tags || []).map(t => libTagBadgeHTML('wing', t)).join('')}
         ${when ? `<span style="font-size:0.75rem;color:var(--text-tertiary);">Updated ${new Date(when).toLocaleString()}</span>` : ''}
       </div>
-      <div class="wing-body">${w.body ? escapeHTML(w.body).replace(/\n/g, '<br/>') : '<em style="color:var(--text-tertiary);">No content yet.</em>'}</div>
+      ${wingReaderMetaHTML(w, schema)}
+      ${w.body ? `<section class="wing-sec"><h3 class="wing-sec-h">${escapeHTML(schema.bodyLabel)}</h3>
+        <div class="wing-body">${escapeHTML(w.body).replace(/\n/g, '<br/>')}</div></section>` : ''}
+      ${wingReaderListHTML(w, schema)}
+      ${wingReaderLinksHTML(w, schema)}
       <div style="display:flex;gap:0.6rem;margin-top:2rem;">
         <button class="btn btn-primary" onclick="wingEdit('${w.id}')"><i data-lucide="pencil" style="width:16px;height:16px;"></i> Edit</button>
         <button class="btn btn-secondary" onclick="libToggleFavorite('wing','${w.id}')">
@@ -312,7 +331,9 @@ function _wingReaderHTML(w) {
 
 function _wingEditorHTML() {
   const isNew = _wingEditing === 'new';
-  const w = isNew ? { title: '', body: '', tags: [], parentId: _wingFolderId } : (wingFind(_wingEditing) || { title: '', body: '', tags: [] });
+  const schema = wingSchema(_wingKey);
+  const w = isNew ? { title: '', body: '', tags: [], data: {}, parentId: _wingFolderId }
+                  : (wingFind(_wingEditing) || { title: '', body: '', tags: [], data: {} });
   const folders = [];
   const walk = (pid, d) => getChildFolders(pid, wingScope()).forEach(f => { folders.push({ id: f.id, label: '— '.repeat(d) + f.name }); walk(f.id, d + 1); });
   walk(null, 0);
@@ -321,18 +342,19 @@ function _wingEditorHTML() {
       <button class="btn btn-ghost btn-sm" onclick="wingBack()" style="margin-bottom:1rem;">
         <i data-lucide="chevron-left" style="width:14px;height:14px;"></i> Cancel
       </button>
-      <h2 style="font-size:1.35rem;font-weight:800;margin-bottom:1.25rem;">${isNew ? 'New entry' : 'Edit entry'}</h2>
-      <div class="af-field"><label class="form-label">Title</label>
-        <input id="wing-f-title" class="form-input af-input-bold" value="${escapeHTML(w.title || '')}" placeholder="Give it a name…" /></div>
+      <h2 style="font-size:1.35rem;font-weight:800;margin-bottom:1.25rem;">${isNew ? 'New ' + escapeHTML(schema.noun) : 'Edit ' + escapeHTML(schema.noun)}</h2>
+      <div class="af-field"><label class="form-label">${escapeHTML(schema.titleLabel)}</label>
+        <input id="wing-f-title" class="form-input af-input-bold" value="${escapeHTML(w.title || '')}" placeholder="${escapeHTML(schema.titlePlaceholder)}" /></div>
       <div class="af-field"><label class="form-label">Folder</label>
         <select id="wing-f-folder" class="form-select">
           <option value="">Uncategorized</option>
           ${folders.map(f => `<option value="${f.id}"${(w.parentId || '') === f.id ? ' selected' : ''}>${escapeHTML(f.label)}</option>`).join('')}
         </select></div>
       <div class="af-field"><label class="form-label">Tags <span class="af-label-hint">(comma separated)</span></label>
-        <input id="wing-f-tags" class="form-input" value="${escapeHTML((w.tags || []).join(', '))}" placeholder="e.g. grammar, verbs" /></div>
-      <div class="af-field"><label class="form-label">Content</label>
-        <textarea id="wing-f-body" class="form-textarea" rows="14" placeholder="Write it out…">${escapeHTML(w.body || '')}</textarea></div>
+        <input id="wing-f-tags" class="form-input" value="${escapeHTML((w.tags || []).join(', '))}" /></div>
+      ${(schema.fields || []).map(f => wingFieldEditorHTML(f, w)).join('')}
+      <div class="af-field"><label class="form-label">${escapeHTML(schema.bodyLabel)}</label>
+        <textarea id="wing-f-body" class="form-textarea" rows="12" placeholder="${escapeHTML(schema.bodyPlaceholder)}">${escapeHTML(w.body || '')}</textarea></div>
       <div style="display:flex;gap:0.6rem;margin-top:1rem;">
         <button class="btn btn-primary" onclick="wingSave()"><i data-lucide="save" style="width:16px;height:16px;"></i> Save</button>
         <button class="btn btn-secondary" onclick="wingBack()">Cancel</button>
@@ -355,16 +377,21 @@ function wingSave() {
     .split(',').map(t => t.trim()).filter(Boolean);
   const parentId = (document.getElementById('wing-f-folder') || {}).value || null;
 
+  const schema = wingSchema(_wingKey);
   const items = wingItems();
   if (_wingEditing === 'new') {
     const item = { id: generateId(), title: title.trim(), body, tags, parentId, favorite: false,
+                   data: wingReadFieldValues(schema, { data: {} }),
                    createdAt: Date.now(), updatedAt: Date.now() };
     items.push(item);
     _wingActiveId = item.id;
   } else {
     const item = wingFind(_wingEditing);
     if (item) {
-      Object.assign(item, { title: title.trim(), body, tags, parentId, updatedAt: Date.now() });
+      // Read against the item as it stands, so a checklist keeps what was
+      // ticked when only its wording changed.
+      const data = wingReadFieldValues(schema, item);
+      Object.assign(item, { title: title.trim(), body, tags, parentId, data, updatedAt: Date.now() });
       _wingActiveId = item.id;
     }
   }
@@ -442,7 +469,7 @@ registerLibAdapter('wing', {
   // A getter, not a value: one adapter serves all eight wings, and which one is
   // open changes as you navigate.
   get scope() { return wingScope(); },
-  noun: 'entry',
+  get noun() { return wingSchema(_wingKey).noun; },
   list: () => wingItems(),
   find: (id) => wingFind(id),
   remove: (id) => { const items = wingItems(); const i = items.findIndex(w => w.id === id); if (i >= 0) items.splice(i, 1); },
