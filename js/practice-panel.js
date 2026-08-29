@@ -505,6 +505,14 @@ function _ppFxAdd(layer, el, ttl) {
   setTimeout(done, ttl);            // animationend never fires on a hidden tab
 }
 
+/* A SOFT target for pieces in the air at once, across every row — not a
+   hard cap, and the difference matters. Every row keeps a floor of six so
+   a late one still celebrates rather than passing in silence, which means
+   a long run can sit above this: ten bursts measured 180 pieces against a
+   target of 150. That is the intended trade. What it actually bought is
+   the node count, 540 against 1020 uncapped. */
+const PP_CONFETTI_SOFT_CAP = 150;
+
 const PP_CONFETTI_COLORS = ['#34d399', '#22d3ee', '#a78bfa', '#fbbf24', '#f472b6',
                             '#60a5fa', '#fb7185', '#facc15', '#4ade80'];
 
@@ -556,7 +564,17 @@ function _ppConfettiBurst(r) {
   const cy = r.top + Math.min(18, r.height / 2);
   const vh = window.innerHeight;
 
-  for (let i = 0; i < 34; i++) {
+  /* A budget, because these bursts arrive in a run. Rows report 90ms apart, so
+     a passing suite of ten fires ten bursts inside a second — at a flat 34
+     pieces of three elements each that is over a thousand animated nodes alive
+     together, on the machine that just finished compiling. The count shrinks
+     as the screen fills and never goes below a handful, so a long clean run
+     stays a celebration rather than turning into a slideshow. */
+  const alive = layer.querySelectorAll('.pp-confetti').length;
+  const room = Math.max(0, PP_CONFETTI_SOFT_CAP - alive);
+  const count = Math.max(6, Math.min(34, room));
+
+  for (let i = 0; i < count; i++) {
     const piece = document.createElement('i');
     piece.className = 'pp-confetti';
     const arc = document.createElement('span');

@@ -7,11 +7,16 @@
    ============================================================ */
 
 .editor-fx {
+  /* Inside #editor-pre, which is what scrolls. Pinned to the top-left of
+     its CONTENT rather than stretched across it: an absolutely placed
+     child of a scroll container travels with the content, which is how a
+     ghost stays on its character when the pane moves. No size and no
+     overflow of its own — the pre already clips anything leaving it. */
   position: absolute;
-  inset: 0;
-  overflow: hidden;          /* a letter thrown off the edge should not scroll the pane */
-  pointer-events: none;      /* the textarea underneath must stay clickable */
-  z-index: 2;                /* over the pre, under nothing that matters */
+  top: 0;
+  left: 0;
+  pointer-events: none;      /* the textarea over it must stay clickable */
+  z-index: 2;
   /* Matched to .editor-pre code so a ghost is the same size as the glyph it
      stands in for. Inherited rather than fixed, because the toolbar's zoom
      changes the editor's font-size and the ghosts have to follow it. */
@@ -19,7 +24,6 @@
   font-size: inherit;
   line-height: inherit;
   white-space: pre;
-  contain: layout paint;     /* ghosts cannot trigger layout on the editor */
 }
 
 .edfx-ghost {

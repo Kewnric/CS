@@ -184,6 +184,11 @@ document.addEventListener('click', function (e) {
   const el = e.target.closest ? e.target : null;
   if (!el) return;
 
+  /* The sound controls play their own confirmation when switched — that is
+     the whole point of them — so the generic toggle cue on top made those two
+     buttons the noisiest thing in the app. */
+  if (el.closest('#settings-sound-item, #typing-sfx-btn, #editor-fx-btn')) return;
+
   // A checkbox or a switch reports its new state rather than a generic press.
   const box = el.closest('input[type="checkbox"], [role="switch"], [aria-pressed]');
   if (box) {

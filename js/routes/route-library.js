@@ -182,7 +182,7 @@ function libraryInit() {
         const n = (typeof wingItems === 'function') ? wingItems(w.key).length : 0;
         const noun = (typeof wingSchema === 'function')
           ? (n === 1 ? wingSchema(w.key).noun : wingSchema(w.key).nounPlural) : 'entries';
-        return card('wing?k=' + w.key, 'lib-card-wing', w.icon, w.name, w.tagline,
+        return card(w.key, 'lib-card-wing', w.icon, w.name, w.tagline,
           _libStatChip('file-text', `${n} ${noun}`), null, `${n} ${noun}`, w.accent);
       }).join('');
   }
@@ -280,7 +280,7 @@ function libHubSearch() {
       if (hits.length >= 40) return;
       if (libMatches(item, q, 'wing')) {
         hits.push({ item, kind: 'wing', route: 'wing', icon: 'file-text',
-                    onclick: (it) => `setSessionParam('wingActiveItem','${it.id}'); spaNavigate('wing?k=${key}')` });
+                    onclick: (it) => `setSessionParam('wingActiveItem','${it.id}'); spaNavigate('${key}')` });
       }
     });
   }

@@ -2,8 +2,26 @@
 function registerAllRoutes() {
   SpaRouter.register('home', { title: 'StudySession Pro — Dashboard', templateFn: homeTemplate, initFn: homeInit, destroyFn: homeDestroy, sidebarVisible: true, navId: 'nav-home' });
   SpaRouter.register('library', { title: 'StudySession Pro — Library', templateFn: libraryTemplate, initFn: libraryInit, destroyFn: libraryDestroy, sidebarVisible: true, navId: 'nav-library' });
-  // One route serves all eight generic wings; the key rides in the hash (#/wing?k=diary).
-  SpaRouter.register('wing', { title: 'StudySession Pro — Library', templateFn: wingTemplate, initFn: wingInit, destroyFn: wingDestroy, sidebarVisible: true, navId: 'nav-library' });
+  /* One route per wing — #/diary, #/mindset — the way every other library
+     has one. They share a template and an engine, which is what made the old
+     single #/wing?k=diary route tempting, but a shared implementation is not
+     a reason to share an address: the key had to be parsed out of the query
+     string, links were awkward, and the route name could not say which
+     library you were in. */
+  (typeof LIBRARY_WINGS !== 'undefined' ? LIBRARY_WINGS : []).forEach((w) => {
+    SpaRouter.register(w.key, {
+      title: 'StudySession Pro — ' + w.name,
+      templateFn: wingTemplate,
+      initFn: () => wingInitFor(w.key),
+      destroyFn: wingDestroy,
+      sidebarVisible: true,
+      navId: 'nav-library'
+    });
+  });
+
+  /* The old address still works. Anything already bookmarked or linked lands
+     here and is sent on to the wing's own route. */
+  SpaRouter.register('wing', { title: 'StudySession Pro — Library', templateFn: wingTemplate, initFn: wingInitLegacy, destroyFn: wingDestroy, sidebarVisible: true, navId: 'nav-library' });
   SpaRouter.register('browse', { title: 'StudySession Pro — Coding Library', templateFn: browseTemplate, initFn: browseInit, destroyFn: browseDestroy, sidebarVisible: true, navId: 'nav-library' });
   SpaRouter.register('study', { title: 'StudySession Pro — Notes Library', templateFn: studyTemplate, initFn: studyInit, destroyFn: studyDestroy, sidebarVisible: true, navId: 'nav-library' });
   SpaRouter.register('snippets', { title: 'StudySession Pro — Snippet Library', templateFn: snippetsTemplate, initFn: snippetsInit, destroyFn: snippetsDestroy, sidebarVisible: true, navId: 'nav-library' });

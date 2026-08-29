@@ -354,19 +354,25 @@ function wingSaveAndRepaint() {
   wingUpdateHeader();
 }
 
-/** Jump to another wing and open one entry there. */
+/**
+ * Jump to another wing and open one entry there.
+ *
+ * The entry is handed over rather than set: wingInitFor picks up
+ * _wingPendingOpen when the route mounts. That replaced a 60ms setTimeout that
+ * reopened the entry after guessing the route had finished building — which
+ * worked until a slow first paint, and then quietly did not.
+ */
 function wingGoTo(key, id) {
   if (typeof event !== 'undefined' && event) event.stopPropagation();
-  _wingKey = key;
-  _wingFolderId = null;
-  _wingActiveId = id;
-  _wingEditing = null;
-  const target = '#/wing?k=' + key;
+  const target = '#/' + key;
   if (window.location.hash === target) {
+    _wingKey = key;
+    _wingFolderId = null;
+    _wingActiveId = id;
+    _wingEditing = null;
     wingRenderSidebar(); wingRenderDetail(); wingUpdateHeader();
-  } else {
-    window.location.hash = target;
-    // The route rebuilds the pane, so the entry has to be reopened after it.
-    setTimeout(() => { _wingActiveId = id; wingRenderDetail(); }, 60);
+    return;
   }
+  _wingPendingOpen = id;
+  window.location.hash = target;
 }

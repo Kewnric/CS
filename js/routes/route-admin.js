@@ -534,9 +534,9 @@ function adminInit() {
     soon.innerHTML = LIBRARY_WINGS.map(p => {
       const n = (typeof wingItems === 'function') ? wingItems(p.key).length : 0;
       return `
-      <div class="lib-card lib-card-wing" onclick="spaNavigate('wing?k=${p.key}')" role="link" tabindex="0"
+      <div class="lib-card lib-card-wing" onclick="spaNavigate('${p.key}')" role="link" tabindex="0"
            style="--lib-accent:${p.accent || '#8b5cf6'};"
-           onkeydown="if(event.key==='Enter')spaNavigate('wing?k=${p.key}')">
+           onkeydown="if(event.key==='Enter')spaNavigate('${p.key}')">
         <div class="lib-card-glow"></div>
         <div class="lib-card-head">
           <div class="lib-card-icon"><i data-lucide="${p.icon}"></i></div>

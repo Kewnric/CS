@@ -831,6 +831,9 @@ function agGoToEntry(key) {
   } else if (e.sourceType === 'notebook') {
     setSessionParam('activeNotebook', e.sourceId);
     agNavigateEvenIfHere('study', () => spaNavigate('study'));
+  } else if (typeof LIBRARY_WINGS !== 'undefined' &&
+             LIBRARY_WINGS.some(w => w.key === e.sourceType)) {
+    agNavigateEvenIfHere(e.sourceType, () => spaNavigate(e.sourceType));
   } else if (e.sourceType === 'langword' || e.sourceType === 'langset') {
     setSessionParam('langView', e.sourceType === 'langset' ? 'sets' : 'dictionary');
     agNavigateEvenIfHere('language', () => spaNavigate('language'));

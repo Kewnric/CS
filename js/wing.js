@@ -50,11 +50,16 @@ function wingAllItems() {
 
 function wingFind(id) { return wingItems().find(w => w.id === id) || null; }
 
-/** The wing key rides in the hash (#/wing?k=diary) so links are shareable. */
+/** Only the legacy #/wing?k=diary address carries the key in a query string. */
 function _wingKeyFromHash() {
   const m = /[?&]k=([\w-]+)/.exec(window.location.hash || '');
   return m ? m[1] : null;
 }
+
+/* An entry to open as soon as the wing mounts. Set by wingGoTo before it
+   navigates, and consumed by the init below — which is what replaced a
+   setTimeout that guessed at how long the route would take to build. */
+let _wingPendingOpen = null;
 
 /* ── Route ────────────────────────────────────────────────── */
 
@@ -98,16 +103,27 @@ function wingTemplate() {
     </div>`;
 }
 
-function wingInit() {
-  const k = _wingKeyFromHash();
-  if (k) _wingKey = k;
+/** Mount a named wing. Each wing's route calls this with its own key. */
+function wingInitFor(key) {
+  if (key) _wingKey = key;
   _wingFolderId = null;
-  _wingActiveId = null;
   _wingEditing = null;
+  // A pending entry survives exactly one mount, so arriving from a cross-link
+  // opens that entry and arriving any other way opens the list.
+  _wingActiveId = _wingPendingOpen;
+  _wingPendingOpen = null;
   wingItems();                       // ensure the bucket exists
   wingRenderSidebar();
   wingRenderDetail();
   wingUpdateHeader();
+}
+
+/** #/wing?k=diary — send it on to #/diary and keep the old links working. */
+function wingInitLegacy() {
+  const k = _wingKeyFromHash();
+  const known = (typeof LIBRARY_WINGS !== 'undefined' ? LIBRARY_WINGS : []).some(w => w.key === k);
+  if (known) { window.location.hash = '#/' + k; return; }
+  wingInitFor(k || _wingKey);
 }
 
 function wingDestroy() { _wingEditing = null; }

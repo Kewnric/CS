@@ -19,6 +19,14 @@
    Not needed here: #editor-pre already renders the same string in the same
    font at the same place, so a Range over the character in the pre gives its
    exact box. The highlighter is doing the layout work for us.
+
+   THE LAYER LIVES INSIDE #editor-pre, which is the element that scrolls, and
+   positions are stored relative to its CONTENT rather than to the viewport.
+   That is what makes a ghost stay with its character: it used to sit in a
+   non-scrolling wrapper with a position fixed at spawn, so scrolling during
+   the 300ms it was alive left it stranded, and typing at the foot of a long
+   file — which scrolls the editor as you go — could place it against a view
+   that had already moved.
    ============================================================ */
 
 const EDFX_KEY = 'ssp.editorFx';
@@ -27,6 +35,9 @@ const EDFX_KEY = 'ssp.editorFx';
    the oldest are dropped — a ghost is 600ms of decoration, and losing one
    under a burst of typing is invisible. */
 const EDFX_MAX = 28;
+
+/* What the editor inserts on its own when you type an opener. */
+const EDFX_PAIRS = { '()': 1, '[]': 1, '{}': 1, '""': 1, "''": 1, '``': 1 };
 
 let _edfxPending = null;   // the character a keydown is about to remove
 let _edfxLive = [];
@@ -42,17 +53,18 @@ function edfxRouteWants() {
   return r === 'practice' || r === 'practice-set';
 }
 
-/** The layer the ghosts live in, made once per editor mount. */
+/** The layer the ghosts live in — inside the pre, so it scrolls with it. */
 function _edfxLayer() {
   const pre = document.getElementById('editor-pre');
-  if (!pre || !pre.parentElement) return null;
+  if (!pre) return null;
   let layer = document.getElementById('editor-fx');
-  if (!layer || layer.parentElement !== pre.parentElement) {
+  if (!layer || layer.parentElement !== pre) {
+    if (layer) layer.remove();
     layer = document.createElement('div');
     layer.id = 'editor-fx';
     layer.className = 'editor-fx';
     layer.setAttribute('aria-hidden', 'true');
-    pre.parentElement.appendChild(layer);
+    pre.appendChild(layer);
   }
   return layer;
 }
@@ -84,9 +96,18 @@ function _edfxCharBox(offset) {
     r.setStart(node, local);
     r.setEnd(node, Math.min(local + 1, node.nodeValue.length));
     const box = r.getBoundingClientRect();
-    const host = layer.getBoundingClientRect();
+    const pre = document.getElementById('editor-pre');
+    if (!pre) return null;
+    const host = pre.getBoundingClientRect();
     if (!box.width && !box.height) return null;
-    return { x: box.left - host.left, y: box.top - host.top, h: box.height };
+    /* Content coordinates, not viewport ones: the scroll offset is added back
+       so the number stays true however the pane is scrolled afterwards. The
+       ghost sits in the scrolling box, so it travels with the text. */
+    return {
+      x: box.left - host.left + pre.scrollLeft,
+      y: box.top - host.top + pre.scrollTop,
+      h: box.height
+    };
   } catch (e) {
     return null;
   }
@@ -133,9 +154,11 @@ function _edfxSpawn(ch, box, cls, delay) {
    does in the combo — each ghost starts oversized and shrinks, so whichever
    arrived last is the largest thing on screen.
    ------------------------------------------------------------ */
-function edfxTyped(ta) {
+function edfxTyped(ta, back) {
   if (!edfxEnabled() || !edfxRouteWants()) return;
-  const at = ta.selectionStart - 1;
+  // `back` steps away from the caret, for a pair whose caret sits between the
+  // two characters rather than after them.
+  const at = ta.selectionStart - (back || 1);
   if (at < 0) return;
   const ch = ta.value.charAt(at);
   if (!ch || ch === '\n') return;              // a newline has nothing to draw
@@ -230,7 +253,17 @@ document.addEventListener('input', function (e) {
   // Only single characters. A paste or an autocomplete insert would spawn a
   // ghost per character of a whole block, which is a snowstorm.
   if (e.inputType && e.inputType.indexOf('insert') !== 0) return;
-  if (e.data && e.data.length > 1) return;
+  /* A pair counts as one keystroke. The editor answers ( with () in a single
+     two-character insert, so the blanket "longer than one character is a
+     paste" rule threw away exactly the punctuation you had just typed —
+     brackets and quotes were the only keys in the file that drew nothing.
+     Only the character YOU pressed gets a ghost; the auto-closed partner
+     appears without ceremony, because you did not type it. */
+  if (e.data && e.data.length > 1) {
+    if (!EDFX_PAIRS[e.data]) return;
+    edfxTyped(ta, 1);
+    return;
+  }
   /* Not while composing. An IME fires insertCompositionText on every keystroke
      of a composition, so typing one Japanese character spawned a ghost for
      each intermediate romaji state and then another for the committed result.
