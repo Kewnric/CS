@@ -968,6 +968,8 @@ async function submitCode() {
   if (submitBtn) { submitBtn.disabled = true; submitBtn.style.opacity = '0.6'; }
 
   _practiceSubmitted = true;
+  if (typeof psfxWorkStop === 'function') psfxWorkStop();
+  if (typeof psfxPowerUp === 'function') psfxPowerUp();
   if (window.activeTimerInterval) clearInterval(window.activeTimerInterval);
   if (_autoSaveInterval) { clearInterval(_autoSaveInterval); _autoSaveInterval = null; }
   clearSessionParam('autoSavedFiles');
@@ -2159,6 +2161,7 @@ function _termClose(byUser) {
 function runCodeWithPiston(seedStdin) {
   const textarea = document.getElementById('editor-textarea');
   if (!textarea) return;
+  if (typeof psfxWorkStart === 'function') psfxWorkStart();
   // The whole file, not what happens to be on screen — a collapsed block is
   // parked outside the textarea (see fold.js).
   const code = (typeof edFullSource === 'function') ? edFullSource(textarea) : textarea.value;
@@ -2485,6 +2488,7 @@ function _termStartClock(session) {
 
 function _termStopClock(session) {
   if (session && session.clock) { clearInterval(session.clock); session.clock = null; }
+  if (typeof psfxWorkStop === 'function') psfxWorkStop();
   const el = document.getElementById('term-elapsed');
   if (el) el.textContent = '';
 }

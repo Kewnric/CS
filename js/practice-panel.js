@@ -318,10 +318,14 @@ function _ppExecHtml() {
 /** Top-bar "Check Code" → run all minimum requirements + test cases for the current problem. */
 async function ppRunAllChecks() {
   if (!_ppCtx) return;
+  if (typeof psfxWorkStart === 'function') psfxWorkStart();
   // A mode whose answers are not compiled brings its own checker. SQL practice
   // compares text against a reference answer; there is nothing to build and
   // nothing to run, so none of the machinery below applies to it.
-  if (_ppCtx.runChecks) return _ppCtx.runChecks();
+  if (_ppCtx.runChecks) {
+    if (typeof psfxWorkStop === 'function') psfxWorkStop();
+    return _ppCtx.runChecks();
+  }
   const codeNow = _ppCtx.code();
   if (!codeNow || !codeNow.trim()) {
     if (typeof toast === 'function') toast('Write some code first.', { type: 'warning' });
@@ -376,6 +380,8 @@ async function ppRunAllChecks() {
     if (typeof lucide !== 'undefined') lucide.createIcons({ root: checkBtn });
   }
   renderPracticePanel();
+
+  if (typeof psfxWorkStop === 'function') psfxWorkStop();
 
   // React per row, then once for the whole run if everything landed.
   if (tests.length) {
@@ -507,6 +513,17 @@ const PP_CONFETTI_COLORS = ['#34d399', '#22d3ee', '#a78bfa', '#fbbf24', '#f472b6
  * @param {number} [delay] stagger when a whole run reports at once
  */
 function ppCelebrateRow(ti, ok, delay) {
+  /* The cue comes first, and on its own schedule. Everything below this line
+     can decline to draw — reduced motion, a row scrolled out of view — and
+     none of those are reasons to go quiet. Asking not to see animation is not
+     asking not to hear the result, and a row you cannot see is exactly the
+     one worth hearing about. */
+  const say = () => {
+    if (typeof psfxPass !== 'function') return;
+    ok ? psfxPass() : psfxFail();
+  };
+  if (delay) setTimeout(say, delay); else say();
+
   if (_ppReduceMotion()) return;
   const wrap = document.querySelector(`.pp-row-wrap[data-ti="${ti}"]`);
   if (!wrap) return;
@@ -556,6 +573,8 @@ function _ppCrossRain(r) {
 
 /** Every test case passed — stars down the whole window, not just the row. */
 function ppStarfall() {
+  // Before the motion check, for the same reason as the row cues.
+  if (typeof psfxStarfall === 'function') psfxStarfall();
   if (_ppReduceMotion()) return;
   const layer = _ppFxLayer();
   const w = window.innerWidth;

@@ -147,6 +147,7 @@ function practiceDestroy() {
   if (typeof closeCheatsheet === 'function') closeCheatsheet();   // it lives on <body>, not in the route
   if (typeof _timerMenuClose === 'function') _timerMenuClose();   // ditto
   if (typeof ppClearFx === 'function') ppClearFx();               // and the confetti layer
+  if (typeof psfxWorkStop === 'function') psfxWorkStop();          // and the build pulse
   // Flush the autosave before tearing down: Back/Esc/sidebar all leave the page
   // between the 30 s ticks, which used to drop up to half a minute of typing.
   // Skipped after a submit — that attempt is graded and its autosave cleared.
