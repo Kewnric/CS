@@ -11,9 +11,19 @@
 
    What makes it read as a voice rather than a beep:
      · a TRIANGLE oscillator, not a square — soft harmonics, no chiptune edge
-     · a BANDPASS around the low formants, which is the nasal, vowel-ish colour
+     · a BANDPASS around the formants, which is the vowel-ish colour
      · a short DOWNWARD pitch glide, the way a spoken syllable falls
      · a soft attack, so there is no click at the front
+
+   Tuned to the standard Mita rather than the darker one she turns into. The
+   difference between those two is NOT the fundamental — pitching this up and
+   leaving everything else alone gives the dark voice played faster, which is
+   measurable: the dominant frequency moved 215Hz to 398Hz while the spectral
+   centroid barely shifted, 646Hz to 728Hz. The formants are what the ear reads
+   as the size of a voice, so the bandpass, the lowpass ceiling and the weight
+   of the sub-oscillator all move together with the pitch. Doing that properly
+   put the centroid at 1142Hz, and it stopped sounding like something in a
+   basement.
 
    Nothing is created until the first keystroke, which is itself the user
    gesture the autoplay policy wants — building the AudioContext at load would
@@ -95,19 +105,24 @@ function sfxBlip(pitch, length, colour) {
   // The fall. A syllable drops as it ends; a beep holds its pitch.
   osc.frequency.exponentialRampToValueAtTime(f * 0.82, t + length);
 
-  // An octave down underneath, quietly, for body.
+  // An octave down underneath, quietly, for body. Kept light — this is the
+  // weight in the sound, and weight is most of what made it read as the
+  // wrong Mita.
   sub.type = 'sine';
   sub.frequency.setValueAtTime(f * 0.5, t);
   sub.frequency.exponentialRampToValueAtTime(f * 0.42, t + length);
   const subGain = ctx.createGain();
-  subGain.gain.value = 0.35;
+  subGain.gain.value = 0.15;
 
   band.type = 'bandpass';
   band.frequency.setValueAtTime(colour * (0.9 + Math.random() * 0.2), t);
   band.Q.value = 1.4;
 
+  // High enough to let the brightness through. At 2600 the ceiling sat on top
+  // of the formants and dragged the whole voice back down however high the
+  // fundamental went.
   tame.type = 'lowpass';
-  tame.frequency.value = 2600;
+  tame.frequency.value = 4600;
 
   // Soft in, then down in two stages. A single exponential to silence
   // collapses the blip in its first third — measured, it left 27ms audible out
@@ -140,12 +155,12 @@ function sfxBlip(pitch, length, colour) {
  * letters before it.
  */
 function sfxKeyVoice(key) {
-  if (key === 'Enter')     return [168, 0.115, 780];   // lower, longer — a full stop
-  if (key === 'Backspace') return [150, 0.075, 620];   // dull, swallowed
-  if (key === 'Delete')    return [150, 0.075, 620];
-  if (key === ' ')         return [196, 0.075, 820];   // the gap between words
-  if (key === 'Tab')       return [180, 0.095, 700];
-  return [232, 0.090, 980];                            // an ordinary character
+  if (key === 'Enter')     return [330, 0.095, 1380];  // lower, longer — a full stop
+  if (key === 'Backspace') return [300, 0.062, 1180];  // dull, swallowed
+  if (key === 'Delete')    return [300, 0.062, 1180];
+  if (key === ' ')         return [380, 0.062, 1560];  // the gap between words
+  if (key === 'Tab')       return [355, 0.078, 1450];
+  return [440, 0.072, 1750];                           // an ordinary character
 }
 
 /** Keys that are navigation or command, not speech. */
@@ -201,8 +216,8 @@ function toggleTypingSfx() {
   _syncTypingSfxBtn();
   if (next) {
     // Play the thing being switched on, so the button proves itself.
-    sfxBlip(232, 0.090, 980);
-    setTimeout(() => sfxBlip(210, 0.100, 900), 95);
+    sfxBlip(440, 0.072, 1750);
+    setTimeout(() => sfxBlip(392, 0.085, 1560), 95);
   } else if (_sfxCtx) {
     _sfxCtx.suspend().catch(() => {});
   }
