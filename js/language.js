@@ -602,6 +602,76 @@ const LANG_POTIONS = [
 function langPowerup(id) { return LANG_POWERUPS.find(p => p.id === id) || null; }
 function langPotion(id) { return LANG_POTIONS.find(p => p.id === id) || null; }
 
+/* ── Who you meet ─────────────────────────────────────────────
+   A shuffle bag, not a fresh coin every time.
+
+   Uniform random has no memory: with ten people it deals the same one twice
+   in a row about one time in ten, and three times in five encounters is
+   perfectly ordinary — which reads as "why is it always Sir Tan". Dealing
+   from a bag that only refills once it is empty means you meet everybody
+   before you meet anybody twice, which is what people actually mean by
+   random.
+
+   On top of that: the bag is ordered by where you are, so a cafeteria deals
+   its own people first, and there is a standing chance of a stranger built
+   from your own vocabulary so the cast is never a fixed ten.
+   ------------------------------------------------------------ */
+
+let _langEnemyBag = [];
+let _langLastEnemy = null;
+
+const LANG_STRANGER_CHANCE = 0.18;   // a dictionary-built passer-by
+
+function langEncounterReady(e) {
+  return (e.line || '').trim() && (e.options || []).some(o => (o.text || '').trim() && o.correct);
+}
+
+function langEligibleScenarios() {
+  return langScenarios().filter(s => (s.encounters || []).some(langEncounterReady));
+}
+
+/** Start the cast over — called when a run begins so each run deals fresh. */
+function langResetEnemyBag() {
+  _langEnemyBag = [];
+  _langLastEnemy = null;
+}
+
+/**
+ * Refill the bag: one copy of everybody, local faces dealt first.
+ *
+ * Weighting by extra COPIES was the first attempt and it recreated the very
+ * complaint — three copies of the street scenario put Traffic Aide at draws
+ * one, three and five. Location belongs in the ORDER, not the count: you
+ * still meet all ten before you meet anyone twice, and the people who belong
+ * where you are turn up early in the cycle.
+ */
+function _langRefillBag(nearLocation) {
+  const pool = langEligibleScenarios();
+  const local = pool.filter(s => nearLocation && s.location === nearLocation);
+  const rest = pool.filter(s => local.indexOf(s) === -1);
+  // pop() takes from the end, so the local cast goes last to come out first.
+  _langEnemyBag = langShuffle(rest).concat(langShuffle(local));
+}
+
+function _langScenarioEnemy(sc) {
+  const usable = (sc.encounters || []).filter(langEncounterReady);
+  return {
+    id: sc.id,
+    name: sc.npc || 'Stranger',
+    location: sc.location || 'street',
+    hp: sc.npcHp || 100,
+    hpMax: sc.npcHp || 100,
+    source: 'scenario',
+    turns: langShuffle(usable).map(e => ({
+      situation: e.situation || '',
+      line: e.line,
+      options: langShuffle((e.options || []).filter(o => (o.text || '').trim())),
+      damage: e.damage || 25,
+      backlash: e.backlash || 20
+    }))
+  };
+}
+
 /**
  * Someone to run into.
  *
@@ -609,29 +679,32 @@ function langPotion(id) { return LANG_POTIONS.find(p => p.id === id) || null; }
  * none written, one is built from the dictionary instead — the game has to be
  * playable the moment there are words in it, not only once somebody has sat
  * down and authored encounters.
+ *
+ * @param {string} [nearLocation] where you are, which tilts who turns up
  */
-function langRandomEnemy() {
-  const ready = (e) => (e.line || '').trim() && (e.options || []).some(o => (o.text || '').trim() && o.correct);
-  const scs = langScenarios().filter(s => (s.encounters || []).some(ready));
-  if (scs.length) {
-    const sc = scs[Math.floor(Math.random() * scs.length)];
-    const usable = (sc.encounters || []).filter(ready);
-    return {
-      name: sc.npc || 'Stranger',
-      location: sc.location || 'street',
-      hp: sc.npcHp || 100,
-      hpMax: sc.npcHp || 100,
-      source: 'scenario',
-      turns: langShuffle(usable).map(e => ({
-        situation: e.situation || '',
-        line: e.line,
-        options: langShuffle((e.options || []).filter(o => (o.text || '').trim())),
-        damage: e.damage || 25,
-        backlash: e.backlash || 20
-      }))
-    };
+function langRandomEnemy(nearLocation) {
+  const pool = langEligibleScenarios();
+  if (!pool.length) return langEnemyFromWords();
+
+  // A passer-by out of your own vocabulary, so the cast is never a fixed ten.
+  if (pool.length > 1 && Math.random() < LANG_STRANGER_CHANCE) {
+    const stranger = langEnemyFromWords();
+    if (stranger) { _langLastEnemy = null; return stranger; }
   }
-  return langEnemyFromWords();
+
+  if (!_langEnemyBag.length) _langRefillBag(nearLocation);
+
+  let sc = _langEnemyBag.pop();
+  // Never the same person twice running, as long as there is anyone else.
+  if (sc && _langLastEnemy && sc.id === _langLastEnemy && _langEnemyBag.length) {
+    const swap = _langEnemyBag.pop();
+    _langEnemyBag.unshift(sc);
+    sc = swap;
+  }
+  if (!sc) return langEnemyFromWords();
+
+  _langLastEnemy = sc.id;
+  return _langScenarioEnemy(sc);
 }
 
 /** A conversation built out of your own vocabulary. */

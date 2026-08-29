@@ -105,6 +105,7 @@ function langQuestInit() {
     lqBeginTurn();
   } else {
     if (langRunBlocker()) { spaNavigate('language'); return; }
+    langResetEnemyBag();   // every run deals the cast from the top
     lqSay('You', 'A whole evening, and nothing decided yet.');
     lqRoadMenu();
   }
@@ -332,7 +333,7 @@ function lqStep() {
   // into pressing the same button at nothing.
   const forced = _lq.steps - (_lq.lastEncounterStep || 0) >= 4;
   if (forced || Math.random() < LANG_ENCOUNTER_CHANCE) {
-    const enemy = langRandomEnemy();
+    const enemy = langRandomEnemy(_lq.location);
     if (enemy) {
       _lq.lastEncounterStep = _lq.steps;
       _lq.enemy = enemy;
