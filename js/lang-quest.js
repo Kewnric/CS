@@ -182,7 +182,7 @@ function lqRender() {
     const grown = _lq.staminaMax > LANG_RUN_STAMINA;
     stats.innerHTML = `
       <span class="lq-stat"><b class="lq-ico-st">⚡</b>STA ${Math.max(0, Math.round(_lq.stamina))}/${_lq.staminaMax}${
-        grown ? `<em class="lq-grown" title="Raised by ${_lq.defeated} conversation${_lq.defeated !== 1 ? 's' : ''} won">+${_lq.staminaMax - LANG_RUN_STAMINA}</em>` : ''}</span>
+        grown ? `<em class="lq-grown" title="${Math.floor(_lq.steps / LANG_RUN_ENDURANCE_EVERY) * LANG_RUN_ENDURANCE_GAIN} from blocks run, ${_lq.defeated * LANG_RUN_STAMINA_GAIN} from conversations won">+${_lq.staminaMax - LANG_RUN_STAMINA}</em>` : ''}</span>
       <span class="lq-stat"><b class="lq-ico-pw">✦</b>PWR ${Math.round(_lq.power)}%</span>
       <span class="lq-stat"><b class="lq-ico-wk">▮</b>BLOCKS ${_lq.steps}</span>
       ${_lq.scene === 'battle' && _lq.enemy
@@ -309,12 +309,23 @@ function lqStep() {
   _lq.steps++;
   _lq.stamina -= LANG_RUN_STEP_COST;
 
+  // Endurance. The leg costs you now and pays you back as headroom: the
+  // maximum rises every few blocks whether or not you meet anybody, so the
+  // walk itself is progress and not just a countdown to the next encounter.
+  const enduranceUp = _lq.steps % LANG_RUN_ENDURANCE_EVERY === 0;
+  if (enduranceUp) _lq.staminaMax += LANG_RUN_ENDURANCE_GAIN;
+
   if (_lq.stamina <= 0) {
     _lq.stamina = 0;
     lqSay(null, 'Your legs are done. You have nothing left to walk on.');
     lqThen(() => lqFinish('exhausted'));
     lqRender();
     return;
+  }
+
+  if (enduranceUp) {
+    lqSay(null, 'Your legs are getting used to this. Total stamina is now {'
+      + _lq.staminaMax + '}.');
   }
 
   // Four quiet legs in a row and the next is certain, so a run cannot stall

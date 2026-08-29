@@ -565,6 +565,12 @@ const LANG_TYPE_RULES = {
 const LANG_RUN_STAMINA = 100;
 const LANG_RUN_STAMINA_GAIN = 10;    // added to the MAX per enemy beaten
 const LANG_RUN_STEP_COST = 6;        // stamina per leg of the run
+
+/* Running builds the capacity to run. Every few blocks the MAXIMUM goes up,
+   which is the whole point of going out: tonight costs you, and tomorrow you
+   can go further. Winning conversations still adds its own bonus on top. */
+const LANG_RUN_ENDURANCE_EVERY = 3;  // blocks per endurance gain
+const LANG_RUN_ENDURANCE_GAIN = 5;   // added to the MAX each time
 const LANG_ENCOUNTER_CHANCE = 0.45;  // per step
 
 /* Flavour while walking. Placeholders, as asked — they set the beat between
