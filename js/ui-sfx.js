@@ -116,6 +116,7 @@ function uisfxClick() {
 /** The button that actually does the thing on the screen. */
 function uisfxPrimary() {
   if (!uisfxOn()) return;
+  _uisfxLastClick = Date.now();          // so a navigation it causes stays quiet
   uisfxTone(660, { to: 990, dur: 0.06, gain: 0.15, type: 'triangle' });
   uisfxTone(1320, { dur: 0.05, gain: 0.06, at: 0.035 });
 }
@@ -123,6 +124,7 @@ function uisfxPrimary() {
 /** Delete, reset, anything you might regret. Lower, and it falls. */
 function uisfxDanger() {
   if (!uisfxOn()) return;
+  _uisfxLastClick = Date.now();
   uisfxTone(340, { to: 250, dur: 0.09, gain: 0.15, type: 'triangle', lowpass: 1600 });
 }
 
@@ -132,9 +134,19 @@ function uisfxToggle(on) {
   else uisfxTone(700, { to: 480, dur: 0.06, gain: 0.11, type: 'triangle' });
 }
 
-/** Moving between screens: two notes, so it reads as travel. */
+/**
+ * Moving between screens: two notes, so it reads as travel.
+ *
+ * Skipped when a click has just been acknowledged. Almost every navigation
+ * starts with pressing something, and the press already made a sound — firing
+ * both meant a click-then-chime on every single nav item and hub card, which
+ * is twice as much sound as the event deserves. What is left for this cue is
+ * the navigation you did NOT click: the back button, a keyboard shortcut,
+ * anything the app does on your behalf.
+ */
 function uisfxNavigate() {
   if (!uisfxOn()) return;
+  if (Date.now() - _uisfxLastClick < 450) return;
   uisfxTone(520, { dur: 0.05, gain: 0.1, type: 'sine' });
   uisfxTone(780, { dur: 0.07, gain: 0.09, type: 'sine', at: 0.045 });
 }

@@ -22,6 +22,7 @@ const PSFX_LEVEL = 2.6;
 
 let _psfxOut = null;
 let _psfxWorkTimer = null;
+let _psfxWorkCap = null;
 let _psfxWorkStep = 0;
 
 /** The cue bus, kept in step with the shared volume slider on every use. */
@@ -103,12 +104,20 @@ function psfxWorkStart() {
   /* A cap, because "started" and "finished" are wired at different call sites
      and a build has several ways to end — an exception, a navigation, an
      engine that never answers. A pulse still going a minute later would be
-     worse than one that stops slightly early. */
-  setTimeout(psfxWorkStop, 25000);
+     worse than one that stops slightly early.
+
+     The handle is KEPT, which it was not. An uncancelled cap belongs to the
+     session that scheduled it and fires 25 seconds later regardless of what
+     is running by then — so a check, a stop, and a second check one second
+     later left the first cap alive to silence the second one mid-build. */
+  clearTimeout(_psfxWorkCap);
+  _psfxWorkCap = setTimeout(psfxWorkStop, 25000);
 }
 
 function psfxWorkStop() {
   if (_psfxWorkTimer) { clearInterval(_psfxWorkTimer); _psfxWorkTimer = null; }
+  clearTimeout(_psfxWorkCap);
+  _psfxWorkCap = null;
 }
 
 /* ── A test case failed ───────────────────────────────────────
