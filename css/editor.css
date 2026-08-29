@@ -1106,6 +1106,58 @@ mark.diff-hit.current {
   color: var(--text-primary);
 }
 
+/* --- Typing sound: the toggle keeps its click, the slider comes in on hover ---
+   The pop sits in a wrapper with no gap between it and the button, so the
+   pointer can travel down into it without crossing dead space and dismissing
+   the thing it is reaching for. It survives :focus-within too, or the slider
+   would be unreachable by keyboard. */
+.sfx-control {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.sfx-vol-pop {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  margin-top: 2px;
+  background: var(--bg-elevated, #1c1c24);
+  border: 1px solid var(--border-color, #2f2f3a);
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 0.12s ease, transform 0.12s ease, visibility 0.12s;
+}
+
+.sfx-control:hover .sfx-vol-pop,
+.sfx-control:focus-within .sfx-vol-pop {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.sfx-vol-range {
+  width: 104px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.sfx-vol-label {
+  min-width: 34px;
+  text-align: right;
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-tertiary);
+}
+
 /* Timer pill matches the button height */
 .practice-topbar-right .timer-display {
   height: 38px;
