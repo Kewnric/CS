@@ -4,35 +4,16 @@
    A short blip per keystroke, in the manner of MiSide's dialogue: the
    voiceless "talking" sound that plays per character while Mita speaks.
 
-   Synthesised rather than sampled, so there is no binary asset in a repo that
-   is served as-is and the shape stays adjustable.
+   Synthesised rather than sampled. One recorded blip repeated at typing speed
+   turns into a machine-gun very quickly — the ear picks out the identical
+   attack and it stops sounding like a voice. Every blip here is built fresh
+   with its own pitch, so a burst of fast typing comes out as patter.
 
-   MONOTONE, deliberately. Every blip is the same pitch, because the game plays
-   one sample over and over. It did not start that way: there was a random
-   wobble of nine percent per blip, plus a table giving each key its own pitch,
-   on the theory that identical repeats sound mechanical. They do — but nine
-   percent is a semitone and a half, which is not texture, it is the sound
-   going out of tune with itself. Sameness is the point.
-
-   SOURCE AND FILTER, which is how a voice actually works: a harmonically
-   rich source, then resonances that shape it into a vowel.
-
-     · a SAWTOOTH source. A triangle has almost no harmonics, and formants can
-       only resonate what is already there — triangle through one gentle
-       filter came out barely distinguishable from a sine, which is to say a
-       note.
-     · a FORMANT PAIR in parallel, not one filter in series. One resonance is
-       a filtered tone; it is the RATIO between two that the ear reads as a
-       vowel. F1 carries the body, F2 identifies it, and both need a real Q —
-       a formant is a sharp peak, and the 1.4 this used to run at is a tilt.
-     · a NOISE TRANSIENT on the attack, twelve milliseconds of it. That is the
-       consonant. Speech is never purely periodic, and a blip with no
-       aperiodic energy at all announces itself as an oscillator.
-     · a soft attack and a two-stage decay, which carry the body.
-
-   This is what "too notey" was: one weak filter on a near-sine, at a fixed
-   pitch, which is the definition of a musical note. The pitch was never the
-   problem — it is still D#4.
+   What makes it read as a voice rather than a beep:
+     · a TRIANGLE oscillator, not a square — soft harmonics, no chiptune edge
+     · a BANDPASS around the formants, which is the vowel-ish colour
+     · a short DOWNWARD pitch glide, the way a spoken syllable falls
+     · a soft attack, so there is no click at the front
 
    Tuned to the standard Mita rather than the darker one she turns into.
 
@@ -45,27 +26,43 @@
    tracker and reads D#4, 311Hz, sitting just under the E4 line — so that is
    the target, and this is tuned to hit it rather than to sound plausible.
 
-   The number below is 311 and not 335. It was 335 while the pitch glided
-   downward, because the blip then spent its life falling and the dominant
-   landed below where it started. With the glide gone the nominal IS the
-   measured pitch, so the tuned figure and the target are the same number
-   again. Leaving 335 would have put it on E4, a semitone sharp — taking the
-   glide out silently retunes the whole thing.
+   The number below is 335 rather than 311 because it is where the blip
+   STARTS, and the glide means it spends its life falling: measured, a nominal
+   335 gives a dominant of 312Hz, which is D#4 within six cents. Setting 311
+   here would land on D4 instead, a whole semitone flat.
 
-   How the earlier guesses did against that target:
-     232Hz -> f0 215Hz  C#4   a fourth flat, and dark with it
-     440Hz -> f0 422Hz  G#4   a fifth sharp
-     270Hz -> f0 258Hz  C4    a minor third flat
-     311Hz -> f0 311Hz  D#4   the reading, and flat across every key
+   How the three earlier guesses did against that target:
+     232Hz base -> f0 215Hz  C#4   a fourth flat, and dark with it
+     440Hz base -> f0 422Hz  G#4   a fifth sharp
+     270Hz base -> f0 258Hz  C4    a minor third flat
+     335Hz base -> f0 312Hz  D#4   the reading
 
-   The dives to C4 in that trace are the tracker losing lock as each blip
-   decays rather than pitch content — they sit at the tail, where there is
-   least signal to follow. The trustworthy part was always the sustained band
-   just under E4, and a flat blip is what puts us on it.
+   What is NOT taken from the trace is the glide. It shows dives to C4 and
+   below, but a pitch tracker loses lock as a sound decays, and those spikes
+   sit at the tail of each blip where there is least to track. The trustworthy
+   part is the sustained band just under E4. Reading the artefacts as pitch
+   content would have doubled the fall for no reason.
 
    Nothing is created until the first keystroke, which is itself the user
    gesture the autoplay policy wants — building the AudioContext at load would
    leave it suspended and silent.
+
+   TWO THINGS WERE TRIED AFTER THIS AND ROLLED BACK, so they do not get
+   rediscovered as improvements:
+
+   Making it monotone. The wobble and the glide were removed on the grounds
+   that the game's blip is one sample repeated. Measured, that is exactly what
+   it produced — every keystroke one pitch — and it sounded worse: a fixed
+   frequency with an envelope on it IS a musical note, and it read as one.
+
+   Then a formant pair on a sawtooth with a noise transient, which is textbook
+   voice synthesis and measurably a vowel: real energy at F1 and at both
+   harmonics either side of F2, where before there was a single peak. It was
+   still not as good to listen to. The small pitch movement below is doing
+   more work than the spectrum was.
+
+   The lesson stuck to here: this is judged by ear, and the measurements are
+   only there to tell me WHAT I changed, not whether it was better.
    ============================================================ */
 
 const SFX_KEY = 'ssp.typingSfx';
@@ -89,45 +86,31 @@ const SFX_MIN_GAP_MS = 34;
    the loudness was settled before the voice was. */
 
 /**
- * The voice, in one place. One sound, used for every key.
+ * The voice, in one place.
  *
- * There used to be a ratio table here giving return, space, backspace and tab
- * their own pitch, length and colour. It is gone: the game plays one sample
- * whatever is happening, and per-key pitches were the second source of the
- * wobble this was meant to lose.
+ * Every key is a ratio of this rather than its own row of numbers, so moving
+ * the pitch moves the whole family together and keeps the shape: return still
+ * lowest and longest, backspace still dullest. Five separate rows is what made
+ * this awkward to tune — changing the voice meant editing five sets of three.
  */
 const SFX_VOICE = {
-  pitch:   311,     // Hz — D#4, straight off the tracker reading
+  pitch:   335,     // Hz at the attack; measures D#4/311Hz, the game's reading
   length:  0.080,   // seconds
-  // A neutral, slightly open vowel — around an "eh". The pair matters more
-  // than either number: F2/F1 near 2.8 is what says vowel rather than tone.
-  f1:      620,     // Hz, first formant — the body
-  f1q:     3,
-  f2:      1750,    // Hz, second formant — what identifies the vowel
-  f2q:     2.5,
-  f2gain:  0.9,
-  /* Those Q values are lower than a textbook formant, on purpose, and this is
-     the one genuinely non-obvious thing in this file.
-
-     A formant is a resonance: it can only amplify harmonics that fall inside
-     its band. The harmonics here sit 311Hz apart, and at Q9 the F2 band is
-     only ~190Hz wide — so 1555 and 1866 both fell OUTSIDE it and F2 resonated
-     nothing at all. Measured, the F2 region carried 0.127 of F1's energy: the
-     pair was a pair on paper and a single filter in the air, which is exactly
-     what "too notey" sounded like.
-
-     Widening the bands so they always straddle a harmonic takes that to
-     0.322. Tuning F2 to sit exactly ON a harmonic scores marginally better
-     still, and is not worth having — it would come apart again the moment the
-     pitch moved. */
-  breath:  0.14,    // the noise transient at the attack — the consonant
-  ceiling: 4600,    // Hz, the lowpass over the whole thing
+  formant: 1600,    // Hz, the bandpass centre — the colour of the voice
+  ceiling: 4600,    // Hz, the lowpass above it
   weight:  0.18,    // the octave-down sine underneath
-  /* Far below the old 1.0 because a sawtooth through two resonances is a much
-     hotter signal than a triangle through one: the shaped blip now peaks near
-     0.77 where it used to reach 0.13. The output level has been held at about
-     -15.5 dBFS across every one of these changes on purpose. */
-  volume:  0.22
+  glide:   0.82,    // where the pitch falls to by the end
+  q:       1.4,     // how sharp the formant is
+  volume:  1.0
+};
+
+/** pitch x, length x, formant x — relative to an ordinary character. */
+const SFX_KEY_RATIOS = {
+  'Enter':     [0.78, 1.25, 0.80],   // lower, longer — a full stop
+  'Backspace': [0.72, 0.85, 0.69],   // dull, swallowed
+  'Delete':    [0.72, 0.85, 0.69],
+  ' ':         [0.89, 0.85, 0.91],   // the gap between words
+  'Tab':       [0.83, 1.06, 0.84]
 };
 
 const SFX_VOL_KEY = 'ssp.typingSfxVol';
@@ -180,18 +163,6 @@ function _sfxContext() {
  * @param {number} length seconds; longer reads as a heavier key
  * @param {number} colour bandpass centre in Hz — lower is duller
  */
-/* One short burst of white noise, built once. Rebuilding it per keystroke
-   would allocate a buffer on every letter typed. */
-let _sfxNoise = null;
-function _sfxNoiseBuffer(ctx) {
-  if (_sfxNoise) return _sfxNoise;
-  const n = Math.floor(ctx.sampleRate * 0.05);
-  _sfxNoise = ctx.createBuffer(1, n, ctx.sampleRate);
-  const d = _sfxNoise.getChannelData(0);
-  for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
-  return _sfxNoise;
-}
-
 function sfxBlip(pitch, length, colour) {
   const ctx = _sfxContext();
   if (!ctx) return;
@@ -200,40 +171,35 @@ function sfxBlip(pitch, length, colour) {
   const t = ctx.currentTime;
   const osc = ctx.createOscillator();
   const sub = ctx.createOscillator();
-  const f1 = ctx.createBiquadFilter();
-  const f2 = ctx.createBiquadFilter();
-  const f2g = ctx.createGain();
+  const band = ctx.createBiquadFilter();
   const tame = ctx.createBiquadFilter();
   const env = ctx.createGain();
 
-  // Flat, and identical every time. No jitter and no glide — see the header.
-  const f = pitch;
+  // ±9% per blip. Without the jitter twenty keystrokes in a row are audibly
+  // the same note and the whole thing sounds mechanical.
+  const f = pitch * (0.91 + Math.random() * 0.18);
 
-  // Sawtooth, because formants can only resonate harmonics that exist. This
-  // is the glottal source; the filters below are the vocal tract.
-  osc.type = 'sawtooth';
+  osc.type = 'triangle';
   osc.frequency.setValueAtTime(f, t);
+  // The fall. A syllable drops as it ends; a beep holds its pitch.
+  osc.frequency.exponentialRampToValueAtTime(f * SFX_VOICE.glide, t + length);
 
   // An octave down underneath, quietly, for body. Kept light — this is the
   // weight in the sound, and weight is most of what made it read as the
   // wrong Mita.
   sub.type = 'sine';
   sub.frequency.setValueAtTime(f * 0.5, t);
+  sub.frequency.exponentialRampToValueAtTime(f * 0.5 * SFX_VOICE.glide, t + length);
   const subGain = ctx.createGain();
   subGain.gain.value = SFX_VOICE.weight;
 
-  // The formant pair, in PARALLEL. In series the second filter would only
-  // carve away what the first passed; side by side they are two resonances
-  // sounding at once, which is what a vowel is.
-  f1.type = 'bandpass';
-  f1.frequency.setValueAtTime(colour, t);
-  f1.Q.value = SFX_VOICE.f1q;
+  band.type = 'bandpass';
+  band.frequency.setValueAtTime(colour * (0.9 + Math.random() * 0.2), t);
+  band.Q.value = SFX_VOICE.q;
 
-  f2.type = 'bandpass';
-  f2.frequency.setValueAtTime(SFX_VOICE.f2, t);
-  f2.Q.value = SFX_VOICE.f2q;
-  f2g.gain.value = SFX_VOICE.f2gain;
-
+  // High enough to let the brightness through. At 2600 the ceiling sat on top
+  // of the formants and dragged the whole voice back down however high the
+  // fundamental went.
   tame.type = 'lowpass';
   tame.frequency.value = SFX_VOICE.ceiling;
 
@@ -248,42 +214,29 @@ function sfxBlip(pitch, length, colour) {
   env.gain.exponentialRampToValueAtTime(0.3, t + length * 0.35);
   env.gain.exponentialRampToValueAtTime(0.0001, t + length);
 
-  // Source into both formants; both formants into the ceiling.
-  osc.connect(f1);
-  osc.connect(f2);
+  osc.connect(band);
   sub.connect(subGain);
-  subGain.connect(f1);
-  f1.connect(tame);
-  f2.connect(f2g);
-  f2g.connect(tame);
+  subGain.connect(band);
+  band.connect(tame);
   tame.connect(env);
   env.connect(_sfxBus);
 
   osc.start(t); sub.start(t);
   osc.stop(t + length + 0.02); sub.stop(t + length + 0.02);
-
-  // The consonant: a brief noise burst under the attack, gone before the
-  // vowel has finished arriving. Without it the onset is too clean and the
-  // whole thing reads as an instrument being played.
-  if (SFX_VOICE.breath > 0) {
-    const nz = ctx.createBufferSource();
-    const nzf = ctx.createBiquadFilter();
-    const nzg = ctx.createGain();
-    nz.buffer = _sfxNoiseBuffer(ctx);
-    nzf.type = 'bandpass';
-    nzf.frequency.value = SFX_VOICE.f2 * 1.3;
-    nzf.Q.value = 1.2;
-    nzg.gain.setValueAtTime(SFX_VOICE.breath, t);
-    nzg.gain.exponentialRampToValueAtTime(0.0001, t + 0.012);
-    nz.connect(nzf); nzf.connect(nzg); nzg.connect(_sfxBus);
-    nz.start(t);
-    nz.stop(t + 0.03);
-  }
 }
 
-/** One sound, whatever was pressed. */
-function sfxKeyVoice() {
-  return [SFX_VOICE.pitch, SFX_VOICE.length, SFX_VOICE.f1];
+/**
+ * What a key sounds like.
+ *
+ * Every key giving the identical blip is the thing that makes a typing sound
+ * tiring. The heavy keys sit lower and last longer, so a line of code has some
+ * shape to it: the return at the end of a line lands differently from the
+ * letters before it.
+ */
+function sfxKeyVoice(key) {
+  const r = SFX_KEY_RATIOS[key];
+  if (!r) return [SFX_VOICE.pitch, SFX_VOICE.length, SFX_VOICE.formant];
+  return [SFX_VOICE.pitch * r[0], SFX_VOICE.length * r[1], SFX_VOICE.formant * r[2]];
 }
 
 /** Keys that are navigation or command, not speech. */
@@ -320,7 +273,7 @@ document.addEventListener('keydown', function (e) {
   if (now - _sfxLast < SFX_MIN_GAP_MS) return;
   _sfxLast = now;
 
-  const voice = sfxKeyVoice();
+  const voice = sfxKeyVoice(e.key);
   sfxBlip(voice[0], voice[1], voice[2]);
 }, true);
 
@@ -354,8 +307,8 @@ function toggleTypingSfx() {
  * Live from the slider.
  *
  * The preview blip is debounced rather than fired per input event: dragging a
- * range emits dozens of those a second, and one blip per event is a buzz that
- * tells you nothing about the level you are setting.
+ * range emits dozens of those a second, and one blip each is a buzz that tells
+ * you nothing about the level you are setting.
  */
 function sfxSetVolume(v) {
   const val = Math.max(0, Math.min(1.5, parseFloat(v) || 0));
@@ -367,7 +320,7 @@ function sfxSetVolume(v) {
   clearTimeout(_sfxVolPreview);
   _sfxVolPreview = setTimeout(() => {
     if (val > 0 && sfxEnabled()) {
-      const voice = sfxKeyVoice();
+      const voice = sfxKeyVoice('a');
       sfxBlip(voice[0], voice[1], voice[2]);
     }
   }, 140);
