@@ -52,17 +52,27 @@
    arrives soft and sharpens as it lands. Blurring on the way IN is unusual —
    things normally blur as they leave — and it is why an oversized letter
    settling does not just look like a zoom.
+
+   IT ARRIVES BIG. Well over twice its final size: the leading letter is meant
+   to dominate, and the whole reason this works without any code tracking
+   which letter is newest is that each one shrinks over 320ms while the next
+   starts whenever the next key falls. Whichever landed last is the largest
+   thing on screen by simple arithmetic.
    ------------------------------------------------------------ */
 .edfx-in {
-  color: #fff;
+  /* No colour here on purpose. It used to be forced white, which made every
+     letter flash out of the syntax palette on its way in and read as a
+     highlight rather than as the letter arriving. The ghost is given the
+     token's real colour in _edfxSpawn instead, so it looks like the character
+     it stands for the whole way down. */
   /* Around the middle rather than the baseline: the tilt should pivot about
      the letter itself, not swing it from its feet. */
   transform-origin: 50% 55%;
-  animation: edfxIn 300ms cubic-bezier(0.22, 1.15, 0.35, 1) both;
+  animation: edfxIn 320ms cubic-bezier(0.22, 1.15, 0.35, 1) both;
 }
 @keyframes edfxIn {
-  0%   { opacity: 0.95;
-         transform: translateX(0.5em) rotate(-8deg) scale(1.62);
+  0%   { opacity: 1;
+         transform: translateX(0.5em) rotate(-8deg) scale(2.35);
          filter: blur(3.2px); }
   /* Most of the focus returns early, so the letter is legible for most of the
      time it is visible and only the first instant is soft. */
@@ -80,7 +90,12 @@
    way and then another.
    ------------------------------------------------------------ */
 .edfx-out {
-  color: #ffd76e;
+  /* No colour here either. This rule used to set gold, and once the ghost
+     started being given the token's real colour inline that gold was simply
+     being overridden — a dead declaration that still read as the answer to
+     'what colour is a deleted letter'. Inheriting is the better answer
+     anyway: the character that leaves is the one you deleted, not a
+     generic marker for deletion. */
   animation: edfxOut 620ms cubic-bezier(0.3, 0.02, 0.7, 1) both;
 }
 @keyframes edfxOut {

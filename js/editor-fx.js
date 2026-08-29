@@ -85,7 +85,14 @@ function _edfxCharBox(offset) {
     const box = r.getBoundingClientRect();
     const host = layer.getBoundingClientRect();
     if (!box.width && !box.height) return null;
-    return { x: box.left - host.left, y: box.top - host.top, h: box.height };
+    /* The token's own colour comes back with the position. We are already
+       standing on the exact text node the highlighter painted, so a keyword
+       ghost is keyword-coloured and a string ghost is string-coloured — the
+       copy matches the character it stands for instead of being told what to
+       be. */
+    const owner = node.parentElement;
+    const colour = owner ? getComputedStyle(owner).color : '';
+    return { x: box.left - host.left, y: box.top - host.top, h: box.height, colour: colour };
   } catch (e) {
     return null;
   }
@@ -100,6 +107,7 @@ function _edfxSpawn(ch, box, cls, delay) {
   g.style.left = box.x + 'px';
   g.style.top = box.y + 'px';
   g.style.lineHeight = box.h + 'px';
+  if (box.colour) g.style.color = box.colour;
   if (delay) g.style.animationDelay = delay + 'ms';
 
   if (cls === 'edfx-out') {
