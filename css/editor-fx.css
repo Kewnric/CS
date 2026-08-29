@@ -26,25 +26,51 @@
   position: absolute;
   display: inline-block;
   transform-origin: 50% 100%;
-  will-change: transform, opacity;
+  will-change: transform, opacity, filter;
   pointer-events: none;
 }
 
 /* ── Landing ──────────────────────────────────────────────────
    The real character is already painted underneath, so this is a copy laid
-   over it that shrinks onto it and fades out. Starting oversized is what
-   gives the leading letter its size: each ghost shrinks over 260ms while the
+   over it that settles onto it and fades out. Starting oversized is what
+   gives the leading letter its size: each ghost shrinks over 300ms while the
    next starts whenever you press the next key, so the newest is the biggest
    thing on screen without anything having to track "newest".
+
+   Three things shape the arrival, and each is doing a specific job:
+
+   IT COMES IN FROM THE RIGHT, not from above. A letter dropping in reads as
+   something falling into a slot; a letter sliding back a little way to its
+   place reads as it being written. The travel is small — half an em — because
+   the point is the settling, not the journey.
+
+   IT IS TILTED, and by a FIXED amount rather than a random one. Random tilt
+   per letter looks like the text is coming apart; the same small lean on
+   every letter, resolving to straight, reads as one hand writing them.
+
+   IT IS OUT OF FOCUS AT FIRST. This is what sells the whole thing: the letter
+   arrives soft and sharpens as it lands. Blurring on the way IN is unusual —
+   things normally blur as they leave — and it is why an oversized letter
+   settling does not just look like a zoom.
    ------------------------------------------------------------ */
 .edfx-in {
   color: #fff;
-  animation: edfxIn 260ms cubic-bezier(0.2, 1.5, 0.4, 1) both;
+  /* Around the middle rather than the baseline: the tilt should pivot about
+     the letter itself, not swing it from its feet. */
+  transform-origin: 50% 55%;
+  animation: edfxIn 300ms cubic-bezier(0.22, 1.15, 0.35, 1) both;
 }
 @keyframes edfxIn {
-  0%   { opacity: 0.95; transform: translateY(-0.22em) scale(2.05); }
-  45%  { opacity: 0.7; }
-  100% { opacity: 0; transform: translateY(0) scale(1); }
+  0%   { opacity: 0.95;
+         transform: translateX(0.5em) rotate(-8deg) scale(1.62);
+         filter: blur(3.2px); }
+  /* Most of the focus returns early, so the letter is legible for most of the
+     time it is visible and only the first instant is soft. */
+  50%  { opacity: 0.6;
+         filter: blur(1px); }
+  100% { opacity: 0;
+         transform: translateX(0) rotate(0deg) scale(1);
+         filter: blur(0); }
 }
 
 /* ── Being thrown away ────────────────────────────────────────
