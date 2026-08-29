@@ -96,6 +96,27 @@ function langSwapPair() {
   langRefreshViews();
 }
 
+/**
+ * The starter-pack offer.
+ *
+ * It lives in Language Admin as well, but nobody goes looking in Admin for the
+ * reason a page is empty — the offer belongs beside the emptiness it fixes.
+ */
+function langSeedOfferHTML(line) {
+  if (typeof langLoadSamplePack !== 'function') return '';
+  return `
+    <div class="lang-seed-offer">
+      <i data-lucide="sparkles"></i>
+      <div class="lang-seed-body">
+        <strong>Nothing here yet</strong>
+        <span>${escapeHTML(line || 'Add the starter pack: ten words, ten drill sets and ten scenarios. Nothing you already have is replaced.')}</span>
+      </div>
+      <button class="btn btn-primary btn-sm" type="button" onclick="langLoadSamplePack()">
+        <i data-lucide="download" style="width:14px;height:14px;"></i> Add starter pack
+      </button>
+    </div>`;
+}
+
 function langOpen(view, arg) {
   langView = view;
   langViewArg = arg || null;
@@ -143,6 +164,15 @@ function renderLangBoard() {
 
   host.innerHTML = `
     <div class="lang-board">
+      ${(!sets && !scenes) ? `
+        <button class="lang-seed-banner" type="button" onclick="langLoadSamplePack()">
+          <i data-lucide="sparkles"></i>
+          <span class="lang-seed-banner-body">
+            <strong>Start with the starter pack</strong>
+            <span>10 words · 10 drill sets · 10 scenarios — nothing you have is replaced</span>
+          </span>
+          <i data-lucide="download" class="lang-seed-banner-go"></i>
+        </button>` : ''}
       <h3 class="lang-board-title"><i data-lucide="book-a"></i> Dictionary</h3>
       ${langBoardCard('dictionary', null, 'library-big', 'Dictionary',
         'Every entry with its meaning, and its example sentences a tap away.', `${words}`)}
@@ -246,7 +276,9 @@ function langDictionaryHTML() {
         </div>
       </div>
       ${langFilterBarHTML()}
-      <div class="lang-entries">${rows || '<div class="lang-empty">No entries match. Words are added in Language Admin.</div>'}</div>
+      <div class="lang-entries">${rows || (langWords().length
+        ? '<div class="lang-empty">No entries match those filters.</div>'
+        : langSeedOfferHTML('Add the starter pack — ten words across all four languages, with definitions and example sentences.'))}</div>
     </div>`;
 }
 
@@ -501,7 +533,8 @@ function langDrillTypeHTML(type) {
           <button class="btn btn-secondary btn-sm" style="margin-top:0.5rem;" onclick="spaNavigate('admin-language')">
             <i data-lucide="plus" style="width:14px;height:14px;"></i> Write some in Admin
           </button>
-        </div>`}
+        </div>
+        ${langSets().length ? '' : langSeedOfferHTML('The starter pack brings ten questions of every type, including this one.')}`}
     </div>`;
 }
 
@@ -538,7 +571,7 @@ function langSetsHTML() {
               <i data-lucide="play" style="width:14px;height:14px;fill:currentColor;"></i> Run
             </button>
           </div>`;
-        }).join('') || '<div class="empty-state">No sets yet — write one in Language Admin.</div>'}
+        }).join('') || langSeedOfferHTML('The starter pack brings ten sets, five questions each — one of every puzzle type.')}
       </div>
     </div>`;
 }
@@ -599,7 +632,8 @@ function langRunHTML() {
           <button class="btn btn-secondary btn-sm" style="margin-top:0.5rem;" onclick="spaNavigate('admin-language')">
             <i data-lucide="plus" style="width:14px;height:14px;"></i> Add some in Admin
           </button>
-        </div>`
+        </div>
+        ${langSeedOfferHTML('The starter pack gives you people to meet straight away.')}`
       : `<div class="prog-detail-actions" style="margin-top:1.25rem;">
           <button class="btn btn-practice btn-lg" onclick="langStartRun()">
             <i data-lucide="play" style="width:18px;height:18px;fill:currentColor;"></i> Set off
@@ -647,7 +681,7 @@ function langScenariosHTML() {
               <i data-lucide="swords" style="width:14px;height:14px;"></i> Fight
             </button>
           </div>`;
-        }).join('') || '<div class="empty-state">No scenarios yet — write one in Language Admin.</div>'}
+        }).join('') || langSeedOfferHTML('The starter pack brings ten scenarios across all six locations.')}
       </div>
     </div>`;
 }
