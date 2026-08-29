@@ -3220,11 +3220,47 @@ body.is-resizing .practice-panel { transition: none; }
   pointer-events: none;
 }
 .sao-combo.show { opacity: 1; transform: translateY(0); }
-.sao-combo.pop { animation: saoComboPop 0.34s cubic-bezier(0.2, 1.6, 0.4, 1); }
-@keyframes saoComboPop {
-  0% { transform: translateY(0) scale(0.7); }
-  60% { transform: translateY(0) scale(1.18); }
-  100% { transform: translateY(0) scale(1); }
+
+/* Per-letter, after the dialogue in MiSide: the line types itself in, and
+   comes apart when it leaves. Replaces a single pop on the whole chip. */
+.sao-combo .cl {
+  display: inline-block;
+  white-space: pre;              /* the space in "6× COMBO" has to survive */
+  transform-origin: 50% 100%;
+  /* backwards is doing the real work here: it holds the letter at the 0%
+     keyframe through its delay, so it is invisible until its turn instead of
+     appearing at once and then animating. That fill mode IS the reveal. */
+  animation: comboIn 300ms cubic-bezier(0.2, 1.5, 0.4, 1) backwards;
+}
+
+@keyframes comboIn {
+  0%   { opacity: 0; transform: translateY(-0.3em) scale(2.2); color: #fffdf3; }
+  55%  { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) scale(1); color: #ffd76e; }
+}
+
+/* The hop, before it comes apart. */
+.sao-combo.leaving {
+  animation: comboHop 0.34s cubic-bezier(0.25, -0.5, 0.35, 1.5) both;
+}
+@keyframes comboHop {
+  0%   { transform: translateY(0); }
+  45%  { transform: translateY(-0.55em); }
+  100% { transform: translateY(-0.35em); }
+}
+
+/* Each letter's drift, spin and scale come in as custom properties set per
+   letter in _bossComboScatter, so no two exits are alike. */
+.sao-combo .cl.fly {
+  animation: comboFly var(--fly, 620ms) cubic-bezier(0.35, 0.05, 0.7, 1) backwards;
+  opacity: 0;
+}
+@keyframes comboFly {
+  0%   { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
+  25%  { opacity: 1; }
+  100% { opacity: 0;
+         transform: translate(var(--dx, 0), var(--dy, 2em))
+                    rotate(var(--rot, 90deg)) scale(var(--sc, 0.8)); }
 }
 
 /* Personal best. Gold, not white — the segment notches are the white lines now,
@@ -3247,7 +3283,15 @@ body.is-resizing .practice-panel { transition: none; }
 .sao-lv.unset { color: rgba(255, 255, 255, 0.55); }
 
 @media (prefers-reduced-motion: reduce) {
-  .sao-combo, .sao-combo.pop { animation: none !important; transition: none !important; }
+  .sao-combo, .sao-combo.leaving { animation: none !important; transition: none !important; }
+  /* No typing in, no scatter — the chip just appears and is cleared on the
+     same schedule by the timer that drives it. */
+  .sao-combo .cl, .sao-combo .cl.fly {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+    color: #ffd76e !important;
+  }
 }
 
 /* --- Sidebar program header (full name above the Description) --- */

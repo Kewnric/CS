@@ -1471,27 +1471,95 @@ function bossPromptLevel() {
     });
 }
 
-/* ── Combo counter ─────────────────────────────────────────── */
+/* ── Combo counter ─────────────────────────────────────────────
+   The chip types itself in a letter at a time and comes apart when it goes,
+   after the dialogue in MiSide. Every character is its own span so it can be
+   animated on its own; the chip used to be one text node that faded.
+   ------------------------------------------------------------ */
 let _bossCombo = 0;
 let _bossComboTimer = null;
+let _bossComboClear = null;
+
+const COMBO_STEP_MS = 45;     // gap between letters landing
+const COMBO_HOLD_MS = 2200;   // how long the finished line sits there
+const COMBO_FLY_MS = 620;     // how long a letter takes to tumble away
+
+/**
+ * Write the chip one letter at a time.
+ *
+ * The "leading letter is bigger" part is not a special case and there is no
+ * code for it: every letter starts oversized and shrinks over 300ms while the
+ * next one starts 45ms later, so whichever arrived last is always the largest
+ * thing on screen. It falls out of the stagger.
+ */
+function _bossComboWrite(el, text) {
+  clearTimeout(_bossComboClear);
+  el.classList.remove('leaving');
+  el.innerHTML = '';
+  Array.from(text).forEach((ch, i) => {
+    const s = document.createElement('span');
+    s.className = 'cl';
+    s.textContent = ch;
+    s.style.animationDelay = (i * COMBO_STEP_MS) + 'ms';
+    el.appendChild(s);
+  });
+  el.classList.add('show');
+}
+
+/**
+ * The exit: the line hops, then falls apart.
+ *
+ * Each letter gets its own drift, spin and scale rather than a shared one, so
+ * the same combo value never comes apart the same way twice. Letters mostly
+ * drop, a few go up, and they spread outward from the middle of the word —
+ * dir is the letter's position either side of centre.
+ */
+function _bossComboScatter(el) {
+  if (!el || !el.classList.contains('show')) return;
+  // Already coming apart. Re-running would re-roll every letter and restart
+  // the flight from the top, which reads as the word snapping back together.
+  if (el.classList.contains('leaving')) return;
+  clearTimeout(_bossComboTimer);
+  el.classList.add('leaving');
+  const letters = el.querySelectorAll('.cl');
+  const last = Math.max(1, letters.length - 1);
+  letters.forEach((s, i) => {
+    const dir = (i / last) - 0.5;
+    s.style.setProperty('--dx', (dir * 2.8 + (Math.random() - 0.5) * 1.4).toFixed(2) + 'em');
+    s.style.setProperty('--dy', (Math.random() < 0.28
+      ? -(0.6 + Math.random() * 1.1)
+      : (1 + Math.random() * 2.2)).toFixed(2) + 'em');
+    s.style.setProperty('--rot', ((Math.random() - 0.5) * 280).toFixed(0) + 'deg');
+    s.style.setProperty('--sc', (0.7 + Math.random() * 0.5).toFixed(2));
+    s.style.animationDelay = (140 + i * 18) + 'ms';
+    s.classList.add('fly');
+  });
+  _bossComboClear = setTimeout(() => {
+    el.classList.remove('show', 'leaving');
+    el.innerHTML = '';
+  }, 140 + letters.length * 18 + COMBO_FLY_MS + 60);
+}
 
 function _bossBumpCombo() {
   _bossCombo++;
   const el = document.getElementById('boss-combo');
   if (!el) return;
   if (_bossCombo < 2) return;            // "1 combo" isn't a combo
-  el.textContent = _bossCombo + '× COMBO';
-  el.classList.remove('pop');
-  void el.offsetWidth;
-  el.classList.add('pop', 'show');
+  // Rewritten from scratch each bump, which also cancels a scatter already in
+  // flight — landing a hit while the last chip is coming apart should put a
+  // fresh one up, not animate the wreckage.
+  _bossComboWrite(el, _bossCombo + '× COMBO');
   clearTimeout(_bossComboTimer);
-  _bossComboTimer = setTimeout(() => el.classList.remove('show'), 2200);
+  _bossComboTimer = setTimeout(() => _bossComboScatter(el), COMBO_HOLD_MS);
 }
 
 function _bossResetCombo() {
   _bossCombo = 0;
   const el = document.getElementById('boss-combo');
-  if (el) el.classList.remove('show');
+  if (!el) return;
+  clearTimeout(_bossComboTimer);
+  // A broken combo gets the same send-off as one that timed out.
+  _bossComboScatter(el);
 }
 
 /* ── Personal-best HP marker ───────────────────────────────── */
