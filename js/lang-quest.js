@@ -176,12 +176,17 @@ function lqRender() {
   if (auto) auto.classList.toggle('is-on', lqAutoSkip());
 
   if (stats) {
+    // Labelled. An unlabelled "▮3" beside the stamina read as a second
+    // stamina figure, which made the maximum look like it was climbing on
+    // its own — it only ever rises when you beat someone, and now says so.
+    const grown = _lq.staminaMax > LANG_RUN_STAMINA;
     stats.innerHTML = `
-      <span class="lq-stat"><b class="lq-ico-st">⚡</b>${Math.max(0, Math.round(_lq.stamina))}/${_lq.staminaMax}</span>
-      <span class="lq-stat"><b class="lq-ico-pw">✦</b>${Math.round(_lq.power)}%</span>
-      <span class="lq-stat"><b class="lq-ico-wk">▮</b>${_lq.steps}</span>
+      <span class="lq-stat"><b class="lq-ico-st">⚡</b>STA ${Math.max(0, Math.round(_lq.stamina))}/${_lq.staminaMax}${
+        grown ? `<em class="lq-grown" title="Raised by ${_lq.defeated} conversation${_lq.defeated !== 1 ? 's' : ''} won">+${_lq.staminaMax - LANG_RUN_STAMINA}</em>` : ''}</span>
+      <span class="lq-stat"><b class="lq-ico-pw">✦</b>PWR ${Math.round(_lq.power)}%</span>
+      <span class="lq-stat"><b class="lq-ico-wk">▮</b>BLOCKS ${_lq.steps}</span>
       ${_lq.scene === 'battle' && _lq.enemy
-        ? `<span class="lq-stat lq-stat-foe"><b>♥</b>${Math.max(0, Math.round(_lq.enemy.hp))}/${_lq.enemy.hpMax}</span>` : ''}`;
+        ? `<span class="lq-stat lq-stat-foe"><b>♥</b>${escapeHTML(_lq.enemy.name)} ${Math.max(0, Math.round(_lq.enemy.hp))}/${_lq.enemy.hpMax}</span>` : ''}`;
   }
 
   scene.style.background =
@@ -253,11 +258,19 @@ function lqCommands() {
   ];
 }
 
+/**
+ * Run a menu item.
+ *
+ * The menu is NOT cleared here. It used to be, which meant any action that
+ * could decline — GO HOME, then Cancel — came back to a screen with no menu
+ * and no commands, and the run was over without saying so. Actions that queue
+ * lines clear it themselves through lqSay, and actions that open a submenu
+ * replace it; an action that changes nothing should leave it alone.
+ */
 function lqPick(i) {
   if (!_lq || !_lq.menu) return;
   const m = _lq.menu[i];
   if (!m || m.off) return;
-  _lq.menu = null;
   m.fn();
 }
 
@@ -281,11 +294,20 @@ function lqRoadMenu() {
   ]);
 }
 
+/**
+ * One leg of the walk.
+ *
+ * A quiet leg used to cost six stamina and print TWO lines that both said
+ * nothing had happened, so walking was three clicks to accomplish nothing and
+ * watch a number go down. It gets one line now, and a quiet leg can actually
+ * turn something up — a bottle somebody left, or a moment to catch your
+ * breath — so the stretch between encounters is worth walking rather than
+ * merely survivable.
+ */
 function lqStep() {
   if (!_lq) return;
   _lq.steps++;
   _lq.stamina -= LANG_RUN_STEP_COST;
-  lqSay(null, LANG_RUN_FLAVOUR[Math.floor(Math.random() * LANG_RUN_FLAVOUR.length)]);
 
   if (_lq.stamina <= 0) {
     _lq.stamina = 0;
@@ -305,16 +327,35 @@ function lqStep() {
       _lq.enemy = enemy;
       _lq.location = enemy.location || _lq.location;
       _lq.turn = 0; _lq.removed = [];
-      lqSay(null, 'You notice someone waiting up ahead.');
       lqSay(null, 'You encountered a {' + enemy.name + '}!');
       lqThen(() => { _lq.scene = 'battle'; lqBeginTurn(); lqRender(); });
       lqRender();
       return;
     }
   }
-  lqSay(null, 'You jog your way over to the next block.');
+
+  lqSay(null, LANG_RUN_FLAVOUR[Math.floor(Math.random() * LANG_RUN_FLAVOUR.length)]);
+  lqFind();
   lqThen(() => { lqRoadMenu(); lqRender(); });
   lqRender();
+}
+
+/** What a quiet leg can turn up. Roughly half of them give you something. */
+function lqFind() {
+  const roll = Math.random();
+  if (roll < 0.28) {
+    const p = _lq.potions[Math.floor(Math.random() * _lq.potions.length)];
+    p.owned++;
+    lqSay(null, 'Someone left a {' + p.name.toLowerCase() + '} on the ledge. You pocket it.');
+  } else if (roll < 0.5 && _lq.stamina < _lq.staminaMax) {
+    const gain = Math.min(5, _lq.staminaMax - _lq.stamina);
+    _lq.stamina += gain;
+    lqSay(null, 'You slow down and get your breath back. (+' + gain + ' stamina)');
+  } else if (roll < 0.62 && _lq.power < _lq.powerMax) {
+    const gain = Math.min(8, _lq.powerMax - _lq.power);
+    _lq.power += gain;
+    lqSay(null, 'You turn a phrase over in your head. (+' + gain + ' power)');
+  }
 }
 
 function lqGoHome() {
