@@ -3446,17 +3446,59 @@ body.is-resizing .practice-panel { transition: none; }
 }
 
 /* Passed — a burst out of the row. */
+/* Confetti, in three layers — see _ppConfettiBurst for why. Each layer owns
+   one motion and one easing, which is the only way to have sideways travel
+   slowing while the fall speeds up and the tumble does neither. */
+
+/* OUTER — sideways drift, decelerating, as air resistance would. Plus the
+   fade, held off until the end so pieces are still bright as they leave. */
 .pp-confetti {
+  position: absolute;
+  width: 0;
+  height: 0;
+  animation: ppConfDrift var(--life, 1.9s) cubic-bezier(0.14, 0.66, 0.32, 1) forwards,
+             ppConfFade var(--life, 1.9s) linear forwards;
+}
+@keyframes ppConfDrift {
+  from { transform: translateX(0); }
+  to   { transform: translateX(var(--dx, 0)); }
+}
+@keyframes ppConfFade {
+  0%, 72% { opacity: 1; }
+  100%    { opacity: 0; }
+}
+
+/* MIDDLE — the arc. Up and decelerating, then down and accelerating: a real
+   parabola, which needs a timing function PER KEYFRAME rather than one for
+   the whole animation. This is the piece the old version was missing, and
+   the reason it looked like it stalled in mid-air. */
+.pp-conf-arc {
+  display: block;
+  animation: ppConfArc var(--life, 1.9s) forwards;
+}
+@keyframes ppConfArc {
+  0%   { transform: translateY(0);
+         animation-timing-function: cubic-bezier(0.18, 0.72, 0.4, 1); }
+  30%  { transform: translateY(var(--rise, -80px));
+         animation-timing-function: cubic-bezier(0.5, 0, 0.78, 0.42); }
+  100% { transform: translateY(var(--fall, 600px)); }
+}
+
+/* INNER — the tumble. Linear and INFINITE: it is still spinning at the moment
+   the piece is removed, which is what stops the end of the burst reading as
+   slow motion. The Y turn is what makes a flat piece flash edge-on and look
+   like paper instead of a dot. */
+.pp-conf-paper {
+  display: block;
   width: 7px;
   height: 4px;
   border-radius: 1px;
-  animation: ppConfetti 1.1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-style: preserve-3d;
+  animation: ppConfTumble var(--spin, 0.8s) linear infinite;
 }
-@keyframes ppConfetti {
-  0%   { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
-  /* Out along the fan first, then gravity takes over. */
-  55%  { opacity: 1; transform: translate(var(--dx), var(--dy)) rotate(var(--rot)) scale(1); }
-  100% { opacity: 0; transform: translate(calc(var(--dx) * 1.15), calc(var(--dy) + 70px)) rotate(var(--rot)) scale(0.7); }
+@keyframes ppConfTumble {
+  from { transform: rotateZ(0deg) rotateY(0deg); }
+  to   { transform: rotateZ(var(--turn, 360deg)) rotateY(var(--flip, 900deg)); }
 }
 
 /* Failed — a shower of crosses falling out of the row. */

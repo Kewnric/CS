@@ -505,7 +505,8 @@ function _ppFxAdd(layer, el, ttl) {
   setTimeout(done, ttl);            // animationend never fires on a hidden tab
 }
 
-const PP_CONFETTI_COLORS = ['#34d399', '#22d3ee', '#a78bfa', '#fbbf24', '#f472b6', '#60a5fa'];
+const PP_CONFETTI_COLORS = ['#34d399', '#22d3ee', '#a78bfa', '#fbbf24', '#f472b6',
+                            '#60a5fa', '#fb7185', '#facc15', '#4ade80'];
 
 /**
  * @param {number} ti   index of the test row
@@ -533,25 +534,79 @@ function ppCelebrateRow(ti, ok, delay) {
   if (delay) setTimeout(run, delay); else run();
 }
 
+/**
+ * One row's worth of confetti.
+ *
+ * THREE NESTED ELEMENTS PER PIECE, and that is the whole point. Confetti
+ * needs three motions at once that do not share a curve: sideways travel
+ * that SLOWS (air resistance), a fall that SPEEDS UP (gravity), and a tumble
+ * that does neither and simply keeps going. One element can only carry one
+ * timing function, which is why the old single-span version appeared to hit
+ * the brakes — everything on it decelerated together, and the rotation
+ * stopped outright halfway through because it held the same value at 55% and
+ * 100%.
+ *
+ * So: the outer drifts and fades, the middle handles the arc, and the inner
+ * spins. Each with its own easing, and the spin runs linear and infinite so
+ * nothing ever coasts to a halt.
+ */
 function _ppConfettiBurst(r) {
   const layer = _ppFxLayer();
   const cx = r.left + r.width / 2;
   const cy = r.top + Math.min(18, r.height / 2);
-  for (let i = 0; i < 22; i++) {
-    const p = document.createElement('i');
-    p.className = 'pp-confetti';
-    // Fan out sideways more than vertically — the row is a wide, short strip.
-    const angle = (-160 + Math.random() * 140) * Math.PI / 180;
-    const dist = 45 + Math.random() * 85;
-    p.style.left = cx + 'px';
-    p.style.top = cy + 'px';
-    p.style.background = PP_CONFETTI_COLORS[i % PP_CONFETTI_COLORS.length];
-    p.style.setProperty('--dx', Math.cos(angle) * dist * (Math.random() < 0.5 ? -1 : 1) + 'px');
-    p.style.setProperty('--dy', Math.sin(angle) * dist + 'px');
-    p.style.setProperty('--rot', (Math.random() * 720 - 360) + 'deg');
-    p.style.animationDelay = (Math.random() * 90) + 'ms';
-    if (Math.random() < 0.4) p.style.borderRadius = '50%';
-    _ppFxAdd(layer, p, 1600);
+  const vh = window.innerHeight;
+
+  for (let i = 0; i < 34; i++) {
+    const piece = document.createElement('i');
+    piece.className = 'pp-confetti';
+    const arc = document.createElement('span');
+    arc.className = 'pp-conf-arc';
+    const paper = document.createElement('b');
+    paper.className = 'pp-conf-paper';
+
+    // Thrown up and out. Mostly sideways, because the row it comes from is a
+    // wide, short strip and a vertical spout would look like a fountain.
+    const dir = Math.random() < 0.5 ? -1 : 1;
+    const spread = 60 + Math.random() * 190;
+    const rise = 55 + Math.random() * 95;
+    // Far enough below the fold that every piece leaves the screen still
+    // travelling. Nothing should be caught stopping.
+    const fall = (cy < vh ? vh - cy : 0) + 140 + Math.random() * 220;
+
+    piece.style.left = cx + 'px';
+    piece.style.top = cy + 'px';
+    piece.style.setProperty('--dx', (dir * spread).toFixed(0) + 'px');
+    piece.style.setProperty('--rise', (-rise).toFixed(0) + 'px');
+    piece.style.setProperty('--fall', fall.toFixed(0) + 'px');
+    piece.style.setProperty('--life', (1.5 + Math.random() * 0.9).toFixed(2) + 's');
+    piece.style.animationDelay = (Math.random() * 120) + 'ms';
+
+    // Tumble. Two axes: the Z turn is what you read as spin, the Y turn is
+    // what makes a piece flash edge-on and read as PAPER rather than a dot.
+    paper.style.setProperty('--turn', (dir * (360 + Math.random() * 540)).toFixed(0) + 'deg');
+    paper.style.setProperty('--flip', (720 + Math.random() * 1080).toFixed(0) + 'deg');
+    paper.style.setProperty('--spin', (0.5 + Math.random() * 0.7).toFixed(2) + 's');
+    paper.style.background = PP_CONFETTI_COLORS[Math.floor(Math.random() * PP_CONFETTI_COLORS.length)];
+
+    // Three shapes, so a burst is not 34 copies of one rectangle.
+    const shape = Math.random();
+    if (shape < 0.18) {
+      paper.style.borderRadius = '50%';
+      paper.style.width = paper.style.height = (4 + Math.random() * 4).toFixed(0) + 'px';
+    } else if (shape < 0.38) {
+      // A ribbon: long, thin, and the most convincing thing in the burst when
+      // it turns edge-on.
+      paper.style.width = (2 + Math.random() * 2).toFixed(0) + 'px';
+      paper.style.height = (10 + Math.random() * 8).toFixed(0) + 'px';
+      paper.style.borderRadius = '1px';
+    } else {
+      paper.style.width = (5 + Math.random() * 4).toFixed(0) + 'px';
+      paper.style.height = (3 + Math.random() * 3).toFixed(0) + 'px';
+    }
+
+    arc.appendChild(paper);
+    piece.appendChild(arc);
+    _ppFxAdd(layer, piece, 2600);
   }
 }
 
