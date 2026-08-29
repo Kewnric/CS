@@ -363,7 +363,11 @@ function renderAdmin() {
       }
     });
 
-    const collapsed = JSON.parse(localStorage.getItem('adminGroupsCollapsed') || '[]');
+    // Guarded like every other read of this kind: a corrupt value here used
+    // to throw mid-render and leave the Coding admin list blank.
+    let collapsed = [];
+    try { collapsed = JSON.parse(localStorage.getItem('adminGroupsCollapsed') || '[]') || []; }
+    catch (e) { collapsed = []; }
     return ordered.map(([key, name, items]) => `
       <details class="admin-group"${collapsed.includes(key) ? '' : ' open'} data-group="${escapeHTML(key)}">
         <summary onclick="setTimeout(() => _adminRememberGroups(), 0)">

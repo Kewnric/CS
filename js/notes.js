@@ -1129,7 +1129,7 @@ function importSharedNotebook(shared) {
 function notebookCtxSetTier(value) {
   if (!notebookCtxTargetNodeId) return;
   updateFolderTier(notebookCtxTargetNodeId, value || null);
-  if (typeof renderNotes === 'function') renderNotes();
+  if (typeof notesRenderSidebar === 'function') notesRenderSidebar();
 }
 
 function nctxOpenTierPicker() {

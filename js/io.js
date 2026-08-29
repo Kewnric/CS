@@ -18,6 +18,7 @@ function handleDataExport() {
     snippets: state.snippets,
     notebooks: state.notebooks,
     notebookHistory: state.notebookHistory,
+    snippetHistory: state.snippetHistory || [],
     challenges: state.challenges,
     codingSets: state.codingSets || [],
     history: state.history,
@@ -30,6 +31,13 @@ function handleDataExport() {
     langScenarios: state.langScenarios || [],
     langHistory: state.langHistory || []
   };
+  // The cheat sheets live in their own localStorage key rather than in
+  // `state`, which is exactly why they were missing from every backup taken
+  // so far. They are a library on the Library board like any other.
+  try {
+    const cheats = JSON.parse(localStorage.getItem('cheatsheetLibrary'));
+    if (cheats && cheats.sheets) data.cheatsheets = cheats.sheets;
+  } catch (e) { /* nothing saved yet */ }
   if (typeof viz !== 'undefined') {
     data.viz = { nodes: viz.nodes, links: viz.links, pan: viz.pan, zoom: viz.zoom, fogEnabled: viz.fogEnabled, panesSwapped: viz.panesSwapped, tabsCollapsed: viz.tabsCollapsed, toolbarCollapsed: viz.toolbarCollapsed, flowyDragEnabled: viz.flowyDragEnabled, globeModeEnabled: viz.globeModeEnabled, snapEnabled: viz.snapEnabled, defaultLinkArrowType: viz.defaultLinkArrowType };
   }
@@ -112,6 +120,7 @@ function handleDataImport(e) {
         state.snippetProgress = parsed.snippetProgress || {};
         state.badges = parsed.badges || [];
         state.notebookHistory = parsed.notebookHistory || [];
+        state.snippetHistory = parsed.snippetHistory || [];
         state.history = parsed.history || [];
         state.activeAttempts = parsed.activeAttempts || {};
         state.review = parsed.review || {};
@@ -135,6 +144,12 @@ function handleDataImport(e) {
 
         saveData();
 
+        if (Array.isArray(parsed.cheatsheets)) {
+          try {
+            localStorage.setItem('cheatsheetLibrary', JSON.stringify({ sheets: parsed.cheatsheets }));
+            if (typeof csLoad === 'function') csLoad();
+          } catch (e) { /* storage full — the reload below will show what landed */ }
+        }
         if (parsed.viz && typeof viz !== 'undefined') {
           viz.nodes = parsed.viz.nodes || []; viz.links = parsed.viz.links || [];
           viz.pan = parsed.viz.pan || { x: 0, y: 0 }; viz.zoom = parsed.viz.zoom || 1;
@@ -193,6 +208,7 @@ function handleDataReset() {
         snippets: seed.snippets,
         notebooks: seed.notebooks,
         notebookHistory: seed.notebookHistory,
+        snippetHistory: [],
         challenges: seed.challenges,
         codingSets: [],
         history: seed.history,
@@ -222,6 +238,7 @@ function handleDataReset() {
 
       // Clear auxiliary local data, but PRESERVE storageMode so the user doesn't
       // get bounced back to the picker on the reload.
+      localStorage.removeItem('cheatsheetLibrary');
       localStorage.removeItem('vizCanvasData');
       localStorage.removeItem('brainCanvasData');
       localStorage.removeItem('vizCanvasData_online');

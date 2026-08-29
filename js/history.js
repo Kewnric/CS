@@ -2303,19 +2303,31 @@ window.bulkDeleteSnippetSelected = function(snippetId) {
   });
 };
 
+/**
+ * Soft-delete snippet history entries.
+ *
+ * This used to call registerUndo(), a function that exists nowhere in the app.
+ * The `typeof` guard around it meant no error and no undo: deleting snippet
+ * attempts was permanent while deleting coding or notebook attempts was not.
+ * Shaped like softDeleteHistory() in undo.js now, snapshots and all.
+ */
 function softDeleteSnippetHistory(ids, callback) {
-  if (!state.snippetHistory) return;
-  if (typeof registerUndo === 'function') {
-    const deletedLogs = state.snippetHistory.filter(h => ids.includes(h.id));
-    registerUndo(() => {
-      state.snippetHistory.push(...deletedLogs);
-      saveData();
-      if (callback) callback();
-    }, "Delete Snippet History");
-  }
+  if (!state.snippetHistory || !ids || !ids.length) return;
+  const snapshots = state.snippetHistory
+    .filter(h => ids.includes(h.id))
+    .map(h => JSON.parse(JSON.stringify(h)));
+  if (!snapshots.length) return;
   state.snippetHistory = state.snippetHistory.filter(h => !ids.includes(h.id));
   saveData();
   if (callback) callback();
+  if (typeof pushUndo === 'function') {
+    pushUndo('Deleted ' + snapshots.length + ' snippet history record' + (snapshots.length > 1 ? 's' : ''), () => {
+      if (!state.snippetHistory) state.snippetHistory = [];
+      snapshots.forEach(h => state.snippetHistory.push(h));
+      saveData();
+      if (callback) callback();
+    });
+  }
 }
 window.softDeleteSnippetHistory = softDeleteSnippetHistory;
 

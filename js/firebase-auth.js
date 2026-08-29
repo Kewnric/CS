@@ -602,6 +602,16 @@ async function _loadV2Domains(uid) {
     state.activeAttempts = d.activeAttempts || {};
     state.expandedNodes = d.expandedNodes || [];
     state.nodes = Array.isArray(d.nodes) ? d.nodes : [];
+    // Defaulted rather than left alone on purpose: signing into a second
+    // account in the same tab used to inherit whatever the first account had
+    // in memory here, and then write it up to the second account's cloud.
+    state.codingSets = d.codingSets || [];
+    state.review = d.review || {};
+    state.deadlines = d.deadlines || {};
+    state.events = d.events || [];
+    state.langWords = d.langWords || [];
+    state.langSets = d.langSets || [];
+    state.langScenarios = d.langScenarios || [];
   }
 
   // History (separated for size management)
@@ -609,6 +619,8 @@ async function _loadV2Domains(uid) {
     const d = histDoc.data();
     state.history = d.history || [];
     state.notebookHistory = d.notebookHistory || [];
+    state.snippetHistory = d.snippetHistory || [];
+    state.langHistory = d.langHistory || [];
   }
 
   // Viz
@@ -674,8 +686,19 @@ function _restoreV1Data(data) {
   state.badges = parsed.badges || [];
   state.notebookHistory = parsed.notebookHistory || [];
   state.history = parsed.history || [];
+  state.snippetHistory = parsed.snippetHistory || [];
   state.activeAttempts = parsed.activeAttempts || {};
   state.expandedNodes = parsed.expandedNodes || [];
+  // A V1 payload predates all of these; defaulting them stops the previous
+  // account's data being carried into this one.
+  state.codingSets = parsed.codingSets || [];
+  state.review = parsed.review || {};
+  state.deadlines = parsed.deadlines || {};
+  state.events = parsed.events || [];
+  state.langWords = parsed.langWords || [];
+  state.langSets = parsed.langSets || [];
+  state.langScenarios = parsed.langScenarios || [];
+  state.langHistory = parsed.langHistory || [];
 
   if (Array.isArray(parsed.nodes)) {
     state.nodes = parsed.nodes;
@@ -1000,13 +1023,25 @@ async function saveToFirestore(uid) {
       snippets: state.snippets,
       notebooks: state.notebooks,
       challenges: state.challenges,
-      activeAttempts: state.activeAttempts
+      activeAttempts: state.activeAttempts,
+      // Everything below this line used to be saved to localStorage and
+      // nowhere else. On a cloud account that made it single-device data that
+      // sign-out deleted.
+      codingSets: state.codingSets || [],
+      review: state.review || {},
+      deadlines: state.deadlines || {},
+      events: state.events || [],
+      langWords: state.langWords || [],
+      langSets: state.langSets || [],
+      langScenarios: state.langScenarios || []
     }) || {};
 
     // History domain (separated — grows unbounded)
     const historyPayload = _sanitizeForFirestore({
       history: state.history,
-      notebookHistory: state.notebookHistory
+      notebookHistory: state.notebookHistory,
+      snippetHistory: state.snippetHistory || [],
+      langHistory: state.langHistory || []
     }) || {};
 
     // Viz domain

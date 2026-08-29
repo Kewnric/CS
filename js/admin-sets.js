@@ -49,12 +49,23 @@ function renderAdminSets() {
 }
 
 function deleteCodingSet(id) {
-  const set = (state.codingSets || []).find(s => s.id === id);
-  if (!set) return;
+  const i = (state.codingSets || []).findIndex(s => s.id === id);
+  if (i === -1) return;
+  const set = state.codingSets[i];
   showConfirm('Delete Practice Set', `Delete "${escapeHTML(set.title)}"? Past attempt history is kept.`, () => {
-    state.codingSets = state.codingSets.filter(s => s.id !== id);
+    state.codingSets.splice(i, 1);
     saveData();
     renderAdminSets();
+    // Every other thing you can delete in this app comes back from the undo
+    // toast. A whole practice set was the one that did not.
+    if (typeof pushUndo === 'function') {
+      pushUndo('Deleted set "' + (set.title || 'Untitled') + '"', () => {
+        if (!state.codingSets) state.codingSets = [];
+        state.codingSets.splice(Math.min(i, state.codingSets.length), 0, set);
+        saveData();
+        renderAdminSets();
+      });
+    }
   });
 }
 

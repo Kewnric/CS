@@ -173,12 +173,8 @@ function renderMindmapItem(item, scope) {
   `;
 }
 
-function getItemsForScope(scope) {
-  if (scope === 'challenge') return state.challenges || [];
-  if (scope === 'snippet') return state.snippets || [];
-  if (scope === 'notebook') return state.notebooks || [];
-  return [];
-}
+/* getItemsForScope() lived here as a second, identical copy. It is declared
+   once now, in state.js beside the other tree helpers. */
 
 function mindmapAddFolder(scope, parentId) {
   showInputDialog('New Folder', null, 'Folder name', '', (name) => {

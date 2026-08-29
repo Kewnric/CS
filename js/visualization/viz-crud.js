@@ -26,15 +26,29 @@ function vizDeleteNode(nodeId) {
   }
 
   if (node.dataId) {
-    // No undo on this path, so the deadline is simply dropped rather than
-    // left behind as a record pointing at an item that no longer exists.
-    if (node.type !== 'folder' && typeof agDetachDeadline === 'function') {
-      agDetachDeadline(node.type, node.dataId);
+    // Through the shared soft-delete helpers, so deleting a node here is the
+    // same act as deleting the item in its own library: the record is
+    // snapshotted, its deadline travels with it, and the undo toast brings
+    // both back. This used to filter `state` in place with no undo of any
+    // kind, and the canvas undo button — which only restores viz.nodes and
+    // viz.links — made it look recoverable when it was not.
+    if (node.type === 'folder') {
+      if (typeof softDeleteFolder === 'function') softDeleteFolder(node.dataId);
+      else deleteNode(node.dataId);
+    } else if (node.type === 'challenge' && typeof softDeleteChallenge === 'function') {
+      softDeleteChallenge(node.dataId);
+    } else if (node.type === 'snippet' && typeof softDeleteSnippet === 'function') {
+      softDeleteSnippet(node.dataId);
+    } else if (node.type === 'notebook' && typeof softDeleteNotebook === 'function') {
+      softDeleteNotebook(node.dataId);
+    } else {
+      if (node.type !== 'folder' && typeof agDetachDeadline === 'function') {
+        agDetachDeadline(node.type, node.dataId);
+      }
+      if (node.type === 'challenge') state.challenges = state.challenges.filter(c => c.id !== node.dataId);
+      else if (node.type === 'snippet') state.snippets = state.snippets.filter(s => s.id !== node.dataId);
+      else if (node.type === 'notebook') state.notebooks = state.notebooks.filter(n => n.id !== node.dataId);
     }
-    if (node.type === 'folder') deleteNode(node.dataId);
-    else if (node.type === 'challenge') state.challenges = state.challenges.filter(c => c.id !== node.dataId);
-    else if (node.type === 'snippet') state.snippets = state.snippets.filter(s => s.id !== node.dataId);
-    else if (node.type === 'notebook') state.notebooks = state.notebooks.filter(n => n.id !== node.dataId);
     saveData();
   }
 

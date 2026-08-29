@@ -194,13 +194,17 @@ function langDeleteWord(id) {
   const rec = state.langWords[i];
   const head = langHeadword(rec);
   state.langWords.splice(i, 1);
-  if (typeof agDetachDeadline === 'function') agDetachDeadline('langword', id);
+  // The detached record has to be kept, not just dropped: undoing the delete
+  // used to bring the word back without its due date, which is the one thing
+  // an undo is supposed to make impossible. langDeleteSet does the same.
+  const deadline = typeof agDetachDeadline === 'function' ? agDetachDeadline('langword', id) : null;
   saveData();
   langRefreshViews();
   if (typeof pushUndo === 'function') {
     pushUndo('Deleted word "' + head + '"', () => {
       langStore();
       state.langWords.splice(Math.min(i, state.langWords.length), 0, rec);
+      if (deadline && typeof agAttachDeadline === 'function') agAttachDeadline(deadline);
       saveData();
       langRefreshViews();
     });

@@ -237,6 +237,7 @@ function langDictionaryHTML() {
             <span class="lang-entry-term">${escapeHTML(langHeadword(w, study))}</span>
             ${f.pos ? `<span class="lang-pos">${escapeHTML(f.pos)}</span>` : ''}
             ${g.term ? `<span class="lang-entry-gloss">${escapeHTML(g.term)}</span>` : ''}
+            ${typeof agDeadlineTextHTML === 'function' ? agDeadlineTextHTML('langword', w.id) : ''}
           </div>
           <div class="lang-entry-def">${escapeHTML(f.definition || g.definition || 'No definition recorded.')}</div>
           ${f.restrictions ? `<div class="lang-entry-warn"><i data-lucide="alert-triangle"></i> ${escapeHTML(f.restrictions)}</div>` : ''}
@@ -254,6 +255,10 @@ function langDictionaryHTML() {
           <button class="ag-icon-btn" type="button" onclick="langOpen('compare'); langActiveWordId='${w.id}'; renderLangDetail();"
                   title="Compare side by side">
             <i data-lucide="columns-2"></i>
+          </button>
+          <button class="ag-icon-btn" type="button" onclick="agOpenDeadlineModal('langword', '${w.id}')"
+                  title="Put a due date on this word">
+            <i data-lucide="flag"></i>
           </button>
         </div>
       </div>`;

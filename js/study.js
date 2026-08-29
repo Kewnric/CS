@@ -1373,7 +1373,9 @@ registerTreeHost('snippets', {
     if (kind === 'folder') {
       return [
         { icon: 'image', label: 'Change icon...', fn: () => { if (typeof browseSetIcon === 'function') browseSetIcon(id); } },
-        { icon: 'palette', label: 'Highlight colour...', fn: () => { if (typeof browseSetColor === 'function') browseSetColor(id); } }
+        { icon: 'palette', label: 'Highlight colour...', fn: () => { if (typeof browseSetColor === 'function') browseSetColor(id); } },
+        { icon: 'award', label: 'Set tier...', fn: () => { snippetCtxTargetNodeId = id; sctxOpenTierPicker(); } },
+        { icon: 'lock', label: 'Set prerequisites...', fn: () => { snippetCtxTargetNodeId = id; sctxOpenLockPicker(); } }
       ];
     }
     const fav = !!(it && it.favorite);
@@ -1449,7 +1451,7 @@ function importSharedSnippet(shared) {
 function snippetCtxSetTier(value) {
   if (!snippetCtxTargetNodeId) return;
   updateFolderTier(snippetCtxTargetNodeId, value || null);
-  if (typeof renderStudy === 'function') renderStudy();
+  if (typeof renderSnippetList === 'function') renderSnippetList();
 }
 
 function sctxOpenTierPicker() {

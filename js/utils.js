@@ -94,8 +94,8 @@ function selectTierTile(tier) {
   } else {
     updateFolderTier(nodeId, tier || null);
     if (typeof renderBrowse === 'function') renderBrowse();
-    if (typeof renderStudy === 'function') renderStudy();
-    if (typeof renderNotes === 'function') renderNotes();
+    if (typeof renderSnippetList === 'function') renderSnippetList();
+    if (typeof notesRenderSidebar === 'function') notesRenderSidebar();
   }
   closeTierPicker();
 }
@@ -253,8 +253,8 @@ function saveLockPicker() {
   saveData();
   closeLockPicker();
   if (typeof renderBrowse === 'function') renderBrowse();
-  if (typeof renderStudy === 'function') renderStudy();
-  if (typeof renderNotes === 'function') renderNotes();
+  if (typeof renderSnippetList === 'function') renderSnippetList();
+  if (typeof notesRenderSidebar === 'function') notesRenderSidebar();
   // The lock picker is also reachable from the admin, where the lock badge and
   // the Skill Tree Locks grid both show what was just changed.
   if (typeof renderAdmin === 'function' && document.getElementById('admin-card-browser')) renderAdmin();
