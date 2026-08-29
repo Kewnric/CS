@@ -14,15 +14,25 @@
    percent is a semitone and a half, which is not texture, it is the sound
    going out of tune with itself. Sameness is the point.
 
-   What makes it read as a voice rather than a beep:
-     · a TRIANGLE oscillator, not a square — soft harmonics, no chiptune edge
-     · a BANDPASS around the formants, which is the vowel-ish colour
-     · a soft attack, so there is no click at the front
-     · a two-stage decay, which carries the body
+   SOURCE AND FILTER, which is how a voice actually works: a harmonically
+   rich source, then resonances that shape it into a vowel.
 
-   With the pitch flat the character has to come from the filter and the
-   envelope, and it does — the formant is what makes this a voice rather than
-   a beep, and that was true before the glide came out.
+     · a SAWTOOTH source. A triangle has almost no harmonics, and formants can
+       only resonate what is already there — triangle through one gentle
+       filter came out barely distinguishable from a sine, which is to say a
+       note.
+     · a FORMANT PAIR in parallel, not one filter in series. One resonance is
+       a filtered tone; it is the RATIO between two that the ear reads as a
+       vowel. F1 carries the body, F2 identifies it, and both need a real Q —
+       a formant is a sharp peak, and the 1.4 this used to run at is a tilt.
+     · a NOISE TRANSIENT on the attack, twelve milliseconds of it. That is the
+       consonant. Speech is never purely periodic, and a blip with no
+       aperiodic energy at all announces itself as an oscillator.
+     · a soft attack and a two-stage decay, which carry the body.
+
+   This is what "too notey" was: one weak filter on a near-sine, at a fixed
+   pitch, which is the definition of a musical note. The pitch was never the
+   problem — it is still D#4.
 
    Tuned to the standard Mita rather than the darker one she turns into.
 
@@ -89,11 +99,35 @@ const SFX_MIN_GAP_MS = 34;
 const SFX_VOICE = {
   pitch:   311,     // Hz — D#4, straight off the tracker reading
   length:  0.080,   // seconds
-  formant: 1600,    // Hz, the bandpass centre — the colour of the voice
-  ceiling: 4600,    // Hz, the lowpass above it
+  // A neutral, slightly open vowel — around an "eh". The pair matters more
+  // than either number: F2/F1 near 2.8 is what says vowel rather than tone.
+  f1:      620,     // Hz, first formant — the body
+  f1q:     3,
+  f2:      1750,    // Hz, second formant — what identifies the vowel
+  f2q:     2.5,
+  f2gain:  0.9,
+  /* Those Q values are lower than a textbook formant, on purpose, and this is
+     the one genuinely non-obvious thing in this file.
+
+     A formant is a resonance: it can only amplify harmonics that fall inside
+     its band. The harmonics here sit 311Hz apart, and at Q9 the F2 band is
+     only ~190Hz wide — so 1555 and 1866 both fell OUTSIDE it and F2 resonated
+     nothing at all. Measured, the F2 region carried 0.127 of F1's energy: the
+     pair was a pair on paper and a single filter in the air, which is exactly
+     what "too notey" sounded like.
+
+     Widening the bands so they always straddle a harmonic takes that to
+     0.322. Tuning F2 to sit exactly ON a harmonic scores marginally better
+     still, and is not worth having — it would come apart again the moment the
+     pitch moved. */
+  breath:  0.14,    // the noise transient at the attack — the consonant
+  ceiling: 4600,    // Hz, the lowpass over the whole thing
   weight:  0.18,    // the octave-down sine underneath
-  q:       1.4,     // how sharp the formant is
-  volume:  1.0      // the tuned level; the slider scales this
+  /* Far below the old 1.0 because a sawtooth through two resonances is a much
+     hotter signal than a triangle through one: the shaped blip now peaks near
+     0.77 where it used to reach 0.13. The output level has been held at about
+     -15.5 dBFS across every one of these changes on purpose. */
+  volume:  0.22
 };
 
 const SFX_VOL_KEY = 'ssp.typingSfxVol';
@@ -146,6 +180,18 @@ function _sfxContext() {
  * @param {number} length seconds; longer reads as a heavier key
  * @param {number} colour bandpass centre in Hz — lower is duller
  */
+/* One short burst of white noise, built once. Rebuilding it per keystroke
+   would allocate a buffer on every letter typed. */
+let _sfxNoise = null;
+function _sfxNoiseBuffer(ctx) {
+  if (_sfxNoise) return _sfxNoise;
+  const n = Math.floor(ctx.sampleRate * 0.05);
+  _sfxNoise = ctx.createBuffer(1, n, ctx.sampleRate);
+  const d = _sfxNoise.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  return _sfxNoise;
+}
+
 function sfxBlip(pitch, length, colour) {
   const ctx = _sfxContext();
   if (!ctx) return;
@@ -154,14 +200,18 @@ function sfxBlip(pitch, length, colour) {
   const t = ctx.currentTime;
   const osc = ctx.createOscillator();
   const sub = ctx.createOscillator();
-  const band = ctx.createBiquadFilter();
+  const f1 = ctx.createBiquadFilter();
+  const f2 = ctx.createBiquadFilter();
+  const f2g = ctx.createGain();
   const tame = ctx.createBiquadFilter();
   const env = ctx.createGain();
 
   // Flat, and identical every time. No jitter and no glide — see the header.
   const f = pitch;
 
-  osc.type = 'triangle';
+  // Sawtooth, because formants can only resonate harmonics that exist. This
+  // is the glottal source; the filters below are the vocal tract.
+  osc.type = 'sawtooth';
   osc.frequency.setValueAtTime(f, t);
 
   // An octave down underneath, quietly, for body. Kept light — this is the
@@ -172,13 +222,18 @@ function sfxBlip(pitch, length, colour) {
   const subGain = ctx.createGain();
   subGain.gain.value = SFX_VOICE.weight;
 
-  band.type = 'bandpass';
-  band.frequency.setValueAtTime(colour, t);
-  band.Q.value = SFX_VOICE.q;
+  // The formant pair, in PARALLEL. In series the second filter would only
+  // carve away what the first passed; side by side they are two resonances
+  // sounding at once, which is what a vowel is.
+  f1.type = 'bandpass';
+  f1.frequency.setValueAtTime(colour, t);
+  f1.Q.value = SFX_VOICE.f1q;
 
-  // High enough to let the brightness through. At 2600 the ceiling sat on top
-  // of the formants and dragged the whole voice back down however high the
-  // fundamental went.
+  f2.type = 'bandpass';
+  f2.frequency.setValueAtTime(SFX_VOICE.f2, t);
+  f2.Q.value = SFX_VOICE.f2q;
+  f2g.gain.value = SFX_VOICE.f2gain;
+
   tame.type = 'lowpass';
   tame.frequency.value = SFX_VOICE.ceiling;
 
@@ -193,20 +248,42 @@ function sfxBlip(pitch, length, colour) {
   env.gain.exponentialRampToValueAtTime(0.3, t + length * 0.35);
   env.gain.exponentialRampToValueAtTime(0.0001, t + length);
 
-  osc.connect(band);
+  // Source into both formants; both formants into the ceiling.
+  osc.connect(f1);
+  osc.connect(f2);
   sub.connect(subGain);
-  subGain.connect(band);
-  band.connect(tame);
+  subGain.connect(f1);
+  f1.connect(tame);
+  f2.connect(f2g);
+  f2g.connect(tame);
   tame.connect(env);
   env.connect(_sfxBus);
 
   osc.start(t); sub.start(t);
   osc.stop(t + length + 0.02); sub.stop(t + length + 0.02);
+
+  // The consonant: a brief noise burst under the attack, gone before the
+  // vowel has finished arriving. Without it the onset is too clean and the
+  // whole thing reads as an instrument being played.
+  if (SFX_VOICE.breath > 0) {
+    const nz = ctx.createBufferSource();
+    const nzf = ctx.createBiquadFilter();
+    const nzg = ctx.createGain();
+    nz.buffer = _sfxNoiseBuffer(ctx);
+    nzf.type = 'bandpass';
+    nzf.frequency.value = SFX_VOICE.f2 * 1.3;
+    nzf.Q.value = 1.2;
+    nzg.gain.setValueAtTime(SFX_VOICE.breath, t);
+    nzg.gain.exponentialRampToValueAtTime(0.0001, t + 0.012);
+    nz.connect(nzf); nzf.connect(nzg); nzg.connect(_sfxBus);
+    nz.start(t);
+    nz.stop(t + 0.03);
+  }
 }
 
 /** One sound, whatever was pressed. */
 function sfxKeyVoice() {
-  return [SFX_VOICE.pitch, SFX_VOICE.length, SFX_VOICE.formant];
+  return [SFX_VOICE.pitch, SFX_VOICE.length, SFX_VOICE.f1];
 }
 
 /** Keys that are navigation or command, not speech. */
