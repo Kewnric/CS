@@ -44,10 +44,12 @@
 
   /* The button floats over the page, so the first thing on each screen needs
      room to clear it rather than sitting underneath. */
+  /* Exactly one element per screen carries this. .messenger-pane-1 used to be
+     in the list as well as .pane-1-header, which sits INSIDE it — so a library
+     got 58px twice and opened on 116px of nothing. */
   .home-scroll,
   .pane-1-header,
-  .lib-hub,
-  .messenger-pane-1 { padding-top: 58px; }
+  .lib-hub { padding-top: 58px; }
 
   /* ── Type and spacing ───────────────────────────────────────
      The desktop scale was being used unchanged on a 375px screen, which is
@@ -92,7 +94,11 @@
      between them goes away — there is nothing left to drag. */
   .messenger-layout {
     flex-direction: column;
-    height: auto;
+    /* The route scrolls rather than clipping. Everything below depends on
+       this: the panes are allowed to be as tall as they need, so something
+       has to be able to scroll past them. */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     min-height: 0;
   }
   .messenger-pane-1,
@@ -101,8 +107,34 @@
     min-width: 0 !important;
     max-width: none !important;
     flex: none;
+    /* layout.css gives both panes height:50% under max-width:768px. That is a
+       hard half-the-viewport split whatever is inside them, and pane 1 has a
+       294px header - title, search and four stat chips - inside its 398px.
+       About 100px reached the folder tree, which is two rows of it. Sizing to
+       content is what lets the header be as tall as it is AND leaves the tree
+       a list worth scrolling. */
+    height: auto !important;
   }
-  .messenger-pane-1 { max-height: 42vh; }
+  /* So the detail pane is still a pane when it is only holding an empty
+     state, rather than a caption under the tree. */
+  .messenger-pane-2 { min-height: 55vh; }
+  /* Cap the scrolling list, never the pane around it. Capping the pane at 42vh
+     left 341px for a header that is 294px tall on its own, so the folder tree
+     was handed a 32px window — the rows were all there, with 117px of content,
+     inside a slot too small to show one of them. The header now takes the room
+     it needs and the tree scrolls in what is left. */
+  .messenger-pane-1 { max-height: none; }
+  .pane-1-content {
+    /* A FLOOR as well as a ceiling. The pane is flex:none on mobile so it has
+       no definite height, which leaves this element's flex:1 with nothing to
+       divide — it collapsed to 102px and stayed there even with 737px of
+       folders inside it. A min-height gives the list a real size of its own
+       instead of asking flex for a share of nothing. */
+    min-height: 34vh;
+    max-height: 44vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
   .resizer-divider { display: none; }
 
   /* ── Things that were simply too wide ───────────────────────
@@ -242,8 +274,14 @@
 }
 
 /* A phone in landscape is short rather than narrow — the drawer should not
-   eat the whole screen. */
-@media (max-width: 900px) and (max-height: 480px) {
-  .messenger-pane-1 { max-height: 55vh; }
-  .home-scroll, .lib-hub, .messenger-pane-1 { padding-top: 50px; }
+   eat the whole screen.
+   640px, not the 900px this was written at. Every rule in here adjusts one
+   set in the block above, which stops at 640 - so between 641 and 900 they
+   applied on their own, with nothing to adjust. An 800x450 laptop got the
+   folder tree capped at 207px inside a side-by-side layout with the full
+   column free, and 50px of header padding to clear a menu button that is
+   display:none at that width. */
+@media (max-width: 640px) and (max-height: 480px) {
+  .pane-1-content { max-height: 46vh; }
+  .home-scroll, .lib-hub, .pane-1-header { padding-top: 50px; }
 }
