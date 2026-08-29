@@ -15,15 +15,25 @@
      · a short DOWNWARD pitch glide, the way a spoken syllable falls
      · a soft attack, so there is no click at the front
 
-   Tuned to the standard Mita rather than the darker one she turns into. The
-   difference between those two is NOT the fundamental — pitching this up and
-   leaving everything else alone gives the dark voice played faster, which is
-   measurable: the dominant frequency moved 215Hz to 398Hz while the spectral
-   centroid barely shifted, 646Hz to 728Hz. The formants are what the ear reads
-   as the size of a voice, so the bandpass, the lowpass ceiling and the weight
-   of the sub-oscillator all move together with the pitch. Doing that properly
-   put the centroid at 1142Hz, and it stopped sounding like something in a
-   basement.
+   Tuned to the standard Mita rather than the darker one she turns into.
+
+   PITCH AND COLOUR ARE SEPARATE KNOBS, and conflating them is how this got
+   set wrong twice. At 232Hz with the formants left low it read as the dark
+   Mita; at 440Hz with them raised it read as squeaky, because 440 is close to
+   an octave above where a person actually speaks.
+
+   There is no published figure for the game's blip — I looked, and AIHASTO
+   have not documented it. So the anchor is the voice itself. Mita is played
+   by a human actress (Kana Hanaiwa in the Japanese dub), and an adult female
+   speaking voice runs roughly 165-255Hz. The fundamental belongs in that band
+   or just over it; what makes a voice sound LIGHT is not a higher fundamental
+   but higher formants, which is why the bandpass and the lowpass ceiling stay
+   where the last pass put them.
+
+   Measured, the three settings come out as:
+     232Hz base -> f0 215Hz, centroid  649Hz   dark, wrong Mita
+     440Hz base -> f0 409Hz, centroid 1192Hz   above human speech, squeaky
+     270Hz base -> f0 258Hz, centroid 1025Hz   speaking range, still bright
 
    Nothing is created until the first keystroke, which is itself the user
    gesture the autoplay policy wants — building the AudioContext at load would
@@ -43,9 +53,11 @@ const SFX_MIN_GAP_MS = 34;
    out before this stage — the shaped blip reaching the bus peaks at about 0.18
    — so the figure here is close to a straight multiplier on that. At 0.16 the
    measured output was 0.028, roughly -31 dBFS, which is inaudible over a
-   laptop fan. 0.8 lands it near 0.15 peak: present, and still well under a
-   notification. */
-const SFX_VOLUME = 0.8;
+   laptop fan. Dropping the fundamental back into speaking range costs a
+   little amplitude — the shaped blip now peaks nearer 0.13 than 0.18 — so this
+   went up to hold the output where it was: measured, 1.0 landed at -17 dBFS
+   against the -15.3 the last voice sat at, and 1.2 puts it back. */
+const SFX_VOLUME = 1.2;
 
 let _sfxCtx = null;
 let _sfxBus = null;
@@ -112,7 +124,7 @@ function sfxBlip(pitch, length, colour) {
   sub.frequency.setValueAtTime(f * 0.5, t);
   sub.frequency.exponentialRampToValueAtTime(f * 0.42, t + length);
   const subGain = ctx.createGain();
-  subGain.gain.value = 0.15;
+  subGain.gain.value = 0.18;
 
   band.type = 'bandpass';
   band.frequency.setValueAtTime(colour * (0.9 + Math.random() * 0.2), t);
@@ -155,12 +167,12 @@ function sfxBlip(pitch, length, colour) {
  * letters before it.
  */
 function sfxKeyVoice(key) {
-  if (key === 'Enter')     return [330, 0.095, 1380];  // lower, longer — a full stop
-  if (key === 'Backspace') return [300, 0.062, 1180];  // dull, swallowed
-  if (key === 'Delete')    return [300, 0.062, 1180];
-  if (key === ' ')         return [380, 0.062, 1560];  // the gap between words
-  if (key === 'Tab')       return [355, 0.078, 1450];
-  return [440, 0.072, 1750];                           // an ordinary character
+  if (key === 'Enter')     return [210, 0.100, 1280];  // lower, longer — a full stop
+  if (key === 'Backspace') return [195, 0.068, 1100];  // dull, swallowed
+  if (key === 'Delete')    return [195, 0.068, 1100];
+  if (key === ' ')         return [240, 0.068, 1450];  // the gap between words
+  if (key === 'Tab')       return [225, 0.085, 1350];
+  return [270, 0.080, 1600];                           // an ordinary character
 }
 
 /** Keys that are navigation or command, not speech. */
@@ -216,8 +228,8 @@ function toggleTypingSfx() {
   _syncTypingSfxBtn();
   if (next) {
     // Play the thing being switched on, so the button proves itself.
-    sfxBlip(440, 0.072, 1750);
-    setTimeout(() => sfxBlip(392, 0.085, 1560), 95);
+    sfxBlip(270, 0.080, 1600);
+    setTimeout(() => sfxBlip(240, 0.092, 1450), 95);
   } else if (_sfxCtx) {
     _sfxCtx.suspend().catch(() => {});
   }
