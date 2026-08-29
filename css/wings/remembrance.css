@@ -1,0 +1,45 @@
+/* ── REMEMBRANCE: the chronology ──────────────────────────────
+   The rail down the left is what makes consecutive entries read as one
+   continuous thread rather than a stack of separate cards.
+   ------------------------------------------------------------ */
+
+.wing-tl { align-items: stretch; }
+
+.wing-tl-rail {
+  position: relative;
+  flex-shrink: 0;
+  width: 62px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding-top: 0.15rem;
+}
+
+.wing-tl-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18);
+}
+
+/* The line runs to the bottom of the row, so it appears to continue into the
+   next one and the column reads as a single thread. */
+.wing-tl-rail::after {
+  content: '';
+  flex: 1;
+  width: 2px;
+  background: var(--border-color);
+  border-radius: 1px;
+}
+
+.wing-tl-date {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.wing-tl-body { flex: 1; min-width: 0; }

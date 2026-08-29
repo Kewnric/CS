@@ -6,11 +6,14 @@
    and folders, plus the folder system, the search, the favourites, the tag
    filter and the bulk bar every other library uses.
 
-   What makes them different from each other is NOT here. A diary entry has a
-   date and a mood, a goal has steps you tick off, a collection item has a
-   medium and a rating; those live in wing-schemas.js as declarations, and
-   wing-views.js draws them. This file is the part they have in common, and it
-   asks the schema whenever the answer differs per wing.
+   What makes them different from each other is NOT here. Each wing owns one
+   file in js/wings/ and one in css/wings/, registers itself through
+   wing-common.js, and brings its own fields, its own card and its own reader
+   sections. This file is only what they genuinely share, and it asks the
+   registry whenever the answer differs per wing.
+
+   To work on one wing, open its two files. Nothing here should need touching,
+   and no other wing can break because of it.
 
    Storage:  state.wings = { <key>: [ { id, title, body, data{}, tags[],
                                         parentId, favorite, createdAt, updatedAt } ] }
@@ -271,18 +274,12 @@ function clearWingFilters() { libClearCommonFilters('wing'); wingRenderDetail();
 function _wingGroupedHTML(list, schema) {
   const groups = wingGroupList(list, schema);
   const wrap = wingIsRowLayout(schema) ? 'wing-rows' : 'card-grid stagger-children';
+  // The index runs across the whole list rather than restarting per group, so
+  // a numbered wing gives an entry one number in the book, not one per
+  // section. The wing decides whether to use it.
   let counter = 0;
   return groups.map(g => {
-    const body = g.items.map(w => {
-      counter++;
-      const html = wingEntryHTML(w, schema);
-      // The rulebook numbers itself, continuing across the groups so a rule
-      // has one number in the whole code rather than one per section.
-      return schema.layout === 'rulebook'
-        ? html.replace('<div class="wing-rule-body">',
-            '<span class="wing-rule-n">' + counter + '</span><div class="wing-rule-body">')
-        : html;
-    }).join('');
+    const body = g.items.map(w => schema.card(w, { index: ++counter })).join('');
     return (g.label
       ? `<h3 class="wing-group-h"><span class="wing-group-name">${escapeHTML(g.label)}</span>
            <span class="wing-group-count">${g.items.length}</span></h3>`
@@ -298,18 +295,17 @@ function _wingSnippet(body, n) {
   return String(body || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n || 160);
 }
 
-/* The card itself is per-wing — see wingEntryHTML in wing-views.js. */
+/* The card is the wing’s own — see card() in its file under js/wings/. */
 
 function _wingReaderHTML(w) {
   const when = w.updatedAt || w.createdAt;
   const schema = wingSchema(_wingKey);
-  const isMuseum = schema.layout === 'museum';
   return `
     <div class="animate-fade-in wing-reader wing-reader-${escapeHTML(schema.layout)}" style="max-width:780px;margin:0 auto;">
       <button class="btn btn-ghost btn-sm" onclick="wingBack()" style="margin-bottom:1rem;">
         <i data-lucide="chevron-left" style="width:14px;height:14px;"></i> Back to ${escapeHTML(schema.nounPlural)}
       </button>
-      <h1 class="wing-reader-title${isMuseum ? ' wing-reader-statement' : ''}">${escapeHTML(w.title || 'Untitled')}</h1>
+      <h1 class="wing-reader-title">${escapeHTML(w.title || 'Untitled')}</h1>
       <div style="display:flex;flex-wrap:wrap;gap:0.4rem;align-items:center;margin-bottom:1.25rem;">
         ${(w.tags || []).map(t => libTagBadgeHTML('wing', t)).join('')}
         ${when ? `<span style="font-size:0.75rem;color:var(--text-tertiary);">Updated ${new Date(when).toLocaleString()}</span>` : ''}
@@ -317,8 +313,7 @@ function _wingReaderHTML(w) {
       ${wingReaderMetaHTML(w, schema)}
       ${w.body ? `<section class="wing-sec"><h3 class="wing-sec-h">${escapeHTML(schema.bodyLabel)}</h3>
         <div class="wing-body">${escapeHTML(w.body).replace(/\n/g, '<br/>')}</div></section>` : ''}
-      ${wingReaderListHTML(w, schema)}
-      ${wingReaderLinksHTML(w, schema)}
+      ${schema.readerExtras ? schema.readerExtras(w) : ''}
       <div style="display:flex;gap:0.6rem;margin-top:2rem;">
         <button class="btn btn-primary" onclick="wingEdit('${w.id}')"><i data-lucide="pencil" style="width:16px;height:16px;"></i> Edit</button>
         <button class="btn btn-secondary" onclick="libToggleFavorite('wing','${w.id}')">

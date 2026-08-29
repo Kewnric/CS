@@ -1,0 +1,55 @@
+/* ── PROGRESSION: goals and their steps ───────────────────────
+   The step list is the working part of this wing, so it is built to be
+   clicked: a real target on the left, and a done step that visibly recedes
+   rather than disappearing.
+   ------------------------------------------------------------ */
+
+.wing-goal { display: flex; flex-direction: column; }
+
+.wing-goal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.4rem;
+}
+.wing-goal-head .wing-row-title { flex: 1; min-width: 0; }
+
+.wing-badge.stage-active  { background: rgba(56,189,248,.14); border-color: rgba(56,189,248,.5); color: #38bdf8; }
+.wing-badge.stage-paused  { background: rgba(251,146,60,.13); border-color: rgba(251,146,60,.45);color: #fb923c; }
+.wing-badge.stage-someday { background: rgba(148,163,184,.14);border-color: rgba(148,163,184,.4);color: #94a3b8; }
+.wing-badge.stage-reached { background: rgba(34,197,94,.15);  border-color: rgba(34,197,94,.5);  color: #4ade80; }
+
+/* ── The tickable steps ───────────────────────────────────── */
+.wing-steps { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+
+.wing-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+/* Done, not gone — a finished step is still evidence of the ground covered. */
+.wing-step.done { opacity: 0.6; }
+.wing-step.done span { text-decoration: line-through; }
+
+.wing-step-box {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.wing-step-box:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.wing-step.done .wing-step-box { background: #4ade80; border-color: #4ade80; color: #0b1220; }

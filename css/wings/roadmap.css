@@ -1,0 +1,89 @@
+/* ── ROADMAP: the walked path ─────────────────────────────────
+   Three states, not two. The pips on the card give the shape of a path at a
+   glance; the route in the reader gives the detail, connected so the stages
+   read as one journey rather than a list.
+   ------------------------------------------------------------ */
+
+.wing-path { display: flex; flex-direction: column; }
+
+.wing-path-goal {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.76rem;
+  color: var(--color-primary);
+  margin: 0 0 0.5rem;
+}
+
+.wing-badge.horizon-now   { background: rgba(34,197,94,.14);  border-color: rgba(34,197,94,.5);  color: #4ade80; }
+.wing-badge.horizon-next  { background: rgba(56,189,248,.13); border-color: rgba(56,189,248,.45);color: #38bdf8; }
+.wing-badge.horizon-later { background: rgba(148,163,184,.14);border-color: rgba(148,163,184,.4);color: #94a3b8; }
+
+/* ── Pips: the whole path in one line, on the card ────────── */
+.wing-pips { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.wing-pip {
+  width: 100%;
+  max-width: 26px;
+  flex: 1;
+  height: 5px;
+  border-radius: 99px;
+  background: rgba(148, 163, 184, 0.28);
+}
+.wing-pip.walking { background: #38bdf8; }
+.wing-pip.cleared { background: #4ade80; }
+
+/* ── The route, in the reader ─────────────────────────────── */
+.wing-route { list-style: none; padding: 0; margin: 0; }
+
+.wing-route-step {
+  position: relative;
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  padding: 0 0 1rem 0;
+}
+
+/* The connector between markers. Not on the last one, which would trail off
+   into nothing. */
+.wing-route-step:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 13px;
+  top: 26px;
+  bottom: 2px;
+  width: 2px;
+  background: var(--border-color);
+}
+/* Ground already covered shows on the connector too, so progress reads down
+   the line rather than marker by marker. */
+.wing-route-step.cleared:not(:last-child)::before { background: #4ade80; }
+
+.wing-route-mark {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 2px solid var(--border-color);
+  background: var(--bg-elevated);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.wing-route-mark:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.wing-route-step.walking .wing-route-mark { border-color: #38bdf8; color: #38bdf8; }
+.wing-route-step.cleared .wing-route-mark { border-color: #4ade80; background: #4ade80; color: #0b1220; }
+
+.wing-route-text { display: flex; flex-direction: column; gap: 0.1rem; padding-top: 0.25rem; }
+.wing-route-text span { font-size: 0.92rem; color: var(--text-primary); }
+.wing-route-step.cleared .wing-route-text span { text-decoration: line-through; opacity: 0.65; }
+.wing-route-text em {
+  font-style: normal;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-tertiary);
+}

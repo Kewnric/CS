@@ -1,0 +1,54 @@
+/* ── INSIGHTS: the rulebook ───────────────────────────────────
+   Rows, not cards. The number sits in its own column so the rules line up
+   down the left the way a numbered code does, and the three parts of a rule
+   are set differently enough that they do not blur into one paragraph.
+   ------------------------------------------------------------ */
+
+.wing-rule { align-items: flex-start; }
+
+.wing-rule-n {
+  flex-shrink: 0;
+  width: 2rem;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-align: right;
+  padding-top: 0.1rem;
+}
+
+.wing-rule-body { flex: 1; min-width: 0; }
+
+.wing-rule-text {
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.45;
+  color: var(--text-primary);
+  margin: 0 0 0.35rem;
+}
+
+/* The trigger is a cue, so it is coloured like one. */
+.wing-rule-when {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.75rem;
+  color: var(--color-primary);
+  margin: 0 0 0.3rem;
+}
+
+/* The reason is quoted rather than stated — it supports the rule above it. */
+.wing-rule-why {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  margin: 0;
+  padding-left: 0.7rem;
+  border-left: 2px solid var(--border-color);
+}
+
+.wing-rule-side { flex-shrink: 0; }
+
+.wing-badge.kind-ethic    { background: rgba(244,114,182,.13); border-color: rgba(244,114,182,.45); color: #f472b6; }
+.wing-badge.kind-instinct { background: rgba(168,85,247,.14);  border-color: rgba(168,85,247,.45);  color: #c084fc; }
+.wing-badge.kind-decision { background: rgba(56,189,248,.13);  border-color: rgba(56,189,248,.45);  color: #38bdf8; }
+.wing-badge.kind-boundary { background: rgba(239,68,68,.13);   border-color: rgba(239,68,68,.45);   color: #f87171; }

@@ -1,0 +1,44 @@
+/* ── MINDSET: the museum ──────────────────────────────────────
+   A plaque, not a card. The statement is set larger and lighter than a card
+   title would be, because a mindset is meant to be read rather than scanned.
+   ------------------------------------------------------------ */
+
+.wing-plaque { display: flex; flex-direction: column; padding: 1.4rem 1.3rem 1.1rem; }
+
+.wing-plaque-rule {
+  width: 34px;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #facc15, rgba(250, 204, 21, 0.15));
+  margin-bottom: 0.9rem;
+}
+
+.wing-plaque-text {
+  font-size: 1.12rem;
+  line-height: 1.45;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.7rem;
+  border: 0;
+  padding: 0;
+}
+
+.wing-plaque-replaces { font-size: 0.78rem; color: var(--text-tertiary); margin: 0 0 0.8rem; }
+.wing-plaque-foot { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-top: auto; }
+
+/* How settled it is, warm through to grey. */
+.wing-badge.conv-core    { background: rgba(250,204,21,.14); border-color: rgba(250,204,21,.5);  color: #facc15; }
+.wing-badge.conv-settled { background: rgba(34,197,94,.13);  border-color: rgba(34,197,94,.45);  color: #4ade80; }
+.wing-badge.conv-working { background: rgba(56,189,248,.13); border-color: rgba(56,189,248,.45); color: #38bdf8; }
+.wing-badge.conv-testing { background: rgba(148,163,184,.14);border-color: rgba(148,163,184,.4); color: #94a3b8; }
+
+/* In the reader the title IS the content, so it is set as a statement rather
+   than a heading — given a rule down the side and room to be read slowly. */
+.wing-reader-museum .wing-reader-title {
+  font-size: 1.75rem;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  padding-left: 0.9rem;
+  border-left: 3px solid #facc15;
+}
