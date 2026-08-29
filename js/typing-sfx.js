@@ -22,18 +22,26 @@
    Mita; at 440Hz with them raised it read as squeaky, because 440 is close to
    an octave above where a person actually speaks.
 
-   There is no published figure for the game's blip — I looked, and AIHASTO
-   have not documented it. So the anchor is the voice itself. Mita is played
-   by a human actress (Kana Hanaiwa in the Japanese dub), and an adult female
-   speaking voice runs roughly 165-255Hz. The fundamental belongs in that band
-   or just over it; what makes a voice sound LIGHT is not a higher fundamental
-   but higher formants, which is why the bandpass and the lowpass ceiling stay
-   where the last pass put them.
+   The pitch is no longer a guess. The game's own blip was put through a pitch
+   tracker and reads D#4, 311Hz, sitting just under the E4 line — so that is
+   the target, and this is tuned to hit it rather than to sound plausible.
 
-   Measured, the three settings come out as:
-     232Hz base -> f0 215Hz, centroid  649Hz   dark, wrong Mita
-     440Hz base -> f0 409Hz, centroid 1192Hz   above human speech, squeaky
-     270Hz base -> f0 258Hz, centroid 1025Hz   speaking range, still bright
+   The number below is 335 rather than 311 because it is where the blip
+   STARTS, and the glide means it spends its life falling: measured, a nominal
+   335 gives a dominant of 312Hz, which is D#4 within six cents. Setting 311
+   here would land on D4 instead, a whole semitone flat.
+
+   How the three earlier guesses did against that target:
+     232Hz base -> f0 215Hz  C#4   a fourth flat, and dark with it
+     440Hz base -> f0 422Hz  G#4   a fifth sharp
+     270Hz base -> f0 258Hz  C4    a minor third flat
+     335Hz base -> f0 312Hz  D#4   the reading
+
+   What is NOT taken from the trace is the glide. It shows dives to C4 and
+   below, but a pitch tracker loses lock as a sound decays, and those spikes
+   sit at the tail of each blip where there is least to track. The trustworthy
+   part is the sustained band just under E4. Reading the artefacts as pitch
+   content would have doubled the fall for no reason.
 
    Nothing is created until the first keystroke, which is itself the user
    gesture the autoplay policy wants — building the AudioContext at load would
@@ -55,8 +63,10 @@ const SFX_MIN_GAP_MS = 34;
    measured output was 0.028, roughly -31 dBFS, which is inaudible over a
    laptop fan. Dropping the fundamental back into speaking range costs a
    little amplitude — the shaped blip now peaks nearer 0.13 than 0.18 — so this
-   went up to hold the output where it was: measured, 1.0 landed at -17 dBFS
-   against the -15.3 the last voice sat at, and 1.2 puts it back. */
+   went up to hold the output where it was. Raising the pitch to the measured
+   D#4 gave some of that amplitude back, so it comes down again — the level has
+   been held at about -15.5 dBFS across all of these changes on purpose, since
+   the loudness was settled before the voice was. */
 
 /**
  * The voice, in one place.
@@ -67,14 +77,14 @@ const SFX_MIN_GAP_MS = 34;
  * this awkward to tune — changing the voice meant editing five sets of three.
  */
 const SFX_VOICE = {
-  pitch:   270,     // Hz, an ordinary character
+  pitch:   335,     // Hz at the attack; measures D#4/311Hz, the game's reading
   length:  0.080,   // seconds
   formant: 1600,    // Hz, the bandpass centre — the colour of the voice
   ceiling: 4600,    // Hz, the lowpass above it
   weight:  0.18,    // the octave-down sine underneath
   glide:   0.82,    // where the pitch falls to by the end
   q:       1.4,     // how sharp the formant is
-  volume:  1.2
+  volume:  1.0
 };
 
 /** pitch x, length x, formant x — relative to an ordinary character. */
