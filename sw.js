@@ -2,7 +2,7 @@
    Online: always serves fresh from the network (so live edits show up and
    nothing goes stale). Offline: falls back to the last cached copy, and to
    the cached app shell for navigations. Bump CACHE to invalidate. */
-const CACHE = 'ssp-v60';
+const CACHE = 'ssp-v61';
 const SHELL = ['./index.html', './manifest.json'];
 
 self.addEventListener('install', (event) => {

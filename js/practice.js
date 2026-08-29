@@ -664,17 +664,48 @@ function practiceDeleteFile(fi) {
 let _starterAnimAborted = false;
 let _starterAnimator = null;
 
+/** Is a starter-code fill actually running right now? */
+function _starterAnimRunning() {
+  return !!(_starterAnimator && _starterAnimator._aborted === false && !_starterAnimator._forceComplete);
+}
+
+/**
+ * Skip the fill.
+ *
+ * The guard on createdAt is against the very click that opened the attempt
+ * also finishing the animation before it has drawn a character.
+ */
+function _starterAnimSkip() {
+  if (!_starterAnimRunning()) return;
+  if (_starterAnimator.createdAt && (Date.now() - _starterAnimator.createdAt < 50)) return;
+  _starterAnimator.complete();
+}
+
 document.addEventListener('click', (e) => {
-  if (e.target && (e.target.closest('button') || e.target.closest('select') || e.target.closest('input') || e.target.closest('textarea') || e.target.closest('.file-tab'))) {
+  if (!e.target) return;
+  /* THE EDITOR IS NOT AN EXCEPTION. It used to be — 'textarea' sat in this
+     list — which meant clicking the one place you would naturally click while
+     watching code fill itself in was the one place that did nothing. Other
+     textareas still are exceptions, because clicking into the description
+     editor is not a request to skip anything. */
+  const inEditor = e.target.closest('#editor-textarea');
+  if (!inEditor && (e.target.closest('button') || e.target.closest('select') ||
+                    e.target.closest('input') || e.target.closest('textarea') ||
+                    e.target.closest('.file-tab'))) {
     return;
   }
-  if (_starterAnimator && _starterAnimator._aborted === false && !_starterAnimator._forceComplete) {
-    if (_starterAnimator.createdAt && (Date.now() - _starterAnimator.createdAt < 50)) {
-      return;
-    }
-    _starterAnimator.complete();
-  }
+  _starterAnimSkip();
 });
+
+/* Typing skips it too, and this one is not just impatience being served: the
+   fill writes the whole of textarea.value on every frame, so a keystroke
+   landing mid-animation was overwritten and lost. Finishing first means what
+   you typed survives. */
+document.addEventListener('keydown', (e) => {
+  if (!_starterAnimRunning()) return;
+  if (e.key === 'Escape' || e.key === 'Tab') return;   // leaving or moving on, not typing
+  _starterAnimSkip();
+}, true);
 
 /** MiSide-style animation for starter code appearing in the editor (DOM-safe) */
 async function animateStarterCode(code, textarea, preCode) {
@@ -700,6 +731,10 @@ async function animateStarterCode(code, textarea, preCode) {
 
     // Sync state as animation progresses
     await _starterAnimator.animate(code, preCode, textarea, syntaxHighlight);
+    /* Released once it is over. Neither _aborted nor _forceComplete is set by
+       a natural finish, so without this the animator sat there looking like a
+       live one and every later click called complete() on a corpse. */
+    _starterAnimator = null;
   } else {
     // Fallback if animation class is missing
     textarea.value = code;
