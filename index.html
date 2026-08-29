@@ -230,6 +230,15 @@
           </span>
           <i data-lucide="chevron-right" class="settings-item-chevron" aria-hidden="true"></i>
         </button>
+        <button onclick="toggleAppSound()" class="settings-item" type="button" id="settings-sound-item"
+                aria-label="Sound" aria-pressed="true">
+          <span class="settings-item-icon"><i data-lucide="volume-2" id="settings-sound-icon" aria-hidden="true"></i></span>
+          <span class="settings-item-info">
+            <span class="settings-item-label" id="settings-sound-label">Sound On</span>
+            <span class="settings-item-desc" id="settings-sound-desc">Clicks, typing and cues</span>
+          </span>
+          <i data-lucide="chevron-right" class="settings-item-chevron" aria-hidden="true"></i>
+        </button>
         <button onclick="handleDataExport()" class="settings-item" type="button" id="export-btn-sidebar" aria-label="Export data backup">
           <span class="settings-item-icon"><i data-lucide="download" aria-hidden="true"></i></span>
           <span class="settings-item-info">
@@ -430,6 +439,7 @@
   <script src="js/typing-sfx.js"></script>
   <script src="js/editor-fx.js"></script>
   <script src="js/practice-sfx.js"></script>
+  <script src="js/ui-sfx.js"></script>
   <script src="js/home.js"></script>
   <script src="js/home-stats.js"></script>
   <script src="js/browse.js"></script>
