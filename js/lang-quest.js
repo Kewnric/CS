@@ -1,48 +1,69 @@
 /* ============================================================
    LANG-QUEST.JS — the run, and the battles along it
    ------------------------------------------------------------
-   Two screens that hand back and forth:
+   Presented the way a pixel-art visual novel is, because that is the shape
+   the mode already had: a scene banner up top, a stacked menu of choices over
+   it, and a dialogue box underneath that you click through.
 
-     the road   — you are somewhere, and you choose to walk on or go home.
-                  Walking costs stamina and may turn up somebody.
-     the battle — laid out the way a turn-based RPG is: them across from you,
-                  your commands underneath. THEY SPEAK FIRST. Answer well and
-                  you take nothing and get some stamina back; answer badly and
-                  it drains.
+   Everything runs off two small queues rather than a pile of view flags:
 
-   Stamina is health — there is no separate bar, because the fiction is that
-   you are out walking and a bad conversation wears you down. Beating someone
-   raises the MAXIMUM, so the reward for a hard talk is a longer walk next time.
+     _lq.say   — lines waiting to be read. The box shows the first, a click
+                 drops it, and when the queue empties the menu appears.
+     _lq.menu  — what you can do right now.
 
-   Backdrops and sprites are placeholders and say so on screen.
+   That is the whole state machine. A turn is "push some lines, then set a
+   menu", which is why the road, the encounter and the battle can share one
+   renderer instead of each having their own.
+
+   Stamina is health. A correct reply costs nothing and gives some back; a
+   wrong one drains you. Beating someone raises the MAXIMUM, so a hard
+   conversation buys you a longer walk.
+
+   Backdrops and portraits are placeholders and say so.
    ============================================================ */
 
 let _lq = null;
 
-/* Stand-in scenery: a gradient and an icon rather than an image, so the game
-   reads correctly now and real art can drop in without the layout moving. */
+/* Stand-in scenery — a gradient per location, so the scene reads now and real
+   art can drop into the same box later without the layout moving. */
 const LQ_BACKDROPS = {
-  cafeteria: { from: '#3b2f4a', to: '#1b1430' },
-  classroom: { from: '#243b55', to: '#141e30' },
-  hallway:   { from: '#2c3e50', to: '#1a252f' },
-  home:      { from: '#4a3728', to: '#241a12' },
-  market:    { from: '#3d4a2f', to: '#1b2413' },
-  street:    { from: '#2f3a4a', to: '#151c26' }
+  cafeteria: { from: '#8a6fa8', mid: '#54407a', to: '#2a1f45' },
+  classroom: { from: '#4d84bd', mid: '#2f5488', to: '#1a2c4d' },
+  hallway:   { from: '#5f7b9c', mid: '#3a5171', to: '#1e2c40' },
+  home:      { from: '#a8794c', mid: '#6b4a2e', to: '#33231a' },
+  market:    { from: '#7d9c52', mid: '#4c6132', to: '#26311b' },
+  street:    { from: '#5a7099', mid: '#33456b', to: '#1a2338' }
 };
+
+const LQ_AUTOSKIP_KEY = 'lang.autoskip';
+
+function lqAutoSkip() {
+  try { return localStorage.getItem(LQ_AUTOSKIP_KEY) === '1'; } catch (e) { return false; }
+}
+
+function lqToggleAutoSkip() {
+  try { localStorage.setItem(LQ_AUTOSKIP_KEY, lqAutoSkip() ? '0' : '1'); } catch (e) { /* private */ }
+  lqRender();
+  if (lqAutoSkip()) lqScheduleAuto();
+}
 
 function langQuestTemplate() {
   return `
     <div class="lq-shell" id="lq-shell">
-      <header class="lq-top">
-        <button class="btn-back-dark" onclick="lqExit()" title="Leave">
-          <i data-lucide="chevron-left" style="width:18px;height:18px;"></i> Back
-        </button>
-        <div class="lq-title" id="lq-title"></div>
-        <div class="lq-badge">PLACEHOLDER ART</div>
-      </header>
-      <div class="lq-hud" id="lq-hud"></div>
-      <div class="lq-stage" id="lq-stage"></div>
-      <div class="lq-panel" id="lq-panel"></div>
+      <div class="lq-frame">
+        <div class="lq-topline">
+          <div class="lq-daytag"><span class="lq-moon">☾</span><span id="lq-daylabel">RUN</span></div>
+          <div class="lq-stats" id="lq-stats"></div>
+        </div>
+        <div class="lq-scene" id="lq-scene"></div>
+        <div class="lq-speaker" id="lq-speaker"></div>
+        <div class="lq-boxwrap">
+          <button class="lq-autoskip" id="lq-autoskip" type="button" onclick="lqToggleAutoSkip()">
+            <span class="lq-check"></span> AUTO-SKIP
+          </button>
+          <div class="lq-box" id="lq-box" onclick="lqAdvance()"></div>
+        </div>
+      </div>
     </div>`;
 }
 
@@ -52,60 +73,88 @@ function langQuestInit() {
   const scId = getSessionParam('langRunScenario');
 
   _lq = {
-    mode,                      // run | scenario
-    scene: 'road',             // road | battle | over
-    location: 'street',
-    stamina: LANG_RUN_STAMINA,
-    staminaMax: LANG_RUN_STAMINA,
-    power: 0,
-    powerMax: 100,
+    mode, scene: 'road', location: 'street',
+    stamina: LANG_RUN_STAMINA, staminaMax: LANG_RUN_STAMINA,
+    power: 0, powerMax: 100,
     potions: LANG_POTIONS.map(p => Object.assign({ owned: 1 }, p)),
-    steps: 0,
-    defeated: 0,
-    fled: 0,
-    correct: 0,
-    asked: 0,
-    flavour: '',
-    enemy: null,
-    turn: 0,
-    removed: [],
-    doubleNext: false,
-    lastPick: null,
+    steps: 0, defeated: 0, fled: 0, correct: 0, asked: 0,
+    enemy: null, turn: 0, removed: [], doubleNext: false,
+    say: [], menu: null, autoTimer: null,
     startTime: Date.now()
   };
-
   document.title = (mode === 'scenario' ? 'Scenario' : 'Free run') + ' — StudySession Pro';
 
   if (mode === 'scenario') {
     const sc = scId ? langFindScenario(scId) : null;
     const ready = (e) => (e.line || '').trim() && (e.options || []).some(o => (o.text || '').trim() && o.correct);
     if (!sc || !(sc.encounters || []).some(ready)) { spaNavigate('language'); return; }
-    const usable = (sc.encounters || []).filter(ready);
     _lq.location = sc.location || 'street';
     _lq.stamina = _lq.staminaMax = sc.playerHp || LANG_RUN_STAMINA;
     _lq.power = sc.playerMana || 0;
     _lq.enemy = {
       name: sc.npc || 'Stranger', location: _lq.location,
-      hp: sc.npcHp || 100, hpMax: sc.npcHp || 100, source: 'scenario',
-      turns: usable.map(e => ({
+      hp: sc.npcHp || 100, hpMax: sc.npcHp || 100,
+      turns: (sc.encounters || []).filter(ready).map(e => ({
         situation: e.situation || '', line: e.line,
         options: langShuffle((e.options || []).filter(o => (o.text || '').trim())),
         damage: e.damage || 25, backlash: e.backlash || 20
       }))
     };
     _lq.scene = 'battle';
+    lqSay(null, 'You encountered a {' + _lq.enemy.name + '}!');
+    lqBeginTurn();
   } else {
     if (langRunBlocker()) { spaNavigate('language'); return; }
-    _lq.flavour = 'You set off. The road is ahead of you.';
+    lqSay('You', 'A whole evening, and nothing decided yet.');
+    lqRoadMenu();
   }
   lqRender();
 }
 
-function langQuestDestroy() { _lq = null; }
+function langQuestDestroy() { lqClearAuto(); _lq = null; }
 
 function lqExit() {
   if (!_lq || _lq.scene === 'over') { spaNavigate('language'); return; }
-  showConfirm('Leave?', 'This run will not be saved.', () => { _lq = null; spaNavigate('language'); });
+  showConfirm('Leave?', 'This run will not be saved.', () => { lqClearAuto(); _lq = null; spaNavigate('language'); });
+}
+
+/* ── The two queues ───────────────────────────────────────── */
+
+/** Queue a line. {name} inside the text is highlighted, as an enemy name is. */
+function lqSay(who, text, cls) {
+  if (!_lq) return;
+  _lq.say.push({ who: who || null, text: text, cls: cls || '' });
+  _lq.menu = null;
+}
+
+function lqMenu(items) {
+  if (!_lq) return;
+  _lq.menu = items;
+}
+
+/** Click the box: drop the current line, and show the menu once they run out. */
+function lqAdvance() {
+  if (!_lq || !_lq.say.length) return;
+  _lq.say.shift();
+  if (!_lq.say.length && _lq.pending) {
+    const fn = _lq.pending;
+    _lq.pending = null;
+    fn();
+  }
+  lqRender();
+}
+
+/** Run something once the queued lines have all been read. */
+function lqThen(fn) { if (_lq) _lq.pending = fn; }
+
+function lqScheduleAuto() {
+  lqClearAuto();
+  if (!_lq || !lqAutoSkip() || !_lq.say.length) return;
+  _lq.autoTimer = setTimeout(() => { _lq && lqAdvance(); }, 1400);
+}
+
+function lqClearAuto() {
+  if (_lq && _lq.autoTimer) { clearTimeout(_lq.autoTimer); _lq.autoTimer = null; }
 }
 
 /* ── Render ───────────────────────────────────────────────── */
@@ -113,121 +162,141 @@ function lqExit() {
 function lqRender() {
   if (!_lq) return;
   const shell = document.getElementById('lq-shell');
-  const title = document.getElementById('lq-title');
-  const hud = document.getElementById('lq-hud');
-  const stage = document.getElementById('lq-stage');
-  const panel = document.getElementById('lq-panel');
-  if (!hud || !stage || !panel) return;
+  const scene = document.getElementById('lq-scene');
+  const stats = document.getElementById('lq-stats');
+  const speaker = document.getElementById('lq-speaker');
+  const box = document.getElementById('lq-box');
+  const day = document.getElementById('lq-daylabel');
+  const auto = document.getElementById('lq-autoskip');
+  if (!scene || !box) return;
 
   const loc = langLocation(_lq.location);
   const bd = LQ_BACKDROPS[loc.key] || LQ_BACKDROPS.street;
-  if (title) title.textContent = _lq.mode === 'scenario' ? 'Scenario' : 'Free run';
+  if (day) day.textContent = _lq.scene === 'battle' ? 'BATTLE' : _lq.scene === 'over' ? 'DONE' : 'RUN';
+  if (auto) auto.classList.toggle('is-on', lqAutoSkip());
 
-  hud.innerHTML = lqHudHTML();
-  stage.style.background = `linear-gradient(160deg, ${bd.from} 0%, ${bd.to} 100%)`;
-  stage.innerHTML = _lq.scene === 'battle' ? lqBattleStageHTML(loc) : lqRoadStageHTML(loc);
-  panel.innerHTML = _lq.scene === 'over' ? lqSummaryHTML()
-    : _lq.scene === 'battle' ? lqBattlePanelHTML() : lqRoadPanelHTML();
+  if (stats) {
+    stats.innerHTML = `
+      <span class="lq-stat"><b class="lq-ico-st">⚡</b>${Math.max(0, Math.round(_lq.stamina))}/${_lq.staminaMax}</span>
+      <span class="lq-stat"><b class="lq-ico-pw">✦</b>${Math.round(_lq.power)}%</span>
+      <span class="lq-stat"><b class="lq-ico-wk">▮</b>${_lq.steps}</span>
+      ${_lq.scene === 'battle' && _lq.enemy
+        ? `<span class="lq-stat lq-stat-foe"><b>♥</b>${Math.max(0, Math.round(_lq.enemy.hp))}/${_lq.enemy.hpMax}</span>` : ''}`;
+  }
+
+  scene.style.background =
+    `linear-gradient(175deg, ${bd.from} 0%, ${bd.mid} 55%, ${bd.to} 100%)`;
+  scene.innerHTML = `
+    <div class="lq-scenetag">${escapeHTML(loc.name.toUpperCase())}</div>
+    ${_lq.scene === 'battle' && _lq.enemy ? lqFoeHTML() : ''}
+    ${_lq.scene === 'battle' && !_lq.say.length && _lq.menu === null ? lqCommandBarHTML() : ''}
+    ${_lq.menu && !_lq.say.length ? lqMenuHTML() : ''}
+    <div class="lq-help" title="Placeholder art — backdrops and portraits are stand-ins">?</div>`;
+
+  const line = _lq.say[0] || null;
+  if (speaker) {
+    const who = line && line.who;
+    speaker.innerHTML = who ? `<span class="lq-name${line.cls === 'foe' ? ' is-foe' : ''}">${escapeHTML(who)}</span>` : '';
+  }
+  box.innerHTML = line
+    ? `<p class="lq-line">${lqMarkup(line.text)}</p>${_lq.say.length ? '<span class="lq-next">▼</span>' : '<span class="lq-next">▼</span>'}`
+    : (_lq.scene === 'over' ? lqSummaryHTML() : '<p class="lq-line lq-dim">…</p>');
+  box.classList.toggle('is-clickable', !!line);
 
   if (typeof lucide !== 'undefined' && shell) lucide.createIcons({ root: shell });
+  lqScheduleAuto();
 }
 
-function lqHudHTML() {
-  const pct = (a, b) => Math.max(0, Math.min(100, (a / Math.max(1, b)) * 100));
-  const low = _lq.stamina <= _lq.staminaMax * 0.25;
+/** {highlighted} in a line, escaped either way. */
+function lqMarkup(text) {
+  return escapeHTML(String(text || '')).replace(/\{([^}]*)\}/g, '<em class="lq-hl">$1</em>');
+}
+
+function lqFoeHTML() {
+  const pct = Math.max(0, (_lq.enemy.hp / Math.max(1, _lq.enemy.hpMax)) * 100);
   return `
-    <div class="lq-meters">
-      <div class="lq-meter">
-        <span class="lq-meter-label"><i data-lucide="flame"></i> STAMINA</span>
-        <div class="lq-meter-track"><div class="lq-meter-fill${low ? ' is-low' : ' is-hp'}" style="width:${pct(_lq.stamina, _lq.staminaMax)}%;"></div></div>
-        <span class="lq-meter-num">${Math.max(0, Math.round(_lq.stamina))}/${_lq.staminaMax}</span>
-      </div>
-      <div class="lq-meter">
-        <span class="lq-meter-label"><i data-lucide="sparkles"></i> POWER</span>
-        <div class="lq-meter-track"><div class="lq-meter-fill is-mp" style="width:${pct(_lq.power, _lq.powerMax)}%;"></div></div>
-        <span class="lq-meter-num">${Math.round(_lq.power)}/${_lq.powerMax}</span>
-      </div>
-      <div class="lq-turn">
-        <span title="Legs walked"><i data-lucide="footprints"></i> ${_lq.steps}</span>
-        <span title="People talked past"><i data-lucide="swords"></i> ${_lq.defeated}</span>
-      </div>
+    <div class="lq-foe">
+      <div class="lq-foe-art">☻</div>
+      <div class="lq-foe-bar"><div class="lq-foe-fill" style="width:${pct}%;"></div></div>
     </div>`;
 }
 
-function lqRoadStageHTML(loc) {
-  return `
-    <div class="lq-scene-tag"><i data-lucide="${loc.icon}"></i> ${escapeHTML(loc.name)}</div>
-    <div class="lq-road">
-      <div class="lq-sprite lq-sprite-you lq-road-you">
-        <div class="lq-sprite-art"><i data-lucide="graduation-cap"></i></div>
-        <div class="lq-sprite-name">You</div>
-      </div>
-      <div class="lq-road-line"></div>
-    </div>`;
+function lqMenuHTML() {
+  return `<div class="lq-menu">
+    ${_lq.menu.map((m, i) => `
+      <button class="lq-mi${m.danger ? ' is-danger' : ''}${m.off ? ' is-off' : ''}" type="button"
+              ${m.off ? 'disabled' : `onclick="lqPick(${i})"`}>${escapeHTML(m.label)}</button>`).join('')}
+  </div>`;
 }
 
-/* The RPG framing: them up and across, you down and near. */
-function lqBattleStageHTML(loc) {
-  const e = _lq.enemy;
-  const pct = Math.max(0, (e.hp / Math.max(1, e.hpMax)) * 100);
-  return `
-    <div class="lq-scene-tag"><i data-lucide="${loc.icon}"></i> ${escapeHTML(loc.name)}</div>
-    <div class="lq-field">
-      <div class="lq-side lq-side-foe">
-        <div class="lq-plate">
-          <div class="lq-plate-name">${escapeHTML(e.name)}</div>
-          <div class="lq-bar lq-bar-npc"><div class="lq-bar-fill" style="width:${pct}%;"></div></div>
-        </div>
-        <div class="lq-sprite lq-sprite-npc">
-          <div class="lq-sprite-art"><i data-lucide="user-round"></i></div>
-        </div>
-      </div>
-      <div class="lq-side lq-side-you">
-        <div class="lq-sprite lq-sprite-you">
-          <div class="lq-sprite-art is-back"><i data-lucide="graduation-cap"></i></div>
-        </div>
-        <div class="lq-plate">
-          <div class="lq-plate-name">You</div>
-          <div class="lq-bar lq-bar-you"><div class="lq-bar-fill" style="width:${Math.max(0, (_lq.stamina / _lq.staminaMax) * 100)}%;"></div></div>
-        </div>
-      </div>
-    </div>`;
+/* The row of square commands, with the label appearing beside the one under
+   the pointer — the way the reference does it. */
+function lqCommandBarHTML() {
+  const cmds = lqCommands();
+  return `<div class="lq-cmdbar">
+    ${cmds.map((c, i) => `
+      <button class="lq-cmdicon${c.off ? ' is-off' : ''}" type="button" ${c.off ? 'disabled' : `onclick="lqCmd('${c.id}')"`}
+              data-label="${escapeHTML(c.label)}" title="${escapeHTML(c.label)}">
+        <span>${c.glyph}</span>
+      </button>`).join('')}
+    <span class="lq-cmdlabel" id="lq-cmdlabel"></span>
+  </div>`;
+}
+
+function lqCommands() {
+  const potions = _lq.potions.reduce((n, p) => n + p.owned, 0);
+  return [
+    { id: 'talk',  glyph: '💬', label: 'SPEAK UP' },
+    { id: 'item',  glyph: '🧃', label: 'ITEM', off: !potions },
+    { id: 'power', glyph: '✦', label: 'POWER', off: _lq.power < Math.min(...LANG_POWERUPS.map(p => p.cost)) },
+    { id: 'flee',  glyph: '🏃', label: 'FLEE FROM BATTLE' }
+  ];
+}
+
+function lqPick(i) {
+  if (!_lq || !_lq.menu) return;
+  const m = _lq.menu[i];
+  if (!m || m.off) return;
+  _lq.menu = null;
+  m.fn();
+}
+
+function lqCmd(id) {
+  if (!_lq) return;
+  if (id === 'talk') { lqReplyMenu(); lqRender(); return; }
+  if (id === 'item') { lqItemMenu(); lqRender(); return; }
+  if (id === 'power') { lqPowerMenu(); lqRender(); return; }
+  if (id === 'flee') { lqFlee(); return; }
 }
 
 /* ── The road ─────────────────────────────────────────────── */
 
-function lqRoadPanelHTML() {
-  return `
-    <div class="lq-textbox">
-      <p>${escapeHTML(_lq.flavour || '…')}</p>
-    </div>
-    <div class="lq-commands">
-      <button class="lq-cmd" type="button" onclick="lqStep()">
-        <i data-lucide="footprints"></i><span>RUN</span><small>−${LANG_RUN_STEP_COST} stamina</small>
-      </button>
-      <button class="lq-cmd" type="button" onclick="lqOpenBag()">
-        <i data-lucide="briefcase"></i><span>BAG</span><small>${_lq.potions.reduce((n, p) => n + p.owned, 0)} left</small>
-      </button>
-      <button class="lq-cmd" type="button" onclick="lqOpenPower()">
-        <i data-lucide="sparkles"></i><span>POWER</span><small>${Math.round(_lq.power)}</small>
-      </button>
-      <button class="lq-cmd is-end" type="button" onclick="lqGoHome()">
-        <i data-lucide="home"></i><span>GO HOME</span><small>end the run</small>
-      </button>
-    </div>`;
+function lqRoadMenu() {
+  const potions = _lq.potions.reduce((n, p) => n + p.owned, 0);
+  lqMenu([
+    { label: 'GO FOR A RUN', fn: lqStep },
+    { label: 'ITEM', off: !potions, fn: () => { lqItemMenu(); lqRender(); } },
+    { label: 'POWER', fn: () => { lqPowerMenu(); lqRender(); } },
+    { label: 'GO HOME', danger: true, fn: () => lqGoHome() }
+  ]);
 }
 
-/** One leg of the walk. */
 function lqStep() {
-  if (!_lq || _lq.scene !== 'road') return;
+  if (!_lq) return;
   _lq.steps++;
   _lq.stamina -= LANG_RUN_STEP_COST;
-  if (_lq.stamina <= 0) { _lq.stamina = 0; lqFinish('exhausted'); return; }
+  lqSay(null, LANG_RUN_FLAVOUR[Math.floor(Math.random() * LANG_RUN_FLAVOUR.length)]);
 
-  _lq.flavour = LANG_RUN_FLAVOUR[Math.floor(Math.random() * LANG_RUN_FLAVOUR.length)];
+  if (_lq.stamina <= 0) {
+    _lq.stamina = 0;
+    lqSay(null, 'Your legs are done. You have nothing left to walk on.');
+    lqThen(() => lqFinish('exhausted'));
+    lqRender();
+    return;
+  }
 
-  // A pity rule: three quiet legs in a row and the next one is certain, so a
-  // run cannot stall into pressing RUN at nothing.
+  // Four quiet legs in a row and the next is certain, so a run cannot stall
+  // into pressing the same button at nothing.
   const forced = _lq.steps - (_lq.lastEncounterStep || 0) >= 4;
   if (forced || Math.random() < LANG_ENCOUNTER_CHANCE) {
     const enemy = langRandomEnemy();
@@ -235,18 +304,20 @@ function lqStep() {
       _lq.lastEncounterStep = _lq.steps;
       _lq.enemy = enemy;
       _lq.location = enemy.location || _lq.location;
-      _lq.turn = 0;
-      _lq.removed = [];
-      _lq.lastPick = null;
-      _lq.scene = 'battle';
-      _lq.flavour = `${enemy.name} blocks your way.`;
+      _lq.turn = 0; _lq.removed = [];
+      lqSay(null, 'You notice someone waiting up ahead.');
+      lqSay(null, 'You encountered a {' + enemy.name + '}!');
+      lqThen(() => { _lq.scene = 'battle'; lqBeginTurn(); lqRender(); });
+      lqRender();
+      return;
     }
   }
+  lqSay(null, 'You jog your way over to the next block.');
+  lqThen(() => { lqRoadMenu(); lqRender(); });
   lqRender();
 }
 
 function lqGoHome() {
-  if (!_lq) return;
   showConfirm('Go home?', 'The run ends here and the score is kept.', () => lqFinish('home'));
 }
 
@@ -256,37 +327,26 @@ function lqCurrentTurn() {
   return _lq && _lq.enemy && _lq.enemy.turns[_lq.turn % _lq.enemy.turns.length];
 }
 
-function lqBattlePanelHTML() {
+/** They speak first — always. */
+function lqBeginTurn() {
   const t = lqCurrentTurn();
-  if (!t) return '';
-  if (_lq.lastPick) return lqResultHTML();
+  if (!t) return;
+  if (t.situation) lqSay(null, t.situation);
+  lqSay(_lq.enemy.name, t.line, 'foe');
+  lqThen(() => { _lq.menu = null; lqRender(); });   // falls through to the command bar
+}
 
+function lqReplyMenu() {
+  const t = lqCurrentTurn();
   const opts = t.options.filter(o => (o.text || '').trim());
-  return `
-    <div class="lq-textbox">
-      ${t.situation ? `<p class="lq-sit"><i data-lucide="eye"></i> ${escapeHTML(t.situation)}</p>` : ''}
-      <p class="lq-said"><strong>${escapeHTML(_lq.enemy.name)}:</strong> ${escapeHTML(t.line || '…')}</p>
-    </div>
-    <div class="lq-replies">
-      ${opts.map((o, i) => _lq.removed.indexOf(i) > -1
-        ? `<button class="lq-option is-removed" type="button" disabled><s>${escapeHTML(o.text)}</s></button>`
-        : `<button class="lq-option" type="button" onclick="lqReply(${i})">${escapeHTML(o.text)}</button>`).join('')}
-    </div>
-    <div class="lq-commands lq-commands-battle">
-      <button class="lq-cmd" type="button" onclick="lqOpenBag()">
-        <i data-lucide="briefcase"></i><span>BAG</span><small>${_lq.potions.reduce((n, p) => n + p.owned, 0)} left</small>
-      </button>
-      <button class="lq-cmd" type="button" onclick="lqOpenPower()">
-        <i data-lucide="sparkles"></i><span>POWER</span><small>${Math.round(_lq.power)}</small>
-      </button>
-      <button class="lq-cmd is-end" type="button" onclick="lqFlee()">
-        <i data-lucide="rabbit"></i><span>RUN AWAY</span><small>−10 stamina</small>
-      </button>
-    </div>`;
+  lqMenu(opts.map((o, i) => ({
+    label: o.text,
+    off: _lq.removed.indexOf(i) > -1,
+    fn: () => lqReply(i)
+  })).concat([{ label: 'BACK', danger: true, fn: () => { _lq.menu = null; lqRender(); } }]));
 }
 
 function lqReply(i) {
-  if (!_lq || _lq.scene !== 'battle' || _lq.lastPick) return;
   const t = lqCurrentTurn();
   const opts = t.options.filter(o => (o.text || '').trim());
   const o = opts[i];
@@ -294,183 +354,133 @@ function lqReply(i) {
 
   _lq.asked++;
   const best = (opts.find(x => x.correct) || {}).text || '';
-  let dmg = 0, heal = 0, hurt = 0;
+  lqSay('You', o.text);
 
   if (o.correct) {
     _lq.correct++;
-    dmg = (t.damage || 25) * (_lq.doubleNext ? 2 : 1);
+    const dmg = (t.damage || 25) * (_lq.doubleNext ? 2 : 1);
     _lq.doubleNext = false;
     _lq.enemy.hp = Math.max(0, _lq.enemy.hp - dmg);
-    // A good reply costs you nothing and gives a little back — the point of
-    // the mode is that saying the right thing keeps you on your feet.
-    heal = Math.min(10, _lq.staminaMax - _lq.stamina);
+    const heal = Math.min(10, _lq.staminaMax - _lq.stamina);
     _lq.stamina += heal;
     _lq.power = Math.min(_lq.powerMax, _lq.power + 15);
+    lqSay(null, 'It lands. {' + _lq.enemy.name + '} takes ' + dmg + '.'
+      + (heal ? ' You catch your breath (+' + heal + ').' : ''));
+    if (o.note) lqSay(null, o.note);
   } else {
-    hurt = t.backlash || 20;
+    const hurt = t.backlash || 20;
     _lq.stamina = Math.max(0, _lq.stamina - hurt);
     _lq.power = Math.min(_lq.powerMax, _lq.power + 5);
+    lqSay(null, 'It falls flat. You lose ' + hurt + ' stamina.');
+    if (best) lqSay(null, 'Better: {' + best + '}');
+    if (o.note) lqSay(null, o.note);
   }
-
-  _lq.lastPick = { ok: !!o.correct, text: o.text, note: o.note || '', dmg, heal, hurt, best };
+  lqThen(lqAfterTurn);
   lqRender();
-}
-
-function lqResultHTML() {
-  const p = _lq.lastPick;
-  const dead = _lq.enemy.hp <= 0;
-  const spent = _lq.stamina <= 0;
-  return `
-    <div class="lq-textbox ${p.ok ? 'is-good' : 'is-bad'}">
-      <p class="lq-said"><strong>You:</strong> ${escapeHTML(p.text)}</p>
-      <p class="lq-verdict">
-        <i data-lucide="${p.ok ? 'check-circle-2' : 'x-circle'}"></i>
-        ${p.ok
-          ? `It lands — ${p.dmg} damage${p.heal ? `, and you catch your breath (+${p.heal})` : ''}.`
-          : `It falls flat — you lose ${p.hurt} stamina.`}
-      </p>
-      ${p.note ? `<p class="lq-note">${escapeHTML(p.note)}</p>` : ''}
-      ${!p.ok && p.best ? `<p class="lq-better">Better: <em>${escapeHTML(p.best)}</em></p>` : ''}
-      ${dead ? `<p class="lq-win">${escapeHTML(_lq.enemy.name)} gives up. Maximum stamina +${LANG_RUN_STAMINA_GAIN}.</p>` : ''}
-    </div>
-    <div class="lq-commands">
-      <button class="lq-cmd is-go" type="button" onclick="lqAfterTurn()">
-        <i data-lucide="arrow-right"></i><span>${dead ? 'CONTINUE' : spent ? 'FINISH' : 'NEXT'}</span>
-      </button>
-    </div>`;
 }
 
 function lqAfterTurn() {
   if (!_lq) return;
-  const dead = _lq.enemy.hp <= 0;
-  _lq.lastPick = null;
   _lq.removed = [];
-
   if (_lq.stamina <= 0) { lqFinish('exhausted'); return; }
 
-  if (dead) {
+  if (_lq.enemy.hp <= 0) {
     _lq.defeated++;
     _lq.staminaMax += LANG_RUN_STAMINA_GAIN;
     _lq.stamina = Math.min(_lq.staminaMax, _lq.stamina + LANG_RUN_STAMINA_GAIN);
-    if (_lq.mode === 'scenario') { lqFinish('won'); return; }
-    _lq.enemy = null;
-    _lq.scene = 'road';
-    _lq.flavour = 'They let you past. The road opens up again.';
+    lqSay(null, '{' + _lq.enemy.name + '} gives up and lets you past.');
+    lqSay(null, 'Maximum stamina rises to ' + _lq.staminaMax + '.');
+    if (_lq.mode === 'scenario') { lqThen(() => lqFinish('won')); lqRender(); return; }
+    lqThen(() => { _lq.enemy = null; _lq.scene = 'road'; lqRoadMenu(); lqRender(); });
     lqRender();
     return;
   }
 
   _lq.turn++;
-  // A scenario is a written conversation with an end; a run's opponent keeps
-  // talking until one of you gives out.
   if (_lq.mode === 'scenario' && _lq.turn >= _lq.enemy.turns.length) { lqFinish('scene'); return; }
+  lqBeginTurn();
   lqRender();
 }
 
 function lqFlee() {
-  if (!_lq || _lq.scene !== 'battle') return;
+  if (!_lq) return;
   _lq.stamina = Math.max(0, _lq.stamina - 10);
   _lq.fled++;
-  if (_lq.stamina <= 0) { lqFinish('exhausted'); return; }
-  if (_lq.mode === 'scenario') { lqFinish('fled'); return; }
-  _lq.enemy = null;
-  _lq.lastPick = null;
-  _lq.scene = 'road';
-  _lq.flavour = 'You slip away before it gets awkward.';
+  lqSay(null, 'You slip away before it gets awkward. (−10 stamina)');
+  if (_lq.stamina <= 0) { lqThen(() => lqFinish('exhausted')); lqRender(); return; }
+  if (_lq.mode === 'scenario') { lqThen(() => lqFinish('fled')); lqRender(); return; }
+  lqThen(() => { _lq.enemy = null; _lq.scene = 'road'; lqRoadMenu(); lqRender(); });
   lqRender();
 }
 
-/* ── Bag and power ────────────────────────────────────────── */
+/* ── Bag and power, as menus rather than popups ───────────── */
 
-function lqOpenBag() {
-  if (!_lq) return;
-  const body = _lq.potions.map(p => `
-    <button class="lq-bag-row${p.owned ? '' : ' is-off'}" type="button" ${p.owned ? `onclick="lqUsePotion('${p.id}')"` : 'disabled'}>
-      <i data-lucide="${p.icon}"></i>
-      <span class="lq-bag-name">${escapeHTML(p.name)}</span>
-      <span class="lq-bag-desc">${escapeHTML(p.desc)}</span>
-      <span class="lq-bag-count">×${p.owned}</span>
-    </button>`).join('');
-  langPopup('Bag', 'briefcase', body);
+function lqItemMenu() {
+  const back = () => { if (_lq.scene === 'battle') { _lq.menu = null; } else { lqRoadMenu(); } lqRender(); };
+  lqMenu(_lq.potions.map(p => ({
+    label: p.name.toUpperCase() + '  ×' + p.owned + '  (+' + p.heal + ')',
+    off: !p.owned || _lq.stamina >= _lq.staminaMax,
+    fn: () => lqUsePotion(p.id)
+  })).concat([{ label: 'BACK', danger: true, fn: back }]));
 }
 
 function lqUsePotion(id) {
-  if (!_lq) return;
   const p = _lq.potions.find(x => x.id === id);
-  if (!p || !p.owned) return;
-  if (_lq.stamina >= _lq.staminaMax) {
-    if (typeof toast === 'function') toast('Stamina is already full.', { type: 'info' });
-    return;
-  }
+  if (!p || !p.owned || _lq.stamina >= _lq.staminaMax) return;
   p.owned--;
+  const before = _lq.stamina;
   _lq.stamina = Math.min(_lq.staminaMax, _lq.stamina + p.heal);
-  const pop = document.getElementById('lang-popup');
-  if (pop) pop.remove();
+  lqSay(null, 'You take the ' + p.name.toLowerCase() + '. (+' + Math.round(_lq.stamina - before) + ' stamina)');
+  lqThen(() => { if (_lq.scene === 'battle') { _lq.menu = null; } else { lqRoadMenu(); } lqRender(); });
   lqRender();
-  if (typeof toast === 'function') toast(`${p.name} — +${p.heal} stamina.`, { type: 'success' });
 }
 
-function lqOpenPower() {
-  if (!_lq) return;
-  const body = LANG_POWERUPS.map(p => {
-    const can = _lq.power >= p.cost;
-    return `
-      <button class="lq-bag-row${can ? '' : ' is-off'}" type="button" ${can ? `onclick="lqUsePower('${p.id}')"` : 'disabled'}>
-        <i data-lucide="${p.icon}"></i>
-        <span class="lq-bag-name">${escapeHTML(p.name)}</span>
-        <span class="lq-bag-desc">${escapeHTML(p.desc)}</span>
-        <span class="lq-bag-count">${p.cost}</span>
-      </button>`;
-  }).join('');
-  langPopup(`Power gauge — ${Math.round(_lq.power)}/${_lq.powerMax}`, 'sparkles', body);
+function lqPowerMenu() {
+  const back = () => { if (_lq.scene === 'battle') { _lq.menu = null; } else { lqRoadMenu(); } lqRender(); };
+  lqMenu(LANG_POWERUPS.map(p => ({
+    label: p.name.toUpperCase() + '  ' + p.cost,
+    off: _lq.power < p.cost || (p.id === 'insight' && _lq.scene !== 'battle'),
+    fn: () => lqUsePower(p.id)
+  })).concat([{ label: 'BACK', danger: true, fn: back }]));
 }
 
 function lqUsePower(id) {
-  if (!_lq) return;
   const p = langPowerup(id);
   if (!p || _lq.power < p.cost) return;
+  const back = () => { if (_lq.scene === 'battle') { _lq.menu = null; } else { lqRoadMenu(); } lqRender(); };
 
   if (id === 'insight') {
-    // Only usable where there is something to strike out.
-    if (_lq.scene !== 'battle' || _lq.lastPick) {
-      if (typeof toast === 'function') toast('Insight only helps during a question.', { type: 'info' });
-      return;
-    }
     const t = lqCurrentTurn();
+    if (!t) return;
     const opts = t.options.filter(o => (o.text || '').trim());
     const wrong = opts.map((o, i) => ({ o, i })).filter(x => !x.o.correct && _lq.removed.indexOf(x.i) === -1);
-    if (!wrong.length) {
-      if (typeof toast === 'function') toast('Nothing left to rule out.', { type: 'info' });
-      return;
-    }
+    if (!wrong.length) { lqSay(null, 'Nothing left to rule out.'); lqThen(back); lqRender(); return; }
     _lq.removed.push(wrong[Math.floor(Math.random() * wrong.length)].i);
+    lqSay(null, 'The phrasebook rules one answer out.');
   } else if (id === 'secondwind') {
-    if (_lq.stamina >= _lq.staminaMax) {
-      if (typeof toast === 'function') toast('Stamina is already full.', { type: 'info' });
-      return;
-    }
+    if (_lq.stamina >= _lq.staminaMax) { lqSay(null, 'You are not tired yet.'); lqThen(back); lqRender(); return; }
+    const before = _lq.stamina;
     _lq.stamina = Math.min(_lq.staminaMax, _lq.stamina + 30);
+    lqSay(null, 'Second wind. (+' + Math.round(_lq.stamina - before) + ' stamina)');
   } else if (id === 'silvertongue') {
-    if (_lq.doubleNext) {
-      if (typeof toast === 'function') toast('Already primed.', { type: 'info' });
-      return;
-    }
+    if (_lq.doubleNext) { lqSay(null, 'Already primed.'); lqThen(back); lqRender(); return; }
     _lq.doubleNext = true;
+    lqSay(null, 'Silver tongue. Your next good reply hits twice as hard.');
   }
-
   _lq.power -= p.cost;
-  const pop = document.getElementById('lang-popup');
-  if (pop) pop.remove();
+  lqThen(back);
   lqRender();
-  if (typeof toast === 'function') toast(p.name + ' used.', { type: 'success' });
 }
 
 /* ── Ending ───────────────────────────────────────────────── */
 
 function lqFinish(reason) {
   if (!_lq || _lq.scene === 'over') return;
+  lqClearAuto();
   _lq.scene = 'over';
   _lq.reason = reason;
+  _lq.say = [];
+  _lq.menu = null;
   const score = _lq.asked ? Math.round((_lq.correct / _lq.asked) * 100) : 0;
   langRecordAttempt({
     kind: _lq.mode === 'scenario' ? 'scenario' : 'run',
@@ -479,41 +489,34 @@ function lqFinish(reason) {
     score, correct: _lq.correct, total: _lq.asked,
     steps: _lq.steps, defeated: _lq.defeated, fled: _lq.fled,
     staminaLeft: Math.max(0, Math.round(_lq.stamina)), staminaMax: _lq.staminaMax,
-    reason,
-    duration: Math.round((Date.now() - _lq.startTime) / 1000)
+    reason, duration: Math.round((Date.now() - _lq.startTime) / 1000)
   });
   lqRender();
 }
 
 function lqSummaryHTML() {
   const score = _lq.asked ? Math.round((_lq.correct / _lq.asked) * 100) : 0;
-  const cls = score >= 80 ? 'score-perfect' : score >= 50 ? 'score-partial' : 'score-low';
   const head = {
-    exhausted: 'You ran out of stamina',
-    home: 'You went home',
-    won: 'Conversation won',
-    fled: 'You slipped away',
-    scene: 'Scene over'
-  }[_lq.reason] || 'Run over';
-  const icon = _lq.reason === 'exhausted' ? 'battery-low' : _lq.reason === 'won' ? 'trophy' : 'home';
+    exhausted: 'YOU RAN OUT OF STAMINA',
+    home: 'YOU WENT HOME',
+    won: 'CONVERSATION WON',
+    fled: 'YOU SLIPPED AWAY',
+    scene: 'SCENE OVER'
+  }[_lq.reason] || 'RUN OVER';
   return `
-    <div class="lq-summary">
-      <div class="lq-summary-icon ${cls}"><i data-lucide="${icon}"></i></div>
-      <h2>${escapeHTML(head)}</h2>
-      <div class="lq-summary-score ${cls}">${score}%</div>
-      <div class="lq-summary-grid">
-        <div><em>Replies right</em><strong>${_lq.correct}/${_lq.asked}</strong></div>
-        <div><em>Legs walked</em><strong>${_lq.steps}</strong></div>
-        <div><em>People beaten</em><strong>${_lq.defeated}</strong></div>
-        <div><em>Slipped away</em><strong>${_lq.fled}</strong></div>
-        <div><em>Stamina left</em><strong>${Math.max(0, Math.round(_lq.stamina))}/${_lq.staminaMax}</strong></div>
-        <div><em>Max reached</em><strong>${_lq.staminaMax}</strong></div>
+    <div class="lq-end">
+      <div class="lq-end-head">${escapeHTML(head)}</div>
+      <div class="lq-end-grid">
+        <span>REPLIES</span><b>${_lq.correct}/${_lq.asked}</b>
+        <span>SCORE</span><b>${score}%</b>
+        <span>BLOCKS RUN</span><b>${_lq.steps}</b>
+        <span>TALKED PAST</span><b>${_lq.defeated}</b>
+        <span>SLIPPED AWAY</span><b>${_lq.fled}</b>
+        <span>STAMINA</span><b>${Math.max(0, Math.round(_lq.stamina))}/${_lq.staminaMax}</b>
       </div>
-      <div class="lq-summary-actions">
-        <button class="btn btn-secondary btn-lg" onclick="spaNavigate('language')">Back to library</button>
-        <button class="btn btn-primary btn-lg" onclick="lqRetry()">
-          <i data-lucide="rotate-ccw" style="width:16px;height:16px;"></i> Go again
-        </button>
+      <div class="lq-end-actions">
+        <button class="lq-mi" type="button" onclick="lqRetry()">GO AGAIN</button>
+        <button class="lq-mi is-danger" type="button" onclick="spaNavigate('language')">BACK TO LIBRARY</button>
       </div>
     </div>`;
 }
@@ -521,6 +524,7 @@ function lqSummaryHTML() {
 function lqRetry() {
   const mode = _lq ? _lq.mode : 'run';
   const id = getSessionParam('langRunScenario');
+  lqClearAuto();
   _lq = null;
   setSessionParam('langRunMode', mode);
   setSessionParam('langRunScenario', id);
