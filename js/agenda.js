@@ -340,7 +340,23 @@ const AG_KIND_META = {
   review:   { icon: 'repeat', label: 'Review', cls: 'ag-k-review' }
 };
 
+/**
+ * The name of whatever a deadline is hung on.
+ *
+ * The Language Library was missing from here entirely, so a deadline on a word
+ * or a drill set resolved to nothing and agEntries dropped it — the record
+ * saved and then never appeared. A language word has no `title`, it has a form
+ * per language, so it needs its own reader.
+ */
 function agItemTitle(type, id) {
+  if (type === 'langword') {
+    const w = (state.langWords || []).find(x => x.id === id);
+    return w ? (typeof langHeadword === 'function' ? langHeadword(w) : 'Word') : null;
+  }
+  if (type === 'langset') {
+    const s = (state.langSets || []).find(x => x.id === id);
+    return s ? (s.title || 'Untitled set') : null;
+  }
   const list = type === 'challenge' ? state.challenges
     : type === 'snippet' ? state.snippets
     : type === 'notebook' ? state.notebooks : null;
@@ -504,6 +520,9 @@ function agRefresh() {
   }
   if (typeof renderSnippetDetail === 'function' && document.getElementById('snippet-detail-container')) {
     renderSnippetDetail();
+  }
+  if (typeof renderLangLibrary === 'function' && document.getElementById('lang-lib-root')) {
+    renderLangLibrary();
   }
 }
 
@@ -812,6 +831,9 @@ function agGoToEntry(key) {
   } else if (e.sourceType === 'notebook') {
     setSessionParam('activeNotebook', e.sourceId);
     agNavigateEvenIfHere('study', () => spaNavigate('study'));
+  } else if (e.sourceType === 'langword' || e.sourceType === 'langset') {
+    setSessionParam('langView', e.sourceType === 'langset' ? 'sets' : 'dictionary');
+    agNavigateEvenIfHere('language', () => spaNavigate('language'));
   }
 }
 

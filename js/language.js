@@ -321,6 +321,8 @@ function langDeleteSet(id) {
   const i = state.langSets.findIndex(s => s.id === id);
   if (i === -1) return;
   const rec = state.langSets[i];
+  // A deadline belongs to its set, exactly as it does to a program.
+  const deadline = typeof agDetachDeadline === 'function' ? agDetachDeadline('langset', id) : null;
   state.langSets.splice(i, 1);
   saveData();
   langRefreshViews();
@@ -328,6 +330,7 @@ function langDeleteSet(id) {
     pushUndo('Deleted set "' + (rec.title || 'Untitled') + '"', () => {
       langStore();
       state.langSets.splice(Math.min(i, state.langSets.length), 0, rec);
+      if (deadline && typeof agAttachDeadline === 'function') agAttachDeadline(deadline);
       saveData();
       langRefreshViews();
     });

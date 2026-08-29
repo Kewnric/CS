@@ -565,8 +565,13 @@ function langSetsHTML() {
                 <span><i data-lucide="languages" style="width:11px;height:11px;"></i> ${escapeHTML(langShort(s.lang))} → ${escapeHTML(langShort(s.refLang))}</span>
                 ${best >= 0 ? `<span><i data-lucide="target" style="width:11px;height:11px;"></i> best ${best}%</span>` : ''}
                 ${problems.length ? `<span style="color:var(--color-warning);"><i data-lucide="alert-triangle" style="width:11px;height:11px;"></i> ${problems.length} to fix</span>` : ''}
+                ${typeof agDeadlineTextHTML === 'function' ? agDeadlineTextHTML('langset', s.id) : ''}
               </div>
             </div>
+            <button class="btn btn-ghost btn-sm" onclick="agOpenDeadlineModal('langset', '${s.id}')"
+                    title="${typeof agGetDeadline === 'function' && agGetDeadline('langset', s.id) ? 'Change or clear the deadline' : 'Put a due date on this set'}">
+              <i data-lucide="flag" style="width:14px;height:14px;"></i>
+            </button>
             <button class="btn btn-practice btn-sm" onclick="langPromptTimer('set', '${s.id}')" ${problems.length ? 'disabled' : ''}>
               <i data-lucide="play" style="width:14px;height:14px;fill:currentColor;"></i> Run
             </button>

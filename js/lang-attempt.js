@@ -52,7 +52,6 @@ function langAttemptInit() {
     set,
     limit,
     remaining: limit,
-    timer: null,
     // A fresh order every run, so the third pass is not muscle memory for
     // "the answer to question 4".
     queue,
@@ -77,10 +76,18 @@ function langAttemptDestroy() { laStopTimer(); _la = null; }
 
 /* ── The optional time limit ──────────────────────────────── */
 
+/* The interval id lives HERE, not on _la.
+   It used to hang off the run object, and laStopTimer only cleared the id it
+   found on the CURRENT one — so replacing _la with a fresh run orphaned the
+   old interval, which then went on decrementing the new run's clock. Two
+   drills in a row and the timer ran at double speed. A module-level handle
+   cannot be orphaned by reassigning the thing beside it. */
+let _laTimer = null;
+
 function laStartTimer() {
   laStopTimer();
   if (!_la || !_la.limit) return;
-  _la.timer = setInterval(function () {
+  _laTimer = setInterval(function () {
     if (!_la || _la.state === 'over') { laStopTimer(); return; }
     _la.remaining--;
     laPaintClock();
@@ -91,7 +98,7 @@ function laStartTimer() {
 }
 
 function laStopTimer() {
-  if (_la && _la.timer) { clearInterval(_la.timer); _la.timer = null; }
+  if (_laTimer) { clearInterval(_laTimer); _laTimer = null; }
 }
 
 function laPaintClock() {

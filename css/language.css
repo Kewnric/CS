@@ -1223,3 +1223,183 @@
   color: #1a1524;
   background: var(--lqGold);
 }
+
+/* ============================================================
+   THE DRILL, IN THE SAME WORLD AS THE RUN
+   ------------------------------------------------------------
+   The drill runner was wearing the app's chrome — its tokens, its sans face,
+   its rounded surfaces — while the run next door is a pixel game. Two visual
+   languages inside one library, reached from two cards on the same board.
+
+   It borrows the run's palette and its two faces here, scoped under .la-shell
+   so nothing leaks. Structure is untouched: this is a re-skin, not a rebuild,
+   because the drill's layout already works and only its clothes were wrong.
+   ============================================================ */
+
+.la-shell {
+  --lqInk: #efeaf5;
+  --lqDim: #9b93ad;
+  --lqPanel: #2a2536;
+  --lqPanelHi: #3d3650;
+  --lqEdge: #15111e;
+  --lqLine: #574d6b;
+  --lqHot: #ff5f6d;
+  --lqGold: #ffd166;
+  --lqCyan: #7ee8e0;
+
+  background: #0d0a14;
+  background-image:
+    repeating-linear-gradient(180deg, rgba(255,255,255,0.035) 0 26px, transparent 26px 60px),
+    repeating-linear-gradient(180deg, rgba(255,255,255,0.035) 0 26px, transparent 26px 60px);
+  background-size: 62px 60px, 62px 60px;
+  background-position: 14px 0, calc(100% - 14px) 0;
+  background-repeat: repeat-y, repeat-y;
+  color: var(--lqInk);
+  font-family: 'Pixelify Sans', 'Courier New', monospace;
+  image-rendering: pixelated;
+}
+
+.la-top {
+  border-bottom: 2px solid var(--lqEdge);
+  background: rgba(20, 16, 30, 0.75);
+}
+
+.la-progress {
+  height: 12px;
+  border-radius: 0;
+  background: rgba(0, 0, 0, 0.55);
+  border: 2px solid var(--lqEdge);
+}
+.la-progress-fill { border-radius: 0; background: var(--lqCyan); }
+
+.la-heart { color: var(--lqHot); }
+.la-clock { font-family: 'Press Start 2P', monospace; font-size: 0.8rem; color: var(--lqInk); }
+.la-clock.is-low { color: var(--lqHot); }
+
+.la-kind {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  color: var(--lqCyan);
+}
+
+.la-prompt {
+  font-family: 'Pixelify Sans', monospace;
+  font-size: 1.9rem;
+  font-weight: 400;
+  color: var(--lqInk);
+}
+
+.la-blank-line { color: var(--lqInk); font-size: 1.4rem; }
+.la-blank-slot { border-bottom-color: var(--lqCyan); color: var(--lqCyan); }
+
+.la-lane { border-bottom: 2px dashed var(--lqLine); }
+.la-lane-hint { color: var(--lqDim); font-family: 'Pixelify Sans', monospace; }
+
+/* Word tiles as chunky keys, the way the run's commands are. */
+.la-tile,
+.la-option,
+.la-match-btn {
+  border-radius: 0;
+  background: rgba(58, 51, 74, 0.95);
+  border: 2px solid var(--lqEdge);
+  border-bottom-width: 4px;
+  color: var(--lqInk);
+  font-family: 'Pixelify Sans', monospace;
+  font-size: 1.15rem;
+  transition: background 0.1s steps(2), border-color 0.1s steps(2);
+}
+
+.la-tile:hover,
+.la-option:hover,
+.la-match-btn:hover { background: rgba(120, 108, 150, 0.96); border-color: var(--lqEdge); }
+
+.la-tile.is-placed,
+.la-option.is-picked,
+.la-match-btn.is-picked {
+  background: rgba(126, 232, 224, 0.2);
+  border-color: var(--lqCyan);
+}
+
+.la-match-btn.is-done { opacity: 0.4; }
+
+.la-option-key {
+  border-radius: 0;
+  border: 2px solid var(--lqLine);
+  color: var(--lqDim);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.6rem;
+}
+
+.la-typed .form-input {
+  border-radius: 0;
+  background: #191426;
+  border: 2px solid var(--lqEdge);
+  color: var(--lqInk);
+  font-family: 'Pixelify Sans', monospace;
+  font-size: 1.3rem;
+}
+
+.la-feedback { border-radius: 0; border: 2px solid var(--lqEdge); }
+.la-feedback.is-right { background: rgba(126, 232, 224, 0.14); }
+.la-feedback.is-wrong { background: rgba(255, 95, 109, 0.14); }
+.la-correct { color: var(--lqInk); font-size: 1.2rem; }
+.la-correct em { color: var(--lqDim); font-family: 'Press Start 2P', monospace; font-size: 0.55rem; }
+.la-note { color: var(--lqDim); }
+
+.la-foot { border-top: 2px solid var(--lqEdge); background: rgba(20, 16, 30, 0.75); }
+.la-foot-inner.is-right { background: rgba(126, 232, 224, 0.12); }
+.la-foot-inner.is-wrong { background: rgba(255, 95, 109, 0.12); }
+.la-verdict { font-family: 'Press Start 2P', monospace; font-size: 0.72rem; }
+.la-foot-inner.is-right .la-verdict { color: var(--lqCyan); }
+.la-foot-inner.is-wrong .la-verdict { color: var(--lqHot); }
+
+/* The footer buttons are the run's menu items, so they read as one game. */
+.la-foot .btn {
+  border-radius: 0;
+  border: 2px solid var(--lqEdge);
+  border-bottom-width: 4px;
+  background: rgba(58, 51, 74, 0.95);
+  color: var(--lqInk);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.la-foot .btn:hover:not(:disabled) { background: rgba(120, 108, 150, 0.96); color: #fff; }
+.la-foot .btn:disabled { opacity: 0.35; }
+.la-foot .btn-ghost { background: transparent; border-color: var(--lqLine); color: var(--lqDim); }
+
+.la-summary h2 { font-family: 'Press Start 2P', monospace; font-size: 1.1rem; color: var(--lqGold); }
+.la-summary p { color: var(--lqDim); }
+.la-summary-icon { border-radius: 0; border: 2px solid var(--lqEdge); background: rgba(58, 51, 74, 0.9); }
+.la-summary-score { font-family: 'Press Start 2P', monospace; font-size: 2rem; }
+.la-summary-score.score-perfect { color: var(--lqCyan); }
+.la-summary-score.score-partial { color: var(--lqGold); }
+.la-summary-score.score-low { color: var(--lqHot); }
+
+.la-review h3 { font-family: 'Press Start 2P', monospace; font-size: 0.6rem; color: var(--lqDim); }
+.la-review-row { border-radius: 0; background: #191426; border: 2px solid var(--lqEdge); font-size: 1rem; }
+.la-review-given { color: var(--lqHot); }
+.la-review-expected { color: var(--lqCyan); }
+
+.la-summary-actions .btn {
+  border-radius: 0;
+  border: 2px solid var(--lqEdge);
+  border-bottom-width: 4px;
+  background: rgba(58, 51, 74, 0.95);
+  color: var(--lqInk);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.72rem;
+}
+.la-summary-actions .btn:hover { background: rgba(120, 108, 150, 0.96); }
+
+/* The back control, matching the run's. */
+.la-top .btn-back-dark {
+  border-radius: 0;
+  border: 2px solid var(--lqEdge);
+  background: var(--lqPanel);
+  color: var(--lqInk);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.6rem;
+}
