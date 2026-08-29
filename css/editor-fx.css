@@ -1,0 +1,77 @@
+/* ============================================================
+   EDITOR-FX.CSS — ghost characters over the editor
+   ------------------------------------------------------------
+   The same two movements the combo chip uses: a letter LANDS when it is typed
+   and is THROWN AWAY when it is deleted. See js/editor-fx.js for why these
+   are ghosts over the editor rather than the editor's own characters.
+   ============================================================ */
+
+.editor-fx {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;          /* a letter thrown off the edge should not scroll the pane */
+  pointer-events: none;      /* the textarea underneath must stay clickable */
+  z-index: 2;                /* over the pre, under nothing that matters */
+  /* Matched to .editor-pre code so a ghost is the same size as the glyph it
+     stands in for. Inherited rather than fixed, because the toolbar's zoom
+     changes the editor's font-size and the ghosts have to follow it. */
+  font-family: var(--font-mono);
+  font-size: inherit;
+  line-height: inherit;
+  white-space: pre;
+  contain: layout paint;     /* ghosts cannot trigger layout on the editor */
+}
+
+.edfx-ghost {
+  position: absolute;
+  display: inline-block;
+  transform-origin: 50% 100%;
+  will-change: transform, opacity;
+  pointer-events: none;
+}
+
+/* ── Landing ──────────────────────────────────────────────────
+   The real character is already painted underneath, so this is a copy laid
+   over it that shrinks onto it and fades out. Starting oversized is what
+   gives the leading letter its size: each ghost shrinks over 260ms while the
+   next starts whenever you press the next key, so the newest is the biggest
+   thing on screen without anything having to track "newest".
+   ------------------------------------------------------------ */
+.edfx-in {
+  color: #fff;
+  animation: edfxIn 260ms cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+@keyframes edfxIn {
+  0%   { opacity: 0.95; transform: translateY(-0.22em) scale(2.05); }
+  45%  { opacity: 0.7; }
+  100% { opacity: 0; transform: translateY(0) scale(1); }
+}
+
+/* ── Being thrown away ────────────────────────────────────────
+   Identical in shape to the combo's exit: UP first, almost straight and
+   barely turning, a moment hanging at the top, and only then away. The two
+   middle keyframes are what make that possible — easing alone cannot go one
+   way and then another.
+   ------------------------------------------------------------ */
+.edfx-out {
+  color: #ffd76e;
+  animation: edfxOut 620ms cubic-bezier(0.3, 0.02, 0.7, 1) both;
+}
+@keyframes edfxOut {
+  0%   { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
+  24%  { opacity: 1;
+         transform: translate(0, -0.55em)
+                    rotate(calc(var(--rot, 90deg) * 0.07)) scale(1.14); }
+  36%  { opacity: 1;
+         transform: translate(calc(var(--dx, 0px) * 0.12), -0.6em)
+                    rotate(calc(var(--rot, 90deg) * 0.16)) scale(1.08); }
+  100% { opacity: 0;
+         transform: translate(var(--dx, 0), var(--dy, 1.6em))
+                    rotate(var(--rot, 90deg)) scale(var(--sc, 0.8)); }
+}
+
+/* Typing is not the place to force motion on someone who has asked for none.
+   The editor itself is untouched either way — these are only ghosts. */
+@media (prefers-reduced-motion: reduce) {
+  .edfx-ghost { display: none !important; }
+}
