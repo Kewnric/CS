@@ -101,7 +101,7 @@ function langQuestInit() {
       }))
     };
     _lq.scene = 'battle';
-    lqSay(null, 'You encountered a {' + _lq.enemy.name + '}!');
+    lqSay(null, lqMeetLine(_lq.enemy));
     lqBeginTurn();
   } else {
     if (langRunBlocker()) { spaNavigate('language'); return; }
@@ -120,6 +120,13 @@ function lqExit() {
 }
 
 /* ── The two queues ───────────────────────────────────────── */
+
+/** "You encountered Ate Marites!" but "You encountered a stranger!" */
+function lqMeetLine(enemy) {
+  return enemy.common
+    ? 'You encountered a {' + enemy.name + '}!'
+    : 'You encountered {' + enemy.name + '}!';
+}
 
 /** Queue a line. {name} inside the text is highlighted, as an enemy name is. */
 function lqSay(who, text, cls) {
@@ -158,6 +165,169 @@ function lqClearAuto() {
   if (_lq && _lq.autoTimer) { clearTimeout(_lq.autoTimer); _lq.autoTimer = null; }
 }
 
+
+/* ── The scene ────────────────────────────────────────────────
+   Drawn as SVG rather than stacked CSS gradients. The gradient version came
+   out as a bar chart — evenly spaced identical stripes, because that is all a
+   repeating-linear-gradient can be. A skyline needs uneven heights, uneven
+   gaps and windows that do not line up, and that means real shapes.
+
+   Every location gets its own layout from a seeded generator, so a place
+   looks the same each time you are there without any of it being hand-drawn,
+   and the whole thing is cached per location.
+   ------------------------------------------------------------ */
+
+const _lqSceneCache = {};
+
+/** Deterministic per location, so a place keeps its own skyline. */
+function _lqRng(key) {
+  let seed = 2166136261;
+  for (let i = 0; i < key.length; i++) {
+    seed ^= key.charCodeAt(i);
+    seed = Math.imul(seed, 16777619);
+  }
+  return function () {
+    seed ^= seed << 13; seed >>>= 0;
+    seed ^= seed >> 17;
+    seed ^= seed << 5;  seed >>>= 0;
+    return seed / 4294967296;
+  };
+}
+
+/* What sits in the foreground, per location — the one thing that makes a
+   cafeteria read as a cafeteria and not as another street. */
+const LQ_FOREGROUND = {
+  cafeteria: 'tables',
+  classroom: 'desks',
+  hallway:   'lockers',
+  home:      'rail',
+  market:    'stalls',
+  street:    'lamps'
+};
+
+function lqSceneArt(loc, bd) {
+  if (_lqSceneCache[loc.key]) return _lqSceneCache[loc.key];
+  const rnd = _lqRng(loc.key);
+  const W = 1000, H = 400, HORIZON = 250;
+
+  // ── stars ──
+  let stars = '';
+  for (let i = 0; i < 46; i++) {
+    const x = rnd() * W, y = rnd() * (HORIZON - 70);
+    const r = rnd() < 0.82 ? 1.1 : 1.9;
+    stars += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="#fff" opacity="${(0.25 + rnd() * 0.55).toFixed(2)}"/>`;
+  }
+
+  // ── far skyline: pale, low contrast, no windows ──
+  let far = '';
+  let x = -20;
+  while (x < W + 20) {
+    const w = 34 + rnd() * 62;
+    const h = 40 + rnd() * 78;
+    far += `<rect x="${x.toFixed(0)}" y="${(HORIZON - h).toFixed(0)}" width="${w.toFixed(0)}" height="${(h + 30).toFixed(0)}"/>`;
+    x += w + rnd() * 14;
+  }
+
+  // ── near skyline: taller, darker, lit windows ──
+  let near = '', windows = '';
+  x = -30;
+  while (x < W + 30) {
+    const w = 46 + rnd() * 74;
+    const h = 70 + rnd() * 132;
+    const top = HORIZON - h;
+    near += `<rect x="${x.toFixed(0)}" y="${top.toFixed(0)}" width="${w.toFixed(0)}" height="${(h + 30).toFixed(0)}"/>`;
+    // A roof box on some of them, so the tops are not all flat.
+    if (rnd() < 0.34) {
+      const rw = 10 + rnd() * 16;
+      near += `<rect x="${(x + w / 2 - rw / 2).toFixed(0)}" y="${(top - 16).toFixed(0)}" width="${rw.toFixed(0)}" height="18"/>`;
+    }
+    // Windows on a grid, most of them dark.
+    for (let wy = top + 12; wy < HORIZON - 10; wy += 17) {
+      for (let wx = x + 8; wx < x + w - 10; wx += 15) {
+        if (rnd() < 0.34) {
+          windows += `<rect x="${wx.toFixed(0)}" y="${wy.toFixed(0)}" width="6" height="8" fill="#ffd98a" opacity="${(0.35 + rnd() * 0.5).toFixed(2)}"/>`;
+        }
+      }
+    }
+    x += w + 4 + rnd() * 20;
+  }
+
+  // ── foreground, per location ──
+  let fg = '';
+  const kind = LQ_FOREGROUND[loc.key] || 'lamps';
+  if (kind === 'lamps' || kind === 'stalls') {
+    for (let i = 0; i < 4; i++) {
+      const lx = 80 + i * 260 + rnd() * 50;
+      fg += `<rect x="${lx}" y="${HORIZON - 78}" width="5" height="118" fill="#0b0812" opacity="0.85"/>`
+         +  `<circle cx="${(lx + 2.5).toFixed(0)}" cy="${HORIZON - 82}" r="9" fill="#ffd98a" opacity="0.9"/>`
+         +  `<circle cx="${(lx + 2.5).toFixed(0)}" cy="${HORIZON - 82}" r="26" fill="#ffd98a" opacity="0.12"/>`;
+      if (kind === 'stalls') {
+        fg += `<rect x="${lx - 58}" y="${HORIZON + 6}" width="120" height="9" fill="#0b0812" opacity="0.8"/>`;
+      }
+    }
+  } else if (kind === 'tables') {
+    for (let i = 0; i < 3; i++) {
+      const tx = 90 + i * 330;
+      fg += `<rect x="${tx}" y="${HORIZON + 34}" width="200" height="11" fill="#0b0812" opacity="0.82"/>`
+         +  `<rect x="${tx + 16}" y="${HORIZON + 45}" width="8" height="46" fill="#0b0812" opacity="0.82"/>`
+         +  `<rect x="${tx + 176}" y="${HORIZON + 45}" width="8" height="46" fill="#0b0812" opacity="0.82"/>`;
+    }
+  } else if (kind === 'desks') {
+    for (let i = 0; i < 4; i++) {
+      const dx = 60 + i * 250;
+      fg += `<rect x="${dx}" y="${HORIZON + 40}" width="150" height="10" fill="#0b0812" opacity="0.82"/>`
+         +  `<rect x="${dx + 10}" y="${HORIZON + 50}" width="7" height="40" fill="#0b0812" opacity="0.82"/>`
+         +  `<rect x="${dx + 133}" y="${HORIZON + 50}" width="7" height="40" fill="#0b0812" opacity="0.82"/>`;
+    }
+  } else if (kind === 'lockers') {
+    for (let i = 0; i < 14; i++) {
+      fg += `<rect x="${i * 74}" y="${HORIZON - 54}" width="62" height="96" fill="#0b0812" opacity="0.55"/>`
+         +  `<rect x="${i * 74 + 44}" y="${HORIZON - 16}" width="8" height="3" fill="#ffd98a" opacity="0.35"/>`;
+    }
+  } else if (kind === 'rail') {
+    fg += `<rect x="0" y="${HORIZON + 30}" width="${W}" height="7" fill="#0b0812" opacity="0.8"/>`;
+    for (let i = 0; i < 18; i++) {
+      fg += `<rect x="${i * 58 + 12}" y="${HORIZON + 37}" width="5" height="34" fill="#0b0812" opacity="0.8"/>`;
+    }
+  }
+
+  const svg = `
+    <svg class="lq-art" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <defs>
+        <linearGradient id="lqsky-${loc.key}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${bd.from}"/>
+          <stop offset="62%" stop-color="${bd.mid}"/>
+          <stop offset="100%" stop-color="${bd.to}"/>
+        </linearGradient>
+        <linearGradient id="lqground-${loc.key}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${bd.to}"/>
+          <stop offset="100%" stop-color="#07050c"/>
+        </linearGradient>
+        <radialGradient id="lqglow-${loc.key}" cx="50%" cy="58%" r="60%">
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.14"/>
+          <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+        </radialGradient>
+      </defs>
+
+      <rect width="${W}" height="${H}" fill="url(#lqsky-${loc.key})"/>
+      <g>${stars}</g>
+      <circle cx="828" cy="66" r="30" fill="#fdf3d0" opacity="0.92"/>
+      <circle cx="814" cy="58" r="27" fill="${bd.from}" opacity="0.96"/>
+      <rect y="${HORIZON - 130}" width="${W}" height="${130}" fill="url(#lqglow-${loc.key})"/>
+
+      <g fill="#0d0a16" opacity="0.42">${far}</g>
+      <g fill="#0a0712" opacity="0.86">${near}</g>
+      <g>${windows}</g>
+
+      <rect y="${HORIZON}" width="${W}" height="${H - HORIZON}" fill="url(#lqground-${loc.key})"/>
+      <rect y="${HORIZON}" width="${W}" height="2" fill="#ffffff" opacity="0.09"/>
+      <g>${fg}</g>
+    </svg>`;
+
+  _lqSceneCache[loc.key] = svg;
+  return svg;
+}
+
 /* ── Render ───────────────────────────────────────────────── */
 
 function lqRender() {
@@ -183,16 +353,15 @@ function lqRender() {
     const grown = _lq.staminaMax > LANG_RUN_STAMINA;
     stats.innerHTML = `
       <span class="lq-stat"><b class="lq-ico-st">⚡</b>STA ${Math.max(0, Math.round(_lq.stamina))}/${_lq.staminaMax}${
-        grown ? `<em class="lq-grown" title="${Math.floor(_lq.steps / LANG_RUN_ENDURANCE_EVERY) * LANG_RUN_ENDURANCE_GAIN} from blocks run, ${_lq.defeated * LANG_RUN_STAMINA_GAIN} from conversations won">+${_lq.staminaMax - LANG_RUN_STAMINA}</em>` : ''}</span>
+        grown ? `<em class="lq-grown" title="${_lq.staminaMax - LANG_RUN_STAMINA - _lq.defeated * LANG_RUN_STAMINA_GAIN} from clear blocks, ${_lq.defeated * LANG_RUN_STAMINA_GAIN} from conversations won">+${_lq.staminaMax - LANG_RUN_STAMINA}</em>` : ''}</span>
       <span class="lq-stat"><b class="lq-ico-pw">✦</b>PWR ${Math.round(_lq.power)}%</span>
       <span class="lq-stat"><b class="lq-ico-wk">▮</b>BLOCKS ${_lq.steps}</span>
       ${_lq.scene === 'battle' && _lq.enemy
-        ? `<span class="lq-stat lq-stat-foe"><b>♥</b>${escapeHTML(_lq.enemy.name)} ${Math.max(0, Math.round(_lq.enemy.hp))}/${_lq.enemy.hpMax}</span>` : ''}`;
+        ? `<span class="lq-stat lq-stat-foe"><b>♥</b>${escapeHTML(lqDisplayName(_lq.enemy))} ${Math.max(0, Math.round(_lq.enemy.hp))}/${_lq.enemy.hpMax}</span>` : ''}`;
   }
 
-  scene.style.background =
-    `linear-gradient(175deg, ${bd.from} 0%, ${bd.mid} 55%, ${bd.to} 100%)`;
   scene.innerHTML = `
+    ${lqSceneArt(loc, bd)}
     <div class="lq-scenetag">${escapeHTML(loc.name.toUpperCase())}</div>
     ${_lq.scene === 'battle' && _lq.enemy ? lqFoeHTML() : ''}
     ${_lq.scene === 'battle' && !_lq.say.length && _lq.menu === null ? lqCommandBarHTML() : ''}
@@ -216,6 +385,12 @@ function lqRender() {
 /** {highlighted} in a line, escaped either way. */
 function lqMarkup(text) {
   return escapeHTML(String(text || '')).replace(/\{([^}]*)\}/g, '<em class="lq-hl">$1</em>');
+}
+
+/** Sentence-cased for anywhere the name stands on its own. */
+function lqDisplayName(e) {
+  if (!e || !e.name) return 'Stranger';
+  return e.common ? e.name.charAt(0).toUpperCase() + e.name.slice(1) : e.name;
 }
 
 function lqFoeHTML() {
@@ -310,23 +485,12 @@ function lqStep() {
   _lq.steps++;
   _lq.stamina -= LANG_RUN_STEP_COST;
 
-  // Endurance. The leg costs you now and pays you back as headroom: the
-  // maximum rises every few blocks whether or not you meet anybody, so the
-  // walk itself is progress and not just a countdown to the next encounter.
-  const enduranceUp = _lq.steps % LANG_RUN_ENDURANCE_EVERY === 0;
-  if (enduranceUp) _lq.staminaMax += LANG_RUN_ENDURANCE_GAIN;
-
   if (_lq.stamina <= 0) {
     _lq.stamina = 0;
     lqSay(null, 'Your legs are done. You have nothing left to walk on.');
     lqThen(() => lqFinish('exhausted'));
     lqRender();
     return;
-  }
-
-  if (enduranceUp) {
-    lqSay(null, 'Your legs are getting used to this. Total stamina is now {'
-      + _lq.staminaMax + '}.');
   }
 
   // Four quiet legs in a row and the next is certain, so a run cannot stall
@@ -339,14 +503,19 @@ function lqStep() {
       _lq.enemy = enemy;
       _lq.location = enemy.location || _lq.location;
       _lq.turn = 0; _lq.removed = [];
-      lqSay(null, 'You encountered a {' + enemy.name + '}!');
+      lqSay(null, lqMeetLine(enemy));
       lqThen(() => { _lq.scene = 'battle'; lqBeginTurn(); lqRender(); });
       lqRender();
       return;
     }
   }
 
+  // Nobody turned up, so the block was pure walking — and walking is what
+  // builds the capacity to walk. Flat, and every single time: a reward you
+  // have to count blocks to predict is not a reward you feel.
+  _lq.staminaMax += LANG_RUN_ENDURANCE_GAIN;
   lqSay(null, LANG_RUN_FLAVOUR[Math.floor(Math.random() * LANG_RUN_FLAVOUR.length)]);
+  lqSay(null, 'A clear stretch. Total stamina is now {' + _lq.staminaMax + '}.');
   lqFind();
   lqThen(() => { lqRoadMenu(); lqRender(); });
   lqRender();
@@ -385,7 +554,7 @@ function lqBeginTurn() {
   const t = lqCurrentTurn();
   if (!t) return;
   if (t.situation) lqSay(null, t.situation);
-  lqSay(_lq.enemy.name, t.line, 'foe');
+  lqSay(lqDisplayName(_lq.enemy), t.line, 'foe');
   lqThen(() => { _lq.menu = null; lqRender(); });   // falls through to the command bar
 }
 
@@ -417,7 +586,7 @@ function lqReply(i) {
     const heal = Math.min(10, _lq.staminaMax - _lq.stamina);
     _lq.stamina += heal;
     _lq.power = Math.min(_lq.powerMax, _lq.power + 15);
-    lqSay(null, 'It lands. {' + _lq.enemy.name + '} takes ' + dmg + '.'
+    lqSay(null, 'It lands. {' + lqDisplayName(_lq.enemy) + '} takes ' + dmg + '.'
       + (heal ? ' You catch your breath (+' + heal + ').' : ''));
     if (o.note) lqSay(null, o.note);
   } else {
@@ -441,7 +610,7 @@ function lqAfterTurn() {
     _lq.defeated++;
     _lq.staminaMax += LANG_RUN_STAMINA_GAIN;
     _lq.stamina = Math.min(_lq.staminaMax, _lq.stamina + LANG_RUN_STAMINA_GAIN);
-    lqSay(null, '{' + _lq.enemy.name + '} gives up and lets you past.');
+    lqSay(null, '{' + lqDisplayName(_lq.enemy) + '} gives up and lets you past.');
     lqSay(null, 'Maximum stamina rises to ' + _lq.staminaMax + '.');
     if (_lq.mode === 'scenario') { lqThen(() => lqFinish('won')); lqRender(); return; }
     lqThen(() => { _lq.enemy = null; _lq.scene = 'road'; lqRoadMenu(); lqRender(); });

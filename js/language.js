@@ -566,11 +566,14 @@ const LANG_RUN_STAMINA = 100;
 const LANG_RUN_STAMINA_GAIN = 10;    // added to the MAX per enemy beaten
 const LANG_RUN_STEP_COST = 6;        // stamina per leg of the run
 
-/* Running builds the capacity to run. Every few blocks the MAXIMUM goes up,
-   which is the whole point of going out: tonight costs you, and tomorrow you
-   can go further. Winning conversations still adds its own bonus on top. */
-const LANG_RUN_ENDURANCE_EVERY = 3;  // blocks per endurance gain
-const LANG_RUN_ENDURANCE_GAIN = 5;   // added to the MAX each time
+/* Running builds the capacity to run. Every block you walk WITHOUT meeting
+   anybody raises the MAXIMUM, which is the whole point of going out: tonight
+   costs you, and tomorrow you can go further. Winning conversations still add
+   their own bonus on top.
+
+   Flat, and every single time, rather than a smaller gain on a counter — a
+   reward you have to count blocks to predict is not a reward you feel. */
+const LANG_RUN_ENDURANCE_GAIN = 10;  // added to the MAX on every clear block
 const LANG_ENCOUNTER_CHANCE = 0.45;  // per step
 
 /* Flavour while walking. Placeholders, as asked — they set the beat between
@@ -727,11 +730,15 @@ function langEnemyFromWords() {
       backlash: 18
     };
   });
-  const names = ['Stranger', 'Classmate', 'Vendor', 'Neighbour', 'Tita', 'Kuya'];
+  const names = ['stranger', 'classmate', 'vendor', 'neighbour', 'tita', 'kuya'];
   return {
+    // Lower case on purpose: these are common nouns, so they read as "a
+    // stranger" where a written scenario reads as "Ate Marites" with no
+    // article at all.
     name: names[Math.floor(Math.random() * names.length)],
     location: LANG_LOCATIONS[Math.floor(Math.random() * LANG_LOCATIONS.length)].key,
     hp: 100, hpMax: 100, source: 'words',
+    common: true,
     turns
   };
 }

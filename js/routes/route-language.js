@@ -607,8 +607,8 @@ function langRunHTML() {
           <h3><i data-lucide="list-ordered"></i> How it goes</h3>
           <ol>
             <li>You start with ${LANG_RUN_STAMINA} stamina. Stamina is your health.</li>
-            <li>Choose <strong>Run</strong> to walk on. Each leg costs ${LANG_RUN_STEP_COST} stamina —
-                and every ${LANG_RUN_ENDURANCE_EVERY} blocks your <em>maximum</em> rises by
+            <li>Choose <strong>Run</strong> to walk on. Each leg costs ${LANG_RUN_STEP_COST} stamina,
+                and any block where nobody stops you raises your <em>maximum</em> by
                 ${LANG_RUN_ENDURANCE_GAIN}. Running builds the capacity to run.</li>
             <li>Sooner or later somebody stops you, and they speak first.</li>
             <li>Reply well and you take no damage and get some stamina back. Reply badly and it drains.</li>
