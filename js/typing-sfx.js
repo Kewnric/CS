@@ -57,7 +57,34 @@ const SFX_MIN_GAP_MS = 34;
    little amplitude — the shaped blip now peaks nearer 0.13 than 0.18 — so this
    went up to hold the output where it was: measured, 1.0 landed at -17 dBFS
    against the -15.3 the last voice sat at, and 1.2 puts it back. */
-const SFX_VOLUME = 1.2;
+
+/**
+ * The voice, in one place.
+ *
+ * Every key is a ratio of this rather than its own row of numbers, so moving
+ * the pitch moves the whole family together and keeps the shape: return still
+ * lowest and longest, backspace still dullest. Five separate rows is what made
+ * this awkward to tune — changing the voice meant editing five sets of three.
+ */
+const SFX_VOICE = {
+  pitch:   270,     // Hz, an ordinary character
+  length:  0.080,   // seconds
+  formant: 1600,    // Hz, the bandpass centre — the colour of the voice
+  ceiling: 4600,    // Hz, the lowpass above it
+  weight:  0.18,    // the octave-down sine underneath
+  glide:   0.82,    // where the pitch falls to by the end
+  q:       1.4,     // how sharp the formant is
+  volume:  1.2
+};
+
+/** pitch x, length x, formant x — relative to an ordinary character. */
+const SFX_KEY_RATIOS = {
+  'Enter':     [0.78, 1.25, 0.80],   // lower, longer — a full stop
+  'Backspace': [0.72, 0.85, 0.69],   // dull, swallowed
+  'Delete':    [0.72, 0.85, 0.69],
+  ' ':         [0.89, 0.85, 0.91],   // the gap between words
+  'Tab':       [0.83, 1.06, 0.84]
+};
 
 let _sfxCtx = null;
 let _sfxBus = null;
@@ -81,7 +108,7 @@ function _sfxContext() {
   try {
     _sfxCtx = new Ctor();
     _sfxBus = _sfxCtx.createGain();
-    _sfxBus.gain.value = SFX_VOLUME;
+    _sfxBus.gain.value = SFX_VOICE.volume;
     _sfxBus.connect(_sfxCtx.destination);
   } catch (e) {
     _sfxCtx = null;
@@ -115,26 +142,26 @@ function sfxBlip(pitch, length, colour) {
   osc.type = 'triangle';
   osc.frequency.setValueAtTime(f, t);
   // The fall. A syllable drops as it ends; a beep holds its pitch.
-  osc.frequency.exponentialRampToValueAtTime(f * 0.82, t + length);
+  osc.frequency.exponentialRampToValueAtTime(f * SFX_VOICE.glide, t + length);
 
   // An octave down underneath, quietly, for body. Kept light — this is the
   // weight in the sound, and weight is most of what made it read as the
   // wrong Mita.
   sub.type = 'sine';
   sub.frequency.setValueAtTime(f * 0.5, t);
-  sub.frequency.exponentialRampToValueAtTime(f * 0.42, t + length);
+  sub.frequency.exponentialRampToValueAtTime(f * 0.5 * SFX_VOICE.glide, t + length);
   const subGain = ctx.createGain();
-  subGain.gain.value = 0.18;
+  subGain.gain.value = SFX_VOICE.weight;
 
   band.type = 'bandpass';
   band.frequency.setValueAtTime(colour * (0.9 + Math.random() * 0.2), t);
-  band.Q.value = 1.4;
+  band.Q.value = SFX_VOICE.q;
 
   // High enough to let the brightness through. At 2600 the ceiling sat on top
   // of the formants and dragged the whole voice back down however high the
   // fundamental went.
   tame.type = 'lowpass';
-  tame.frequency.value = 4600;
+  tame.frequency.value = SFX_VOICE.ceiling;
 
   // Soft in, then down in two stages. A single exponential to silence
   // collapses the blip in its first third — measured, it left 27ms audible out
@@ -167,12 +194,9 @@ function sfxBlip(pitch, length, colour) {
  * letters before it.
  */
 function sfxKeyVoice(key) {
-  if (key === 'Enter')     return [210, 0.100, 1280];  // lower, longer — a full stop
-  if (key === 'Backspace') return [195, 0.068, 1100];  // dull, swallowed
-  if (key === 'Delete')    return [195, 0.068, 1100];
-  if (key === ' ')         return [240, 0.068, 1450];  // the gap between words
-  if (key === 'Tab')       return [225, 0.085, 1350];
-  return [270, 0.080, 1600];                           // an ordinary character
+  const r = SFX_KEY_RATIOS[key];
+  if (!r) return [SFX_VOICE.pitch, SFX_VOICE.length, SFX_VOICE.formant];
+  return [SFX_VOICE.pitch * r[0], SFX_VOICE.length * r[1], SFX_VOICE.formant * r[2]];
 }
 
 /** Keys that are navigation or command, not speech. */
@@ -228,8 +252,9 @@ function toggleTypingSfx() {
   _syncTypingSfxBtn();
   if (next) {
     // Play the thing being switched on, so the button proves itself.
-    sfxBlip(270, 0.080, 1600);
-    setTimeout(() => sfxBlip(240, 0.092, 1450), 95);
+    const v = sfxKeyVoice('a'), w = sfxKeyVoice(' ');
+    sfxBlip(v[0], v[1], v[2]);
+    setTimeout(() => sfxBlip(w[0], w[1] * 1.15, w[2]), 95);
   } else if (_sfxCtx) {
     _sfxCtx.suspend().catch(() => {});
   }
