@@ -163,7 +163,16 @@
     position: sticky;
     right: 2px;
     z-index: 3;
-    box-shadow: -10px 0 12px -6px var(--bg-primary, rgba(0, 0, 0, 0.6));
+    /* Fades the strip out behind the pinned button rather than letting
+       controls appear to slide under a hard edge.
+
+       Hardcoded to match .practice-topbar, which hardcodes the same value.
+       Two earlier attempts were wrong in different ways: --bg-primary is not
+       a token this app defines at all, so it silently used my fallback, and
+       --bg-nav-solid is real but resolves to #0f172a against the topbar's
+       #161b22 — close enough to look deliberate and still the wrong colour.
+       A shadow meant to fade INTO a surface has to be that surface. */
+    box-shadow: -12px 0 14px -6px #161b22;
   }
   .practice-topbar > * { flex-shrink: 0; }
 
