@@ -27,7 +27,7 @@ let _wingActiveId = null;
 let _wingEditing = null;       // id being edited, or 'new'
 
 function wingConfig(key) {
-  const list = (typeof LIBRARY_PLACEHOLDERS !== 'undefined') ? LIBRARY_PLACEHOLDERS : [];
+  const list = (typeof LIBRARY_WINGS !== 'undefined') ? LIBRARY_WINGS : [];
   return list.find(p => p.key === key) || { key, name: 'Library', icon: 'library', tagline: '' };
 }
 
@@ -43,7 +43,7 @@ function wingItems(key) {
 /** Every wing's entries at once, for the hub's cross-library search. */
 function wingAllItems() {
   const out = [];
-  const keys = (typeof LIBRARY_PLACEHOLDERS !== 'undefined' ? LIBRARY_PLACEHOLDERS : []).map(p => p.key);
+  const keys = (typeof LIBRARY_WINGS !== 'undefined' ? LIBRARY_WINGS : []).map(p => p.key);
   keys.forEach(k => wingItems(k).forEach(item => out.push({ key: k, item })));
   return out;
 }

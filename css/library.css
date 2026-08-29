@@ -617,17 +617,31 @@
 /* Wings are real libraries now, so they stop looking disabled. They lost their
    icon styling when .lib-card-soon went away — each gets its own accent instead,
    so the row reads as eight collections rather than eight greyed-out stubs. */
+/* The accent now arrives inline from the wing's own definition. It used to
+   come from :nth-child on the "other wings" grid, which made the colour a
+   property of the ROW — so moving the wings into Your collections would have
+   quietly turned all seven purple. The fallback below is for anything that
+   renders a wing card without passing one. */
 .lib-card-wing { cursor: pointer; --lib-accent: #8b5cf6; }
 .lib-card-wing .lib-card-icon { background: color-mix(in srgb, var(--lib-accent) 16%, transparent); color: var(--lib-accent); }
 .lib-card-wing .lib-card-desc { min-height: 2.4em; }
-.lib-hub-grid-soon .lib-card:nth-child(8n + 1) { --lib-accent: #8b5cf6; }
-.lib-hub-grid-soon .lib-card:nth-child(8n + 2) { --lib-accent: #ec4899; }
-.lib-hub-grid-soon .lib-card:nth-child(8n + 3) { --lib-accent: #f59e0b; }
-.lib-hub-grid-soon .lib-card:nth-child(8n + 4) { --lib-accent: #eab308; }
-.lib-hub-grid-soon .lib-card:nth-child(8n + 5) { --lib-accent: #10b981; }
-.lib-hub-grid-soon .lib-card:nth-child(8n + 6) { --lib-accent: #06b6d4; }
-.lib-hub-grid-soon .lib-card:nth-child(8n + 7) { --lib-accent: #3b82f6; }
-.lib-hub-grid-soon .lib-card:nth-child(8n + 8) { --lib-accent: #a3a3a3; }
+
+/* The one card left under "Other wings": a marker for what comes next, so it
+   should read as an empty slot rather than as something you failed to open.
+   Dashed, dimmed, and it does not lift on hover the way a real card does. */
+.lib-card-placeholder {
+  --lib-accent: #64748b;
+  border-style: dashed;
+  cursor: default;
+  opacity: 0.72;
+}
+.lib-card-placeholder .lib-card-icon {
+  background: color-mix(in srgb, var(--lib-accent) 14%, transparent);
+  color: var(--lib-accent);
+}
+.lib-card-placeholder .lib-card-desc { min-height: 2.4em; }
+.lib-card-placeholder:hover { transform: none; opacity: 0.85; }
+.lib-card-placeholder .lib-card-arrow { color: var(--lib-accent); opacity: 0.8; }
 /* Browsers without color-mix still get a readable tile. */
 @supports not (background: color-mix(in srgb, red 16%, transparent)) {
   .lib-card-wing .lib-card-icon { background: var(--bg-surface-hover); }

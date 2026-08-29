@@ -2,17 +2,27 @@
    A doorway to every collection, plus the two things you actually come here to
    do: see what's due across all of them, and find something by name. */
 
-const LIBRARY_PLACEHOLDERS = [
-  /* Language moved out of here and into Your collections — it is being built
-     rather than merely planned, and a wing you can add words to does not
-     belong under a heading that means "not yet". */
-  { key: 'mindset',     name: 'Mindset Library',     icon: 'brain',        tagline: 'Mental models, attitudes & principles.' },
-  { key: 'insights',    name: 'Insights Library',    icon: 'lightbulb',    tagline: 'Aha-moments and lessons worth keeping.' },
-  { key: 'remembrance', name: 'Remembrance Library', icon: 'star',         tagline: 'Things you never want to forget.' },
-  { key: 'diary',       name: 'Diary Library',       icon: 'pen-line',     tagline: 'Daily reflections & journaling.' },
-  { key: 'collection',  name: 'Collection Library',  icon: 'boxes',        tagline: 'Curate and catalogue anything.' },
-  { key: 'progression', name: 'Progression Library', icon: 'trending-up',  tagline: 'Milestones, levels & growth tracking.' },
-  { key: 'roadmap',     name: 'Roadmap Library',     icon: 'map',          tagline: 'Plans, paths & what comes next.' },
+/**
+ * The seven wings. NOT placeholders — they were, and the constant was called
+ * LIBRARY_WINGS for as long as they only raised a toast. Each now has
+ * its own file, its own fields and its own layout, so they sit in Your
+ * collections beside the other libraries and the name says what they are.
+ *
+ * "Other wings" holds a single Placeholder Library card instead: a marker for
+ * the next one, rather than seven finished libraries filed under "not yet".
+ */
+const LIBRARY_WINGS = [
+  /* The accent belongs to the wing, not to where it happens to sit. These
+     used to come from :nth-child on the "other wings" grid, which meant the
+     colours were a property of the row rather than of the library — and would
+     have silently collapsed to one purple the moment they moved. */
+  { key: 'mindset',     name: 'Mindset Library',     icon: 'brain',        accent: '#8b5cf6', tagline: 'Mental models, attitudes & principles.' },
+  { key: 'insights',    name: 'Insights Library',    icon: 'lightbulb',    accent: '#ec4899', tagline: 'Aha-moments and lessons worth keeping.' },
+  { key: 'remembrance', name: 'Remembrance Library', icon: 'star',         accent: '#f59e0b', tagline: 'Things you never want to forget.' },
+  { key: 'diary',       name: 'Diary Library',       icon: 'pen-line',     accent: '#eab308', tagline: 'Daily reflections & journaling.' },
+  { key: 'collection',  name: 'Collection Library',  icon: 'boxes',        accent: '#10b981', tagline: 'Curate and catalogue anything.' },
+  { key: 'progression', name: 'Progression Library', icon: 'trending-up',  accent: '#06b6d4', tagline: 'Milestones, levels & growth tracking.' },
+  { key: 'roadmap',     name: 'Roadmap Library',     icon: 'map',          accent: '#3b82f6', tagline: 'Plans, paths & what comes next.' },
 ];
 
 function libraryTemplate() {
@@ -51,6 +61,13 @@ function libraryTemplate() {
   `;
 }
 
+/** The one thing the placeholder card can do. */
+function libPlaceholderNote() {
+  if (typeof toast === 'function') {
+    toast('Nothing here yet — this is where the next library will go.', { type: 'info' });
+  }
+}
+
 function _libStatChip(icon, label) {
   return `<span class="lib-stat-chip"><i data-lucide="${icon}"></i> ${label}</span>`;
 }
@@ -83,7 +100,13 @@ function libraryInit() {
       ${_libStatChip('file-code', `${challenges.length} programs`)}
       ${_libStatChip('book-open', `${notebooks.length} notebooks`)}
       ${_libStatChip('code', `${snippets.length} snippets`)}
-      ${_libStatChip('boxes', `${LIBRARY_PLACEHOLDERS.length} more wings`)}
+      ${(() => {
+        // They are not "more wings" now that they are in with everything else;
+        // what is worth counting is what you have actually written in them.
+        const n = LIBRARY_WINGS.reduce((t, w) =>
+          t + ((typeof wingItems === 'function') ? wingItems(w.key).length : 0), 0);
+        return _libStatChip('boxes', `${n} wing entr${n === 1 ? 'y' : 'ies'}`);
+      })()}
     `;
   }
 
@@ -91,8 +114,9 @@ function libraryInit() {
 
   const active = document.getElementById('lib-hub-active');
   if (active) {
-    const card = (route, cls, icon, name, desc, chips, pct, pctLabel) => `
+    const card = (route, cls, icon, name, desc, chips, pct, pctLabel, accent) => `
       <div class="lib-card ${cls}" onclick="spaNavigate('${route}')" role="link" tabindex="0"
+           ${accent ? `style="--lib-accent:${accent};"` : ''}
            onkeydown="if(event.key==='Enter')spaNavigate('${route}')">
         <div class="lib-card-glow"></div>
         <div class="lib-card-head">
@@ -152,26 +176,35 @@ function libraryInit() {
           _libStatChip('dumbbell', `${drills} drill${drills !== 1 ? 's' : ''}`) +
           _libStatChip('swords', `${scenes} scenario${scenes !== 1 ? 's' : ''}`),
           null, `${words} word${words !== 1 ? 's' : ''}`);
-      })();
+      })() +
+      // The seven wings, in with everything else. They are built libraries now.
+      LIBRARY_WINGS.map(w => {
+        const n = (typeof wingItems === 'function') ? wingItems(w.key).length : 0;
+        const noun = (typeof wingSchema === 'function')
+          ? (n === 1 ? wingSchema(w.key).noun : wingSchema(w.key).nounPlural) : 'entries';
+        return card('wing?k=' + w.key, 'lib-card-wing', w.icon, w.name, w.tagline,
+          _libStatChip('file-text', `${n} ${noun}`), null, `${n} ${noun}`, w.accent);
+      }).join('');
   }
 
+  /* One card, standing in for whatever comes next. This used to hold the
+     seven wings, which stopped making sense the moment they were finished —
+     a built library filed under "not yet" is just a lie about the state of
+     the app. */
   const soon = document.getElementById('lib-hub-soon');
   if (soon) {
-    soon.innerHTML = LIBRARY_PLACEHOLDERS.map(p => {
-      const n = (typeof wingItems === 'function') ? wingItems(p.key).length : 0;
-      return `
-      <div class="lib-card lib-card-wing" onclick="spaNavigate('wing?k=${p.key}')" role="link" tabindex="0"
-           onkeydown="if(event.key==='Enter')spaNavigate('wing?k=${p.key}')">
+    soon.innerHTML = `
+      <div class="lib-card lib-card-placeholder" role="note" tabindex="0"
+           onclick="libPlaceholderNote()" onkeydown="if(event.key==='Enter')libPlaceholderNote()">
         <div class="lib-card-glow"></div>
         <div class="lib-card-head">
-          <div class="lib-card-icon"><i data-lucide="${p.icon}"></i></div>
-          <i data-lucide="arrow-up-right" class="lib-card-arrow"></i>
+          <div class="lib-card-icon"><i data-lucide="package-plus"></i></div>
+          <i data-lucide="sparkles" class="lib-card-arrow"></i>
         </div>
-        <h3 class="lib-card-name">${p.name}</h3>
-        <p class="lib-card-desc">${p.tagline}</p>
-        <div class="lib-card-chips">${_libStatChip('file-text', `${n} entr${n === 1 ? 'y' : 'ies'}`)}</div>
+        <h3 class="lib-card-name">Placeholder Library</h3>
+        <p class="lib-card-desc">Room for the next wing. Nothing lives here yet.</p>
+        <div class="lib-card-chips">${_libStatChip('clock', 'Not built yet')}</div>
       </div>`;
-    }).join('');
   }
 
   const libRoot = document.querySelector('.lib-hub');
@@ -266,7 +299,7 @@ function libHubSearch() {
 }
 
 function libraryComingSoon(key) {
-  const lib = LIBRARY_PLACEHOLDERS.find(p => p.key === key);
+  const lib = LIBRARY_WINGS.find(p => p.key === key);
   const name = lib ? lib.name : 'This library';
   if (typeof toast === 'function') toast(`${name} is under construction — coming soon!`, { type: 'info', title: 'Coming soon' });
   else if (typeof showMessage === 'function') showMessage('Coming soon', `${name} is under construction.`);

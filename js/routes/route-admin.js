@@ -531,10 +531,11 @@ function adminInit() {
     // These stopped being placeholders when the wings became real libraries.
     // They have no separate admin form — entries are written inside the wing —
     // so the card says so and opens it rather than raising a "coming soon".
-    soon.innerHTML = LIBRARY_PLACEHOLDERS.map(p => {
+    soon.innerHTML = LIBRARY_WINGS.map(p => {
       const n = (typeof wingItems === 'function') ? wingItems(p.key).length : 0;
       return `
       <div class="lib-card lib-card-wing" onclick="spaNavigate('wing?k=${p.key}')" role="link" tabindex="0"
+           style="--lib-accent:${p.accent || '#8b5cf6'};"
            onkeydown="if(event.key==='Enter')spaNavigate('wing?k=${p.key}')">
         <div class="lib-card-glow"></div>
         <div class="lib-card-head">
