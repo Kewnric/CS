@@ -1155,3 +1155,13 @@
   .lq-mi { font-size: 0.8rem; }
   .lq-end-grid { grid-template-columns: auto auto; }
 }
+
+/* The admin's tab row and its one global action share a line. */
+.lang-admin-head {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.lang-admin-head .lang-tabs-admin { padding: 0; margin: 0; flex: 1; }

@@ -21,7 +21,13 @@ function adminLanguageTemplate() {
           </button>
           <h1 class="lib-hub-title" style="font-size:1.6rem; margin-left:0.75rem;">Language Admin</h1>
         </div>
-        <div class="lang-tabs lang-tabs-admin" id="lang-admin-tabs"></div>
+        <div class="lang-admin-head">
+          <div class="lang-tabs lang-tabs-admin" id="lang-admin-tabs"></div>
+          <button class="btn btn-secondary btn-sm" type="button" onclick="langLoadSamplePack()"
+                  title="Ten words, ten drill sets and ten scenarios — nothing is replaced">
+            <i data-lucide="sparkles" style="width:14px;height:14px;"></i> Add starter pack
+          </button>
+        </div>
         <div id="lang-admin-body"></div>
       </div>
     </div>`;
