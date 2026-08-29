@@ -30,6 +30,7 @@ const EDFX_MAX = 28;
 
 let _edfxPending = null;   // the character a keydown is about to remove
 let _edfxLive = [];
+let _edfxComposing = false;
 
 /** On unless it has been switched off. */
 function edfxEnabled() {
@@ -177,6 +178,23 @@ function edfxDeleted() {
   _edfxPending = null;
 }
 
+/**
+ * Drop everything and forget it.
+ *
+ * Called when the editor goes away. Without this the live list went on
+ * holding ghosts whose layer had already been destroyed with the route —
+ * measured at two detached nodes after navigating away. The 1400ms sweep
+ * would have released them eventually, so it was bounded rather than a true
+ * leak, but holding detached DOM for a second after every visit to the
+ * editor is untidy for something this cheap to get right.
+ */
+function edfxReset() {
+  _edfxLive.forEach(g => { if (g && g.parentElement) g.remove(); });
+  _edfxLive = [];
+  _edfxPending = null;
+  _edfxComposing = false;
+}
+
 /* ── Wiring ───────────────────────────────────────────────────
    One delegated pair on the document rather than a hook inside the editor's
    own handler set: the editor is attached and detached per file tab, and this
@@ -191,6 +209,19 @@ document.addEventListener('keydown', function (e) {
   else _edfxPending = null;
 }, true);
 
+document.addEventListener('compositionstart', function (e) {
+  if (e.target && e.target.id === 'editor-textarea') _edfxComposing = true;
+}, true);
+
+document.addEventListener('compositionend', function (e) {
+  if (e.target && e.target.id === 'editor-textarea') _edfxComposing = false;
+}, true);
+
+/* The editor is rebuilt per route, so its ghosts should not outlive it. */
+new MutationObserver(() => {
+  if (!document.getElementById('editor-textarea') && _edfxLive.length) edfxReset();
+}).observe(document.body, { attributes: true, attributeFilter: ['data-route'] });
+
 document.addEventListener('input', function (e) {
   const ta = e.target;
   if (!ta || ta.id !== 'editor-textarea') return;
@@ -200,6 +231,12 @@ document.addEventListener('input', function (e) {
   // ghost per character of a whole block, which is a snowstorm.
   if (e.inputType && e.inputType.indexOf('insert') !== 0) return;
   if (e.data && e.data.length > 1) return;
+  /* Not while composing. An IME fires insertCompositionText on every keystroke
+     of a composition, so typing one Japanese character spawned a ghost for
+     each intermediate romaji state and then another for the committed result.
+     The commit arrives as insertFromComposition or insertText, which is the
+     one worth drawing. */
+  if (_edfxComposing || e.inputType === 'insertCompositionText') return;
   edfxTyped(ta);
 }, true);
 
