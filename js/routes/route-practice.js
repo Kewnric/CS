@@ -70,6 +70,7 @@ function practiceTemplate() {
           <button class="btn btn-ghost practice-icon-btn" onclick="openCheatsheet()" title="Cheat sheet" id="cheatsheet-toggle-btn" aria-label="Cheat sheet" style="display:none;">
             <i data-lucide="book-open" style="width:16px;height:16px;" aria-hidden="true"></i>
           </button>
+          ${typingSfxButtonTemplate()}
           <button class="btn btn-ghost practice-icon-btn" onclick="toggleFullscreen()" title="Full screen" id="fullscreen-toggle-btn" aria-label="Full screen" aria-pressed="false">
             <i data-lucide="maximize" style="width:16px;height:16px;" aria-hidden="true"></i>
           </button>
