@@ -1482,7 +1482,12 @@ let _bossComboClear = null;
 
 const COMBO_STEP_MS = 45;     // gap between letters landing
 const COMBO_HOLD_MS = 2200;   // how long the finished line sits there
-const COMBO_FLY_MS = 620;     // how long a letter takes to tumble away
+const COMBO_FLY_MS = 700;     // one letter: jump, then tumble away
+/* The gap between letters LEAVING. It was 18ms, which is below the point
+   where the eye reads a sequence — eight letters inside 150ms is one event,
+   and the line appeared to burst rather than come apart. At 70ms you watch it
+   happen letter by letter, which is the whole idea. */
+const COMBO_EXIT_STEP_MS = 70;
 
 /**
  * Write the chip one letter at a time.
@@ -1507,7 +1512,12 @@ function _bossComboWrite(el, text) {
 }
 
 /**
- * The exit: the line hops, then falls apart.
+ * The exit: each letter jumps, then falls apart, one after another.
+ *
+ * The jump belongs to the LETTER, not the line. Hopping the whole chip and
+ * then scattering it is one movement followed by another; giving each letter
+ * its own little launch is what makes the word look like it is coming apart
+ * rather than being thrown.
  *
  * Each letter gets its own drift, spin and scale rather than a shared one, so
  * the same combo value never comes apart the same way twice. Letters mostly
@@ -1531,13 +1541,13 @@ function _bossComboScatter(el) {
       : (1 + Math.random() * 2.2)).toFixed(2) + 'em');
     s.style.setProperty('--rot', ((Math.random() - 0.5) * 280).toFixed(0) + 'deg');
     s.style.setProperty('--sc', (0.7 + Math.random() * 0.5).toFixed(2));
-    s.style.animationDelay = (140 + i * 18) + 'ms';
+    s.style.animationDelay = (i * COMBO_EXIT_STEP_MS) + 'ms';
     s.classList.add('fly');
   });
   _bossComboClear = setTimeout(() => {
     el.classList.remove('show', 'leaving');
     el.innerHTML = '';
-  }, 140 + letters.length * 18 + COMBO_FLY_MS + 60);
+  }, letters.length * COMBO_EXIT_STEP_MS + COMBO_FLY_MS + 60);
 }
 
 function _bossBumpCombo() {

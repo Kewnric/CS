@@ -3239,25 +3239,30 @@ body.is-resizing .practice-panel { transition: none; }
   100% { opacity: 1; transform: translateY(0) scale(1); color: #ffd76e; }
 }
 
-/* The hop, before it comes apart. */
-.sao-combo.leaving {
-  animation: comboHop 0.34s cubic-bezier(0.25, -0.5, 0.35, 1.5) both;
-}
-@keyframes comboHop {
-  0%   { transform: translateY(0); }
-  45%  { transform: translateY(-0.55em); }
-  100% { transform: translateY(-0.35em); }
-}
+/* The chip itself no longer hops — the letters do, each on its own. Hopping
+   the whole line and then scattering it read as one movement followed by
+   another; this way the word comes apart. .leaving is still set, because the
+   scatter guard uses it to know one is already running. */
 
 /* Each letter's drift, spin and scale come in as custom properties set per
-   letter in _bossComboScatter, so no two exits are alike. */
+   letter in _bossComboScatter, so no two exits are alike. The shape is
+   deliberately two moves in one animation: UP first, almost straight and
+   barely turning, and only then away. Easing cannot do that on its own, which
+   is what the middle keyframe is for. */
 .sao-combo .cl.fly {
-  animation: comboFly var(--fly, 620ms) cubic-bezier(0.35, 0.05, 0.7, 1) backwards;
+  animation: comboFly var(--fly, 700ms) cubic-bezier(0.3, 0.02, 0.7, 1) backwards;
   opacity: 0;
 }
 @keyframes comboFly {
   0%   { opacity: 1; transform: translate(0, 0) rotate(0deg) scale(1); }
-  25%  { opacity: 1; }
+  /* The jump. Straight up, a touch bigger, hardly any spin yet. */
+  26%  { opacity: 1;
+         transform: translate(0, -0.62em)
+                    rotate(calc(var(--rot, 90deg) * 0.07)) scale(1.16); }
+  /* Hangs for a moment at the top, the way a thrown thing does. */
+  38%  { opacity: 1;
+         transform: translate(calc(var(--dx, 0px) * 0.12), -0.66em)
+                    rotate(calc(var(--rot, 90deg) * 0.16)) scale(1.1); }
   100% { opacity: 0;
          transform: translate(var(--dx, 0), var(--dy, 2em))
                     rotate(var(--rot, 90deg)) scale(var(--sc, 0.8)); }

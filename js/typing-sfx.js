@@ -107,8 +107,16 @@ const SFX_VOICE = {
 /** pitch x, length x, formant x — relative to an ordinary character. */
 const SFX_KEY_RATIOS = {
   'Enter':     [0.78, 1.25, 0.80],   // lower, longer — a full stop
-  'Backspace': [0.72, 0.85, 0.69],   // dull, swallowed
-  'Delete':    [0.72, 0.85, 0.69],
+  /* 0.72 put backspace a fourth below an ordinary character and dropped its
+     formant to 1100, which is far enough that it stopped being the same voice
+     and started being a thud every time you corrected a typo — the one key you
+     hit most often after the letters. Under two semitones below an ordinary
+     character now rather than nearly six. That does lift it above return and
+     tab in pitch, so it is no longer the lowest of the set; it is still the
+     dullest, and the dullness is what read as a correction rather than the
+     depth. */
+  'Backspace': [0.90, 0.85, 0.86],   // dull, swallowed
+  'Delete':    [0.90, 0.85, 0.86],
   ' ':         [0.89, 0.85, 0.91],   // the gap between words
   'Tab':       [0.83, 1.06, 0.84]
 };
