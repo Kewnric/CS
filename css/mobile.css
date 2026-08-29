@@ -76,7 +76,9 @@
   .home-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
   .home-stat-card { padding: 0.85rem 0.7rem; }
   .stat-value { font-size: 1.5rem; }
-  .stat-label { font-size: 0.62rem; letter-spacing: 0.06em; }
+  /* 0.62rem works out at 9.92px, which I set in the last pass and which is
+     smaller than anything else in the app. Phone text has a floor. */
+  .stat-label { font-size: 0.7rem; letter-spacing: 0.05em; }
   .stat-icon { width: 34px; height: 34px; }
 
   /* Cards stack; a two-column grid at this width leaves nothing readable. */
@@ -128,6 +130,106 @@
   /* The floating settings gear and the agenda flag both sit in corners the
      thumb reaches for; keep them clear of the menu button. */
   .ag-flag-root { right: 6px; }
+
+  /* ── THE ATTEMPT SCREEN ─────────────────────────────────────
+     Two things here were not "cramped", they were unusable.
+
+     The topbar carries ten controls and needs 557px to lay them out. In a
+     373px bar with no overflow rule, everything past the fifth simply was not
+     there: Check Code sat at x=417 with no way to reach it. It scrolls
+     sideways now, which is the honest answer for a strip of controls that
+     genuinely does not fit — the alternative, wrapping, pushes the editor off
+     the bottom of the screen.
+
+     And the test panel was display:none, so an attempt on a phone could be
+     run but never checked — the results existed and could not be seen. It
+     sits under the editor now. */
+  .practice-topbar {
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 0.35rem;
+    padding-left: 58px;          /* clear of the floating menu button */
+  }
+  .practice-topbar::-webkit-scrollbar { display: none; }
+
+  /* Check Code rides along at the right edge instead of scrolling away with
+     everything else. A strip that scrolls is a fair answer for ten controls
+     that do not fit; making you scroll 300px to reach the primary action is
+     not, and it is the one button an attempt is actually for. */
+  .practice-topbar .pp-check-btn {
+    position: sticky;
+    right: 2px;
+    z-index: 3;
+    box-shadow: -10px 0 12px -6px var(--bg-primary, rgba(0, 0, 0, 0.6));
+  }
+  .practice-topbar > * { flex-shrink: 0; }
+
+  /* The boss bar is the exception. It is hidden by default and costs nothing
+     then, but switched ON it measured 307px — most of a 375px screen — and
+     pushed the action buttons that far further out of reach. It shrinks here
+     rather than being hidden, because it is a feature and not clutter; it
+     just does not get to outrank the button that runs your tests. */
+  .practice-topbar-center {
+    flex-shrink: 1;
+    min-width: 0;
+    max-width: 34vw;
+    overflow: hidden;
+  }
+
+  .practice-panel {
+    display: block !important;
+    width: 100% !important;
+    flex-basis: auto !important;
+    max-height: 45vh;
+    overflow-y: auto;
+    border-left: none;
+    border-top: 1px solid var(--border-color);
+  }
+  .practice-sidebar { max-height: 34vh; overflow-y: auto; }
+  .practice-editor-area { min-height: 46vh; }
+
+  /* ── TOUCH TARGETS ──────────────────────────────────────────
+     Measured across every route: the back button in each library was 64x23,
+     and a handful of others sat between 20 and 26px tall. Thumbs are about
+     9mm; these were being aimed at with a fingernail. */
+  .btn-back-dark,
+  .hero-verse-btn,
+  .hc-go,
+  .activity-action,
+  .lang-pill {
+    min-height: 34px;
+    padding-top: 0.4rem;
+    padding-bottom: 0.4rem;
+  }
+  .hc-dismiss,
+  .lang-swap-btn,
+  .hero-verse-btn,
+  .lang-pill { min-width: 34px; min-height: 34px; }
+
+  /* ── TEXT FLOORS ────────────────────────────────────────────
+     Anything under 11px measured across the routes, lifted to a size that
+     survives a phone screen at arm's length. */
+  .stat-goal-txt,
+  .hc-sub,
+  .lang-pair-label,
+  .lang-pill,
+  .lang-board-hint,
+  .prog-stat-body em { font-size: 0.72rem; }
+
+  /* A keyboard shortcut is not advice a phone can act on. */
+  .search-shortcut-hint { display: none; }
+
+  /* The cloud status toast was pinned 366px from the left of a 375px screen,
+     so it hung off the right edge. */
+  .cloud-toast {
+    left: 10px;
+    right: 10px;
+    width: auto;
+    max-width: calc(100vw - 20px);
+  }
 }
 
 /* A phone in landscape is short rather than narrow — the drawer should not
