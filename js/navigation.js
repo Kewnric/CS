@@ -26,6 +26,13 @@ function toggleSidebar() {
   }
 }
 
+/* Any route change closes the drawer. Tapping a nav item used to leave it
+   open over the page you had just asked for, which on a phone means the
+   destination is behind the menu you navigated with. */
+new MutationObserver(function () {
+  if (window.innerWidth <= 640) closeMobileSidebar();
+}).observe(document.body, { attributes: true, attributeFilter: ['data-route'] });
+
 function closeMobileSidebar() {
   const sidebar = document.querySelector('.app-sidebar');
   if (sidebar) sidebar.classList.remove('mobile-open');

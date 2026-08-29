@@ -1,0 +1,138 @@
+/* ============================================================
+   MOBILE.CSS — the phone pass
+   ------------------------------------------------------------
+   Everything here is under one breakpoint so there is a single place to tune
+   how the app behaves on a phone.
+
+   The headline fix is the menu button. The mobile drawer already worked —
+   toggleSidebar() has handled .mobile-open and the backdrop for a long time —
+   but the ONLY control that called it lived inside the sidebar, which is
+   translated fully off-screen on a phone. So the button sat at x = -244 and
+   there was no way to reach navigation at all. It is now a fixed control that
+   is not part of the sidebar and cannot travel with it.
+   ============================================================ */
+
+/* ── The menu button ──────────────────────────────────────────
+   Desktop never sees it: there the sidebar is always on screen and its own
+   toggle is reachable.
+   ------------------------------------------------------------ */
+.mobile-menu-btn { display: none; }
+
+@media (max-width: 640px) {
+  .mobile-menu-btn {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    /* Under the sidebar's 200 on purpose: when the drawer is open it slides
+       over the button, and the backdrop behind it is what closes it. Two
+       controls fighting over the same corner would be worse. */
+    z-index: 190;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    background: color-mix(in srgb, var(--bg-nav-solid) 88%, transparent);
+    backdrop-filter: blur(10px);
+    color: var(--text-primary);
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+  }
+  .mobile-menu-btn:active { transform: scale(0.94); }
+
+  /* The button floats over the page, so the first thing on each screen needs
+     room to clear it rather than sitting underneath. */
+  .home-scroll,
+  .pane-1-header,
+  .lib-hub,
+  .messenger-pane-1 { padding-top: 58px; }
+
+  /* ── Type and spacing ───────────────────────────────────────
+     The desktop scale was being used unchanged on a 375px screen, which is
+     what "everything is too large" was. Headings come down hardest because
+     they were sized for a column three times this wide. */
+  /* .hero-greeting, not .hero-title — the visible heading on the dashboard is
+     the greeting, and the only h1 is screen-reader-only. Sizing the h1 changed
+     nothing anyone could see. */
+  .hero-greeting,
+  .lib-hub-title { font-size: 1.5rem; line-height: 1.2; }
+  .hero-greeting .miside-char { font-size: inherit; }
+
+  .hero-sub,
+  .hero-verse,
+  .lib-hub-subtitle { font-size: 0.9rem; }
+
+  .home-hero,
+  .hero-section,
+  .lib-hub-hero { padding: 1.1rem; }
+
+  .section-header-title { font-size: 1.05rem; }
+  .browse-folder-title { font-size: 1.15rem; }
+
+  /* Stat tiles: two up rather than one, and the numbers no longer set at a
+     size meant to be read across a room. */
+  .home-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+  .home-stat-card { padding: 0.85rem 0.7rem; }
+  .stat-value { font-size: 1.5rem; }
+  .stat-label { font-size: 0.62rem; letter-spacing: 0.06em; }
+  .stat-icon { width: 34px; height: 34px; }
+
+  /* Cards stack; a two-column grid at this width leaves nothing readable. */
+  .card-grid,
+  .lib-hub-grid { grid-template-columns: 1fr; gap: 0.7rem; }
+  .card, .lib-card { padding: 0.9rem; }
+
+  /* ── The two-pane layouts ───────────────────────────────────
+     Every library is a sidebar tree beside a detail pane. At 375px there is
+     no room for both, so the tree sits above the detail and the drag handle
+     between them goes away — there is nothing left to drag. */
+  .messenger-layout {
+    flex-direction: column;
+    height: auto;
+    min-height: 0;
+  }
+  .messenger-pane-1,
+  .messenger-pane-2 {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    flex: none;
+  }
+  .messenger-pane-1 { max-height: 42vh; }
+  .resizer-divider { display: none; }
+
+  /* ── Things that were simply too wide ───────────────────────
+     A year is 53 columns wide however small the squares get, so this scrolls
+     inside its own box rather than pretending to fit. Smaller cells just mean
+     less of that scrolling: 844px down to about 480. The page itself never
+     overflows — the box clips it. */
+  .home-heatmap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .heatmap-grid { gap: 1px; }
+  .heatmap-grid .heatmap-cell { width: 8px; height: 8px; }
+
+  /* Tables and code blocks scroll inside themselves rather than pushing the
+     page sideways. */
+  .wing-body pre,
+  .practice-desc-body pre,
+  table { max-width: 100%; overflow-x: auto; display: block; }
+
+  /* ── Touch targets ──────────────────────────────────────────
+     Anything you tap wants to be reachable with a thumb rather than a
+     fingernail. */
+  .btn, .btn-sm { min-height: 38px; }
+  .practice-icon-btn { width: 36px; height: 36px; }
+  .tree-node-row { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+
+  /* The floating settings gear and the agenda flag both sit in corners the
+     thumb reaches for; keep them clear of the menu button. */
+  .ag-flag-root { right: 6px; }
+}
+
+/* A phone in landscape is short rather than narrow — the drawer should not
+   eat the whole screen. */
+@media (max-width: 900px) and (max-height: 480px) {
+  .messenger-pane-1 { max-height: 55vh; }
+  .home-scroll, .lib-hub, .messenger-pane-1 { padding-top: 50px; }
+}

@@ -48,6 +48,7 @@
   <link rel="stylesheet" href="css/wings/collection.css">
   <link rel="stylesheet" href="css/wings/progression.css">
   <link rel="stylesheet" href="css/wings/roadmap.css">
+  <link rel="stylesheet" href="css/mobile.css">
   <link rel="stylesheet" href="css/motion.css">
 
   <!-- Pixel faces, used only by the Language run screen. -->
@@ -140,6 +141,13 @@
   <a href="#spa-content" class="skip-link">Skip to main content</a>
   <div class="app-layout">
     <div id="sidebar-backdrop" class="sidebar-backdrop hidden" onclick="closeMobileSidebar()" aria-hidden="true"></div>
+    <!-- Outside .app-sidebar on purpose: the sidebar is translated fully
+         off-screen on a phone, and the only toggle used to be inside it. -->
+    <button id="mobile-menu-btn" class="mobile-menu-btn" type="button"
+            onclick="toggleSidebar()" aria-label="Open navigation" aria-expanded="false"
+            aria-controls="app-sidebar-nav">
+      <i data-lucide="menu" aria-hidden="true"></i>
+    </button>
 
     <nav class="app-sidebar" id="app-sidebar-nav">
       <div class="sidebar-top">
