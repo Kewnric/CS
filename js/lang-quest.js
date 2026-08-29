@@ -428,9 +428,9 @@ function lqCommands() {
   const potions = _lq.potions.reduce((n, p) => n + p.owned, 0);
   return [
     { id: 'talk',  glyph: '💬', label: 'SPEAK UP' },
-    { id: 'item',  glyph: '🧃', label: 'ITEM', off: !potions },
-    { id: 'power', glyph: '✦', label: 'POWER', off: _lq.power < Math.min(...LANG_POWERUPS.map(p => p.cost)) },
-    { id: 'flee',  glyph: '🏃', label: 'FLEE FROM BATTLE' }
+    { id: 'item',  glyph: '🧃', label: 'ITEM  ×' + potions, off: !potions },
+    { id: 'power', glyph: '✦', label: 'POWER  ' + Math.round(_lq.power), off: _lq.power < Math.min(...LANG_POWERUPS.map(p => p.cost)) },
+    { id: 'flee',  glyph: '🏃', label: 'FLEE FROM BATTLE  −' + LQ_FLEE_COST }
   ];
 }
 
@@ -493,16 +493,20 @@ function lqStep() {
     return;
   }
 
-  // Four quiet legs in a row and the next is certain, so a run cannot stall
+  // Six quiet legs in a row and the next is certain, so a run cannot stall
   // into pressing the same button at nothing.
-  const forced = _lq.steps - (_lq.lastEncounterStep || 0) >= 4;
+  const forced = _lq.steps - (_lq.lastEncounterStep || 0) >= 6;
   if (forced || Math.random() < LANG_ENCOUNTER_CHANCE) {
     const enemy = langRandomEnemy(_lq.location);
     if (enemy) {
       _lq.lastEncounterStep = _lq.steps;
       _lq.enemy = enemy;
+      const moved = enemy.location && enemy.location !== _lq.location;
       _lq.location = enemy.location || _lq.location;
       _lq.turn = 0; _lq.removed = [];
+      // Naming the place you have walked into, the way REC does when the
+      // backdrop changes — otherwise the scene swaps under you unremarked.
+      if (moved) lqSay(null, 'You are currently in the {' + langLocation(_lq.location).name + '}.');
       lqSay(null, lqMeetLine(enemy));
       lqThen(() => { _lq.scene = 'battle'; lqBeginTurn(); lqRender(); });
       lqRender();
@@ -521,19 +525,25 @@ function lqStep() {
   lqRender();
 }
 
-/** What a quiet leg can turn up. Roughly half of them give you something. */
+/**
+ * What a quiet block can turn up. Almost always: nothing.
+ *
+ * This used to fire on 62% of clear blocks, and 22% of those handed back
+ * stamina — which cancelled the very drain the walk is supposed to have and
+ * made a 10-point flee vanish into the noise. The shape of a run is meant to
+ * be plain: the total climbs, the current falls, and once in a while you find
+ * something. Roughly one block in eight now, and nothing it gives ever
+ * refunds the current stamina.
+ */
 function lqFind() {
   const roll = Math.random();
-  if (roll < 0.28) {
+  if (roll < 0.07) {
     const p = _lq.potions[Math.floor(Math.random() * _lq.potions.length)];
     p.owned++;
-    lqSay(null, 'Someone left a {' + p.name.toLowerCase() + '} on the ledge. You pocket it.');
-  } else if (roll < 0.5 && _lq.stamina < _lq.staminaMax) {
-    const gain = Math.min(5, _lq.staminaMax - _lq.stamina);
-    _lq.stamina += gain;
-    lqSay(null, 'You slow down and get your breath back. (+' + gain + ' stamina)');
-  } else if (roll < 0.62 && _lq.power < _lq.powerMax) {
-    const gain = Math.min(8, _lq.powerMax - _lq.power);
+    lqSay(null, 'You notice something gleaming from the corner of your eye.');
+    lqSay(null, 'Someone left a {' + p.name.toLowerCase() + '} behind. You pocket it.');
+  } else if (roll < 0.12 && _lq.power < _lq.powerMax) {
+    const gain = Math.min(10, _lq.powerMax - _lq.power);
     _lq.power += gain;
     lqSay(null, 'You turn a phrase over in your head. (+' + gain + ' power)');
   }
@@ -624,11 +634,18 @@ function lqAfterTurn() {
   lqRender();
 }
 
+/* Backing out is the expensive option: it costs more than a block of walking
+   and, unlike a block of walking, it buys you no endurance at all. */
+const LQ_FLEE_COST = 15;
+
 function lqFlee() {
   if (!_lq) return;
-  _lq.stamina = Math.max(0, _lq.stamina - 10);
+  const before = _lq.stamina;
+  _lq.stamina = Math.max(0, _lq.stamina - LQ_FLEE_COST);
   _lq.fled++;
-  lqSay(null, 'You slip away before it gets awkward. (−10 stamina)');
+  lqSay(null, 'You slip away before it gets awkward.');
+  lqSay(null, 'Backing out took it out of you. {−' + Math.round(before - _lq.stamina)
+    + ' stamina}, and no ground gained.');
   if (_lq.stamina <= 0) { lqThen(() => lqFinish('exhausted')); lqRender(); return; }
   if (_lq.mode === 'scenario') { lqThen(() => lqFinish('fled')); lqRender(); return; }
   lqThen(() => { _lq.enemy = null; _lq.scene = 'road'; lqRoadMenu(); lqRender(); });

@@ -574,7 +574,10 @@ const LANG_RUN_STEP_COST = 6;        // stamina per leg of the run
    Flat, and every single time, rather than a smaller gain on a counter — a
    reward you have to count blocks to predict is not a reward you feel. */
 const LANG_RUN_ENDURANCE_GAIN = 10;  // added to the MAX on every clear block
-const LANG_ENCOUNTER_CHANCE = 0.45;  // per step
+/* Walking should be the thing you spend most of a run doing. At 0.45 a run
+   turned up more fights than clear blocks, which buried the loop the mode is
+   actually built on — total up, current down, block after block. */
+const LANG_ENCOUNTER_CHANCE = 0.28;  // per step
 
 /* Flavour while walking. Placeholders, as asked — they set the beat between
    encounters without pretending to be finished writing. */
