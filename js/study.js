@@ -1448,12 +1448,6 @@ function importSharedSnippet(shared) {
    and are reached through treeContextMenu like every other library. */
 
 
-function snippetCtxSetTier(value) {
-  if (!snippetCtxTargetNodeId) return;
-  updateFolderTier(snippetCtxTargetNodeId, value || null);
-  if (typeof renderSnippetList === 'function') renderSnippetList();
-}
-
 function sctxOpenTierPicker() {
   closeSnippetCtxMenu();
   if (!snippetCtxTargetNodeId) return;

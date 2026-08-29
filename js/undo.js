@@ -163,6 +163,11 @@ function softDeleteFolder(nodeId, afterDelete) {
   const childSnippets = (state.snippets || []).filter(s => s.parentId === nodeId).map(s => ({ id: s.id, parentId: s.parentId }));
   const childNotebooks = (state.notebooks || []).filter(n => n.parentId === nodeId).map(n => ({ id: n.id, parentId: n.parentId }));
   const childSets = (state.codingSets || []).filter(s => (s.parentId || null) === nodeId).map(s => ({ id: s.id, parentId: s.parentId }));
+  // deleteNode also drops this folder's own lock rule and rewires every rule
+  // that pointed at it. Snapshotting the whole map is the only honest way to
+  // put that back: the folder used to return without its prerequisites, and
+  // other folders kept the rewiring.
+  const reqSnapshot = JSON.parse(JSON.stringify(state.categoryRequirements || {}));
 
   // Execute the actual delete (promotes children to parent)
   deleteNode(nodeId);
@@ -171,6 +176,7 @@ function softDeleteFolder(nodeId, afterDelete) {
   pushUndo('Deleted folder "' + (nodeSnapshot.name || 'Untitled') + '"', () => {
     // Restore the folder node
     state.nodes.push(nodeSnapshot);
+    state.categoryRequirements = reqSnapshot;
     // Re-parent children back under this folder
     childFolders.forEach(cf => {
       const n = state.nodes.find(x => x.id === cf.id);

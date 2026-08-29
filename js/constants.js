@@ -9,6 +9,7 @@ function getAppStorageKey() { return sessionStorage.getItem('storageMode') === '
 function getVizStorageKey() { return sessionStorage.getItem('storageMode') === 'online' ? 'vizCanvasData_online' : 'vizCanvasData'; }
 function getBrainStorageKey() { return sessionStorage.getItem('storageMode') === 'online' ? 'brainCanvasData_online' : 'brainCanvasData'; }
 function getQuestStorageKey() { return sessionStorage.getItem('storageMode') === 'online' ? 'questBoardData_online' : 'questBoardData_v3'; }
+function getCheatStorageKey() { return sessionStorage.getItem('storageMode') === 'online' ? 'cheatsheetLibrary_online' : 'cheatsheetLibrary'; }
 
 /** sessionStorage key prefix used by setSessionParam / getSessionParam */
 const SESSION_PREFIX = 'cm_';

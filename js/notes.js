@@ -1126,12 +1126,6 @@ function importSharedNotebook(shared) {
    over the shared one; its actions now hang off registerTreeHost('notes') and
    are reached through treeContextMenu like every other library. */
 
-function notebookCtxSetTier(value) {
-  if (!notebookCtxTargetNodeId) return;
-  updateFolderTier(notebookCtxTargetNodeId, value || null);
-  if (typeof notesRenderSidebar === 'function') notesRenderSidebar();
-}
-
 function nctxOpenTierPicker() {
   closeNotebookCtxMenu();
   if (!notebookCtxTargetNodeId) return;

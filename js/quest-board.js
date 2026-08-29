@@ -525,12 +525,27 @@ function _collectFormValues(q) {
 }
 
 function deleteActiveQuest() {
-  showConfirm('Delete Quest', 'Permanently delete this quest?', () => {
-    questState.quests = questState.quests.filter(q => q.id !== questState.activeQuestId);
+  const id = questState.activeQuestId;
+  const at = questState.quests.findIndex(q => q.id === id);
+  if (at === -1) return;
+  const snapshot = JSON.parse(JSON.stringify(questState.quests[at]));
+  showConfirm('Delete Quest', 'Delete this quest? You can undo it from the toast that follows.', () => {
+    questState.quests.splice(at, 1);
     questState.activeQuestId = null;
     saveQuestData();
     renderQuestList();
     renderQuestDetails();
+    // A quest carries its whole checklist and timers with it, so losing one to
+    // a misclick cost more than any other delete that already had an undo.
+    if (typeof pushUndo === 'function') {
+      pushUndo('Deleted quest "' + (snapshot.title || 'Untitled') + '"', () => {
+        questState.quests.splice(Math.min(at, questState.quests.length), 0, snapshot);
+        questState.activeQuestId = snapshot.id;
+        saveQuestData();
+        renderQuestList();
+        renderQuestDetails();
+      });
+    }
   });
 }
 

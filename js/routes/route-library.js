@@ -112,7 +112,7 @@ function libraryInit() {
     // Read straight from the cheat-sheet store; it is not part of `state`.
     let cheatCount = 0, cheatPages = 0;
     try {
-      const raw = JSON.parse(localStorage.getItem('cheatsheetLibrary')) || {};
+      const raw = JSON.parse(localStorage.getItem(typeof getCheatStorageKey === 'function' ? getCheatStorageKey() : 'cheatsheetLibrary')) || {};
       cheatCount = (raw.sheets || []).length;
       cheatPages = (raw.sheets || []).reduce((n, x) => n + ((x.pages || []).length), 0);
     } catch (e) { /* nothing saved yet */ }

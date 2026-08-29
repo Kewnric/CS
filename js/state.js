@@ -185,6 +185,7 @@ function loadData() {
       state.langSets = parsed.langSets || [];
       state.langScenarios = parsed.langScenarios || [];
       state.langHistory = parsed.langHistory || [];
+      state.wings = (parsed.wings && typeof parsed.wings === 'object') ? parsed.wings : {};
       state.expandedNodes = parsed.expandedNodes || [];
 
       // Tree migration: if nodes don't exist yet, migrate from flat categories
@@ -295,7 +296,8 @@ function _flushSaveData() {
     langWords: state.langWords || [],
     langSets: state.langSets || [],
     langScenarios: state.langScenarios || [],
-    langHistory: state.langHistory || []
+    langHistory: state.langHistory || [],
+    wings: state.wings || {}
   };
   try {
     localStorage.setItem(getAppStorageKey(), JSON.stringify(dataToSave));

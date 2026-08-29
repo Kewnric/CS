@@ -13,7 +13,12 @@
    (which opens the same sheets read-only).
    ============================================================ */
 
-const CS_KEY = 'cheatsheetLibrary';
+/* Per account, like every other store. csKey() rather than a constant
+   because the mode is only known at call time. */
+function csKey() {
+  return typeof getCheatStorageKey === 'function'
+    ? getCheatStorageKey() : 'cheatsheetLibrary';
+}
 const CS_PAGE = 15;                 // cards per page, same as everywhere else
 
 const cs = {
@@ -39,13 +44,24 @@ function csId(p) { return p + '_' + (typeof generateId === 'function' ? generate
 function csLoad() {
   try { const v = localStorage.getItem('csView'); if (v === 'list' || v === 'grid') cs.view = v; } catch (e) { /* none */ }
   try {
-    const raw = JSON.parse(localStorage.getItem(CS_KEY));
+    const key = csKey();
+    let raw = JSON.parse(localStorage.getItem(key));
+    // One-time carry-over: the library used to be shared by both modes. An
+    // online account reading for the first time inherits what was there
+    // rather than opening onto an empty shelf.
+    if (!raw && key !== 'cheatsheetLibrary') {
+      const shared = JSON.parse(localStorage.getItem('cheatsheetLibrary'));
+      if (shared && shared.sheets && shared.sheets.length) {
+        raw = shared;
+        try { localStorage.setItem(key, JSON.stringify({ sheets: shared.sheets })); } catch (e) { /* full */ }
+      }
+    }
     cs.sheets = (raw && raw.sheets) || [];
   } catch (e) { cs.sheets = []; }
 }
 
 function csSave() {
-  try { localStorage.setItem(CS_KEY, JSON.stringify({ sheets: cs.sheets })); }
+  try { localStorage.setItem(csKey(), JSON.stringify({ sheets: cs.sheets })); }
   catch (e) {
     // A silent failure here loses written notes, which is the worst thing this
     // file could do quietly.

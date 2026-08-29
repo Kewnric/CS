@@ -101,7 +101,7 @@ function analyticsInit() {
   if (typeof lucide !== 'undefined') lucide.createIcons(libRoot ? { root: libRoot } : undefined);
 }
 
-function analyticsDestroy() { }
+function analyticsDestroy() { animateCountersStop(); }
 
 
 /* -------------------------------------------------------------
@@ -177,7 +177,7 @@ function analyticsCodingInit() {
   }
 }
 
-function analyticsCodingDestroy() { }
+function analyticsCodingDestroy() { animateCountersStop(); }
 
 
 /* -------------------------------------------------------------
@@ -252,7 +252,7 @@ function analyticsNotesInit() {
   }
 }
 
-function analyticsNotesDestroy() { }
+function analyticsNotesDestroy() { animateCountersStop(); }
 
 
 /* -------------------------------------------------------------
@@ -298,7 +298,7 @@ function analyticsSnippetsInit() {
   if (typeof lucide !== 'undefined') lucide.createIcons();
 }
 
-function analyticsSnippetsDestroy() { }
+function analyticsSnippetsDestroy() { animateCountersStop(); }
 
 /* updateAnalyticsSummary() used to live here. It queried #analytics-summary-strip
    and #analytics-header-stats — ids that exist nowhere in the templates (they are
@@ -360,7 +360,17 @@ function calcStudyStreak() {
   return streak;
 }
 
+/* Held so leaving the route mid-count stops the tickers rather than leaving
+   them writing into elements that are no longer on the page. */
+let _anCounterTimers = [];
+
+function animateCountersStop() {
+  _anCounterTimers.forEach(clearInterval);
+  _anCounterTimers = [];
+}
+
 function animateCounters(container) {
+  animateCountersStop();
   container.querySelectorAll('[data-count]').forEach(el => {
     const target = parseInt(el.dataset.count);
     if (isNaN(target) || target === 0) return;
@@ -368,8 +378,13 @@ function animateCounters(container) {
     const step = Math.max(1, Math.ceil(target / 30));
     const interval = setInterval(() => {
       current += step;
-      if (current >= target) { current = target; clearInterval(interval); }
+      if (current >= target) {
+        current = target;
+        clearInterval(interval);
+        _anCounterTimers = _anCounterTimers.filter(t => t !== interval);
+      }
       el.textContent = current;
     }, 25);
+    _anCounterTimers.push(interval);
   });
 }

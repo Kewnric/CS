@@ -200,6 +200,12 @@ function brainDeleteFolder(id) {
                brain.versions.filter(v => v.folderId === id).length;
   const go = () => {
     const parent = f.parentId || null;
+    // Snapshotted before the move so Undo can put the folder back and return
+    // everything that was inside it, the way brainDeleteVersion does.
+    const at = brain.folders.indexOf(f);
+    const snapshot = JSON.parse(JSON.stringify(f));
+    const movedFolders = brain.folders.filter(c => c.parentId === id).map(c => c.id);
+    const movedVersions = brain.versions.filter(v => v.folderId === id).map(v => v.id);
     // Child FOLDERS were left pointing at a folder that no longer exists, so
     // they and everything under them vanished from the tree for good. Both
     // kinds move up to the deleted folder's own parent.
@@ -207,6 +213,23 @@ function brainDeleteFolder(id) {
     brain.versions.forEach(v => { if (v.folderId === id) v.folderId = parent; });
     brain.folders = brain.folders.filter(x => x.id !== id);
     brainSave(); brainRenderSidebar();
+    if (typeof toast === 'function') {
+      toast('Deleted \u201c' + snapshot.name + '\u201d.', {
+        type: 'info', duration: 8000,
+        action: { label: 'Undo', onClick: () => {
+          brain.folders.splice(Math.min(at, brain.folders.length), 0, snapshot);
+          movedFolders.forEach(cid => {
+            const c = brain.folders.find(x => x.id === cid);
+            if (c) c.parentId = id;
+          });
+          movedVersions.forEach(vid => {
+            const v = brain.versions.find(x => x.id === vid);
+            if (v) v.folderId = id;
+          });
+          brainSave(); brainRenderSidebar();
+        } }
+      });
+    }
   };
   const where = f.parentId ? 'the folder above' : 'the top level';
   if (typeof showConfirm === 'function') {

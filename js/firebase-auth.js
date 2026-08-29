@@ -576,6 +576,27 @@ async function loadFromFirestore(uid) {
   }
 }
 
+/** The cheat sheets, read straight from their store when cheatsheet.js has
+    not loaded its copy yet. */
+function _cheatSheetsFromStorage() {
+  try {
+    const key = typeof getCheatStorageKey === 'function' ? getCheatStorageKey() : 'cheatsheetLibrary';
+    return (JSON.parse(localStorage.getItem(key)) || {}).sheets || [];
+  } catch (e) { return []; }
+}
+
+/** Put a cloud copy of the cheat sheets back, in memory and on disk. Always
+    called, even with nothing to restore, so one account's sheets cannot be
+    left in place for the next one that signs in. */
+function _restoreCheatSheets(sheets) {
+  const list = Array.isArray(sheets) ? sheets : [];
+  try {
+    const key = typeof getCheatStorageKey === 'function' ? getCheatStorageKey() : 'cheatsheetLibrary';
+    localStorage.setItem(key, JSON.stringify({ sheets: list }));
+  } catch (e) { /* storage full */ }
+  if (typeof cs !== 'undefined') cs.sheets = list;
+}
+
 /** Load V2 subcollection documents in parallel. */
 async function _loadV2Domains(uid) {
   const userRef = fbDb.collection('users').doc(uid);
@@ -612,6 +633,8 @@ async function _loadV2Domains(uid) {
     state.langWords = d.langWords || [];
     state.langSets = d.langSets || [];
     state.langScenarios = d.langScenarios || [];
+    state.wings = (d.wings && typeof d.wings === 'object') ? d.wings : {};
+    _restoreCheatSheets(d.cheatsheets);
   }
 
   // History (separated for size management)
@@ -699,6 +722,8 @@ function _restoreV1Data(data) {
   state.langSets = parsed.langSets || [];
   state.langScenarios = parsed.langScenarios || [];
   state.langHistory = parsed.langHistory || [];
+  state.wings = (parsed.wings && typeof parsed.wings === 'object') ? parsed.wings : {};
+  _restoreCheatSheets(parsed.cheatsheets);
 
   if (Array.isArray(parsed.nodes)) {
     state.nodes = parsed.nodes;
@@ -1033,7 +1058,12 @@ async function saveToFirestore(uid) {
       events: state.events || [],
       langWords: state.langWords || [],
       langSets: state.langSets || [],
-      langScenarios: state.langScenarios || []
+      langScenarios: state.langScenarios || [],
+      wings: state.wings || {},
+      // The cheat sheets live in their own localStorage key rather than in
+      // `state`. csSave() has always asked for a cloud save; nothing carried
+      // them until now.
+      cheatsheets: (typeof cs !== 'undefined' && cs.sheets) ? cs.sheets : _cheatSheetsFromStorage()
     }) || {};
 
     // History domain (separated — grows unbounded)
@@ -1396,7 +1426,7 @@ async function _doSignOut() {
     localStorage.removeItem('vizCanvasData_online');
     localStorage.removeItem('brainCanvasData_online');
     localStorage.removeItem('questBoardData_online');
-    localStorage.removeItem('questBoardData_v3');
+    localStorage.removeItem('cheatsheetLibrary_online');
 
     // Also wipe sessionStorage so nothing carries over to the next account
     try { sessionStorage.clear(); } catch (e) {}

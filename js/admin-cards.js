@@ -949,14 +949,23 @@ function adminDeleteFolder(id) {
     : 'It is empty.';
   showConfirm('Delete "' + (f.name || 'category') + '"?', detail, () => {
     const up = f.parentId || null;
-    (state.nodes || []).forEach(c => { if (c.parentId === id) c.parentId = up; });
-    (state[sc.key] || []).forEach(x => { if (x.parentId === id) x.parentId = up; });
-    delete (state.categoryRequirements || {})[id];
-    state.nodes = (state.nodes || []).filter(x => x.id !== id);
     if (_adminNavFolderId === id) _adminNavFolderId = up;
-    saveData();
-    if (typeof renderAdmin === 'function') renderAdmin();
-    adminRenderCards();
+    const repaint = () => {
+      if (typeof renderAdmin === 'function') renderAdmin();
+      adminRenderCards();
+    };
+    // Through the shared helper, which promotes the children exactly the same
+    // way and raises the undo toast this path never had.
+    if (typeof softDeleteFolder === 'function') {
+      softDeleteFolder(id, repaint);
+    } else {
+      (state.nodes || []).forEach(c => { if (c.parentId === id) c.parentId = up; });
+      (state[sc.key] || []).forEach(x => { if (x.parentId === id) x.parentId = up; });
+      delete (state.categoryRequirements || {})[id];
+      state.nodes = (state.nodes || []).filter(x => x.id !== id);
+      saveData();
+      repaint();
+    }
   });
 }
 

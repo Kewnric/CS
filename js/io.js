@@ -29,13 +29,14 @@ function handleDataExport() {
     langWords: state.langWords || [],
     langSets: state.langSets || [],
     langScenarios: state.langScenarios || [],
-    langHistory: state.langHistory || []
+    langHistory: state.langHistory || [],
+    wings: state.wings || {}
   };
   // The cheat sheets live in their own localStorage key rather than in
   // `state`, which is exactly why they were missing from every backup taken
   // so far. They are a library on the Library board like any other.
   try {
-    const cheats = JSON.parse(localStorage.getItem('cheatsheetLibrary'));
+    const cheats = JSON.parse(localStorage.getItem(typeof getCheatStorageKey === 'function' ? getCheatStorageKey() : 'cheatsheetLibrary'));
     if (cheats && cheats.sheets) data.cheatsheets = cheats.sheets;
   } catch (e) { /* nothing saved yet */ }
   if (typeof viz !== 'undefined') {
@@ -130,6 +131,7 @@ function handleDataImport(e) {
         state.langSets = parsed.langSets || [];
         state.langScenarios = parsed.langScenarios || [];
         state.langHistory = parsed.langHistory || [];
+        state.wings = (parsed.wings && typeof parsed.wings === 'object') ? parsed.wings : {};
 
         if (parsed.nodes && parsed.nodes.length > 0) {
           state.nodes = parsed.nodes;
@@ -146,7 +148,7 @@ function handleDataImport(e) {
 
         if (Array.isArray(parsed.cheatsheets)) {
           try {
-            localStorage.setItem('cheatsheetLibrary', JSON.stringify({ sheets: parsed.cheatsheets }));
+            localStorage.setItem(typeof getCheatStorageKey === 'function' ? getCheatStorageKey() : 'cheatsheetLibrary', JSON.stringify({ sheets: parsed.cheatsheets }));
             if (typeof csLoad === 'function') csLoad();
           } catch (e) { /* storage full — the reload below will show what landed */ }
         }
@@ -220,6 +222,7 @@ function handleDataReset() {
         langSets: [],
         langScenarios: [],
         langHistory: [],
+        wings: {},
         activeChallenge: null,
         activeVariant: null,
         userCode: '',
@@ -238,7 +241,7 @@ function handleDataReset() {
 
       // Clear auxiliary local data, but PRESERVE storageMode so the user doesn't
       // get bounced back to the picker on the reload.
-      localStorage.removeItem('cheatsheetLibrary');
+      localStorage.removeItem(typeof getCheatStorageKey === 'function' ? getCheatStorageKey() : 'cheatsheetLibrary');
       localStorage.removeItem('vizCanvasData');
       localStorage.removeItem('brainCanvasData');
       localStorage.removeItem('vizCanvasData_online');

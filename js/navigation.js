@@ -233,7 +233,7 @@ function getGlobalCommands() {
     // The one library the palette could not see into.
     ...((() => {
       let sheets = [];
-      try { sheets = (JSON.parse(localStorage.getItem('cheatsheetLibrary')) || {}).sheets || []; } catch (e) { sheets = []; }
+      try { sheets = (JSON.parse(localStorage.getItem(typeof getCheatStorageKey === 'function' ? getCheatStorageKey() : 'cheatsheetLibrary')) || {}).sheets || []; } catch (e) { sheets = []; }
       return sheets.slice(0, 40).map(sh => ({
         id: 'cs_' + sh.id,
         icon: sh.icon || 'book-marked',

@@ -379,16 +379,30 @@ function wingSave() {
 function wingDelete(id) {
   const item = wingFind(id);
   if (!item) return;
-  showConfirm('Delete entry', `Delete “${item.title || 'Untitled'}”? This can't be undone from here.`, () => {
-    const items = wingItems();
+  const key = _wingKey;
+  showConfirm('Delete entry', `Delete “${item.title || 'Untitled'}”?`, () => {
+    const items = wingItems(key);
     const i = items.findIndex(w => w.id === id);
-    if (i >= 0) items.splice(i, 1);
+    if (i < 0) return;
+    const snapshot = JSON.parse(JSON.stringify(items[i]));
+    items.splice(i, 1);
     _wingActiveId = null;
     saveData();
     wingRenderSidebar();
     wingRenderDetail();
     wingUpdateHeader();
-    if (typeof toast === 'function') toast('Deleted.', { type: 'success' });
+    // It used to say "This can't be undone from here", which was true and is
+    // the only delete left in the app that had to admit it.
+    if (typeof pushUndo === 'function') {
+      pushUndo('Deleted "' + (snapshot.title || 'Untitled') + '"', () => {
+        const list = wingItems(key);
+        list.splice(Math.min(i, list.length), 0, snapshot);
+        saveData();
+        wingRenderSidebar();
+        wingRenderDetail();
+        wingUpdateHeader();
+      });
+    }
   });
 }
 
