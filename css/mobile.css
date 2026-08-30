@@ -193,9 +193,16 @@
     row-gap: 0.3rem;
     gap: 0.35rem;
     overflow: visible;
-    padding-left: 58px;          /* clear of the floating menu button */
+    /* No blanket 58px any more. The floating menu button only overlaps the
+       FIRST row, so padding the whole bar left an empty 58px strip beside
+       every control on the second one. Row one clears the button itself. */
+    padding-left: 0.5rem;
   }
-  .practice-topbar-left { order: 1; flex-shrink: 0; }
+  .practice-topbar-left {
+    order: 1;
+    flex-shrink: 0;
+    margin-left: 50px;           /* this row, and only this row, clears it */
+  }
   .practice-topbar-center { order: 2; }
   .practice-topbar-right {
     order: 3;
@@ -213,20 +220,16 @@
      everything else. A strip that scrolls is a fair answer for ten controls
      that do not fit; making you scroll 300px to reach the primary action is
      not, and it is the one button an attempt is actually for. */
-  .practice-topbar .pp-check-btn {
-    position: sticky;
-    right: 2px;
-    z-index: 3;
-    /* Fades the strip out behind the pinned button rather than letting
-       controls appear to slide under a hard edge.
+  /* Check Code sits in the row, next to Retry, and scrolls with it.
 
-       Hardcoded to match .practice-topbar, which hardcodes the same value.
-       Two earlier attempts were wrong in different ways: --bg-primary is not
-       a token this app defines at all, so it silently used my fallback, and
-       --bg-nav-solid is real but resolves to #0f172a against the topbar's
-       #161b22 — close enough to look deliberate and still the wrong colour.
-       A shadow meant to fade INTO a surface has to be that surface. */
-    box-shadow: -12px 0 14px -6px #161b22;
+     It used to be pinned to the right edge so it could not scroll away. That
+     was written when every control shared ONE row with the title and reaching
+     it meant scrolling 300px. Now that the controls have a row to themselves
+     the button is a short scroll away, and pinning it only bought a panel
+     parked on top of whatever you were trying to scroll to. */
+  .practice-topbar .pp-check-btn {
+    position: static;
+    box-shadow: none;
   }
   /* The timer wanted 146px of the control row for hundredths of a second
      nobody reads mid-attempt. Minutes and seconds still fit. */

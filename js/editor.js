@@ -64,6 +64,7 @@ function setupSpecificEditor(textareaId, preId, codeId, isPracticeMode, stateFie
     textarea.removeEventListener('scroll', oldHandlers.scroll);
     textarea.removeEventListener('input', oldHandlers.input);
     textarea.removeEventListener('keydown', oldHandlers.keydown);
+    if (oldHandlers.beforeinput) textarea.removeEventListener('beforeinput', oldHandlers.beforeinput);
   }
 
   const handlers = {
@@ -122,57 +123,32 @@ function setupSpecificEditor(textareaId, preId, codeId, isPracticeMode, stateFie
       // or an auto-closed bracket into the file.
       if (mod || e.altKey) return;
 
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        const multiline = value.slice(selectionStart, selectionEnd).includes('\n');
-        if (multiline || e.shiftKey) {
-          edIndentLines(textarea, e.shiftKey ? -1 : 1);
-        } else {
-          edReplaceRange(textarea, selectionStart, selectionEnd, ED_INDENT, selectionStart + ED_INDENT.length);
-        }
-      } else if (bracketPairs[e.key]) {
-        e.preventDefault();
-        edReplaceRange(textarea, selectionStart, selectionEnd, e.key + bracketPairs[e.key], selectionStart + 1);
-      } else if (e.key === '"' || e.key === "'" || e.key === '`') {
-        e.preventDefault();
-        const selected = value.substring(selectionStart, selectionEnd);
-        const caret = selected.length === 0 ? selectionStart + 1 : selectionStart + 1 + selected.length;
-        edReplaceRange(textarea, selectionStart, selectionEnd, e.key + selected + e.key, caret);
-      } else if (e.key === 'Enter') {
-        e.preventDefault();
-        const textBefore = value.substring(0, selectionStart);
-        const textAfter = value.substring(selectionEnd);
-        const linesBeforeCursor = textBefore.split('\n');
-        const currentLine = linesBeforeCursor[linesBeforeCursor.length - 1];
-        const indentMatch = currentLine.match(/^\s*/);
-        let indent = indentMatch ? indentMatch[0] : '';
+      if (edTextEntry(textarea, e.key, e.shiftKey)) e.preventDefault();
+    },
 
-        if ((textBefore.endsWith('{') && textAfter.startsWith('}')) || (textBefore.endsWith('[') && textAfter.startsWith(']'))) {
-          const innerIndent = indent + ED_INDENT;
-          edReplaceRange(textarea, selectionStart, selectionEnd,
-            '\n' + innerIndent + '\n' + indent, selectionStart + 1 + innerIndent.length);
-          return;
-        }
+    /* The same behaviours again, for keyboards that will not say what was
+       typed. An Android IME reports keydown with key "Unidentified" for every
+       printable character, so a handler that switches on e.key does nothing
+       there: no auto-closed bracket, no auto-indent, no de-indented brace.
 
-        if (currentLine.trim().endsWith('{') || currentLine.trim().endsWith('[')) indent += ED_INDENT;
-        edReplaceRange(textarea, selectionStart, selectionEnd, '\n' + indent, selectionStart + 1 + indent.length);
-      } else if (e.key === '}' || e.key === ']') {
-        const linesBeforeCursor = value.substring(0, selectionStart).split('\n');
-        const currentLine = linesBeforeCursor[linesBeforeCursor.length - 1];
-
-        if (currentLine.trim() === '' && currentLine.length > 0) {
-          e.preventDefault();
-          const lineStart = selectionStart - currentLine.length;
-          const newIndent = currentLine.length >= ED_INDENT.length ? currentLine.slice(0, -ED_INDENT.length) : '';
-          edReplaceRange(textarea, lineStart, selectionEnd, newIndent + e.key, lineStart + newIndent.length + 1);
-        }
-      }
+       beforeinput does carry the character, in e.data, and is cancellable, so
+       it can do the same edits. There is no double-handling to guard against:
+       when the keydown path recognises a key it calls preventDefault, the
+       character is never inserted, and beforeinput never fires for it. */
+    beforeinput: (e) => {
+      const t = e.target;
+      let key = null;
+      if (e.inputType === 'insertLineBreak' || e.inputType === 'insertParagraph') key = 'Enter';
+      else if (e.inputType === 'insertText' && e.data && e.data.length === 1) key = e.data;
+      if (!key) return;
+      if (edTextEntry(t, key, false)) e.preventDefault();
     }
   };
 
   textarea.addEventListener('scroll', handlers.scroll);
   textarea.addEventListener('input', handlers.input);
   textarea.addEventListener('keydown', handlers.keydown);
+  textarea.addEventListener('beforeinput', handlers.beforeinput);
   if (isPracticeMode) {
     textarea.addEventListener('click', () => setTimeout(() => updateLineNumbers(textarea), 0));
     textarea.addEventListener('keyup', () => setTimeout(() => updateLineNumbers(textarea), 0));
@@ -675,4 +651,90 @@ function updateVal(newVal, cursorOffset, textarea, preCode, isPracticeMode, stat
     adminState.variants[adminState.activeVariantIndex][stateField] = newVal;
   }
   if (preCode) preCode.innerHTML = syntaxHighlight(newVal) + '<br/>';
+}
+
+/* ============================================================
+   THE TEXT-ENTRY BEHAVIOURS
+   ------------------------------------------------------------
+   Auto-closing a bracket, wrapping a selection in quotes, indenting after an
+   opening brace, pulling a closing brace back out — everything the editor
+   does in response to one character being typed.
+
+   Lifted out of the keydown handler so that beforeinput can run exactly the
+   same code. They were only ever reachable through e.key, which an Android
+   keyboard does not fill in, so none of this worked on a phone: you got a
+   bare "(" with no ")", and Enter left the caret at column zero.
+
+   @param   {HTMLTextAreaElement} textarea
+   @param   {string} key    the character being inserted, or 'Enter' / 'Tab'
+   @param   {boolean} shiftKey
+   @returns {boolean} true when the insertion was handled and the caller
+            should cancel the default one
+   ============================================================ */
+function edTextEntry(textarea, key, shiftKey) {
+  if (!textarea || !key) return false;
+  const value = textarea.value;
+  const selectionStart = textarea.selectionStart;
+  const selectionEnd = textarea.selectionEnd;
+  const bracketPairs = { '{': '}', '(': ')', '[': ']' };
+
+  if (key === 'Tab') {
+    const multiline = value.slice(selectionStart, selectionEnd).includes('\n');
+    if (multiline || shiftKey) {
+      edIndentLines(textarea, shiftKey ? -1 : 1);
+    } else {
+      edReplaceRange(textarea, selectionStart, selectionEnd, ED_INDENT, selectionStart + ED_INDENT.length);
+    }
+    return true;
+  }
+
+  if (bracketPairs[key]) {
+    edReplaceRange(textarea, selectionStart, selectionEnd, key + bracketPairs[key], selectionStart + 1);
+    return true;
+  }
+
+  if (key === '"' || key === "'" || key === '`') {
+    const selected = value.substring(selectionStart, selectionEnd);
+    const caret = selected.length === 0 ? selectionStart + 1 : selectionStart + 1 + selected.length;
+    edReplaceRange(textarea, selectionStart, selectionEnd, key + selected + key, caret);
+    return true;
+  }
+
+  if (key === 'Enter') {
+    const textBefore = value.substring(0, selectionStart);
+    const textAfter = value.substring(selectionEnd);
+    const linesBeforeCursor = textBefore.split('\n');
+    const currentLine = linesBeforeCursor[linesBeforeCursor.length - 1];
+    const indentMatch = currentLine.match(/^\s*/);
+    let indent = indentMatch ? indentMatch[0] : '';
+
+    // Between a pair: the closing half goes to its own line and the caret
+    // lands on the blank one between them.
+    if ((textBefore.endsWith('{') && textAfter.startsWith('}')) ||
+        (textBefore.endsWith('[') && textAfter.startsWith(']'))) {
+      const innerIndent = indent + ED_INDENT;
+      edReplaceRange(textarea, selectionStart, selectionEnd,
+        '\n' + innerIndent + '\n' + indent, selectionStart + 1 + innerIndent.length);
+      return true;
+    }
+
+    if (currentLine.trim().endsWith('{') || currentLine.trim().endsWith('[')) indent += ED_INDENT;
+    edReplaceRange(textarea, selectionStart, selectionEnd, '\n' + indent, selectionStart + 1 + indent.length);
+    return true;
+  }
+
+  if (key === '}' || key === ']') {
+    const linesBeforeCursor = value.substring(0, selectionStart).split('\n');
+    const currentLine = linesBeforeCursor[linesBeforeCursor.length - 1];
+    // Only pull back when the brace is the first thing on its line; typing one
+    // mid-expression must not reindent the line under it.
+    if (currentLine.trim() === '' && currentLine.length > 0) {
+      const lineStart = selectionStart - currentLine.length;
+      const newIndent = currentLine.length >= ED_INDENT.length ? currentLine.slice(0, -ED_INDENT.length) : '';
+      edReplaceRange(textarea, lineStart, selectionEnd, newIndent + key, lineStart + newIndent.length + 1);
+      return true;
+    }
+  }
+
+  return false;
 }
