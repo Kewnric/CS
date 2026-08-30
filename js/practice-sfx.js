@@ -198,6 +198,10 @@ document.addEventListener('visibilitychange', function () {
    ------------------------------------------------------------ */
 function psfxLevelUp() {
   if (!_psfxOn()) return;
+  // TEMPORARY: audio/potion.MP3 when it is decoded, the synthesised bubble
+  // otherwise. Turning SAMPLES_ENABLED off in js/audio-samples.js restores
+  // the synth everywhere with no other change.
+  if (typeof samplePlay === 'function' && samplePlay('potion', _psfxBus(), { gain: 0.13 })) return;
   /* Ten steps over about a third of a second. Fewer reads as an arpeggio and
      more as a siren; this is the density that reads as bubbling.
 
@@ -232,6 +236,9 @@ function psfxPunch() {
   if (!_psfxOn()) return;
   const bus = _psfxBus();
   if (!bus) return;
+  // TEMPORARY: audio/punch.MP3 when it is decoded, the synthesised crack
+  // otherwise. See psfxLevelUp above.
+  if (typeof samplePlay === 'function' && samplePlay('punch', bus, { gain: 0.24 })) return;
   const ctx = _sfxContext();
   const t = ctx.currentTime;
 

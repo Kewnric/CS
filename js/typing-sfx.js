@@ -145,11 +145,15 @@ const SFX_VOICE_KEY = 'ssp.typingSfxVoice';
    ============================================================ */
 
 const SFX_VOICES = {
-  mita: { id: 'mita', label: 'Mita', hint: 'The dialogue blip', engine: 'voice' },
-  keys: { id: 'keys', label: 'Keys', hint: 'A mechanical keyboard', engine: 'keys' }
+  mita:   { id: 'mita',   label: 'Mita',   hint: 'The dialogue blip',      engine: 'voice' },
+  keys:   { id: 'keys',   label: 'Keys',   hint: 'A mechanical keyboard',  engine: 'keys' },
+  /* The recorded one. TEMPORARY — see js/audio-samples.js. If the sample has
+     not decoded yet, or SAMPLES_ENABLED is off, the engine falls back to the
+     Mita blip rather than typing in silence. */
+  sample: { id: 'sample', label: 'Recorded', hint: 'From audio/voice.MP3', engine: 'sample' }
 };
 
-const SFX_VOICE_ORDER = ['mita', 'keys'];
+const SFX_VOICE_ORDER = ['mita', 'keys', 'sample'];
 
 /** Body pitch, length, click colour — relative to an ordinary character. */
 const SFX_KEYBOARD = {
@@ -251,6 +255,10 @@ function _sfxContext() {
   } catch (e) {
     _sfxCtx = null;
   }
+  // Fetch and decode the recordings as soon as there is something to decode
+  // with. Safe from recursion: _sfxCtx is already assigned, so the load path
+  // calling back in here returns immediately. Three files, about 40KB.
+  if (_sfxCtx && typeof samplePrewarm === 'function') samplePrewarm();
   return _sfxCtx;
 }
 
@@ -269,7 +277,14 @@ function sfxBlip(pitch, length, colour, extra) {
   // One entry point, two engines. Everything that calls this — the keystroke
   // handler, the volume preview, the toggle's proof-of-life — gets whichever
   // voice is selected without knowing there is a choice.
-  if (sfxVoiceDef().engine === 'keys') { _sfxKeyPress(ctx, pitch, length, colour, extra); return; }
+  const engine = sfxVoiceDef().engine;
+  if (engine === 'keys') { _sfxKeyPress(ctx, pitch, length, colour, extra); return; }
+  if (engine === 'sample') {
+    // extra carries the per-key playback rate for this voice.
+    if (samplePlay('voice', _sfxBus, { gain: 0.17, rate: extra || 1, rateJitter: 0.06 })) return;
+    // Not decoded yet — fall through and speak in the original voice rather
+    // than swallowing the keystroke.
+  }
 
   const t = ctx.currentTime;
   const osc = ctx.createOscillator();
@@ -336,7 +351,23 @@ function sfxBlip(pitch, length, colour, extra) {
  * shape to it: the return at the end of a line lands differently from the
  * letters before it.
  */
+/* The recorded voice has no synthesis knobs, so the heavy keys are shaped by
+   playback rate instead: slower is lower and longer, which is the same thing
+   the other two voices do with pitch and length. */
+const SFX_SAMPLE_RATES = {
+  'Enter':     0.86,
+  'Backspace': 0.94,
+  'Delete':    0.94,
+  ' ':         0.90,
+  'Tab':       0.92
+};
+
 function sfxKeyVoice(key) {
+  if (sfxVoiceDef().engine === 'sample') {
+    // pitch/length/colour are unused by the sample engine; the fourth value is
+    // the playback rate, which is the only knob a recording has.
+    return [SFX_VOICE.pitch, SFX_VOICE.length, SFX_VOICE.formant, SFX_SAMPLE_RATES[key] || 1];
+  }
   if (sfxVoiceDef().engine === 'keys') {
     const k = SFX_KEYBOARD;
     const r = SFX_KEYBOARD_RATIOS[key];
