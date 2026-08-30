@@ -147,9 +147,8 @@ const SFX_VOICE_KEY = 'ssp.typingSfxVoice';
 const SFX_VOICES = {
   mita:   { id: 'mita',   label: 'Mita',   hint: 'The dialogue blip',      engine: 'voice' },
   keys:   { id: 'keys',   label: 'Keys',   hint: 'A mechanical keyboard',  engine: 'keys' },
-  /* The recorded one. TEMPORARY — see js/audio-samples.js. If the sample has
-     not decoded yet, or SAMPLES_ENABLED is off, the engine falls back to the
-     Mita blip rather than typing in silence. */
+  /* The recorded one: audio/voice.MP3, played whole. It does not fall back to
+     a synthesised blip — this voice is the recording. See js/audio-samples.js. */
   sample: { id: 'sample', label: 'Recorded', hint: 'From audio/voice.MP3', engine: 'sample' }
 };
 
@@ -280,10 +279,12 @@ function sfxBlip(pitch, length, colour, extra) {
   const engine = sfxVoiceDef().engine;
   if (engine === 'keys') { _sfxKeyPress(ctx, pitch, length, colour, extra); return; }
   if (engine === 'sample') {
-    // extra carries the per-key playback rate for this voice.
-    if (samplePlay('voice', _sfxBus, { gain: 0.17, rate: extra || 1, rateJitter: 0.06 })) return;
-    // Not decoded yet — fall through and speak in the original voice rather
-    // than swallowing the keystroke.
+    // audio/voice.MP3, and only that. It does not fall through to the Mita
+    // blip if the file is slow: this voice is the recording, and substituting
+    // a synthesised one for a few keystrokes would be the imitation the whole
+    // point was to avoid. `extra` carries the per-key playback rate.
+    samplePlay('voice', _sfxBus, { gain: 0.17, rate: extra || 1, rateJitter: 0.06 });
+    return;
   }
 
   const t = ctx.currentTime;

@@ -1,29 +1,26 @@
 /* ============================================================
    AUDIO-SAMPLES.JS — the recorded voice and cues
    ------------------------------------------------------------
-   TEMPORARY, and built to be easy to take back out. Everything synthesised
-   is still there and still works: this adds a third typing voice and lets the
-   two run cues prefer a recording when one is available.
+   These three sounds ARE the files in audio/. Nothing here synthesises an
+   imitation and nothing falls back to one: the recorded typing voice, the
+   success cue and the failure cue play audio/voice.MP3, audio/potion.MP3 and
+   audio/punch.MP3 respectively, and if a file cannot be played there is
+   silence rather than a substitute.
 
-   TO REVERT: set SAMPLES_ENABLED to false. The third voice disappears from
-   the picker, the run cues go back to the synthesised potion and crack, and
-   nothing else changes. To remove it for good, delete this file, its script
-   tag, and the audio/ folder.
+   There is deliberately no on/off flag. One would now mean "play nothing",
+   since there is no synthesised path behind these any more, and a switch
+   whose off position is silence is a worse thing to leave lying around than
+   no switch at all. To remove the feature, delete this file, its script tag,
+   and the audio/ folder.
 
    WHY BUFFERS RATHER THAN <audio>. A keystroke sound has to be able to
    overlap itself — you type faster than the sample is long — and an <audio>
-   element can only be at one position at a time, so fast typing would cut
-   each blip off to restart it. Decoding once into an AudioBuffer and firing a
-   fresh BufferSource per press is the only way the overlap sounds right, and
-   it routes through the same gain buses as everything else, so the mute and
-   the volume slider keep working without special cases.
+   element has one playback position, so fast typing would cut each blip off
+   to restart it. Buffers also route through the same gain buses as
+   everything else, so the mute and the volume slider keep working with no
+   special case.
    ============================================================ */
 
-const SAMPLES_ENABLED = true;
-
-/* The names are the files. Case included: GitHub Pages serves from a
-   case-sensitive filesystem, so audio/voice.mp3 would 404 in production while
-   working perfectly on Windows. */
 const SAMPLE_FILES = {
   voice:  'audio/voice.MP3',
   potion: 'audio/potion.MP3',
@@ -33,38 +30,26 @@ const SAMPLE_FILES = {
 /** name -> AudioBuffer once decoded, or null while a fetch is in flight. */
 const _sampleBuf = {};
 const _sampleTried = {};
-/** name -> { leadSec, endSec, peak } measured once at decode. */
+/** name -> { peak } measured once at decode, for levelling only. */
 const _sampleMeta = {};
 
-/* Anything below this counts as silence rather than signal. Low enough to keep
-   a soft attack, high enough to ignore encoder noise in a quiet lead-in. */
-const SAMPLE_SILENCE = 0.01;
-
 /**
- * Where the sound actually starts and stops, and how loud it is.
+ * How loud the file is, so it can be levelled without being altered.
  *
- * Both matter, and both were wrong when played raw. voice.MP3 carries 104ms of
- * silence before its 80ms of sound: started at zero, every keystroke would
- * arrive a tenth of a second after the key, which reads as the app lagging
- * rather than as a voice. And the three files peak between 0.026 and 0.1,
- * where the synthesised cues sit at 0.33 to 0.62 — played at face value the
- * potion would be inaudible under the typing.
+ * Only the peak now. The three files peak between 0.026 and 0.1, where the
+ * rest of the app's cues sit between 0.33 and 0.62 — at face value the potion
+ * would be inaudible under the typing. Levelling is a volume control, which is
+ * the one thing that does have to be applied; the audio itself is untouched
+ * and plays end to end.
  */
 function _sampleMeasure(buf) {
   const d = buf.getChannelData(0);
-  let first = -1, last = 0, peak = 0;
+  let peak = 0;
   for (let i = 0; i < d.length; i++) {
     const a = Math.abs(d[i]);
     if (a > peak) peak = a;
-    if (a > SAMPLE_SILENCE) { if (first < 0) first = i; last = i; }
   }
-  if (first < 0) { first = 0; last = d.length - 1; }
-  return {
-    leadSec: first / buf.sampleRate,
-    // A little tail past the last audible sample, so a decay is not clipped.
-    endSec: Math.min(buf.duration, (last / buf.sampleRate) + 0.04),
-    peak: peak || 1
-  };
+  return { peak: peak || 1 };
 }
 
 /**
@@ -76,7 +61,6 @@ function _sampleMeasure(buf) {
  * typing blip that arrives 200ms late is worse than one that is synthesised.
  */
 function sampleLoad(name) {
-  if (!SAMPLES_ENABLED) return null;
   if (_sampleBuf[name]) return _sampleBuf[name];
   if (_sampleTried[name]) return null;
 
@@ -99,7 +83,6 @@ function sampleLoad(name) {
 
 /** Is this sample ready to play right now? */
 function sampleReady(name) {
-  if (!SAMPLES_ENABLED) return false;
   if (_sampleBuf[name]) return true;
   sampleLoad(name);
   return false;
@@ -114,16 +97,29 @@ function sampleReady(name) {
  * @returns {boolean} whether it played, so callers can fall back
  */
 function samplePlay(name, bus, opts) {
-  if (!SAMPLES_ENABLED || !bus) return false;
+  if (!bus) return false;
   const buf = _sampleBuf[name];
-  if (!buf) { sampleLoad(name); return false; }
+  if (!buf) {
+    /* Not decoded yet. Queue it rather than drop it: with no synthesised
+       sound behind these, dropping would make the first run of a session
+       silent — which is the run you most want to hear. Capped, because a
+       cue that arrives ten seconds after the thing it describes is worse
+       than one that never came. */
+    sampleLoad(name);
+    const at = Date.now();
+    const wait = setInterval(() => {
+      if (_sampleBuf[name]) { clearInterval(wait); samplePlay(name, bus, opts); }
+      else if (Date.now() - at > 2000) clearInterval(wait);
+    }, 60);
+    return false;
+  }
 
   const ctx = _sfxContext();
   if (!ctx) return false;
   if (ctx.state === 'suspended') ctx.resume().catch(() => {});
 
   const o = opts || {};
-  const meta = _sampleMeta[name] || { leadSec: 0, endSec: buf.duration, peak: 1 };
+  const meta = _sampleMeta[name] || { peak: 1 };
 
   const src = ctx.createBufferSource();
   src.buffer = buf;
@@ -140,15 +136,18 @@ function samplePlay(name, bus, opts) {
   g.gain.value = (o.gain == null ? 1 : o.gain) / meta.peak;
   src.connect(g); g.connect(bus);
 
-  // Start where the sound starts, not where the file starts, and stop at the
-  // end of it rather than playing out the dead tail.
-  src.start(ctx.currentTime, meta.leadSec, meta.endSec - meta.leadSec);
+  /* The whole file, from the top. An earlier version started at the first
+     audible sample and stopped after the last, on the measurement that
+     voice.MP3 opens with 104ms below the threshold — but the threshold was
+     11% of that file's peak, so what it called silence was really a soft
+     attack, and cutting it removed the front of the sound. These are cut the
+     way they are meant to be heard; the player's job is to play them. */
+  src.start(ctx.currentTime);
   return true;
 }
 
 /* Warm the cache as soon as there is a context to decode with, so the first
    keystroke is not the one that misses. Cheap: three files, ~40KB total. */
 function samplePrewarm() {
-  if (!SAMPLES_ENABLED) return;
   Object.keys(SAMPLE_FILES).forEach(sampleLoad);
 }

@@ -185,101 +185,23 @@ document.addEventListener('visibilitychange', function () {
 });
 
 /* ── A run that compiled and finished ─────────────────────────
-   The Pokemon potion: what you hear when an item is used and the bar refills.
+   audio/potion.MP3. The file, played — there is no synthesised version behind
+   this any more, because a recording and an imitation of it are two different
+   sounds and only one of them was asked for.
 
-   It is not a fanfare — a fanfare is what you get for winning, and this
-   happens every time the code runs. It is a fast rising bubble: a run of very
-   short blips climbing a scale, each one bending up inside itself, which is
-   the "glug" of the thing being drunk. Then it settles rather than lands.
-
-   Square waves and no filter, because the reference is a Game Boy. The things
-   that would make this sound expensive - a sweep, a reverb tail, velocity
-   shaping - are exactly the things that would stop it sounding like Pokemon.
+   If the file has not decoded yet the play is QUEUED rather than dropped: with
+   nothing to fall back to, dropping it would mean the first run of a session
+   is silent, which is exactly the run you most want to hear.
    ------------------------------------------------------------ */
 function psfxLevelUp() {
   if (!_psfxOn()) return;
-  // TEMPORARY: audio/potion.MP3 when it is decoded, the synthesised bubble
-  // otherwise. Turning SAMPLES_ENABLED off in js/audio-samples.js restores
-  // the synth everywhere with no other change.
-  if (typeof samplePlay === 'function' && samplePlay('potion', _psfxBus(), { gain: 0.13 })) return;
-  /* Ten steps over about a third of a second. Fewer reads as an arpeggio and
-     more as a siren; this is the density that reads as bubbling.
-
-     The blips barely overlap, so the peak is close to one blip's own level
-     rather than their sum — at 0.055 each the whole cue measured 0.19, half
-     of what the cues around it peak at. */
-  const steps = [392, 466, 523, 587, 659, 740, 831, 932, 1047, 1175];
-  steps.forEach((f, i) => {
-    psfxTone({ freq: f, to: f * 1.06, type: 'square', dur: 0.05, gain: 0.095, at: i * 0.032 });
-  });
-  // The last swallow, softer and rounder, so it stops rather than cuts off.
-  psfxTone({ freq: 1319, to: 1397, type: 'square',   dur: 0.10, gain: 0.10, at: 0.33 });
-  psfxTone({ freq: 659,               type: 'triangle', dur: 0.22, gain: 0.08, at: 0.34 });
+  samplePlay('potion', _psfxBus(), { gain: 0.13 });
 }
 
 /* ── A run that would not compile, or fell over ───────────────
-   "Pak" — a crack, not a thud.
-
-   The first version of this was a kick drum and sounded like hitting a box,
-   for two reasons that are worth keeping written down. A sine falling to 45Hz
-   IS a boom: that frequency is the body of a drum, and no amount of shortening
-   it changes what it is. And the noise burst was low-passed down to 320Hz,
-   which threw away every part of the sound that makes a crack a crack.
-
-   So: no sub-bass at all, and the noise is BANDPASSED high and wide rather
-   than low-passed. The weight comes from a short mid-range transient around
-   400Hz instead — enough to feel like contact, well above where a room starts
-   ringing. And the whole thing is 50ms rather than 160, because a "pak" that
-   lasts long enough to have a tail is a "boom".
+   audio/punch.MP3, on the same terms as the potion above.
    ------------------------------------------------------------ */
 function psfxPunch() {
   if (!_psfxOn()) return;
-  const bus = _psfxBus();
-  if (!bus) return;
-  // TEMPORARY: audio/punch.MP3 when it is decoded, the synthesised crack
-  // otherwise. See psfxLevelUp above.
-  if (typeof samplePlay === 'function' && samplePlay('punch', bus, { gain: 0.24 })) return;
-  const ctx = _sfxContext();
-  const t = ctx.currentTime;
-
-  // The crack. Short, steep, and up where the ear hears "sharp".
-  const len = Math.floor(ctx.sampleRate * 0.035);
-  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-  const d = buf.getChannelData(0);
-  for (let i = 0; i < len; i++) {
-    // A steeper curve than the old thud: almost all the energy in the first
-    // few milliseconds is what makes it a snap.
-    d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 5);
-  }
-  const noise = ctx.createBufferSource();
-  noise.buffer = buf;
-  const bp = ctx.createBiquadFilter();
-  bp.type = 'bandpass';
-  bp.frequency.value = 2200;
-  bp.Q.value = 0.7;          // wide: a narrow one whistles instead of cracking
-  const hp = ctx.createBiquadFilter();
-  hp.type = 'highpass';
-  hp.frequency.value = 700;  // nothing below this, or the box comes back
-  const ngain = ctx.createGain();
-  // A crack concentrates its energy into a few milliseconds, so the same gain
-  // that was safe on the old spread-out thud peaked at 0.94 here.
-  ngain.gain.value = 0.25;
-  noise.connect(bp); bp.connect(hp); hp.connect(ngain); ngain.connect(bus);
-  noise.start(t);
-
-  // The contact. Mid, not sub — this is the "pa", and it is over in 30ms.
-  const osc = ctx.createOscillator();
-  const env = ctx.createGain();
-  const lp = ctx.createBiquadFilter();
-  osc.type = 'triangle';
-  osc.frequency.setValueAtTime(420, t);
-  osc.frequency.exponentialRampToValueAtTime(180, t + 0.03);
-  lp.type = 'lowpass';
-  lp.frequency.value = 2400;
-  env.gain.setValueAtTime(0.0001, t);
-  env.gain.linearRampToValueAtTime(0.18, t + 0.003);
-  env.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
-  osc.connect(lp); lp.connect(env); env.connect(bus);
-  osc.start(t);
-  osc.stop(t + 0.08);
+  samplePlay('punch', _psfxBus(), { gain: 0.24 });
 }
