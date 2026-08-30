@@ -481,6 +481,35 @@ document.addEventListener('keydown', function (e) {
   sfxBlip(voice[0], voice[1], voice[2], voice[3]);
 }, true);
 
+/* ── The same thing again, for soft keyboards ─────────────────
+   An Android keyboard does not report what you typed. Ordinary characters
+   arrive as keydown with key "Unidentified" (keyCode 229) because the IME has
+   not committed them yet, so the test above — which asks what the key WAS —
+   rejected every letter. Backspace and Delete are reported properly, which is
+   why deleting made a sound on a phone and typing made none.
+
+   `input` is the event that does fire for those characters, so it is the
+   fallback. There is no separate mobile path and no user-agent test: the
+   dedupe is the gap that is already enforced between blips. On a desktop the
+   keydown has just played, so this arrives inside that gap and is dropped; on
+   a phone nothing played, the gap has long passed, and this is the sound.
+   ------------------------------------------------------------ */
+document.addEventListener('input', function (e) {
+  if (!sfxEnabled() || !sfxRouteWantsSound()) return;
+  if (!sfxIsTypingTarget(e.target)) return;
+
+  const now = Date.now();
+  if (now - _sfxLast < SFX_MIN_GAP_MS) return;   // the keydown already spoke
+  _sfxLast = now;
+
+  /* Which key it was is genuinely unknown here — that is the whole problem —
+     so it gets the ordinary character's voice. A deletion is the one case
+     that can be told apart, and it already came through keydown. */
+  const isDelete = e.inputType && e.inputType.indexOf('delete') === 0;
+  const voice = sfxKeyVoice(isDelete ? 'Backspace' : 'a');
+  sfxBlip(voice[0], voice[1], voice[2], voice[3]);
+}, true);
+
 /* Leaving the tab mid-sentence should not leave an oscillator running. */
 document.addEventListener('visibilitychange', function () {
   if (!_sfxCtx) return;

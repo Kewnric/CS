@@ -176,16 +176,38 @@
      And the test panel was display:none, so an attempt on a phone could be
      run but never checked — the results existed and could not be seen. It
      sits under the editor now. */
+  /* TWO ROWS, which reverses the call made here earlier.
+
+     One scrolling strip was the wrong answer, and the measurements say why:
+     the right-hand group alone needs 549px in a 412px bar, so the title was
+     squeezed to ZERO width and parked at x=676 — off the side of the phone.
+     You could not see which problem you were solving. Wrapping costs about
+     40px of a 915px screen; an invisible title costs the context for the
+     whole screen.
+
+     Row one is Back and the title. Row two is every control, and only that
+     row scrolls, so the strip that genuinely does not fit is the only thing
+     that behaves like a strip. */
   .practice-topbar {
-    overflow-x: auto;
-    overflow-y: hidden;
-    flex-wrap: nowrap;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
+    flex-wrap: wrap;
+    row-gap: 0.3rem;
     gap: 0.35rem;
+    overflow: visible;
     padding-left: 58px;          /* clear of the floating menu button */
   }
-  .practice-topbar::-webkit-scrollbar { display: none; }
+  .practice-topbar-left { order: 1; flex-shrink: 0; }
+  .practice-topbar-center { order: 2; }
+  .practice-topbar-right {
+    order: 3;
+    flex: 1 0 100%;              /* its own row */
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    min-width: 0;
+  }
+  .practice-topbar-right::-webkit-scrollbar { display: none; }
+  .practice-topbar-right > * { flex-shrink: 0; }
 
   /* Check Code rides along at the right edge instead of scrolling away with
      everything else. A strip that scrolls is a fair answer for ten controls
@@ -206,19 +228,49 @@
        A shadow meant to fade INTO a surface has to be that surface. */
     box-shadow: -12px 0 14px -6px #161b22;
   }
-  .practice-topbar > * { flex-shrink: 0; }
+  /* The timer wanted 146px of the control row for hundredths of a second
+     nobody reads mid-attempt. Minutes and seconds still fit. */
+  .practice-topbar-right .timer-display { font-size: 0.75rem; padding: 0.2rem 0.4rem; }
 
   /* The boss bar is the exception. It is hidden by default and costs nothing
      then, but switched ON it measured 307px — most of a 375px screen — and
      pushed the action buttons that far further out of reach. It shrinks here
      rather than being hidden, because it is a feature and not clutter; it
      just does not get to outrank the button that runs your tests. */
+  /* The title and boss bar share row one with Back, so they get the width
+     that row has rather than the 34vw they were rationed when everything was
+     fighting over a single line. */
   .practice-topbar-center {
-    flex-shrink: 1;
+    /* basis 0, not auto. On auto it asks for its content's full 344px, which
+       will not sit beside Back in the 352px left after the menu button, so it
+       wrapped to a row of its own and the bar became three rows deep. From
+       zero it takes what is left of row one instead. */
+    flex: 1 1 0;
     min-width: 0;
-    max-width: 34vw;
+    max-width: none;
     overflow: hidden;
   }
+
+  /* Inside that row the split was wrong: the health track took 135px and the
+     problem's NAME got 63, so the one piece of text telling you what you are
+     solving read "Hello,...". The bar is a gauge and stays legible at any
+     width; a truncated name tells you nothing. */
+  .practice-topbar-center .sao-plate-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    /* The cap, not the flex, was what held this at 63px: the base rule sets
+       max-width:30%, so freeing space beside it changed nothing and the room
+       went to empty plate. On a wide screen 30% is a sensible share; on a
+       phone it is three words of a title. */
+    max-width: 72%;
+  }
+  .practice-topbar-center .sao-track {
+    flex: 0 1 auto;
+    max-width: 64px;
+  }
+  /* The level chip is "LV. —" until a level exists; it is not worth 46px of a
+     row that cannot fit the title. */
+  .practice-topbar-center .sao-lv.unset { display: none; }
 
   .practice-panel {
     display: block !important;
