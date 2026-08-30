@@ -276,30 +276,22 @@
 .wing-badge { font-size: 0.7rem; }
 .wing-group-count { font-size: 0.7rem; color: var(--text-secondary); }
 
-/* ── The sidebar was a third of the screen for two rows ───────
-   480px of a 1440px window, in a 693px-tall box holding about 80px of
-   folders, and at 1024px it squeezed the cards down to one column. The
-   libraries with deep folder trees keep their width; these do not have them.
+/* ── The sidebar is NOT narrowed here, deliberately ───────────
+   The audit called 480px too wide for two rows of folders and this file used
+   to cut the wings to 26%/340px. That was overruled: every library should
+   open at the same width, and the Coding Library's is the one they match.
+   A wing that started narrower than the library beside it read as a
+   different kind of screen rather than a tidier one.
+
+   So the base rule in layout.css owns this — 40%, 320–480px — for all ten,
+   and the divider moves it from there. Nothing to override.
    ------------------------------------------------------------ */
-/* Specificity, NOT !important. The resizer drags by writing width, flex-basis
-   and max-width:none as INLINE styles, and an inline style loses to
-   !important — so the previous version of this rule pinned the pane and the
-   divider could not move it at all. Two class names beat the base rule and
-   still lose to the drag, which is the order these three need to be in.
 
-   The lower bound is left generous for the same reason: the drag clamps
-   itself at 200px, and a min-width above that would quietly stop the handle
-   before the user's cursor did. */
-.messenger-layout.wing-layout .messenger-pane-1 {
-  width: 26%;
-  min-width: 220px;
-  max-width: 340px;
-}
-
-/* ── The sidebar header at that width ────────────────────────
-   Four stat chips in a 330px pane ran off the edge, clipping "Learning", and
-   the title wrapped into the subtitle. They wrap now instead of overflowing,
-   and the header is allowed the room two lines of title need.
+/* ── The sidebar header ──────────────────────────────────────
+   The chips fit on one row at 480px, but the divider can be dragged down to
+   200px, and at that width four of them used to run off the edge and clip
+   "Learning". Wrapping costs nothing when there is room and is the whole
+   difference when there is not.
    ------------------------------------------------------------ */
 .wing-layout .browse-mini-stats {
   flex-wrap: wrap;
