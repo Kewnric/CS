@@ -283,7 +283,7 @@ function sfxBlip(pitch, length, colour, extra) {
     // blip if the file is slow: this voice is the recording, and substituting
     // a synthesised one for a few keystrokes would be the imitation the whole
     // point was to avoid. `extra` carries the per-key playback rate.
-    samplePlay('voice', _sfxBus, { gain: 0.17, rate: extra || 1, rateJitter: 0.06 });
+    samplePlay('voice', _sfxBus, { gain: 0.238, rate: extra || 1, rateJitter: 0.06 });
     return;
   }
 
