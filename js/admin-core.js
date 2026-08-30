@@ -10,7 +10,13 @@ window.adminIsDirty = false;
 window.saveCurrentAdminForm = null;
 
 function isAdminFormOpen() {
-  const forms = ['admin-form-container', 'study-form-container', 'notebook-form-container'];
+  // wing-form and awx-form are the library and admin editors the seven wings
+  // share. They are removed from the DOM rather than hidden, so merely
+  // existing is what "open" means for them, which the check below already
+  // handles. Without them here the browser's Back button discarded unsaved
+  // wing edits in silence.
+  const forms = ['admin-form-container', 'study-form-container', 'notebook-form-container',
+                 'wing-form', 'awx-form'];
   return forms.some(id => {
     const el = document.getElementById(id);
     return el && !el.classList.contains('hidden');

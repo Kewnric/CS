@@ -91,6 +91,7 @@ function adminWingInitFor(key) {
 function adminWingDestroy() {
   _awxEditing = null;
   _awxSelected = [];
+  wingFormEnd();
 }
 
 /** Leaving with an open form asks first, like every other admin does. */
@@ -383,6 +384,7 @@ function awxBulkDelete() {
       });
       removed.slice().sort((a, b) => b.at - a.at).forEach(r => items.splice(r.at, 1));
       _awxSelected = [];
+      const cleared = wingClearDeadGoalRefs();
       saveData();
       renderAwx();
 
@@ -391,6 +393,7 @@ function awxBulkDelete() {
           const list = wingItems(key);
           removed.slice().sort((a, b) => a.at - b.at)
             .forEach(r => list.splice(Math.min(r.at, list.length), 0, r.item));
+          wingRestoreGoalRefs(cleared);
           saveData();
           renderAwx();
         });
@@ -409,12 +412,19 @@ function awxDelete(id) {
     const at = list.findIndex(w => w.id === id);
     if (at < 0) return;
     list.splice(at, 1);
+    // Otherwise the bulk bar goes on counting it: select three, delete one
+    // from its own row, and the bar still claimed "3 selected" over two
+    // ticked boxes.
+    const sel = _awxSelected.indexOf(id);
+    if (sel >= 0) _awxSelected.splice(sel, 1);
+    const cleared = wingClearDeadGoalRefs();
     saveData();
     renderAwx();
     if (typeof pushUndo === 'function') {
       pushUndo('Deleted "' + (snapshot.title || 'Untitled') + '"', () => {
         const l = wingItems(key);
         l.splice(Math.min(at, l.length), 0, snapshot);
+        wingRestoreGoalRefs(cleared);
         saveData();
         renderAwx();
       });
@@ -534,8 +544,8 @@ function awxDeleteFolder(id) {
 
 function awxNew() {
   _awxEditing = 'new';
-  wingTagsBegin([]);
-  wingFormBegin('awx-save-status');
+  wingTagsBegin([], _awxKey);
+  wingFormBegin('awx-save-status', awxSave);
   renderAwx();
 }
 
@@ -543,13 +553,13 @@ function awxEdit(id) {
   const w = awxItems().find(x => x.id === id);
   if (!w) return;
   _awxEditing = id;
-  wingTagsBegin(w.tags || []);
-  wingFormBegin('awx-save-status');
+  wingTagsBegin(w.tags || [], _awxKey);
+  wingFormBegin('awx-save-status', awxSave);
   renderAwx();
 }
 
 function awxCancel() {
-  wingConfirmDiscard(() => { _awxEditing = null; renderAwx(); }, (o) => awxSave(o));
+  wingConfirmDiscard(() => { _awxEditing = null; wingFormEnd(); renderAwx(); }, (o) => awxSave(o));
 }
 
 function awxFormHTML() {

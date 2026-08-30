@@ -126,7 +126,7 @@ function wingInitLegacy() {
   wingInitFor(k || _wingKey);
 }
 
-function wingDestroy() { _wingEditing = null; }
+function wingDestroy() { _wingEditing = null; wingFormEnd(); }
 
 function wingUpdateHeader() {
   const cfg = wingConfig(_wingKey);
@@ -455,22 +455,22 @@ function wingOpen(id) { _wingActiveId = id; _wingEditing = null; wingRenderDetai
 function wingEdit(id) {
   const w = wingFind(id);
   _wingEditing = id;
-  wingTagsBegin(w ? (w.tags || []) : []);
-  wingFormBegin('wing-save-status');
+  wingTagsBegin(w ? (w.tags || []) : [], _wingKey);
+  wingFormBegin('wing-save-status', wingSave);
   wingRenderDetail();
 }
 
 function wingNewEntry() {
   _wingEditing = 'new';
   _wingActiveId = null;
-  wingTagsBegin([]);
-  wingFormBegin('wing-save-status');
+  wingTagsBegin([], _wingKey);
+  wingFormBegin('wing-save-status', wingSave);
   wingRenderDetail();
 }
 
 /** Leaving an open form asks first rather than dropping what was typed. */
 function wingBack() {
-  const go = () => { _wingEditing = null; _wingActiveId = null; wingRenderDetail(); };
+  const go = () => { _wingEditing = null; _wingActiveId = null; wingFormEnd(); wingRenderDetail(); };
   if (_wingEditing) { wingConfirmDiscard(go, (o) => wingSave(o)); return; }
   go();
 }
@@ -535,6 +535,9 @@ function wingDelete(id) {
     const snapshot = JSON.parse(JSON.stringify(items[i]));
     items.splice(i, 1);
     _wingActiveId = null;
+    // Deleting a goal from here breaks the same Roadmap links the admin's
+    // delete does, so it repairs them the same way.
+    const cleared = wingClearDeadGoalRefs();
     saveData();
     wingRenderSidebar();
     wingRenderDetail();
@@ -545,6 +548,7 @@ function wingDelete(id) {
       pushUndo('Deleted "' + (snapshot.title || 'Untitled') + '"', () => {
         const list = wingItems(key);
         list.splice(Math.min(i, list.length), 0, snapshot);
+        wingRestoreGoalRefs(cleared);
         saveData();
         wingRenderSidebar();
         wingRenderDetail();

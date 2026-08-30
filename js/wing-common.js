@@ -284,6 +284,10 @@ function wingSetRating(key, n) {
   // be undone without hunting for a separate control.
   const next = (n === cur) ? 0 : n;
   host.dataset.value = next;
+  // A star is a click, not an input or a change, so the delegated dirty
+  // tracking never saw it. A rating was the one edit you could make and then
+  // lose without being asked about it.
+  if (typeof wingMarkDirty === 'function') wingMarkDirty();
   host.querySelectorAll('.wing-rate-star').forEach(b => {
     const on = (parseInt(b.dataset.n, 10) || 0) <= next;
     b.classList.toggle('on', on);
@@ -395,12 +399,23 @@ function wingGoTo(key, id) {
    ============================================================ */
 
 let _wingTagDraft = [];
+let _wingTagScope = null;      // which wing this form belongs to
 let _wingFormDirty = false;
 let _wingFormStatusId = null;
+let _wingLastSaveFn = null;    // the save hook we lent the router
+let _wingTagPool = [];         // the suggestions currently on screen
 
-/** Seed the chip editor. Call before rendering a form. */
-function wingTagsBegin(tags) {
+/**
+ * Seed the chip editor.
+ *
+ * The wing is held here rather than read from _wingKey when needed. The admin
+ * runs against _awxKey, and _wingKey is whatever library you last opened, so
+ * refreshing suggestions from _wingKey showed the wrong wing's tags: editing
+ * in the Roadmap admin after visiting Mindset offered Mindset's vocabulary.
+ */
+function wingTagsBegin(tags, scopeKey) {
   _wingTagDraft = Array.isArray(tags) ? tags.slice() : [];
+  _wingTagScope = scopeKey || null;
 }
 
 function wingTagsRead() { return _wingTagDraft.slice(); }
@@ -412,13 +427,14 @@ function wingTagsRead() { return _wingTagDraft.slice(); }
  * suggestions are that wing's own vocabulary rather than the whole app's.
  */
 function wingTagEditorHTML(scopeKey) {
+  if (scopeKey) _wingTagScope = scopeKey;
   return `
     <div class="af-field af-field-wide">
       <label class="form-label" for="wing-tag-input">Tags
         <span class="af-label-hint">Enter or comma to add</span></label>
       <div class="af-tag-input-row">
         <input id="wing-tag-input" class="form-input" placeholder="Add a tag..."
-               onkeydown="wingTagKeydown(event)" oninput="wingTagSuggest('${escapeHTML(scopeKey)}')" />
+               onkeydown="wingTagKeydown(event)" oninput="wingTagSuggest()" />
         <button type="button" class="btn btn-secondary btn-sm af-add-btn" onclick="wingTagAdd()">
           <i data-lucide="plus" style="width:14px;height:14px;"></i> Add
         </button>
@@ -480,27 +496,42 @@ function wingTopTags(key, limit) {
     .slice(0, limit || 8);
 }
 
-function wingTagSuggest(key) {
+/**
+ * The tags already used in this wing, offered as buttons.
+ *
+ * The handlers are BOUND, not written into an onclick attribute. A tag is
+ * ordinary text and may contain an apostrophe; escapeHTML turns that into
+ * &#39;, which the HTML parser faithfully decodes back to ' before the JS in
+ * the attribute is ever compiled. So onclick="wingTagPick('don't panic')"
+ * threw "missing ) after argument list" and that tag could not be picked at
+ * all. Escaping for two nested languages at once is a trap worth stepping
+ * around: keep the data out of the attribute and the whole class goes away.
+ */
+function wingTagSuggest() {
   const host = document.getElementById('wing-tag-suggestions');
   const input = document.getElementById('wing-tag-input');
   if (!host || !input) return;
   const typed = String(input.value || '').trim().toLowerCase();
-  const pool = wingTopTags(key, 24)
+  _wingTagPool = wingTopTags(_wingTagScope, 24)
     .filter(t => !_wingTagDraft.includes(t))
     .filter(t => !typed || t.toLowerCase().includes(typed))
     .slice(0, 8);
-  host.innerHTML = pool.length
-    ? `<span class="af-tag-suggest-label">In use</span>` + pool.map(t =>
-        `<button type="button" class="af-tag-suggest" onclick="wingTagPick('${escapeHTML(t).replace(/'/g, "\'")}')">${escapeHTML(t)}</button>`).join('')
-    : '';
+
+  if (!_wingTagPool.length) { host.innerHTML = ''; return; }
+  host.innerHTML = `<span class="af-tag-suggest-label">In use</span>` +
+    _wingTagPool.map(t => `<button type="button" class="af-tag-suggest">${escapeHTML(t)}</button>`).join('');
+  host.querySelectorAll('.af-tag-suggest').forEach((b, i) => {
+    b.addEventListener('click', () => wingTagPick(_wingTagPool[i]));
+  });
 }
 
 function wingTagPick(t) {
+  if (t === undefined || t === null) return;
   if (!_wingTagDraft.includes(t)) _wingTagDraft.push(t);
   const input = document.getElementById('wing-tag-input');
   if (input) input.value = '';
   wingRenderTags();
-  wingTagSuggest(_wingKey);
+  wingTagSuggest();
   wingMarkDirty();
 }
 
@@ -509,13 +540,29 @@ function wingTagPick(t) {
    lose what you had typed without being asked.
    ------------------------------------------------------------ */
 
-function wingFormBegin(statusId) {
+/**
+ * @param {string}   statusId  the save-status element to drive
+ * @param {function} saveFn    what the router should call to save this form
+ *
+ * window.adminIsDirty and window.saveCurrentAdminForm are the router's own
+ * unsaved-changes guard, which intercepts the BROWSER's Back and Forward
+ * buttons. The wing forms tracked dirtiness privately, so that guard never
+ * fired for them and Back threw away what you had typed without asking —
+ * every other admin form in the app is protected there.
+ */
+function wingFormBegin(statusId, saveFn) {
   _wingFormDirty = false;
   _wingFormStatusId = statusId || null;
+  window.adminIsDirty = false;
+  if (typeof saveFn === 'function') {
+    _wingLastSaveFn = saveFn;
+    window.saveCurrentAdminForm = saveFn;
+  }
 }
 
 function wingMarkDirty() {
   _wingFormDirty = true;
+  window.adminIsDirty = true;
   if (_wingFormStatusId && typeof setSaveStatus === 'function') {
     setSaveStatus(_wingFormStatusId, 'unsaved');
   }
@@ -525,8 +572,25 @@ function wingFormIsDirty() { return _wingFormDirty; }
 
 function wingFormClean(showSaved) {
   _wingFormDirty = false;
+  window.adminIsDirty = false;
   if (_wingFormStatusId && typeof setSaveStatus === 'function') {
     setSaveStatus(_wingFormStatusId, showSaved ? 'saved' : '');
+  }
+}
+
+/**
+ * Leaving a wing form: stop claiming the router's save hook.
+ *
+ * Only if it is still ours. openAdminForm sets the same global when a coding
+ * or notebook form opens, and clearing it blindly would disarm that form's
+ * guard instead of our own.
+ */
+function wingFormEnd() {
+  _wingFormDirty = false;
+  window.adminIsDirty = false;
+  if (_wingLastSaveFn && window.saveCurrentAdminForm === _wingLastSaveFn) {
+    window.saveCurrentAdminForm = null;
+    _wingLastSaveFn = null;
   }
 }
 
@@ -566,4 +630,43 @@ function wingBindFormDirty(host) {
   host._wingDirtyBound = true;
   host.addEventListener('input', wingMarkDirty);
   host.addEventListener('change', wingMarkDirty);
+}
+
+/* ── Links between wings ──────────────────────────────────────
+   A Roadmap path names the Progression goal it serves, by id. Deleting the
+   goal left the path pointing at nothing, and wingReaderMetaHTML skips a
+   goalref it cannot resolve — so a broken link looked exactly like a path
+   that never had one, and the id sat in the data until the next time anyone
+   happened to open and re-save that path.
+   ------------------------------------------------------------ */
+
+/**
+ * Clear every goalRef whose goal no longer exists.
+ *
+ * @returns {Array<{id:string, goalRef:string}>} what was cleared, so the
+ *          caller can hand it to its own undo. Deleting a goal and undoing it
+ *          should put the paths back too, not just the goal.
+ */
+function wingClearDeadGoalRefs() {
+  const alive = {};
+  wingItems('progression').forEach(g => { alive[g.id] = true; });
+  const cleared = [];
+  wingItems('roadmap').forEach(p => {
+    const ref = p.data && p.data.goalRef;
+    if (ref && !alive[ref]) {
+      cleared.push({ id: p.id, goalRef: ref });
+      p.data.goalRef = '';
+    }
+  });
+  return cleared;
+}
+
+/** Put back what wingClearDeadGoalRefs cleared. */
+function wingRestoreGoalRefs(cleared) {
+  if (!cleared || !cleared.length) return;
+  const paths = wingItems('roadmap');
+  cleared.forEach(c => {
+    const p = paths.find(x => x.id === c.id);
+    if (p) { p.data = p.data || {}; p.data.goalRef = c.goalRef; }
+  });
 }
