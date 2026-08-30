@@ -185,39 +185,48 @@ document.addEventListener('visibilitychange', function () {
 });
 
 /* ── A run that compiled and finished ─────────────────────────
-   The Pokémon level-up shape: a fast rising arpeggio, then the same figure
-   again a step higher, landing on a held note. What makes it read as that
-   rather than as any ascending run is the CHARACTER — square waves with no
-   filter, notes of equal short length, and no space between them. It is a
-   Game Boy sound, so the things to avoid are exactly the things that make a
-   sound modern: sweeps, reverb tails, velocity shaping.
+   The Pokemon potion: what you hear when an item is used and the bar refills.
 
-   Deliberately not psfxPowerUp, which ends the whole attempt. This fires
-   every clean run, so it is shorter and lighter — a sound you will hear fifty
-   times an hour has to stay welcome.
+   It is not a fanfare — a fanfare is what you get for winning, and this
+   happens every time the code runs. It is a fast rising bubble: a run of very
+   short blips climbing a scale, each one bending up inside itself, which is
+   the "glug" of the thing being drunk. Then it settles rather than lands.
+
+   Square waves and no filter, because the reference is a Game Boy. The things
+   that would make this sound expensive - a sweep, a reverb tail, velocity
+   shaping - are exactly the things that would stop it sounding like Pokemon.
    ------------------------------------------------------------ */
 function psfxLevelUp() {
   if (!_psfxOn()) return;
-  // C-E-G-C, then a tone up, the way the jingle steps.
-  const run = [523, 659, 784, 1047];
-  const step = 0.045;
-  run.forEach((f, i) => psfxTone({ freq: f, type: 'square', dur: 0.06, gain: 0.075, at: i * step }));
-  run.forEach((f, i) => psfxTone({ freq: f * 1.122, type: 'square', dur: 0.06, gain: 0.075, at: 0.19 + i * step }));
-  // The landing, held, with a softer voice under it so it is not all edge.
-  psfxTone({ freq: 1568, type: 'square',   dur: 0.26, gain: 0.085, at: 0.38 });
-  psfxTone({ freq: 784,  type: 'triangle', dur: 0.30, gain: 0.06,  at: 0.38 });
+  /* Ten steps over about a third of a second. Fewer reads as an arpeggio and
+     more as a siren; this is the density that reads as bubbling.
+
+     The blips barely overlap, so the peak is close to one blip's own level
+     rather than their sum — at 0.055 each the whole cue measured 0.19, half
+     of what the cues around it peak at. */
+  const steps = [392, 466, 523, 587, 659, 740, 831, 932, 1047, 1175];
+  steps.forEach((f, i) => {
+    psfxTone({ freq: f, to: f * 1.06, type: 'square', dur: 0.05, gain: 0.095, at: i * 0.032 });
+  });
+  // The last swallow, softer and rounder, so it stops rather than cuts off.
+  psfxTone({ freq: 1319, to: 1397, type: 'square',   dur: 0.10, gain: 0.10, at: 0.33 });
+  psfxTone({ freq: 659,               type: 'triangle', dur: 0.22, gain: 0.08, at: 0.34 });
 }
 
 /* ── A run that would not compile, or fell over ───────────────
-   A punch: the impact, then the weight behind it.
+   "Pak" — a crack, not a thud.
 
-   Three parts, because two of them alone read as something else. The noise
-   crack on its own is a snare; the pitch drop on its own is a cartoon boing.
-   Together — a very short filtered noise burst over a fast fall from 160Hz to
-   45Hz — they land as something hitting something.
+   The first version of this was a kick drum and sounded like hitting a box,
+   for two reasons that are worth keeping written down. A sine falling to 45Hz
+   IS a boom: that frequency is the body of a drum, and no amount of shortening
+   it changes what it is. And the noise burst was low-passed down to 320Hz,
+   which threw away every part of the sound that makes a crack a crack.
 
-   The fall is exponential and quick (90ms). A slow one is a falling tone; the
-   speed is what makes it a thud rather than a note.
+   So: no sub-bass at all, and the noise is BANDPASSED high and wide rather
+   than low-passed. The weight comes from a short mid-range transient around
+   400Hz instead — enough to feel like contact, well above where a room starts
+   ringing. And the whole thing is 50ms rather than 160, because a "pak" that
+   lasts long enough to have a tail is a "boom".
    ------------------------------------------------------------ */
 function psfxPunch() {
   if (!_psfxOn()) return;
@@ -226,45 +235,44 @@ function psfxPunch() {
   const ctx = _sfxContext();
   const t = ctx.currentTime;
 
-  // The impact: a short burst of noise, most of it low-mid so it is a thump
-  // and not a hiss.
-  const len = Math.floor(ctx.sampleRate * 0.09);
+  // The crack. Short, steep, and up where the ear hears "sharp".
+  const len = Math.floor(ctx.sampleRate * 0.035);
   const buf = ctx.createBuffer(1, len, ctx.sampleRate);
   const d = buf.getChannelData(0);
   for (let i = 0; i < len; i++) {
-    // Shaped as it is written rather than by a gain node: the decay is part of
-    // what a hit IS, and doing it here keeps it sample-accurate.
-    d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6);
+    // A steeper curve than the old thud: almost all the energy in the first
+    // few milliseconds is what makes it a snap.
+    d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 5);
   }
   const noise = ctx.createBufferSource();
   noise.buffer = buf;
-  const nlp = ctx.createBiquadFilter();
-  nlp.type = 'lowpass';
-  nlp.frequency.setValueAtTime(1800, t);
-  nlp.frequency.exponentialRampToValueAtTime(320, t + 0.09);
+  const bp = ctx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = 2200;
+  bp.Q.value = 0.7;          // wide: a narrow one whistles instead of cracking
+  const hp = ctx.createBiquadFilter();
+  hp.type = 'highpass';
+  hp.frequency.value = 700;  // nothing below this, or the box comes back
   const ngain = ctx.createGain();
-  /* Levelled against the cues that were already here, which peak between
-     0.33 and 0.43. At 0.5 this hit 1.04 and clipped; at 0.3 it still peaked
-     0.82, roughly double the loudest of them, which is not force but a
-     mixing error. It should be the hardest thing in the set without being in
-     a different set. */
-  ngain.gain.value = 0.2;
-  noise.connect(nlp); nlp.connect(ngain); ngain.connect(bus);
+  // A crack concentrates its energy into a few milliseconds, so the same gain
+  // that was safe on the old spread-out thud peaked at 0.94 here.
+  ngain.gain.value = 0.25;
+  noise.connect(bp); bp.connect(hp); hp.connect(ngain); ngain.connect(bus);
   noise.start(t);
 
-  // The weight: a fast fall, which is the body of the hit.
+  // The contact. Mid, not sub — this is the "pa", and it is over in 30ms.
   const osc = ctx.createOscillator();
   const env = ctx.createGain();
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(160, t);
-  osc.frequency.exponentialRampToValueAtTime(45, t + 0.09);
+  const lp = ctx.createBiquadFilter();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(420, t);
+  osc.frequency.exponentialRampToValueAtTime(180, t + 0.03);
+  lp.type = 'lowpass';
+  lp.frequency.value = 2400;
   env.gain.setValueAtTime(0.0001, t);
-  env.gain.linearRampToValueAtTime(0.17, t + 0.006);
-  env.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
-  osc.connect(env); env.connect(bus);
+  env.gain.linearRampToValueAtTime(0.18, t + 0.003);
+  env.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+  osc.connect(lp); lp.connect(env); env.connect(bus);
   osc.start(t);
-  osc.stop(t + 0.2);
-
-  // A little knuckle on top, so it has a front edge as well as a bottom.
-  psfxTone({ freq: 220, to: 90, type: 'triangle', dur: 0.07, gain: 0.05, lowpass: 900 });
+  osc.stop(t + 0.08);
 }
