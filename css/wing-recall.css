@@ -1,0 +1,303 @@
+/* ============================================================
+   WING-RECALL.CSS — the wings' practice screen
+   ------------------------------------------------------------
+   One card at a time, centred, with nothing else competing for attention.
+   The attempt screens are dense because you are working in them; this is the
+   opposite job — you are trying to remember something, and every extra
+   control on screen is something to look at instead of thinking.
+
+   The wing's own colour comes in through --wing-accent, set on .wr-shell, so
+   a Diary session and a Roadmap session are visibly different places.
+   ============================================================ */
+
+.wr-root { padding: 1.5rem 1.25rem 4rem; }
+
+.wr-shell {
+  --wing-accent: #8b5cf6;
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+/* ── Where you are ────────────────────────────────────────── */
+
+.wr-top {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.wr-progress {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--bg-surface-hover);
+  overflow: hidden;
+}
+.wr-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--wing-accent);
+  transition: width 260ms ease;
+}
+.wr-count {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── The card ─────────────────────────────────────────────── */
+
+.wr-card {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-xl);
+  background: var(--bg-surface);
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  /* Enough that revealing a one-line answer does not make the whole page
+     jump up under the pointer heading for a grade button. */
+  min-height: 300px;
+}
+.wr-card.is-revealed { border-color: color-mix(in srgb, var(--wing-accent) 45%, transparent); }
+
+.wr-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.wr-wing {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--wing-accent);
+}
+.wr-wing i, .wr-wing svg { width: 14px; height: 14px; }
+
+.wr-prompt-label {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.wr-prompt {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: var(--text-primary);
+}
+.wr-tags { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+
+/* Before the reveal: a deliberate blank, not a spinner. The pause is the
+   exercise. */
+.wr-veil {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: var(--text-tertiary);
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+}
+.wr-veil i, .wr-veil svg { width: 26px; height: 26px; opacity: 0.5; }
+.wr-veil p { margin: 0; font-size: 0.85rem; }
+
+.wr-answer {
+  border-top: 1px solid var(--border-color-subtle);
+  padding-top: 0.9rem;
+  animation: wrReveal 240ms ease both;
+}
+@keyframes wrReveal {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+.wr-empty-body {
+  margin: 0;
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--text-tertiary);
+}
+
+/* ── Reveal and grade ─────────────────────────────────────── */
+
+.wr-reveal-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+}
+.wr-reveal { min-width: 160px; }
+.wr-hint { font-size: 0.75rem; color: var(--text-tertiary); }
+.wr-hint kbd, .wr-grade kbd {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  padding: 0.05rem 0.3rem;
+  border: 1px solid var(--border-color);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--bg-surface-hover);
+  color: var(--text-secondary);
+}
+
+.wr-grades {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.wr-grade {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.7rem 0.4rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+.wr-grade:hover { transform: translateY(-2px); }
+.wr-grade:active { transform: translateY(0); }
+.wr-grade-label { font-size: 0.85rem; font-weight: 800; color: var(--text-primary); }
+.wr-grade-hint { font-size: 0.68rem; color: var(--text-tertiary); }
+
+/* The four carry meaning, so they carry colour: failing and excelling should
+   not look like the same button. */
+.wr-again { --g: var(--color-danger); }
+.wr-hard  { --g: var(--color-warning); }
+.wr-good  { --g: var(--color-primary); }
+.wr-easy  { --g: var(--color-success); }
+.wr-grade:hover { border-color: var(--g); background: color-mix(in srgb, var(--g) 10%, transparent); }
+.wr-grade:hover .wr-grade-label { color: var(--g); }
+
+.wr-edit {
+  align-self: center;
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.wr-edit:hover { color: var(--wing-accent); text-decoration: underline; }
+
+/* ── The summary ──────────────────────────────────────────── */
+
+.wr-summary { align-items: center; text-align: center; padding-top: 2rem; }
+
+.wr-sum-ring {
+  --pct: 0;
+  width: 118px;
+  height: 118px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(var(--wing-accent) calc(var(--pct) * 1%), var(--bg-surface-hover) 0);
+  position: relative;
+}
+.wr-sum-ring::after {
+  content: '';
+  position: absolute;
+  inset: 9px;
+  border-radius: 50%;
+  background: var(--bg-surface);
+}
+.wr-sum-ring > span {
+  position: relative;
+  z-index: 1;
+  font-size: 1.7rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+.wr-sum-ring small { font-size: 0.85rem; color: var(--text-tertiary); }
+
+.wr-sum-title { margin: 0; font-size: 1.3rem; font-weight: 800; color: var(--text-primary); }
+.wr-sum-sub { margin: 0; max-width: 46ch; font-size: 0.88rem; color: var(--text-secondary); line-height: 1.5; }
+.wr-sum-next { margin: 0; font-size: 0.8rem; color: var(--text-tertiary); }
+
+.wr-sum-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 420px;
+}
+.wr-sum-cell {
+  display: flex;
+  flex-direction: column;
+  padding: 0.6rem 0.3rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  border-top: 3px solid var(--g, var(--border-color));
+}
+.wr-sum-n { font-size: 1.2rem; font-weight: 800; color: var(--text-primary); }
+.wr-sum-l { font-size: 0.68rem; color: var(--text-tertiary); font-weight: 700; }
+
+.wr-sum-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; justify-content: center; }
+
+/* ── Phone ────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .wr-root { padding: 58px 0.9rem 3rem; }   /* clear of the floating menu button */
+  .wr-card { padding: 1.15rem; min-height: 240px; }
+  .wr-prompt { font-size: 1.25rem; }
+  /* Four grade buttons across a 375px screen leaves each about 80px, which is
+     too narrow for "Again" plus its hint. Two rows of two instead. */
+  .wr-grades { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wr-sum-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wr-hint { display: none; }               /* no physical keyboard to hint at */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wr-answer { animation: none; }
+  .wr-grade:hover { transform: none; }
+  .wr-progress-fill { transition: none; }
+}
+
+/* ── Due-ness in the library ──────────────────────────────────
+   Set by wingShell on any card the schedule has come round to. A left edge
+   rather than a badge, so it reads identically across seven card layouts and
+   cannot land on top of the fav button or the select box.
+   ------------------------------------------------------------ */
+.wing-is-due {
+  position: relative;
+  border-left: 3px solid var(--color-primary) !important;
+}
+.wing-is-due::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--color-primary) 12%, transparent), transparent 38%);
+  pointer-events: none;
+}
+
+/* The header's Due count earns a colour only when there is something in it. */
+.mini-stat-chip.due {
+  border-color: color-mix(in srgb, var(--color-primary) 45%, transparent);
+  color: var(--color-primary);
+}
+.mini-stat-chip.due .mini-stat-value { color: var(--color-primary); }
+
+.wing-recall-btn.is-due {
+  border-color: color-mix(in srgb, var(--color-primary) 55%, transparent);
+}

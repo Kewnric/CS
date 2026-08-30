@@ -21,6 +21,16 @@ function registerAllRoutes() {
 
   /* The old address still works. Anything already bookmarked or linked lands
      here and is sent on to the wing's own route. */
+  /* The wings' practice screen. Deliberately NOT a focused route: an attempt
+     hides the sidebar because you are meant to stay in it, but recall is
+     study you should be able to walk away from, and the four attempt screens
+     are where that trade-off belongs. */
+  SpaRouter.register('wing-recall', {
+    title: 'StudySession Pro — Recall',
+    templateFn: wingRecallTemplate, initFn: wingRecallInit, destroyFn: wingRecallDestroy,
+    sidebarVisible: true, navId: 'nav-library'
+  });
+
   SpaRouter.register('wing', { title: 'StudySession Pro — Library', templateFn: wingTemplate, initFn: wingInitLegacy, destroyFn: wingDestroy, sidebarVisible: true, navId: 'nav-library' });
   SpaRouter.register('browse', { title: 'StudySession Pro — Coding Library', templateFn: browseTemplate, initFn: browseInit, destroyFn: browseDestroy, sidebarVisible: true, navId: 'nav-library' });
   SpaRouter.register('study', { title: 'StudySession Pro — Notes Library', templateFn: studyTemplate, initFn: studyInit, destroyFn: studyDestroy, sidebarVisible: true, navId: 'nav-library' });

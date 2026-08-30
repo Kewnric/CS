@@ -144,11 +144,19 @@ function wingUpdateHeader() {
   const mini = document.getElementById('wing-mini-stats');
   if (mini) {
     const favs = items.filter(libIsFavorite).length;
+    const revType = (typeof revWingType === 'function') ? revWingType(_wingKey) : null;
+    const due = (revType && typeof libDueCount === 'function') ? libDueCount(revType, items) : 0;
+    const tracked = revType && state.review
+      ? items.filter(w => state.review[revType + ':' + w.id]).length : 0;
     mini.innerHTML = `
       <div class="mini-stat-chip" title="Total entries"><i data-lucide="file-text" style="width:12px;height:12px;"></i>
         <span class="mini-stat-value">${items.length}</span><span class="mini-stat-label">Total</span></div>
       <div class="mini-stat-chip${favs ? ' completed' : ''}" title="Favourites"><i data-lucide="star" style="width:12px;height:12px;"></i>
-        <span class="mini-stat-value">${favs}</span><span class="mini-stat-label">Starred</span></div>`;
+        <span class="mini-stat-value">${favs}</span><span class="mini-stat-label">Starred</span></div>
+      <div class="mini-stat-chip${due ? ' due' : ''}" title="Due for recall today"><i data-lucide="brain" style="width:12px;height:12px;"></i>
+        <span class="mini-stat-value">${due}</span><span class="mini-stat-label">Due</span></div>
+      <div class="mini-stat-chip" title="Entries with a review history"><i data-lucide="repeat" style="width:12px;height:12px;"></i>
+        <span class="mini-stat-value">${tracked}</span><span class="mini-stat-label">Learning</span></div>`;
     if (typeof lucide !== 'undefined') lucide.createIcons({ root: mini });
   }
 }
@@ -232,7 +240,11 @@ function wingRenderDetail() {
 
   const schema = wingSchema(_wingKey);
   const prefiltered = pool;
-  let list = libApplyCommonFilters('wing', pool.slice(), null);
+  // The wing's own review type, so the Due chip filters this wing's schedule
+  // rather than nothing. Passing null here was why the wings had every shared
+  // filter except the one the other libraries are organised around.
+  const revType = (typeof revWingType === 'function') ? revWingType(_wingKey) : null;
+  let list = libApplyCommonFilters('wing', pool.slice(), revType);
   const sort = getLibPref('wing.sort', 'recent');
   // A wing with its own date sorts on THAT: a diary ordered by when you last
   // touched an entry is not a diary, it is a list of recent edits.
@@ -249,7 +261,7 @@ function wingRenderDetail() {
     : [['recent', 'Recently updated'], ['oldest', 'Oldest first'], ['title', 'Title A–Z']];
   const filterBar = prefiltered.length ? `
     <div style="display:flex;flex-wrap:wrap;align-items:center;gap:0.5rem;margin-bottom:1rem;">
-      ${(() => { const c = libCommonChipsHTML('wing', null, prefiltered); return c ? `<div class="lib-chip-row">${c}</div>` : ''; })()}
+      ${(() => { const c = libCommonChipsHTML('wing', revType, prefiltered); return c ? `<div class="lib-chip-row">${c}</div>` : ''; })()}
       ${libTagChipsHTML('wing', prefiltered)}
       <div style="display:flex;gap:0.4rem;align-items:center;margin-left:auto;">
         <span style="font-size:0.72rem;color:var(--text-tertiary);">${list.length} of ${prefiltered.length}</span>
@@ -270,6 +282,20 @@ function wingRenderDetail() {
         </div>
         <div class="browse-folder-actions">
           ${libSelectToggleHTML('wing')}
+          ${(() => {
+            const due = (typeof wingRecallDueCount === 'function') ? wingRecallDueCount(_wingKey) : 0;
+            const any = wingItems().some(w => (w.title || '').trim() || (w.body || '').trim());
+            if (!any) return '';
+            // Due first when there is any, because that is the whole point of
+            // the schedule; otherwise a plain run through the wing.
+            return due
+              ? `<button class="btn btn-practice wing-recall-btn is-due" onclick="wingRecallStartDue('${_wingKey}')">
+                   <i data-lucide="brain" style="width:16px;height:16px;"></i> Recall ${due} due
+                 </button>`
+              : `<button class="btn btn-secondary wing-recall-btn" onclick="wingRecallStart('${_wingKey}')">
+                   <i data-lucide="brain" style="width:16px;height:16px;"></i> Recall
+                 </button>`;
+          })()}
           <button class="btn btn-primary" onclick="wingNewEntry()"><i data-lucide="plus" style="width:16px;height:16px;"></i> New ${escapeHTML(schema.noun)}</button>
         </div>
       </div>
@@ -279,9 +305,15 @@ function wingRenderDetail() {
           <i data-lucide="${cfg.icon}" style="width:44px;height:44px;opacity:0.45;margin-bottom:0.75rem;"></i>
           <h3 style="font-weight:700;">${prefiltered.length ? 'Nothing matches these filters' : 'Nothing here yet'}</h3>
           <p style="font-size:0.85rem;color:var(--text-tertiary);margin-top:0.35rem;">${prefiltered.length ? '' : escapeHTML(cfg.tagline)}</p>
-          <button class="btn btn-primary" style="margin-top:1rem;" onclick="${prefiltered.length ? `clearWingFilters()` : `wingNewEntry()`}">
-            <i data-lucide="${prefiltered.length ? 'x' : 'plus'}" style="width:15px;height:15px;"></i> ${prefiltered.length ? 'Clear filters' : 'Add the first ' + escapeHTML(schema.noun)}
-          </button>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;justify-content:center;margin-top:1rem;">
+            <button class="btn btn-primary" onclick="${prefiltered.length ? `clearWingFilters()` : `wingNewEntry()`}">
+              <i data-lucide="${prefiltered.length ? 'x' : 'plus'}" style="width:15px;height:15px;"></i> ${prefiltered.length ? 'Clear filters' : 'Add the first ' + escapeHTML(schema.noun)}
+            </button>
+            ${(!prefiltered.length && typeof wingSeedAvailable === 'function' && wingSeedAvailable(_wingKey))
+              ? `<button class="btn btn-secondary" onclick="wingLoadSeedPack('${_wingKey}', () => { wingRenderSidebar(); wingRenderDetail(); wingUpdateHeader(); })">
+                   <i data-lucide="sparkles" style="width:15px;height:15px;"></i> Add starter pack
+                 </button>` : ''}
+          </div>
         </div>`}
       ${libSelectionBarHTML('wing', list.map(w => w.id))}
     </div>`;
@@ -334,6 +366,8 @@ function _wingReaderHTML(w) {
       <h1 class="wing-reader-title">${escapeHTML(w.title || 'Untitled')}</h1>
       <div style="display:flex;flex-wrap:wrap;gap:0.4rem;align-items:center;margin-bottom:1.25rem;">
         ${(w.tags || []).map(t => libTagBadgeHTML('wing', t)).join('')}
+        ${(typeof revWingType === 'function' && typeof libReviewChipHTML === 'function')
+            ? libReviewChipHTML(revWingType(_wingKey), w.id) : ''}
         ${when ? `<span style="font-size:0.75rem;color:var(--text-tertiary);">Updated ${new Date(when).toLocaleString()}</span>` : ''}
       </div>
       ${wingReaderMetaHTML(w, schema)}
@@ -341,6 +375,10 @@ function _wingReaderHTML(w) {
         <div class="wing-body">${escapeHTML(w.body).replace(/\n/g, '<br/>')}</div></section>` : ''}
       ${schema.readerExtras ? schema.readerExtras(w) : ''}
       <div style="display:flex;gap:0.6rem;margin-top:2rem;">
+        <button class="btn btn-practice" onclick="wingRecallStart('${escapeHTML(_wingKey)}', ['${w.id}'])"
+                title="Cover it up and see whether it comes back">
+          <i data-lucide="brain" style="width:16px;height:16px;"></i> Recall
+        </button>
         <button class="btn btn-primary" onclick="wingEdit('${w.id}')"><i data-lucide="pencil" style="width:16px;height:16px;"></i> Edit</button>
         <button class="btn btn-secondary" onclick="libToggleFavorite('wing','${w.id}')">
           <i data-lucide="star" style="width:16px;height:16px;${libIsFavorite(w) ? 'fill:currentColor;' : ''}"></i> ${libIsFavorite(w) ? 'Starred' : 'Star'}

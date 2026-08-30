@@ -66,6 +66,11 @@ function adminWingTemplate() {
         </div>
         <div class="awx-head">
           <div class="lang-tabs lang-tabs-admin" id="awx-tabs"></div>
+          <button class="btn btn-secondary btn-sm" type="button" onclick="awxSeedPack()"
+                  title="Add worked examples that use this wing's own fields"
+                  id="awx-seed-btn">
+            <i data-lucide="sparkles" style="width:14px;height:14px;"></i> Add starter pack
+          </button>
           <button class="btn btn-secondary btn-sm" type="button" onclick="awxOpenLibrary()"
                   title="Open the library this configures">
             <i data-lucide="external-link" style="width:14px;height:14px;"></i> Open library
@@ -105,6 +110,12 @@ function awxLeave(route) {
 
 function awxOpenLibrary() { awxLeave(_awxKey); }
 
+/** Worked examples, so a brand new wing is not an empty grid. */
+function awxSeedPack() {
+  if (typeof wingLoadSeedPack !== 'function') return;
+  wingLoadSeedPack(_awxKey, () => renderAwx());
+}
+
 function awxSetTab(tab) {
   const go = () => { _awxTab = tab; _awxEditing = null; _awxSelected = []; renderAwx(); };
   if (_awxEditing) { wingConfirmDiscard(go, (o) => awxSave(o)); return; }
@@ -136,6 +147,14 @@ function renderAwx() {
   if (_awxEditing) body.innerHTML = awxFormHTML();
   else if (_awxTab === 'folders') body.innerHTML = awxFoldersHTML();
   else body.innerHTML = awxListHTML();
+
+  // Nothing left to add means the button has nothing to say; hiding it beats
+  // a control that only ever tells you it did nothing.
+  const seedBtn = document.getElementById('awx-seed-btn');
+  if (seedBtn) {
+    const left = (typeof wingSeedAvailable === 'function') ? wingSeedAvailable(_awxKey) : 0;
+    seedBtn.style.display = left ? '' : 'none';
+  }
 
   if (typeof lucide !== 'undefined') lucide.createIcons({ root });
 

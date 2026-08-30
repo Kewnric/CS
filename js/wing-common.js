@@ -191,8 +191,15 @@ function wingSlug(s) {
 /** The wrapper every card and row shares: selection, favourite, click target. */
 function wingShell(w, inner, extraClass) {
   const selecting = libSelectMode('wing');
+  /* Due-ness is a CLASS, not a badge dropped into the card. Seven wings lay
+     their cards out seven ways — a timeline, a museum wall, a rulebook — and
+     an absolutely placed chip that suited one would land on the text of
+     another. A left edge stripe reads the same everywhere and cannot collide
+     with the fav button or the select box already in the corners. */
+  const revType = (typeof revWingType === 'function') ? revWingType(_wingKey) : null;
+  const due = (revType && typeof libIsDue === 'function' && libIsDue(revType, w.id)) ? ' wing-is-due' : '';
   return `
-    <div class="${extraClass}${libIsSelected('wing', w.id) ? ' lib-selected' : ''}"
+    <div class="${extraClass}${libIsSelected('wing', w.id) ? ' lib-selected' : ''}${due}"
          onclick="${selecting ? `libToggleSelect('wing','${w.id}')` : `wingOpen('${w.id}')`}" style="cursor:pointer;">
       ${libSelectBoxHTML('wing', w.id)}
       ${libFavButtonHTML('wing', w)}

@@ -47,13 +47,35 @@ function _revScoreToQuality(pct) {
 const _REV_TYPES = ['challenge', 'snippet', 'notebook'];
 
 /**
+ * The seven wings schedule too, as 'wing:<key>'.
+ *
+ * They are not in _REV_TYPES because that list is fixed and the wings are a
+ * registry — a wing added later should start scheduling without this file
+ * being edited. Everything downstream keys on the string, so one type per
+ * wing keeps a Mindset card and a Diary entry on separate schedules rather
+ * than in one undifferentiated pile.
+ */
+function revWingType(key) { return 'wing:' + key; }
+
+function _revIsWingType(type) {
+  if (typeof type !== 'string' || type.indexOf('wing:') !== 0) return false;
+  const key = type.slice(5);
+  const known = (typeof LIBRARY_WINGS !== 'undefined') ? LIBRARY_WINGS : [];
+  return known.some(w => w.key === key);
+}
+
+function _revTypeAllowed(type) {
+  return _REV_TYPES.indexOf(type) !== -1 || _revIsWingType(type);
+}
+
+/**
  * Record a review result and reschedule via SM-2.
- * @param {'challenge'|'snippet'|'notebook'} type
+ * @param {'challenge'|'snippet'|'notebook'|string} type  or 'wing:<key>'
  * @param {string} id  item id
  * @param {number} scorePct  0–100
  */
 function recordReview(type, id, scorePct) {
-  if (!type || !id || _REV_TYPES.indexOf(type) === -1) return;
+  if (!type || !id || !_revTypeAllowed(type)) return;
   if (!state.review || typeof state.review !== 'object') state.review = {};
 
   const key = type + ':' + id;
@@ -104,6 +126,9 @@ function _revResolveItem(rec) {
   } else if (rec.type === 'notebook') {
     item = (state.notebooks || []).find(n => n.id === rec.id);
     title = item ? item.title : '';
+  } else if (_revIsWingType(rec.type) && typeof wingItems === 'function') {
+    item = wingItems(rec.type.slice(5)).find(w => w.id === rec.id);
+    title = item ? (item.title || 'Untitled') : '';
   }
   return item ? { item, title } : null;
 }
@@ -160,6 +185,12 @@ function reviewNavigateTo(type, id) {
   } else if (type === 'notebook') {
     setSessionParam('activeNotebook', id);
     spaNavigate('study');
+  } else if (_revIsWingType(type)) {
+    // Straight into a recall session for that one entry, rather than the
+    // library with the entry merely open. "Due" means there is something to
+    // do, and the other three types all land you on the doing.
+    if (typeof wingRecallStart === 'function') wingRecallStart(type.slice(5), [id]);
+    else if (typeof wingGoTo === 'function') wingGoTo(type.slice(5), id);
   }
 }
 
