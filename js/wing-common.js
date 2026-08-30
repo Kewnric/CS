@@ -376,3 +376,194 @@ function wingGoTo(key, id) {
   _wingPendingOpen = id;
   window.location.hash = target;
 }
+
+/* ============================================================
+   THE SHARED FORM PIECES
+   ------------------------------------------------------------
+   The wings had the plainest forms in the app: a stack of labelled inputs,
+   tags typed as one comma-separated string, no way to tell whether what you
+   had typed was saved, and nothing stopping you navigating away mid-edit.
+   Every other library got the admin form chrome — sections, a save status, a
+   required marker, chip tags with suggestions — and the wings did not.
+
+   These are shared rather than written into the wing editor because the wing
+   ADMIN needs exactly the same pieces, and a tag editor that behaves one way
+   in the library and another way in its admin is worse than no admin at all.
+
+   Only one wing form is ever open at a time, in one route, so a single draft
+   here is the whole state it needs.
+   ============================================================ */
+
+let _wingTagDraft = [];
+let _wingFormDirty = false;
+let _wingFormStatusId = null;
+
+/** Seed the chip editor. Call before rendering a form. */
+function wingTagsBegin(tags) {
+  _wingTagDraft = Array.isArray(tags) ? tags.slice() : [];
+}
+
+function wingTagsRead() { return _wingTagDraft.slice(); }
+
+/**
+ * The chip editor.
+ *
+ * `scopeKey` is the wing, used to gather the tags already in use so the
+ * suggestions are that wing's own vocabulary rather than the whole app's.
+ */
+function wingTagEditorHTML(scopeKey) {
+  return `
+    <div class="af-field af-field-wide">
+      <label class="form-label" for="wing-tag-input">Tags
+        <span class="af-label-hint">Enter or comma to add</span></label>
+      <div class="af-tag-input-row">
+        <input id="wing-tag-input" class="form-input" placeholder="Add a tag..."
+               onkeydown="wingTagKeydown(event)" oninput="wingTagSuggest('${escapeHTML(scopeKey)}')" />
+        <button type="button" class="btn btn-secondary btn-sm af-add-btn" onclick="wingTagAdd()">
+          <i data-lucide="plus" style="width:14px;height:14px;"></i> Add
+        </button>
+      </div>
+      <div class="af-tags-list" id="wing-tags-list"></div>
+      <div class="af-tag-suggestions" id="wing-tag-suggestions"></div>
+    </div>`;
+}
+
+function wingRenderTags() {
+  const host = document.getElementById('wing-tags-list');
+  if (!host) return;
+  host.innerHTML = _wingTagDraft.map((t, i) => `
+    <span class="tag">${escapeHTML(t)}
+      <button type="button" onclick="wingTagRemove(${i})" title="Remove tag"
+              aria-label="Remove tag ${escapeHTML(t)}"><i data-lucide="x" style="width:12px;height:12px;"></i></button>
+    </span>`).join('');
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
+}
+
+function wingTagAdd() {
+  const input = document.getElementById('wing-tag-input');
+  if (!input) return;
+  String(input.value || '').split(',').map(v => v.trim()).filter(Boolean).forEach(v => {
+    if (!_wingTagDraft.includes(v)) _wingTagDraft.push(v);
+  });
+  input.value = '';
+  wingRenderTags();
+  const sug = document.getElementById('wing-tag-suggestions');
+  if (sug) sug.innerHTML = '';
+  wingMarkDirty();
+}
+
+function wingTagRemove(i) {
+  _wingTagDraft.splice(i, 1);
+  wingRenderTags();
+  wingMarkDirty();
+}
+
+function wingTagKeydown(ev) {
+  if (ev.key === 'Enter' || ev.key === ',') { ev.preventDefault(); wingTagAdd(); return; }
+  // Backspace on an empty box takes the last chip back, so a mistyped tag does
+  // not need the mouse to undo.
+  if (ev.key === 'Backspace' && !ev.target.value && _wingTagDraft.length) {
+    ev.preventDefault();
+    _wingTagDraft.pop();
+    wingRenderTags();
+    wingMarkDirty();
+  }
+}
+
+/** The tags already used in this wing, most common first. */
+function wingTopTags(key, limit) {
+  const counts = {};
+  (typeof wingItems === 'function' ? wingItems(key) : []).forEach(w =>
+    (w.tags || []).forEach(t => { counts[t] = (counts[t] || 0) + 1; }));
+  return Object.keys(counts)
+    .sort((a, b) => counts[b] - counts[a] || a.localeCompare(b))
+    .slice(0, limit || 8);
+}
+
+function wingTagSuggest(key) {
+  const host = document.getElementById('wing-tag-suggestions');
+  const input = document.getElementById('wing-tag-input');
+  if (!host || !input) return;
+  const typed = String(input.value || '').trim().toLowerCase();
+  const pool = wingTopTags(key, 24)
+    .filter(t => !_wingTagDraft.includes(t))
+    .filter(t => !typed || t.toLowerCase().includes(typed))
+    .slice(0, 8);
+  host.innerHTML = pool.length
+    ? `<span class="af-tag-suggest-label">In use</span>` + pool.map(t =>
+        `<button type="button" class="af-tag-suggest" onclick="wingTagPick('${escapeHTML(t).replace(/'/g, "\'")}')">${escapeHTML(t)}</button>`).join('')
+    : '';
+}
+
+function wingTagPick(t) {
+  if (!_wingTagDraft.includes(t)) _wingTagDraft.push(t);
+  const input = document.getElementById('wing-tag-input');
+  if (input) input.value = '';
+  wingRenderTags();
+  wingTagSuggest(_wingKey);
+  wingMarkDirty();
+}
+
+/* ── Dirty tracking ───────────────────────────────────────────
+   The wings were the only library you could navigate away from mid-edit and
+   lose what you had typed without being asked.
+   ------------------------------------------------------------ */
+
+function wingFormBegin(statusId) {
+  _wingFormDirty = false;
+  _wingFormStatusId = statusId || null;
+}
+
+function wingMarkDirty() {
+  _wingFormDirty = true;
+  if (_wingFormStatusId && typeof setSaveStatus === 'function') {
+    setSaveStatus(_wingFormStatusId, 'unsaved');
+  }
+}
+
+function wingFormIsDirty() { return _wingFormDirty; }
+
+function wingFormClean(showSaved) {
+  _wingFormDirty = false;
+  if (_wingFormStatusId && typeof setSaveStatus === 'function') {
+    setSaveStatus(_wingFormStatusId, showSaved ? 'saved' : '');
+  }
+}
+
+/**
+ * Ask before throwing away edits, and offer to keep them instead.
+ *
+ * Mirrors confirmCloseAdminForm rather than reimplementing the dialog, so a
+ * wing behaves the way the rest of the admin already does.
+ */
+function wingConfirmDiscard(onLeave, onSave) {
+  if (!_wingFormDirty) { onLeave(); return; }
+  if (typeof showUnsavedConfirm !== 'function') { onLeave(); return; }
+  showUnsavedConfirm(
+    () => { _wingFormDirty = false; onLeave(); },
+    () => {
+      const ok = typeof onSave === 'function' ? onSave({ silent: true }) : true;
+      if (ok === false) return;          // validation failed — stay put
+      _wingFormDirty = false;
+      // And then go where you were going. Saving was how you answered "I am
+      // leaving, keep this" — stopping at the save would leave you on the form
+      // you had just asked to leave, which is the one thing the dialog was
+      // opened to resolve. confirmCloseAdminForm has always done this.
+      onLeave();
+    }
+  );
+}
+
+/**
+ * Every input in a form marks it dirty.
+ *
+ * Delegated on the container rather than an oninput on each field, because
+ * the schema fields are built by wingFieldEditorHTML and adding a handler to
+ * each of the seven field types would mean seven places to forget one.
+ */
+function wingBindFormDirty(host) {
+  if (!host || host._wingDirtyBound) return;
+  host._wingDirtyBound = true;
+  host.addEventListener('input', wingMarkDirty);
+  host.addEventListener('change', wingMarkDirty);
+}

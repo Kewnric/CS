@@ -205,3 +205,29 @@
   .wing-row, .wing-link-card, .wing-rate-star, .wing-prog-fill { transition: none !important; }
   .wing-row:hover, .wing-link-card:hover { transform: none; }
 }
+
+/* ── The entry form ───────────────────────────────────────────
+   The library's form and its admin's form are the same form, so they share
+   the admin form chrome from admin.css. Only the accent differs, and that
+   comes from the wing's own colour rather than from where the form is shown.
+   ------------------------------------------------------------ */
+.wing-form {
+  max-width: 820px;
+  margin: 0 auto;
+  --wing-accent: #8b5cf6;
+}
+.wing-form .af-header-badge {
+  background: color-mix(in srgb, var(--wing-accent) 18%, transparent);
+  color: var(--wing-accent);
+}
+.wing-form .af-section-icon { color: var(--wing-accent); }
+
+/* The footer is sticky in admin.css because there the form panel is its own
+   scroll container and the actions should stay in reach. Both wing forms sit
+   on a page that scrolls as a whole, so sticky pinned them to the viewport
+   and they floated over the middle of the form — measured overlapping the
+   section below by 31px. Here they belong at the end of the form. */
+.wing-form .admin-form-footer,
+.awx-form .admin-form-footer {
+  position: static;
+}

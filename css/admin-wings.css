@@ -1,0 +1,336 @@
+/* ============================================================
+   ADMIN-WINGS.CSS — the seven wings' admin
+   ------------------------------------------------------------
+   The form chrome is admin.css's: .admin-form-panel, .af-section, .af-field
+   and the rest are reused rather than restyled, because a wing form that
+   looked different from a coding form would be a second design for the same
+   job. What is here is the part admin.css does not have — a table, a bulk
+   bar, a folder list — plus the accent plumbing that lets each wing colour
+   its own page.
+
+   Every wing sets --wing-accent from its entry in LIBRARY_WINGS, so the colour
+   belongs to the library rather than to a position in a grid.
+   ============================================================ */
+
+#awx-root { --wing-accent: #8b5cf6; }
+
+.awx-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.25rem;
+}
+.awx-head .lang-tabs-admin { padding: 0; margin: 0; flex: 1; min-width: 0; }
+
+/* The tab's own count, so the size of each list is legible before opening it. */
+.awx-tab-n {
+  display: inline-block;
+  min-width: 1.25em;
+  padding: 0 0.35em;
+  border-radius: var(--radius-full);
+  background: var(--bg-surface-hover);
+  color: var(--text-tertiary);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-align: center;
+}
+.lang-tab.is-active .awx-tab-n {
+  background: color-mix(in srgb, var(--color-primary) 22%, transparent);
+  color: var(--color-primary);
+}
+
+/* ── The toolbar ──────────────────────────────────────────── */
+
+.awx-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.awx-count {
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+.awx-search {
+  position: relative;
+  flex: 1;
+  min-width: 180px;
+  max-width: 340px;
+}
+.awx-search i,
+.awx-search svg {
+  position: absolute;
+  left: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 15px;
+  height: 15px;
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+.awx-search .form-input { padding-left: 2rem; }
+
+.awx-folder-filter { max-width: 200px; }
+
+/* ── The bulk bar ─────────────────────────────────────────── */
+
+.awx-bulk {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--wing-accent) 45%, transparent);
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--wing-accent) 10%, transparent);
+}
+.awx-bulk-n {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--wing-accent);
+}
+.awx-bulk .form-select { max-width: 200px; }
+
+/* ── The table ────────────────────────────────────────────────
+   Its own horizontal scroller. A wing with three schema columns plus title,
+   folder, updated and actions does not fit a narrow window, and a page that
+   scrolls sideways because of one table is worse than a table that does.
+   ------------------------------------------------------------ */
+
+.awx-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+}
+
+.awx-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.awx-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0.6rem;
+  text-align: left;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  background: var(--bg-elevated);
+  border-bottom: 1px solid var(--border-color);
+  white-space: nowrap;
+}
+.awx-table td {
+  padding: 0.55rem 0.6rem;
+  border-bottom: 1px solid var(--border-color-subtle);
+  color: var(--text-secondary);
+  vertical-align: top;
+}
+.awx-table tbody tr:last-child td { border-bottom: none; }
+.awx-table tbody tr { transition: background var(--transition-fast); }
+.awx-table tbody tr:hover { background: var(--bg-surface-hover); }
+.awx-table tbody tr.is-selected {
+  background: color-mix(in srgb, var(--wing-accent) 12%, transparent);
+}
+
+.awx-check-cell { width: 34px; }
+.awx-check-cell input { cursor: pointer; }
+
+.awx-actions { text-align: right; white-space: nowrap; }
+.awx-actions .btn { padding: 0.25rem 0.4rem; }
+.awx-actions i, .awx-actions svg { width: 14px; height: 14px; }
+
+/* The title is the way into the row, so it is a control and looks like one. */
+.awx-title-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+.awx-title-btn:hover { color: var(--wing-accent); text-decoration: underline; }
+
+.awx-row-tags { display: flex; flex-wrap: wrap; gap: 0.2rem; margin-top: 0.25rem; }
+.awx-mini-tag {
+  padding: 0.05rem 0.35rem;
+  border-radius: var(--radius-full);
+  background: var(--bg-surface-hover);
+  color: var(--text-tertiary);
+  font-size: 0.63rem;
+  font-weight: 700;
+}
+
+.awx-dim { color: var(--text-tertiary); font-style: normal; }
+.awx-rate { color: var(--color-warning); letter-spacing: 0.04em; }
+.awx-rate .awx-dim { color: var(--border-color); }
+
+/* ── Empty states ─────────────────────────────────────────── */
+
+.awx-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+}
+.awx-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--wing-accent) 14%, transparent);
+  color: var(--wing-accent);
+}
+.awx-empty-icon i, .awx-empty-icon svg { width: 24px; height: 24px; }
+.awx-empty h3 { margin: 0; font-size: 1rem; font-weight: 800; color: var(--text-primary); }
+.awx-empty p {
+  margin: 0;
+  max-width: 46ch;
+  font-size: 0.82rem;
+  color: var(--text-tertiary);
+  line-height: 1.5;
+}
+.awx-empty .btn { margin-top: 0.4rem; }
+
+/* ── Folders ──────────────────────────────────────────────── */
+
+.awx-folder-list {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+
+.awx-folder-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 0.85rem;
+  border-bottom: 1px solid var(--border-color-subtle);
+  /* Nesting is shown by indent rather than by a tree, because the depth here
+     is only ever a couple of levels and a full tree would be more chrome than
+     the information deserves. */
+  padding-left: calc(0.85rem + var(--awx-depth, 0) * 1.15rem);
+  transition: background var(--transition-fast);
+}
+.awx-folder-row:last-child { border-bottom: none; }
+.awx-folder-row:hover { background: var(--bg-surface-hover); }
+.awx-folder-row i, .awx-folder-row svg { width: 16px; height: 16px; color: var(--wing-accent); flex-shrink: 0; }
+.awx-folder-row.is-loose i, .awx-folder-row.is-loose svg { color: var(--text-tertiary); }
+.awx-folder-row.is-loose .awx-folder-name { color: var(--text-tertiary); font-style: italic; }
+
+.awx-folder-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.awx-folder-n {
+  padding: 0.05rem 0.45rem;
+  border-radius: var(--radius-full);
+  background: var(--bg-surface-hover);
+  color: var(--text-tertiary);
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+.awx-folder-actions {
+  display: flex;
+  gap: 0.15rem;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+.awx-folder-row:hover .awx-folder-actions,
+.awx-folder-row:focus-within .awx-folder-actions { opacity: 1; }
+.awx-folder-actions .btn { padding: 0.25rem 0.35rem; }
+.awx-folder-actions i, .awx-folder-actions svg { width: 14px; height: 14px; color: inherit; }
+
+/* Touch has no hover, so the actions cannot be hidden behind one. */
+@media (hover: none) {
+  .awx-folder-actions { opacity: 1; }
+}
+
+/* ── The form ─────────────────────────────────────────────────
+   admin.css does the work. This only gives the panel the wing's accent and
+   room to breathe on a page that is not the two-pane admin layout.
+   ------------------------------------------------------------ */
+
+.awx-form { max-width: 860px; }
+.awx-form .af-header-badge {
+  background: color-mix(in srgb, var(--wing-accent) 18%, transparent);
+  color: var(--wing-accent);
+}
+.awx-form .af-section-icon { color: var(--wing-accent); }
+
+/* ── The hub ──────────────────────────────────────────────── */
+
+/* Same density as the grid the wings used to sit in, without the name that
+   said they were not finished yet. */
+.lib-hub-grid-compact { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+
+.lib-hub-section-note {
+  margin: -0.35rem 0 0.9rem;
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+}
+
+/* ── Phone ────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  /* !important because the template sets padding inline, which otherwise beats
+     every class rule including mobile.css's own .home-scroll clearance. */
+  #awx-root { padding: 0.5rem 1rem 3rem !important; }
+  /* The 58px that clears the floating menu button lives on the head, not the
+     root, so it is not paid twice — and admin-language uses the same head, so
+     its back button stops sitting under the button too. */
+  .admin-hub-head { padding-top: 58px; }
+
+  /* The tab strip and "Open library" shared a row and did not fit: the Folders
+     tab ran to 236px and the button started at 222, so the button sat on top
+     of the tab. The button gets its own line, and the tabs scroll rather than
+     overflowing their box in silence. */
+  .awx-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+  .awx-head .lang-tabs-admin {
+    flex: none;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .awx-head .lang-tabs-admin::-webkit-scrollbar { display: none; }
+  .awx-head .lang-tab { flex-shrink: 0; }
+  .awx-head > .btn { align-self: flex-start; }
+  .awx-search { max-width: none; }
+  .awx-folder-filter { max-width: none; flex: 1; }
+  .awx-count { margin-left: 0; }
+  .awx-form { max-width: none; }
+
+  /* The table keeps its columns and scrolls, rather than being crushed into
+     an unreadable width. */
+  .awx-table { min-width: 620px; }
+}

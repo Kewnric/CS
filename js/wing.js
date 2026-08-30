@@ -205,7 +205,17 @@ function wingRenderDetail() {
   const host = document.getElementById('wing-detail');
   if (!host) return;
 
-  if (_wingEditing) { host.innerHTML = _wingEditorHTML(); _wingAfterRender(host); return; }
+  if (_wingEditing) {
+    host.innerHTML = _wingEditorHTML();
+    _wingAfterRender(host);
+    // The chips and the dirty tracking are wired after the markup exists, the
+    // same way the wing admin does it — they are the same form.
+    wingRenderTags();
+    wingBindFormDirty(document.getElementById('wing-form'));
+    const t = document.getElementById('wing-f-title');
+    if (t && _wingEditing === 'new') t.focus();
+    return;
+  }
   if (_wingActiveId) {
     const item = wingFind(_wingActiveId);
     if (item) { host.innerHTML = _wingReaderHTML(item); _wingAfterRender(host); return; }
@@ -348,44 +358,140 @@ function _wingEditorHTML() {
   const folders = [];
   const walk = (pid, d) => getChildFolders(pid, wingScope()).forEach(f => { folders.push({ id: f.id, label: '— '.repeat(d) + f.name }); walk(f.id, d + 1); });
   walk(null, 0);
+  const cfg = wingConfig(_wingKey);
+  const fieldHTML = (schema.fields || []).map(f => wingFieldEditorHTML(f, w)).join('');
+
+  /* The same chrome the wing admin uses, and for the same reason: this was the
+     plainest form in the app — one column of inputs, tags typed as a comma
+     string, no way to see whether what you had typed was saved, and nothing
+     asking before you navigated away mid-edit. */
   return `
-    <div class="animate-fade-in" style="max-width:780px;margin:0 auto;">
-      <button class="btn btn-ghost btn-sm" onclick="wingBack()" style="margin-bottom:1rem;">
-        <i data-lucide="chevron-left" style="width:14px;height:14px;"></i> Cancel
-      </button>
-      <h2 style="font-size:1.35rem;font-weight:800;margin-bottom:1.25rem;">${isNew ? 'New ' + escapeHTML(schema.noun) : 'Edit ' + escapeHTML(schema.noun)}</h2>
-      <div class="af-field"><label class="form-label">${escapeHTML(schema.titleLabel)}</label>
-        <input id="wing-f-title" class="form-input af-input-bold" value="${escapeHTML(w.title || '')}" placeholder="${escapeHTML(schema.titlePlaceholder)}" /></div>
-      <div class="af-field"><label class="form-label">Folder</label>
-        <select id="wing-f-folder" class="form-select">
-          <option value="">Uncategorized</option>
-          ${folders.map(f => `<option value="${f.id}"${(w.parentId || '') === f.id ? ' selected' : ''}>${escapeHTML(f.label)}</option>`).join('')}
-        </select></div>
-      <div class="af-field"><label class="form-label">Tags <span class="af-label-hint">(comma separated)</span></label>
-        <input id="wing-f-tags" class="form-input" value="${escapeHTML((w.tags || []).join(', '))}" /></div>
-      ${(schema.fields || []).map(f => wingFieldEditorHTML(f, w)).join('')}
-      <div class="af-field"><label class="form-label">${escapeHTML(schema.bodyLabel)}</label>
-        <textarea id="wing-f-body" class="form-textarea" rows="12" placeholder="${escapeHTML(schema.bodyPlaceholder)}">${escapeHTML(w.body || '')}</textarea></div>
-      <div style="display:flex;gap:0.6rem;margin-top:1rem;">
-        <button class="btn btn-primary" onclick="wingSave()"><i data-lucide="save" style="width:16px;height:16px;"></i> Save</button>
-        <button class="btn btn-secondary" onclick="wingBack()">Cancel</button>
+    <div class="admin-form-panel wing-form animate-fade-in" id="wing-form"
+         style="--wing-accent:${cfg.accent || '#8b5cf6'};">
+      <div class="admin-form-header">
+        <div class="af-header-left">
+          <div class="af-header-badge"><i data-lucide="${cfg.icon || 'file-text'}"></i></div>
+          <div class="af-header-text">
+            <h2>${isNew ? 'New ' + escapeHTML(schema.noun) : 'Edit ' + escapeHTML(schema.noun)}</h2>
+            <p>${escapeHTML(cfg.name)}</p>
+          </div>
+        </div>
+        <span class="af-save-status" id="wing-save-status"></span>
+        <button class="af-close-btn" onclick="wingBack()" title="Close" aria-label="Close">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+
+      <div class="af-section">
+        <div class="af-section-header">
+          <span class="af-section-icon"><i data-lucide="pen-line"></i></span>
+          <h3>Essentials</h3>
+        </div>
+        <div class="af-section-body">
+          <div class="af-field af-field-wide">
+            <label class="form-label" for="wing-f-title">${escapeHTML(schema.titleLabel)}
+              <span class="af-req${String(w.title || '').trim() ? ' is-filled' : ''}" id="wing-req-title">Required</span></label>
+            <input id="wing-f-title" class="form-input af-input-bold" value="${escapeHTML(w.title || '')}"
+                   placeholder="${escapeHTML(schema.titlePlaceholder)}" oninput="wingTitleTyped(this.value)" />
+          </div>
+          <div class="af-field">
+            <label class="form-label" for="wing-f-folder">Folder</label>
+            <select id="wing-f-folder" class="form-select">
+              <option value="">Uncategorized</option>
+              ${folders.map(f => `<option value="${f.id}"${(w.parentId || '') === f.id ? ' selected' : ''}>${escapeHTML(f.label)}</option>`).join('')}
+            </select>
+          </div>
+          ${wingTagEditorHTML(_wingKey)}
+        </div>
+      </div>
+
+      ${fieldHTML ? `
+      <div class="af-section">
+        <div class="af-section-header">
+          <span class="af-section-icon"><i data-lucide="sliders"></i></span>
+          <h3>${escapeHTML(schema.noun.charAt(0).toUpperCase() + schema.noun.slice(1))} details</h3>
+        </div>
+        <div class="af-section-body">${fieldHTML}</div>
+      </div>` : ''}
+
+      <div class="af-section">
+        <div class="af-section-header">
+          <span class="af-section-icon"><i data-lucide="align-left"></i></span>
+          <h3>${escapeHTML(schema.bodyLabel)}</h3>
+        </div>
+        <div class="af-section-body">
+          <div class="af-field af-field-wide">
+            <textarea id="wing-f-body" class="form-textarea" rows="12"
+                      placeholder="${escapeHTML(schema.bodyPlaceholder)}">${escapeHTML(w.body || '')}</textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-form-footer">
+        <span class="af-footer-hint"><kbd>Ctrl</kbd>+<kbd>S</kbd> to save · <kbd>Esc</kbd> to close</span>
+        <div class="af-footer-actions">
+          <button class="btn btn-secondary" onclick="wingBack()">
+            <i data-lucide="x" style="width:15px;height:15px;"></i> Discard
+          </button>
+          <button class="btn btn-primary" onclick="wingSave()">
+            <i data-lucide="save" style="width:16px;height:16px;"></i> Save ${escapeHTML(schema.noun)}
+          </button>
+        </div>
       </div>
     </div>`;
+}
+
+/** The required marker goes as soon as the field stops being empty. */
+function wingTitleTyped(v) {
+  const req = document.getElementById('wing-req-title');
+  if (req) req.classList.toggle('is-filled', !!String(v || '').trim());
+  wingMarkDirty();
 }
 
 /* ── Actions ──────────────────────────────────────────────── */
 
 function wingOpen(id) { _wingActiveId = id; _wingEditing = null; wingRenderDetail(); }
-function wingEdit(id) { _wingEditing = id; wingRenderDetail(); }
-function wingNewEntry() { _wingEditing = 'new'; _wingActiveId = null; wingRenderDetail(); }
-function wingBack() { _wingEditing = null; _wingActiveId = null; wingRenderDetail(); }
 
-function wingSave() {
-  const title = (document.getElementById('wing-f-title') || {}).value || '';
-  if (!title.trim()) { if (typeof toast === 'function') toast('Give it a title first.', { type: 'warning' }); return; }
+function wingEdit(id) {
+  const w = wingFind(id);
+  _wingEditing = id;
+  wingTagsBegin(w ? (w.tags || []) : []);
+  wingFormBegin('wing-save-status');
+  wingRenderDetail();
+}
+
+function wingNewEntry() {
+  _wingEditing = 'new';
+  _wingActiveId = null;
+  wingTagsBegin([]);
+  wingFormBegin('wing-save-status');
+  wingRenderDetail();
+}
+
+/** Leaving an open form asks first rather than dropping what was typed. */
+function wingBack() {
+  const go = () => { _wingEditing = null; _wingActiveId = null; wingRenderDetail(); };
+  if (_wingEditing) { wingConfirmDiscard(go, (o) => wingSave(o)); return; }
+  go();
+}
+
+/**
+ * @param   {object} [opts]  opts.silent keeps the form open (the unsaved
+ *                           dialog's "save" path).
+ * @returns {boolean} false when validation failed, so that dialog keeps the
+ *                    form open rather than closing over an error.
+ */
+function wingSave(opts) {
+  const silent = !!(opts && opts.silent);
+  const titleEl = document.getElementById('wing-f-title');
+  const title = String((titleEl || {}).value || '');
+  if (!title.trim()) {
+    if (typeof showValidationError === 'function') showValidationError(titleEl);
+    if (typeof toast === 'function') toast('Give it a title first.', { type: 'warning' });
+    return false;
+  }
   const body = (document.getElementById('wing-f-body') || {}).value || '';
-  const tags = String((document.getElementById('wing-f-tags') || {}).value || '')
-    .split(',').map(t => t.trim()).filter(Boolean);
+  const tags = wingTagsRead();
   const parentId = (document.getElementById('wing-f-folder') || {}).value || null;
 
   const schema = wingSchema(_wingKey);
@@ -406,12 +512,16 @@ function wingSave() {
       _wingActiveId = item.id;
     }
   }
-  _wingEditing = null;
   saveData();
-  wingRenderSidebar();
-  wingRenderDetail();
-  wingUpdateHeader();
-  if (typeof toast === 'function') toast('Saved.', { type: 'success' });
+  wingFormClean(true);
+  if (!silent) {
+    _wingEditing = null;
+    wingRenderSidebar();
+    wingRenderDetail();
+    wingUpdateHeader();
+    if (typeof toast === 'function') toast('Saved.', { type: 'success' });
+  }
+  return true;
 }
 
 function wingDelete(id) {
@@ -486,3 +596,20 @@ registerLibAdapter('wing', {
   remove: (id) => { const items = wingItems(); const i = items.findIndex(w => w.id === id); if (i >= 0) items.splice(i, 1); },
   rerender: () => { wingRenderSidebar(); wingRenderDetail(); wingUpdateHeader(); }
 });
+
+/* Ctrl+S saves and Esc closes, matching the wing admin and the rest of the
+   app. Gated on a wing form being on screen so it never competes with the
+   editor shortcuts on other routes. */
+document.addEventListener('keydown', function (e) {
+  if (!_wingEditing || !document.getElementById('wing-form')) return;
+  if ((e.ctrlKey || e.metaKey) && String(e.key).toLowerCase() === 's') {
+    e.preventDefault();
+    e.stopPropagation();
+    wingSave();
+    return;
+  }
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    wingBack();
+  }
+}, true);

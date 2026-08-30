@@ -36,6 +36,20 @@ function registerAllRoutes() {
   SpaRouter.register('admin-notes', { title: 'StudySession Pro — Notes Admin', templateFn: adminNotesTemplate, initFn: adminNotesInit, destroyFn: adminNotesDestroy, sidebarVisible: true, navId: 'nav-admin' });
   SpaRouter.register('admin-snippets', { title: 'StudySession Pro — Snippets Admin', templateFn: adminSnippetsTemplate, initFn: adminSnippetsInit, destroyFn: adminSnippetsDestroy, sidebarVisible: true, navId: 'nav-admin' });
   SpaRouter.register('admin-language', { title: 'StudySession Pro — Language Admin', templateFn: adminLanguageTemplate, initFn: adminLanguageInit, destroyFn: adminLanguageDestroy, sidebarVisible: true, navId: 'nav-admin' });
+
+  /* An admin route per wing, from the same list the libraries come from.
+     One engine in js/admin-wings.js reads each wing schema for its columns
+     and its form, so a wing added to LIBRARY_WINGS gets an admin here with
+     nothing to write. */
+  (typeof LIBRARY_WINGS !== 'undefined' ? LIBRARY_WINGS : []).forEach((w) => {
+    SpaRouter.register('admin-' + w.key, {
+      title: 'StudySession Pro — ' + w.name + ' Admin',
+      templateFn: adminWingTemplate,
+      initFn: () => adminWingInitFor(w.key),
+      destroyFn: adminWingDestroy,
+      sidebarVisible: true, navId: 'nav-admin'
+    });
+  });
   SpaRouter.register('visualization', { title: 'StudySession Pro — Visualization', templateFn: vizTemplate, initFn: vizInit, destroyFn: vizDestroy, sidebarVisible: true, navId: 'nav-mindmap' });
   SpaRouter.register('quests', { title: 'StudySession Pro — Quest Board', templateFn: questTemplate, initFn: questInit, destroyFn: questDestroy, sidebarVisible: true, navId: 'nav-quests' });
   SpaRouter.register('practice', { title: 'StudySession Pro — Practice', templateFn: practiceTemplate, initFn: practiceInit, destroyFn: practiceDestroy, sidebarVisible: false, navId: null });

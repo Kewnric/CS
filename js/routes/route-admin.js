@@ -467,8 +467,9 @@ function adminTemplate() {
         </section>
 
         <section style="margin-top:2rem;">
-          <h2 class="lib-hub-section-title"><i data-lucide="boxes"></i> Other Wings</h2>
-          <div class="lib-hub-grid lib-hub-grid-soon stagger-children" id="admin-hub-soon"></div>
+          <h2 class="lib-hub-section-title"><i data-lucide="boxes"></i> Wing Libraries</h2>
+          <p class="lib-hub-section-note">Each one has its own table, folders and form, the same as the four above.</p>
+          <div class="lib-hub-grid lib-hub-grid-compact stagger-children" id="admin-hub-wings"></div>
         </section>
       </div>
     </div>
@@ -487,7 +488,7 @@ function adminInit() {
   const totals = document.getElementById('admin-hub-totals');
   if (totals) {
     totals.innerHTML = `
-      ${_libStatChip('sliders', '4 active wings')}
+      ${_libStatChip('sliders', `${4 + LIBRARY_WINGS.length} wings`)}
       ${_libStatChip('file-code', `${challenges.length} programs`)}
       ${_libStatChip('book-open', `${notebooks.length} notebooks`)}
       ${_libStatChip('code', `${snippets.length} snippets`)}
@@ -526,25 +527,33 @@ function adminInit() {
         _libStatChip('swords', `${(state.langScenarios || []).length} scenarios`));
   }
 
-  const soon = document.getElementById('admin-hub-soon');
-  if (soon) {
-    // These stopped being placeholders when the wings became real libraries.
-    // They have no separate admin form — entries are written inside the wing —
-    // so the card says so and opens it rather than raising a "coming soon".
-    soon.innerHTML = LIBRARY_WINGS.map(p => {
-      const n = (typeof wingItems === 'function') ? wingItems(p.key).length : 0;
+  const wings = document.getElementById('admin-hub-wings');
+  if (wings) {
+    // These used to open the library and say entries were managed in there,
+    // which was true and made them the only cards in the panel that were not
+    // admin. Each has a real one now — table, folders, form — built by
+    // js/admin-wings.js from the wing's own schema.
+    wings.innerHTML = LIBRARY_WINGS.map(p => {
+      const items = (typeof wingItems === 'function') ? wingItems(p.key) : [];
+      const n = items.length;
+      const folders = state.nodes.filter(x => x.scope === 'wing:' + p.key && x.type === 'folder').length;
+      const schema = (typeof wingSchema === 'function') ? wingSchema(p.key) : { noun: 'entry', nounPlural: 'entries' };
+      const noun = n === 1 ? schema.noun : schema.nounPlural;
       return `
-      <div class="lib-card lib-card-wing" onclick="spaNavigate('${p.key}')" role="link" tabindex="0"
+      <div class="lib-card lib-card-wing" onclick="spaNavigate('admin-${p.key}')" role="link" tabindex="0"
            style="--lib-accent:${p.accent || '#8b5cf6'};"
-           onkeydown="if(event.key==='Enter')spaNavigate('${p.key}')">
+           onkeydown="if(event.key==='Enter')spaNavigate('admin-${p.key}')">
         <div class="lib-card-glow"></div>
         <div class="lib-card-head">
           <div class="lib-card-icon"><i data-lucide="${p.icon}"></i></div>
           <i data-lucide="arrow-up-right" class="lib-card-arrow"></i>
         </div>
-        <h3 class="lib-card-name">${p.name}</h3>
-        <p class="lib-card-desc">Entries and folders are managed inside the wing itself.</p>
-        <div class="lib-card-chips">${_libStatChip('file-text', `${n} entr${n === 1 ? 'y' : 'ies'}`)}</div>
+        <h3 class="lib-card-name">${escapeHTML(p.name)}</h3>
+        <p class="lib-card-desc">${escapeHTML(p.tagline || '')}</p>
+        <div class="lib-card-chips">
+          ${_libStatChip('file-text', `${n} ${noun}`)}
+          ${_libStatChip('folder', `${folders} folder${folders === 1 ? '' : 's'}`)}
+        </div>
       </div>`;
     }).join('');
   }
