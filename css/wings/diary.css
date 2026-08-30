@@ -20,10 +20,10 @@
 .wing-day-num { font-size: 1.3rem; font-weight: 800; color: var(--text-primary); line-height: 1; }
 
 .wing-day-dow {
-  font-size: 0.62rem;
+  font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-tertiary);
+  color: var(--wing-muted);
   margin-top: 0.15rem;
 }
 

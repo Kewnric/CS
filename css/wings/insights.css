@@ -11,8 +11,8 @@
   width: 2rem;
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--text-tertiary);
+  font-weight: 800;
+  color: var(--wing-muted);
   text-align: right;
   padding-top: 0.1rem;
 }

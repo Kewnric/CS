@@ -19,7 +19,7 @@
   color: var(--color-primary);
 }
 
-.wing-cat-by { font-size: 0.76rem; color: var(--text-tertiary); margin: 0.1rem 0 0; }
+.wing-cat-by { font-size: 0.76rem; color: var(--wing-muted); margin: 0.1rem 0 0; }
 .wing-cat-rate { margin-bottom: 0.4rem; }
 
 .wing-badge.status-finished   { background: rgba(34,197,94,.13);  border-color: rgba(34,197,94,.4);  color: #4ade80; }
@@ -27,3 +27,57 @@
 .wing-badge.status-backlog    { background: rgba(148,163,184,.14);border-color: rgba(148,163,184,.4);color: #94a3b8; }
 .wing-badge.status-dropped    { background: rgba(239,68,68,.12);  border-color: rgba(239,68,68,.4);  color: #f87171; }
 .wing-badge.status-revisiting { background: rgba(168,85,247,.13); border-color: rgba(168,85,247,.4); color: #c084fc; }
+
+/* ── Covers ───────────────────────────────────────────────────
+   Of the seven wings this is the one cataloguing things that HAVE covers, and
+   a shelf of books and films identified only by their titles is a list, not a
+   catalogue. An entry without one falls back to libCoverFallbackHTML, the
+   same generated cover the notebooks use, so the grid never goes ragged.
+   ------------------------------------------------------------ */
+.wing-cat-cover {
+  margin: -0.9rem -0.9rem 0.75rem;
+  height: 116px;
+  overflow: hidden;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: var(--bg-elevated);
+}
+.wing-cat-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+/* The generated fallback is square by default; here it fills the band. */
+.wing-cat-cover .nb-card-cover {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  margin: 0;
+}
+
+/* ── The image field in the form ──────────────────────────── */
+.wing-img-field { display: flex; gap: 0.75rem; align-items: flex-start; flex-wrap: wrap; }
+.wing-img-preview {
+  width: 132px;
+  height: 88px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--bg-elevated);
+  display: grid;
+  place-items: center;
+}
+.wing-img-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.wing-img-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  color: var(--wing-muted);
+}
+.wing-img-empty i, .wing-img-empty svg { width: 18px; height: 18px; }
+.wing-img-actions { display: flex; flex-direction: column; gap: 0.4rem; }
+.wing-img-actions .btn { cursor: pointer; }
+.wing-img-actions .btn:disabled { opacity: 0.45; cursor: not-allowed; }

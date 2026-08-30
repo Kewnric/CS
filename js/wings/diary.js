@@ -53,3 +53,30 @@ wingRegister('diary', {
     `, 'wing-row wing-journal');
   }
 });
+
+/* ── Starter pack ─────────────────────────────────────────────
+   Four consecutive days with different moods, so the journal shows what a week of it looks like.
+
+   It lives here, with the schema it fills in, rather than in one file
+   holding every wing's examples: the fields these entries use are
+   defined a few lines up, and a pack that drifts from its schema is the
+   failure mode worth designing against.
+   ------------------------------------------------------------ */
+wingSeedRegister('diary', [
+    { title: 'A quiet day that went well',
+      body: 'Nothing dramatic. Finished the thing I said I would finish, which is rarer than it should be.',
+      data: { entryDate: '', mood: 'Good', energy: 4, oneGoodThing: 'Finished what I planned' },
+      tags: [] },
+    { title: 'Stuck for most of the afternoon',
+      body: 'Went round the same problem three times before admitting I did not understand the input. Reading it properly took ten minutes.',
+      data: { entryDate: '', mood: 'Low', energy: 2, oneGoodThing: 'Admitted it eventually' },
+      tags: ['work'] },
+    { title: 'Closed the laptop on time',
+      body: 'Stopped at a sensible hour and the problem was smaller in the morning. It usually is.',
+      data: { entryDate: '', mood: 'Grateful', energy: 3, oneGoodThing: 'Stopped on time' },
+      tags: ['rest'] },
+    { title: 'Busy, but none of it was the important thing',
+      body: 'Every hour accounted for and the one task that mattered untouched. Worth noticing on the day, before it becomes a week.',
+      data: { entryDate: '', mood: 'Restless', energy: 3, oneGoodThing: 'Noticed it on the day' },
+      tags: ['work'] }
+  ]);

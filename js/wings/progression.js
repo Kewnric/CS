@@ -46,9 +46,10 @@ wingRegister('progression', {
         ${wingBadge(stage, 'stage-' + wingSlug(stage))}
       </div>
       ${p ? wingProgressBarHTML(p) : '<p class="wing-muted">No steps yet.</p>'}
+      ${wingGoalCardStepsHTML(w)}
       <p class="wing-row-snip">${escapeHTML(_wingSnippet(w.body, 110) || '')}</p>
       <div class="wing-row-meta">
-        ${target ? `<span><i data-lucide="calendar" style="width:11px;height:11px;"></i> ${escapeHTML(target)}</span>` : ''}
+        ${target ? wingTargetChipHTML(w) : ''}
         ${(w.tags || []).slice(0, 2).map(t => libTagBadgeHTML('wing', t)).join('')}
       </div>
     `, 'card card-enhanced wing-goal');
@@ -108,4 +109,93 @@ function wingToggleStep(id, i) {
   if (p && p.done === p.total && w.data.stage !== 'Reached') w.data.stage = 'Reached';
   else if (p && p.done < p.total && w.data.stage === 'Reached') w.data.stage = 'Active';
   wingSaveAndRepaint();
+}
+
+/* ── Starter pack ─────────────────────────────────────────────
+   One goal at each stage, including a reached one, so the board is not all "Active".
+
+   It lives here, with the schema it fills in, rather than in one file
+   holding every wing's examples: the fields these entries use are
+   defined a few lines up, and a pack that drifts from its schema is the
+   failure mode worth designing against.
+   ------------------------------------------------------------ */
+wingSeedRegister('progression', [
+    { title: 'Read a stack trace in any language I use',
+      body: 'Not memorising frameworks — being able to open an unfamiliar trace and find the line that matters without guessing.',
+      data: { stage: 'Active', target: '',
+              steps: [{ text: 'Read one trace a day for a fortnight', done: true },
+                      { text: 'Write down what each frame meant', done: false },
+                      { text: 'Do it once in a language I do not know', done: false }] },
+      tags: ['debugging'] },
+    { title: 'Ship something end to end, alone',
+      body: 'Design, build, deploy and support it. The gaps show up in the parts nobody hands you.',
+      data: { stage: 'Someday', target: '',
+              steps: [{ text: 'Pick something small and real', done: false },
+                      { text: 'Get it in front of one other person', done: false },
+                      { text: 'Fix the first thing they hit', done: false }] },
+      tags: ['projects'] },
+    { title: 'Explain my work to someone outside the field',
+      body: 'The test of understanding is whether it survives losing the vocabulary.',
+      data: { stage: 'Paused', target: '',
+              steps: [{ text: 'Write one paragraph with no jargon', done: false },
+                      { text: 'Read it aloud and watch where they frown', done: false }] },
+      tags: ['communication'] },
+    { title: 'Stop needing the debugger for control flow',
+      body: 'Reading what a function does should not require stepping through it. Stepping is for state now, not for shape.',
+      data: { stage: 'Reached', target: '',
+              steps: [{ text: 'Predict the path before running it', done: true },
+                      { text: 'Only step in when the prediction was wrong', done: true }] },
+      tags: ['debugging'] }
+  ]);
+
+/* ── The next steps, tickable from the card ───────────────────
+   Ticking a step off is the thing you do most in this library, and it was
+   two clicks away behind opening the goal. The card shows the next few
+   undone steps and takes the tick directly; the reader still shows all of
+   them. Three, because a card is a summary — a goal with twelve steps
+   should not become a page.
+   ------------------------------------------------------------ */
+const WING_GOAL_CARD_STEPS = 3;
+
+function wingGoalCardStepsHTML(w) {
+  const steps = Array.isArray(wingVal(w, 'steps')) ? wingVal(w, 'steps') : [];
+  if (!steps.length) return '';
+  // Index against the original array, since that is what the toggle needs.
+  const next = steps.map((s, i) => ({ s: s, i: i })).filter(x => !x.s.done).slice(0, WING_GOAL_CARD_STEPS);
+  if (!next.length) return '<p class="wing-goal-alldone"><i data-lucide="check-check"></i> Every step done</p>';
+  return `
+    <ul class="wing-goal-next">
+      ${next.map(x => `
+        <li class="wing-step">
+          <button class="wing-step-box" onclick="wingToggleStep('${w.id}', ${x.i})"
+                  aria-pressed="false" aria-label="Mark done">
+            <i data-lucide="circle" style="width:13px;height:13px;"></i>
+          </button>
+          <span>${escapeHTML(x.s.text)}</span>
+        </li>`).join('')}
+      ${steps.filter(s => !s.done).length > next.length
+        ? `<li class="wing-goal-more">+${steps.filter(s => !s.done).length - next.length} more</li>` : ''}
+    </ul>`;
+}
+
+/* ── A target date that says whether it has passed ────────────
+   Overdue, tomorrow and next year all rendered identically, which makes the
+   field decorative. The chip carries the state now, and says how late.
+   ------------------------------------------------------------ */
+function wingTargetChipHTML(w) {
+  const raw = wingVal(w, 'target');
+  const label = wingDateLabel(raw);
+  if (!label) return '';
+  const stage = wingVal(w, 'stage');
+  const d = (typeof wingParseDate === 'function') ? wingParseDate(raw) : null;
+  let cls = '', note = '';
+  // A goal already reached is not late, whatever the date says.
+  if (d && stage !== 'Reached') {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const days = Math.round((d - today) / 86400000);
+    if (days < 0) { cls = ' is-overdue'; note = ' · ' + (-days) + 'd late'; }
+    else if (days === 0) { cls = ' is-today'; note = ' · today'; }
+    else if (days <= 7) { cls = ' is-soon'; note = ' · ' + days + 'd'; }
+  }
+  return `<span class="wing-target${cls}"><i data-lucide="calendar" style="width:11px;height:11px;"></i> ${escapeHTML(label)}${note}</span>`;
 }

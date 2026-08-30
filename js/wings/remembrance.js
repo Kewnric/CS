@@ -52,3 +52,26 @@ wingRegister('remembrance', {
     `, 'wing-row wing-tl');
   }
 });
+
+/* ── Starter pack ─────────────────────────────────────────────
+   Three memories, spaced years apart, so the timeline has something to put in order.
+
+   It lives here, with the schema it fills in, rather than in one file
+   holding every wing's examples: the fields these entries use are
+   defined a few lines up, and a pack that drifts from its schema is the
+   failure mode worth designing against.
+   ------------------------------------------------------------ */
+wingSeedRegister('remembrance', [
+    { title: 'The first program that did something I did not expect',
+      body: 'A loop that printed the wrong number of lines. Finding out why was the first time a computer felt like something to understand rather than something to operate.',
+      data: { occurred: '', place: 'A school computer room', who: 'Just me', feeling: 'Hooked' },
+      tags: ['beginnings'] },
+    { title: 'Being asked to explain it without the jargon',
+      body: 'I could not do it, and realised I did not understand it either. It changed how I judge whether I have finished learning something.',
+      data: { occurred: '', place: 'A first job', who: 'A patient colleague', feeling: 'Embarrassed, then grateful' },
+      tags: ['learning'] },
+    { title: 'The outage I caused, and what happened next',
+      body: 'Nobody shouted. Someone sat down and walked through it with me, and the fix went in with my name on it. It taught me more about the team than about the bug.',
+      data: { occurred: '', place: 'Somewhere I was new', who: 'The whole on-call rota', feeling: 'Sick, then safe' },
+      tags: ['work'] }
+  ]);

@@ -35,11 +35,22 @@
 }
 
 .wing-tl-date {
-  font-size: 0.68rem;
+  font-size: 0.74rem;
   font-weight: 700;
-  color: var(--text-tertiary);
+  color: var(--wing-muted);
   text-align: center;
   white-space: nowrap;
 }
 
 .wing-tl-body { flex: 1; min-width: 0; }
+
+/* The date is the point of a timeline, and it was the smallest and faintest
+   element on it at 0.68rem. The feeling badge takes free text ("Embarrassed,
+   then grateful") in a chip shaped for one word, so it is allowed to wrap
+   rather than run out of its own pill. */
+.wing-tl-date { font-size: 0.74rem; }
+.wing-tl .wing-badge.soft {
+  white-space: normal;
+  text-align: left;
+  line-height: 1.35;
+}

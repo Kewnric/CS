@@ -1,5 +1,5 @@
 /* ============================================================
-   WING-RECALL.JS — the wings' practice
+   WINGS/CORE/RECALL.JS — the wings' practice
    ------------------------------------------------------------
    What made Coding, Notes and Snippets feel finished was never the list. It
    was that each has something to DO: you attempt a program, sit a notebook,

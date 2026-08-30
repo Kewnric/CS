@@ -42,3 +42,9 @@
   padding-left: 0.9rem;
   border-left: 3px solid #facc15;
 }
+
+/* What a mindset replaced was struck through AND at the faintest tone, which
+   is twice-removed: the strike already says "this is the old one", so the
+   colour does not need to hide it as well. */
+.wing-plaque-replaces,
+.wing-plaque-replaces s { color: var(--wing-muted); text-decoration-thickness: 1px; }

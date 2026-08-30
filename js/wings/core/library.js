@@ -1,5 +1,5 @@
 /* ============================================================
-   WING.JS — the generic list library
+   WINGS/CORE/LIBRARY.JS — the shell every wing is shown in
    ------------------------------------------------------------
    Seven wings — Mindset, Insights, Remembrance, Diary, Collection,
    Progression, Roadmap — share one engine: titled entries with a body, tags
@@ -8,7 +8,7 @@
 
    What makes them different from each other is NOT here. Each wing owns one
    file in js/wings/ and one in css/wings/, registers itself through
-   wing-common.js, and brings its own fields, its own card and its own reader
+   core/registry.js, and brings its own fields, its own card and its own reader
    sections. This file is only what they genuinely share, and it asks the
    registry whenever the answer differs per wing.
 
@@ -64,8 +64,12 @@ let _wingPendingOpen = null;
 /* ── Route ────────────────────────────────────────────────── */
 
 function wingTemplate() {
+  /* wing-layout is what lets the wings tune the shared two-pane shell — the
+     sidebar width, the card grid, the reading measure — without any of it
+     reaching the Coding, Snippet or Notebook libraries, which use the same
+     shell and are finished. */
   return `
-    <div class="messenger-layout">
+    <div class="messenger-layout wing-layout">
       <main class="messenger-pane-1">
         <div class="pane-1-header">
           <div style="display:flex; align-items:center; gap:0.5rem; width:100%; justify-content:space-between;">
@@ -264,7 +268,7 @@ function wingRenderDetail() {
       ${(() => { const c = libCommonChipsHTML('wing', revType, prefiltered); return c ? `<div class="lib-chip-row">${c}</div>` : ''; })()}
       ${libTagChipsHTML('wing', prefiltered)}
       <div style="display:flex;gap:0.4rem;align-items:center;margin-left:auto;">
-        <span style="font-size:0.72rem;color:var(--text-tertiary);">${list.length} of ${prefiltered.length}</span>
+        <span class="wing-count-of">${list.length} of ${prefiltered.length}</span>
         <i data-lucide="arrow-down-up" style="width:13px;height:13px;color:var(--text-tertiary);"></i>
         <select class="form-select" style="font-size:0.74rem;padding:0.22rem 1.5rem 0.22rem 0.5rem;height:auto;width:auto;"
                 onchange="setLibPref('wing.sort', this.value); wingRenderDetail();">
@@ -368,7 +372,7 @@ function _wingReaderHTML(w) {
         ${(w.tags || []).map(t => libTagBadgeHTML('wing', t)).join('')}
         ${(typeof revWingType === 'function' && typeof libReviewChipHTML === 'function')
             ? libReviewChipHTML(revWingType(_wingKey), w.id) : ''}
-        ${when ? `<span style="font-size:0.75rem;color:var(--text-tertiary);">Updated ${new Date(when).toLocaleString()}</span>` : ''}
+        ${when ? `<span class="wing-updated">Updated ${new Date(when).toLocaleString()}</span>` : ''}
       </div>
       ${wingReaderMetaHTML(w, schema)}
       ${w.body ? `<section class="wing-sec"><h3 class="wing-sec-h">${escapeHTML(schema.bodyLabel)}</h3>

@@ -1,5 +1,5 @@
 /* ============================================================
-   WING-RECALL.CSS — the wings' practice screen
+   WINGS/CORE/RECALL.CSS — the wings' practice screen
    ------------------------------------------------------------
    One card at a time, centred, with nothing else competing for attention.
    The attempt screens are dense because you are working in them; this is the
@@ -174,7 +174,7 @@
 .wr-grade:hover { transform: translateY(-2px); }
 .wr-grade:active { transform: translateY(0); }
 .wr-grade-label { font-size: 0.85rem; font-weight: 800; color: var(--text-primary); }
-.wr-grade-hint { font-size: 0.68rem; color: var(--text-tertiary); }
+.wr-grade-hint { font-size: 0.72rem; color: var(--wing-muted); }
 
 /* The four carry meaning, so they carry colour: failing and excelling should
    not look like the same button. */
@@ -301,3 +301,14 @@
 .wing-recall-btn.is-due {
   border-color: color-mix(in srgb, var(--color-primary) 55%, transparent);
 }
+
+/* ── The recall screen's own small print ──────────────────────
+   The first audit sweep only looked at the library lists, so this screen kept
+   the faults the lists had fixed: a 10.88px label at 3.56:1, a 10.08px tag at
+   3.11:1, and the progress counter at 3.96:1.
+   ------------------------------------------------------------ */
+.wr-count { color: var(--wing-muted); }
+.wr-prompt-label { font-size: 0.72rem; color: var(--wing-muted); }
+.wr-shell .awx-mini-tag { font-size: 0.7rem; color: var(--text-secondary); }
+.wr-hint kbd, .wr-grade kbd { font-size: 0.72rem; color: var(--text-secondary); }
+.wr-card .wing-meta-row dt { color: var(--wing-muted); }

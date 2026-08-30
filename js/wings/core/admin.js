@@ -1,5 +1,5 @@
 /* ============================================================
-   ADMIN-WINGS.JS — the admin the seven wings never had
+   WINGS/CORE/ADMIN.JS — the admin the seven wings never had
    ------------------------------------------------------------
    Mindset, Insights, Remembrance, Diary, Collection, Progression and Roadmap
    sat in the Admin Panel under "Other Wings" as cards that opened the library
@@ -8,7 +8,7 @@
    edit, no folder management, and no form of the kind every other wing gets.
 
    ONE ENGINE, NOT SEVEN PAGES. Every wing already declares what it is through
-   wing-common.js — its noun, its fields, their types. That is enough to build
+   core/registry.js — its noun, its fields, their types. That is enough to build
    a table with the right columns and a form with the right editors, so this
    asks the registry instead of hardcoding anything. A wing added later gets
    its admin the moment it registers, with nothing here to change.

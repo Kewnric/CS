@@ -48,7 +48,7 @@ function registerAllRoutes() {
   SpaRouter.register('admin-language', { title: 'StudySession Pro — Language Admin', templateFn: adminLanguageTemplate, initFn: adminLanguageInit, destroyFn: adminLanguageDestroy, sidebarVisible: true, navId: 'nav-admin' });
 
   /* An admin route per wing, from the same list the libraries come from.
-     One engine in js/admin-wings.js reads each wing schema for its columns
+     One engine in js/wings/core/admin.js reads each wing schema for its columns
      and its form, so a wing added to LIBRARY_WINGS gets an admin here with
      nothing to write. */
   (typeof LIBRARY_WINGS !== 'undefined' ? LIBRARY_WINGS : []).forEach((w) => {

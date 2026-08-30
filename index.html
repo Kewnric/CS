@@ -33,8 +33,6 @@
   <link rel="stylesheet" href="css/notes-practice-inline.css">
   <link rel="stylesheet" href="css/snippet-attempt.css">
   <link rel="stylesheet" href="css/admin.css">
-  <link rel="stylesheet" href="css/admin-wings.css">
-  <link rel="stylesheet" href="css/wing-recall.css">
   <link rel="stylesheet" href="css/visualization.css">
   <link rel="stylesheet" href="css/auth.css">
   <link rel="stylesheet" href="css/quest-board.css">
@@ -42,7 +40,10 @@
   <link rel="stylesheet" href="css/language.css">
   <link rel="stylesheet" href="css/agenda.css">
   <link rel="stylesheet" href="css/editor-fx.css">
-  <link rel="stylesheet" href="css/wing-common.css">
+  <!-- Wings: the shared engine, then one file per wing. -->
+  <link rel="stylesheet" href="css/wings/core/library.css">
+  <link rel="stylesheet" href="css/wings/core/recall.css">
+  <link rel="stylesheet" href="css/wings/core/admin.css">
   <link rel="stylesheet" href="css/wings/mindset.css">
   <link rel="stylesheet" href="css/wings/insights.css">
   <link rel="stylesheet" href="css/wings/remembrance.css">
@@ -455,8 +456,13 @@
   <script src="js/browse.js"></script>
   <script src="js/study.js"></script>
   <script src="js/notes.js"></script>
-  <script src="js/wing.js"></script>
-  <script src="js/wing-common.js"></script>
+  <!-- Wings. core/ is the shared engine; each wing file below registers its own
+       schema, card, reader and starter pack, so the engine must load first. -->
+  <script src="js/wings/core/registry.js"></script>
+  <script src="js/wings/core/seed.js"></script>
+  <script src="js/wings/core/library.js"></script>
+  <script src="js/wings/core/recall.js"></script>
+  <script src="js/wings/core/admin.js"></script>
   <script src="js/wings/mindset.js"></script>
   <script src="js/wings/insights.js"></script>
   <script src="js/wings/remembrance.js"></script>
@@ -501,9 +507,6 @@
   <script src="js/language.js"></script>
   <script src="js/language-seed.js"></script>
   <script src="js/admin-language.js"></script>
-  <script src="js/admin-wings.js"></script>
-  <script src="js/wing-recall.js"></script>
-  <script src="js/wing-seed.js"></script>
   <script src="js/lang-attempt.js"></script>
   <script src="js/lang-quest.js"></script>
   <script src="js/quest-board.js"></script>

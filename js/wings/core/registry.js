@@ -1,5 +1,5 @@
 /* ============================================================
-   WING-COMMON.JS — the registry the seven wings plug into
+   WINGS/CORE/REGISTRY.JS — the registry the seven wings plug into
    ------------------------------------------------------------
    Each wing lives in its own file under js/wings/ and registers itself here.
    Nothing in this file knows what a mindset or a diary is; it holds only what
@@ -271,6 +271,31 @@ function wingFieldEditorHTML(f, w) {
     </div>`;
   }
 
+  /* An image field, for the one wing that catalogues things with covers.
+     The value is a downscaled data URL held on the preview element, read back
+     by wingReadFieldValues — the same shape and the same _downscaleImage the
+     other libraries' covers use, rather than a second way of storing a
+     picture. */
+  if (f.type === 'image') {
+    const cur = raw || '';
+    return `<div class="af-field af-field-wide">${label}
+      <div class="wing-img-field" id="${id}" data-value="${escapeHTML(cur)}">
+        <div class="wing-img-preview">
+          ${cur ? `<img src="${escapeHTML(cur)}" alt="" />`
+                : `<span class="wing-img-empty"><i data-lucide="image"></i> No image</span>`}
+        </div>
+        <div class="wing-img-actions">
+          <label class="btn btn-secondary btn-sm">
+            <i data-lucide="upload" style="width:14px;height:14px;"></i> Choose image
+            <input type="file" accept="image/*" style="display:none;"
+                   onchange="wingImagePick('${f.key}', this)" />
+          </label>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="wingImageClear('${f.key}')"
+                  ${cur ? '' : 'disabled'}>Remove</button>
+        </div>
+      </div></div>`;
+  }
+
   if (f.type === 'textarea') {
     return `<div class="af-field">${label}
       <textarea id="${id}" class="form-textarea" rows="${f.rows || 4}"
@@ -317,6 +342,8 @@ function wingReadFieldValues(schema, existing) {
     if (!el) return;
 
     if (f.type === 'rating') { data[f.key] = parseInt(el.dataset.value, 10) || 0; return; }
+
+    if (f.type === 'image') { data[f.key] = el.dataset.value || ''; return; }
 
     if (f.type === 'checklist' || f.type === 'stages') {
       const was = Array.isArray(wingVal(existing, f.key)) ? wingVal(existing, f.key) : [];
@@ -676,4 +703,46 @@ function wingRestoreGoalRefs(cleared) {
     const p = paths.find(x => x.id === c.id);
     if (p) { p.data = p.data || {}; p.data.goalRef = c.goalRef; }
   });
+}
+
+/* ── The image field's handlers ───────────────────────────────
+   Downscaled before storing, because these libraries live in localStorage and
+   a handful of full-size photographs would fill the quota and take the whole
+   store down with them.
+   ------------------------------------------------------------ */
+function wingImagePick(key, input) {
+  const host = document.getElementById('wing-x-' + key);
+  const file = input && input.files && input.files[0];
+  if (!host || !file) return;
+  if (!/^image\//.test(file.type)) {
+    if (typeof toast === 'function') toast('That is not an image file.', { type: 'warning' });
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const done = (dataUrl) => {
+      host.dataset.value = dataUrl;
+      const prev = host.querySelector('.wing-img-preview');
+      if (prev) prev.innerHTML = `<img src="${dataUrl}" alt="" />`;
+      const rm = host.querySelector('.wing-img-actions button');
+      if (rm) rm.disabled = false;
+      if (typeof wingMarkDirty === 'function') wingMarkDirty();
+    };
+    if (typeof _downscaleImage === 'function') _downscaleImage(e.target.result, 640, 0.82, done);
+    else done(e.target.result);
+  };
+  reader.readAsDataURL(file);
+  input.value = '';        // so choosing the same file twice still fires
+}
+
+function wingImageClear(key) {
+  const host = document.getElementById('wing-x-' + key);
+  if (!host) return;
+  host.dataset.value = '';
+  const prev = host.querySelector('.wing-img-preview');
+  if (prev) prev.innerHTML = '<span class="wing-img-empty"><i data-lucide="image"></i> No image</span>';
+  const rm = host.querySelector('.wing-img-actions button');
+  if (rm) rm.disabled = true;
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: host });
+  if (typeof wingMarkDirty === 'function') wingMarkDirty();
 }

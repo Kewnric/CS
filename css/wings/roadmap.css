@@ -87,3 +87,41 @@
   letter-spacing: 0.07em;
   color: var(--text-tertiary);
 }
+
+/* ── Where on the path you are ────────────────────────────────
+   The pips show each stage's state but not its name; this says which one
+   you are actually on, which is the question a path card should answer.
+   ------------------------------------------------------------ */
+.wing-path-where {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+.wing-path-where i, .wing-path-where svg { flex-shrink: 0; align-self: center; color: var(--wing-muted); }
+.wing-path-where-l {
+  flex-shrink: 0;
+  /* 0.64rem was 10.24px — under the floor, and my own regression. */
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--wing-muted);
+}
+/* The icon carries the primary colour; the label does not. Indigo on a dark
+   card measures 3.8:1, which is fine for a 12px glyph and not for text. */
+.wing-path-where.is-walking i,
+.wing-path-where.is-walking svg { color: var(--color-primary); }
+.wing-path-where.is-walking .wing-path-where-l { color: var(--text-secondary); }
+.wing-path-where.is-done { color: var(--color-success); font-weight: 700; }
+.wing-path-where.is-done i, .wing-path-where.is-done svg { color: var(--color-success); }
+
+/* The stage's state, in the reader's route list — 10.56px at 3.56:1. */
+.wing-route-step em {
+  font-size: 0.72rem;
+  font-style: normal;
+  color: var(--wing-muted);
+}

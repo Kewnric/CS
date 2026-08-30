@@ -1,5 +1,5 @@
 /* ============================================================
-   WING-COMMON.CSS — what all seven wings share
+   WINGS/CORE/LIBRARY.CSS — what all seven wings share
    ------------------------------------------------------------
    Group headings, the row/card shells, badges, stars, progress bars and the
    reader's furniture. Anything specific to one wing lives in css/wings/.
@@ -71,7 +71,7 @@
   color: var(--text-tertiary);
 }
 .wing-row-meta span { display: inline-flex; align-items: center; gap: 0.25rem; }
-.wing-muted { color: var(--text-tertiary); font-size: 0.75rem; }
+.wing-muted { color: var(--wing-muted); font-size: 0.75rem; }
 .wing-tagrow { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.5rem; }
 .wing-good { color: var(--color-primary); }
 
@@ -135,11 +135,11 @@
 }
 .wing-meta-row { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
 .wing-meta-row dt {
-  font-size: 0.66rem;
+  font-size: 0.7rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: var(--text-tertiary);
+  color: var(--wing-muted);
 }
 .wing-meta-row dd { margin: 0; font-size: 0.88rem; color: var(--text-primary); word-break: break-word; }
 
@@ -152,7 +152,7 @@
   font-weight: 800;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: var(--text-tertiary);
+  color: var(--wing-muted);
   margin-bottom: 0.6rem;
 }
 .wing-sec-h .wing-prog { margin: 0; max-width: 220px; }
@@ -230,4 +230,116 @@
 .wing-form .admin-form-footer,
 .awx-form .admin-form-footer {
   position: static;
+}
+
+/* ============================================================
+   THE AUDIT FIXES
+   ------------------------------------------------------------
+   Everything below is scoped to .wing-layout, or to classes only the wings
+   use, so none of it reaches the Coding, Snippet or Notebook libraries that
+   share this shell.
+   ============================================================ */
+
+/* ── A muted tone that is still readable ─────────────────────
+   --text-tertiary measured 3.56:1 on a card in dark and about 2.8:1 in
+   light, against the 4.5 that text this size needs. The wings lean on it
+   harder than anywhere else in the app — group headings, dates, counters and
+   the "by" line are all metadata — so they get a tone of their own rather
+   than making the whole app brighter.
+   ------------------------------------------------------------ */
+:root { --wing-muted: #5b6b7f; }
+[data-theme="dark"] { --wing-muted: #93a3b8; }
+
+/* The per-wing files set their own metadata colours and load after this one,
+   so they use --wing-muted at their own declarations. These are the ones this
+   file owns. */
+.wing-group-h,
+.wing-prog-num,
+.wing-count-of { color: var(--wing-muted); }
+
+.wing-count-of { font-size: 0.72rem; }
+
+/* The shared chips and tag badges sit at 3.5:1. They belong to every library,
+   so they are lifted only inside a wing rather than changed underneath the
+   three finished ones. */
+.wing-layout .lib-chip { color: var(--wing-muted); }
+.wing-layout .lib-chip.active { color: var(--text-primary); }
+.wing-layout .badge.badge-primary,
+.wing-layout .lib-tag-badge {
+  color: color-mix(in srgb, var(--color-primary) 45%, var(--text-primary));
+}
+
+/* ── Text floors ──────────────────────────────────────────────
+   The badge was 10.56px and the group count 10.88px, both under the 11px
+   floor the rest of the app was brought up to.
+   ------------------------------------------------------------ */
+.wing-badge { font-size: 0.7rem; }
+.wing-group-count { font-size: 0.7rem; color: var(--text-secondary); }
+
+/* ── The sidebar was a third of the screen for two rows ───────
+   480px of a 1440px window, in a 693px-tall box holding about 80px of
+   folders, and at 1024px it squeezed the cards down to one column. The
+   libraries with deep folder trees keep their width; these do not have them.
+   ------------------------------------------------------------ */
+.wing-layout .messenger-pane-1 {
+  width: 26% !important;
+  min-width: 240px !important;
+  max-width: 330px !important;
+}
+
+/* ── Cards in grouped wings: NOT overridden, deliberately ─────
+   The audit called the empty second column beside a one-entry group wasted
+   space. It is not: it is how a grid keeps card widths equal between groups,
+   and both cures are worse. auto-fit lets a lone card stretch to the full
+   928px, and a capped track (280–460px) needs 936px for two columns in a
+   928px grid, so it silently collapsed four cards into one column.
+
+   The app's own .card-grid was right. Narrowing the sidebar above already
+   widened these cards from 381px to 456px, which was the real complaint.
+   ------------------------------------------------------------ */
+
+/* ── A readable measure ──────────────────────────────────────
+   The reader ran to about 103 characters a line. Comfortable is 45–75, and
+   of everything in this app these are the screens meant for reading.
+   ------------------------------------------------------------ */
+.wing-reader .wing-body,
+.wing-reader > p,
+.wing-sec > p { max-width: 68ch; }
+
+/* ── Phone ────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  /* The toolbar fitted until something came due: "Recall 1 due" is 206px
+     against "Recall" at 107, which pushed New … to x=395 in a 375 viewport
+     with nowrap. It wraps now rather than putting the primary action
+     off-screen. */
+  .wing-layout .browse-folder-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.4rem;
+  }
+  .wing-layout .browse-folder-header { flex-wrap: wrap; }
+}
+
+/* The reader's timestamp, out of an inline style so a stylesheet can reach it. */
+.wing-updated { font-size: 0.75rem; color: var(--wing-muted); }
+
+/* ── The wing forms' small print ──────────────────────────────
+   .form-label, .af-label-hint and the footer's kbd belong to every admin form
+   in the app, so they are lifted only inside the two wing forms rather than
+   changed underneath the Coding, Snippet and Notebook forms that share them.
+   ------------------------------------------------------------ */
+.awx-form .form-label,
+.wing-form .form-label { color: var(--text-secondary); }
+
+.awx-form .af-label-hint,
+.wing-form .af-label-hint,
+.awx-form .af-header-text p,
+.wing-form .af-header-text p,
+.awx-form .wing-rate-clear,
+.wing-form .wing-rate-clear { color: var(--wing-muted); }
+
+.awx-form .af-footer-hint kbd,
+.wing-form .af-footer-hint kbd {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
 }

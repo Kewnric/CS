@@ -49,7 +49,8 @@ wingRegister('roadmap', {
       </div>
       ${goal ? `<p class="wing-path-goal"><i data-lucide="flag" style="width:11px;height:11px;"></i> ${escapeHTML(goal.title || 'Untitled')}</p>` : ''}
       ${stages.length ? `<div class="wing-pips">${stages.map(s =>
-        `<span class="wing-pip ${escapeHTML(s.status || 'planned')}" title="${escapeHTML(s.text)}"></span>`).join('')}</div>`
+        `<span class="wing-pip ${escapeHTML(s.status || 'planned')}" title="${escapeHTML(s.text)}"></span>`).join('')}</div>
+        ${wingPathWhereHTML(stages)}`
         : '<p class="wing-muted">No stages yet.</p>'}
       ${p ? wingProgressBarHTML(p) : ''}
       <div class="wing-row-meta">
@@ -114,4 +115,60 @@ function wingCycleStage(id, i) {
   w.data.stages[i].status = WING_STAGE_STATES[(WING_STAGE_STATES.indexOf(cur) + 1) % WING_STAGE_STATES.length];
   w.updatedAt = Date.now();
   wingSaveAndRepaint();
+}
+
+/* ── Starter pack ─────────────────────────────────────────────
+   One path per horizon, with stages part-walked, so the path layout has a path to draw.
+
+   It lives here, with the schema it fills in, rather than in one file
+   holding every wing's examples: the fields these entries use are
+   defined a few lines up, and a pack that drifts from its schema is the
+   failure mode worth designing against.
+   ------------------------------------------------------------ */
+wingSeedRegister('roadmap', [
+    { title: 'From reading code to changing it confidently',
+      body: 'The gap is not syntax, it is knowing what will break. Each stage shortens the distance between making a change and knowing whether it worked.',
+      data: { horizon: 'Now', goalRef: '',
+              stages: [{ text: 'Run the tests before touching anything', status: 'cleared' },
+                       { text: 'Make one change and predict the failure first', status: 'walking' },
+                       { text: 'Refactor with the tests as the safety net', status: 'planned' },
+                       { text: 'Change something with no tests, adding them as I go', status: 'planned' }] },
+      tags: ['craft'] },
+    { title: 'Learning a language properly, not just enough to copy',
+      body: 'Enough-to-copy plateaus fast. The way out is writing the things the language is actually good at.',
+      data: { horizon: 'Next', goalRef: '',
+              stages: [{ text: 'Finish a tutorial without skipping the exercises', status: 'cleared' },
+                       { text: 'Rewrite something I already built', status: 'walking' },
+                       { text: 'Read a real codebase in it', status: 'planned' },
+                       { text: 'Write something idiomatic enough to review well', status: 'planned' }] },
+      tags: ['learning'] },
+    { title: 'Understanding the machine under the language',
+      body: 'Not to write assembly, but so that performance stops being folklore.',
+      data: { horizon: 'Later', goalRef: '',
+              stages: [{ text: 'Read what the compiler emits, once', status: 'planned' },
+                       { text: 'Measure a cache miss on purpose', status: 'planned' },
+                       { text: 'Explain a slow loop without guessing', status: 'planned' }] },
+      tags: ['performance'] }
+  ]);
+
+/* ── Where on the path you actually are ───────────────────────
+   The pips carry each stage's state, but they are anonymous: their names
+   live in a title attribute, which is no name at all on a phone and a hover
+   away everywhere else. A path whose card cannot say which stage you are on
+   is a picture of a path rather than a path.
+
+   The one being walked, or else the next one planned — that is the answer to
+   "where am I", and it is one line.
+   ------------------------------------------------------------ */
+function wingPathWhereHTML(stages) {
+  const walking = stages.find(s => s.status === 'walking');
+  const next = walking || stages.find(s => (s.status || 'planned') === 'planned');
+  if (!next) {
+    return `<p class="wing-path-where is-done"><i data-lucide="flag-triangle-right" style="width:12px;height:12px;"></i> Path walked</p>`;
+  }
+  const label = walking ? 'Walking' : 'Next';
+  return `<p class="wing-path-where${walking ? ' is-walking' : ''}">
+    <i data-lucide="${walking ? 'footprints' : 'milestone'}" style="width:12px;height:12px;"></i>
+    <span class="wing-path-where-l">${label}</span> ${escapeHTML(next.text)}
+  </p>`;
 }
