@@ -2683,6 +2683,11 @@ async function _termRunStep() {
     return;
   }
 
+  /* It compiled and it started. That is the moment the potion is for, and it
+     is the only moment: an interactive program reaches here again after every
+     line you type, which is what used to replay the sound mid-conversation. */
+  _termCue(session, 'potion');
+
   const exitCode = resA.exitCode;
   session.exitCode = exitCode;
   const outA = resA.stdout || '';
@@ -2780,7 +2785,8 @@ async function _termRunStep() {
   // 143/137/124 mean the sandbox killed it — say so, rather than printing a
   // bare number that looks like the program chose to return it.
   const note = termExitNote(exitCode);
-  _termCue(session, note.ok ? 'potion' : 'punch');
+  // No cue here. The build was announced when it succeeded; a bad exit code
+  // is reported in the line below and by the status, not by a second sound.
   session.lines.push({ type: note.ok ? 'info' : 'warning', text: note.line });
   if (statusEl) statusEl.textContent = note.status + (resA.execTime ? ' · ' + resA.execTime + 'ms' : '');
   _termRender();
@@ -3767,8 +3773,18 @@ document.addEventListener('keydown', (e) => {
  * run does announce itself again.
  */
 function _termCue(session, which) {
-  if (!session || session.cueDone) return;
-  session.cueDone = true;
-  if (which === 'potion') { if (typeof psfxLevelUp === 'function') psfxLevelUp(); }
-  else if (typeof psfxPunch === 'function') psfxPunch();
+  if (!session) return;
+  if (which === 'potion') {
+    if (session.cuedOk) return;
+    session.cuedOk = true;
+    if (typeof psfxLevelUp === 'function') psfxLevelUp();
+    return;
+  }
+  /* Tracked separately from the potion rather than sharing one flag. A program
+     that builds cleanly and then segfaults has done two distinct things, and
+     collapsing them would let a crash pass in silence behind the sound that
+     said the build was fine. */
+  if (session.cuedBad) return;
+  session.cuedBad = true;
+  if (typeof psfxPunch === 'function') psfxPunch();
 }

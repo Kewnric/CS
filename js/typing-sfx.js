@@ -450,6 +450,11 @@ function sfxIsSilentKey(e) {
 /** Only where text is actually being written. */
 function sfxIsTypingTarget(el) {
   if (!el) return false;
+  /* The terminal is the program's input, not yours. Typing an answer to a
+     scanf is talking to the running program — giving it the same voice as
+     writing code puts a sound on the one moment the terminal is waiting for
+     you, and the run's own cues are already speaking there. */
+  if (el.id === 'term-input' || el.closest && el.closest('.run-code-overlay, .term-surface')) return false;
   const tag = el.tagName;
   if (tag === 'TEXTAREA') return true;
   if (tag === 'INPUT') {

@@ -195,7 +195,7 @@ document.addEventListener('visibilitychange', function () {
    ------------------------------------------------------------ */
 function psfxLevelUp() {
   if (!_psfxOn()) return;
-  samplePlay('potion', _psfxBus(), { gain: 0.078 });
+  samplePlay('potion', _psfxBus(), { gain: 0.0624 });
 }
 
 /* ── A run that would not compile, or fell over ───────────────
