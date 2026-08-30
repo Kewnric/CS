@@ -21,11 +21,17 @@
    special case.
    ============================================================ */
 
-const SAMPLE_FILES = {
-  voice:  'audio/voice.MP3',
-  potion: 'audio/potion.MP3',
-  punch:  'audio/punch.MP3'
-};
+/* ── Where the audio comes from ───────────────────────────────
+   js/audio-data.js, embedded as base64, rather than fetched from audio/.
+
+   Fetching worked over http and was silent everywhere else, which is the
+   worst way for audio to fail: nothing throws, nothing logs, the sound simply
+   never arrives. A page opened from disk cannot fetch its own neighbours at
+   all, and a stale service worker or a case-mismatched path fail the same
+   quiet way. None of that can happen to a string in a script.
+
+   audio/ is still the source of truth; js/audio-data.js is generated from it.
+   ------------------------------------------------------------ */
 
 /** name -> AudioBuffer once decoded, or null while a fetch is in flight. */
 const _sampleBuf = {};
@@ -33,23 +39,48 @@ const _sampleTried = {};
 /** name -> { peak } measured once at decode, for levelling only. */
 const _sampleMeta = {};
 
+/* Digital silence, not "quiet". An earlier version trimmed at 11% of a file's
+   own peak, which cut the front off a soft attack — that was wrong and this is
+   deliberately far below anything audible. */
+const SAMPLE_ZERO = 0.001;
+/* However padded a file is, never cut more than this from the front. A safety
+   rail against a file whose real content genuinely does start quietly. */
+const SAMPLE_MAX_TRIM = 0.35;
+
 /**
- * How loud the file is, so it can be levelled without being altered.
+ * The peak, for levelling, and where the actual audio sits inside the file.
  *
- * Only the peak now. The three files peak between 0.026 and 0.1, where the
- * rest of the app's cues sit between 0.33 and 0.62 — at face value the potion
- * would be inaudible under the typing. Levelling is a volume control, which is
- * the one thing that does have to be applied; the audio itself is untouched
- * and plays end to end.
+ * voice.MP3 measures as 70ms of EXACT zeroes, then about 140ms of sound, then
+ * about 340ms of exact zeroes again — a short blip inside a half-second file.
+ * Played from the top, every keystroke's sound arrives some 90ms after the
+ * key, which is what stops it tracking your typing: the sounds are all there,
+ * they are just uniformly late.
+ *
+ * So the padding is skipped, and nothing else is. This is not the earlier trim
+ * that cut into the attack: the threshold here is a thousandth of full scale,
+ * about a fortieth of this file's own peak, so only true silence goes.
+ *
+ * Levelling is the other thing applied, and for the same kind of reason: the
+ * three files peak between 0.026 and 0.1 where the app's other cues sit at
+ * 0.33 to 0.62, so at face value the potion is inaudible under the typing.
  */
 function _sampleMeasure(buf) {
   const d = buf.getChannelData(0);
-  let peak = 0;
+  let peak = 0, first = -1, last = 0;
   for (let i = 0; i < d.length; i++) {
     const a = Math.abs(d[i]);
     if (a > peak) peak = a;
+    if (a > SAMPLE_ZERO) { if (first < 0) first = i; last = i; }
   }
-  return { peak: peak || 1 };
+  if (first < 0) return { peak: peak || 1, startSec: 0, playSec: buf.duration };
+
+  const sr = buf.sampleRate;
+  // Back off a few milliseconds so the very first cycle of the attack survives.
+  let startSec = Math.max(0, (first / sr) - 0.005);
+  startSec = Math.min(startSec, buf.duration * SAMPLE_MAX_TRIM);
+  // Keep a generous tail so a decay is never clipped.
+  const endSec = Math.min(buf.duration, (last / sr) + 0.06);
+  return { peak: peak || 1, startSec: startSec, playSec: Math.max(0.02, endSec - startSec) };
 }
 
 /**
@@ -63,21 +94,23 @@ function _sampleMeasure(buf) {
 function sampleLoad(name) {
   if (_sampleBuf[name]) return _sampleBuf[name];
   if (_sampleTried[name]) return null;
+  if (typeof AUDIO_DATA === 'undefined' || !AUDIO_DATA[name]) return null;
 
   const ctx = (typeof _sfxContext === 'function') ? _sfxContext() : null;
   if (!ctx) return null;                    // no gesture yet; try again next time
   _sampleTried[name] = true;
 
-  fetch(SAMPLE_FILES[name])
-    .then(r => (r.ok ? r.arrayBuffer() : Promise.reject(new Error('HTTP ' + r.status))))
-    .then(b => ctx.decodeAudioData(b))
+  let bytes;
+  try {
+    const bin = atob(AUDIO_DATA[name]);
+    bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  } catch (e) { _sampleTried[name] = false; return null; }
+
+  // Still asynchronous: decoding an MP3 is, wherever the bytes came from.
+  ctx.decodeAudioData(bytes.buffer)
     .then(buf => { _sampleBuf[name] = buf; _sampleMeta[name] = _sampleMeasure(buf); })
-    .catch(() => {
-      // A missing or unreadable file is not an error worth interrupting anyone
-      // over — the synthesised sound covers it. Allowed to be retried, since
-      // the usual cause is a fetch that raced the service worker.
-      _sampleTried[name] = false;
-    });
+    .catch(() => { _sampleTried[name] = false; });
   return null;
 }
 
@@ -119,7 +152,7 @@ function samplePlay(name, bus, opts) {
   if (ctx.state === 'suspended') ctx.resume().catch(() => {});
 
   const o = opts || {};
-  const meta = _sampleMeta[name] || { peak: 1 };
+  const meta = _sampleMeta[name] || { peak: 1, startSec: 0, playSec: buf.duration };
 
   const src = ctx.createBufferSource();
   src.buffer = buf;
@@ -136,18 +169,13 @@ function samplePlay(name, bus, opts) {
   g.gain.value = (o.gain == null ? 1 : o.gain) / meta.peak;
   src.connect(g); g.connect(bus);
 
-  /* The whole file, from the top. An earlier version started at the first
-     audible sample and stopped after the last, on the measurement that
-     voice.MP3 opens with 104ms below the threshold — but the threshold was
-     11% of that file's peak, so what it called silence was really a soft
-     attack, and cutting it removed the front of the sound. These are cut the
-     way they are meant to be heard; the player's job is to play them. */
-  src.start(ctx.currentTime);
+  // All of the audio, none of the padding — see _sampleMeasure.
+  src.start(ctx.currentTime, meta.startSec, meta.playSec);
   return true;
 }
 
 /* Warm the cache as soon as there is a context to decode with, so the first
    keystroke is not the one that misses. Cheap: three files, ~40KB total. */
 function samplePrewarm() {
-  Object.keys(SAMPLE_FILES).forEach(sampleLoad);
+  Object.keys(AUDIO_DATA || {}).forEach(sampleLoad);
 }
