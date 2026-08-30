@@ -614,8 +614,12 @@ function libBulkDelete(ns) {
   if (!a || !items.length || !a.remove) return;
   const n = items.length;
   const go = () => {
+    // removeMany, when the adapter has one, so a bulk delete is a single undo
+    // rather than one per item. Adapters without it keep the per-item loop
+    // exactly as before.
+    if (typeof a.removeMany === 'function') a.removeMany(items.map(it => it.id));
     // Delete in one pass, then re-render once — each remove() saves on its own.
-    items.forEach(it => a.remove(it.id));
+    else items.forEach(it => a.remove(it.id));
     if (typeof saveData === 'function') saveData();
     if (typeof toast === 'function') toast(`Deleted ${n} ${a.noun}${n === 1 ? '' : 's'}.`, { type: 'success' });
     libToggleSelectMode(ns);

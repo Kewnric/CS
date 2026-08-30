@@ -639,9 +639,55 @@ registerLibAdapter('wing', {
   get noun() { return wingSchema(_wingKey).noun; },
   list: () => wingItems(),
   find: (id) => wingFind(id),
-  remove: (id) => { const items = wingItems(); const i = items.findIndex(w => w.id === id); if (i >= 0) items.splice(i, 1); },
+  remove: (id) => softDeleteWingEntry(_wingKey, [id]),
+  removeMany: (ids) => softDeleteWingEntry(_wingKey, ids),
   rerender: () => { wingRenderSidebar(); wingRenderDetail(); wingUpdateHeader(); }
 });
+
+/**
+ * Delete wing entries the way every other library deletes: recoverably.
+ *
+ * The adapter used to splice them straight out of the array, so selecting a
+ * whole wing and pressing Delete destroyed it permanently — while the
+ * confirmation said "They move to the recycle bin and can be restored from
+ * there", and while the single-entry delete beside it and the wing admin's
+ * bulk delete both offered undo. Of the three ways to delete a wing entry it
+ * was the one that took the most at once that could not be taken back.
+ *
+ * Positions are snapshotted so undo puts them back where they were, and the
+ * whole batch is one undo rather than one per entry.
+ */
+function softDeleteWingEntry(key, ids, afterDelete) {
+  const items = wingItems(key);
+  const removed = [];
+  (ids || []).forEach(id => {
+    const i = items.findIndex(w => w.id === id);
+    if (i >= 0) removed.push({ at: i, item: JSON.parse(JSON.stringify(items[i])) });
+  });
+  if (!removed.length) return;
+
+  removed.slice().sort((a, b) => b.at - a.at).forEach(r => items.splice(r.at, 1));
+  const cleared = (typeof wingClearDeadGoalRefs === 'function') ? wingClearDeadGoalRefs() : [];
+  saveData();
+  if (afterDelete) afterDelete();
+
+  if (typeof pushUndo === 'function') {
+    const schema = wingSchema(key);
+    const n = removed.length;
+    const label = n === 1
+      ? 'Deleted "' + (removed[0].item.title || 'Untitled') + '"'
+      : 'Deleted ' + n + ' ' + (n === 1 ? schema.noun : schema.nounPlural);
+    pushUndo(label, () => {
+      const list = wingItems(key);
+      removed.slice().sort((a, b) => a.at - b.at)
+        .forEach(r => list.splice(Math.min(r.at, list.length), 0, r.item));
+      if (typeof wingRestoreGoalRefs === 'function') wingRestoreGoalRefs(cleared);
+      saveData();
+      wingRenderSidebar(); wingRenderDetail(); wingUpdateHeader();
+      if (afterDelete) afterDelete();
+    });
+  }
+}
 
 /* Ctrl+S saves and Esc closes, matching the wing admin and the rest of the
    app. Gated on a wing form being on screen so it never competes with the

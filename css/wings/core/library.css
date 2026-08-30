@@ -281,11 +281,33 @@
    folders, and at 1024px it squeezed the cards down to one column. The
    libraries with deep folder trees keep their width; these do not have them.
    ------------------------------------------------------------ */
-.wing-layout .messenger-pane-1 {
-  width: 26% !important;
-  min-width: 240px !important;
-  max-width: 330px !important;
+/* Specificity, NOT !important. The resizer drags by writing width, flex-basis
+   and max-width:none as INLINE styles, and an inline style loses to
+   !important — so the previous version of this rule pinned the pane and the
+   divider could not move it at all. Two class names beat the base rule and
+   still lose to the drag, which is the order these three need to be in.
+
+   The lower bound is left generous for the same reason: the drag clamps
+   itself at 200px, and a min-width above that would quietly stop the handle
+   before the user's cursor did. */
+.messenger-layout.wing-layout .messenger-pane-1 {
+  width: 26%;
+  min-width: 220px;
+  max-width: 340px;
 }
+
+/* ── The sidebar header at that width ────────────────────────
+   Four stat chips in a 330px pane ran off the edge, clipping "Learning", and
+   the title wrapped into the subtitle. They wrap now instead of overflowing,
+   and the header is allowed the room two lines of title need.
+   ------------------------------------------------------------ */
+.wing-layout .browse-mini-stats {
+  flex-wrap: wrap;
+  overflow: visible;
+  gap: 0.3rem;
+}
+.wing-layout .pane-1-header .section-header-title { line-height: 1.2; }
+.wing-layout .pane-1-header .section-header-subtitle { line-height: 1.3; }
 
 /* ── Cards in grouped wings: NOT overridden, deliberately ─────
    The audit called the empty second column beside a one-entry group wasted
