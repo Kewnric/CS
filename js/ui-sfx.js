@@ -278,6 +278,22 @@ function _syncAppSoundRow() {
   if (typeof _setLucideIcon === 'function') {
     _setLucideIcon(document.getElementById('settings-sound-icon'), on ? 'volume-2' : 'volume-x');
   }
+
+  /* The slider shows the same stored value the attempt topbar's does — there
+     is one volume, not a second one that happens to live in Settings. It is
+     disabled while sound is off, because a slider that changes nothing you
+     can hear is a control that lies about what it does. */
+  const vol = (typeof sfxVolume === 'function') ? sfxVolume() : 1;
+  const pct = Math.round(vol * 100);
+  const volRange = document.getElementById('settings-vol');
+  const volLabel = document.getElementById('settings-vol-label');
+  const volRow = document.getElementById('settings-volume-row');
+  // Not while it is being dragged: writing the value back mid-drag fights the
+  // thumb under the user's finger.
+  if (volRange && document.activeElement !== volRange) volRange.value = String(pct);
+  if (volRange) volRange.disabled = !on;
+  if (volLabel) volLabel.textContent = pct + '%';
+  if (volRow) volRow.classList.toggle('is-muted', !on);
 }
 
 document.addEventListener('DOMContentLoaded', () => setTimeout(_syncAppSoundRow, 400));

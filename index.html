@@ -250,6 +250,20 @@
           </span>
           <i data-lucide="chevron-right" class="settings-item-chevron" aria-hidden="true"></i>
         </button>
+        <!-- The same volume the attempt topbar sets, reachable from Settings
+             so it can be found without opening a coding attempt. Its own row
+             because a range input cannot live inside the toggle button. -->
+        <div class="settings-item settings-item-slider" id="settings-volume-row">
+          <span class="settings-item-icon"><i data-lucide="sliders-horizontal" aria-hidden="true"></i></span>
+          <span class="settings-item-info">
+            <span class="settings-item-label">Volume</span>
+            <input type="range" id="settings-vol" class="settings-vol-range"
+                   min="0" max="150" step="5" value="100"
+                   aria-label="Sound volume"
+                   oninput="sfxSetVolume(this.value / 100)">
+          </span>
+          <span class="settings-vol-label" id="settings-vol-label">100%</span>
+        </div>
         <button onclick="handleDataExport()" class="settings-item" type="button" id="export-btn-sidebar" aria-label="Export data backup">
           <span class="settings-item-icon"><i data-lucide="download" aria-hidden="true"></i></span>
           <span class="settings-item-info">

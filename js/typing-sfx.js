@@ -325,6 +325,10 @@ function sfxSetVolume(v) {
   const label = document.getElementById('sfx-vol-label');
   if (label) label.textContent = Math.round(val * 100) + '%';
   _syncTypingSfxBtn();
+  // The Settings modal shows the same volume, so moving either control moves
+  // both rather than leaving the other one describing a value that is no
+  // longer stored.
+  if (typeof _syncAppSoundRow === 'function') _syncAppSoundRow();
   clearTimeout(_sfxVolPreview);
   _sfxVolPreview = setTimeout(() => {
     if (val > 0 && sfxEnabled()) {

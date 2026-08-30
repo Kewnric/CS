@@ -3612,3 +3612,48 @@ body[data-route="visualization"] .settings-fab { display: none; }
 /* Quill writes an empty paragraph for a blank line; without a height it
    collapses and the spacing the author put in is lost. */
 #practice-desc p:empty, #pset-desc p:empty { min-height: 1em; }
+
+/* ── Settings: the volume row ─────────────────────────────────
+   A companion to the Sound toggle above it, driving the same stored value the
+   attempt topbar's slider does. It is a div rather than a button — the rest of
+   the list is buttons, but a range input inside one is invalid markup and the
+   button would swallow the drag.
+   ------------------------------------------------------------ */
+.settings-item-slider {
+  cursor: default;
+  /* The row above it is the switch; this reads as part of the same control
+     rather than a separate destination, so it does not light up on hover. */
+  background: transparent;
+}
+.settings-item-slider:hover { background: transparent; }
+
+.settings-item-slider .settings-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.settings-vol-range {
+  width: 100%;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+  margin: 0;
+}
+.settings-vol-range:disabled { cursor: not-allowed; }
+
+.settings-vol-label {
+  min-width: 40px;
+  text-align: right;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+/* Sound off: the slider still shows where it is set, but says plainly that
+   nothing it does can be heard right now. */
+.settings-item-slider.is-muted { opacity: 0.45; }
+.settings-item-slider.is-muted .settings-vol-range { accent-color: var(--text-tertiary); }
