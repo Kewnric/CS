@@ -467,9 +467,8 @@ function adminTemplate() {
         </section>
 
         <section style="margin-top:2rem;">
-          <h2 class="lib-hub-section-title"><i data-lucide="boxes"></i> Wing Libraries</h2>
-          <p class="lib-hub-section-note">Each one has its own table, folders and form, the same as the four above.</p>
-          <div class="lib-hub-grid lib-hub-grid-compact stagger-children" id="admin-hub-wings"></div>
+          <h2 class="lib-hub-section-title"><i data-lucide="boxes"></i> Other Wings</h2>
+          <div class="lib-hub-grid lib-hub-grid-compact stagger-children" id="admin-hub-soon"></div>
         </section>
       </div>
     </div>
@@ -497,8 +496,9 @@ function adminInit() {
 
   const active = document.getElementById('admin-hub-active');
   if (active) {
-    const card = (route, cls, icon, name, desc, chips) => `
+    const card = (route, cls, icon, name, desc, chips, accent) => `
       <div class="lib-card ${cls}" onclick="spaNavigate('${route}')" role="link" tabindex="0"
+           ${accent ? `style="--lib-accent:${accent};"` : ''}
            onkeydown="if(event.key==='Enter')spaNavigate('${route}')">
         <div class="lib-card-glow"></div>
         <div class="lib-card-head">
@@ -524,38 +524,45 @@ function adminInit() {
         'Write dictionary entries across four languages, build drill puzzles, and script scenario encounters.',
         _libStatChip('book-a', `${(state.langWords || []).length} words`) +
         _libStatChip('dumbbell', `${(state.langSets || []).length} sets`) +
-        _libStatChip('swords', `${(state.langScenarios || []).length} scenarios`));
+        _libStatChip('swords', `${(state.langScenarios || []).length} scenarios`)) +
+      /* The seven wings belong in this grid, not in a section of their own.
+         Each is an individual library exactly as the four above are, and the
+         Library hub already files them beside the others in Your collections
+         — an admin that sorted them differently would be describing an app
+         that no longer exists. */
+      LIBRARY_WINGS.map(w => {
+        const n = (typeof wingItems === 'function') ? wingItems(w.key).length : 0;
+        const schema = (typeof wingSchema === 'function') ? wingSchema(w.key) : null;
+        const noun = schema ? (n === 1 ? schema.noun : schema.nounPlural) : 'entries';
+        const folders = state.nodes.filter(x => x.scope === 'wing:' + w.key && x.type === 'folder').length;
+        // "… Admin", like the four beside them. Every card in this grid opens an
+        // admin page, and the Library hub is where the plain names belong.
+        return card('admin-' + w.key, 'lib-card-wing', w.icon,
+          escapeHTML(w.name) + ' Admin', escapeHTML(w.tagline || ''),
+          _libStatChip('file-text', `${n} ${noun}`) +
+          _libStatChip('folder', `${folders} folder${folders === 1 ? '' : 's'}`),
+          w.accent);
+      }).join('');
   }
 
-  const wings = document.getElementById('admin-hub-wings');
-  if (wings) {
-    // These used to open the library and say entries were managed in there,
-    // which was true and made them the only cards in the panel that were not
-    // admin. Each has a real one now — table, folders, form — built by
-    // js/admin-wings.js from the wing's own schema.
-    wings.innerHTML = LIBRARY_WINGS.map(p => {
-      const items = (typeof wingItems === 'function') ? wingItems(p.key) : [];
-      const n = items.length;
-      const folders = state.nodes.filter(x => x.scope === 'wing:' + p.key && x.type === 'folder').length;
-      const schema = (typeof wingSchema === 'function') ? wingSchema(p.key) : { noun: 'entry', nounPlural: 'entries' };
-      const noun = n === 1 ? schema.noun : schema.nounPlural;
-      return `
-      <div class="lib-card lib-card-wing" onclick="spaNavigate('admin-${p.key}')" role="link" tabindex="0"
-           style="--lib-accent:${p.accent || '#8b5cf6'};"
-           onkeydown="if(event.key==='Enter')spaNavigate('admin-${p.key}')">
+  /* One card, standing in for whatever comes next — the same marker the
+     Library hub keeps. The wings moved up into the grid above the moment they
+     had real admin sections; leaving a finished library filed under "other"
+     would say something untrue about the state of the app. */
+  const soon = document.getElementById('admin-hub-soon');
+  if (soon) {
+    soon.innerHTML = `
+      <div class="lib-card lib-card-placeholder" role="note" tabindex="0"
+           onclick="libPlaceholderNote()" onkeydown="if(event.key==='Enter')libPlaceholderNote()">
         <div class="lib-card-glow"></div>
         <div class="lib-card-head">
-          <div class="lib-card-icon"><i data-lucide="${p.icon}"></i></div>
-          <i data-lucide="arrow-up-right" class="lib-card-arrow"></i>
+          <div class="lib-card-icon"><i data-lucide="package-plus"></i></div>
+          <i data-lucide="sparkles" class="lib-card-arrow"></i>
         </div>
-        <h3 class="lib-card-name">${escapeHTML(p.name)}</h3>
-        <p class="lib-card-desc">${escapeHTML(p.tagline || '')}</p>
-        <div class="lib-card-chips">
-          ${_libStatChip('file-text', `${n} ${noun}`)}
-          ${_libStatChip('folder', `${folders} folder${folders === 1 ? '' : 's'}`)}
-        </div>
+        <h3 class="lib-card-name">Placeholder Library</h3>
+        <p class="lib-card-desc">Room for the next wing. Its admin will appear here.</p>
+        <div class="lib-card-chips">${_libStatChip('clock', 'Not built yet')}</div>
       </div>`;
-    }).join('');
   }
 
   const adminRoot = document.querySelector('.lib-hub');

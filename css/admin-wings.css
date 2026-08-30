@@ -291,11 +291,6 @@
    said they were not finished yet. */
 .lib-hub-grid-compact { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
 
-.lib-hub-section-note {
-  margin: -0.35rem 0 0.9rem;
-  font-size: 0.8rem;
-  color: var(--text-tertiary);
-}
 
 /* ── Phone ────────────────────────────────────────────────── */
 
