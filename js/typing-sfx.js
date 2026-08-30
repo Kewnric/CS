@@ -122,6 +122,96 @@ const SFX_KEY_RATIOS = {
 };
 
 const SFX_VOL_KEY = 'ssp.typingSfxVol';
+const SFX_VOICE_KEY = 'ssp.typingSfxVoice';
+
+/* ============================================================
+   TWO VOICES
+   ------------------------------------------------------------
+   The Mita blip above is a voice, and a voice is a particular taste. The
+   second one is a mechanical keyboard, which is the sound most people
+   actually want under code: it rewards the keystroke instead of commenting
+   on it, and it does not compete with thinking the way something speaking
+   does.
+
+   They are different ENGINES, not different numbers. Everything that makes
+   the Mita blip work — the glide, the formant, the octave beneath — is what
+   makes it a voice, and a keyswitch has none of those. It is a hard noise
+   transient (the switch) over a fast low body (the keycap hitting the
+   plate), which no amount of retuning a bandpassed triangle produces.
+
+   Voices are per-key like the first: a spacebar is a longer keycap on a
+   stabiliser and lands deeper, return is heavier still, and backspace is the
+   dull one because it is the key you hit when something went wrong.
+   ============================================================ */
+
+const SFX_VOICES = {
+  mita: { id: 'mita', label: 'Mita', hint: 'The dialogue blip', engine: 'voice' },
+  keys: { id: 'keys', label: 'Keys', hint: 'A mechanical keyboard', engine: 'keys' }
+};
+
+const SFX_VOICE_ORDER = ['mita', 'keys'];
+
+/** Body pitch, length, click colour — relative to an ordinary character. */
+const SFX_KEYBOARD = {
+  thock:   150,     // Hz, the keycap bottoming out
+  drop:    0.72,    // where that falls to by the end
+  length:  0.055,
+  click:   3200,    // Hz, the centre of the switch's click
+  clickQ:  1.1,
+  /* Levelled against the Mita blip, which peaks about 0.15. A keyswitch
+     should be the more present of the two — that is most of why it is the
+     satisfying one — but 0.42/0.46 measured 0.52, three and a half times the
+     voice it sits beside, so switching voices was a jump in volume rather
+     than a change of character. Twice is the difference; three and a half is
+     a different setting. */
+  clickAmt: 0.24,   // how much of the switch you hear against the board
+  body:    0.27
+};
+
+const SFX_KEYBOARD_RATIOS = {
+  'Enter':     [0.80, 1.30, 0.86, 1.10],   // the big one, and the end of a line
+  'Backspace': [0.92, 0.92, 0.78, 0.86],   // dull, because it is a correction
+  'Delete':    [0.92, 0.92, 0.78, 0.86],
+  ' ':         [0.74, 1.18, 0.82, 1.16],   // stabilised, deeper, a touch louder
+  'Tab':       [0.86, 1.05, 0.88, 0.96]
+};
+
+/** Which voice is speaking. Unknown or unset falls back to the original. */
+function sfxVoiceId() {
+  try {
+    const v = localStorage.getItem(SFX_VOICE_KEY);
+    return SFX_VOICES[v] ? v : 'mita';
+  } catch (e) { return 'mita'; }
+}
+
+function sfxVoiceDef() { return SFX_VOICES[sfxVoiceId()]; }
+
+/** Choose a voice outright, from the picker. */
+function sfxPickVoice(id) {
+  if (!SFX_VOICES[id] || sfxVoiceId() === id) return;
+  _sfxApplyVoice(id);
+}
+
+/** Cycle to the next voice, for a keyboard shortcut or a single-button UI. */
+function cycleTypingSfxVoice() {
+  const i = SFX_VOICE_ORDER.indexOf(sfxVoiceId());
+  _sfxApplyVoice(SFX_VOICE_ORDER[(i + 1) % SFX_VOICE_ORDER.length]);
+}
+
+function _sfxApplyVoice(next) {
+  try { localStorage.setItem(SFX_VOICE_KEY, next); } catch (e) { /* private mode */ }
+  _syncTypingSfxBtn();
+  // Switching voices while muted would be silent and look broken, so it
+  // demonstrates the choice either way.
+  if (!sfxEnabled()) { try { localStorage.setItem(SFX_KEY, '1'); } catch (e) {} _syncTypingSfxBtn(); }
+  const a = sfxKeyVoice('a'), b = sfxKeyVoice('e'), sp = sfxKeyVoice(' ');
+  sfxBlip(a[0], a[1], a[2], a[3]);
+  setTimeout(() => sfxBlip(b[0], b[1], b[2], b[3]), 85);
+  setTimeout(() => sfxBlip(sp[0], sp[1], sp[2], sp[3]), 170);
+  if (typeof toast === 'function') {
+    toast(SFX_VOICES[next].label + ' — ' + SFX_VOICES[next].hint, { type: 'info', duration: 1800 });
+  }
+}
 
 let _sfxCtx = null;
 let _sfxBus = null;
@@ -171,10 +261,15 @@ function _sfxContext() {
  * @param {number} length seconds; longer reads as a heavier key
  * @param {number} colour bandpass centre in Hz — lower is duller
  */
-function sfxBlip(pitch, length, colour) {
+function sfxBlip(pitch, length, colour, extra) {
   const ctx = _sfxContext();
   if (!ctx) return;
   if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+
+  // One entry point, two engines. Everything that calls this — the keystroke
+  // handler, the volume preview, the toggle's proof-of-life — gets whichever
+  // voice is selected without knowing there is a choice.
+  if (sfxVoiceDef().engine === 'keys') { _sfxKeyPress(ctx, pitch, length, colour, extra); return; }
 
   const t = ctx.currentTime;
   const osc = ctx.createOscillator();
@@ -242,9 +337,73 @@ function sfxBlip(pitch, length, colour) {
  * letters before it.
  */
 function sfxKeyVoice(key) {
+  if (sfxVoiceDef().engine === 'keys') {
+    const k = SFX_KEYBOARD;
+    const r = SFX_KEYBOARD_RATIOS[key];
+    if (!r) return [k.thock, k.length, k.click, 1];
+    return [k.thock * r[0], k.length * r[1], k.click * r[2], r[3]];
+  }
   const r = SFX_KEY_RATIOS[key];
   if (!r) return [SFX_VOICE.pitch, SFX_VOICE.length, SFX_VOICE.formant];
   return [SFX_VOICE.pitch * r[0], SFX_VOICE.length * r[1], SFX_VOICE.formant * r[2]];
+}
+
+/* ── The keyboard engine ──────────────────────────────────────
+   Two things happening at once, which is what a keypress is:
+
+   THE SWITCH — a very short noise burst through a bandpass, 6ms of it. This
+   is the click, and it is what makes the sound feel like contact rather than
+   a tone. Shaped in the buffer rather than with a gain node so the decay is
+   sample-accurate at this length; a 6ms envelope drawn with ramps is mostly
+   ramp.
+
+   THE BOARD — a triangle at about 150Hz falling fast, low-passed. This is the
+   keycap reaching the plate, and it is where the satisfaction lives. Take it
+   away and you have a click; take the click away and you have a knock.
+
+   Both jitter per press. The same two components at identical settings
+   twenty times a second is a machine gun for exactly the reason the vocal
+   engine jitters too.
+   ------------------------------------------------------------ */
+function _sfxKeyPress(ctx, thock, length, click, loud) {
+  const t = ctx.currentTime;
+  const k = SFX_KEYBOARD;
+  const amp = (typeof loud === 'number' ? loud : 1);
+
+  // The switch.
+  const nlen = Math.max(1, Math.floor(ctx.sampleRate * 0.006));
+  const buf = ctx.createBuffer(1, nlen, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < nlen; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / nlen, 2);
+  const noise = ctx.createBufferSource();
+  noise.buffer = buf;
+  const bp = ctx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = click * (0.88 + Math.random() * 0.24);
+  bp.Q.value = k.clickQ;
+  const ng = ctx.createGain();
+  ng.gain.value = k.clickAmt * amp;
+  noise.connect(bp); bp.connect(ng); ng.connect(_sfxBus);
+  noise.start(t);
+
+  // The board.
+  const f = thock * (0.94 + Math.random() * 0.12);
+  const osc = ctx.createOscillator();
+  const lp = ctx.createBiquadFilter();
+  const env = ctx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(f, t);
+  osc.frequency.exponentialRampToValueAtTime(f * k.drop, t + length);
+  lp.type = 'lowpass';
+  lp.frequency.value = 1400;
+  // Near-instant attack: a key either is or is not pressed, and any ramp long
+  // enough to hear reads as a soft synth pad rather than a switch.
+  env.gain.setValueAtTime(0.0001, t);
+  env.gain.linearRampToValueAtTime(k.body * amp, t + 0.002);
+  env.gain.exponentialRampToValueAtTime(0.0001, t + length);
+  osc.connect(lp); lp.connect(env); env.connect(_sfxBus);
+  osc.start(t);
+  osc.stop(t + length + 0.02);
 }
 
 /** Keys that are navigation or command, not speech. */
@@ -282,7 +441,7 @@ document.addEventListener('keydown', function (e) {
   _sfxLast = now;
 
   const voice = sfxKeyVoice(e.key);
-  sfxBlip(voice[0], voice[1], voice[2]);
+  sfxBlip(voice[0], voice[1], voice[2], voice[3]);
 }, true);
 
 /* Leaving the tab mid-sentence should not leave an oscillator running. */
@@ -301,8 +460,8 @@ function toggleTypingSfx() {
   if (next) {
     // Play the thing being switched on, so the button proves itself.
     const v = sfxKeyVoice('a'), w = sfxKeyVoice(' ');
-    sfxBlip(v[0], v[1], v[2]);
-    setTimeout(() => sfxBlip(w[0], w[1] * 1.15, w[2]), 95);
+    sfxBlip(v[0], v[1], v[2], v[3]);
+    setTimeout(() => sfxBlip(w[0], w[1] * 1.15, w[2], w[3]), 95);
   } else if (_sfxCtx) {
     _sfxCtx.suspend().catch(() => {});
   }
@@ -333,7 +492,7 @@ function sfxSetVolume(v) {
   _sfxVolPreview = setTimeout(() => {
     if (val > 0 && sfxEnabled()) {
       const voice = sfxKeyVoice('a');
-      sfxBlip(voice[0], voice[1], voice[2]);
+      sfxBlip(voice[0], voice[1], voice[2], voice[3]);
     }
   }, 140);
 }
@@ -351,6 +510,15 @@ function _syncTypingSfxBtn() {
   btn.style.color = on ? 'var(--color-primary)' : '';
   const icon = btn.querySelector('[data-lucide], svg');
   if (typeof _setLucideIcon === 'function') _setLucideIcon(icon, on ? 'volume-2' : 'volume-x');
+
+  // Keep the picker showing which voice is actually speaking, whether it was
+  // changed from here, from the cycle, or in another tab.
+  const cur = sfxVoiceId();
+  document.querySelectorAll('.sfx-voice-opt').forEach(b => {
+    const isOn = b.dataset.voice === cur;
+    b.classList.toggle('is-on', isOn);
+    b.setAttribute('aria-pressed', String(isOn));
+  });
 }
 
 /**
@@ -374,11 +542,23 @@ function typingSfxButtonTemplate() {
         <i data-lucide="${lit ? 'volume-2' : 'volume-x'}" style="width:16px;height:16px;" aria-hidden="true"></i>
       </button>
       <div class="sfx-vol-pop">
-        <input type="range" id="sfx-vol" class="sfx-vol-range"
-               min="0" max="150" step="5" value="${vol}"
-               aria-label="Typing sound volume"
-               oninput="sfxSetVolume(this.value / 100)">
-        <span class="sfx-vol-label" id="sfx-vol-label">${vol}%</span>
+        <div class="sfx-vol-row">
+          <input type="range" id="sfx-vol" class="sfx-vol-range"
+                 min="0" max="150" step="5" value="${vol}"
+                 aria-label="Typing sound volume"
+                 oninput="sfxSetVolume(this.value / 100)">
+          <span class="sfx-vol-label" id="sfx-vol-label">${vol}%</span>
+        </div>
+        <!-- The voice picker lives here rather than as a second topbar button:
+             the strip already needs ten controls to fit on a phone, and this is
+             something you set once, not something you reach for mid-attempt. -->
+        <div class="sfx-voice-row" role="group" aria-label="Typing voice">
+          ${SFX_VOICE_ORDER.map(id => `
+            <button type="button" class="sfx-voice-opt${sfxVoiceId() === id ? ' is-on' : ''}"
+                    data-voice="${id}" onclick="sfxPickVoice('${id}')"
+                    title="${escapeHTML(SFX_VOICES[id].hint)}"
+                    aria-pressed="${sfxVoiceId() === id}">${escapeHTML(SFX_VOICES[id].label)}</button>`).join('')}
+        </div>
       </div>
     </div>`;
 }

@@ -2653,6 +2653,7 @@ async function _termRunStep() {
     } catch (err2) {
       if (_term !== session) return;
       session.lines.splice(spinIdx, 1);
+      if (typeof psfxPunch === 'function') psfxPunch();
       session.lines.push({ type: 'error', text: 'Error: ' + (err2.message || err2) });
       session.completed = true;
       session.running = false;
@@ -2672,6 +2673,7 @@ async function _termRunStep() {
 
   // Handle compilation failure
   if (!resA.didExecute) {
+    if (typeof psfxPunch === 'function') psfxPunch();
     session.lines.push({ type: 'error', text: 'Compilation Error:\n' + (termCleanDiagnostics(resA.buildStderr || resA.stderr) || 'Unknown error') });
     session.completed = true;
     session.running = false;
@@ -2757,6 +2759,7 @@ async function _termRunStep() {
       9: 'Killed (SIGKILL)', 11: 'Segmentation Fault (SIGSEGV)',
       14: 'Time Limit Exceeded (SIGALRM)'
     };
+    if (typeof psfxPunch === 'function') psfxPunch();
     session.lines.push({ type: 'error', text: 'Runtime Error: ' + (signalMap[sig] || 'Signal ' + sig) });
     const errText = termCleanDiagnostics(resA.stderr);
     if (errText) session.lines.push({ type: 'error', text: errText });
@@ -2777,6 +2780,10 @@ async function _termRunStep() {
   // 143/137/124 mean the sandbox killed it — say so, rather than printing a
   // bare number that looks like the program chose to return it.
   const note = termExitNote(exitCode);
+  // Only when it is waiting on you does neither fire: a run that pauses for
+  // input has not finished, and returns above before reaching here.
+  if (note.ok) { if (typeof psfxLevelUp === 'function') psfxLevelUp(); }
+  else if (typeof psfxPunch === 'function') psfxPunch();
   session.lines.push({ type: note.ok ? 'info' : 'warning', text: note.line });
   if (statusEl) statusEl.textContent = note.status + (resA.execTime ? ' · ' + resA.execTime + 'ms' : '');
   _termRender();

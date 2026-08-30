@@ -183,3 +183,88 @@ function psfxPowerUp() {
 document.addEventListener('visibilitychange', function () {
   if (document.hidden) psfxWorkStop();
 });
+
+/* ── A run that compiled and finished ─────────────────────────
+   The Pokémon level-up shape: a fast rising arpeggio, then the same figure
+   again a step higher, landing on a held note. What makes it read as that
+   rather than as any ascending run is the CHARACTER — square waves with no
+   filter, notes of equal short length, and no space between them. It is a
+   Game Boy sound, so the things to avoid are exactly the things that make a
+   sound modern: sweeps, reverb tails, velocity shaping.
+
+   Deliberately not psfxPowerUp, which ends the whole attempt. This fires
+   every clean run, so it is shorter and lighter — a sound you will hear fifty
+   times an hour has to stay welcome.
+   ------------------------------------------------------------ */
+function psfxLevelUp() {
+  if (!_psfxOn()) return;
+  // C-E-G-C, then a tone up, the way the jingle steps.
+  const run = [523, 659, 784, 1047];
+  const step = 0.045;
+  run.forEach((f, i) => psfxTone({ freq: f, type: 'square', dur: 0.06, gain: 0.075, at: i * step }));
+  run.forEach((f, i) => psfxTone({ freq: f * 1.122, type: 'square', dur: 0.06, gain: 0.075, at: 0.19 + i * step }));
+  // The landing, held, with a softer voice under it so it is not all edge.
+  psfxTone({ freq: 1568, type: 'square',   dur: 0.26, gain: 0.085, at: 0.38 });
+  psfxTone({ freq: 784,  type: 'triangle', dur: 0.30, gain: 0.06,  at: 0.38 });
+}
+
+/* ── A run that would not compile, or fell over ───────────────
+   A punch: the impact, then the weight behind it.
+
+   Three parts, because two of them alone read as something else. The noise
+   crack on its own is a snare; the pitch drop on its own is a cartoon boing.
+   Together — a very short filtered noise burst over a fast fall from 160Hz to
+   45Hz — they land as something hitting something.
+
+   The fall is exponential and quick (90ms). A slow one is a falling tone; the
+   speed is what makes it a thud rather than a note.
+   ------------------------------------------------------------ */
+function psfxPunch() {
+  if (!_psfxOn()) return;
+  const bus = _psfxBus();
+  if (!bus) return;
+  const ctx = _sfxContext();
+  const t = ctx.currentTime;
+
+  // The impact: a short burst of noise, most of it low-mid so it is a thump
+  // and not a hiss.
+  const len = Math.floor(ctx.sampleRate * 0.09);
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) {
+    // Shaped as it is written rather than by a gain node: the decay is part of
+    // what a hit IS, and doing it here keeps it sample-accurate.
+    d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6);
+  }
+  const noise = ctx.createBufferSource();
+  noise.buffer = buf;
+  const nlp = ctx.createBiquadFilter();
+  nlp.type = 'lowpass';
+  nlp.frequency.setValueAtTime(1800, t);
+  nlp.frequency.exponentialRampToValueAtTime(320, t + 0.09);
+  const ngain = ctx.createGain();
+  /* Levelled against the cues that were already here, which peak between
+     0.33 and 0.43. At 0.5 this hit 1.04 and clipped; at 0.3 it still peaked
+     0.82, roughly double the loudest of them, which is not force but a
+     mixing error. It should be the hardest thing in the set without being in
+     a different set. */
+  ngain.gain.value = 0.2;
+  noise.connect(nlp); nlp.connect(ngain); ngain.connect(bus);
+  noise.start(t);
+
+  // The weight: a fast fall, which is the body of the hit.
+  const osc = ctx.createOscillator();
+  const env = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(160, t);
+  osc.frequency.exponentialRampToValueAtTime(45, t + 0.09);
+  env.gain.setValueAtTime(0.0001, t);
+  env.gain.linearRampToValueAtTime(0.17, t + 0.006);
+  env.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+  osc.connect(env); env.connect(bus);
+  osc.start(t);
+  osc.stop(t + 0.2);
+
+  // A little knuckle on top, so it has a front edge as well as a bottom.
+  psfxTone({ freq: 220, to: 90, type: 'triangle', dur: 0.07, gain: 0.05, lowpass: 900 });
+}

@@ -3804,3 +3804,38 @@ body.is-resizing .practice-panel { transition: none; }
   max-height: none;
   height: 100%;
 }
+
+/* ── The typing voice picker ──────────────────────────────────
+   Under the volume slider in the same popover. Two words, not two icons: the
+   difference between the voices is what they sound like, and no glyph says
+   "the dialogue blip" versus "a mechanical keyboard".
+   ------------------------------------------------------------ */
+.sfx-vol-row { display: flex; align-items: center; gap: 0.5rem; }
+
+.sfx-voice-row {
+  display: flex;
+  gap: 0.25rem;
+  margin-top: 0.45rem;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--border-color);
+}
+.sfx-voice-opt {
+  flex: 1;
+  padding: 0.24rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+.sfx-voice-opt:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
+.sfx-voice-opt.is-on {
+  background: color-mix(in srgb, var(--color-primary) 18%, transparent);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
