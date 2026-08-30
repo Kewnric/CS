@@ -100,12 +100,44 @@ function termStripAnsi(text) {
 }
 
 /** Diagnostics worth showing: the shim's own are noise the user can't act on. */
-function termCleanDiagnostics(text) {
+function termCleanDiagnostics(text, originalSource) {
   const clean = termStripAnsi(text);
   if (!clean.trim()) return '';
   // Drop each diagnostic block that names one of the injected helpers.
   const blocks = clean.split(/\n(?=\S)/);
-  return blocks.filter(b => !/__ssp_[ipl]/.test(b)).join('\n').trim();
+  const kept = blocks.filter(b => !/__ssp_[ipl]/.test(b)).join('\n').trim();
+  return originalSource ? termRepointExcerpts(kept, originalSource) : kept;
+}
+
+/**
+ * Quote the user's source in a diagnostic, not the instrumented file's.
+ *
+ * The probe build injects a shim after the last #include and ends it with a
+ * #line directive, so GCC REPORTS the right line number — a warning about the
+ * user's line 8 does say 8. But the excerpt it prints underneath is fetched
+ * from the file it actually compiled, and physical line 8 of that file is one
+ * of the injected `#undef` lines. The result is a correct complaint quoting a
+ * line the user never wrote:
+ *
+ *     <source>:8:6: warning: suggest parentheses around assignment ...
+ *         8 | #undef fscanf
+ *
+ * The number is trustworthy, so the fix is to look line 8 up in what the user
+ * actually typed and print that instead. The caret line has no line number of
+ * its own and is left alone: its column was measured against the real line, so
+ * it lands correctly once the real line is underneath it.
+ */
+function termRepointExcerpts(text, originalSource) {
+  const src = String(originalSource || '').split('\n');
+  if (!src.length) return text;
+  return String(text).split('\n').map(line => {
+    // "   8 | some code" — the number, the bar, then the quoted source.
+    const m = /^(\s*)(\d+)(\s*\|)(.*)$/.exec(line);
+    if (!m) return line;                       // caret rows and prose pass through
+    const real = src[parseInt(m[2], 10) - 1];
+    if (real === undefined) return line;
+    return m[1] + m[2] + m[3] + (real ? ' ' + real : '');
+  }).join('\n');
 }
 
 /**

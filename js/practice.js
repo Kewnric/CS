@@ -2653,7 +2653,7 @@ async function _termRunStep() {
     } catch (err2) {
       if (_term !== session) return;
       session.lines.splice(spinIdx, 1);
-      if (typeof psfxPunch === 'function') psfxPunch();
+      _termCue(session, 'punch');
       session.lines.push({ type: 'error', text: 'Error: ' + (err2.message || err2) });
       session.completed = true;
       session.running = false;
@@ -2673,8 +2673,8 @@ async function _termRunStep() {
 
   // Handle compilation failure
   if (!resA.didExecute) {
-    if (typeof psfxPunch === 'function') psfxPunch();
-    session.lines.push({ type: 'error', text: 'Compilation Error:\n' + (termCleanDiagnostics(resA.buildStderr || resA.stderr) || 'Unknown error') });
+    _termCue(session, 'punch');
+    session.lines.push({ type: 'error', text: 'Compilation Error:\n' + (termCleanDiagnostics(resA.buildStderr || resA.stderr, session.code) || 'Unknown error') });
     session.completed = true;
     session.running = false;
     session.exitCode = -1;
@@ -2759,9 +2759,9 @@ async function _termRunStep() {
       9: 'Killed (SIGKILL)', 11: 'Segmentation Fault (SIGSEGV)',
       14: 'Time Limit Exceeded (SIGALRM)'
     };
-    if (typeof psfxPunch === 'function') psfxPunch();
+    _termCue(session, 'punch');
     session.lines.push({ type: 'error', text: 'Runtime Error: ' + (signalMap[sig] || 'Signal ' + sig) });
-    const errText = termCleanDiagnostics(resA.stderr);
+    const errText = termCleanDiagnostics(resA.stderr, session.code);
     if (errText) session.lines.push({ type: 'error', text: errText });
     session.completed = true;
     session.running = false;
@@ -2770,9 +2770,9 @@ async function _termRunStep() {
     return;
   }
 
-  const errText = termCleanDiagnostics(resA.stderr);
+  const errText = termCleanDiagnostics(resA.stderr, session.code);
     if (errText) session.lines.push({ type: 'error', text: errText });
-  const warnText = termCleanDiagnostics(resA.buildStderr);
+  const warnText = termCleanDiagnostics(resA.buildStderr, session.code);
   if (warnText) session.lines.push({ type: 'warning', text: '⚠️ ' + warnText });
 
   session.completed = true;
@@ -2780,10 +2780,7 @@ async function _termRunStep() {
   // 143/137/124 mean the sandbox killed it — say so, rather than printing a
   // bare number that looks like the program chose to return it.
   const note = termExitNote(exitCode);
-  // Only when it is waiting on you does neither fire: a run that pauses for
-  // input has not finished, and returns above before reaching here.
-  if (note.ok) { if (typeof psfxLevelUp === 'function') psfxLevelUp(); }
-  else if (typeof psfxPunch === 'function') psfxPunch();
+  _termCue(session, note.ok ? 'potion' : 'punch');
   session.lines.push({ type: note.ok ? 'info' : 'warning', text: note.line });
   if (statusEl) statusEl.textContent = note.status + (resA.execTime ? ' · ' + resA.execTime + 'ms' : '');
   _termRender();
@@ -3755,3 +3752,23 @@ document.addEventListener('keydown', (e) => {
   e.stopPropagation();
   practiceCloseDescription();
 }, true);
+
+/**
+ * The run's verdict, said once.
+ *
+ * An interactive program is compiled and run repeatedly: once to reach the
+ * first prompt, then again after each thing you type, each pass replaying the
+ * whole program from the top with more stdin. Every one of those passes ends,
+ * so the cue fired on every one of them — a potion after each keystroke of
+ * input, which is both wrong and maddening.
+ *
+ * A run has one outcome, so it gets one sound. The flag lives on the session,
+ * which is replaced whenever Run or Restart is pressed, so a genuinely new
+ * run does announce itself again.
+ */
+function _termCue(session, which) {
+  if (!session || session.cueDone) return;
+  session.cueDone = true;
+  if (which === 'potion') { if (typeof psfxLevelUp === 'function') psfxLevelUp(); }
+  else if (typeof psfxPunch === 'function') psfxPunch();
+}
