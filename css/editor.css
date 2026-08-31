@@ -116,6 +116,10 @@
 .syntax-preproc { color: #c586c0; }
 .syntax-header { color: #ce9178; }
 .syntax-operator { color: #c586c0; }
+/* Format specifiers, inside the string they belong to. Deliberately a long way
+   from the string's own orange: the point is to pick `%d` out of the text
+   around it, and a near neighbour of #ce9178 would not. */
+.syntax-format { color: #9cdcfe; font-weight: 600; }
 
 /* --- Practice Sidebar --- */
 .practice-sidebar {

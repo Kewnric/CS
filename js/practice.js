@@ -42,6 +42,8 @@ function initPractice() {
   let autoSaved = (autoSavedRaw && autoSavedRaw.challengeId === challengeId && autoSavedRaw.variantId === variantId)
     ? autoSavedRaw.files
     : null;
+  // Which tab was open travels with the files it refers to, and only with them.
+  let autoSavedTab = autoSaved ? autoSavedRaw.activeFileIndex : null;
   if (autoSavedRaw && !autoSaved) clearSessionParam('autoSavedFiles'); // stale, different attempt
 
   // Nothing in this tab's session: the tab was closed, or the browser restarted.
@@ -51,6 +53,7 @@ function initPractice() {
     const disk = _practiceReadDraft(challengeId, variantId);
     if (disk && (disk.files || []).some(f => (f.userCode || '').trim())) {
       autoSaved = disk.files;
+      autoSavedTab = disk.activeFileIndex;
       _restoredFromDisk = disk;
     }
   }
@@ -89,7 +92,11 @@ function initPractice() {
               starterCode: '', code: '', userCode: sv.userCode || '' };
       })
     : variant.files.map(f => ({ ...f, userCode: f.starterCode || '' }));
-  state.activeFileIndex = 0;
+  /* Back to the file you were actually in. Clamped against the list that was
+     just rebuilt rather than the one that was saved, because a file may have
+     been deleted since and an index past the end would load nothing at all. */
+  state.activeFileIndex = Math.max(0, Math.min(
+    parseInt(autoSavedTab, 10) || 0, state.userFiles.length - 1));
   _submitInProgress = false;
   _practiceSubmitted = false;
   state.timeLimit = timeLimit;
@@ -149,7 +156,7 @@ function initPractice() {
   renderPracticeFileTabs();
   // `restored` tells the first load not to save the (still empty) editor over the
   // code we just pulled out of the autosave — see loadPracticeFile().
-  loadPracticeFile(0, { restored: !!autoSaved });
+  loadPracticeFile(state.activeFileIndex, { restored: !!autoSaved });
 
   // Boss bar — LV. comes from the program's level, set in Admin or by clicking it.
   bossSetLevel(typeof getProgramLevel === 'function' ? getProgramLevel(challenge) : challenge.level);
@@ -322,6 +329,10 @@ function _practiceWriteDraft() {
       title: state.activeChallenge.title || '',
       savedAt: Date.now(),
       startTime: (state.sessionData || {}).startTime || Date.now(),
+      // Which tab was open is part of where you were, the same as the text in
+      // it: coming back to main.c after a reload means finding your place again
+      // every time.
+      activeFileIndex: state.activeFileIndex || 0,
       // id as well as name: it is what lets a renamed file still be matched to
       // the variant file it came from, and so keep its starter code.
       files: (state.userFiles || []).map(f => ({ id: f.id, name: f.name, ext: f.ext, userCode: f.userCode || '' }))
@@ -348,6 +359,7 @@ function _practiceAutoSave() {
   setSessionParam('autoSavedFiles', {
     challengeId: state.activeChallenge.id,
     variantId: state.activeVariant.id,
+    activeFileIndex: state.activeFileIndex || 0,
     files: state.userFiles.map(f => ({ id: f.id, name: f.name, ext: f.ext, userCode: f.userCode || '' }))
   });
   _practiceSaveExecs();

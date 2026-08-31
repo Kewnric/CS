@@ -98,7 +98,22 @@ function syntaxHighlight(code) {
     let replacement;
 
     if (t.type === 'string') {
-      replacement = `\uE009${t.match}\uE00F`;
+      /* Format specifiers get their own colour inside the string.
+
+         `printf("Your: %d")` is two different things wearing one colour: the
+         text being printed, and the placeholder that decides what gets printed
+         there. The placeholder is the part that has to agree with the argument
+         list, and the part worth being able to pick out at a glance.
+
+         Nested inside the string's own span rather than breaking the string
+         up, so it still reads as one run with the specifier lit within it.
+         Flags, width, precision and length modifiers all belong to the
+         specifier -- `%-5.2f` and `%ld` are each one thing -- and `%%` counts
+         because a literal percent is an escape, not text. */
+      replacement = '\uE009' + t.match.replace(
+        /%[-+ #0']*[0-9*]*(?:\.[0-9*]+)?(?:hh|h|ll|l|L|j|z|t)?[diouxXeEfFgGaAcspn%]/g,
+        '\uE00D$&\uE00F'
+      ) + '\uE00F';
     } else if (t.type === 'comment') {
       replacement = `\uE00A${t.match}\uE00F`;
     } else if (t.type === 'preproc') {
@@ -128,5 +143,6 @@ function syntaxHighlight(code) {
     .replace(/\uE00A/g, '<span class="syntax-comment">')
     .replace(/\uE00B/g, '<span class="syntax-preproc">')
     .replace(/\uE00C/g, '<span class="syntax-header">')
+    .replace(/\uE00D/g, '<span class="syntax-format">')
     .replace(/\uE00F/g, '</span>');
 }
