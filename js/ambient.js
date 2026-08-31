@@ -33,24 +33,31 @@ function _ambHosts() {
 
 /* Five slivers, and neighbours never share one.
 
-   Long and thin, because the shard IS the streak now -- there is no separate
-   trail behind it. Drawn upright in a tall narrow box and turned a quarter by
-   the stylesheet, so the length ends up along the direction of travel.
+   CURVED AND POINTED AT BOTH ENDS. Each is two arcs meeting at a point, so it
+   reads as a splinter rather than a tapered rectangle, and each bends a
+   different way and by a different amount. The widest part sits about two
+   thirds down, which leaves a long fine point at the y=0 end -- and y=0 is the
+   end that leads, since the stylesheet turns the shape a quarter clockwise and
+   that maps the top of the box onto the direction of travel.
+
+   Filled rather than outlined. At 17px a stroke was most of the shard and the
+   fill was a sliver of a sliver, so it read as a hollow shape; solid reads as
+   a fleck catching the light.
 
    Taken in order rather than at random, which is what guarantees no two
    adjacent shards match; random pairs them often enough to notice, and
    noticing is the whole problem being solved. */
 const AMB_SHAPES = [
-  '<path d="M3 0 L5.2 13 L3 30 L0.8 13 Z" fill="currentColor" fill-opacity=".22"'
-  + ' stroke="currentColor" stroke-width=".7" stroke-linejoin="round"/>',
-  '<path d="M3 0 L5 9 L3.6 30 L1.2 10 Z" fill="currentColor" fill-opacity=".18"'
-  + ' stroke="currentColor" stroke-width=".6" stroke-linejoin="round"/>',
-  '<path d="M3 0 L6 15 L3 30 L0 15 Z" fill="currentColor" fill-opacity=".15"'
-  + ' stroke="currentColor" stroke-width=".7" stroke-linejoin="round"/>',
-  '<path d="M3 0 L4.4 7 L3 30 L1.7 8 Z" fill="currentColor" fill-opacity=".26"'
-  + ' stroke="currentColor" stroke-width=".55" stroke-linejoin="round"/>',
-  '<path d="M3 0 L5.4 20 L3 30 L0.6 19 Z" fill="currentColor" fill-opacity=".2"'
-  + ' stroke="currentColor" stroke-width=".65" stroke-linejoin="round"/>'
+  '<path d="M3 0 C4.6 10 5.4 20 3.3 30 C2.6 20 2.2 10 3 0 Z" fill="currentColor"'
+  + ' fill-opacity=".85"/>',
+  '<path d="M3 0 C1.5 10 0.7 21 3.1 30 C3.6 21 4.4 10 3 0 Z" fill="currentColor"'
+  + ' fill-opacity=".8"/>',
+  '<path d="M3 0 C5.2 12 5.0 23 3.4 30 C3.2 23 3.5 12 3 0 Z" fill="currentColor"'
+  + ' fill-opacity=".9"/>',
+  '<path d="M3 0 C4.2 9 5.6 22 3.2 30 C2.4 22 1.9 9 3 0 Z" fill="currentColor"'
+  + ' fill-opacity=".75"/>',
+  '<path d="M3 0 C1.9 11 1.2 22 3.2 30 C3.9 22 4.8 11 3 0 Z" fill="currentColor"'
+  + ' fill-opacity=".85"/>'
 ];
 
 function _ambShapeSVG(i) {

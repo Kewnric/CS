@@ -144,7 +144,7 @@
   top: var(--gy, 40%);
   width: 0;
   height: 0;
-  animation: ambSwirl var(--gt, 9s) cubic-bezier(0.22, 0.62, 0.35, 1) infinite;
+  animation: ambSwirl var(--gt, 9s) linear infinite;
   animation-delay: var(--gd, 0s);
 }
 
@@ -169,50 +169,57 @@
   margin: -8.5px 0 0 -1.75px;
   color: var(--amb-lit);
   opacity: 0;
-  animation: ambShoot var(--t, 9s) cubic-bezier(0.22, 0.62, 0.35, 1) infinite;
+  /* Linear, deliberately. An ease-out spends the last third of the flight
+     slowing to a stop, which reads as slow motion -- a fleck should be going
+     as fast at the moment it goes out as it was when it arrived. */
+  animation: ambShoot var(--t, 9s) linear infinite;
   animation-delay: var(--d, 0s);
 }
 
-/* ── Dissolving along its own length ──────────────────────────
-   A shard does not blink out whole. It is eaten from the tail toward the tip,
-   so it reads as being consumed on the way past rather than as a sprite whose
-   opacity was turned down.
+/* ── Going out from both ends ─────────────────────────────────
+   A shard is eaten from BOTH points inward, and only once it is down to a
+   short glint in the middle does the brightness drop. Taken from one end it
+   looked swept away; closing from both makes it look spent.
 
-   A mask does it, and the mask lives on the svg rather than on its parent
-   because the svg is the thing that gets turned a quarter: a mask applies in
-   an element's own coordinates BEFORE its own transform, so `to bottom` here
-   means along the shard's drawn length whichever way the shard is later
-   pointed. The tip is at the top of the box, so it is the last part to go.
+   The mask is one gradient -- transparent, opaque, transparent -- and the
+   whole thing is SCALED rather than moved. At 400% tall the opaque middle
+   covers the element completely; shrinking its height walks both transparent
+   ends inward at once, and at 0 there is nothing left. One animated property,
+   symmetric for nothing.
 
-   The mask image is three times the box tall, which is what lets the soft band
-   between opaque and transparent sweep the whole length and still leave the
-   shard completely shown at one end of the travel and completely gone at the
-   other. */
+   It lives on the svg rather than its parent because the svg is the element
+   that gets turned a quarter: a mask applies in an element's own coordinates
+   BEFORE its own transform, so `to bottom` here means along the shard's drawn
+   length whichever way the shard is later pointed.
+   ------------------------------------------------------------ */
 .amb-shard svg {
   width: 100%;
   height: 100%;
   display: block;
+  /* A quarter clockwise, which puts the y=0 point -- the long fine one -- at
+     the leading edge of the travel. */
   transform: rotate(90deg);
-  -webkit-mask-image: linear-gradient(to bottom, #000 0 33%, transparent 50%);
-          mask-image: linear-gradient(to bottom, #000 0 33%, transparent 50%);
-  -webkit-mask-size: 100% 300%;
-          mask-size: 100% 300%;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 20%, #000 80%, transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent 0%, #000 20%, #000 80%, transparent 100%);
   -webkit-mask-repeat: no-repeat;
           mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+          mask-position: center;
+  -webkit-mask-size: 100% 0%;
+          mask-size: 100% 0%;
   animation: ambDissolve var(--t, 9s) linear infinite;
   animation-delay: var(--d, 0s);
 }
 
-/* Drawn on from the tip, then eaten back to it. The timings sit inside the
-   flight's own window, so the shard is whole for the middle of its crossing
-   and going at both ends of it. */
 @keyframes ambDissolve {
-  0%   { -webkit-mask-position: 0 100%; mask-position: 0 100%; }
-  4%   { -webkit-mask-position: 0 0%;   mask-position: 0 0%; }
-  8%   { -webkit-mask-position: 0 0%;   mask-position: 0 0%; }
-  13%  { -webkit-mask-position: 0 100%; mask-position: 0 100%; }
-  100% { -webkit-mask-position: 0 100%; mask-position: 0 100%; }
+  0%   { -webkit-mask-size: 100% 0%;   mask-size: 100% 0%; }
+  3%   { -webkit-mask-size: 100% 400%; mask-size: 100% 400%; }
+  9%   { -webkit-mask-size: 100% 400%; mask-size: 100% 400%; }
+  13%  { -webkit-mask-size: 100% 55%;  mask-size: 100% 55%; }
+  14%  { -webkit-mask-size: 100% 0%;   mask-size: 100% 0%; }
+  100% { -webkit-mask-size: 100% 0%;   mask-size: 100% 0%; }
 }
+
 
 /* Struck, curved, gone -- then nothing for the rest of the cycle. The arc is
    the --curve offset at the halfway point, and the shard turns through it so
@@ -224,8 +231,10 @@
   3%   { opacity: var(--o, 1); }
   7%   { transform: translate(calc(var(--len, 240px) * 0.5), var(--curve, -26px))
                     rotate(0deg) scale(var(--s, 1)); }
-  11%  { opacity: var(--o, 1); }
-  13%  { opacity: 0;
+  /* Still at full brightness while the two ends close in: the dimming is the
+     last thing that happens, not something running alongside it. */
+  12%  { opacity: var(--o, 1); }
+  14%  { opacity: 0;
          transform: translate(var(--len, 240px), 0) rotate(var(--spin, 12deg)) scale(var(--s, 1)); }
   100% { opacity: 0;
          transform: translate(var(--len, 240px), 0) rotate(var(--spin, 12deg)) scale(var(--s, 1)); }
