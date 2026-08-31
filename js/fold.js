@@ -211,13 +211,29 @@ function edToggleFold(view) {
   const range = edFoldScan(full).find(r => r.start === real);
   if (!range) return;
   const fullLines = full.split('\n');
+
+  /* The BODY, not the body and its closing line.
+     
+     Parking through range.end swallowed the line the block closes on, and that
+     line is not always just a brace: `}else {` both ends the if and begins the
+     else. Folding the if therefore hid the else's own header, so the else
+     looked folded too and its marker went with it.
+
+     Keeping the closing line on screen is also what an editor normally does —
+     you fold the inside of a block, and its last line stays to show where it
+     ended. */
+  const hidden = range.end - real - 1;
+  if (hidden < 1) return;              // nothing between the braces to park
+
   // Any fold living inside this block is absorbed — its text is already part of
   // the slab being parked, so expanding the outer block expands them all.
-  const kept = edFoldsFor().filter(f => !(f.real > real && f.real <= range.end));
+  // Strictly inside: a fold anchored ON the closing line (the `}else {` case)
+  // is not part of the slab any more and must survive.
+  const kept = edFoldsFor().filter(f => !(f.real > real && f.real < range.end));
   kept.push({
     real: real,
-    lines: range.end - real,
-    text: fullLines.slice(real, range.end).join('\n')
+    lines: hidden,
+    text: fullLines.slice(real, range.end - 1).join('\n')
   });
   _edSetFolds(kept);
   _edRenderView(ta, full, real);
@@ -351,6 +367,9 @@ function edFoldMarkers(viewText) {
   const full = ta ? edFullSource(ta) : viewText;
   const map = {};
   edFoldScan(full).forEach(r => {
+    // A block with nothing between its braces has no body to park, and a
+    // marker that does nothing when clicked is worse than no marker.
+    if (r.end - r.start - 1 < 1) return;
     const v = edRealToView(r.start);
     if (v > 0) map[v] = 'open';
   });
