@@ -72,6 +72,7 @@ function practiceTemplate() {
           </button>
           ${typingSfxButtonTemplate()}
           ${editorFxButtonTemplate()}
+          ${ambientButtonTemplate()}
           <button class="btn btn-ghost practice-icon-btn" onclick="toggleFullscreen()" title="Full screen" id="fullscreen-toggle-btn" aria-label="Full screen" aria-pressed="false">
             <i data-lucide="maximize" style="width:16px;height:16px;" aria-hidden="true"></i>
           </button>
@@ -139,6 +140,9 @@ function practiceInit() {
   // Also clear any tour left over from a previous page so it can't linger.
   if (typeof GuidedTutorial !== 'undefined' && GuidedTutorial.end) GuidedTutorial.end();
   initPractice();
+  // The sidebar is built with the route, so its crystals go in once, here. The
+  // panel puts its own back after each render — see renderPracticePanel.
+  if (typeof ambMount === 'function') ambMount();
 }
 function practiceDestroy() {
   if (typeof GuidedTutorial !== 'undefined' && GuidedTutorial.end) GuidedTutorial.end();

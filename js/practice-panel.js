@@ -84,6 +84,10 @@ function initPanelResizerDrag(e, resizer) {
 function renderPracticePanel() {
   const host = document.getElementById('practice-panel');
   if (!host || !_ppCtx) return;
+  /* This replaces the panel's contents wholesale, which takes the ambient
+     crystals with it. They are put back at the end -- the field and the colour
+     wash need no such help, being properties of the panel rather than nodes
+     inside it. */
   // Finish sits at the very bottom of the panel: it's the end of the flow, and
   // pinning it to the top put the most destructive action under the cursor while
   // reading test results.
@@ -114,6 +118,7 @@ function renderPracticePanel() {
   _ppRenderProblems();
   _ppRenderTabBody();
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: host });
+  if (typeof ambMount === 'function') ambMount();
 }
 
 /** Only rendered when there's more than one problem — a lone "1" box is noise

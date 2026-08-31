@@ -1,0 +1,155 @@
+/* ============================================================
+   AMBIENT.CSS — the quiet motion behind the practice panes
+   ------------------------------------------------------------
+   The sidebar and the results panel are mostly empty for most of an attempt,
+   and empty was all they were. This gives them something to be: a field of
+   faint crystal outlines drifting past, a slow wash of colour behind it, and
+   a few crystals that catch the light and blow through like leaves.
+
+   Three rules held throughout.
+
+   IT IS NEVER IN THE WAY. Everything here is behind the content and inert to
+   the pointer, and none of it changes the layout of what it sits behind.
+
+   IT IS CHEAP. The drift is a transform on a pseudo-element rather than an
+   animated background-position, so it composites instead of repainting the
+   pane every frame. The colours are two radial gradients that only scale and
+   rotate. The crystals are a handful of nodes, not a particle system.
+
+   IT CAN BE TURNED OFF. `.amb-off` on the body stops all of it and gives back
+   the plain panes, and prefers-reduced-motion stops the movement on its own.
+   ============================================================ */
+
+/* Indigo and cyan, the app's own two accents. The reference for this was pink;
+   pink belongs to a different app. */
+:root {
+  --amb-ink: #6366f1;
+  --amb-lit: #22d3ee;
+}
+
+.practice-sidebar,
+#practice-panel {
+  position: relative;
+  isolation: isolate;      /* the layers below can never rise past the content */
+}
+
+/* ── The field of crystals ────────────────────────────────────
+   One tile, repeated, moved by transform. It is drawn oversized and offset so
+   that translating it can never expose an edge.
+   ------------------------------------------------------------ */
+.practice-sidebar::before,
+#practice-panel::before {
+  content: '';
+  position: absolute;
+  top: -140px;
+  left: -140px;
+  width: calc(100% + 280px);
+  height: calc(100% + 280px);
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.5;
+  background-repeat: repeat;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140' viewBox='0 0 140 140'%3E%3Cg fill='none' stroke='%236366f1' stroke-width='1.1' opacity='.55'%3E%3Cpath d='M26 16 L35 27 L26 50 L17 27 Z'/%3E%3Cpath d='M17 27 L35 27 M26 16 L26 50'/%3E%3Cpath d='M100 78 L108 87 L100 105 L92 87 Z'/%3E%3Cpath d='M92 87 L108 87'/%3E%3C/g%3E%3Cg fill='none' stroke='%2322d3ee' stroke-width='1' opacity='.4'%3E%3Cpath d='M68 60 l3.5 -7 l3.5 7 l7 3.5 l-7 3.5 l-3.5 7 l-3.5 -7 l-7 -3.5 Z'/%3E%3Cpath d='M118 26 L124 33 L118 45 L112 33 Z'/%3E%3C/g%3E%3Cg fill='%2322d3ee' opacity='.34'%3E%3Ccircle cx='82' cy='30' r='1.7'/%3E%3Ccircle cx='46' cy='96' r='1.7'/%3E%3Ccircle cx='12' cy='112' r='1.3'/%3E%3Ccircle cx='128' cy='118' r='1.3'/%3E%3Ccircle cx='60' cy='128' r='1.1'/%3E%3C/g%3E%3C/svg%3E");
+  animation: ambDrift 90s linear infinite;
+}
+
+/* A whole tile in each direction, so the loop closes on itself and there is no
+   jump when it restarts. */
+@keyframes ambDrift {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-140px, -140px, 0); }
+}
+
+/* ── The wash of colour ───────────────────────────────────────
+   Two soft pools that breathe against each other. Only transform and opacity
+   move, so this costs a composite rather than a repaint.
+   ------------------------------------------------------------ */
+.practice-sidebar::after,
+#practice-panel::after {
+  content: '';
+  position: absolute;
+  inset: -30%;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    radial-gradient(42% 34% at 26% 20%, color-mix(in srgb, var(--amb-ink) 26%, transparent), transparent 70%),
+    radial-gradient(38% 30% at 76% 74%, color-mix(in srgb, var(--amb-lit) 18%, transparent), transparent 72%);
+  animation: ambBreathe 34s ease-in-out infinite alternate;
+}
+
+@keyframes ambBreathe {
+  from { transform: scale(1) rotate(0deg); opacity: 0.85; }
+  to   { transform: scale(1.18) rotate(8deg); opacity: 1; }
+}
+
+/* ── Crystals on the wind ─────────────────────────────────────
+   Two nested elements per crystal: the outer one carries it across the pane,
+   the inner one sways and turns. Splitting them is what makes the path read
+   as blown rather than as a straight line with a spin on it — one keyframe
+   set cannot do both without the sway inheriting the travel's easing.
+   ------------------------------------------------------------ */
+.amb-leaves {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.amb-leaf {
+  position: absolute;
+  top: var(--y, 50%);
+  left: 0;
+  width: 14px;
+  height: 22px;
+  animation: ambBlow var(--t, 26s) linear infinite;
+  animation-delay: var(--d, 0s);
+}
+
+.amb-leaf-i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--amb-lit);
+  animation: ambSway calc(var(--t, 26s) / 5) ease-in-out infinite alternate;
+  animation-delay: var(--d, 0s);
+}
+
+.amb-leaf svg { width: 100%; height: 100%; display: block; }
+
+/* Across, and a little up: leaves lift on the gust before they fall out of it.
+   Opacity does the appearing and disappearing, so a crystal is never seen
+   arriving at an edge. */
+@keyframes ambBlow {
+  0%   { opacity: 0; transform: translate3d(-30px, 0, 0); }
+  12%  { opacity: var(--o, 0.5); }
+  50%  { transform: translate3d(calc(50% + 50px), -26px, 0); }
+  80%  { opacity: var(--o, 0.5); }
+  100% { opacity: 0; transform: translate3d(calc(100% + 60px), 8px, 0); }
+}
+
+@keyframes ambSway {
+  from { transform: translateY(-7px) rotate(-24deg) scale(var(--s, 1)); }
+  to   { transform: translateY(7px) rotate(28deg) scale(var(--s, 1)); }
+}
+
+/* ── Off ──────────────────────────────────────────────────────
+   The toggle gives back exactly the panes as they were: no layers, nothing
+   animating, nothing composited.
+   ------------------------------------------------------------ */
+.amb-off .practice-sidebar::before,
+.amb-off .practice-sidebar::after,
+.amb-off #practice-panel::before,
+.amb-off #practice-panel::after { content: none; }
+.amb-off .amb-leaves { display: none; }
+
+/* Movement is the part that is unwelcome, not the decoration, so the field and
+   the wash stay and simply stop. The crystals go: their whole point is travel,
+   and a row of them frozen mid-pane reads as a rendering fault. */
+@media (prefers-reduced-motion: reduce) {
+  .practice-sidebar::before,
+  .practice-sidebar::after,
+  #practice-panel::before,
+  #practice-panel::after { animation: none; }
+  .amb-leaves { display: none; }
+}
