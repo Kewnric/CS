@@ -36,6 +36,11 @@ const EDFX_KEY = 'ssp.editorFx';
    under a burst of typing is invisible. */
 const EDFX_MAX = 28;
 
+/* The two animation lengths, matching css/editor-fx.css. Duplicated here only
+   to bound how long a ghost may live -- see the release in _edfxSpawn. */
+const EDFX_IN_MS = 340;
+const EDFX_OUT_MS = 620;
+
 /* What the editor inserts on its own when you type an opener. */
 const EDFX_PAIRS = { '()': 1, '[]': 1, '{}': 1, '""': 1, "''": 1, '``': 1 };
 
@@ -59,6 +64,85 @@ function _edfxNextTilt() {
   const deg = EDFX_TILT_MAX * Math.sin((2 * Math.PI * _edfxTiltStep) / EDFX_TILT_STEPS);
   _edfxTiltStep = (_edfxTiltStep + 1) % EDFX_TILT_STEPS;
   return deg;
+}
+
+/* -- Not painting the character twice ------------------------
+   A ghost is the character while it is moving. The <pre> underneath is
+   painting that same character all along, so a landing letter was really two
+   letters: a big tilted one settling, over a small straight one that was
+   already home. That is the doubling.
+
+   So the character below is made invisible for as long as its ghost is in
+   flight -- `visibility: hidden`, which keeps its box, so nothing reflows and
+   the measurement the ghost was positioned from stays true. The ghost ends at
+   exactly that character's size, angle, position and colour, and is removed
+   in the same task that reveals it, so the swap has nothing to show.
+
+   The <pre> is rebuilt from innerHTML on every keystroke, which throws these
+   away, so they are re-applied after each repaint from the list below rather
+   than trusted to survive.
+
+   Each entry remembers WHICH character it is hiding, and a hole is only
+   punched where that character still is. Between an edit and the repaint an
+   offset can go stale -- and hiding the wrong character is worse than briefly
+   painting one twice. */
+let _edfxHoles = [];       // { off, ch } for every ghost in flight
+let _edfxPrevLen = -1;
+
+/** Has this reader asked for less motion? Then there are no ghosts at all. */
+function _edfxMotionOk() {
+  try { return !window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+  catch (e) { return true; }
+}
+
+/**
+ * Slide the holes past an edit, so they keep pointing at their own character.
+ * Same rule as the fold anchors: the caret sits at the end of what changed, so
+ * the change began at `caret - delta` for an insert and at `caret` for a
+ * delete, and everything at or after that moved by delta.
+ */
+function _edfxShiftHoles(ta) {
+  const len = ta.value.length;
+  const delta = _edfxPrevLen < 0 ? 0 : len - _edfxPrevLen;
+  _edfxPrevLen = len;
+  if (!delta || !_edfxHoles.length) return;
+  const from = ta.selectionStart - Math.max(delta, 0);
+  _edfxHoles.forEach(h => { if (h.off >= from) h.off += delta; });
+}
+
+/** Hide the one character at `off`, if that is still the character there. */
+function _edfxPunch(code, off, ch) {
+  const walk = document.createTreeWalker(code, NodeFilter.SHOW_TEXT);
+  let seen = 0, n;
+  while ((n = walk.nextNode())) {
+    const len = n.nodeValue.length;
+    if (seen + len > off) {
+      const local = off - seen;
+      if (n.nodeValue.charAt(local) !== ch) return;      // moved; leave it alone
+      try {
+        const r = document.createRange();
+        r.setStart(n, local);
+        r.setEnd(n, local + 1);
+        const span = document.createElement('span');
+        span.className = 'edfx-hole';
+        r.surroundContents(span);
+      } catch (e) { /* the range crossed a tag; not worth forcing */ }
+      return;
+    }
+    seen += len;
+  }
+}
+
+/** Re-hide exactly the characters that have a ghost in flight, and no others. */
+function _edfxApplyHoles() {
+  const code = document.getElementById('editor-code');
+  if (!code) return;
+  code.querySelectorAll('.edfx-hole').forEach(span => {
+    span.replaceWith(document.createTextNode(span.textContent));
+  });
+  if (!_edfxHoles.length) return;
+  code.normalize();                       // one text node per run again
+  _edfxHoles.forEach(h => _edfxPunch(code, h.off, h.ch));
 }
 
 let _edfxPending = null;   // the character a keydown is about to remove
@@ -146,7 +230,7 @@ function _edfxCharBox(offset) {
   }
 }
 
-function _edfxSpawn(ch, box, cls, delay) {
+function _edfxSpawn(ch, box, cls, delay, off) {
   const layer = _edfxLayer();
   if (!layer || !box) return;
   const g = document.createElement('span');
@@ -176,15 +260,51 @@ function _edfxSpawn(ch, box, cls, delay) {
 
   layer.appendChild(g);
   _edfxLive.push(g);
+  /* Only now, with a ghost actually on screen to stand in for it, is the real
+     character hidden. Punching the hole first would leave the character
+     invisible with nothing in its place if anything below failed. */
+  if (cls === 'edfx-in' && off != null) {
+    g._edfxHole = { off: off, ch: ch };
+    _edfxHoles.push(g._edfxHole);
+    _edfxApplyHoles();
+  }
   while (_edfxLive.length > EDFX_MAX) {
     const old = _edfxLive.shift();
     if (old && old.parentElement) old.remove();
+    if (old && old._edfxHole) {
+      _edfxHoles = _edfxHoles.filter(h => h !== old._edfxHole);
+      old._edfxHole = null;
+    }
   }
-  const done = () => { g.remove(); _edfxLive = _edfxLive.filter(x => x !== g); };
+  const done = () => {
+    g.remove();
+    _edfxLive = _edfxLive.filter(x => x !== g);
+    // The ghost has finished on top of the character it was standing in for,
+    // at the same size and angle and colour, so revealing it in the same task
+    // that removes the ghost is a swap with nothing to see.
+    if (g._edfxHole) {
+      _edfxHoles = _edfxHoles.filter(h => h !== g._edfxHole);
+      g._edfxHole = null;
+      _edfxApplyHoles();
+    }
+  };
+  /* Three ways to finish, because one of them is not reliable and a ghost
+     that never finishes now means a character that never comes back.
+
+     animationend is the prompt one, and it does not fire at all while the
+     page is not being rendered -- a background tab, a hidden pane. The
+     animation still completes on the timeline, so `finished` resolves where
+     the event does not; that is the one that actually guarantees the letter
+     is handed back. The timeout is the last resort for a ghost whose layer is
+     torn down mid-flight, and it is now the animation's own length rather
+     than a flat 1400ms: with the character underneath hidden, that was how
+     long text could be missing for.
+
+     `done` is idempotent, so whichever arrives first simply wins. */
   g.addEventListener('animationend', done, { once: true });
-  // A belt-and-braces sweep: if the layer is torn down mid-flight the
-  // animationend never fires and the node would leak.
-  setTimeout(done, 1400);
+  const running = g.getAnimations()[0];
+  if (running && running.finished) running.finished.then(done, () => {});
+  setTimeout(done, (cls === 'edfx-out' ? EDFX_OUT_MS : EDFX_IN_MS) + 120);
 }
 
 /* ── Typing ───────────────────────────────────────────────────
@@ -195,7 +315,10 @@ function _edfxSpawn(ch, box, cls, delay) {
    arrived last is the largest thing on screen.
    ------------------------------------------------------------ */
 function edfxTyped(ta, back) {
-  if (!edfxEnabled() || !edfxRouteWants()) return;
+  if (!edfxEnabled() || !edfxRouteWants() || !_edfxMotionOk()) return;
+  // Before anything else: the edit that just happened moved the characters
+  // the ghosts already in flight are standing in for.
+  _edfxShiftHoles(ta);
   // `back` steps away from the caret, for a pair whose caret sits between the
   // two characters rather than after them.
   const at = ta.selectionStart - (back || 1);
@@ -212,8 +335,10 @@ function edfxTyped(ta, back) {
      moved. A zero timeout still runs after the current task, so the repaint is
      just as done, and it behaves the same whether or not anyone is looking. */
   setTimeout(() => {
+    // The repaint threw every hole away; put back the ones still in flight.
+    _edfxApplyHoles();
     const box = _edfxCharBox(at);
-    if (box) _edfxSpawn(ch === ' ' ? ' ' : ch, box, 'edfx-in');
+    if (box) _edfxSpawn(ch === ' ' ? ' ' : ch, box, 'edfx-in', 0, at);
   }, 0);
 }
 
@@ -225,7 +350,7 @@ function edfxTyped(ta, back) {
    driven by how fast you are deleting rather than by a fixed stagger.
    ------------------------------------------------------------ */
 function edfxWillDelete(ta) {
-  if (!edfxEnabled() || !edfxRouteWants()) { _edfxPending = null; return; }
+  if (!edfxEnabled() || !edfxRouteWants() || !_edfxMotionOk()) { _edfxPending = null; return; }
   if (ta.selectionStart !== ta.selectionEnd) { _edfxPending = null; return; }  // a selection, not one char
   const at = ta.selectionStart - 1;
   if (at < 0) { _edfxPending = null; return; }
@@ -259,6 +384,10 @@ function edfxReset() {
   // A new file starts the sweep at level, so the first letter you type is not
   // arbitrarily mid-lean.
   _edfxTiltStep = 0;
+  // Every hidden character comes back, whatever state its ghost was in.
+  _edfxHoles = [];
+  _edfxPrevLen = -1;
+  _edfxApplyHoles();
 }
 
 /* ── Wiring ───────────────────────────────────────────────────
