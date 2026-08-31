@@ -54,10 +54,41 @@ function initPractice() {
       _restoredFromDisk = disk;
     }
   }
-  state.userFiles = variant.files.map(f => {
-    const saved = autoSaved && autoSaved.find(s => s.name === f.name && s.ext === f.ext);
-    return { ...f, userCode: saved ? saved.userCode : (f.starterCode || '') };
-  });
+  /* WHICH files exist is the save's business, not the variant's.
+
+     This used to rebuild the list by walking variant.files and looking up each
+     one's saved text, which quietly made the variant authoritative over the
+     student's own file list. Everything they could do to that list was undone
+     by a reload:
+
+       added   a header you created was not in variant.files, so it vanished --
+               and the next autosave then wrote the shorter list back over the
+               draft, so it was destroyed rather than merely hidden
+       renamed the saved name did not match, so the file came back under its
+               original name holding its original starter code
+       deleted a file you removed had no saved entry, so it was resurrected
+
+     So the saved list decides which files there are and what order they are
+     in, and the variant is consulted only for what it actually owns: the
+     starter code behind each file, for the per-file Reset. Matching prefers
+     the id, so a renamed file is still recognised as the same file; drafts
+     written before ids were saved fall back to the name. */
+  const usedSaves = new Set();
+  const variantFor = (sv) => {
+    let v = sv.id && variant.files.find(f => f.id === sv.id);
+    if (!v) v = variant.files.find(f => f.name === sv.name && f.ext === sv.ext && !usedSaves.has(f));
+    if (v) usedSaves.add(v);
+    return v || null;
+  };
+  state.userFiles = (autoSaved && autoSaved.length)
+    ? autoSaved.map(sv => {
+        const v = variantFor(sv);
+        return v
+          ? { ...v, name: sv.name, ext: sv.ext, userCode: sv.userCode || '' }
+          : { id: sv.id || generateId(), name: sv.name, ext: sv.ext,
+              starterCode: '', code: '', userCode: sv.userCode || '' };
+      })
+    : variant.files.map(f => ({ ...f, userCode: f.starterCode || '' }));
   state.activeFileIndex = 0;
   _submitInProgress = false;
   _practiceSubmitted = false;
@@ -291,7 +322,9 @@ function _practiceWriteDraft() {
       title: state.activeChallenge.title || '',
       savedAt: Date.now(),
       startTime: (state.sessionData || {}).startTime || Date.now(),
-      files: (state.userFiles || []).map(f => ({ name: f.name, ext: f.ext, userCode: f.userCode || '' }))
+      // id as well as name: it is what lets a renamed file still be matched to
+      // the variant file it came from, and so keep its starter code.
+      files: (state.userFiles || []).map(f => ({ id: f.id, name: f.name, ext: f.ext, userCode: f.userCode || '' }))
     }));
   } catch (e) { /* quota — the session copy still covers a reload */ }
 }
@@ -315,7 +348,7 @@ function _practiceAutoSave() {
   setSessionParam('autoSavedFiles', {
     challengeId: state.activeChallenge.id,
     variantId: state.activeVariant.id,
-    files: state.userFiles.map(f => ({ name: f.name, ext: f.ext, userCode: f.userCode || '' }))
+    files: state.userFiles.map(f => ({ id: f.id, name: f.name, ext: f.ext, userCode: f.userCode || '' }))
   });
   _practiceSaveExecs();
   _bossMarkSaved();
