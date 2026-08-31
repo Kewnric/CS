@@ -168,11 +168,45 @@
   animation-delay: var(--d, 0s);
 }
 
+/* ── Dissolving along its own length ──────────────────────────
+   A shard does not blink out whole. It is eaten from the tail toward the tip,
+   so it reads as being consumed on the way past rather than as a sprite whose
+   opacity was turned down.
+
+   A mask does it, and the mask lives on the svg rather than on its parent
+   because the svg is the thing that gets turned a quarter: a mask applies in
+   an element's own coordinates BEFORE its own transform, so `to bottom` here
+   means along the shard's drawn length whichever way the shard is later
+   pointed. The tip is at the top of the box, so it is the last part to go.
+
+   The mask image is three times the box tall, which is what lets the soft band
+   between opaque and transparent sweep the whole length and still leave the
+   shard completely shown at one end of the travel and completely gone at the
+   other. */
 .amb-shard svg {
   width: 100%;
   height: 100%;
   display: block;
   transform: rotate(90deg);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0 33%, transparent 50%);
+          mask-image: linear-gradient(to bottom, #000 0 33%, transparent 50%);
+  -webkit-mask-size: 100% 300%;
+          mask-size: 100% 300%;
+  -webkit-mask-repeat: no-repeat;
+          mask-repeat: no-repeat;
+  animation: ambDissolve var(--t, 9s) linear infinite;
+  animation-delay: var(--d, 0s);
+}
+
+/* Drawn on from the tip, then eaten back to it. The timings sit inside the
+   flight's own window, so the shard is whole for the middle of its crossing
+   and going at both ends of it. */
+@keyframes ambDissolve {
+  0%   { -webkit-mask-position: 0 100%; mask-position: 0 100%; }
+  4%   { -webkit-mask-position: 0 0%;   mask-position: 0 0%; }
+  8%   { -webkit-mask-position: 0 0%;   mask-position: 0 0%; }
+  13%  { -webkit-mask-position: 0 100%; mask-position: 0 100%; }
+  100% { -webkit-mask-position: 0 100%; mask-position: 0 100%; }
 }
 
 /* Struck, curved, gone -- then nothing for the rest of the cycle. The arc is
