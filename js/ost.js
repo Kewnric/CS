@@ -20,12 +20,17 @@
 
 const OST_DIR = 'audio/ost/';
 
+/* Filenames are plain ascii, lower case, no spaces. The originals carried
+   spaces, brackets and an em dash, which a static host serves only through
+   percent-encoding -- a needless way for a URL to go wrong on someone else's
+   server. The pretty name lives in `title`, which is the only one anybody
+   sees. */
 const OST_TRACKS = [
-  { file: 'MiSide OST — Cappie Life (In-Game Version).mp3', title: 'MiSide — Cappie Life' },
-  { file: 'MiSide OST_ AmbientDay First.mp3',               title: 'MiSide — AmbientDay First' },
-  { file: 'MiSide OST_ Plane Picture.mp3',                  title: 'MiSide — Plane Picture' },
-  { file: 'MiSide_OST_MainMenu.mp3',                        title: 'MiSide — Main Menu' },
-  { file: 'Your Lie in April OST - Again (Piano).mp3',      title: 'Your Lie in April — Again (Piano)' }
+  { file: 'miside-cappie-life.mp3',            title: 'MiSide — Cappie Life' },
+  { file: 'miside-ambient-day-first.mp3',      title: 'MiSide — AmbientDay First' },
+  { file: 'miside-plane-picture.mp3',          title: 'MiSide — Plane Picture' },
+  { file: 'miside-main-menu.mp3',              title: 'MiSide — Main Menu' },
+  { file: 'your-lie-in-april-again-piano.mp3', title: 'Your Lie in April — Again (Piano)' }
 ];
 
 const OST_KEY_TRACK = 'ssp.ost.track';
@@ -87,7 +92,7 @@ function _ostEl() {
   return a;
 }
 
-/** Encoded per segment: these filenames carry spaces, em dashes and brackets. */
+/** Encoded even though the names are plain: a file added later may not be. */
 function _ostSrc(i) {
   const t = OST_TRACKS[i];
   return t ? OST_DIR + encodeURIComponent(t.file) : '';
