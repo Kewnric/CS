@@ -29,14 +29,40 @@ function _ambHosts() {
     .filter(Boolean);
 }
 
-/* The app's own crystal, drawn small. Faceted rather than a plain diamond so
-   it still reads as a gem at 14px. */
-function _ambCrystalSVG() {
-  return '<svg viewBox="0 0 14 22" fill="none" aria-hidden="true">'
-       + '<path d="M7 1 L13 8 L7 21 L1 8 Z" fill="currentColor" fill-opacity=".14"'
-       + ' stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/>'
-       + '<path d="M1 8 L13 8 M7 1 L7 21" stroke="currentColor" stroke-width=".7" opacity=".55"/>'
-       + '</svg>';
+/* Five shapes, and neighbours never share one.
+
+   A single repeated crystal read as one asset copied seven times, which is
+   what it was. Broken glass is not all the same piece: there are whole gems,
+   long slivers, chips and the odd catch of light. Taking them in order rather
+   than at random is what guarantees no two adjacent shapes match — random
+   would pair them up often enough to notice, and noticing is the whole
+   problem being solved.
+
+   Each is drawn faintly filled and outlined, so it reads as something
+   translucent catching the light rather than as an icon. */
+const AMB_SHAPES = [
+  // a whole gem, faceted
+  '<path d="M7.5 1 L14 8 L7.5 21 L1 8 Z" fill="currentColor" fill-opacity=".13"'
+  + ' stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/>'
+  + '<path d="M1 8 L14 8 M7.5 1 L7.5 21" stroke="currentColor" stroke-width=".7" opacity=".5"/>',
+  // a long sliver
+  '<path d="M8.5 1 L11 12 L7 21 L5.6 11 Z" fill="currentColor" fill-opacity=".16"'
+  + ' stroke="currentColor" stroke-width=".9" stroke-linejoin="round"/>',
+  // a catch of light
+  '<path d="M7.5 3 l1.7 4.5 l4.5 1.7 l-4.5 1.7 l-1.7 4.5 l-1.7 -4.5 l-4.5 -1.7 l4.5 -1.7 Z"'
+  + ' fill="currentColor" fill-opacity=".2" stroke="currentColor" stroke-width=".8"'
+  + ' stroke-linejoin="round"/>',
+  // a small rhombus
+  '<path d="M7.5 5 L12 11.5 L7.5 18 L3 11.5 Z" fill="currentColor" fill-opacity=".11"'
+  + ' stroke="currentColor" stroke-width="1" stroke-linejoin="round"/>',
+  // a chip
+  '<path d="M4 4.5 L13 9.5 L6.5 18 Z" fill="currentColor" fill-opacity=".15"'
+  + ' stroke="currentColor" stroke-width=".9" stroke-linejoin="round"/>'
+];
+
+function _ambShapeSVG(i) {
+  return '<svg viewBox="0 0 15 22" fill="none" aria-hidden="true">'
+       + AMB_SHAPES[i % AMB_SHAPES.length] + '</svg>';
 }
 
 /**
@@ -71,9 +97,15 @@ function _ambFill(host) {
     leaf.style.setProperty('--s', (0.55 + Math.random() * 0.85).toFixed(2));
     leaf.style.setProperty('--o', (0.22 + Math.random() * 0.3).toFixed(2));
 
+    /* Upright, then leaning, then upright again. Every shape at its own random
+       angle looked shaken rather than blown; alternating gives the run a
+       rhythm, and the sway on top of it keeps that from being mechanical. */
+    const lean = (i % 2) ? 0 : (14 + Math.random() * 18) * (Math.random() < 0.5 ? -1 : 1);
+    leaf.style.setProperty('--tilt', lean.toFixed(1) + 'deg');
+
     const inner = document.createElement('span');
     inner.className = 'amb-leaf-i';
-    inner.innerHTML = _ambCrystalSVG();
+    inner.innerHTML = _ambShapeSVG(i);
     // Cyan or indigo, so the drift is not one flat colour.
     inner.style.color = Math.random() < 0.55 ? 'var(--amb-lit)' : 'var(--amb-ink)';
     leaf.appendChild(inner);
