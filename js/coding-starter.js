@@ -146,6 +146,17 @@ function codingStarterPack() {
          expected: '0 x 1 = 0\n0 x 2 = 0\n0 x 3 = 0\n0 x 4 = 0\n0 x 5 = 0\n0 x 6 = 0\n0 x 7 = 0\n0 x 8 = 0\n0 x 9 = 0\n0 x 10 = 0' }])
   ];
 
+  /* The second half lives in its own file: arrays, pointers, memory and the
+     bag. Kept apart because that half is a course of its own and this one is
+     the warm-up before it. */
+  if (typeof codingStarterFundamentals === 'function') {
+    const more = codingStarterFundamentals();
+    return {
+      challenges: challenges.concat(more.challenges),
+      nodes: nodes.concat(more.nodes),
+      sets: []
+    };
+  }
   return { challenges: challenges, nodes: nodes, sets: [] };
 }
 
