@@ -24,6 +24,7 @@ function browseTemplate() {
               <button class="tutorial-trigger-btn" id="browse-toggle-items-btn" onclick="toggleBrowseTreeItems()" title="Toggle file visibility">
                 <i data-lucide="${localStorage.getItem('browseHideItems') === 'true' ? 'eye-off' : 'eye'}" id="browse-toggle-items-icon"></i>
               </button>
+              ${typeof codingStarterButtonTemplate === 'function' ? codingStarterButtonTemplate() : ''}
               <button class="tutorial-trigger-btn" onclick="GuidedTutorial.start()" title="Show Page Tour">
                 <i data-lucide="graduation-cap"></i>
               </button>
@@ -35,6 +36,7 @@ function browseTemplate() {
             <span class="search-shortcut-hint">Ctrl+K</span>
           </div>
           <div class="browse-mini-stats" id="browse-mini-stats"></div>
+          <div id="browse-starter-banner">${typeof codingStarterBannerTemplate === 'function' ? codingStarterBannerTemplate() : ''}</div>
         </div>
         <div class="pane-1-content tree-container" id="browse-category-list"></div>
       </main>

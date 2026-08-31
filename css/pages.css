@@ -653,6 +653,35 @@
 }
 .tutorial-trigger-btn svg { width: 18px; height: 18px; }
 
+/* ── The starter-pack switch ──────────────────────────────────
+   Lit while the starter pack is the library on screen. This one is a MODE
+   rather than an action, so it has to keep saying so after the click that set
+   it -- the other buttons in this row can go back to looking idle, and this
+   one cannot. */
+.tutorial-trigger-btn.is-on {
+  border-color: var(--color-primary, #6366f1);
+  color: var(--color-primary, #6366f1);
+  background: var(--color-primary-subtle, rgba(99, 102, 241, 0.08));
+}
+
+/* And a line under the header saying it in words, because a lit icon is not
+   enough warning that the programs listed are not the ones you wrote. */
+.cs-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid color-mix(in srgb, var(--color-primary, #6366f1) 45%, transparent);
+  background: var(--color-primary-subtle, rgba(99, 102, 241, 0.08));
+  border-radius: var(--radius-sm, 6px);
+  color: var(--text-secondary, #a8a8b8);
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+.cs-banner strong { color: var(--color-primary, #6366f1); }
+.cs-banner svg { width: 15px; height: 15px; flex: 0 0 auto; margin-top: 1px; color: var(--color-primary, #6366f1); }
+
 .practice-topbar .tutorial-trigger-btn {
   background: rgba(255, 255, 255, 0.08);
   border-color: rgba(255, 255, 255, 0.12);
