@@ -124,7 +124,15 @@ function edFullSource(textarea) {
   for (let i = 0; i < lines.length; i++) {
     out.push(lines[i]);
     const hit = rows.find(r => r.view === i + 1);
-    if (hit) out.push.apply(out, hit.fold.text.split('\n'));
+    if (hit) {
+      out.push.apply(out, hit.fold.text.split('\n'));
+      // Restore the brace this fold took off the front of the closing line,
+      // so what gets compiled is what was written.
+      if (hit.fold.closeCut && i + 1 < lines.length) {
+        out.push(_edUncutClose(lines[i + 1], hit.fold.closeCut));
+        i++;
+      }
+    }
   }
   return out.join('\n');
 }
@@ -157,7 +165,14 @@ function _edRenderView(ta, full, caretReal) {
   while (i < lines.length) {
     out.push(lines[i]);
     const f = folds.find(x => x.real === i + 1);
-    i += f ? f.lines + 1 : 1;
+    if (f) {
+      i += f.lines + 1;
+      // The closing line, minus the brace that went with the body.
+      if (f.closeCut && i < lines.length) {
+        out.push(_edCutClose(lines[i], f.closeCut));
+        i++;
+      }
+    } else i++;
   }
   _edApplyView(ta, out.join('\n'), Math.max(1, edRealToView(caretReal || 1) || 1));
 }
@@ -212,18 +227,35 @@ function edToggleFold(view) {
   if (!range) return;
   const fullLines = full.split('\n');
 
-  /* The BODY, not the body and its closing line.
-     
-     Parking through range.end swallowed the line the block closes on, and that
-     line is not always just a brace: `}else {` both ends the if and begins the
-     else. Folding the if therefore hid the else's own header, so the else
-     looked folded too and its marker went with it.
+  /* The body, plus the closing brace itself — but NOT whatever shares its line.
 
-     Keeping the closing line on screen is also what an editor normally does —
-     you fold the inside of a block, and its last line stays to show where it
-     ended. */
+     `}else {` is one line holding two things: the brace that ends the if, and
+     the header that begins the else. The brace belongs to the block being
+     folded and should go with it; the `else {` belongs to the next block and
+     has to stay. So the closing line is SPLIT: its leading brace is parked
+     with the body and the remainder stays on screen.
+
+     Folding the if therefore reads
+
+         if(x == 1){⋯
+         else {
+
+     rather than leaving a `}` behind that now closes nothing visible, or
+     swallowing the whole line and taking the else's header with it. */
   const hidden = range.end - real - 1;
   if (hidden < 1) return;              // nothing between the braces to park
+
+  const closeLine = fullLines[range.end - 1] || '';
+  const braceAt = closeLine.indexOf('}');
+  /* Split only a line that BEGINS with its closing brace and carries something
+     after it. Indent-then-`}`-then-code is the `}else {` shape; a brace with
+     code in front of it is something else and is left alone rather than
+     guessed at, and a line that is only `}` keeps its whole self so the block
+     still shows where it ended. */
+  const split = braceAt >= 0
+    && closeLine.slice(0, braceAt).trim() === ''
+    && closeLine.slice(braceAt + 1).trim() !== '';
+  const closeCut = split ? closeLine.slice(0, braceAt + 1) : '';
 
   // Any fold living inside this block is absorbed — its text is already part of
   // the slab being parked, so expanding the outer block expands them all.
@@ -233,7 +265,10 @@ function edToggleFold(view) {
   kept.push({
     real: real,
     lines: hidden,
-    text: fullLines.slice(real, range.end - 1).join('\n')
+    text: fullLines.slice(real, range.end - 1).join('\n'),
+    // The closing brace taken off the line after the parked ones, held as its
+    // original text so edFullSource can put it back exactly.
+    closeCut: closeCut
   });
   _edSetFolds(kept);
   _edRenderView(ta, full, real);
@@ -306,6 +341,32 @@ function edFoldOnInput(ta) {
  * Positioned like .ed-mark-band: the pre scrolls, and absolutely positioned
  * children scroll with it.
  */
+/* -- The split closing line ----------------------------------
+   `}else {` is one line holding two things: the brace that closes the block
+   being folded, and the header of the one that follows. The brace goes with
+   the fold, the header stays.
+
+   `closeCut` is the exact original text through that brace -- indent included,
+   e.g. "  }" -- because that is what has to come back verbatim. But only the
+   BRACE is taken off the screen: the indent stays, so the `else` keeps sitting
+   under its `if` rather than jumping to column 0.
+
+   These two are exact inverses. Anything that changes one changes the other. */
+
+/** "  }else {" -> "  else {" */
+function _edCutClose(line, cut) {
+  if (!cut || line.indexOf(cut) !== 0) return line;
+  return cut.slice(0, -1) + line.slice(cut.length);   // indent, then the rest
+}
+
+/** "  else {" -> "  }else {" */
+function _edUncutClose(line, cut) {
+  if (!cut) return line;
+  const indent = cut.slice(0, -1);
+  if (line.indexOf(indent) !== 0) return cut + line;
+  return cut + line.slice(indent.length);
+}
+
 function edFoldPaintBadges(ta) {
   const pre = document.getElementById('editor-pre');
   if (!pre) return;
@@ -348,12 +409,18 @@ function edFoldPaintBadges(ta) {
     badge.style.top = top + 'px';
     badge.style.left = (padLeft + x + 6) + 'px';
     badge.style.height = lh + 'px';
-    /* Just the ellipsis. The brace used to be drawn here because the fold
-       swallowed the line the block closed on, so the badge stood in for it.
-       The closing line stays on screen now, which made the badge a SECOND
-       closing brace: `if(x == 1){⋯ }` on the header and `}else {` still sitting
-       two lines below it. */
-    badge.textContent = '⋯';
+    /* `⋯ }` when the fold took the closing brace with it, `⋯` when it didn't.
+
+       Whether the brace belongs here depends on what the fold actually hid. On
+       `}else {` the brace is folded away and the badge stands in for it, so
+       the block reads as closed:
+
+           if(x == 1){⋯ }
+           else {
+
+       On a closing line that is nothing but `}`, that line stays on screen
+       whole — drawing a brace here too would show two closers for one block. */
+    badge.textContent = r.fold.closeCut ? '⋯ }' : '⋯';
     badge.title = r.fold.lines + ' line' + (r.fold.lines === 1 ? '' : 's') + ' hidden — click to expand';
     badge.onclick = () => edToggleFold(r.view);
     frag.appendChild(badge);
