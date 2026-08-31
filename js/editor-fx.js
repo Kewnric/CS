@@ -39,6 +39,28 @@ const EDFX_MAX = 28;
 /* What the editor inserts on its own when you type an opener. */
 const EDFX_PAIRS = { '()': 1, '[]': 1, '{}': 1, '""': 1, "''": 1, '``': 1 };
 
+/* ── The lean ─────────────────────────────────────────────────
+   Each landing letter arrives at its own angle, and the angles walk a sine
+   around zero: lean one way, come upright, lean the other, come back. A run
+   of characters all tilting by the same amount reads as a mechanism running;
+   a run that varies reads as handwriting.
+
+   A sine and not a random angle per letter. Random neighbours disagree with
+   each other and the line looks scattered, where a wave means any two letters
+   next to each other are nearly parallel and the drift only shows across a
+   word. STEPS is the period in characters -- long enough that the change is
+   a drift rather than a wobble, short enough to come round within a line. */
+const EDFX_TILT_MAX = 15;      // degrees at the extremes of the sweep
+const EDFX_TILT_STEPS = 14;    // characters per full sweep
+let _edfxTiltStep = 0;
+
+/** The angle for the next landing letter, walking the sweep on each call. */
+function _edfxNextTilt() {
+  const deg = EDFX_TILT_MAX * Math.sin((2 * Math.PI * _edfxTiltStep) / EDFX_TILT_STEPS);
+  _edfxTiltStep = (_edfxTiltStep + 1) % EDFX_TILT_STEPS;
+  return deg;
+}
+
 let _edfxPending = null;   // the character a keydown is about to remove
 let _edfxLive = [];
 let _edfxComposing = false;
@@ -103,10 +125,21 @@ function _edfxCharBox(offset) {
     /* Content coordinates, not viewport ones: the scroll offset is added back
        so the number stays true however the pane is scrolled afterwards. The
        ghost sits in the scrolling box, so it travels with the text. */
+    /* The colour the highlighter gave this character, taken from the very
+       span it lives in. A ghost of a keyword is the keyword's blue, a ghost
+       inside a string is the string's green: the copy looks like the thing it
+       is a copy of, instead of every character flashing the same white.
+
+       Read here rather than worked out from the token type, because that
+       decision has already been made -- by syntax.js, in the element under
+       this Range -- and re-deriving it would be a second opinion to keep in
+       step with the first. */
+    const owner = node.parentElement;
     return {
       x: box.left - host.left + pre.scrollLeft,
       y: box.top - host.top + pre.scrollTop,
-      h: box.height
+      h: box.height,
+      color: owner ? getComputedStyle(owner).color : ''
     };
   } catch (e) {
     return null;
@@ -123,6 +156,13 @@ function _edfxSpawn(ch, box, cls, delay) {
   g.style.top = box.y + 'px';
   g.style.lineHeight = box.h + 'px';
   if (delay) g.style.animationDelay = delay + 'ms';
+  /* Landing wears the character's own syntax colour. Deleting keeps its amber,
+     which is a signal rather than a likeness -- it says the character is being
+     thrown away, and the colour it used to be is not the point. */
+  if (cls === 'edfx-in') {
+    if (box.color) g.style.color = box.color;
+    g.style.setProperty('--tilt', _edfxNextTilt().toFixed(2) + 'deg');
+  }
 
   if (cls === 'edfx-out') {
     // Same scatter the combo uses: outward drift, mostly downward, its own
@@ -216,6 +256,9 @@ function edfxReset() {
   _edfxLive = [];
   _edfxPending = null;
   _edfxComposing = false;
+  // A new file starts the sweep at level, so the first letter you type is not
+  // arbitrarily mid-lean.
+  _edfxTiltStep = 0;
 }
 
 /* ── Wiring ───────────────────────────────────────────────────

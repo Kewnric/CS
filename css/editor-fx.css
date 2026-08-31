@@ -46,15 +46,56 @@
    something dropping into a slot, where a letter sliding a short way back to
    its place reads as it being written. Half an em, because the point is the
    settling and not the journey.
+
+   And it arrives TILTED, righting itself on the way down. The pivot is the
+   baseline (transform-origin: 50% 100%), so the letter turns on the line it
+   is going to sit on rather than about its middle -- it reads as being set
+   upright onto the row, not as spinning.
+
+   THE ANGLE IS NOT FIXED. --tilt is set per ghost by js/editor-fx.js, which
+   walks a sine around zero, so a typed run leans one way, comes upright,
+   leans the other and back. Every letter tilting by the same amount reads as
+   a mechanism; a run of them varying reads as handwriting. Nothing here needs
+   to know that -- the keyframes just use whatever angle they are given, and
+   the mid-point is expressed as a FRACTION of it so the overshoot flips sign
+   automatically when the lean does.
+
+   The whole turn happens inside the part you can still SEE, which is what the
+   keyframe percentages are really about. Two earlier versions were measured
+   and thrown away for missing that:
+
+     - one segment on this animation's spring put the letter at 8 degrees by
+       39ms and past upright by 90ms. The tilt was there and invisible.
+     - stretching it to 55% fixed the visibility but finished the turn at
+       187ms, and the ghost is fully faded by ~182ms. The letter faded out
+       still leaning, so it never once looked straight.
+
+   So: the lean is gone by 32%, a little past level, back level by 45%, and
+   only then the fade -- the correction is over while the letter is still at
+   0.7 opacity, and the rest is it settling onto the character underneath.
    ------------------------------------------------------------ */
 .edfx-in {
+  /* A fallback only. js/editor-fx.js reads the colour the highlighter gave the
+     character and sets it inline, so a keyword's ghost is the keyword's blue
+     and a ghost inside a string is the string's green. This white is what a
+     ghost gets when that colour cannot be read. */
   color: #fff;
-  animation: edfxIn 260ms cubic-bezier(0.2, 1.5, 0.4, 1) both;
+  animation: edfxIn 420ms cubic-bezier(0.2, 1.5, 0.4, 1) both;
 }
 @keyframes edfxIn {
-  0%   { opacity: 0.95; transform: translateX(0.5em) scale(2.05); }
-  45%  { opacity: 0.7; }
-  100% { opacity: 0; transform: translateX(0) scale(1); }
+  /* Eased at BOTH ends, not front-loaded. A fast-start curve here spent the
+     first two thirds of the angle in about two frames, too quick to register. */
+  0%   { opacity: 0.95;
+         transform: translateX(0.5em) rotate(var(--tilt, 15deg)) scale(2.05);
+         animation-timing-function: cubic-bezier(0.55, 0.03, 0.45, 0.97); }
+  /* Past level, and by a fraction of the lean rather than a fixed angle, so a
+     letter leaning left overshoots right and one leaning right overshoots
+     left. That is the difference between correcting itself and just stopping. */
+  32%  { transform: translateX(0.14em) rotate(calc(var(--tilt, 15deg) * -0.3)) scale(1.36);
+         animation-timing-function: cubic-bezier(0.4, 0, 0.35, 1); }
+  45%  { opacity: 0.7; transform: translateX(0.06em) rotate(0deg) scale(1.2);
+         animation-timing-function: cubic-bezier(0.33, 0, 0.5, 1); }
+  100% { opacity: 0; transform: translateX(0) rotate(0deg) scale(1); }
 }
 
 /* ── Being thrown away ────────────────────────────────────────
