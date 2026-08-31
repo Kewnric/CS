@@ -112,14 +112,14 @@
 .syntax-bracket { color: #ffd700; }
 .syntax-function { color: #dcdcaa; }
 .syntax-function-call { color: #dcdcaa; }
-.syntax-stdlib { color: #dcdcaa; }
+/* A format specifier belongs to the call it is written for, so it wears the
+   same colour as the function itself rather than one of its own. In the same
+   rule, not a copy of the value, so the two cannot drift apart. */
+.syntax-stdlib,
+.syntax-format { color: #dcdcaa; }
 .syntax-preproc { color: #c586c0; }
 .syntax-header { color: #ce9178; }
 .syntax-operator { color: #c586c0; }
-/* Format specifiers, inside the string they belong to. Deliberately a long way
-   from the string's own orange: the point is to pick `%d` out of the text
-   around it, and a near neighbour of #ce9178 would not. */
-.syntax-format { color: #9cdcfe; font-weight: 600; }
 
 /* --- Practice Sidebar --- */
 .practice-sidebar {
