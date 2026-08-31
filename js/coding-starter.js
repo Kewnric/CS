@@ -42,10 +42,23 @@ function codingLibraryIsStarter() { return codingLibraryMode() === 'starter'; }
    programs your history already refers to.
    ------------------------------------------------------------ */
 
-const _CS_MAIN = '#include <stdio.h>\n\nint main(void) {\n\n    return 0;\n}\n';
 
-/** One program, with the boilerplate every one of them repeats. */
+/**
+ * One program, with the boilerplate every one of them repeats.
+ *
+ * TWO FIELDS THAT ARE NOT THE SAME THING, and getting them the wrong way round
+ * is what broke the boss bar. `starterCode` is what the editor opens with;
+ * `code` is the finished program the bar measures your distance from and Check
+ * Code grades against. This pack shipped with the same empty main() in both,
+ * so the editor matched the target exactly on load and the bar arrived at zero
+ * HP before a key was pressed.
+ *
+ * So: nothing to start with, and the reference is the real answer. Every one
+ * of them lives in coding-starter-solutions.js, compiled and run against its
+ * own tests before being put there.
+ */
 function _csProgram(id, folder, title, description, samples, tests) {
+  const solution = (typeof CS_SOLUTIONS !== 'undefined' && CS_SOLUTIONS[id]) || '';
   return {
     id: 'starter-' + id,
     title: title,
@@ -56,11 +69,11 @@ function _csProgram(id, folder, title, description, samples, tests) {
       id: 'starter-' + id + '-v1',
       name: 'C',
       description: '',
-      starterCode: _CS_MAIN,
-      code: '',
+      starterCode: '',
+      code: solution,
       activeFileIndex: 0,
       files: [{ id: 'starter-' + id + '-f1', name: 'main', ext: '.c',
-                starterCode: _CS_MAIN, code: _CS_MAIN }],
+                starterCode: '', code: solution }],
       samples: samples || [],
       tests: tests || [],
       minRequirements: []
