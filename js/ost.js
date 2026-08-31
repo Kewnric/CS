@@ -30,7 +30,7 @@ const OST_TRACKS = [
   { file: 'miside-ambient-day-first.mp3',      title: 'MiSide — AmbientDay First' },
   { file: 'miside-plane-picture.mp3',          title: 'MiSide — Plane Picture' },
   { file: 'miside-main-menu.mp3',              title: 'MiSide — Main Menu' },
-  { file: 'your-lie-in-april-again-piano.mp3', title: 'Your Lie in April — Again (Piano)' }
+  { file: 'your-lie-in-april-again-piano.mp3', title: 'Your Lie in April — Again (Piano)', end: 54 }
 ];
 
 const OST_KEY_TRACK = 'ssp.ost.track';
@@ -41,6 +41,9 @@ const OST_KEY_MODE = 'ssp.ost.mode';     // 'all' | 'one' | 'shuffle'
 let _ostAudio = null;
 let _ostIndex = 0;
 let _ostMode = 'all';
+/* timeupdate fires several times a second, and moving to the next track is not
+   instant; without this the cut would be taken more than once. */
+let _ostCapping = false;
 
 /* ── State that outlives the button ──────────────────────── */
 
@@ -78,7 +81,7 @@ function _ostEl() {
     const pos = _ostReadInt(OST_KEY_POS, 0);
     if (pos > 0) a.addEventListener('loadedmetadata', function once() {
       a.removeEventListener('loadedmetadata', once);
-      if (pos < a.duration - 1) { try { a.currentTime = pos; } catch (e) {} }
+      if (pos < _ostEnd() - 1) { try { a.currentTime = pos; } catch (e) {} }
       _ostSync();
     });
   }
@@ -90,6 +93,24 @@ function _ostEl() {
   a.addEventListener('loadedmetadata', _ostSync);
   a.addEventListener('error', _ostSync);
   return a;
+}
+
+/**
+ * Where a track finishes, which is not always where the file does.
+ *
+ * `end` on a track cuts it short: the bar spans that long, seeking works
+ * within it, and reaching it moves on exactly as the real end would. Done here
+ * rather than by trimming the mp3 so the file stays whole -- the number is one
+ * edit away from being changed or dropped, where a re-encode is not.
+ */
+function _ostEnd() {
+  const a = _ostAudio;
+  const t = OST_TRACKS[_ostIndex];
+  const real = a && isFinite(a.duration) ? a.duration : NaN;
+  const cut = t && t.end > 0 ? t.end : NaN;
+  if (!isFinite(cut)) return real;
+  if (!isFinite(real)) return cut;
+  return Math.min(cut, real);      // a cut past the end of the file is just the end
 }
 
 /** Encoded even though the names are plain: a file added later may not be. */
@@ -187,8 +208,9 @@ function ostPrev() {
 
 function ostSeek(value) {
   const a = _ostEl();
-  if (!isFinite(a.duration)) return;
-  a.currentTime = (Math.max(0, Math.min(100, +value)) / 100) * a.duration;
+  const end = _ostEnd();
+  if (!isFinite(end)) return;
+  a.currentTime = (Math.max(0, Math.min(100, +value)) / 100) * end;
   _ostRemember();
 }
 
@@ -224,18 +246,33 @@ function ostTogglePop() {
  *  once-a-second case does not rebuild the track list. */
 function _ostTick() {
   const a = _ostAudio;
-  const seek = document.getElementById('ost-seek');
-  if (!a || !seek) return;
-  if (seek.dataset.dragging === '1') return;    // don't fight the thumb
-  const pct = isFinite(a.duration) && a.duration > 0 ? (a.currentTime / a.duration) * 100 : 0;
-  seek.value = String(pct);
-  const cur = document.getElementById('ost-cur');
-  if (cur) cur.textContent = _ostFmt(a.currentTime);
-  const dur = document.getElementById('ost-dur');
-  if (dur) dur.textContent = _ostFmt(a.duration);
+  if (!a) return;
+  const end = _ostEnd();
+
+  /* The cut is taken BEFORE anything to do with the panel, and everything
+     below returns early when the panel is shut. A track has to stop where it
+     was told to whether or not anybody happens to be looking at the player. */
+  if (!_ostCapping && !a.paused && isFinite(end) && a.currentTime >= end - 0.08) {
+    _ostCapping = true;
+    // Whatever the real end would have done -- so repeat-one and shuffle carry
+    // on behaving the same way at a cut as they do at the end of a file.
+    ostNext();
+    setTimeout(() => { _ostCapping = false; }, 250);
+    return;
+  }
+
   // Cheap enough to do here, and it means a reload never loses more than a
   // second of where you were.
   if (Math.floor(a.currentTime) % 5 === 0) _ostRemember();
+
+  const seek = document.getElementById('ost-seek');
+  if (!seek || seek.dataset.dragging === '1') return;   // shut, or the thumb is held
+  const pct = isFinite(end) && end > 0 ? Math.min(100, (a.currentTime / end) * 100) : 0;
+  seek.value = String(pct);
+  const cur = document.getElementById('ost-cur');
+  if (cur) cur.textContent = _ostFmt(isFinite(end) ? Math.min(a.currentTime, end) : a.currentTime);
+  const dur = document.getElementById('ost-dur');
+  if (dur) dur.textContent = _ostFmt(end);
 }
 
 /** Reflect all of the state into whatever UI currently exists. */
