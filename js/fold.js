@@ -124,13 +124,22 @@ function edFullSource(textarea) {
   for (let i = 0; i < lines.length; i++) {
     out.push(lines[i]);
     const hit = rows.find(r => r.view === i + 1);
-    if (hit) {
-      out.push.apply(out, hit.fold.text.split('\n'));
-      // Restore the brace this fold took off the front of the closing line,
-      // so what gets compiled is what was written.
-      if (hit.fold.closeCut && i + 1 < lines.length) {
-        out.push(_edUncutClose(lines[i + 1], hit.fold.closeCut));
-        i++;
+    if (!hit) continue;
+    out.push.apply(out, hit.fold.text.split('\n'));
+    // The brace goes back on the closing line, which is then left for the loop
+    // to reach normally -- it may carry a fold of its own. See _edRenderView.
+    const cut = hit.fold.closeCut;
+    if (cut) {
+      const next = lines[i + 1];
+      /* Only onto the line the brace actually came off. Deleting that line
+         while the block is folded slides a stranger up into its place, and
+         stapling the brace to that produces `}     return 0;` — a line nobody
+         wrote, in the text that gets compiled. The brace still has to come
+         back, so when its line is gone it gets one of its own. */
+      if (next != null && _edCloseCut(_edUncutClose(next, cut)) === cut) {
+        lines[i + 1] = _edUncutClose(next, cut);
+      } else {
+        out.push(cut.replace(/\s+$/, ''));
       }
     }
   }
@@ -165,14 +174,15 @@ function _edRenderView(ta, full, caretReal) {
   while (i < lines.length) {
     out.push(lines[i]);
     const f = folds.find(x => x.real === i + 1);
-    if (f) {
-      i += f.lines + 1;
-      // The closing line, minus the brace that went with the body.
-      if (f.closeCut && i < lines.length) {
-        out.push(_edCutClose(lines[i], f.closeCut));
-        i++;
-      }
-    } else i++;
+    if (!f) { i++; continue; }
+    i += f.lines + 1;
+    /* The closing line loses its brace and is then left for the loop to handle
+       like any other line -- because it can be a fold anchor itself.
+       `} else if (...) {` folded after the `if` above it is exactly that, and
+       skipping past it here left the second fold recorded but never applied:
+       its body stayed on screen while the line numbers counted it as hidden,
+       so every number below it read one too high. */
+    if (f.closeCut && i < lines.length) lines[i] = _edCutClose(lines[i], f.closeCut);
   }
   _edApplyView(ta, out.join('\n'), Math.max(1, edRealToView(caretReal || 1) || 1));
 }
@@ -245,17 +255,7 @@ function edToggleFold(view) {
   const hidden = range.end - real - 1;
   if (hidden < 1) return;              // nothing between the braces to park
 
-  const closeLine = fullLines[range.end - 1] || '';
-  const braceAt = closeLine.indexOf('}');
-  /* Split only a line that BEGINS with its closing brace and carries something
-     after it. Indent-then-`}`-then-code is the `}else {` shape; a brace with
-     code in front of it is something else and is left alone rather than
-     guessed at, and a line that is only `}` keeps its whole self so the block
-     still shows where it ended. */
-  const split = braceAt >= 0
-    && closeLine.slice(0, braceAt).trim() === ''
-    && closeLine.slice(braceAt + 1).trim() !== '';
-  const closeCut = split ? closeLine.slice(0, braceAt + 1) : '';
+  const closeCut = _edCloseCut(fullLines[range.end - 1]) || '';
 
   // Any fold living inside this block is absorbed — its text is already part of
   // the slab being parked, so expanding the outer block expands them all.
@@ -292,10 +292,21 @@ function edFoldReapply(ta) {
   const folds = edFoldsFor(key);
   _edFoldTrack = { key: key, lines: ta.value.split('\n').length };
   if (!folds.length) return;
-  // The buffer holds the whole file right now; drop any fold that no longer
-  // points at a real block in it rather than hiding lines that moved.
+  /* The buffer holds the whole file right now; drop any fold that no longer
+     points at a real block in it rather than hiding lines that moved.
+
+     A fold parks the BODY, so its last parked line is `real + lines` and the
+     block closes on the line after that. Matching r.end against
+     `real + lines` — as this did while folds still swallowed the closing line
+     — matched nothing, and every fold was silently dropped on a file switch
+     or a restore. */
   const ranges = edFoldScan(ta.value);
-  const live = folds.filter(f => ranges.some(r => r.start === f.real && r.end === f.real + f.lines));
+  const live = folds.filter(f => ranges.some(r => r.start === f.real && r.end === f.real + f.lines + 1));
+  // Re-derive the split from the text actually in the buffer, rather than
+  // trusting a prefix recorded against a version of the file that may since
+  // have been edited elsewhere.
+  const reLines = ta.value.split('\n');
+  live.forEach(f => { f.closeCut = _edCloseCut(reLines[f.real + f.lines]) || ''; });
   _edSetFolds(live, key);
   if (!live.length) return;
   _edRenderView(ta, ta.value, 1);
@@ -316,9 +327,19 @@ function edFoldOnInput(ta) {
   if (!folds.length) return;
 
   if (delta !== 0) {
-    const editView = ta.value.slice(0, ta.selectionStart).split('\n').length;
-    const editReal = edViewToReal(editView);
-    folds.forEach(f => { if (f.real >= editReal) f.real += delta; });
+    /* Which anchors moved. The caret sits at the end of whatever just changed,
+       so in the CURRENT view the change began at `caret - delta` for an insert
+       and at `caret` for a deletion; every anchor at or after that point
+       shifted by the same amount.
+
+       Deliberately in view coordinates. Mapping the caret back through
+       edViewToReal measured a view from AFTER the edit against the fold layout
+       from before it, so the boundary landed in the wrong place: typing a new
+       block above a folded one left the fold anchored on a line that had
+       moved, and its parked brace went back onto whatever now sat there. */
+    const caret = ta.value.slice(0, ta.selectionStart).split('\n').length;
+    const from = caret - Math.max(delta, 0);
+    _edFoldRows().forEach(r => { if (r.view >= from) r.fold.real += delta; });
   }
 
   // An anchor that no longer ends in `{` has stopped describing a folded block
@@ -326,7 +347,20 @@ function edFoldOnInput(ta) {
   // than holding code the user can neither see nor reach.
   const stale = _edFoldRows().filter(r => {
     const anchor = lines[r.view - 1];
-    return anchor == null || !/\{$/.test(anchor.replace(/\/\/.*$/, '').trimEnd());
+    if (anchor == null || !/\{$/.test(anchor.replace(/\/\/.*$/, '').trimEnd())) return true;
+    const cut = r.fold.closeCut;
+    if (!cut) return false;
+    /* A split fold holds the block's `}` in this module and nowhere else, so
+       the line it came off has to still be there AND still be the same shape.
+       Delete that line and something else slides up into its place; put the
+       brace back on that and you get `}     return 0;` — a line the user never
+       wrote, in the file that gets compiled.
+
+       Rebuilding the line and re-deriving the cut is the exact test: it passes
+       while the user edits around the `else`, and fails the moment the line
+       stops being the one the brace was taken from. */
+    const close = lines[r.view];
+    return close == null || _edCloseCut(_edUncutClose(close, cut)) !== cut;
   }).map(r => r.fold);
   if (!stale.length) { _edSetFolds(folds); return; }
 
@@ -353,18 +387,44 @@ function edFoldOnInput(ta) {
 
    These two are exact inverses. Anything that changes one changes the other. */
 
-/** "  }else {" -> "  else {" */
-function _edCutClose(line, cut) {
-  if (!cut || line.indexOf(cut) !== 0) return line;
-  return cut.slice(0, -1) + line.slice(cut.length);   // indent, then the rest
+const ED_FOLD_CONTINUE = /^(?:else|catch|finally)\b/;
+
+/**
+ * How to split a block's closing line, or null to leave it whole.
+ * @returns {string|null} the exact leading text to park -- indent, brace, and
+ *   any space after it, e.g. "    } " -- so it can be put back verbatim.
+ */
+function _edCloseCut(closeLine) {
+  const line = String(closeLine == null ? '' : closeLine);
+  const braceAt = line.indexOf('}');
+  // The brace has to open the line. `foo(); }` is something else, and rather
+  // than guess at it the line is left alone.
+  if (braceAt < 0 || line.slice(0, braceAt).trim() !== '') return null;
+  // Absorb the gap after the brace too, so `} else` and `}else` both leave the
+  // `else` at the block's own indent instead of one column to the right of it.
+  const rest = line.slice(braceAt + 1);
+  const gap = rest.length - rest.replace(/^[ \t]+/, '').length;
+  if (!ED_FOLD_CONTINUE.test(rest.slice(gap))) return null;
+  return line.slice(0, braceAt + 1 + gap);
 }
 
-/** "  else {" -> "  }else {" */
+/** The indent that stays on screen when `cut` is parked. */
+function _edCloseKeep(cut) { return (/^[ \t]*/.exec(cut) || [''])[0]; }
+
+/* Exact inverses. Anything that changes one changes the other. */
+
+/** "    } else {" -> "    else {" */
+function _edCutClose(line, cut) {
+  if (!cut || line.indexOf(cut) !== 0) return line;
+  return _edCloseKeep(cut) + line.slice(cut.length);
+}
+
+/** "    else {" -> "    } else {" */
 function _edUncutClose(line, cut) {
   if (!cut) return line;
-  const indent = cut.slice(0, -1);
-  if (line.indexOf(indent) !== 0) return cut + line;
-  return cut + line.slice(indent.length);
+  const keep = _edCloseKeep(cut);
+  if (line.indexOf(keep) !== 0) return cut + line;
+  return cut + line.slice(keep.length);
 }
 
 function edFoldPaintBadges(ta) {
