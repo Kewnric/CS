@@ -115,6 +115,25 @@
   100% { transform: translateX(0) rotate(0deg) scale(1); }
 }
 
+/* ── Overlay style, kept as an option ─────────────────────────
+   The older behaviour: nothing is hidden underneath, so the ghost is a copy
+   laid over a character that is already there, and it has to fade or the two
+   would sit on top of each other at the end.
+
+   A SECOND animation rather than a second copy of the keyframes. This one
+   touches only opacity and the one above only transform, so they compose
+   without either knowing about the other -- and the movement can never drift
+   between the two styles, because there is only one description of it. */
+.edfx-in.edfx-overlay {
+  animation: edfxIn 340ms cubic-bezier(0.2, 1.5, 0.4, 1) both,
+             edfxOverlayFade 340ms cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+@keyframes edfxOverlayFade {
+  0%   { opacity: 0.95; }
+  45%  { opacity: 0.7; }
+  100% { opacity: 0; }
+}
+
 /* ── Being thrown away ────────────────────────────────────────
    Identical in shape to the combo's exit: UP first, almost straight and
    barely turning, a moment hanging at the top, and only then away. The two

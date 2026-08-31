@@ -31,6 +31,29 @@
 
 const EDFX_KEY = 'ssp.editorFx';
 
+/* Two ways to have the letters back the way they were before, because both of
+   the changes they undo are matters of taste rather than correctness.
+
+   OVERLAY is the older behaviour: the ghost is a translucent copy laid over
+   the character, which stays painted underneath the whole time. That is the
+   doubling -- you see the settling copy and the finished letter at once -- and
+   some people read it as weight rather than as a fault.
+
+   TILT off holds every letter upright. The lean is the part most likely to
+   annoy someone who types quickly. */
+const EDFX_OVERLAY_KEY = 'ssp.editorFxOverlay';
+const EDFX_TILT_KEY = 'ssp.editorFxTilt';
+
+/** Old style: a copy over the text, both visible at once. */
+function edfxOverlayMode() {
+  try { return localStorage.getItem(EDFX_OVERLAY_KEY) === '1'; } catch (e) { return false; }
+}
+
+/** Do letters lean as they land? */
+function edfxTiltOn() {
+  try { return localStorage.getItem(EDFX_TILT_KEY) !== '0'; } catch (e) { return true; }
+}
+
 /* Typing fast should not pile up hundreds of nodes. Past this many at once
    the oldest are dropped — a ghost is 600ms of decoration, and losing one
    under a burst of typing is invisible. */
@@ -243,9 +266,15 @@ function _edfxSpawn(ch, box, cls, delay, off) {
   /* Landing wears the character's own syntax colour. Deleting keeps its amber,
      which is a signal rather than a likeness -- it says the character is being
      thrown away, and the colour it used to be is not the point. */
+  const overlay = cls === 'edfx-in' && edfxOverlayMode();
   if (cls === 'edfx-in') {
     if (box.color) g.style.color = box.color;
-    g.style.setProperty('--tilt', _edfxNextTilt().toFixed(2) + 'deg');
+    // Upright when the lean is turned off; the keyframes read the angle from
+    // here, so zero simply means no rotation rather than a special case.
+    g.style.setProperty('--tilt', edfxTiltOn() ? _edfxNextTilt().toFixed(2) + 'deg' : '0deg');
+    // In overlay mode the ghost fades instead of ending solid, because the
+    // character underneath is left painted and something has to give way.
+    if (overlay) g.classList.add('edfx-overlay');
   }
 
   if (cls === 'edfx-out') {
@@ -263,7 +292,7 @@ function _edfxSpawn(ch, box, cls, delay, off) {
   /* Only now, with a ghost actually on screen to stand in for it, is the real
      character hidden. Punching the hole first would leave the character
      invisible with nothing in its place if anything below failed. */
-  if (cls === 'edfx-in' && off != null) {
+  if (cls === 'edfx-in' && off != null && !overlay) {
     g._edfxHole = { off: off, ch: ch };
     _edfxHoles.push(g._edfxHole);
     _edfxApplyHoles();
@@ -460,6 +489,30 @@ function toggleEditorFx() {
   }
 }
 
+/** Old overlay style on or off. */
+function toggleEditorFxOverlay() {
+  const next = !edfxOverlayMode();
+  try { localStorage.setItem(EDFX_OVERLAY_KEY, next ? '1' : '0'); } catch (e) { /* private mode */ }
+  // Anything in flight was spawned under the old rule -- and in overlay mode
+  // nothing hides the character, so a ghost that still holds a hole would
+  // leave it hidden with a fading copy on top.
+  edfxReset();
+  _syncEditorFxBtn();
+  if (typeof toast === 'function') {
+    toast(next ? 'Letters draw over the text' : 'Letters become the text', { type: 'info', duration: 1800 });
+  }
+}
+
+/** The lean on or off. */
+function toggleEditorFxTilt() {
+  const next = !edfxTiltOn();
+  try { localStorage.setItem(EDFX_TILT_KEY, next ? '1' : '0'); } catch (e) { /* private mode */ }
+  _syncEditorFxBtn();
+  if (typeof toast === 'function') {
+    toast(next ? 'Letters lean as they land' : 'Letters land upright', { type: 'info', duration: 1800 });
+  }
+}
+
 function _syncEditorFxBtn() {
   const on = edfxEnabled();
   const label = on ? 'Letter animation on' : 'Letter animation off';
@@ -471,16 +524,54 @@ function _syncEditorFxBtn() {
   btn.style.color = on ? 'var(--color-primary)' : '';
   const icon = btn.querySelector('[data-lucide], svg');
   if (typeof _setLucideIcon === 'function') _setLucideIcon(icon, on ? 'sparkles' : 'sparkle');
+
+  // The two style switches, which are pressed when they are DEPARTING from the
+  // default: overlay on, or tilt off.
+  const ov = document.getElementById('edfx-overlay-opt');
+  if (ov) {
+    ov.classList.toggle('is-on', edfxOverlayMode());
+    ov.setAttribute('aria-pressed', String(edfxOverlayMode()));
+  }
+  const tl = document.getElementById('edfx-tilt-opt');
+  if (tl) {
+    tl.classList.toggle('is-on', !edfxTiltOn());
+    tl.setAttribute('aria-pressed', String(!edfxTiltOn()));
+  }
 }
 
 /** Sits beside the typing-sound toggle — both are the same kind of switch. */
 function editorFxButtonTemplate() {
   const on = edfxEnabled();
   const label = on ? 'Letter animation on' : 'Letter animation off';
+  const overlay = edfxOverlayMode();
+  const tilt = edfxTiltOn();
+  /* The two style switches live behind the same button rather than beside it.
+     The strip already needs ten controls to fit on a phone, and these are set
+     once and then left alone -- the same reasoning that put the typing voices
+     inside the volume control instead of giving them a button of their own.
+     js-hold-pop is what the long-press opener looks for. */
   return `
-    <button class="btn btn-ghost practice-icon-btn" onclick="toggleEditorFx()"
-            title="${label}" id="editor-fx-btn" aria-label="${label}" aria-pressed="${on}"
-            style="${on ? 'color:var(--color-primary);' : ''}">
-      <i data-lucide="${on ? 'sparkles' : 'sparkle'}" style="width:16px;height:16px;" aria-hidden="true"></i>
-    </button>`;
+    <div class="edfx-control js-hold-pop">
+      <button class="btn btn-ghost practice-icon-btn" onclick="toggleEditorFx()"
+              title="${label}" id="editor-fx-btn" aria-label="${label}" aria-pressed="${on}"
+              style="${on ? 'color:var(--color-primary);' : ''}">
+        <i data-lucide="${on ? 'sparkles' : 'sparkle'}" style="width:16px;height:16px;" aria-hidden="true"></i>
+      </button>
+      <div class="edfx-pop" role="group" aria-label="Letter animation style">
+        <button type="button" class="edfx-opt${overlay ? ' is-on' : ''}"
+                id="edfx-overlay-opt" onclick="toggleEditorFxOverlay()"
+                aria-pressed="${overlay}"
+                title="Draw the letter as a copy over the text, the way it was before">
+          <span class="edfx-opt-name">Overlay style</span>
+          <span class="edfx-opt-hint">a copy over the text, both visible</span>
+        </button>
+        <button type="button" class="edfx-opt${tilt ? '' : ' is-on'}"
+                id="edfx-tilt-opt" onclick="toggleEditorFxTilt()"
+                aria-pressed="${!tilt}"
+                title="Land every letter upright, with no lean">
+          <span class="edfx-opt-name">No tilt</span>
+          <span class="edfx-opt-hint">letters land upright</span>
+        </button>
+      </div>
+    </div>`;
 }

@@ -601,7 +601,7 @@ function typingSfxButtonTemplate() {
   const lit = enabled && vol > 0;
   const label = enabled ? 'Typing sound on' : 'Typing sound off';
   return `
-    <div class="sfx-control">
+    <div class="sfx-control js-hold-pop">
       <button class="btn btn-ghost practice-icon-btn" onclick="toggleTypingSfx()"
               title="${label}" id="typing-sfx-btn" aria-label="${label}" aria-pressed="${enabled}"
               style="${lit ? 'color:var(--color-primary);' : ''}">
@@ -646,10 +646,14 @@ function typingSfxButtonTemplate() {
   const MOVE_TOLERANCE = 10;
   let timer = null, startX = 0, startY = 0, opened = false;
 
-  const control = (el) => (el && el.closest) ? el.closest('.sfx-control') : null;
+  /* Any control that keeps options behind a long press, not just this one.
+     The letter-animation button in the same strip needs exactly this gesture,
+     and a second copy of the timing, the movement tolerance and the
+     click-swallowing would be a second place for them to drift. */
+  const control = (el) => (el && el.closest) ? el.closest('.js-hold-pop') : null;
 
   function closeAll(except) {
-    document.querySelectorAll('.sfx-control.is-open').forEach(c => {
+    document.querySelectorAll('.js-hold-pop.is-open').forEach(c => {
       if (c !== except) c.classList.remove('is-open');
     });
   }
