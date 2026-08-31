@@ -348,7 +348,12 @@ function edFoldPaintBadges(ta) {
     badge.style.top = top + 'px';
     badge.style.left = (padLeft + x + 6) + 'px';
     badge.style.height = lh + 'px';
-    badge.textContent = '⋯ }';
+    /* Just the ellipsis. The brace used to be drawn here because the fold
+       swallowed the line the block closed on, so the badge stood in for it.
+       The closing line stays on screen now, which made the badge a SECOND
+       closing brace: `if(x == 1){⋯ }` on the header and `}else {` still sitting
+       two lines below it. */
+    badge.textContent = '⋯';
     badge.title = r.fold.lines + ' line' + (r.fold.lines === 1 ? '' : 's') + ' hidden — click to expand';
     badge.onclick = () => edToggleFold(r.view);
     frag.appendChild(badge);
