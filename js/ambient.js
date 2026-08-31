@@ -13,10 +13,10 @@
 
 const AMB_KEY = 'ssp.ambient';
 
-/* Enough to read as a drift, few enough that nobody's laptop notices. Each
-   carries its own line, size, speed and delay, so the group never falls into
-   a visible rhythm. */
-const AMB_COUNT = 7;
+/* A dozen, because each one is only visible for about a tenth of its cycle --
+   so at any moment one or two are in flight and the rest are waiting. Fewer
+   read as a pane where nothing happens; many more read as rain. */
+const AMB_COUNT = 12;
 
 /** Is the ambient layer on? On by default; the switch is a departure from it. */
 function ambEnabled() {
@@ -29,98 +29,132 @@ function _ambHosts() {
     .filter(Boolean);
 }
 
-/* Five shapes, and neighbours never share one.
+/* Five slivers, and neighbours never share one.
 
-   A single repeated crystal read as one asset copied seven times, which is
-   what it was. Broken glass is not all the same piece: there are whole gems,
-   long slivers, chips and the odd catch of light. Taking them in order rather
-   than at random is what guarantees no two adjacent shapes match — random
-   would pair them up often enough to notice, and noticing is the whole
-   problem being solved.
+   Long and thin, because the shard IS the streak now -- there is no separate
+   trail behind it. Drawn upright in a tall narrow box and turned a quarter by
+   the stylesheet, so the length ends up along the direction of travel.
 
-   Each is drawn faintly filled and outlined, so it reads as something
-   translucent catching the light rather than as an icon. */
+   Taken in order rather than at random, which is what guarantees no two
+   adjacent shards match; random pairs them often enough to notice, and
+   noticing is the whole problem being solved. */
 const AMB_SHAPES = [
-  // a whole gem, faceted
-  '<path d="M7.5 1 L14 8 L7.5 21 L1 8 Z" fill="currentColor" fill-opacity=".13"'
-  + ' stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/>'
-  + '<path d="M1 8 L14 8 M7.5 1 L7.5 21" stroke="currentColor" stroke-width=".7" opacity=".5"/>',
-  // a long sliver
-  '<path d="M8.5 1 L11 12 L7 21 L5.6 11 Z" fill="currentColor" fill-opacity=".16"'
-  + ' stroke="currentColor" stroke-width=".9" stroke-linejoin="round"/>',
-  // a catch of light
-  '<path d="M7.5 3 l1.7 4.5 l4.5 1.7 l-4.5 1.7 l-1.7 4.5 l-1.7 -4.5 l-4.5 -1.7 l4.5 -1.7 Z"'
-  + ' fill="currentColor" fill-opacity=".2" stroke="currentColor" stroke-width=".8"'
-  + ' stroke-linejoin="round"/>',
-  // a small rhombus
-  '<path d="M7.5 5 L12 11.5 L7.5 18 L3 11.5 Z" fill="currentColor" fill-opacity=".11"'
-  + ' stroke="currentColor" stroke-width="1" stroke-linejoin="round"/>',
-  // a chip
-  '<path d="M4 4.5 L13 9.5 L6.5 18 Z" fill="currentColor" fill-opacity=".15"'
-  + ' stroke="currentColor" stroke-width=".9" stroke-linejoin="round"/>'
+  '<path d="M3 0 L5.2 13 L3 30 L0.8 13 Z" fill="currentColor" fill-opacity=".22"'
+  + ' stroke="currentColor" stroke-width=".7" stroke-linejoin="round"/>',
+  '<path d="M3 0 L5 9 L3.6 30 L1.2 10 Z" fill="currentColor" fill-opacity=".18"'
+  + ' stroke="currentColor" stroke-width=".6" stroke-linejoin="round"/>',
+  '<path d="M3 0 L6 15 L3 30 L0 15 Z" fill="currentColor" fill-opacity=".15"'
+  + ' stroke="currentColor" stroke-width=".7" stroke-linejoin="round"/>',
+  '<path d="M3 0 L4.4 7 L3 30 L1.7 8 Z" fill="currentColor" fill-opacity=".26"'
+  + ' stroke="currentColor" stroke-width=".55" stroke-linejoin="round"/>',
+  '<path d="M3 0 L5.4 20 L3 30 L0.6 19 Z" fill="currentColor" fill-opacity=".2"'
+  + ' stroke="currentColor" stroke-width=".65" stroke-linejoin="round"/>'
 ];
 
 function _ambShapeSVG(i) {
-  return '<svg viewBox="0 0 15 22" fill="none" aria-hidden="true">'
+  return '<svg viewBox="0 0 6 30" fill="none" aria-hidden="true">'
        + AMB_SHAPES[i % AMB_SHAPES.length] + '</svg>';
 }
+
+const _ambRand = (lo, hi) => lo + Math.random() * (hi - lo);
 
 /**
  * Fill one pane, if it is not already filled.
  *
  * Idempotent by design: it is called after every panel render, and a pane that
- * still has its crystals must be left alone rather than restarted — restarting
- * would snap every crystal back to the left edge in unison, which is the one
- * thing that would make them look like a mechanism.
+ * still has its shards must be left alone rather than restarted -- restarting
+ * would fire every shard at once, which is the one thing that would make them
+ * look like a mechanism instead of weather.
  */
 function _ambFill(host) {
   if (!host) return;
-  const existing = host.querySelector(':scope > .amb-leaves');
-  if (existing) return;
+  if (host.querySelector(':scope > .amb-shards')) return;
 
   const layer = document.createElement('div');
-  layer.className = 'amb-leaves';
+  layer.className = 'amb-shards';
   layer.setAttribute('aria-hidden', 'true');
 
-  for (let i = 0; i < AMB_COUNT; i++) {
-    const leaf = document.createElement('div');
-    leaf.className = 'amb-leaf';
-    /* Spread over the height, then jittered, so they neither line up in bands
-       nor clump the way pure random does over so few. */
-    const lane = (i + 0.5) / AMB_COUNT;
-    const y = Math.round((lane * 92 + (Math.random() * 10 - 5)) * 10) / 10;
-    leaf.style.setProperty('--y', Math.max(2, Math.min(94, y)) + '%');
-    leaf.style.setProperty('--t', (26 + Math.random() * 26).toFixed(1) + 's');
-    // Negative, so the pane opens with crystals already in flight rather than
-    // with an empty pane that slowly fills.
-    leaf.style.setProperty('--d', (-Math.random() * 40).toFixed(1) + 's');
-    leaf.style.setProperty('--s', (0.55 + Math.random() * 0.85).toFixed(2));
-    leaf.style.setProperty('--o', (0.22 + Math.random() * 0.3).toFixed(2));
+  // Runs across every shard in the pane, gusts included, so the no-two-alike
+  // rule holds across the whole layer rather than within each group.
+  let n = 0;
 
-    /* Upright, then leaning, then upright again. Every shape at its own random
-       angle looked shaken rather than blown; alternating gives the run a
-       rhythm, and the sway on top of it keeps that from being mechanical. */
-    const lean = (i % 2) ? 0 : (14 + Math.random() * 18) * (Math.random() < 0.5 ? -1 : 1);
-    leaf.style.setProperty('--tilt', lean.toFixed(1) + 'deg');
+  const shardAt = (x, y, ang, cycle, delay) => {
+    const el = document.createElement('div');
+    el.className = 'amb-shard';
+    const curve = _ambRand(18, 62) * (Math.random() < 0.5 ? -1 : 1);
+    el.style.setProperty('--x', x);
+    el.style.setProperty('--y', y);
+    el.style.setProperty('--ang', ang.toFixed(1) + 'deg');
+    el.style.setProperty('--len', Math.round(_ambRand(130, 280)) + 'px');
+    el.style.setProperty('--curve', Math.round(curve) + 'px');
+    // Turned the way it is bending, so its length follows the curve rather
+    // than pointing where it set off.
+    el.style.setProperty('--spin', (curve > 0 ? 16 : -16).toFixed(0) + 'deg');
+    el.style.setProperty('--s', _ambRand(0.65, 1.3).toFixed(2));
+    el.style.setProperty('--t', cycle.toFixed(1) + 's');
+    el.style.setProperty('--d', delay.toFixed(2) + 's');
 
     const inner = document.createElement('span');
-    inner.className = 'amb-leaf-i';
-    inner.innerHTML = _ambShapeSVG(i);
-    // Cyan or indigo, so the drift is not one flat colour.
-    inner.style.color = Math.random() < 0.55 ? 'var(--amb-lit)' : 'var(--amb-ink)';
-    leaf.appendChild(inner);
-    layer.appendChild(leaf);
+    inner.className = 'amb-shard-i';
+    inner.style.color = (n % 3) ? 'var(--amb-lit)' : 'var(--amb-ink)';
+    inner.innerHTML = _ambShapeSVG(n);
+    n++;
+    el.appendChild(inner);
+    return el;
+  };
+
+  /* Four that travel alone, anywhere and in any direction. */
+  for (let i = 0; i < 4; i++) {
+    const cycle = _ambRand(6, 14);
+    layer.appendChild(shardAt(
+      _ambRand(8, 88).toFixed(1) + '%',
+      _ambRand(8, 88).toFixed(1) + '%',
+      _ambRand(0, 360),
+      cycle,
+      -Math.random() * cycle
+    ));
   }
+
+  /* And two gusts: a handful each, thrown from one point at one moment, with
+     the ground turning under them. Members share the cycle and very nearly the
+     delay -- near, not equal, because a group that strikes in perfect unison
+     reads as a chorus line rather than as wind. */
+  for (let g = 0; g < 2; g++) {
+    const gust = document.createElement('div');
+    gust.className = 'amb-gust';
+    const cycle = _ambRand(7, 12);
+    const delay = -Math.random() * cycle;
+    gust.style.setProperty('--gx', _ambRand(20, 80).toFixed(1) + '%');
+    gust.style.setProperty('--gy', _ambRand(20, 80).toFixed(1) + '%');
+    gust.style.setProperty('--gt', cycle.toFixed(1) + 's');
+    gust.style.setProperty('--gd', delay.toFixed(2) + 's');
+    gust.style.setProperty('--gspin', (_ambRand(90, 210) * (Math.random() < 0.5 ? -1 : 1)).toFixed(0) + 'deg');
+
+    // Fanned around one heading: blown together, not scattered from a point.
+    const heading = _ambRand(0, 360);
+    const members = 4 + Math.round(Math.random());
+    for (let i = 0; i < members; i++) {
+      gust.appendChild(shardAt(
+        Math.round(_ambRand(-34, 34)) + 'px',
+        Math.round(_ambRand(-34, 34)) + 'px',
+        heading + _ambRand(-38, 38),
+        cycle,
+        delay + _ambRand(-0.3, 0.3)
+      ));
+    }
+    layer.appendChild(gust);
+  }
+
   // First child, so it sits behind everything the pane already holds.
   host.insertBefore(layer, host.firstChild);
 }
 
-/** Put the crystals back wherever they are missing, or take them all away. */
+/** Put the shards back wherever they are missing, or take them all away. */
 function ambMount() {
   const on = ambEnabled();
   document.body.classList.toggle('amb-off', !on);
   if (!on) {
-    document.querySelectorAll('.amb-leaves').forEach(el => el.remove());
+    document.querySelectorAll('.amb-shards').forEach(el => el.remove());
     return;
   }
   _ambHosts().forEach(_ambFill);

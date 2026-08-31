@@ -91,17 +91,26 @@
   to   { background-size: 138% 78%; opacity: 1; }
 }
 
-/* ── Shapes on the wind ───────────────────────────────────────
-   Two nested elements each: the outer carries it across the pane, the inner
-   turns and sways. Splitting them is what makes the path read as blown rather
-   than as a straight line with a spin on it — one keyframe set cannot do both
-   without the sway inheriting the travel's easing.
+/* ── Shards ───────────────────────────────────────────────────
+   Shooting stars: each appears out of nothing, curves across in about three
+   quarters of a second, and is gone, then waits out most of its cycle before
+   coming round again.
 
-   The travel curls rather than crossing straight: it lifts on the gust, sinks,
-   lifts again and drops out, which is nearer to how something light actually
-   moves through moving air than a single arc is.
+   NO TIMERS. Each shard is a permanent element on a long cycle whose visible
+   part is roughly a tenth of it, given a random negative delay. That is the
+   same sporadic flicker as spawning nodes on an interval, without a heartbeat
+   running behind the editor or nodes being built and discarded all session.
+
+   NO TRAIL ELEMENT. The shard IS the streak -- a long thin sliver drawn along
+   its own direction of travel. A separate trail was a second thing to keep
+   lined up behind a moving, turning object, and it never looked like part of
+   the same shard.
+
+   The direction is on the OUTER element and the flight is a translate on the
+   inner one, so a shard flies wherever it was pointed without any of the
+   keyframes below needing to know which way that is.
    ------------------------------------------------------------ */
-.amb-leaves {
+.amb-shards {
   position: absolute;
   inset: 0;
   z-index: -1;
@@ -109,51 +118,78 @@
   pointer-events: none;
 }
 
-.amb-leaf {
+.amb-shard {
   position: absolute;
-  top: var(--y, 50%);
+  left: var(--x, 40%);
+  top: var(--y, 30%);
+  width: 0;
+  height: 0;
+  transform: rotate(var(--ang, 36deg));
+}
+
+/* ── Gusts ────────────────────────────────────────────────────
+   Some shards travel alone; the rest come in handfuls that go together.
+
+   A gust is a point that TURNS while its members fly outward from it. Each
+   member is already travelling along its own heading, so turning the ground
+   under them bends every path around a common centre at once -- which is the
+   swirl. Doing it this way means no member has to know it is in a gust, and
+   the spiral falls out of two plain rotations instead of being drawn.
+
+   The turn runs on the same clock as the flight, so the swirl happens during
+   the burst and the gust sits still through the long pause after it. */
+.amb-gust {
+  position: absolute;
+  left: var(--gx, 50%);
+  top: var(--gy, 40%);
+  width: 0;
+  height: 0;
+  animation: ambSwirl var(--gt, 9s) cubic-bezier(0.22, 0.62, 0.35, 1) infinite;
+  animation-delay: var(--gd, 0s);
+}
+
+@keyframes ambSwirl {
+  0%   { transform: rotate(0deg); }
+  13%  { transform: rotate(var(--gspin, 120deg)); }
+  100% { transform: rotate(var(--gspin, 120deg)); }
+}
+
+/* Long and thin. Turned a quarter so the length lies along the travel. */
+.amb-shard-i {
+  position: absolute;
   left: 0;
-  width: 15px;
-  height: 22px;
-  animation: ambBlow var(--t, 26s) linear infinite;
+  top: 0;
+  width: 7px;
+  height: 34px;
+  margin: -17px 0 0 -3.5px;
+  color: var(--amb-lit);
+  opacity: 0;
+  animation: ambShoot var(--t, 9s) cubic-bezier(0.22, 0.62, 0.35, 1) infinite;
   animation-delay: var(--d, 0s);
 }
 
-.amb-leaf-i {
-  display: block;
+.amb-shard svg {
   width: 100%;
   height: 100%;
-  color: var(--amb-lit);
-  animation: ambSway calc(var(--t, 26s) / 6) ease-in-out infinite alternate,
-             ambFlicker calc(var(--t, 26s) / 3.5) ease-in-out infinite alternate;
-  animation-delay: var(--d, 0s), var(--d, 0s);
+  display: block;
+  transform: rotate(90deg);
 }
 
-.amb-leaf svg { width: 100%; height: 100%; display: block; }
-
-/* Across, curling as it goes. Opacity does the appearing and disappearing, so
-   a shape is never seen arriving at an edge. */
-@keyframes ambBlow {
-  0%   { opacity: 0; transform: translate3d(-40px, 0, 0); }
-  10%  { opacity: var(--o, 0.5); }
-  28%  { transform: translate3d(calc(25% + 20px), -30px, 0); }
-  46%  { transform: translate3d(calc(45% + 30px), 12px, 0); }
-  64%  { transform: translate3d(calc(65% + 40px), -22px, 0); }
-  85%  { opacity: var(--o, 0.5); }
-  100% { opacity: 0; transform: translate3d(calc(100% + 60px), 14px, 0); }
-}
-
-/* The base tilt is the shape's own: some ride upright, some already leaning. */
-@keyframes ambSway {
-  from { transform: rotate(calc(var(--tilt, 0deg) - 26deg)) scale(var(--s, 1)); }
-  to   { transform: rotate(calc(var(--tilt, 0deg) + 30deg)) scale(var(--s, 1)); }
-}
-
-/* Shards catching the light and losing it — the part that reads as appearing
-   and disappearing rather than merely crossing. */
-@keyframes ambFlicker {
-  from { opacity: 0.45; }
-  to   { opacity: 1; }
+/* Struck, curved, gone -- then nothing for the rest of the cycle. The arc is
+   the --curve offset at the halfway point, and the shard turns through it so
+   its length stays with the direction it is actually going rather than the
+   one it set out in. */
+@keyframes ambShoot {
+  0%   { opacity: 0;
+         transform: translate(0, 0) rotate(calc(var(--spin, 12deg) * -1)) scale(var(--s, 1)); }
+  3%   { opacity: 1; }
+  7%   { transform: translate(calc(var(--len, 240px) * 0.5), var(--curve, -26px))
+                    rotate(0deg) scale(var(--s, 1)); }
+  11%  { opacity: 1; }
+  13%  { opacity: 0;
+         transform: translate(var(--len, 240px), 0) rotate(var(--spin, 12deg)) scale(var(--s, 1)); }
+  100% { opacity: 0;
+         transform: translate(var(--len, 240px), 0) rotate(var(--spin, 12deg)) scale(var(--s, 1)); }
 }
 
 /* ── Off ────────────────────────────────────────────────────── */
@@ -161,7 +197,7 @@
 .amb-off .practice-sidebar::after,
 .amb-off #practice-panel::before,
 .amb-off #practice-panel::after { content: none; }
-.amb-off .amb-leaves { display: none; }
+.amb-off .amb-shards { display: none; }
 
 /* Movement is the unwelcome part, not the decoration, so the field and the
    glow stay and simply stop. The shapes go: their whole point is travel, and a
@@ -171,5 +207,5 @@
   .practice-sidebar::after,
   #practice-panel::before,
   #practice-panel::after { animation: none; }
-  .amb-leaves { display: none; }
+  .amb-shards { display: none; }
 }
