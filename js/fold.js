@@ -165,6 +165,71 @@ function edRealToView(real) {
   return view;
 }
 
+/* -- View offset <-> file offset ------------------------------
+   Line numbers are not enough for anything that works in characters. Two
+   things move an offset: every parked line above it, and the brace a split
+   fold took off the front of its closing line.
+
+   Bracket matching is why these exist. Run against what is on screen, the `{`
+   of a folded `else {` pairs with the next unmatched `}` the view can see --
+   main's, several blocks below -- because its own closing brace is parked.
+   Matching has to happen in the complete file and come back out.            */
+
+/** Offset of the start of 1-based `line` in `text`. */
+function _edLineStart(text, line) {
+  const lines = text.split('\n');
+  let at = 0;
+  for (let i = 0; i < line - 1 && i < lines.length; i++) at += lines[i].length + 1;
+  return at;
+}
+
+/* A split closing line has three parts, and a column lands in one of them:
+
+       "    } else {"
+        ^^^^          the indent, which stays on screen
+            ^^        the brace and its gap, which are parked
+              ^^^^^^  the rest, which stays but shifts left
+
+   `keep` is the first part; `cut` is the first two together.               */
+
+/** What a split fold took off the front of real line `real`, or ''. */
+function _edCutAt(real) {
+  const f = edFoldsFor().find(x => x.closeCut && x.real + x.lines + 1 === real);
+  return f ? f.closeCut : '';
+}
+
+/** Offset in the view -> offset in the complete file. */
+function edViewOffsetToFull(ta, off) {
+  if (!edFoldsFor().length) return off;
+  const before = ta.value.slice(0, off).split('\n');
+  const line = edViewToReal(before.length);
+  let col = before[before.length - 1].length;
+  const cut = _edCutAt(line);
+  // A column in the indent has not moved; everything past it shifted left by
+  // whatever was parked.
+  if (cut && col >= _edCloseKeep(cut).length) col += cut.length - _edCloseKeep(cut).length;
+  return _edLineStart(edFullSource(ta), line) + col;
+}
+
+/** Offset in the complete file -> offset in the view, or -1 when not on screen. */
+function edFullOffsetToView(ta, off) {
+  if (!edFoldsFor().length) return off;
+  const before = edFullSource(ta).slice(0, off).split('\n');
+  const real = before.length;
+  const view = edRealToView(real);
+  if (view <= 0) return -1;                                  // the whole line is parked
+  let col = before[before.length - 1].length;
+  const cut = _edCutAt(real);
+  if (cut) {
+    const keep = _edCloseKeep(cut).length;
+    // Between the two sits the brace itself: on this line, but not on screen.
+    // Reporting a column for it would put the highlight on the space beside it.
+    if (col >= keep && col < cut.length) return -1;
+    if (col >= cut.length) col -= cut.length - keep;
+  }
+  return _edLineStart(ta.value, view) + col;
+}
+
 /** Rebuild the textarea from the complete file minus everything parked. */
 function _edRenderView(ta, full, caretReal) {
   const lines = full.split('\n');
@@ -252,10 +317,35 @@ function edToggleFold(view) {
 
      rather than leaving a `}` behind that now closes nothing visible, or
      swallowing the whole line and taking the else's header with it. */
-  const hidden = range.end - real - 1;
-  if (hidden < 1) return;              // nothing between the braces to park
+  if (range.end - real - 1 < 1) return;   // nothing between the braces to park
 
-  const closeCut = _edCloseCut(fullLines[range.end - 1]) || '';
+  /* How much of the closing line goes with the block.
+
+     The brace closes what is being folded, so it belongs inside the fold and
+     is drawn on the badge instead — `if (x) {⋯ }` reads as a closed block,
+     while leaving a bare `}` on screen below it does not.
+
+     Three shapes, because the rest of that line does not always belong to the
+     same block:
+
+       `}`, `};`, `} Size;`, `} while (i < 3);`
+           All of it belongs to this block, so all of it goes and the badge
+           shows what went: `⋯ }`, `⋯ };`, `⋯ } while (i < 3);`. The `while` of
+           a do-while is the tail of the block, not the head of a new one.
+
+       `} else {`, `} catch (e) {`
+           The brace is this block's, the header after it is the next one's.
+           Only the brace goes; `else {` stays as a line of its own.
+
+       anything else ending in `{`
+           An opener this module does not recognise. The line stays whole
+           rather than be guessed at — hiding a block header would lose the
+           user's place. */
+  const closeLine = fullLines[range.end - 1] || '';
+  const closeCut = _edCloseCut(closeLine) || '';
+  const opensBlock = /\{\s*$/.test(closeLine.replace(/\/\/.*$/, ''));
+  const swallow = !closeCut && !opensBlock;
+  const hidden = range.end - real - (swallow ? 0 : 1);
 
   // Any fold living inside this block is absorbed — its text is already part of
   // the slab being parked, so expanding the outer block expands them all.
@@ -265,10 +355,17 @@ function edToggleFold(view) {
   kept.push({
     real: real,
     lines: hidden,
-    text: fullLines.slice(real, range.end - 1).join('\n'),
+    // Where the block closes, kept so a reload can tell this fold still
+    // describes a real block without having to re-derive how much of the
+    // closing line went with it.
+    end: range.end,
+    text: fullLines.slice(real, real + hidden).join('\n'),
     // The closing brace taken off the line after the parked ones, held as its
-    // original text so edFullSource can put it back exactly.
-    closeCut: closeCut
+    // original text so edFullSource can put it back exactly. Empty when the
+    // whole closing line went, or when none of it did.
+    closeCut: closeCut,
+    // What the badge draws after the ellipsis: whatever was folded away.
+    tail: swallow ? closeLine.trim() : (closeCut ? '}' : '')
   });
   _edSetFolds(kept);
   _edRenderView(ta, full, real);
@@ -301,12 +398,15 @@ function edFoldReapply(ta) {
      — matched nothing, and every fold was silently dropped on a file switch
      or a restore. */
   const ranges = edFoldScan(ta.value);
-  const live = folds.filter(f => ranges.some(r => r.start === f.real && r.end === f.real + f.lines + 1));
+  const live = folds.filter(f => ranges.some(r => r.start === f.real && r.end === f.end));
   // Re-derive the split from the text actually in the buffer, rather than
   // trusting a prefix recorded against a version of the file that may since
-  // have been edited elsewhere.
+  // have been edited elsewhere. Only a fold that left its closing line on
+  // screen has one to re-derive.
   const reLines = ta.value.split('\n');
-  live.forEach(f => { f.closeCut = _edCloseCut(reLines[f.real + f.lines]) || ''; });
+  live.forEach(f => {
+    if (f.closeCut) f.closeCut = _edCloseCut(reLines[f.real + f.lines]) || '';
+  });
   _edSetFolds(live, key);
   if (!live.length) return;
   _edRenderView(ta, ta.value, 1);
@@ -339,7 +439,9 @@ function edFoldOnInput(ta) {
        moved, and its parked brace went back onto whatever now sat there. */
     const caret = ta.value.slice(0, ta.selectionStart).split('\n').length;
     const from = caret - Math.max(delta, 0);
-    _edFoldRows().forEach(r => { if (r.view >= from) r.fold.real += delta; });
+    _edFoldRows().forEach(r => {
+      if (r.view >= from) { r.fold.real += delta; r.fold.end += delta; }
+    });
   }
 
   // An anchor that no longer ends in `{` has stopped describing a folded block
@@ -440,22 +542,22 @@ function edFoldPaintBadges(ta) {
   const padLeft = parseFloat(cs.paddingLeft) || 0;
   if (!lh) return;
 
-  // One probe, reused: the font is monospace, but tabs and wide glyphs are not,
-  // so the width of the actual line text is measured rather than guessed.
-  const probe = document.createElement('span');
-  probe.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;top:0;left:0;';
-  probe.style.font = cs.font;
-  probe.style.letterSpacing = cs.letterSpacing;
-  probe.style.tabSize = cs.tabSize;
-  pre.appendChild(probe);
-
+  // Line starts, so a row can be turned into an offset for edCharRect. The
+  // badge used to sit at the width of a copy of the line measured in a hidden
+  // span, which carried the <pre>'s font while the text is drawn inside <code>
+  // in tokens of differing weight -- the two drifted apart by about a pixel per
+  // column, and the badge ended up over the end of its own line.
   const lines = ta.value.split('\n');
+  const starts = [];
+  for (let i = 0, at = 0; i < lines.length; i++) { starts.push(at); at += lines[i].length + 1; }
   const frag = document.createDocumentFragment();
   rows.forEach(r => {
     const text = lines[r.view - 1];
     if (text == null) return;
-    probe.textContent = text;
-    const x = probe.getBoundingClientRect().width;
+    // The right edge of the line's last character; an empty anchor line cannot
+    // happen, since an anchor is a line that ends in `{`.
+    const end = text.length ? edCharRect(starts[r.view - 1] + text.length - 1) : null;
+    const x = end ? end.right : padLeft;
     const top = padTop + (r.view - 1) * lh;
 
     const band = document.createElement('div');
@@ -467,7 +569,7 @@ function edFoldPaintBadges(ta) {
     const badge = document.createElement('div');
     badge.className = 'ed-fold-badge';
     badge.style.top = top + 'px';
-    badge.style.left = (padLeft + x + 6) + 'px';
+    badge.style.left = (x + 6) + 'px';
     badge.style.height = lh + 'px';
     /* `⋯ }` when the fold took the closing brace with it, `⋯` when it didn't.
 
@@ -480,12 +582,11 @@ function edFoldPaintBadges(ta) {
 
        On a closing line that is nothing but `}`, that line stays on screen
        whole — drawing a brace here too would show two closers for one block. */
-    badge.textContent = r.fold.closeCut ? '⋯ }' : '⋯';
+    badge.textContent = r.fold.tail ? '\u22ef ' + r.fold.tail : '\u22ef';
     badge.title = r.fold.lines + ' line' + (r.fold.lines === 1 ? '' : 's') + ' hidden — click to expand';
     badge.onclick = () => edToggleFold(r.view);
     frag.appendChild(badge);
   });
-  probe.remove();
   pre.appendChild(frag);
 }
 

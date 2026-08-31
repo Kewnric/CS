@@ -65,6 +65,10 @@ function setupSpecificEditor(textareaId, preId, codeId, isPracticeMode, stateFie
     textarea.removeEventListener('input', oldHandlers.input);
     textarea.removeEventListener('keydown', oldHandlers.keydown);
     if (oldHandlers.beforeinput) textarea.removeEventListener('beforeinput', oldHandlers.beforeinput);
+    if (oldHandlers.caret) {
+      textarea.removeEventListener('focus', oldHandlers.caret);
+      textarea.removeEventListener('blur', oldHandlers.caret);
+    }
   }
 
   const handlers = {
@@ -142,7 +146,13 @@ function setupSpecificEditor(textareaId, preId, codeId, isPracticeMode, stateFie
       else if (e.inputType === 'insertText' && e.data && e.data.length === 1) key = e.data;
       if (!key) return;
       if (edTextEntry(t, key, false)) e.preventDefault();
-    }
+    },
+
+    /* Focus and blur move no caret, so updateLineNumbers does not run for
+       them — but the bracket highlight has to appear when the editor is
+       focused and go when it is not, or it sits there pointing at a caret
+       that is no longer in the file. */
+    caret: () => { if (typeof edPaintBrackets === 'function') edPaintBrackets(textarea); }
   };
 
   textarea.addEventListener('scroll', handlers.scroll);
@@ -152,6 +162,8 @@ function setupSpecificEditor(textareaId, preId, codeId, isPracticeMode, stateFie
   if (isPracticeMode) {
     textarea.addEventListener('click', () => setTimeout(() => updateLineNumbers(textarea), 0));
     textarea.addEventListener('keyup', () => setTimeout(() => updateLineNumbers(textarea), 0));
+    textarea.addEventListener('focus', handlers.caret);
+    textarea.addEventListener('blur', handlers.caret);
   }
   editorListeners.set(textarea, handlers);
 }
@@ -640,6 +652,50 @@ function updateLineNumbers(textarea) {
   }
   _edPaintMarkBands(marks, lineCount);
   if (typeof edFoldPaintBadges === 'function') edFoldPaintBadges(textarea);
+  // Repainted from here rather than from a listener of its own: this already
+  // runs on input, on click and on keyup, which is every way the caret moves.
+  if (typeof edPaintBrackets === 'function') edPaintBrackets(textarea);
+}
+
+/**
+ * Where character `idx` of the editor is actually drawn, as offsets from
+ * #editor-pre's padding box -- the coordinates every overlay in here uses.
+ *
+ * Measured with a Range over the rendered text rather than by measuring a copy
+ * of the line in a hidden span. The two disagree: the probe carried the <pre>'s
+ * font, while the text is drawn inside <code> in tokens that are not all the
+ * same weight, so the error grew by about a pixel per column and had an overlay
+ * a whole character out of place by the middle of a line.
+ *
+ * @returns {{left:number, top:number, right:number, height:number}|null}
+ */
+function edCharRect(idx) {
+  const pre = document.getElementById('editor-pre');
+  const code = document.getElementById('editor-code');
+  if (!pre || !code || !(idx >= 0)) return null;
+  const walk = document.createTreeWalker(code, NodeFilter.SHOW_TEXT);
+  let seen = 0, n;
+  while ((n = walk.nextNode())) {
+    const len = n.nodeValue.length;
+    if (seen + len > idx) {
+      const r = document.createRange();
+      r.setStart(n, idx - seen);
+      r.setEnd(n, idx - seen + 1);
+      const b = r.getBoundingClientRect();
+      const p = pre.getBoundingClientRect();
+      const cs = getComputedStyle(pre);
+      // Absolute children are placed from the padding box, which starts inside
+      // the border; the rect above is measured from outside it.
+      const bx = parseFloat(cs.borderLeftWidth) || 0;
+      const by = parseFloat(cs.borderTopWidth) || 0;
+      return { left: b.left - p.left - bx + pre.scrollLeft,
+               right: b.right - p.left - bx + pre.scrollLeft,
+               top: b.top - p.top - by + pre.scrollTop,
+               height: b.height };
+    }
+    seen += len;
+  }
+  return null;
 }
 
 /** Legacy whole-value setter, kept for the admin forms that still call it. */
