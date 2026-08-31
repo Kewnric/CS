@@ -283,6 +283,13 @@
     overflow-y: auto;
     border-left: none;
     border-top: 1px solid var(--border-color);
+    /* Room to scroll clear of the Run/Finish bar, which is sticky and sits
+       over the last 63px of this panel. Without it the tail of the results
+       could not be read at all: scrolling fed the text into the strip behind
+       the buttons rather than into view, which is what the overlapping
+       "…use Check Code to compile check" was. */
+    padding-bottom: 76px;
+    scroll-padding-bottom: 76px;
   }
   .practice-sidebar { max-height: 34vh; overflow-y: auto; }
   .practice-editor-area { min-height: 46vh; }
@@ -317,6 +324,116 @@
 
   /* A keyboard shortcut is not advice a phone can act on. */
   .search-shortcut-hint { display: none; }
+
+
+  /* ── THE REST OF THE APP, AUDITED AT 412px ──────────────────
+     Every route was measured rather than eyeballed, and these are what came
+     back. Two were structural and the rest were the same two faults over and
+     over: text under the readable floor, and controls too small to hit.
+     ------------------------------------------------------------ */
+
+  /* THE VISUALIZATION TOPBAR WAS UNREACHABLE. It wants 761px, it has 412, and
+     its overflow-x was `visible` — so the strip was not clipped, not
+     scrollable, just drawn off the side of the phone. The "Notebooks" and
+     "General" tabs sat 345px past the edge with no way to reach them. */
+  .viz-topbar {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .viz-topbar::-webkit-scrollbar { display: none; }
+  .viz-topbar > * { flex-shrink: 0; }
+  .viz-module-tabs-wrapper { overflow: visible; }
+
+  /* The wing admin's folder filter was squeezed to 30px — a dropdown you
+     cannot read the current value of, let alone aim at. The New button and
+     the search box take the first line; this gets the second. */
+  .awx-bar .awx-folder-filter {
+    flex: 1 1 100%;
+    min-width: 140px;
+    max-width: none;
+  }
+
+  /* ── The 11px floor, applied where the audit found it broken ──
+     9px on an analytics label, 9.6px on a badge and on the quest status
+     title, and a scatter of 10-10.9px through the trees, tabs and tables. */
+  .analytics-mini-label,
+  .an-sn-legend,
+  .system-status-title,
+  .badge,
+  .admin-group-count,
+  .admin-panel-count,
+  .lang-card-chip,
+  .tree-node-badge,
+  .tree-node-count,
+  .awx-mini-tag,
+  .awx-tab-n,
+  .awx-table th,
+  .awx-actions,
+  .wing-goal-more { font-size: 0.7rem; }
+
+  /* The stragglers, which needed naming individually because a more specific
+     rule was already winning. Found by walking up from each element that was
+     still under the floor rather than by guessing at selectors. */
+  .badge.badge-neutral,
+  .badge.badge-primary,
+  .badge.badge-success,
+  .badge.badge-warning,
+  .badge.badge-danger { font-size: 0.7rem; }
+  .lang-admin-table th { font-size: 0.7rem; }
+  .an-sn-list-t em { font-size: 0.7rem; }
+  /* ── The ones written into a style attribute ─────────────────
+     About twenty places build markup with font-size:0.6rem or 0.65rem inline
+     — 9.6px and 10.4px. An inline style beats every stylesheet rule, so no
+     selector above could reach them and none of the earlier attempts did
+     anything at all.
+
+     !important is the correct tool exactly here and almost nowhere else: it
+     is the only thing that outranks an inline declaration. Matching on the
+     attribute keeps it to the sizes that are actually too small, and the
+     whole thing is inside the phone breakpoint, so the desktop layouts these
+     sizes were chosen for are untouched. The real fix is to stop inlining
+     type; this stops it hurting anyone on a phone in the meantime. */
+  [style*="font-size:0.6rem"],
+  [style*="font-size: 0.6rem"],
+  [style*="font-size:0.65rem"],
+  [style*="font-size: 0.65rem"] { font-size: 0.7rem !important; }
+
+  /* 30px was still short of a thumb; the card behind it stays clickable, so
+     this only has to be big enough to aim at deliberately. */
+  .wing-goal-next .wing-step-box { width: 32px; height: 32px; }
+
+  /* ── Thumb-sized controls ────────────────────────────────────
+     A thumb is about 9mm. These measured between 20px and 30px, so they were
+     being aimed at rather than pressed. Height only: widening them would
+     rearrange rows that already fit. */
+  .an-range-chip,
+  .admin-tool-btn,
+  .ali-folder-btn,
+  .lang-tab,
+  .lib-chip,
+  .lib-fav-btn,
+  .quest-new-btn,
+  .quest-sort-btn,
+  .quest-tab,
+  .viz-module-tab,
+  .viz-swap-btn,
+  .viz-tabs-toggle-btn,
+  .viz-zoom-btn {
+    min-height: 32px;
+  }
+  /* These two are icon buttons, so they need the width as well or they become
+     tall slivers. */
+  .admin-tool-btn,
+  .ali-folder-btn,
+  .viz-zoom-btn { min-width: 32px; }
+
+  /* The title in an admin table row is the way into the entry, so it is a tap
+     target and not just text. Padding rather than min-height: it sits inline
+     above its tag chips and a fixed height would push those out of the cell. */
+  .awx-title-btn { padding: 0.35rem 0; }
+
 
   /* The cloud status toast was pinned 366px from the left of a 375px screen,
      so it hung off the right edge. */

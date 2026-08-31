@@ -628,3 +628,72 @@ function typingSfxButtonTemplate() {
       </div>
     </div>`;
 }
+
+/* ── Opening the volume popover on a touch screen ─────────────
+   The slider and the voice picker appeared on hover, which a phone does not
+   have, and on focus-within, which a tap on the button does not produce
+   before the click handler has already toggled mute. So on a phone the
+   control was a mute button and nothing else: the volume and both other
+   voices were unreachable.
+
+   A long press opens it. Short press keeps its meaning — muting in a hurry is
+   the common case and must not need a gesture — and the press that opens the
+   panel deliberately suppresses that click, or letting go would mute at the
+   same moment the slider appeared.
+   ------------------------------------------------------------ */
+(function () {
+  const HOLD_MS = 350;      // long enough not to fire while scrolling past
+  const MOVE_TOLERANCE = 10;
+  let timer = null, startX = 0, startY = 0, opened = false;
+
+  const control = (el) => (el && el.closest) ? el.closest('.sfx-control') : null;
+
+  function closeAll(except) {
+    document.querySelectorAll('.sfx-control.is-open').forEach(c => {
+      if (c !== except) c.classList.remove('is-open');
+    });
+  }
+
+  document.addEventListener('touchstart', function (e) {
+    const c = control(e.target);
+    if (!c) { closeAll(null); return; }
+    const t = e.touches[0];
+    startX = t.clientX; startY = t.clientY;
+    opened = false;
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      opened = true;
+      closeAll(c);
+      c.classList.add('is-open');
+      // A short buzz where the platform offers one, so the press reads as
+      // having done something even before the panel finishes appearing.
+      if (navigator.vibrate) { try { navigator.vibrate(15); } catch (err) {} }
+    }, HOLD_MS);
+  }, { passive: true });
+
+  document.addEventListener('touchmove', function (e) {
+    if (!timer) return;
+    const t = e.touches[0];
+    // A scroll is not a press. Without this the panel opens whenever a finger
+    // happens to start its swipe on the button.
+    if (Math.abs(t.clientX - startX) > MOVE_TOLERANCE || Math.abs(t.clientY - startY) > MOVE_TOLERANCE) {
+      clearTimeout(timer); timer = null;
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchend', function () {
+    clearTimeout(timer); timer = null;
+  }, { passive: true });
+
+  /* Swallow the click the opening press would otherwise produce, so a long
+     press shows the panel instead of showing it and muting at once. */
+  document.addEventListener('click', function (e) {
+    if (opened && control(e.target)) {
+      opened = false;
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    if (!control(e.target)) closeAll(null);
+  }, true);
+})();

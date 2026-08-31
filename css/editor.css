@@ -1117,6 +1117,29 @@ mark.diff-hit.current {
   flex-shrink: 0;
 }
 
+/* ── The attempt toolbar is chrome, not text ──────────────────
+   Holding a finger on it — the timer especially, which is a long run of
+   digits — started a text selection and threw up the copy/share bar, on top
+   of the panel the same press was opening. Nothing up here is worth copying:
+   it is a clock, a title and a row of buttons.
+
+   Selection is re-enabled for anything you actually type into, so this cannot
+   quietly break an input that lands in the bar later.
+   ------------------------------------------------------------ */
+.practice-topbar,
+.practice-topbar * {
+  -webkit-user-select: none;
+  user-select: none;
+  /* Stops the long-press magnifier and the callout menu on touch devices. */
+  -webkit-touch-callout: none;
+}
+.practice-topbar input,
+.practice-topbar textarea,
+.practice-topbar [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 .sfx-vol-pop {
   position: absolute;
   top: 100%;
@@ -1138,10 +1161,50 @@ mark.diff-hit.current {
 }
 
 .sfx-control:hover .sfx-vol-pop,
-.sfx-control:focus-within .sfx-vol-pop {
+.sfx-control:focus-within .sfx-vol-pop,
+/* Held open by a long press. A phone has no hover, so on a touch screen the
+   slider and the voice picker had no way to appear at all — the button only
+   ever toggled mute and the rest of the control was unreachable. */
+.sfx-control.is-open .sfx-vol-pop {
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
+}
+
+/* ── On a phone it is a sheet, not a popover ──────────────────
+   Anchoring it to the button does not work here for two reasons that both
+   have to be solved by leaving the button behind.
+
+   The control lives in the controls row, and that row is overflow-x:auto so
+   it can scroll — which means it CLIPS anything drawn outside it, popover
+   included. And the button sits near the left of a 412px screen, so a 342px
+   panel centred on it starts at about x=-100 regardless.
+
+   position:fixed escapes the scroll container entirely, and pinning it to the
+   bottom edge puts it where a thumb already is.
+   ------------------------------------------------------------ */
+@media (max-width: 640px) {
+  .sfx-control.is-open .sfx-vol-pop {
+    position: fixed;
+    top: auto;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: auto;
+    max-width: none;
+    margin: 0;
+    transform: none;
+    z-index: 400;                /* over the sticky action bar */
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+    padding: 0.85rem;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  }
+  .sfx-control.is-open .sfx-vol-row { width: 100%; }
+  .sfx-control.is-open .sfx-vol-range { width: 100%; }
+  /* Full-width targets in a sheet you opened deliberately. */
+  .sfx-control.is-open .sfx-voice-opt { padding: 0.5rem 0.5rem; }
 }
 
 .sfx-vol-range {
