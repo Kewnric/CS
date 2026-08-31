@@ -1,0 +1,235 @@
+/* ============================================================
+   OST.CSS — the record on the topbar, and the player behind it
+   ------------------------------------------------------------
+   A disc that turns while something is playing and sits still when it is not,
+   so the topbar answers "is the music on?" without being opened. The rings
+   beating outward are the only part here that is decoration for its own sake.
+
+   The panel borrows the shape of the typing-sound popover (see editor.css) so
+   the two read as the same kind of thing — but not its trigger: a press opens
+   this one. A player that appeared on hover would open every time the pointer
+   crossed the topbar.
+   ============================================================ */
+
+.ost-control {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+/* ── The record ───────────────────────────────────────────────
+   Grooves are a repeating radial gradient rather than a stack of ring
+   elements: one paint, and it stays sharp at whatever size the topbar asks.
+   ------------------------------------------------------------ */
+.ost-disc-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+}
+
+.ost-disc {
+  position: relative;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background:
+    repeating-radial-gradient(circle at 50% 50%,
+      rgba(255, 255, 255, 0.07) 0 1px, rgba(0, 0, 0, 0) 1px 2.5px),
+    conic-gradient(from 0deg, #2a2f3a, #12151c 25%, #2a2f3a 50%, #12151c 75%, #2a2f3a);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.09), 0 1px 4px rgba(0, 0, 0, 0.5);
+  animation: ostSpin 3.6s linear infinite;
+  animation-play-state: paused;      /* still until something is playing */
+}
+.ost-control.is-playing .ost-disc { animation-play-state: running; }
+
+/* The label. Its colour comes from the track, so changing song is visible on
+   the topbar itself without opening anything. */
+.ost-disc::before {
+  content: '';
+  position: absolute;
+  inset: 5.5px;
+  border-radius: 50%;
+  background-color: var(--ost-hue, #6366f1);
+  background-image: var(--ost-cover, none);
+  background-size: cover;
+  background-position: center;
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.5);
+}
+/* The spindle hole. */
+.ost-disc::after {
+  content: '';
+  position: absolute;
+  inset: 9.2px;
+  border-radius: 50%;
+  background: #0d1117;
+}
+
+@keyframes ostSpin { to { transform: rotate(360deg); } }
+
+/* ── The beat ─────────────────────────────────────────────────
+   Two rings half a cycle apart, so one is always on its way out. Only while
+   playing: a pulsing topbar with the music off would be telling you something
+   untrue.
+   ------------------------------------------------------------ */
+.ost-waves {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.ost-control.is-playing .ost-waves { opacity: 1; }
+.ost-waves::before,
+.ost-waves::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid var(--ost-hue, #6366f1);
+  animation: ostBeat 1.9s ease-out infinite;
+}
+.ost-waves::after { animation-delay: 0.95s; }
+
+@keyframes ostBeat {
+  0%   { transform: scale(0.8); opacity: 0.55; }
+  100% { transform: scale(1.85); opacity: 0; }
+}
+
+/* ── The panel ────────────────────────────────────────────── */
+.ost-pop {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 60;
+  width: 288px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.7rem 0.75rem;
+  margin-top: 4px;
+  background: var(--bg-elevated, #1c1c24);
+  border: 1px solid var(--border-color, #2f2f3a);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 0.13s ease, transform 0.13s ease, visibility 0.13s;
+}
+.ost-control.is-open .ost-pop {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.ost-now { display: flex; align-items: center; gap: 0.55rem; min-width: 0; }
+.ost-now-art {
+  flex: 0 0 auto;
+  width: 34px; height: 34px;
+  border-radius: 6px;
+  background-color: var(--ost-hue, #6366f1);
+  background-image: var(--ost-cover, none);
+  background-size: cover; background-position: center;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+.ost-now-text { min-width: 0; }
+.ost-now-label {
+  font-size: 0.6rem; font-weight: 800; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--text-tertiary, #6e7681);
+}
+.ost-now-title {
+  font-size: 0.8rem; font-weight: 700; color: var(--text-primary, #e6edf3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* ── Progress ─────────────────────────────────────────────────
+   A range input rather than a div with a click handler: it is draggable,
+   focusable and arrow-key seekable for nothing, and it already understands
+   what a position in a track is.
+   ------------------------------------------------------------ */
+.ost-seek-row { display: flex; align-items: center; gap: 0.45rem; }
+.ost-seek {
+  flex: 1;
+  accent-color: var(--color-primary, #6366f1);
+  cursor: pointer;
+  min-width: 0;
+}
+.ost-time {
+  font-size: 0.62rem; font-variant-numeric: tabular-nums;
+  color: var(--text-tertiary, #6e7681); flex: 0 0 auto;
+}
+
+.ost-transport { display: flex; align-items: center; gap: 0.3rem; }
+.ost-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; padding: 0;
+  background: transparent; border: 1px solid transparent; border-radius: 7px;
+  color: var(--text-secondary, #a8a8b8); cursor: pointer;
+  transition: color 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+}
+.ost-btn:hover { color: var(--text-primary, #e6edf3); border-color: var(--text-tertiary, #6e7681); }
+.ost-btn.is-on {
+  color: var(--color-primary, #6366f1);
+  border-color: color-mix(in srgb, var(--color-primary, #6366f1) 55%, transparent);
+}
+.ost-btn-play { width: 32px; height: 32px; color: var(--color-primary, #6366f1); }
+.ost-vol { width: 68px; accent-color: var(--color-primary, #6366f1); cursor: pointer; margin-left: auto; }
+
+/* ── The tracks ───────────────────────────────────────────────
+   Scrolls past a handful, so the panel cannot grow taller than the window
+   whatever ends up in audio/ost.
+   ------------------------------------------------------------ */
+.ost-list {
+  display: flex; flex-direction: column; gap: 1px;
+  max-height: 168px; overflow-y: auto;
+  border-top: 1px solid var(--border-color, #2f2f3a);
+  padding-top: 0.45rem;
+}
+.ost-item {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.34rem 0.4rem; border-radius: 6px;
+  background: transparent; border: none; text-align: left;
+  color: var(--text-secondary, #a8a8b8); cursor: pointer;
+  font: inherit; font-size: 0.74rem;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.ost-item:hover { background: rgba(255, 255, 255, 0.05); color: var(--text-primary, #e6edf3); }
+.ost-item.is-current {
+  color: var(--color-primary, #6366f1);
+  background: color-mix(in srgb, var(--color-primary, #6366f1) 12%, transparent);
+}
+.ost-item-dot { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: 0.55; }
+.ost-item-name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ost-empty { font-size: 0.72rem; color: var(--text-tertiary, #6e7681); padding: 0.3rem 0.1rem; }
+
+/* ── On a phone it is a sheet ─────────────────────────────────
+   Same reasoning as the typing-sound panel: the controls row scrolls, so it
+   clips anything drawn outside it, and a 288px card anchored near the left of
+   a 412px screen hangs off the edge.
+   ------------------------------------------------------------ */
+@media (max-width: 640px) {
+  .ost-control.is-open .ost-pop {
+    position: fixed;
+    top: auto; left: 12px; right: 12px; bottom: 12px;
+    width: auto; margin: 0; transform: none;
+    z-index: 400;
+    padding: 0.9rem;
+  }
+  .ost-list { max-height: 40vh; }
+  .ost-item { padding: 0.55rem 0.45rem; font-size: 0.8rem; }
+}
+
+/* The record turning is the one thing here that is motion for its own sake. */
+@media (prefers-reduced-motion: reduce) {
+  .ost-disc { animation: none; }
+  .ost-waves { display: none; }
+}

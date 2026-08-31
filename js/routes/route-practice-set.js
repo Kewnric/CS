@@ -22,6 +22,7 @@ function practiceSetTemplate() {
           ${typingSfxButtonTemplate()}
           ${editorFxButtonTemplate()}
           ${ambientButtonTemplate()}
+          ${ostButtonTemplate()}
           <button class="btn btn-ghost practice-icon-btn" onclick="toggleFullscreen()" title="Full screen" id="fullscreen-toggle-btn" aria-label="Full screen" aria-pressed="false">
             <i data-lucide="maximize" style="width:16px;height:16px;" aria-hidden="true"></i>
           </button>
