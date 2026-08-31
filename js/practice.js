@@ -3367,23 +3367,63 @@ function preprocessMultiFile(code) {
   // Inline includes in the main file
   let result = inlineIncludes(code);
 
-  // Mark the main file as included so we don't append it again
-  const mainFile = state.userFiles[state.activeFileIndex];
-  if (mainFile) included.add(mainFile.name + mainFile.ext);
+  // The file you pressed Run on is already here; don't append it again.
+  const activeFile = state.userFiles[state.activeFileIndex];
+  if (activeFile) included.add(activeFile.name + activeFile.ext);
 
-  // Append every .c source file that hasn't been inlined yet.
-  // This handles the common pattern: main.c #includes utils.h (declarations),
-  // but utils.c (implementations) needs to be compiled too.
-  for (const f of state.userFiles) {
-    const fullName = f.name + f.ext;
-    if (included.has(fullName)) continue;
-    if (f.ext !== '.c' && f.ext !== '.cpp') continue;
-    if (f.userCode == null || f.userCode.trim() === '') continue;
+  const isSource = (f) => f.ext === '.c' || f.ext === '.cpp';
+  const hasBody = (f) => f.userCode != null && f.userCode.trim() !== '';
+  /* A DEFINITION of main, not a mention of one. Anchored to the start of a
+     line because that is where a definition is written, which keeps
+     printf("main") and a commented-out one out of it. */
+  const DEFINES_MAIN = /^[\t ]*(?:int|void)\s+main\s*\(/m;
 
-    included.add(fullName);
-    // Inline any local includes inside this companion source file too
-    const resolved = inlineIncludes(f.userCode);
-    result += '\n\n/* ── ' + fullName + ' (auto-linked) ── */\n' + resolved + '\n/* ── end ' + fullName + ' ── */';
+  const append = (f, why) => {
+    included.add(f.name + f.ext);
+    result += '\n\n/* ── ' + f.name + f.ext + ' (' + why + ') ── */\n'
+            + inlineIncludes(f.userCode)
+            + '\n/* ── end ' + f.name + f.ext + ' ── */';
+  };
+
+  /* Link a companion .c to the HEADER THAT DECLARES IT, and to nothing else.
+
+     This used to append every .c file in the attempt, related or not, which is
+     how running a self-contained header ended up compiling main.c beside it:
+     two definitions of main in one translation unit, and a wall of errors
+     about a file you were not even looking at.
+
+     The pairing used here is the one C itself uses -- utils.c is the
+     implementation of utils.h, so it belongs in the unit exactly when utils.h
+     is in the unit. A file that nothing includes is not part of this program.
+
+     Repeated until nothing new arrives, since a file linked this way can
+     include a header whose own .c then belongs here too. */
+  const linkPass = () => {
+    let added = false;
+    for (const f of state.userFiles) {
+      if (included.has(f.name + f.ext) || !isSource(f) || !hasBody(f)) continue;
+      if (!included.has(f.name + '.h') && !included.has(f.name + '.hpp')) continue;
+      append(f, 'linked: implements ' + f.name + '.h');
+      added = true;
+    }
+    return added;
+  };
+  while (linkPass()) { /* until stable */ }
+
+  /* Nothing in here can start. A companion file has no main of its own, and
+     running one should still run the program it belongs to rather than fail to
+     link -- so the file that does define main is brought in, and its headers
+     get their partners linked in turn.
+
+     A file that DOES define its own main never reaches this, which is what
+     lets a self-contained header run on its own. */
+  if (!DEFINES_MAIN.test(result)) {
+    const starter = state.userFiles.find(f =>
+      !included.has(f.name + f.ext) && isSource(f) && hasBody(f) && DEFINES_MAIN.test(f.userCode));
+    if (starter) {
+      append(starter, 'linked: defines main');
+      while (linkPass()) { /* headers the starter pulled in */ }
+    }
   }
 
   return result;
