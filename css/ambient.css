@@ -154,14 +154,19 @@
   100% { transform: rotate(var(--gspin, 120deg)); }
 }
 
-/* Long and thin. Turned a quarter so the length lies along the travel. */
+/* Small. A field of these is meant to read as flecks caught in the light --
+   many of them, each barely there -- not as a handful of streaks crossing the
+   pane. The first pass was 34px long and twelve to a pane, which is the same
+   amount of movement spent in the wrong places.
+
+   Long and thin, turned a quarter so the length lies along the travel. */
 .amb-shard-i {
   position: absolute;
   left: 0;
   top: 0;
-  width: 7px;
-  height: 34px;
-  margin: -17px 0 0 -3.5px;
+  width: 3.5px;
+  height: 17px;
+  margin: -8.5px 0 0 -1.75px;
   color: var(--amb-lit);
   opacity: 0;
   animation: ambShoot var(--t, 9s) cubic-bezier(0.22, 0.62, 0.35, 1) infinite;
@@ -216,10 +221,10 @@
 @keyframes ambShoot {
   0%   { opacity: 0;
          transform: translate(0, 0) rotate(calc(var(--spin, 12deg) * -1)) scale(var(--s, 1)); }
-  3%   { opacity: 1; }
+  3%   { opacity: var(--o, 1); }
   7%   { transform: translate(calc(var(--len, 240px) * 0.5), var(--curve, -26px))
                     rotate(0deg) scale(var(--s, 1)); }
-  11%  { opacity: 1; }
+  11%  { opacity: var(--o, 1); }
   13%  { opacity: 0;
          transform: translate(var(--len, 240px), 0) rotate(var(--spin, 12deg)) scale(var(--s, 1)); }
   100% { opacity: 0;

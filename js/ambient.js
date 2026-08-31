@@ -13,10 +13,12 @@
 
 const AMB_KEY = 'ssp.ambient';
 
-/* A dozen, because each one is only visible for about a tenth of its cycle --
-   so at any moment one or two are in flight and the rest are waiting. Fewer
-   read as a pane where nothing happens; many more read as rain. */
-const AMB_COUNT = 12;
+/* Each shard is only lit for about a tenth of its cycle, so the number here is
+   roughly ten times what is on screen at once. Twenty-six gives two or three
+   flecks at any moment and a field that is never quite still -- a dozen gave
+   one, which read as a pane where something occasionally happened rather than
+   as a field with weather in it. */
+const AMB_COUNT = 26;
 
 /** Is the ambient layer on? On by default; the switch is a departure from it. */
 function ambEnabled() {
@@ -81,16 +83,21 @@ function _ambFill(host) {
   const shardAt = (x, y, ang, cycle, delay) => {
     const el = document.createElement('div');
     el.className = 'amb-shard';
-    const curve = _ambRand(18, 62) * (Math.random() < 0.5 ? -1 : 1);
+    const curve = _ambRand(8, 30) * (Math.random() < 0.5 ? -1 : 1);
     el.style.setProperty('--x', x);
     el.style.setProperty('--y', y);
     el.style.setProperty('--ang', ang.toFixed(1) + 'deg');
-    el.style.setProperty('--len', Math.round(_ambRand(130, 280)) + 'px');
+    /* A short drift, not a crossing. These are small enough that 280px read as
+       a streak fired across the pane; at this size the eye wants a fleck that
+       moves a little and is gone. */
+    el.style.setProperty('--len', Math.round(_ambRand(40, 130)) + 'px');
     el.style.setProperty('--curve', Math.round(curve) + 'px');
+    // Not all equally bright, so the field has some depth to it.
+    el.style.setProperty('--o', _ambRand(0.45, 1).toFixed(2));
     // Turned the way it is bending, so its length follows the curve rather
     // than pointing where it set off.
     el.style.setProperty('--spin', (curve > 0 ? 16 : -16).toFixed(0) + 'deg');
-    el.style.setProperty('--s', _ambRand(0.65, 1.3).toFixed(2));
+    el.style.setProperty('--s', _ambRand(0.5, 1.25).toFixed(2));
     el.style.setProperty('--t', cycle.toFixed(1) + 's');
     el.style.setProperty('--d', delay.toFixed(2) + 's');
 
@@ -103,8 +110,8 @@ function _ambFill(host) {
     return el;
   };
 
-  /* Four that travel alone, anywhere and in any direction. */
-  for (let i = 0; i < 4; i++) {
+  /* Most travel alone, anywhere and in any direction. */
+  for (let i = 0; i < AMB_COUNT - 10; i++) {
     const cycle = _ambRand(6, 14);
     layer.appendChild(shardAt(
       _ambRand(8, 88).toFixed(1) + '%',
@@ -132,7 +139,7 @@ function _ambFill(host) {
 
     // Fanned around one heading: blown together, not scattered from a point.
     const heading = _ambRand(0, 360);
-    const members = 4 + Math.round(Math.random());
+    const members = 5;
     for (let i = 0; i < members; i++) {
       gust.appendChild(shardAt(
         Math.round(_ambRand(-34, 34)) + 'px',
