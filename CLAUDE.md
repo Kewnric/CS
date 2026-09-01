@@ -22,7 +22,7 @@ modules. A duplicate top-level `const` or `let` is a hard `SyntaxError` that
 kills the *entire second file* — every function in it silently stops existing,
 and the failure looks like an unrelated feature breaking.
 
-There are currently **2851 top-level declarations across 108 files and zero
+There are currently **2882 top-level declarations across 108 files and zero
 collisions**. Keep it that way. After adding or renaming anything top-level:
 
 ```bash
@@ -34,7 +34,7 @@ for f in sorted(glob.glob('js/**/*.js', recursive=True)):
     depth = 0
     for line in io.open(f, encoding='utf-8', errors='replace'):
         if depth == 0:
-            m = re.match(r'\s*(?:const|let|var|function|class)\s+([A-Za-z_$][\w$]*)', line)
+            m = re.match(r'\s*(?:async\s+)?(?:const|let|var|function|class)\s+([A-Za-z_$][\w$]*)', line)
             if m: names[m.group(1)].append(f)
         depth += line.count('{') - line.count('}')
         if depth < 0: depth = 0
