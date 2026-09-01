@@ -162,15 +162,20 @@ function codingStarterPack() {
   /* The second half lives in its own file: arrays, pointers, memory and the
      bag. Kept apart because that half is a course of its own and this one is
      the warm-up before it. */
+  let allCh = challenges, allNodes = nodes;
   if (typeof codingStarterFundamentals === 'function') {
     const more = codingStarterFundamentals();
-    return {
-      challenges: challenges.concat(more.challenges),
-      nodes: nodes.concat(more.nodes),
-      sets: []
-    };
+    allCh = allCh.concat(more.challenges);
+    allNodes = allNodes.concat(more.nodes);
   }
-  return { challenges: challenges, nodes: nodes, sets: [] };
+  /* The list ADT coursework, which is the one part of the pack that ships with
+     starter code -- see coding-starter-lists.js for why. */
+  if (typeof codingStarterLists === 'function') {
+    const lists = codingStarterLists();
+    allCh = allCh.concat(lists.challenges);
+    allNodes = allNodes.concat(lists.nodes);
+  }
+  return { challenges: allCh, nodes: allNodes, sets: [] };
 }
 
 /* ── The switch ───────────────────────────────────────────── */
