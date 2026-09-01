@@ -275,36 +275,61 @@
      row that cannot fit the title. */
   .practice-topbar-center .sao-lv.unset { display: none; }
 
+  /* ── RESULTS AS A BOTTOM SHEET ──────────────────────────────
+     At rest the panel is nothing but its tab row and its button bar,
+     sitting on the floor of the screen: Tests / Executions / Run Code /
+     Finish read as a footer and the results are below the fold. Scrolling
+     the sheet lifts it half a screen and the rows rise into view under the
+     bar, which is pinned and stays put. Scrolling back to the top drops it
+     to a footer again.
+
+     Absolutely positioned rather than in flow, because expanding in flow
+     would have to take the height from the editor, which has a floor of its
+     own -- the two cannot both be satisfied. Out of flow, the sheet simply
+     lies over the editor, and .practice-body reserves the collapsed height
+     so the last lines of code are never behind the bar.
+
+     --pp-collapsed-h is measured and set by ppSheetInit() in
+     practice-panel.js: the button bar wraps on narrow phones, so its height
+     is not a constant worth hard-coding. The 94px is only a first paint
+     fallback. */
+  .practice-body {
+    position: relative;
+    padding-bottom: var(--pp-collapsed-h, 94px);
+  }
+
   .practice-panel {
     /* Flex, not block: the children are reordered below, and order only
        applies to flex items. */
     display: flex !important;
     flex-direction: column;
-    width: 100% !important;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto !important;
     flex-basis: auto !important;
-    /* Height budget, measured on a 812px phone (.practice-body = 702px).
-       The editor's old 46vh floor took 374px and left the panel 150px --
-       minus 39px of tabs and 63px of buttons that is 47px of results, i.e.
-       exactly one test row. Lowering the editor floor and giving the panel
-       one of its own puts the panel at ~250px, so 3-4 rows show and the
-       rest scrolls instead of being a peephole. */
-    min-height: 30vh;
-    max-height: 52vh;
+    height: var(--pp-collapsed-h, 94px);
+    min-height: 0;
+    max-height: none;
     overflow-y: auto;
     border-left: none;
     border-top: 1px solid var(--border-color);
+    /* Over .run-code-overlay, which is a body-level fixed layer at 9999. */
+    z-index: 10000;
+    transition: height 260ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .practice-panel.pp-open {
+    height: calc(var(--pp-collapsed-h, 94px) + 50vh);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .practice-panel { transition: none; }
   }
 
-  /* The Run/Finish bar used to stick to the BOTTOM of a panel only ~185px
-     tall, so it floated over the first rows of whichever tab was open --
-     test cases and execution history were read through the buttons. The
-     76px of bottom padding that used to be here only rescued the tail.
-
-     It now sits directly under the tab row instead: tabs pinned at the top,
-     buttons pinned right beneath them, results scrolling below both. The
-     pinned chrome costs the same 102px either way, so nothing is lost by
-     moving it -- the difference is that content now starts below the
-     buttons rather than sliding underneath them. */
+  /* The four controls in one pinned block at the top of the sheet: the tab
+     row first, the buttons directly under it, results below both. The tab
+     row keeps its height on purpose -- the buttons stick at exactly that
+     height, so shrinking one without the other opens a gap between them. */
   .practice-panel .pp-tabs { order: 1; }
   .practice-panel .pp-footer {
     order: 2;
@@ -316,15 +341,9 @@
     z-index: 3;
   }
   .practice-panel .pp-tab-body { order: 3; }
-  /* Every pixel the pinned chrome gives back is a pixel of results. The tab
-     row keeps its height on purpose: the footer sticks at exactly that
-     height, so shrinking one without the other opens a gap between them. */
-  .practice-panel .pp-footer { padding: 0.5rem 0.55rem; }
-  /* Capped tightly on purpose: this pane scrolls, and any height it is
-     allowed to take comes straight out of the results panel below --
-     lowering the editor floor alone just fed the extra space to here. */
-  .practice-sidebar { max-height: 22vh; overflow-y: auto; }
-  .practice-editor-area { min-height: 30vh; }
+
+  .practice-sidebar { max-height: 34vh; overflow-y: auto; }
+  .practice-editor-area { min-height: 46vh; }
 
   /* ── TOUCH TARGETS ──────────────────────────────────────────
      Measured across every route: the back button in each library was 64x23,

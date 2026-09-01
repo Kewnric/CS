@@ -119,6 +119,7 @@ function renderPracticePanel() {
   _ppRenderTabBody();
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: host });
   if (typeof ambMount === 'function') ambMount();
+  ppSheetInit();
 }
 
 /** Only rendered when there's more than one problem — a lone "1" box is noise
@@ -150,6 +151,7 @@ function ppSwitchTab(tab) {
   const host = document.getElementById('practice-panel');
   if (host) host.querySelectorAll('.pp-tab').forEach(b => b.classList.toggle('active', b.getAttribute('onclick').includes(`'${tab}'`)));
   _ppRenderTabBody();
+  ppSheetOpen();   // a tab tapped while the sheet is shut must show something
 }
 
 function _ppRenderTabBody() {
@@ -688,3 +690,111 @@ function ppRunUnavailable() {
   if (typeof toast === 'function') toast(why, { type: 'info', duration: 6000 });
 }
 window.ppRunUnavailable = ppRunUnavailable;
+
+
+/* ============================================================
+   THE RESULTS SHEET (phones only)
+   ============================================================
+   On a phone the panel is a bottom sheet rather than a column beside the
+   editor. Collapsed, it is exactly its tab row plus its button bar, sitting
+   on the floor of the screen -- Tests / Executions / Run Code / Finish read
+   as a footer, and the results are below the fold. Scroll it and it rises by
+   half a screen with the bar pinned to its top, so the rows come up
+   underneath the four controls instead of behind them. Scroll back to the
+   top and it drops to a footer again.
+
+   The open/closed test is simply whether the sheet is scrolled: any downward
+   scroll puts scrollTop above zero and opens it, returning to zero closes it.
+   That needs no gesture handling and it cannot disagree with what is on
+   screen, because it is reading the same number the browser scrolled to. */
+
+const PP_SHEET_MQ = '(max-width: 640px)';
+const PP_SHEET_DRAG = 12;          // px of finger travel before it counts
+
+function _ppSheetOn() {
+  return window.matchMedia(PP_SHEET_MQ).matches;
+}
+
+/* Measured, not assumed: the two buttons wrap onto a second row on narrow
+   phones, which makes the bar taller. A hard-coded height would either hide
+   part of the bar or leave a gap under it. */
+function _ppSheetMeasure() {
+  const panel = document.getElementById('practice-panel');
+  if (!panel) return;
+  const tabs = panel.querySelector('.pp-tabs');
+  const foot = panel.querySelector('.pp-footer');
+  if (!tabs || !foot) return;
+  const h = Math.round(tabs.getBoundingClientRect().height +
+                       foot.getBoundingClientRect().height);
+  if (h <= 0) return;                       // panel is hidden; nothing to measure
+  const host = panel.closest('.practice-body') || panel;
+  host.style.setProperty('--pp-collapsed-h', h + 'px');
+}
+
+function _ppSheetSet(open) {
+  const panel = document.getElementById('practice-panel');
+  if (!panel) return;
+  /* Off the phone layout the panel is an ordinary column again, and the class
+     would otherwise stay behind after a rotation. */
+  if (!_ppSheetOn()) { panel.classList.remove('pp-open'); return; }
+  panel.classList.toggle('pp-open', !!open);
+}
+
+/** Opens the sheet from elsewhere -- switching tabs, for one: a tab you tap
+    while the sheet is shut would otherwise change nothing you can see. */
+function ppSheetOpen() { _ppSheetSet(true); }
+
+let _ppSheetBound = false;
+let _ppSheetTouchY = null;
+
+/** Called at the end of every panel render; the listeners are bound once.
+
+    Direction, not scroll position, decides this. Scroll position looks like
+    the obvious signal and does not work: collapsed, the sheet is 102px around
+    ~380px of content and scrolls freely, but once open it is half a screen
+    taller than that content, so it stops being scrollable at all, scrollTop
+    is forced back to 0, and a rule keyed on scrollTop would read that as
+    "closed" and shut the sheet the instant it opened. */
+function ppSheetInit() {
+  _ppSheetMeasure();
+  if (_ppSheetBound) return;
+  _ppSheetBound = true;
+
+  /* Scrolled off the top: it is open, whatever any gesture said. Capture,
+     because scroll does not bubble and the panel is replaced on every
+     render, so a listener on the element itself would not survive. */
+  document.addEventListener('scroll', e => {
+    const t = e.target;
+    if (t && t.id === 'practice-panel' && t.scrollTop > 0) _ppSheetSet(true);
+  }, true);
+
+  document.addEventListener('wheel', e => {
+    const panel = e.target && e.target.closest && e.target.closest('#practice-panel');
+    if (!panel) return;
+    if (e.deltaY > 0) _ppSheetSet(true);
+    else if (e.deltaY < 0 && panel.scrollTop <= 0) _ppSheetSet(false);
+  }, { passive: true });
+
+  document.addEventListener('touchstart', e => {
+    const panel = e.target && e.target.closest && e.target.closest('#practice-panel');
+    _ppSheetTouchY = (panel && e.touches[0]) ? e.touches[0].clientY : null;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', e => {
+    if (_ppSheetTouchY === null || !e.touches[0]) return;
+    const panel = e.target && e.target.closest && e.target.closest('#practice-panel');
+    if (!panel) return;
+    const dy = _ppSheetTouchY - e.touches[0].clientY;   // finger travelling up
+    if (dy > PP_SHEET_DRAG) _ppSheetSet(true);
+    else if (dy < -PP_SHEET_DRAG && panel.scrollTop <= 0) _ppSheetSet(false);
+  }, { passive: true });
+
+  document.addEventListener('touchend', () => { _ppSheetTouchY = null; }, { passive: true });
+
+  window.addEventListener('resize', () => {
+    _ppSheetMeasure();
+    if (!_ppSheetOn()) _ppSheetSet(false);
+  });
+}
+window.ppSheetInit = ppSheetInit;
+window.ppSheetOpen = ppSheetOpen;
