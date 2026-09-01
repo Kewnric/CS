@@ -456,6 +456,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 0.625rem;
+  flex-wrap: wrap;
   background: var(--bg-surface);
   background: linear-gradient(to bottom, transparent, var(--bg-surface) 25%, var(--bg-surface) 100%);
   z-index: 10;
@@ -467,6 +468,8 @@
   display: flex;
   align-items: center;
   gap: 0.25rem;
+  min-width: 0;
+  flex: 0 1 auto;
 }
 .af-footer-hint kbd {
   background: var(--bg-surface-hover);
@@ -483,6 +486,8 @@
 .af-footer-actions {
   display: flex;
   gap: 0.625rem;
+  flex-wrap: wrap;
+  margin-left: auto;
 }
 
 @media (max-width: 600px) {
