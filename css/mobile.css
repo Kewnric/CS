@@ -276,21 +276,39 @@
   .practice-topbar-center .sao-lv.unset { display: none; }
 
   .practice-panel {
-    display: block !important;
+    /* Flex, not block: the children are reordered below, and order only
+       applies to flex items. */
+    display: flex !important;
+    flex-direction: column;
     width: 100% !important;
     flex-basis: auto !important;
     max-height: 45vh;
     overflow-y: auto;
     border-left: none;
     border-top: 1px solid var(--border-color);
-    /* Room to scroll clear of the Run/Finish bar, which is sticky and sits
-       over the last 63px of this panel. Without it the tail of the results
-       could not be read at all: scrolling fed the text into the strip behind
-       the buttons rather than into view, which is what the overlapping
-       "…use Check Code to compile check" was. */
-    padding-bottom: 76px;
-    scroll-padding-bottom: 76px;
   }
+
+  /* The Run/Finish bar used to stick to the BOTTOM of a panel only ~185px
+     tall, so it floated over the first rows of whichever tab was open --
+     test cases and execution history were read through the buttons. The
+     76px of bottom padding that used to be here only rescued the tail.
+
+     It now sits directly under the tab row instead: tabs pinned at the top,
+     buttons pinned right beneath them, results scrolling below both. The
+     pinned chrome costs the same 102px either way, so nothing is lost by
+     moving it -- the difference is that content now starts below the
+     buttons rather than sliding underneath them. */
+  .practice-panel .pp-tabs { order: 1; }
+  .practice-panel .pp-footer {
+    order: 2;
+    margin-top: 0;
+    top: calc(var(--ed-toolbar-h, 38px) + 1px);   /* directly under .pp-tabs */
+    bottom: auto;
+    border-top: none;
+    border-bottom: 1px solid #21262d;
+    z-index: 3;
+  }
+  .practice-panel .pp-tab-body { order: 3; }
   .practice-sidebar { max-height: 34vh; overflow-y: auto; }
   .practice-editor-area { min-height: 46vh; }
 
