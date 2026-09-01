@@ -282,7 +282,14 @@
     flex-direction: column;
     width: 100% !important;
     flex-basis: auto !important;
-    max-height: 45vh;
+    /* Height budget, measured on a 812px phone (.practice-body = 702px).
+       The editor's old 46vh floor took 374px and left the panel 150px --
+       minus 39px of tabs and 63px of buttons that is 47px of results, i.e.
+       exactly one test row. Lowering the editor floor and giving the panel
+       one of its own puts the panel at ~250px, so 3-4 rows show and the
+       rest scrolls instead of being a peephole. */
+    min-height: 30vh;
+    max-height: 52vh;
     overflow-y: auto;
     border-left: none;
     border-top: 1px solid var(--border-color);
@@ -309,8 +316,15 @@
     z-index: 3;
   }
   .practice-panel .pp-tab-body { order: 3; }
-  .practice-sidebar { max-height: 34vh; overflow-y: auto; }
-  .practice-editor-area { min-height: 46vh; }
+  /* Every pixel the pinned chrome gives back is a pixel of results. The tab
+     row keeps its height on purpose: the footer sticks at exactly that
+     height, so shrinking one without the other opens a gap between them. */
+  .practice-panel .pp-footer { padding: 0.5rem 0.55rem; }
+  /* Capped tightly on purpose: this pane scrolls, and any height it is
+     allowed to take comes straight out of the results panel below --
+     lowering the editor floor alone just fed the extra space to here. */
+  .practice-sidebar { max-height: 22vh; overflow-y: auto; }
+  .practice-editor-area { min-height: 30vh; }
 
   /* ── TOUCH TARGETS ──────────────────────────────────────────
      Measured across every route: the back button in each library was 64x23,
