@@ -28,24 +28,24 @@ function ambEnabled() {
 /** The panes worth filling: the two that are mostly empty for most of an attempt. */
 /* Every pane this should sit behind, in one place.
 
-   .practice-sidebar / .practice-panel cover the attempt screens -- coding
-   practice, practice sets, snippet attempts, notes practice all build from the
-   same two-pane shell. .messenger-pane-1 / -2 cover everything else with large
-   empty areas: the coding, snippet and study libraries, the admin forms,
-   analytics, quests and the language pages.
+   The attempt screens ONLY -- .practice-sidebar and .practice-panel, the
+   two-pane shell shared by coding practice, practice sets, snippet attempts
+   and notes practice. These are the panes that genuinely sit empty while you
+   work, which is what the effect was for.
 
-   .an-sn-page is the one analytics view that does not use the two-pane shell,
-   so it needs naming separately -- analytics-coding and analytics-notes are
-   already covered by the panes.
+   This used to also list .messenger-pane-1 / -2 and .an-sn-page, which put it
+   behind the libraries, admin forms, analytics, quests and the language pages.
+   That was wrong on a phone: those panes go full-width, so a layer sized for a
+   340px sidebar tiled the entire screen and read as page background rather
+   than as something inside a pane. Kept to the attempt panes, it stays
+   contained on every width.
 
    Deliberately NOT .home-content: the dashboard is dense with cards, and the
-   analytics and admin landing pages are menus you pass through. This is for
-   panes that sit empty while you work, not for every screen.
+   analytics and admin landing pages are menus you pass through.
 
    Adding a screen later means adding a selector here and nothing else; the
    stylesheet keys off the .amb-host class this applies. */
-const AMB_HOST_SELECTOR =
-  '.practice-sidebar, .practice-panel, .messenger-pane-1, .messenger-pane-2, .an-sn-page';
+const AMB_HOST_SELECTOR = '.practice-sidebar, .practice-panel';
 
 function _ambHosts() {
   const hosts = Array.from(document.querySelectorAll(AMB_HOST_SELECTOR));
