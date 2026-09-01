@@ -166,9 +166,21 @@ marks correct work wrong, silently.
 
 ## Traps that have already cost time
 
-**Verify by measuring, not reasoning.** Several "bugs" this codebase appeared to
-have were measurement mistakes. Check the measurement before believing a
-surprising result.
+**Verify by measuring, not reasoning — then check the measurement.** Every
+alarming finding this codebase has produced so far has been the tool, not the
+code. A scan that reports 117 broken things in an app that visibly works is
+reporting a broken scan. Confirm one case by hand before believing the set.
+
+Specifically, when scanning this app's JS for "is this defined anywhere", a
+naive scan will be wrong three ways:
+
+- functions are often `window.foo = function ...`, not a top-level declaration
+- `async function foo()` does not match `(const|let|var|function|class)\s+`
+- an `onclick="...${_esc(x)}..."` contains build-time interpolation that is
+  never part of the emitted handler
+
+With all three handled, all 1281 inline handlers resolve and there are no dead
+buttons.
 
 - **Browser-pane artefacts:** `requestAnimationFrame` does not fire while the
   pane is hidden; timers throttle; CSS transitions mean `getComputedStyle` right
