@@ -143,7 +143,6 @@ function practiceInit() {
   initPractice();
   // The sidebar is built with the route, so its crystals go in once, here. The
   // panel puts its own back after each render — see renderPracticePanel.
-  if (typeof ambMount === 'function') ambMount();
   if (typeof ostMount === 'function') ostMount();
 }
 function practiceDestroy() {

@@ -219,6 +219,13 @@ const SpaRouter = (() => {
       // bring its badge up to date after data loads or changes.
       if (typeof agPaintFlag === 'function') agPaintFlag();
 
+      /* The ambient background, for whichever panes this route just built.
+         Here rather than in each route: every screen with a large empty pane
+         wants it, and fifteen copies of one call is fifteen places to forget
+         it. Idempotent, so a route that mounts its own panes later can call it
+         again without starting the animation over. */
+      if (typeof ambMount === 'function') ambMount();
+
       // Re-create Lucide icons globally safely
       if (typeof lucide !== 'undefined') {
         lucide.createIcons();

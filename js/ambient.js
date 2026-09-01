@@ -26,9 +26,33 @@ function ambEnabled() {
 }
 
 /** The panes worth filling: the two that are mostly empty for most of an attempt. */
+/* Every pane this should sit behind, in one place.
+
+   .practice-sidebar / .practice-panel cover the attempt screens -- coding
+   practice, practice sets, snippet attempts, notes practice all build from the
+   same two-pane shell. .messenger-pane-1 / -2 cover everything else with large
+   empty areas: the coding, snippet and study libraries, the admin forms,
+   analytics, quests and the language pages.
+
+   .an-sn-page is the one analytics view that does not use the two-pane shell,
+   so it needs naming separately -- analytics-coding and analytics-notes are
+   already covered by the panes.
+
+   Deliberately NOT .home-content: the dashboard is dense with cards, and the
+   analytics and admin landing pages are menus you pass through. This is for
+   panes that sit empty while you work, not for every screen.
+
+   Adding a screen later means adding a selector here and nothing else; the
+   stylesheet keys off the .amb-host class this applies. */
+const AMB_HOST_SELECTOR =
+  '.practice-sidebar, .practice-panel, .messenger-pane-1, .messenger-pane-2, .an-sn-page';
+
 function _ambHosts() {
-  return [document.querySelector('.practice-sidebar'), document.getElementById('practice-panel')]
-    .filter(Boolean);
+  const hosts = Array.from(document.querySelectorAll(AMB_HOST_SELECTOR));
+  // The stylesheet needs the class; giving it here keeps the list of pages and
+  // the thing that marks them from drifting apart.
+  hosts.forEach(h => h.classList.add('amb-host'));
+  return hosts;
 }
 
 /* Five slivers, and neighbours never share one.
@@ -169,6 +193,7 @@ function ambMount() {
   document.body.classList.toggle('amb-off', !on);
   if (!on) {
     document.querySelectorAll('.amb-shards').forEach(el => el.remove());
+    document.querySelectorAll('.amb-host').forEach(el => el.classList.remove('amb-host'));
     return;
   }
   _ambHosts().forEach(_ambFill);

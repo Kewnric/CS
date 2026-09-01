@@ -33,8 +33,14 @@
   --amb-lit: var(--color-accent-hover, #22d3ee);
 }
 
-.practice-sidebar,
-#practice-panel {
+/* ONE CLASS, NOT A LIST OF PAGES. js/ambient.js puts .amb-host on every pane
+   that should carry this, so adding a screen later is one string in that file
+   rather than another selector in each of the six rules below.
+
+   border-radius: inherit on the layers matters more than it looks. The library
+   and analytics panes are rounded, floating cards; a full-bleed inset:0 layer
+   squares their corners off, and the pane stops looking like a card. */
+.amb-host {
   position: relative;
   isolation: isolate;      /* the layers below can never rise past the content */
 }
@@ -43,11 +49,11 @@
    Exactly the pane, drifting by background-position. One whole tile in each
    direction, so the loop closes on itself with no jump at the restart.
    ------------------------------------------------------------ */
-.practice-sidebar::before,
-#practice-panel::before {
+.amb-host::before {
   content: '';
   position: absolute;
   inset: 0;
+  border-radius: inherit;
   z-index: -1;
   pointer-events: none;
   opacity: 0.45;
@@ -70,11 +76,11 @@
    It breathes by growing and fading rather than by scaling the element,
    which would put the box outside the pane again.
    ------------------------------------------------------------ */
-.practice-sidebar::after,
-#practice-panel::after {
+.amb-host::after {
   content: '';
   position: absolute;
   inset: 0;
+  border-radius: inherit;
   z-index: -2;
   pointer-events: none;
   background-repeat: no-repeat;
@@ -113,6 +119,7 @@
 .amb-shards {
   position: absolute;
   inset: 0;
+  border-radius: inherit;
   z-index: -1;
   overflow: hidden;       /* nothing in here reaches the scrollbars either */
   pointer-events: none;
@@ -241,19 +248,15 @@
 }
 
 /* ── Off ────────────────────────────────────────────────────── */
-.amb-off .practice-sidebar::before,
-.amb-off .practice-sidebar::after,
-.amb-off #practice-panel::before,
-.amb-off #practice-panel::after { content: none; }
+.amb-off .amb-host::before,
+.amb-off .amb-host::after { content: none; }
 .amb-off .amb-shards { display: none; }
 
 /* Movement is the unwelcome part, not the decoration, so the field and the
    glow stay and simply stop. The shapes go: their whole point is travel, and a
    row of them frozen mid-pane reads as a rendering fault. */
 @media (prefers-reduced-motion: reduce) {
-  .practice-sidebar::before,
-  .practice-sidebar::after,
-  #practice-panel::before,
-  #practice-panel::after { animation: none; }
+  .amb-host::before,
+  .amb-host::after { animation: none; }
   .amb-shards { display: none; }
 }
