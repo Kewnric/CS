@@ -13,6 +13,36 @@
 
 const AMB_KEY = 'ssp.ambient';
 
+/* Which set of colours, shapes and motion the panes carry. The on/off switch
+   above is kept separate rather than folded in as a fourth theme: turning the
+   motion off is an accessibility choice and it should survive picking a look,
+   so a reader who has it off and tries a theme does not get motion back.
+
+   'default' is the crystals this started as. Everything a theme changes lives
+   in css/ambient.css under .amb-theme-<id>; nothing here knows what any of
+   them look like. */
+const AMB_THEME_KEY = 'ssp.ambientTheme';
+const AMB_THEMES = [
+  { id: 'default', name: 'Default',      hint: 'crystal shards, indigo and cyan', icon: 'gem' },
+  { id: 'fire',    name: 'Fireflies',    hint: 'campfire warmth, leaves and embers', icon: 'flame' },
+  { id: 'night',   name: 'Starry night', hint: 'fairy lights over a quiet room', icon: 'moon' }
+];
+
+/** The chosen theme id, always one that exists. */
+function ambTheme() {
+  let t = 'default';
+  try { t = localStorage.getItem(AMB_THEME_KEY) || 'default'; } catch (e) { /* private mode */ }
+  return AMB_THEMES.some(x => x.id === t) ? t : 'default';
+}
+
+/* On the body, not on each pane: the tile, the glow and the shards are all
+   themed, and two of the three are pseudo-elements that no per-pane class
+   could reach without repeating this selector in every rule. */
+function _ambApplyThemeClass() {
+  const t = ambTheme();
+  AMB_THEMES.forEach(x => document.body.classList.toggle('amb-theme-' + x.id, x.id === t));
+}
+
 /* Each shard is only lit for about a tenth of its cycle, so the number here is
    roughly ten times what is on screen at once. Twenty-six gives two or three
    flecks at any moment and a field that is never quite still -- a dozen gave
@@ -191,6 +221,7 @@ function _ambFill(host) {
 function ambMount() {
   const on = ambEnabled();
   document.body.classList.toggle('amb-off', !on);
+  _ambApplyThemeClass();
   if (!on) {
     document.querySelectorAll('.amb-shards').forEach(el => el.remove());
     document.querySelectorAll('.amb-host').forEach(el => el.classList.remove('amb-host'));
@@ -199,7 +230,7 @@ function ambMount() {
   _ambHosts().forEach(_ambFill);
 }
 
-/** The topbar switch. */
+/** The topbar switch. Still the on/off; the themes live in the panel. */
 function toggleAmbient() {
   const next = !ambEnabled();
   try { localStorage.setItem(AMB_KEY, next ? '1' : '0'); } catch (e) { /* private mode */ }
@@ -210,26 +241,94 @@ function toggleAmbient() {
   }
 }
 
+/* Click opens the panel rather than long-press, which is what the two controls
+   beside it use. Those hide a secondary setting behind a button whose primary
+   job is a toggle; here the panel IS the point, and a look you pick once is
+   not worth hiding behind a gesture nothing on screen advertises.
+
+   The control still carries .js-hold-pop, so the shared opener in
+   typing-sfx.js closes it when a click lands anywhere else. */
+function toggleAmbientMenu(ev) {
+  if (ev) ev.stopPropagation();
+  const btn = document.getElementById('ambient-btn');
+  const control = btn && btn.closest('.js-hold-pop');
+  if (!control) return;
+  const open = !control.classList.contains('is-open');
+  document.querySelectorAll('.js-hold-pop.is-open').forEach(c => c.classList.remove('is-open'));
+  control.classList.toggle('is-open', open);
+}
+
+/** Pick a look. Turns the motion back on if it was off, because choosing a
+    theme from a panel you opened on purpose says you want to see it. */
+function setAmbTheme(id) {
+  const theme = AMB_THEMES.find(t => t.id === id) || AMB_THEMES[0];
+  try { localStorage.setItem(AMB_THEME_KEY, theme.id); } catch (e) { /* private mode */ }
+  try { localStorage.setItem(AMB_KEY, '1'); } catch (e) { /* private mode */ }
+  /* The shards are built once per pane and left alone, so a theme that only
+     recoloured them would keep the old motion until the panel next rendered.
+     Clearing them makes the next mount rebuild under the new rules. */
+  document.querySelectorAll('.amb-shards').forEach(el => el.remove());
+  ambMount();
+  _syncAmbientBtn();
+  if (typeof toast === 'function') {
+    toast(theme.name + ' background', { type: 'info', duration: 1800 });
+  }
+}
+
 function _syncAmbientBtn() {
   const on = ambEnabled();
-  const label = on ? 'Background motion on' : 'Background motion off';
+  const theme = AMB_THEMES.find(t => t.id === ambTheme()) || AMB_THEMES[0];
+  const label = on ? ('Background: ' + theme.name) : 'Background motion off';
   const btn = document.getElementById('ambient-btn');
   if (!btn) return;
   btn.title = label;
   btn.setAttribute('aria-label', label);
-  btn.setAttribute('aria-pressed', String(on));
+  btn.setAttribute('aria-expanded', String(!!btn.closest('.js-hold-pop.is-open')));
   btn.style.color = on ? 'var(--color-accent-hover, #22d3ee)' : '';
   const icon = btn.querySelector('[data-lucide], svg');
-  if (typeof _setLucideIcon === 'function') _setLucideIcon(icon, on ? 'gem' : 'square');
+  // The button wears the theme's own icon, so the strip says which is on
+  // without the panel being open.
+  if (typeof _setLucideIcon === 'function') _setLucideIcon(icon, on ? theme.icon : 'square');
+
+  document.querySelectorAll('.amb-opt[data-amb-theme]').forEach(el => {
+    const isOn = on && el.getAttribute('data-amb-theme') === theme.id;
+    el.classList.toggle('is-on', isOn);
+    el.setAttribute('aria-pressed', String(isOn));
+  });
+  const off = document.getElementById('amb-off-opt');
+  if (off) {
+    off.classList.toggle('is-on', !on);
+    off.setAttribute('aria-pressed', String(!on));
+  }
 }
 
 function ambientButtonTemplate() {
   const on = ambEnabled();
-  const label = on ? 'Background motion on' : 'Background motion off';
+  const current = ambTheme();
+  const theme = AMB_THEMES.find(t => t.id === current) || AMB_THEMES[0];
+  const label = on ? ('Background: ' + theme.name) : 'Background motion off';
+  const opts = AMB_THEMES.map(t => `
+        <button type="button" class="amb-opt${on && t.id === current ? ' is-on' : ''}"
+                data-amb-theme="${t.id}" onclick="setAmbTheme('${t.id}')"
+                aria-pressed="${on && t.id === current}" title="${t.name}">
+          <span class="amb-opt-name">${t.name}</span>
+          <span class="amb-opt-hint">${t.hint}</span>
+        </button>`).join('');
   return `
-    <button class="btn btn-ghost practice-icon-btn" onclick="toggleAmbient()"
-            title="${label}" id="ambient-btn" aria-label="${label}" aria-pressed="${on}"
-            style="${on ? 'color:var(--color-accent-hover,#22d3ee);' : ''}">
-      <i data-lucide="${on ? 'gem' : 'square'}" style="width:16px;height:16px;" aria-hidden="true"></i>
-    </button>`;
+    <div class="amb-control js-hold-pop">
+      <button class="btn btn-ghost practice-icon-btn" onclick="toggleAmbientMenu(event)"
+              title="${label}" id="ambient-btn" aria-label="${label}"
+              aria-haspopup="true" aria-expanded="false"
+              style="${on ? 'color:var(--color-accent-hover,#22d3ee);' : ''}">
+        <i data-lucide="${on ? theme.icon : 'square'}" style="width:16px;height:16px;" aria-hidden="true"></i>
+      </button>
+      <div class="amb-pop" role="group" aria-label="Background style">${opts}
+        <button type="button" class="amb-opt amb-opt-off${on ? '' : ' is-on'}"
+                id="amb-off-opt" onclick="toggleAmbient()"
+                aria-pressed="${!on}" title="Stop the background motion entirely">
+          <span class="amb-opt-name">Off</span>
+          <span class="amb-opt-hint">no motion behind the panes</span>
+        </button>
+      </div>
+    </div>`;
 }

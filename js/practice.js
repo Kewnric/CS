@@ -196,6 +196,22 @@ function initPractice() {
   // reflex ended your attempt on one screen and not the other. Finishing is
   // deliberately a two-hand chord.
   window._practiceShortcutHandler = function(e) {
+    /* Ctrl+S is answered BEFORE the three guards below, and that placement is
+       the whole fix. Those guards hand the keyboard to an open modal, to the
+       terminal and to the find bar -- so while you were reading run output,
+       the one shortcut you reach for did nothing here and fell through to the
+       browser's "Save page" dialog instead.
+
+       Saving is safe from all three: it reads the editor and writes a draft,
+       and none of those states change what that means. */
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey &&
+        (e.key === 's' || e.key === 'S')) {
+      e.preventDefault();
+      if (practiceSaveNow() && typeof toast === 'function') {
+        toast('Saved', { type: 'success', duration: 1400 });
+      }
+      return;
+    }
     if (document.querySelector('.modal-overlay:not(.hidden)')) return;
     if (document.getElementById('run-code-overlay')) return;
     const findBar = document.getElementById('ed-find-bar');
@@ -367,6 +383,22 @@ function _practiceAutoSave() {
 }
 
 /* ── Check-Code restore points, kept across leaving the page ───────────── */
+/**
+ * Save on demand (Ctrl+S).
+ *
+ * Deliberately the SAME call the autosave makes rather than a second write
+ * that does most of it: _practiceAutoSave already pulls the editor into
+ * state, writes the draft, records the session copy and stamps the toolbar
+ * chip. A separate path would be a second place for those steps to fall out
+ * of step, and the chip disagreeing with what is on disk is exactly the bug
+ * this shortcut exists to remove.
+ */
+function practiceSaveNow() {
+  if (!state.userFiles || !state.activeChallenge || !state.activeVariant) return false;
+  _practiceAutoSave();          // ends in _bossMarkSaved(), which paints #ed-save-state
+  return true;
+}
+
 function _practiceExecKey() {
   return (state.activeChallenge && state.activeVariant)
     ? state.activeChallenge.id + '::' + state.activeVariant.id : null;

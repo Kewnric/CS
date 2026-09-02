@@ -1149,7 +1149,8 @@ mark.diff-hit.current {
    same reveal, same bottom-sheet treatment on a phone. Only what goes inside
    them differs. */
 .sfx-vol-pop,
-.edfx-pop {
+.edfx-pop,
+.amb-pop {
   position: absolute;
   top: 100%;
   right: 0;
@@ -1181,7 +1182,9 @@ mark.diff-hit.current {
 .edfx-control:hover .edfx-pop,
 .edfx-control:focus-within .edfx-pop,
 .sfx-control.is-open .sfx-vol-pop,
-.edfx-control.is-open .edfx-pop {
+.edfx-control.is-open .edfx-pop,
+.amb-control.is-open .amb-pop,
+.amb-control:focus-within .amb-pop {
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
@@ -1201,7 +1204,8 @@ mark.diff-hit.current {
    ------------------------------------------------------------ */
 @media (max-width: 640px) {
   .sfx-control.is-open .sfx-vol-pop,
-  .edfx-control.is-open .edfx-pop {
+  .edfx-control.is-open .edfx-pop,
+  .amb-control.is-open .amb-pop {
     position: fixed;
     top: auto;
     left: 12px;
@@ -1228,13 +1232,15 @@ mark.diff-hit.current {
    A column of switches rather than a row: each carries a line of explanation,
    because "Overlay style" means nothing on its own. Wide enough to read on a
    phone, where this becomes a sheet along the bottom edge. */
-.edfx-pop {
+.edfx-pop,
+.amb-pop {
   flex-direction: column;
   align-items: stretch;
   gap: 0.35rem;
   min-width: 210px;
 }
-.edfx-opt {
+.edfx-opt,
+.amb-opt {
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
@@ -1248,17 +1254,25 @@ mark.diff-hit.current {
   font: inherit;
   transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
 }
-.edfx-opt:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
-.edfx-opt.is-on {
+.edfx-opt:hover,
+.amb-opt:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
+.edfx-opt.is-on,
+.amb-opt.is-on {
   color: var(--color-primary);
   border-color: color-mix(in srgb, var(--color-primary) 55%, transparent);
   background: color-mix(in srgb, var(--color-primary) 12%, transparent);
 }
-.edfx-opt-name { font-size: 0.78rem; font-weight: 600; }
-.edfx-opt-hint { font-size: 0.68rem; opacity: 0.72; }
+.edfx-opt-name,
+.amb-opt-name { font-size: 0.78rem; font-weight: 600; }
+.edfx-opt-hint,
+.amb-opt-hint { font-size: 0.68rem; opacity: 0.72; }
+/* The off switch is not one of the looks; a rule above it says so. */
+.amb-opt-off { margin-top: 0.15rem; border-top: 1px solid var(--border-color, #2f2f3a);
+               border-radius: 0 0 6px 6px; padding-top: 0.5rem; }
 
 @media (max-width: 640px) {
-  .edfx-control.is-open .edfx-opt { padding: 0.6rem 0.65rem; }
+  .edfx-control.is-open .edfx-opt,
+  .amb-control.is-open .amb-opt { padding: 0.6rem 0.65rem; }
 }
 
 .sfx-vol-range {
