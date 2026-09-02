@@ -43,6 +43,10 @@ const EDFX_KEY = 'ssp.editorFx';
    annoy someone who types quickly. */
 const EDFX_OVERLAY_KEY = 'ssp.editorFxOverlay';
 const EDFX_TILT_KEY = 'ssp.editorFxTilt';
+/* BLUR off lands every letter sharp from the first frame. On -- the default --
+   the letter spends its first fraction of a second soft and faint and resolves
+   as it comes down, so it reads as arriving rather than as appearing. */
+const EDFX_BLUR_KEY = 'ssp.editorFxBlur';
 
 /** Old style: a copy over the text, both visible at once. */
 function edfxOverlayMode() {
@@ -52,6 +56,11 @@ function edfxOverlayMode() {
 /** Do letters lean as they land? */
 function edfxTiltOn() {
   try { return localStorage.getItem(EDFX_TILT_KEY) !== '0'; } catch (e) { return true; }
+}
+
+/** Do letters resolve out of a blur as they land? */
+function edfxBlurOn() {
+  try { return localStorage.getItem(EDFX_BLUR_KEY) !== '0'; } catch (e) { return true; }
 }
 
 /* Typing fast should not pile up hundreds of nodes. Past this many at once
@@ -275,6 +284,10 @@ function _edfxSpawn(ch, box, cls, delay, off) {
     // In overlay mode the ghost fades instead of ending solid, because the
     // character underneath is left painted and something has to give way.
     if (overlay) g.classList.add('edfx-overlay');
+    // Soft and faint for the first fraction of the flight, resolving as it
+    // comes down. Composes with the overlay class; the stylesheet orders the
+    // two so the overlay copy still fades out.
+    if (edfxBlurOn()) g.classList.add('edfx-blur');
   }
 
   if (cls === 'edfx-out') {
@@ -503,6 +516,16 @@ function toggleEditorFxOverlay() {
   }
 }
 
+/** The soft start on or off. */
+function toggleEditorFxBlur() {
+  const next = !edfxBlurOn();
+  try { localStorage.setItem(EDFX_BLUR_KEY, next ? '1' : '0'); } catch (e) { /* private mode */ }
+  _syncEditorFxBtn();
+  if (typeof toast === 'function') {
+    toast(next ? 'Letters resolve out of a blur' : 'Letters land sharp', { type: 'info', duration: 1800 });
+  }
+}
+
 /** The lean on or off. */
 function toggleEditorFxTilt() {
   const next = !edfxTiltOn();
@@ -537,6 +560,11 @@ function _syncEditorFxBtn() {
     tl.classList.toggle('is-on', !edfxTiltOn());
     tl.setAttribute('aria-pressed', String(!edfxTiltOn()));
   }
+  const bl = document.getElementById('edfx-blur-opt');
+  if (bl) {
+    bl.classList.toggle('is-on', !edfxBlurOn());
+    bl.setAttribute('aria-pressed', String(!edfxBlurOn()));
+  }
 }
 
 /** Sits beside the typing-sound toggle — both are the same kind of switch. */
@@ -545,7 +573,8 @@ function editorFxButtonTemplate() {
   const label = on ? 'Letter animation on' : 'Letter animation off';
   const overlay = edfxOverlayMode();
   const tilt = edfxTiltOn();
-  /* The two style switches live behind the same button rather than beside it.
+  const blur = edfxBlurOn();
+  /* The style switches live behind the same button rather than beside it.
      The strip already needs ten controls to fit on a phone, and these are set
      once and then left alone -- the same reasoning that put the typing voices
      inside the volume control instead of giving them a button of their own.
@@ -571,6 +600,13 @@ function editorFxButtonTemplate() {
                 title="Land every letter upright, with no lean">
           <span class="edfx-opt-name">No tilt</span>
           <span class="edfx-opt-hint">letters land upright</span>
+        </button>
+        <button type="button" class="edfx-opt${blur ? '' : ' is-on'}"
+                id="edfx-blur-opt" onclick="toggleEditorFxBlur()"
+                aria-pressed="${!blur}"
+                title="Land every letter sharp, with no soft start">
+          <span class="edfx-opt-name">No blur</span>
+          <span class="edfx-opt-hint">letters land sharp, not resolving</span>
         </button>
       </div>
     </div>`;

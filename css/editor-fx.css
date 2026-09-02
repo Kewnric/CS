@@ -134,6 +134,49 @@
   100% { opacity: 0; }
 }
 
+/* ── Arriving out of focus ────────────────────────────────────
+   The letter resolves rather than simply appearing: a fraction of a second
+   soft and faint at the start, sharp and solid well before it lands, and the
+   rest of the flight is just the settling.
+
+   A THIRD animation, for the same reason the fade is a second one -- this
+   touches only filter and opacity, edfxIn only transform, so none of them
+   needs to know about the others and the movement stays described once.
+
+   The blur is in em, so it tracks the font size, and it is applied before the
+   transform: at the 2.05 scale it starts at, the softness reads about twice
+   what the number says and tightens as the letter shrinks, which is the
+   coming-into-focus part rather than a blur that merely switches off.
+
+   It clears by 38% -- about 130ms of the 340 -- because the tilt is still
+   correcting until 45% and a letter that is still soft by then reads as
+   out of focus rather than as arriving.
+
+   ITS OWN CURVE, and not the spring the movement uses. Focus has to fall in
+   one direction. Driven by cubic-bezier(0.2, 1.5, ...) the blur inherited the
+   overshoot meant for the lean and stopped being monotonic -- measured at
+   1.12px, 0.17px by a tenth of the flight, 0.10px, then back UP to 0.17px
+   before snapping off. It read as a flicker, and it cleared in about 34ms
+   rather than the fraction of a second it is supposed to take. */
+.edfx-in.edfx-blur {
+  animation: edfxIn 340ms cubic-bezier(0.2, 1.5, 0.4, 1) both,
+             edfxBlurIn 340ms cubic-bezier(0.33, 0, 0.35, 1) both;
+}
+/* Both styles at once. edfxOverlayFade is listed LAST on purpose: the two
+   later animations both touch opacity, and the last one wins, so the overlay
+   copy still fades away to nothing instead of being held solid by the blur. */
+.edfx-in.edfx-overlay.edfx-blur {
+  animation: edfxIn 340ms cubic-bezier(0.2, 1.5, 0.4, 1) both,
+             edfxBlurIn 340ms cubic-bezier(0.33, 0, 0.35, 1) both,
+             edfxOverlayFade 340ms cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+@keyframes edfxBlurIn {
+  0%   { filter: blur(0.08em); opacity: 0.5; }
+  38%  { filter: blur(0.012em); opacity: 1; }
+  60%  { filter: blur(0); opacity: 1; }
+  100% { filter: blur(0); opacity: 1; }
+}
+
 /* ── Being thrown away ────────────────────────────────────────
    Identical in shape to the combo's exit: UP first, almost straight and
    barely turning, a moment hanging at the top, and only then away. The two
