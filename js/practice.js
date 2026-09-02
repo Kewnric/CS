@@ -1792,8 +1792,16 @@ function _bossBarPaint(healthPercent, opts) {
     }
   }
 
-  // Glass shards burst off the damage boundary, SAO-style.
-  if (!instant && dropped > 1.2) _bossDamageShards(clamped, dropped);
+  /* Glass shards burst off the damage boundary, SAO-style -- and green motes
+     off the same boundary when it travels the other way.
+
+     Note which direction is which here: the boss's HP is the INVERSE of your
+     progress, so HP going UP means the reference is being matched LESS well
+     than it was. Green for the rise and red for the fall is what was asked
+     for and it is also the honest signal -- the bar is the boss's health, and
+     the boss recovering is the thing you just undid. */
+  if (!instant && dropped > 1.2) _bossDamageShards(clamped, dropped, 'damage');
+  else if (!instant && clamped - prev > 1.2) _bossDamageShards(clamped, clamped - prev, 'heal');
 
   // Combo: consecutive hits with no healing in between.
   if (!instant) {
@@ -1881,7 +1889,21 @@ function bossLockOn() {
  * and remove themselves when the animation ends.
  */
 let _bossShardCooldown = 0;
-function _bossDamageShards(healthPercent, damage) {
+/**
+ * The burst off the HP boundary, in one of two moods.
+ *
+ * 'damage' is the original: hot pink-to-crimson glass flung up and to the
+ * right, shed by a hit. 'heal' is the same machinery with green motes that
+ * rise nearly straight and slower -- HP coming BACK should look like it is
+ * gathering, not like more of the boss breaking off, so the lean is dropped
+ * and the drift is softened rather than just recolouring the debris.
+ *
+ * @param {number} healthPercent where the boundary is now
+ * @param {number} amount        size of the change, drives how many fly
+ * @param {'damage'|'heal'} [kind='damage']
+ */
+function _bossDamageShards(healthPercent, damage, kind) {
+  const heal = kind === 'heal';
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const now = Date.now();
   if (now - _bossShardCooldown < 220) return;   // typing fires damage constantly
@@ -1910,18 +1932,23 @@ function _bossDamageShards(healthPercent, damage) {
     // Alternate between the top and bottom edge of the wound; both sets drift
     // upward, so the ones from the bottom edge rise past the bar.
     const y = (i % 2 === 0 ? yTop + 1 : yBot - 1) + (Math.random() - 0.5) * 3;
-    const w = 5 + Math.random() * 7;
-    const h = w * (1.05 + Math.random() * 0.85);
+    const w = heal ? 3.5 + Math.random() * 4.5 : 5 + Math.random() * 7;
+    // Round-ish when healing, jagged when breaking.
+    const h = w * (heal ? 0.9 + Math.random() * 0.4 : 1.05 + Math.random() * 0.85);
     s.style.cssText =
       `left:${x + (Math.random() - 0.5) * 14}px; top:${y}px; width:${w.toFixed(1)}px; height:${h.toFixed(1)}px;` +
       // A straight diagonal drift up and to the right — no wobble, no tumbling,
       // just a slight turn of the petal itself as it goes.
-      `--pt-y:${(-22 - Math.random() * 26).toFixed(1)}px;` +
-      `--pt-lean:${(16 + Math.random() * 30).toFixed(1)}px;` +
-      `--pt-rot:${((Math.random() - 0.5) * 60).toFixed(0)}deg;` +
-      `--pt-dur:${(0.95 + Math.random() * 0.65).toFixed(2)}s;` +
-      `--pt-delay:${(Math.random() * 0.11).toFixed(2)}s;` +
-      `background:linear-gradient(${Math.round(Math.random() * 360)}deg, #ff9dba 0%, #f5194b 48%, #93002a 100%);` +
+      `--pt-y:${(heal ? -26 - Math.random() * 22 : -22 - Math.random() * 26).toFixed(1)}px;` +
+      // Barely any sideways travel when healing: motes rising off the bar, not
+      // fragments thrown clear of it.
+      `--pt-lean:${(heal ? (Math.random() - 0.5) * 16 : 16 + Math.random() * 30).toFixed(1)}px;` +
+      `--pt-rot:${((Math.random() - 0.5) * (heal ? 26 : 60)).toFixed(0)}deg;` +
+      `--pt-dur:${(heal ? 1.25 + Math.random() * 0.7 : 0.95 + Math.random() * 0.65).toFixed(2)}s;` +
+      `--pt-delay:${(Math.random() * (heal ? 0.18 : 0.11)).toFixed(2)}s;` +
+      `background:linear-gradient(${Math.round(Math.random() * 360)}deg, ${heal
+        ? '#d1fae5 0%, #10b981 46%, #065f46 100%'
+        : '#ff9dba 0%, #f5194b 48%, #93002a 100%'});` +
       `clip-path:${_bossShardShape()};`;
     s.addEventListener('animationend', () => s.remove(), { once: true });
     frag.appendChild(s);

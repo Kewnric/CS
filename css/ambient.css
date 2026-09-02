@@ -155,10 +155,21 @@
   animation-delay: var(--gd, 0s);
 }
 
+/* A gust DECAYS, it does not stop. The first version turned the whole angle by
+   13% and then held that rotation dead still for the remaining 87% of the
+   cycle, which is what made the swirl read as a mechanism resetting rather
+   than as air moving: hard arrival, long freeze, hard restart.
+
+   Now the turn eases out of its own momentum -- fast at the strike, slowing
+   through the flight -- and then keeps creeping for the rest of the cycle
+   instead of locking. Nothing ever sits perfectly still, so there is no frame
+   where the eye can catch the loop. */
 @keyframes ambSwirl {
-  0%   { transform: rotate(0deg); }
-  13%  { transform: rotate(var(--gspin, 120deg)); }
-  100% { transform: rotate(var(--gspin, 120deg)); }
+  0%   { transform: rotate(0deg);
+         animation-timing-function: cubic-bezier(0.16, 0.72, 0.3, 1); }
+  17%  { transform: rotate(var(--gspin, 120deg));
+         animation-timing-function: linear; }
+  100% { transform: rotate(calc(var(--gspin, 120deg) * 1.28)); }
 }
 
 /* Small. A field of these is meant to read as flecks caught in the light --
@@ -179,7 +190,12 @@
   /* Linear, deliberately. An ease-out spends the last third of the flight
      slowing to a stop, which reads as slow motion -- a fleck should be going
      as fast at the moment it goes out as it was when it arrived. */
-  animation: ambShoot var(--t, 9s) linear infinite;
+  /* Near-linear, and a DIFFERENT near-linear per shard (js/ambient.js seeds
+     --ease). The original comment holds -- a fleck should be going as fast
+     when it goes out as when it arrived, so nothing here eases to a stop --
+     but one shared curve meant every shard in the pane accelerated in exactly
+     the same way, and identical is what the eye reads as mechanical. */
+  animation: ambShoot var(--t, 9s) var(--ease, linear) infinite;
   animation-delay: var(--d, 0s);
 }
 
@@ -234,17 +250,27 @@
    one it set out in. */
 @keyframes ambShoot {
   0%   { opacity: 0;
-         transform: translate(0, 0) rotate(calc(var(--spin, 12deg) * -1)) scale(var(--s, 1)); }
-  3%   { opacity: var(--o, 1); }
-  7%   { transform: translate(calc(var(--len, 240px) * 0.5), var(--curve, -26px))
+         transform: translate(0, 0) rotate(calc(var(--spin, 12deg) * -1)) scale(calc(var(--s, 1) * 0.88)); }
+  2.5% { opacity: var(--o, 1); }
+  /* FOUR points along the flight, not one. A single midpoint can only bow the
+     path one way, and a pane of shards all bowing the same way with the same
+     symmetry was most of what read as machinery. The second bend takes the
+     tail back across its own line, so each one leaves a shallow S rather than
+     a perfect arc, and --curve2 is seeded per shard against --curve so the two
+     halves are never in proportion. */
+  5%   { transform: translate(calc(var(--len, 240px) * 0.28), calc(var(--curve, -26px) * 0.72))
+                    rotate(calc(var(--spin, 12deg) * -0.4)) scale(var(--s, 1)); }
+  8%   { transform: translate(calc(var(--len, 240px) * 0.57), var(--curve, -26px))
                     rotate(0deg) scale(var(--s, 1)); }
+  11%  { transform: translate(calc(var(--len, 240px) * 0.82), var(--curve2, 6px))
+                    rotate(calc(var(--spin, 12deg) * 0.62)) scale(calc(var(--s, 1) * 0.97)); }
   /* Still at full brightness while the two ends close in: the dimming is the
      last thing that happens, not something running alongside it. */
-  12%  { opacity: var(--o, 1); }
-  14%  { opacity: 0;
-         transform: translate(var(--len, 240px), 0) rotate(var(--spin, 12deg)) scale(var(--s, 1)); }
+  12.5% { opacity: var(--o, 1); }
+  14.5% { opacity: 0;
+         transform: translate(var(--len, 240px), 0) rotate(var(--spin, 12deg)) scale(calc(var(--s, 1) * 0.9)); }
   100% { opacity: 0;
-         transform: translate(var(--len, 240px), 0) rotate(var(--spin, 12deg)) scale(var(--s, 1)); }
+         transform: translate(var(--len, 240px), 0) rotate(var(--spin, 12deg)) scale(calc(var(--s, 1) * 0.9)); }
 }
 
 /* ============================================================

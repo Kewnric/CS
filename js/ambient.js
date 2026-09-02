@@ -119,6 +119,21 @@ function _ambShapeSVG(i) {
        + AMB_SHAPES[i % AMB_SHAPES.length] + '</svg>';
 }
 
+/* Taken in turn like the shapes are, not at random: the point is that
+   NEIGHBOURS differ, and random assignment pairs them often enough to see.
+   All of these stay near the diagonal -- a fleck must not visibly slow down
+   before it goes out -- so they change the feel of the travel without turning
+   any of them into an ease-out. */
+const AMB_EASES = [
+  'linear',
+  'cubic-bezier(0.30, 0.12, 0.72, 0.90)',
+  'cubic-bezier(0.14, 0.34, 0.58, 0.78)',
+  'cubic-bezier(0.42, 0.06, 0.86, 0.70)',
+  'cubic-bezier(0.22, 0.44, 0.66, 0.96)',
+  'cubic-bezier(0.36, 0.20, 0.80, 0.84)',
+  'cubic-bezier(0.10, 0.26, 0.50, 0.72)'
+];
+
 const _ambRand = (lo, hi) => lo + Math.random() * (hi - lo);
 
 /**
@@ -159,6 +174,12 @@ function _ambFill(host) {
     // than pointing where it set off.
     el.style.setProperty('--spin', (curve > 0 ? 16 : -16).toFixed(0) + 'deg');
     el.style.setProperty('--s', _ambRand(0.5, 1.25).toFixed(2));
+    /* The second bend, taken against the first rather than with it, so the
+       path crosses its own line instead of bowing once. Not a fixed fraction:
+       a constant ratio would give every shard the same S. */
+    el.style.setProperty('--curve2', Math.round(curve * _ambRand(-0.55, -0.12)) + 'px');
+    // Its own acceleration. All close to linear -- see the note in the CSS.
+    el.style.setProperty('--ease', AMB_EASES[n % AMB_EASES.length]);
     el.style.setProperty('--t', cycle.toFixed(1) + 's');
     el.style.setProperty('--d', delay.toFixed(2) + 's');
 

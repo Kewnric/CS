@@ -1116,7 +1116,13 @@ mark.diff-hit.current {
    the thing it is reaching for. It survives :focus-within too, or the slider
    would be unreachable by keyboard. */
 .sfx-control,
-.edfx-control {
+/* position:relative is load-bearing, not tidiness: the panel is absolute at
+   top:100%, so without a positioned parent it anchors to whatever ancestor
+   IS positioned. The ambient one did exactly that -- it opened correctly
+   and landed at top:916 in a 914px viewport, then three overflow:hidden
+   ancestors clipped it away, so a working panel looked like a dead button. */
+.edfx-control,
+.amb-control {
   position: relative;
   display: inline-flex;
   flex-shrink: 0;
@@ -1183,8 +1189,7 @@ mark.diff-hit.current {
 .edfx-control:focus-within .edfx-pop,
 .sfx-control.is-open .sfx-vol-pop,
 .edfx-control.is-open .edfx-pop,
-.amb-control.is-open .amb-pop,
-.amb-control:focus-within .amb-pop {
+.amb-control.is-open .amb-pop {
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
