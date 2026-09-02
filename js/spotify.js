@@ -270,6 +270,14 @@ async function spotifyEnsurePlayer() {
 
   _spotPlayer.addListener('player_state_changed', st => {
     if (!st) { _spotState = null; _spotSync(); return; }
+    /* Spotify has started, so the local track stops. This lives here rather
+       than only in the source switch because playback can begin from outside
+       this app entirely -- the phone, the desktop client, another tab -- and
+       the switch never runs in those cases. Whatever started it, hearing two
+       things at once is the bug. */
+    if (!st.paused && typeof _ostAudio !== 'undefined' && _ostAudio && !_ostAudio.paused) {
+      _ostAudio.pause();
+    }
     const tr = st.track_window && st.track_window.current_track;
     _spotState = {
       paused: st.paused,
@@ -355,6 +363,66 @@ async function spotifyToggleShuffle() {
   if (typeof toast === 'function') {
     toast(on ? 'Shuffling on Spotify' : 'Shuffle off', { type: 'info', duration: 1500 });
   }
+}
+
+/* ── Search ─────────────────────────────────────────────────── */
+
+let _spotSearchTimer = null;
+let _spotSearchSeq = 0;
+
+/** Typing fires per keystroke; the API should not. */
+function spotifySearchDebounced(q) {
+  clearTimeout(_spotSearchTimer);
+  _spotSearchTimer = setTimeout(() => spotifySearch(q), 320);
+}
+
+async function spotifySearch(q) {
+  const box = document.getElementById('spot-results');
+  if (!box) return;
+  const query = (q || '').trim();
+  if (!query) { box.innerHTML = ''; return; }
+
+  /* Results can come back out of order -- a short query answered after a
+     longer one would leave the wrong list on screen. Each search claims a
+     number and only the newest is allowed to paint. */
+  const seq = ++_spotSearchSeq;
+  box.innerHTML = '<div class="spot-note">Searching…</div>';
+
+  const j = await _spotApi('search?q=' + encodeURIComponent(query) + '&type=track&limit=8');
+  if (seq !== _spotSearchSeq) return;
+
+  const items = (j && j.tracks && j.tracks.items) ? j.tracks.items : [];
+  if (!items.length) { box.innerHTML = '<div class="spot-note">No matches.</div>'; return; }
+
+  const esc = typeof escapeHTML === 'function' ? escapeHTML : (s => String(s));
+  box.innerHTML = items.map(t => {
+    const art = (t.album && t.album.images && t.album.images.length)
+      ? t.album.images[t.album.images.length - 1].url : '';
+    const who = (t.artists || []).map(a => a.name).join(', ');
+    return `
+      <button type="button" class="spot-result" onclick="spotifyPlayUri('${esc(t.uri)}')"
+              title="${esc(t.name)} — ${esc(who)}">
+        <span class="spot-result-art"${art ? ` style="background-image:url('${esc(art)}')"` : ''}></span>
+        <span class="spot-result-text">
+          <span class="spot-result-name">${esc(t.name)}</span>
+          <span class="spot-result-artist">${esc(who)}</span>
+        </span>
+      </button>`;
+  }).join('');
+}
+
+/** Play one track on this device. */
+async function spotifyPlayUri(uri) {
+  await spotifyEnsurePlayer();
+  if (!_spotDeviceId) {
+    _spotError = 'The player is still starting — try again in a moment.';
+    _spotSync();
+    return;
+  }
+  // device_id is required: without it Spotify plays on whatever device it
+  // considers active, which is usually not this browser tab.
+  const r = await _spotApi('me/player/play?device_id=' + _spotDeviceId, 'PUT', { uris: [uri] });
+  if (r && r.error) { _spotError = r.error.message || 'Could not start that track.'; _spotSync(); }
 }
 
 /* ── Which source the player is showing ─────────────────────── */
@@ -502,6 +570,12 @@ function spotifyPanelTemplate() {
               <i data-lucide="shuffle" style="width:15px;height:15px;"></i></button>
             <input type="range" class="ost-vol" min="0" max="100" step="1" value="55"
                    aria-label="Spotify volume" oninput="spotifySetVolume(this.value)">
+          </div>
+          <div class="spot-search">
+            <input type="search" class="spot-input" id="spot-q" placeholder="Search Spotify…"
+                   spellcheck="false" autocomplete="off"
+                   oninput="spotifySearchDebounced(this.value)">
+            <div class="spot-results" id="spot-results"></div>
           </div>
           <button type="button" class="spot-link" onclick="spotifyLogout()">Disconnect</button>
         </div>

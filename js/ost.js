@@ -108,7 +108,15 @@ function _ostEl() {
     if (a.readyState >= 1) _ostTryAutoplay();
   }
 
-  a.addEventListener('play', _ostSync);
+  a.addEventListener('play', () => {
+    // The other half of the rule in spotify.js. Pausing does not raise 'play',
+    // so the two cannot chase each other.
+    if (typeof _spotPlayer !== 'undefined' && _spotPlayer &&
+        typeof _spotState !== 'undefined' && _spotState && !_spotState.paused) {
+      try { _spotPlayer.pause(); } catch (e) { /* the listeners report it */ }
+    }
+    _ostSync();
+  });
   a.addEventListener('pause', () => { _ostRemember(); _ostSync(); });
   a.addEventListener('ended', ostNext);
   a.addEventListener('timeupdate', _ostTick);
@@ -157,6 +165,10 @@ let _ostDisarmAutoplay = () => {};
 function _ostTryAutoplay() {
   const a = _ostAudio;
   if (!a || !ostAutoplayOn() || !OST_TRACKS.length) return;
+  // Spotify is the chosen source: starting the local track here would put two
+  // things on at once the moment the page loads, which is the worst place for
+  // it to happen because nobody has touched the player yet.
+  if (typeof ostSourceIsSpotify === 'function' && ostSourceIsSpotify()) return;
   const p = a.play();
   if (p && typeof p.catch === 'function') p.catch(() => _ostArmFirstGesture());
 }
