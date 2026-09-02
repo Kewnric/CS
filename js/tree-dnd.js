@@ -695,25 +695,89 @@ function treeContextMenu(e, id, ns) {
   _treeShowMenu(e, actions);
 }
 
+/**
+ * Build and place the right-click menu.
+ *
+ * Placement used to be one line: clamp top to innerHeight - height - 8. That is
+ * fine until the menu is taller than the viewport, at which point the clamp
+ * produces a NEGATIVE top and the first rows sit above the screen, unreachable
+ * -- measured at top: -177px with six rows off the top edge. The menu never
+ * scrolled, so there was no way to get to them at all.
+ *
+ * So: measure the natural height, then pick a placement. Open downward if it
+ * fits; flip above the cursor if it fits better there; if it fits on screen
+ * but not beside the cursor, slide it up until it does; and only when it is
+ * taller than the screen itself give it a max-height and let the list scroll.
+ */
 function _treeShowMenu(e, actions) {
   const menu = document.createElement('div');
   menu.id = 'tree-ctx';
   menu.className = 'tree-ctx';
   menu.setAttribute('role', 'menu');
-  menu.innerHTML = actions.map((a, i) => a.sep
+
+  /* The rows live in their own scroller so the fades, which mark that there is
+     more above or below, can sit still over the top of it. */
+  const scroll = document.createElement('div');
+  scroll.className = 'tree-ctx-scroll';
+  scroll.innerHTML = actions.map((a, i) => a.sep
     ? '<div class="tree-ctx-sep"></div>'
     : `<button class="tree-ctx-item${a.danger ? ' danger' : ''}" role="menuitem" data-i="${i}">
-         <i data-lucide="${a.icon}" style="width:14px;height:14px;"></i> ${a.label}
+         <i data-lucide="${a.icon}"></i><span class="tree-ctx-label">${a.label}</span>
        </button>`).join('');
+  menu.appendChild(scroll);
   document.body.appendChild(menu);
+  // Before measuring, not after: the height being measured has to be the height
+  // the user will see.
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: menu });
 
-  const w = menu.offsetWidth, h = menu.offsetHeight;
-  menu.style.left = Math.min(e.clientX, window.innerWidth - w - 8) + 'px';
-  menu.style.top = Math.min(e.clientY, window.innerHeight - h - 8) + 'px';
+  const GAP = 8;                                   // never touch the screen edge
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const w = menu.offsetWidth;
+  const natural = menu.offsetHeight;               // layout box, so the open
+                                                   // animation's scale() is not
+                                                   // in the number
+  const below = vh - e.clientY - GAP;
+  const above = e.clientY - GAP;
+
+  let top;
+  if (natural <= below) {
+    top = e.clientY;                               // the usual case
+  } else if (natural <= above) {
+    top = e.clientY - natural;                     // more room upward: flip it
+  } else if (natural <= vh - GAP * 2) {
+    /* Taller than the room on either side of the cursor, but not taller than
+       the screen. Slide it up until it fits rather than scrolling: on a 360px
+       viewport this is the difference between all eight rows showing and eight
+       rows crammed into the 172px beside the cursor. */
+    top = vh - natural - GAP;
+  } else {
+    // Genuinely taller than the screen. Use the whole height and scroll.
+    top = GAP;
+    menu.style.maxHeight = (vh - GAP * 2) + 'px';
+  }
+  menu.style.left = Math.max(GAP, Math.min(e.clientX, vw - w - GAP)) + 'px';
+  menu.style.top = Math.max(GAP, top) + 'px';
+
+  /* Which fade is lit. Without a scrollbar this is the only thing saying there
+     is more, so it has to track the scroll rather than being set once. The 2px
+     slack keeps the bottom fade from flickering on a fractional scrollHeight. */
+  const syncFades = () => {
+    const more = scroll.scrollHeight - scroll.clientHeight;
+    menu.classList.toggle('can-up', scroll.scrollTop > 2);
+    menu.classList.toggle('can-down', more > 2 && scroll.scrollTop < more - 2);
+  };
+  scroll.addEventListener('scroll', syncFades, { passive: true });
+  syncFades();
+
   menu.querySelectorAll('.tree-ctx-item').forEach(btn => {
     btn.onclick = () => { const a = actions[+btn.dataset.i]; treeCloseMenu(); if (a && a.fn) a.fn(); };
+    /* A tooltip only where one is earned. Labels are clipped rather than
+       wrapped, so a long one needs a title to stay readable -- but putting a
+       title on every row means a tooltip pops up over a menu whose labels are
+       already fully visible. Ask the layout which ones actually overflow. */
+    const label = btn.querySelector('.tree-ctx-label');
+    if (label && label.scrollWidth > label.clientWidth + 1) btn.title = label.textContent.trim();
   });
-  if (typeof lucide !== 'undefined') lucide.createIcons({ root: menu });
   document.addEventListener('mousedown', _treeMenuOutside, true);
   document.addEventListener('keydown', _treeMenuKey, true);
 }
