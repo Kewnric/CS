@@ -21,8 +21,6 @@
 const PSFX_LEVEL = 2.6;
 
 let _psfxOut = null;
-let _psfxWorkVoice = null;   // the live graph while a build runs
-let _psfxWorkCap = null;
 
 /** The cue bus, kept in step with the shared volume slider on every use. */
 function _psfxBus() {
@@ -83,112 +81,113 @@ function psfxTone(o) {
   osc.stop(t + dur + 0.02);
 }
 
-/* ── Waiting on a build ───────────────────────────────────────
-   A warm, slowly breathing hum that holds until the check finishes.
+/* ── Sending a build ──────────────────────────────────────────
+   One hammer blow on an anvil, struck as the check goes out.
 
-   IT USED TO BE A CLOCK, and that is the thing being fixed. Two notes, 262
-   and 196, alternating on a setInterval every 340ms: a fixed period with two
-   pitches in it is a tick-tock however it is described, and once the ear has
-   named it a clock the sound is telling you that time is passing rather than
-   that work is happening. Waiting for a compiler is already the part of the
-   loop that feels slow; a metronome counting it out makes it worse.
+   METAL IS INHARMONIC, and that is what makes this sound struck rather than
+   played. A pitched instrument's partials are whole multiples of its
+   fundamental; a struck bar's are not -- roughly 1 : 2.76 : 5.40 : 8.93.
+   Sound those ratios and the ear hears metal even though every one of them
+   is a plain sine. Whole multiples here would give a note, not a clang.
 
-   So there is no repeating event here at all. One sustained voice starts when
-   the build does and stops when it ends, and everything that moves in it is
-   driven by two LFOs at 0.24 and 0.17 Hz -- deliberately not multiples of
-   each other, so the filter sweep and the level swell drift in and out of
-   phase and the sound never repeats a state. Nothing has an onset, so there
-   is nothing for the ear to count.
-
-   Low and quiet on purpose: it says the machine is still thinking, and it may
-   run for several seconds, so anything that asks for attention would be the
-   wrong sound. The two near-unison voices a whisker apart (116 and 116.9 Hz)
-   beat against each other about once a second, which is what gives it life
-   without giving it a pulse.
+   Three parts to the strike: the ring above, a very short filtered noise
+   burst for the chink of impact, and a low thud that falls in pitch as it
+   decays -- the anvil's own mass moving. The `thud` and `ring` arguments stay
+   parameters rather than being folded in, so a lighter tap is one call away
+   if this ever wants a second voice.
    ------------------------------------------------------------ */
-function psfxWorkStart() {
-  if (!_psfxOn()) return;
-  psfxWorkStop();
+
+/** Ratios of a struck bar's modes. Not harmonics; that is the point. */
+const PSFX_METAL = [1, 2.76, 5.40, 8.93];
+
+function _psfxAnvilHit(o) {
   const bus = _psfxBus();
   if (!bus) return;
   const ctx = _sfxContext();
   const t = ctx.currentTime;
+  const g = o.gain;
 
-  const out = ctx.createGain();
-  out.gain.setValueAtTime(0.0001, t);
-  out.gain.linearRampToValueAtTime(0.052, t + 0.35);   // fade in, never a click
+  PSFX_METAL.forEach((ratio, i) => {
+    const osc = ctx.createOscillator();
+    const env = ctx.createGain();
+    osc.type = 'sine';
+    // A hair off exact, per partial per strike, so two hits are never twins.
+    osc.frequency.setValueAtTime(o.freq * ratio * (1 + (Math.random() - 0.5) * 0.012), t);
+    // Higher modes shed their energy first, which is why a clang brightens at
+    // the moment of impact and darkens as it rings out.
+    const dur = o.ring * [1, 0.62, 0.38, 0.24][i];
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.linearRampToValueAtTime(g / (i + 1.5), t + 0.002);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    osc.connect(env); env.connect(bus);
+    osc.start(t); osc.stop(t + dur + 0.02);
+  });
 
-  const lp = ctx.createBiquadFilter();
-  lp.type = 'lowpass';
-  lp.frequency.setValueAtTime(560, t);
-  /* Q of 1.1, not 5. A resonant peak sweeping across the octave at 232 Hz
-     boosted it every time it passed, so the sweep itself became a pulse --
-     measured as part of an 11x swing between peak and trough. Gentle here;
-     the movement should be felt, not heard arriving. */
-  lp.Q.value = 1.1;
+  /* The impact itself. Noise shaped by a cubic fall, so it is a chink rather
+     than a hiss -- without it the partials alone sound like a bell being
+     rung, not like something being hit with a hammer. */
+  const len = Math.floor(ctx.sampleRate * 0.045);
+  const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+  const ch = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) {
+    const k = 1 - i / len;
+    ch[i] = (Math.random() * 2 - 1) * k * k * k;
+  }
+  const noise = ctx.createBufferSource();
+  noise.buffer = buf;
+  const bp = ctx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = o.freq * 3.1;
+  bp.Q.value = 1.1;
+  const ng = ctx.createGain();
+  ng.gain.value = g * 0.8;
+  noise.connect(bp); bp.connect(ng); ng.connect(bus);
+  noise.start(t);
 
-  /* Two voices a fraction apart, plus a quiet octave for body.
-     THE PAIR IS DELIBERATELY UNEQUAL. At matched amplitude, 116 and 116.9 Hz
-     beat all the way to full cancellation roughly once a second -- the hum
-     dropped to near silence and came back, which is a slow throb and exactly
-     the kind of countable pulse this sound exists to avoid. At 0.45 the
-     second voice the beat runs between about 1.45 and 0.55 of the first:
-     audible as shimmer, never as a gap. */
-  const a = ctx.createOscillator(); a.type = 'sine';     a.frequency.value = 116;
-  const b = ctx.createOscillator(); b.type = 'sine';     b.frequency.value = 116.9;
-  const bGain = ctx.createGain(); bGain.gain.value = 0.45;
-  const c = ctx.createOscillator(); c.type = 'triangle'; c.frequency.value = 232;
-  const cGain = ctx.createGain(); cGain.gain.value = 0.26;
-
-  // The sweep. Slow enough that no single pass reads as an event.
-  const lfoF = ctx.createOscillator(); lfoF.type = 'sine'; lfoF.frequency.value = 0.24;
-  const lfoFAmt = ctx.createGain(); lfoFAmt.gain.value = 170;
-  lfoF.connect(lfoFAmt); lfoFAmt.connect(lp.frequency);
-
-  // The swell, on its own unrelated period so the two never line up.
-  const lfoG = ctx.createOscillator(); lfoG.type = 'sine'; lfoG.frequency.value = 0.17;
-  const lfoGAmt = ctx.createGain(); lfoGAmt.gain.value = 0.011;
-  lfoG.connect(lfoGAmt); lfoGAmt.connect(out.gain);
-
-  a.connect(lp); b.connect(bGain); bGain.connect(lp); c.connect(cGain); cGain.connect(lp);
-  lp.connect(out); out.connect(bus);
-
-  const voices = [a, b, c, lfoF, lfoG];
-  voices.forEach(n => n.start(t));
-  _psfxWorkVoice = { out, voices };
-
-  /* A cap, because "started" and "finished" are wired at different call sites
-     and a build has several ways to end — an exception, a navigation, an
-     engine that never answers. A hum still going a minute later would be
-     worse than one that stops slightly early.
-
-     The handle is KEPT, which it was not. An uncancelled cap belongs to the
-     session that scheduled it and fires 25 seconds later regardless of what
-     is running by then — so a check, a stop, and a second check one second
-     later left the first cap alive to silence the second one mid-build. */
-  clearTimeout(_psfxWorkCap);
-  _psfxWorkCap = setTimeout(psfxWorkStop, 25000);
+  // The anvil's mass, on the heavy blow only.
+  if (o.thud) {
+    const low = ctx.createOscillator();
+    const le = ctx.createGain();
+    low.type = 'sine';
+    low.frequency.setValueAtTime(160, t);
+    low.frequency.exponentialRampToValueAtTime(72, t + 0.09);
+    le.gain.setValueAtTime(0.0001, t);
+    le.gain.linearRampToValueAtTime(g * 0.95, t + 0.004);
+    le.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+    low.connect(le); le.connect(bus);
+    low.start(t); low.stop(t + 0.17);
+  }
 }
 
-function psfxWorkStop() {
-  clearTimeout(_psfxWorkCap);
-  _psfxWorkCap = null;
-  const v = _psfxWorkVoice;
-  _psfxWorkVoice = null;
-  if (!v) return;
-  const ctx = (typeof _sfxContext === 'function') ? _sfxContext() : null;
-  if (!ctx) return;
-  const t = ctx.currentTime;
-  try {
-    /* Released rather than cut. Stopping the oscillators outright ends the
-       waveform mid-cycle, and a hum that stops at a non-zero sample is a
-       click — the one thing a sound this quiet cannot afford. */
-    v.out.gain.cancelScheduledValues(t);
-    v.out.gain.setValueAtTime(Math.max(0.0001, v.out.gain.value), t);
-    v.out.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
-    v.voices.forEach(n => { try { n.stop(t + 0.3); } catch (e) { /* already stopped */ } });
-  } catch (e) { /* context closed under us */ }
+/* ONE STRIKE, not a loop. The cue marks the moment the check is sent, the
+   way the fail and pass cues mark their moments -- it is not a progress
+   indicator, and it does not try to fill the wait.
+
+   That is the third shape this has taken and the first that is a cue at all.
+   A repeating sound has to answer "how long does it run for", and every
+   answer was wrong: a fixed interval became a clock, a sustained drone became
+   ominous, and hammering on a loop turned a workshop into a factory floor.
+   A single strike has no duration to get wrong.
+
+   It also removes the machinery that existed only to stop the loop -- the
+   pending-strike list and the 25-second cap. Nothing needs cancelling when
+   the sound is over before the build is. */
+function psfxWorkStart() {
+  if (!_psfxOn()) return;
+  // A little more weight and ring than a strike in a sequence would carry,
+  // because nothing follows it.
+  _psfxAnvilHit({ freq: 585, gain: 0.10, ring: 1.15, thud: true });
 }
+
+/**
+ * Kept, and deliberately empty.
+ *
+ * Four call sites stop the cue when a build ends, aborts or the page leaves,
+ * and they were right to when there was something running. There is not any
+ * more. Removing the function would mean editing all four and losing the
+ * hook, so it stays as the place a future sustained cue would be turned off.
+ */
+function psfxWorkStop() { /* a single strike finishes on its own */ }
 
 /* ── A test case failed ───────────────────────────────────────
    Two notes falling a tritone, detuned against each other. The interval is
