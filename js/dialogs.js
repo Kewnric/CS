@@ -119,6 +119,56 @@ function showConfirm(title, message, onConfirm) {
   lucide.createIcons({ root: modal });
 }
 
+/**
+ * Two ways forward plus Cancel, where neither way is the obvious one.
+ *
+ * showConfirm has a single Confirm, which forces a question with two real
+ * answers to be asked as two questions or to quietly pick one. Leaving an
+ * attempt is exactly that: keeping the work and throwing it away are both
+ * legitimate, and the app should not choose.
+ *
+ * @param {object} o  { title, message, primary, secondary, danger, onPrimary, onSecondary }
+ *   `primary` is the safe one and is styled as such; `secondary` carries the
+ *   destructive styling when `danger` is set.
+ */
+function showChoice(o) {
+  const modal = document.getElementById('dialog-modal');
+  if (!modal) {
+    // No modal host: fall back to the browser's one question, and take the
+    // SAFE branch on cancel rather than the destructive one.
+    if (confirm(o.title + ': ' + o.message + '\n\nOK = ' + o.primary + ', Cancel = stay')) o.onPrimary();
+    return;
+  }
+  modal.setAttribute('role', 'alertdialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.setAttribute('aria-label', o.title);
+  document.getElementById('dialog-title').innerText = o.title;
+  document.getElementById('dialog-msg').innerText = o.message;
+  document.getElementById('dialog-icon').innerHTML =
+    '<i data-lucide="help-circle" class="modal-icon-svg" style="color: var(--color-warning);"></i>';
+
+  const btnContainer = document.getElementById('dialog-actions');
+  btnContainer.innerHTML =
+    '<button id="dlg-cancel" class="btn btn-ghost" style="flex:1;">Cancel</button>'
+    + '<button id="dlg-second" class="btn ' + (o.danger ? 'btn-danger' : 'btn-secondary')
+    + '" style="flex:1;">' + escapeHTML(o.secondary) + '</button>'
+    + '<button id="dlg-primary" class="btn btn-primary" style="flex:1;">' + escapeHTML(o.primary) + '</button>';
+
+  document.getElementById('dlg-cancel').onclick = () => closeModalSmooth(modal);
+  document.getElementById('dlg-second').onclick = () => {
+    closeModalSmooth(modal);
+    if (o.onSecondary) o.onSecondary();
+  };
+  document.getElementById('dlg-primary').onclick = () => {
+    closeModalSmooth(modal);
+    if (o.onPrimary) o.onPrimary();
+  };
+
+  modal.classList.remove('hidden');
+  _trapFocus(modal);
+  lucide.createIcons({ root: modal });
+}
+
 function showUnsavedConfirm(onDiscard, onSave) {
   const modal = document.getElementById('dialog-modal');
   if (!modal) {

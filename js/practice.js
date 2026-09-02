@@ -369,6 +369,7 @@ function _practiceClearDraft() {
 }
 
 function _practiceAutoSave() {
+  if (_practiceDiscarding) return;      // this attempt is being thrown away
   if (!state.userFiles || !state.activeChallenge || !state.activeVariant) return;
   savePracticeFileCode();
   _practiceWriteDraft();
@@ -579,12 +580,79 @@ function initZenState() {
 }
 
 /** Leaving mid-attempt — the code is autosaved, but say so rather than just vanishing. */
+/* Set while an attempt is being thrown away, and read by the autosave and by
+   practiceDestroy. Without it, discarding does nothing: the route's destroyFn
+   flushes an autosave on the way out, so the draft that was just deleted would
+   be written straight back on the next line. */
+let _practiceDiscarding = false;
+function practiceIsDiscarding() { return _practiceDiscarding; }
+
+/**
+ * Throw this attempt away: the draft, the session copy, the restore points and
+ * the timer.
+ *
+ * What it does NOT touch is history. A graded attempt is a record of something
+ * that happened and is not this function's to delete; an ungraded one was never
+ * in history to begin with. Discarding is about the work in progress.
+ */
+function practiceDiscardAttempt() {
+  _practiceDiscarding = true;
+  try {
+    _practiceClearDraft();
+    if (typeof clearSessionParam === 'function') {
+      clearSessionParam('autoSavedFiles');
+      clearSessionParam('practiceExecs');
+    }
+    _practiceExecs = [];
+    /* The in-memory copy too, not just what is on disk. Clearing only the
+       stored ones left the live files sitting in state, so leaving and
+       re-entering fast enough that the route never tore down brought the
+       discarded work straight back. Rare, but the whole promise of this
+       button is that the work is gone. */
+    state.userFiles = [];
+    state.userCode = '';
+    state.activeFileIndex = 0;
+    if (window.activeTimerInterval) {
+      clearInterval(window.activeTimerInterval);
+      window.activeTimerInterval = null;
+    }
+    state.sessionData = null;
+  } catch (e) {
+    console.error('[Practice] Discard failed:', e);
+  }
+  if (typeof toast === 'function') {
+    toast('Attempt discarded — nothing was saved.', { type: 'info', duration: 3000 });
+  }
+  spaNavigate('browse');
+  // Cleared after the navigation so destroyFn, which runs during it, still
+  // sees the flag and skips its own autosave.
+  setTimeout(() => { _practiceDiscarding = false; }, 0);
+}
+
 function practiceConfirmExit() {
   if (_practiceSubmitted || !state.sessionData) { spaNavigate('browse'); return; }
-  if (typeof showConfirm !== 'function') { spaNavigate('browse'); return; }
-  showConfirm('Leave attempt?',
-    'Your code is saved and the timer will pick up where you left off, but nothing is graded until you finish the attempt. Leave anyway?',
-    () => spaNavigate('browse'));
+  if (typeof showChoice !== 'function') {
+    if (typeof showConfirm === 'function') {
+      showConfirm('Leave attempt?', 'Your work is kept and you can pick it up where you left off.',
+                  () => spaNavigate('browse'));
+    } else { spaNavigate('browse'); }
+    return;
+  }
+  /* Two real answers, so two buttons. Keeping was the only option before --
+     leaving always left a resumable attempt behind, and starting genuinely
+     fresh meant hunting for Retry afterwards. Keep is the primary because it
+     is the one you cannot undo the other way round: work thrown away is gone,
+     work kept can still be discarded later. */
+  showChoice({
+    title: 'Leave attempt?',
+    message: 'Keep it and the code, timer and restore points are all waiting when you come back. '
+           + 'Discard and this attempt is gone — nothing is graded either way.',
+    secondary: 'Discard attempt',
+    primary: 'Keep and leave',
+    danger: true,
+    onSecondary: () => practiceDiscardAttempt(),
+    onPrimary: () => spaNavigate('browse')
+  });
 }
 
 /** Finish button / Ctrl+Shift+Enter — confirm, then grade. */

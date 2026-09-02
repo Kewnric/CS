@@ -156,7 +156,10 @@ function practiceDestroy() {
   // Flush the autosave before tearing down: Back/Esc/sidebar all leave the page
   // between the 30 s ticks, which used to drop up to half a minute of typing.
   // Skipped after a submit — that attempt is graded and its autosave cleared.
+  // Skipped after a submit -- and after a discard, where flushing here would
+  // write back the very draft the discard just deleted.
   if (typeof _practiceSubmitted !== 'undefined' && !_practiceSubmitted &&
+      !(typeof practiceIsDiscarding === 'function' && practiceIsDiscarding()) &&
       typeof _practiceAutoSave === 'function' && state.sessionData) {
     try { _practiceAutoSave(); } catch (e) { console.error('[Practice] Autosave on exit failed:', e); }
   }
