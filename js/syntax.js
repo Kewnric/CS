@@ -52,6 +52,51 @@ function syntaxHighlight(code) {
   const closeRe = /\}\s*([A-Za-z_]\w*)\s*;/g;
   while ((mt = closeRe.exec(rawSrc))) userTypes.add(mt[1]);
 
+  const reservedSet = 'if|else|for|while|do|switch|case|return|break|continue|default|goto|int|char|float|double|void|struct|typedef|enum|sizeof|unsigned|signed|long|short|bool|string|wchar_t|size_t|FILE|const|static|extern|volatile|register|inline|mutable|explicit|virtual|override|template|typename|auto|class|public|private|protected|new|delete|this|throw|try|catch|finally|using|namespace|std|cout|cin|endl|cerr|clog|union|restrict|true|false|null|undefined|NULL|nullptr|TRUE|FALSE|EOF|let|var|function|import|export|async|await|const_cast|static_cast|dynamic_cast|reinterpret_cast|friend|operator|printf|scanf|fprintf|fscanf|sprintf|sscanf|snprintf|malloc|calloc|realloc|free|fgets|fputs|fopen|fclose|fread|fwrite|fseek|ftell|rewind|fflush|strlen|strcpy|strncpy|strcat|strncat|strcmp|strncmp|strchr|strrchr|strstr|strtok|memcpy|memset|memmove|memcmp|atoi|atof|atol|strtol|strtod|abs|labs|fabs|sqrt|pow|ceil|floor|round|log|log10|sin|cos|tan|rand|srand|time|clock|getchar|putchar|puts|gets|getline|exit|abort|atexit|system|isalpha|isdigit|isalnum|isupper|islower|toupper|tolower|isspace|qsort|bsearch';
+  const reservedWords = new Set(reservedSet.split('|'));
+
+  /* Phase 1c: the names this file DECLARES.
+
+     Colouring every bare identifier was wrong: type `bbbbbbbD` on a line by
+     itself and it came out the same blue as a real variable, so gibberish
+     looked like working code. VS Code does not do that -- without a language
+     server it leaves an unresolved word alone, and with one it marks it as an
+     error. Neither of those is "paint it like a variable".
+
+     So only names the file introduces get the variable colour. A declaration
+     is found by its TYPE and then read to the end of the declarator list, which
+     is what makes `int a, b;`, `int *p`, `int arr[MAX]`, `for (int i = 0;` and
+     a parameter list all fall out of one rule instead of five.
+
+     A name followed by `(` is skipped -- that is a call or a definition, and
+     the function phases above have already coloured it. */
+  const declared = new Set();
+  (function collectDeclared(src) {
+    const TYPE_LEAD = /\b(?:const|static|extern|volatile|register|inline|unsigned|signed|long|short|int|char|float|double|void|_Bool|bool|size_t|FILE|struct|union|enum)\b/g;
+    let m;
+    while ((m = TYPE_LEAD.exec(src))) {
+      let i = m.index + m[0].length, depth = 0, span = '';
+      while (i < src.length) {
+        const ch = src[i];
+        if (ch === '(') { depth++; }
+        else if (ch === ')') { if (depth === 0) break; depth--; }
+        else if (depth === 0 && (ch === ';' || ch === '{' || ch === '=' || ch === '\n')) break;
+        span += ch;
+        i++;
+      }
+      span.replace(/\b([A-Za-z_]\w*)\b(\s*\()?/g, function (whole, name, call) {
+        if (call) return whole;                 // a call or a definition
+        if (reservedWords.has(name)) return whole;
+        declared.add(name);
+        return whole;
+      });
+    }
+    // Macros are names the program introduces too.
+    let mm;
+    const DEFINE = /^[ \t]*#[ \t]*define[ \t]+([A-Za-z_]\w*)/gm;
+    while ((mm = DEFINE.exec(src))) declared.add(mm[1]);
+  })(rawSrc);
+
   // Phase 2: Highlight C Standard Library functions
   escaped = escaped.replace(
     /\b(printf|scanf|fprintf|fscanf|sprintf|sscanf|snprintf|vprintf|vfprintf|vsprintf|vsnprintf|malloc|calloc|realloc|free|fgets|fputs|fopen|fclose|fread|fwrite|fseek|ftell|rewind|fflush|feof|ferror|clearerr|remove|rename|tmpfile|tmpnam|strlen|strcpy|strncpy|strcat|strncat|strcmp|strncmp|strchr|strrchr|strstr|strtok|strdup|memcpy|memset|memmove|memcmp|atoi|atof|atol|strtol|strtod|strtoul|strtof|strtold|abs|labs|fabs|sqrt|pow|ceil|floor|round|log|log10|log2|sin|cos|tan|asin|acos|atan|atan2|exp|ldexp|frexp|modf|fmod|rand|srand|time|clock|difftime|mktime|localtime|gmtime|strftime|asctime|ctime|getchar|putchar|puts|gets|getline|exit|abort|atexit|system|getenv|isalpha|isdigit|isalnum|isupper|islower|toupper|tolower|isspace|ispunct|isprint|iscntrl|isxdigit|qsort|bsearch|perror|signal|raise|setjmp|longjmp|assert)\b(?=\s*\()/g,
@@ -59,8 +104,7 @@ function syntaxHighlight(code) {
   );
 
   // Phase 3: Detect user-defined function calls
-  const reservedSet = 'if|else|for|while|do|switch|case|return|break|continue|default|goto|int|char|float|double|void|struct|typedef|enum|sizeof|unsigned|signed|long|short|bool|string|wchar_t|size_t|FILE|const|static|extern|volatile|register|inline|mutable|explicit|virtual|override|template|typename|auto|class|public|private|protected|new|delete|this|throw|try|catch|finally|using|namespace|std|cout|cin|endl|cerr|clog|union|restrict|true|false|null|undefined|NULL|nullptr|TRUE|FALSE|EOF|let|var|function|import|export|async|await|const_cast|static_cast|dynamic_cast|reinterpret_cast|friend|operator|printf|scanf|fprintf|fscanf|sprintf|sscanf|snprintf|malloc|calloc|realloc|free|fgets|fputs|fopen|fclose|fread|fwrite|fseek|ftell|rewind|fflush|strlen|strcpy|strncpy|strcat|strncat|strcmp|strncmp|strchr|strrchr|strstr|strtok|memcpy|memset|memmove|memcmp|atoi|atof|atol|strtol|strtod|abs|labs|fabs|sqrt|pow|ceil|floor|round|log|log10|sin|cos|tan|rand|srand|time|clock|getchar|putchar|puts|gets|getline|exit|abort|atexit|system|isalpha|isdigit|isalnum|isupper|islower|toupper|tolower|isspace|qsort|bsearch';
-  const reservedWords = new Set(reservedSet.split('|'));
+
 
   escaped = escaped.replace(
     /\b([a-zA-Z_]\w*)\b(?=\s*\()/g,
@@ -187,6 +231,10 @@ function syntaxHighlight(code) {
     const re = /[\uE000-\uE00E\uE00F\uE010\uE011]/g;
     const bare = seg => seg.replace(/\b([A-Za-z_]\w*)\b/g, function (m, name) {
       if (userTypes.has(name)) return '\uE011' + name + '\uE00F';
+      /* Not declared anywhere in this file, so there is nothing to say about
+         it. Left as plain text -- which is also what half-typed and misspelt
+         names look like, and that is useful rather than a shortcoming. */
+      if (!declared.has(name)) return m;
       return '\uE010' + name + '\uE00F';
     });
     let m;
