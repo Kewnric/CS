@@ -18,12 +18,14 @@ const AMB_KEY = 'ssp.ambient';
    motion off is an accessibility choice and it should survive picking a look,
    so a reader who has it off and tries a theme does not get motion back.
 
-   'default' is the crystals this started as. Everything a theme changes lives
+   The first one is shown as "Crystals" but keeps the id 'default': the id is
+   what is written to localStorage, and renaming it would silently reset the
+   choice of anyone who had already picked it. Everything a theme changes lives
    in css/ambient.css under .amb-theme-<id>; nothing here knows what any of
    them look like. */
 const AMB_THEME_KEY = 'ssp.ambientTheme';
 const AMB_THEMES = [
-  { id: 'default', name: 'Default',      hint: 'crystal shards, indigo and cyan', icon: 'gem' },
+  { id: 'default', name: 'Crystals',     hint: 'drifting shards, indigo and cyan', icon: 'gem' },
   { id: 'fire',    name: 'Fireflies',    hint: 'campfire warmth, leaves and embers', icon: 'flame' },
   { id: 'night',   name: 'Starry night', hint: 'fairy lights over a quiet room', icon: 'moon' }
 ];
@@ -50,9 +52,12 @@ function _ambApplyThemeClass() {
    as a field with weather in it. */
 const AMB_COUNT = 26;
 
-/** Is the ambient layer on? On by default; the switch is a departure from it. */
+/** Is the ambient layer on? Off by default; picking a look turns it on. */
 function ambEnabled() {
-  try { return localStorage.getItem(AMB_KEY) !== '0'; } catch (e) { return true; }
+  /* Off until asked for. This used to default on, which meant every new
+     session started with motion behind the panes whether or not the reader
+     wanted any -- the wrong way round for something decorative. */
+  try { return localStorage.getItem(AMB_KEY) === '1'; } catch (e) { return false; }
 }
 
 /** The panes worth filling: the two that are mostly empty for most of an attempt. */

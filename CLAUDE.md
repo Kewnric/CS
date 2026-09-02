@@ -164,6 +164,27 @@ marks correct work wrong, silently.
 
 ---
 
+## Ambient backgrounds
+
+`js/ambient.js` puts `.amb-host` on the two attempt panes and paints three
+layers behind them: a tiled field (`::before`), a glow (`::after`), and drifting
+shards. **Nothing in `css/ambient.css` may be bigger than the pane or
+transformed** — both panes scroll, and an oversized layer grows their
+scrollbars. Layers are `inset: 0` and move by `background-position`.
+
+Four looks, chosen from the topbar gem: Crystals (id `default`), Fireflies,
+Starry night, Off. The theme class goes on the **body**, because two of the
+three layers are pseudo-elements. Off is a separate switch, not a theme, so it
+survives picking a look — and no theme rule sets `content`, which is what keeps
+`.amb-off`'s `content: none` winning over all of them.
+
+A theme recolours those layers and reshapes the shards — Fireflies swaps the
+slivers for soft round glows that wander and blink, Starry night for points
+that twinkle where they hang. All of it is CSS keyframes; there is no canvas
+and no `rAF` loop behind the panes.
+
+---
+
 ## Traps that have already cost time
 
 **Verify by measuring, not reasoning — then check the measurement.** Every
