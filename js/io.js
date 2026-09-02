@@ -168,7 +168,8 @@ function handleDataImport(e) {
           if (typeof brainSave === 'function') brainSave();
         }
         if (parsed.quests && typeof questState !== 'undefined') {
-          questState.quests = parsed.quests.quests || [];
+          questState.quests = (typeof migrateQuest === 'function')
+            ? (parsed.quests.quests || []).map(migrateQuest) : (parsed.quests.quests || []);
           if (parsed.quests.player) questState.player = parsed.quests.player;
           if (parsed.quests.lastLoginDate) questState.lastLoginDate = parsed.quests.lastLoginDate;
           if (typeof saveQuestData === 'function') saveQuestData();

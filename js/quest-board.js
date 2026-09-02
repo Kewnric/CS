@@ -69,9 +69,19 @@ function migrateQuest(q) {
   if (!q.rank) q.rank = 'E';
   if (!q.type) q.type = 'main';
   if (q.xpReward === undefined) q.xpReward = 50;
+  /* The ITEMS are migrated too, not just the key they live under.
+
+     This used to run migrateChecklist only when `objectives` was absent, so a
+     quest that already had the key but held older items -- no timer object at
+     all, or the old {d,h,m,s} shape -- passed through untouched and then
+     crashed the renderer on item.timer.durationMs. migrateChecklist keeps a
+     well-formed timer as it is, so running it every time is idempotent and
+     costs one pass over a list that is a handful of entries long. */
   if (!q.objectives) {
     q.objectives = q.checklist ? migrateChecklist(q.checklist) : [generateObjective()];
     delete q.checklist;
+  } else {
+    q.objectives = migrateChecklist(q.objectives);
   }
   if (!q.penalties) q.penalties = [];
   if (q.lastXPAwardDate === undefined) q.lastXPAwardDate = null;
@@ -137,6 +147,30 @@ function saveQuestData() {
   if (window.questHUD) window.questHUD.refresh();
 }
 
+/**
+ * Bring the streak up to date with the calendar.
+ *
+ * It was only ever recomputed when a daily was COMPLETED, so a player who
+ * stopped for a week still saw the number they left behind. A streak that
+ * survives not doing the thing is not a streak; it is a high score with the
+ * wrong label, and it is the one number on this screen that is supposed to
+ * cost something to keep.
+ *
+ * Yesterday still counts -- today's daily may not be done yet, and breaking
+ * the streak at midnight rather than at the end of the day would punish
+ * anyone who works in the evening.
+ */
+function reconcileStreak() {
+  const p = questState.player;
+  if (!p.streak) return false;
+  if (!p.lastDailyCompleted) { p.streak = 0; return true; }
+  const today = new Date().toDateString();
+  const yesterday = new Date(Date.now() - 86400000).toDateString();
+  if (p.lastDailyCompleted === today || p.lastDailyCompleted === yesterday) return false;
+  p.streak = 0;
+  return true;
+}
+
 function checkDailyReset() {
   const today = new Date().toDateString();
   if (questState.lastLoginDate !== today) {
@@ -156,10 +190,19 @@ function checkDailyReset() {
         resetOccurred = true;
       }
     });
-    if (resetOccurred) {
+    const broken = reconcileStreak();
+    if (resetOccurred || broken) {
+      /* lastLoginDate is stamped by saveQuestData, so this also stops the
+         check re-running on every load of a day with no dailies in it. */
       saveQuestData();
-      showSystemOverlay('DAILY RESET', 'Your daily quests have been reset.', []);
+      showSystemOverlay('DAILY RESET',
+        broken ? 'Your daily quests have been reset. Streak lost.'
+               : 'Your daily quests have been reset.', []);
     }
+  } else {
+    /* Same day, but the streak can still be stale from a run of missed days
+       before it -- the board is often left open across midnight. */
+    if (reconcileStreak()) saveQuestData();
   }
 }
 
@@ -520,7 +563,11 @@ function _collectFormValues(q) {
   if (desc !== null) q.description = desc.trim();
   if (rank !== null) q.rank = rank;
   if (type !== null) q.type = type;
-  if (xp !== null) q.xpReward = parseInt(xp) || 0;
+  /* Clamped. The field took anything, so a typo of 999999 in a box next to
+     50 jumped the player from Lv.1 to Lv.22 in one click and there is no way
+     back down -- levels only fall to penalties, and none of them are that
+     large. 10,000 is far above any real reward and still recoverable. */
+  if (xp !== null) q.xpReward = Math.max(0, Math.min(10000, parseInt(xp) || 0));
   if (reward !== null) q.reward = reward.trim();
 }
 
@@ -625,11 +672,22 @@ function completeQuest(q) {
   let xpAward = q.xpReward;
   const rewards = [];
 
-  // Anti-farm: a daily quest only pays XP once per calendar day (restart→complete
-  // on the same day previously farmed unlimited XP).
-  if (q.type === 'daily' && q.lastXPAwardDate === today) {
+  /* Anti-farm. A daily pays once per calendar day; everything else pays once,
+     full stop.
+
+     The guard only covered dailies, so a Main quest could be completed,
+     restarted and completed again for its full reward every time -- measured
+     at 150 XP from three passes over one 50 XP quest, which makes levelling a
+     matter of clicking rather than of doing. Main, Side and Hidden quests are
+     one-off tasks; finishing one twice is the same finish, not a second one. */
+  if (q.type === 'daily') {
+    if (q.lastXPAwardDate === today) {
+      xpAward = 0;
+      rewards.push('Daily XP already claimed today');
+    }
+  } else if (q.xpClaimed) {
     xpAward = 0;
-    rewards.push('Daily XP already claimed today');
+    rewards.push('XP already claimed for this quest');
   }
 
   // Unresolved triggered penalties halve the reward — clear them first for full XP.
@@ -639,7 +697,10 @@ function completeQuest(q) {
     rewards.push(`XP halved — ${unresolved} unresolved penalt${unresolved > 1 ? 'ies' : 'y'}`);
   }
 
-  if (xpAward > 0) q.lastXPAwardDate = today;
+  if (xpAward > 0) {
+    q.lastXPAwardDate = today;
+    if (q.type !== 'daily') q.xpClaimed = true;
+  }
   const leveledUp = addXP(xpAward);
   rewards.unshift(`+${xpAward} XP`);
   if (q.reward) rewards.push(q.reward);
@@ -1152,6 +1213,13 @@ function updateParentStatuses(items) {
 
 // ── Timer Display ─────────────────────────────────────────────
 function getDeadlineTime(item, quest) {
+  /* An objective saved before timers existed has no timer object at all, and
+     three load paths reach the renderer without migrating -- signing in to
+     the cloud, and importing a backup. Both crashed the whole board on
+     `item.timer.durationMs`. The paths are fixed too; this is the guard that
+     means the next shape change is a missing feature rather than a blank
+     screen. */
+  if (!item || !item.timer) return null;
   if (quest.status !== 'active' || !quest.activatedAt) return null;
   if (item.timer.date) return new Date(item.timer.date).getTime();
   if (!item.timer.durationMs) return null;
@@ -1160,6 +1228,7 @@ function getDeadlineTime(item, quest) {
 }
 
 function getTimerDisplayHTML(item, quest) {
+  if (!item || !item.timer) return '';
   const targetTime = getDeadlineTime(item, quest);
   if (!targetTime) {
     if (item.timer.durationMs > 0) {

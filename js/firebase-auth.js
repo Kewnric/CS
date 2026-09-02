@@ -674,7 +674,8 @@ async function _loadV2Domains(uid) {
   // Quests
   if (questsDoc.exists && typeof questState !== 'undefined') {
     const d = questsDoc.data();
-    questState.quests = d.quests || [];
+    questState.quests = (typeof migrateQuest === 'function')
+      ? (d.quests || []).map(migrateQuest) : (d.quests || []);
     if (d.player) questState.player = d.player;
     if (d.lastLoginDate) questState.lastLoginDate = d.lastLoginDate;
   }
@@ -759,7 +760,8 @@ function _restoreV1Data(data) {
   }
 
   if (data.quests && typeof questState !== 'undefined') {
-    questState.quests = data.quests.quests || [];
+    questState.quests = (typeof migrateQuest === 'function')
+      ? (data.quests.quests || []).map(migrateQuest) : (data.quests.quests || []);
     if (data.quests.player) questState.player = data.quests.player;
     if (data.quests.lastLoginDate) questState.lastLoginDate = data.quests.lastLoginDate;
   }
