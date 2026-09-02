@@ -11,6 +11,11 @@ let questState = {
     title: 'None',
     totalCompleted: 0,
     streak: 0,
+    bestStreak: 0,
+    /* Spend one to survive a single missed day. Earned every 7 days of streak
+       and capped, so they cannot be hoarded into immunity -- the streak has to
+       stay worth something or breaking it means nothing. */
+    freezes: 0,
     lastDailyCompleted: null
   },
   quests: [],
@@ -19,8 +24,41 @@ let questState = {
   isEditMode: false,
   isActionMode: false,
   lastLoginDate: new Date().toDateString(),
-  sortMode: 'rank'
+  sortMode: 'rank',
+  search: '',
+  showArchived: false,
+  selectMode: false,
+  selection: []
 };
+
+const QUEST_MAX_FREEZES = 3;
+const QUEST_RECURRING = ['daily', 'weekly', 'monthly'];
+function isRecurringQuest(q) { return QUEST_RECURRING.indexOf(q && q.type) !== -1; }
+
+/**
+ * The period a recurring quest belongs to, as a string that changes exactly
+ * when the quest should come back.
+ *
+ * Comparing against a stored key rather than against "was the last login
+ * yesterday" is what makes this survive being away: a weekly quest missed for
+ * a month still resets once, on the next visit, instead of needing one visit
+ * per period to catch up.
+ */
+function questPeriodKey(type, when) {
+  const dt = when || new Date();
+  if (type === 'daily') return dt.toDateString();
+  if (type === 'monthly') return dt.getFullYear() + '-' + (dt.getMonth() + 1);
+  if (type === 'weekly') {
+    // ISO-8601 week: Thursday decides which year a boundary week belongs to.
+    const t = new Date(Date.UTC(dt.getFullYear(), dt.getMonth(), dt.getDate()));
+    const day = t.getUTCDay() || 7;
+    t.setUTCDate(t.getUTCDate() + 4 - day);
+    const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+    const week = Math.ceil((((t - yearStart) / 86400000) + 1) / 7);
+    return t.getUTCFullYear() + '-W' + String(week).padStart(2, '0');
+  }
+  return null;                      // one-off: never resets
+}
 
 // ── Helpers ───────────────────────────────────────────────────
 const XP_BASE = 100;
@@ -42,6 +80,11 @@ function generateObjective() {
     done: false,
     expanded: true,
     timer: { durationMs: 0, elapsedMs: 0, date: null },
+    /* Paid when the box is ticked, not only when the whole quest lands. A
+       quest worth doing over a week gave nothing until the last item, which
+       is the wrong shape for the thing it is meant to encourage. */
+    xp: 0,
+    xpClaimed: false,
     children: []
   };
 }
@@ -60,7 +103,10 @@ function generateQuest() {
     activatedAt: null,
     completedAt: null,
     objectives: [generateObjective()],
-    penalties: []
+    penalties: [],
+    xpClaimed: false,
+    archived: false,
+    lastResetKey: null
   };
 }
 
@@ -85,6 +131,9 @@ function migrateQuest(q) {
   }
   if (!q.penalties) q.penalties = [];
   if (q.lastXPAwardDate === undefined) q.lastXPAwardDate = null;
+  if (q.xpClaimed === undefined) q.xpClaimed = false;
+  if (q.archived === undefined) q.archived = false;
+  if (q.lastResetKey === undefined) q.lastResetKey = null;
   if (!q.activatedAt) q.activatedAt = q.ongoingAt || null;
   if (q.status === 'ongoing') q.status = 'active';
   if (q.status === 'penalty') q.status = 'active';
@@ -109,6 +158,8 @@ function migrateChecklist(items) {
       done: item.done || false,
       expanded: item.expanded !== undefined ? item.expanded : true,
       timer,
+      xp: Math.max(0, Math.min(1000, parseInt(item.xp) || 0)),
+      xpClaimed: !!item.xpClaimed,
       children: item.children ? migrateChecklist(item.children) : []
     };
   });
@@ -167,48 +218,92 @@ function reconcileStreak() {
   const today = new Date().toDateString();
   const yesterday = new Date(Date.now() - 86400000).toDateString();
   if (p.lastDailyCompleted === today || p.lastDailyCompleted === yesterday) return false;
+
+  /* Exactly one day missed, and a freeze in hand: spend it. The freeze stands
+     in for the missing day, so the run continues rather than restarting -- one
+     bad day should not undo a month. Two missed days is not a bad day, it is a
+     stop, and no number of freezes covers it. */
+  const dayBefore = new Date(Date.now() - 2 * 86400000).toDateString();
+  if (p.lastDailyCompleted === dayBefore && (p.freezes | 0) > 0) {
+    p.freezes--;
+    p.lastDailyCompleted = yesterday;
+    return 'frozen';
+  }
   p.streak = 0;
   return true;
 }
 
-function checkDailyReset() {
-  const today = new Date().toDateString();
-  if (questState.lastLoginDate !== today) {
-    let resetOccurred = false;
-    questState.quests.forEach(q => {
-      if (q.type === 'daily') {
-        q.status = 'pending';
-        q.activatedAt = null;
-        q.completedAt = null;
-        resetObjectives(q.objectives);
-        // Reset penalty pool for fresh run
-        (q.penalties || []).forEach(p => {
-          p.triggeredAt = null;
-          p.completedAt = null;
-          p.multiplier = 1;
-        });
-        resetOccurred = true;
+function checkDailyReset() { return checkRecurringResets(); }
+
+/**
+ * Bring every recurring quest into the current period, and the streak with it.
+ *
+ * Replaces a check that only knew about dailies and only fired when the stored
+ * login date was not today. Each quest now remembers the period it was last
+ * reset FOR, so weekly and monthly work, and any of them can be away for
+ * several periods and still come back exactly once.
+ */
+function checkRecurringResets() {
+  let resetCount = 0;
+  const kinds = new Set();
+
+  questState.quests.forEach(q => {
+    if (!isRecurringQuest(q)) return;
+    const key = questPeriodKey(q.type);
+    if (!key || q.lastResetKey === key) return;
+    /* First sight of a quest that predates this field: adopt the current
+       period silently rather than wiping progress that is legitimately from
+       today. */
+    if (!q.lastResetKey) { q.lastResetKey = key; return; }
+    q.status = 'pending';
+    q.activatedAt = null;
+    q.completedAt = null;
+    resetObjectives(q.objectives || []);
+    (q.penalties || []).forEach(p => { p.triggeredAt = null; p.completedAt = null; p.multiplier = 1; });
+    q.lastResetKey = key;
+    resetCount++;
+    kinds.add(q.type);
+  });
+
+  const streakState = reconcileStreak();
+  const dayChanged = questState.lastLoginDate !== new Date().toDateString();
+
+  if (resetCount || streakState || dayChanged) {
+    saveQuestData();
+    if (resetCount || streakState) {
+      const what = Array.from(kinds).join(' and ') || 'recurring';
+      const msg = resetCount ? ('Your ' + what + ' quests have been reset.') : '';
+      const streakMsg = streakState === 'frozen'
+        ? ' Streak freeze used — ' + questState.player.freezes + ' left.'
+        : (streakState ? ' Streak lost.' : '');
+      if (typeof showSystemOverlay === 'function') {
+        showSystemOverlay(streakState === 'frozen' ? 'STREAK FROZEN' : 'RESET',
+                          (msg + streakMsg).trim(), []);
       }
-    });
-    const broken = reconcileStreak();
-    if (resetOccurred || broken) {
-      /* lastLoginDate is stamped by saveQuestData, so this also stops the
-         check re-running on every load of a day with no dailies in it. */
-      saveQuestData();
-      showSystemOverlay('DAILY RESET',
-        broken ? 'Your daily quests have been reset. Streak lost.'
-               : 'Your daily quests have been reset.', []);
     }
-  } else {
-    /* Same day, but the streak can still be stale from a run of missed days
-       before it -- the board is often left open across midnight. */
-    if (reconcileStreak()) saveQuestData();
+    if (typeof renderQuestList === 'function') renderQuestList();
+    if (typeof renderPlayerStatus === 'function') renderPlayerStatus();
   }
+  _scheduleMidnightReset();
+}
+
+/* The board is often left open overnight. Without this the reset waited for a
+   reload, so the first thing after midnight was a stale board showing
+   yesterday's ticks. Scheduled to the next boundary rather than polled. */
+let _questMidnightTimer = null;
+function _scheduleMidnightReset() {
+  clearTimeout(_questMidnightTimer);
+  const now = new Date();
+  const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5);
+  const ms = Math.max(1000, next - now);
+  // setTimeout saturates past ~24.8 days; this is always under a day.
+  _questMidnightTimer = setTimeout(() => { checkRecurringResets(); }, ms);
 }
 
 function resetObjectives(items) {
   items.forEach(item => {
     item.done = false;
+    item.xpClaimed = false;          // a new run can earn the same XP again
     if (item.timer) {
       item.timer.elapsedMs = 0;
       item.timer.penaltyFired = false;
@@ -284,6 +379,21 @@ function renderPlayerStatus() {
     }
   });
 
+  const st = document.getElementById('stat-streak');
+  if (st) {
+    const span = st.querySelector('span');
+    if (span) span.textContent = p.streak || 0;
+    st.title = 'Daily streak' + (p.bestStreak ? ' — best ' + p.bestStreak : '');
+    st.classList.toggle('is-hot', (p.streak || 0) >= 3);
+  }
+  const fz = document.getElementById('stat-freeze');
+  if (fz) {
+    const span = fz.querySelector('span');
+    if (span) span.textContent = p.freezes || 0;
+    fz.title = (p.freezes || 0) + ' streak freeze' + ((p.freezes || 0) === 1 ? '' : 's')
+             + ' — each covers one missed day. Earned every 7 days of streak.';
+  }
+
   updateQuestTabBadges();
   const playerPanel = document.getElementById('quest-player-panel') || document.getElementById('quest-board-root');
   if (typeof lucide !== 'undefined') lucide.createIcons(playerPanel ? { root: playerPanel } : undefined);
@@ -332,6 +442,151 @@ function addXP(amount) {
 }
 
 // ── Sort ──────────────────────────────────────────────────────
+/* ── Archive, duplicate, bulk ────────────────────────────────
+   Everything here works on ids rather than on the current selection, so the
+   same function serves a single quest and a multi-select. */
+
+function setQuestArchived(id, on) {
+  const q = questState.quests.find(x => x.id === id);
+  if (!q) return;
+  q.archived = !!on;
+  saveQuestData();
+  renderQuestList();
+  renderQuestDetails();
+}
+
+function toggleShowArchived() {
+  questState.showArchived = !questState.showArchived;
+  renderQuestList();
+}
+
+/** Archive every completed quest at once -- the usual reason to archive. */
+function archiveAllCompleted() {
+  const todo = questState.quests.filter(q => q.status === 'completed' && !q.archived);
+  if (!todo.length) {
+    if (typeof toast === 'function') toast('Nothing to archive.', { type: 'info', duration: 1800 });
+    return;
+  }
+  todo.forEach(q => { q.archived = true; });
+  saveQuestData();
+  renderQuestList();
+  if (typeof pushUndo === 'function') {
+    pushUndo('Archived ' + todo.length + ' quest' + (todo.length === 1 ? '' : 's'), () => {
+      todo.forEach(q => { q.archived = false; });
+      saveQuestData(); renderQuestList();
+    });
+  }
+}
+
+/**
+ * Copy a quest, structure and all.
+ *
+ * Every id is regenerated -- ids address objectives for ticking and for
+ * penalties, so a copy that shared them would tick two quests at once. The
+ * copy starts pending and unclaimed: it is a new run, not a finished one.
+ */
+function duplicateQuest(id) {
+  const src = questState.quests.find(x => x.id === (id || questState.activeQuestId));
+  if (!src) return;
+  const copy = JSON.parse(JSON.stringify(src));
+  const reid = items => (items || []).forEach(it => {
+    it.id = generateId();
+    it.done = false;
+    it.xpClaimed = false;
+    if (it.timer) it.timer.elapsedMs = 0;
+    reid(it.children);
+  });
+  copy.id = generateId();
+  copy.title = (src.title || 'Untitled') + ' (copy)';
+  copy.status = 'pending';
+  copy.createdAt = new Date().toISOString();
+  copy.activatedAt = null;
+  copy.completedAt = null;
+  copy.archived = false;
+  copy.xpClaimed = false;
+  copy.lastXPAwardDate = null;
+  copy.lastResetKey = null;
+  reid(copy.objectives);
+  (copy.penalties || []).forEach(pn => { pn.triggeredAt = null; pn.completedAt = null; pn.multiplier = 1; });
+  questState.quests.push(copy);
+  questState.activeQuestId = copy.id;
+  saveQuestData();
+  setQuestTab('pending');
+  renderQuestDetails();
+  if (typeof toast === 'function') toast('Duplicated as "' + copy.title + '"', { type: 'success', duration: 2200 });
+}
+
+/* ── Multi-select ──────────────────────────────────────────── */
+
+function toggleQuestSelectMode() {
+  questState.selectMode = !questState.selectMode;
+  questState.selection = [];
+  renderQuestList();
+}
+
+function toggleQuestSelected(id, ev) {
+  if (ev && ev.stopPropagation) ev.stopPropagation();
+  const at = questState.selection.indexOf(id);
+  if (at === -1) questState.selection.push(id); else questState.selection.splice(at, 1);
+  renderQuestList();
+}
+
+function selectAllVisibleQuests() {
+  const ids = Array.from(document.querySelectorAll('[data-quest-id]'))
+    .map(el => el.getAttribute('data-quest-id'));
+  const all = ids.every(id => questState.selection.indexOf(id) !== -1);
+  questState.selection = all ? [] : ids;
+  renderQuestList();
+}
+
+function bulkQuestAction(what) {
+  const ids = (questState.selection || []).slice();
+  if (!ids.length) return;
+  const picked = questState.quests.filter(q => ids.indexOf(q.id) !== -1);
+
+  if (what === 'delete') {
+    const snapshot = JSON.parse(JSON.stringify(picked));
+    showConfirm('Delete ' + ids.length + ' quest' + (ids.length === 1 ? '' : 's'),
+      'This can be undone from the toast that follows.', () => {
+        questState.quests = questState.quests.filter(q => ids.indexOf(q.id) === -1);
+        questState.selection = [];
+        saveQuestData(); renderQuestList(); renderQuestDetails();
+        if (typeof pushUndo === 'function') {
+          pushUndo('Deleted ' + snapshot.length + ' quests', () => {
+            questState.quests = questState.quests.concat(snapshot);
+            saveQuestData(); renderQuestList();
+          });
+        }
+      });
+    return;
+  }
+
+  /* Bulk complete deliberately does NOT pay XP. Reward follows doing the work
+     one quest at a time; a button that hands out a level for selecting a list
+     would make every other number on this screen meaningless. */
+  picked.forEach(q => {
+    if (what === 'archive') q.archived = true;
+    else if (what === 'unarchive') q.archived = false;
+    else if (what === 'complete') {
+      q.status = 'completed';
+      q.completedAt = new Date().toISOString();
+      _markAllDone(q.objectives || []);
+    } else if (what === 'pending') {
+      q.status = 'pending';
+      q.activatedAt = null;
+      q.completedAt = null;
+    }
+  });
+  questState.selection = [];
+  saveQuestData();
+  renderQuestList();
+  if (typeof toast === 'function') {
+    toast(picked.length + ' quest' + (picked.length === 1 ? '' : 's') + ' updated'
+          + (what === 'complete' ? ' (no XP for bulk completion)' : ''),
+          { type: 'info', duration: 2600 });
+  }
+}
+
 function toggleQuestSort() {
   const modes = ['rank', 'newest', 'deadline'];
   const cur = modes.indexOf(questState.sortMode);
@@ -355,10 +610,24 @@ function renderQuestList() {
   const container = document.getElementById('quest-list-container');
   if (!container) return;
 
+  /* The box is rebuilt with the panel, so reading it is only right while it
+     is on screen. The query lives in state and the field is refilled from it,
+     which is what makes a search survive switching tabs. */
   const searchEl = document.getElementById('quest-search-input');
-  const query = searchEl ? searchEl.value.trim().toLowerCase() : '';
+  if (searchEl) {
+    if (document.activeElement === searchEl) questState.search = searchEl.value;
+    else if (searchEl.value !== (questState.search || '')) searchEl.value = questState.search || '';
+  }
+  const query = String(questState.search || '').trim().toLowerCase();
 
   let filtered = questState.quests.filter(q => q.status === questState.activeTab);
+
+  /* Done fills up and never empties, and an old finished quest is not a task
+     any more -- it is a record. Archiving keeps it without letting it crowd
+     the list, and nothing is ever deleted for you. */
+  if (questState.activeTab === 'completed' && !questState.showArchived) {
+    filtered = filtered.filter(q => !q.archived);
+  }
 
   if (query) {
     filtered = filtered.filter(q =>
@@ -366,6 +635,8 @@ function renderQuestList() {
       (q.description || '').toLowerCase().includes(query)
     );
   }
+
+  _renderQuestBulkBar();
 
   const rankOrder = { S: 0, A: 1, B: 2, C: 3, D: 4, E: 5 };
   if (questState.sortMode === 'rank') {
@@ -402,8 +673,11 @@ function renderQuestList() {
     const hasDeadline = _getQuestEarliestDeadline(q);
 
     html += `
-      <div class="quest-card${isActive ? ' active' : ''} rank-accent-${q.rank}" onclick="selectQuest('${q.id}')">
+      <div class="quest-card${isActive ? ' active' : ''}${q.archived ? ' is-archived' : ''} rank-accent-${q.rank}"
+           data-quest-id="${q.id}"
+           onclick="${questState.selectMode ? `toggleQuestSelected('${q.id}', event)` : `selectQuest('${q.id}')`}">
         <div class="quest-card-header">
+          ${questState.selectMode ? `<span class="quest-select-box${(questState.selection||[]).indexOf(q.id) !== -1 ? ' is-on' : ''}">${(questState.selection||[]).indexOf(q.id) !== -1 ? '✓' : ''}</span>` : ''}
           <span class="rank-badge rank-${q.rank}">${q.rank}</span>
           <div class="quest-card-title">${escapeHTML(q.title) || 'Untitled Quest'}</div>
           <div class="quest-card-badges">
@@ -425,6 +699,44 @@ function renderQuestList() {
   container.innerHTML = html;
   if (typeof lucide !== 'undefined') lucide.createIcons({ el: container });
   updateQuestTabBadges();
+}
+
+/* The strip above the tabs. It carries two unrelated things that both only
+   make sense in context: what to do with a multi-selection, and whether the
+   Done tab is hiding archived quests. Neither is worth permanent chrome. */
+function _renderQuestBulkBar() {
+  const host = document.getElementById('quest-bulk-bar');
+  if (!host) return;
+  const sel = (questState.selection || []).length;
+  const archivedCount = questState.quests.filter(q => q.status === 'completed' && q.archived).length;
+  let html = '';
+
+  if (questState.selectMode) {
+    html += '<div class="quest-bulk-strip">'
+         +  '<button class="quest-bulk-btn" onclick="selectAllVisibleQuests()">'
+         +  (sel ? 'Clear' : 'Select all') + '</button>'
+         +  '<span class="quest-bulk-count">' + sel + ' selected</span>';
+    if (sel) {
+      html += '<button class="quest-bulk-btn" onclick="bulkQuestAction(\'complete\')">Complete</button>'
+           +  '<button class="quest-bulk-btn" onclick="bulkQuestAction(\'pending\')">To pending</button>'
+           +  '<button class="quest-bulk-btn" onclick="bulkQuestAction(\'archive\')">Archive</button>'
+           +  '<button class="quest-bulk-btn danger" onclick="bulkQuestAction(\'delete\')">Delete</button>';
+    }
+    html += '<button class="quest-bulk-btn" onclick="toggleQuestSelectMode()">Done</button></div>';
+  }
+
+  if (questState.activeTab === 'completed' && (archivedCount || questState.showArchived)) {
+    html += '<div class="quest-bulk-strip subtle">'
+         +  '<button class="quest-bulk-btn" onclick="toggleShowArchived()">'
+         +  (questState.showArchived ? 'Hide' : 'Show') + ' archived (' + archivedCount + ')</button>'
+         +  '<button class="quest-bulk-btn" onclick="archiveAllCompleted()">Archive all done</button>'
+         +  '</div>';
+  } else if (questState.activeTab === 'completed') {
+    html += '<div class="quest-bulk-strip subtle">'
+         +  '<button class="quest-bulk-btn" onclick="archiveAllCompleted()">Archive all done</button></div>';
+  }
+
+  host.innerHTML = html;
 }
 
 function _getQuestProgress(q) {
@@ -665,6 +977,10 @@ function completeQuest(q) {
         ? (questState.player.streak || 0) + 1
         : 1;
       questState.player.lastDailyCompleted = today;
+      const p = questState.player;
+      if (p.streak > (p.bestStreak || 0)) p.bestStreak = p.streak;
+      // One freeze per full week of streak, capped.
+      if (p.streak % 7 === 0 && (p.freezes | 0) < QUEST_MAX_FREEZES) p.freezes = (p.freezes | 0) + 1;
     }
   }
 
@@ -796,6 +1112,8 @@ function renderViewLayout(q) {
         ${progressRing}
         <div class="quest-detail-btns">
           <button class="quest-icon-btn" onclick="enterEditMode()" title="Edit"><i data-lucide="pencil"></i></button>
+          <button class="quest-icon-btn" onclick="duplicateQuest()" title="Duplicate — a fresh copy, ids and ticks reset"><i data-lucide="copy"></i></button>
+          ${q.status === 'completed' ? `<button class="quest-icon-btn" onclick="setQuestArchived('${q.id}', ${!q.archived})" title="${q.archived ? 'Unarchive' : 'Archive — keeps it, out of the Done list'}"><i data-lucide="${q.archived ? 'archive-restore' : 'archive'}"></i></button>` : ''}
           <button class="quest-icon-btn danger" onclick="deleteActiveQuest()" title="Delete"><i data-lucide="trash-2"></i></button>
         </div>
       </div>
@@ -911,6 +1229,8 @@ function renderEditForm(q) {
             <select id="qf-type" class="system-input" onchange="updateQuestField('type', this.value)">
               <option value="main" ${q.type === 'main' ? 'selected' : ''}>Main</option>
               <option value="daily" ${q.type === 'daily' ? 'selected' : ''}>Daily</option>
+              <option value="weekly" ${q.type === 'weekly' ? 'selected' : ''}>Weekly</option>
+              <option value="monthly" ${q.type === 'monthly' ? 'selected' : ''}>Monthly</option>
               <option value="side" ${q.type === 'side' ? 'selected' : ''}>Side</option>
               <option value="hidden" ${q.type === 'hidden' ? 'selected' : ''}>Hidden</option>
             </select>
@@ -989,6 +1309,10 @@ function renderObjectivesEdit(items, quest, level = 0) {
             value="${escapeHTML(item.text)}"
             onchange="updateClItemField('${item.id}', 'text', this.value)"
             oninput="updateClItemField('${item.id}', 'text', this.value)" />
+        <input type="number" class="system-input cl-xp-input" min="0" max="1000"
+               value="${item.xp || 0}" title="XP for ticking this objective"
+               placeholder="XP"
+               onchange="updateClItemField('${item.id}', 'xp', this.value)">
           <button class="quest-icon-btn" style="width:24px;height:24px;flex-shrink:0;" onclick="addClChild('${item.id}')" title="Add sub-objective">
             <i data-lucide="plus" style="width:11px;height:11px;"></i>
           </button>
@@ -1116,6 +1440,7 @@ function removeClItemRecursive(items, id) {
 }
 
 function updateClItemField(id, field, value) {
+  if (field === 'xp') value = Math.max(0, Math.min(1000, parseInt(value) || 0));
   const q = questState.quests.find(q => q.id === questState.activeQuestId);
   if (!q) return;
   const item = findClItem(q.objectives, id);
@@ -1181,6 +1506,15 @@ function toggleItemDone(id, questId) {
   const item = findClItem(q.objectives, id);
   if (!item) return;
   item.done = !item.done;
+  /* Paid on the tick, once per run. Unticking does not take it back: the work
+     was done, and a checkbox that costs you XP to correct is a checkbox people
+     stop correcting. resetObjectives clears the claim when the quest restarts. */
+  if (item.done && !item.xpClaimed && (item.xp | 0) > 0 && q.status === 'active') {
+    item.xpClaimed = true;
+    addXP(item.xp | 0);
+    if (typeof toast === 'function') toast('+' + (item.xp | 0) + ' XP — ' + (item.text || 'objective'),
+                                           { type: 'success', duration: 1800 });
+  }
   const allDone = updateParentStatuses(q.objectives);
   if (allDone && (q.objectives || []).length > 0 && q.status === 'active') {
     q.status = 'completed';

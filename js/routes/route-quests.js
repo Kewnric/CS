@@ -20,6 +20,12 @@ function questTemplate() {
           <div class="status-stat" id="stat-pending"><i data-lucide="clock"></i><span>0</span><label>Pending</label></div>
           <div class="status-stat completed" id="stat-completed"><i data-lucide="check-circle-2"></i><span>0</span><label>Done</label></div>
           <div class="status-stat failed" id="stat-failed"><i data-lucide="skull"></i><span>0</span><label>Failed</label></div>
+          <!-- The streak was stored and never shown, which is why nobody
+               noticed it had stopped decaying. -->
+          <div class="status-stat streak" id="stat-streak" title="Daily streak">
+            <i data-lucide="flame"></i><span>0</span><label>Streak</label></div>
+          <div class="status-stat freeze" id="stat-freeze" title="Streak freezes — each one covers a single missed day">
+            <i data-lucide="snowflake"></i><span>0</span><label>Freeze</label></div>
         </div>
       </div>
 
@@ -36,6 +42,10 @@ function questTemplate() {
                 <button class="quest-sort-btn" id="quest-sort-btn" onclick="toggleQuestSort()" title="Sort quests">
                   <i data-lucide="arrow-up-down"></i>
                 </button>
+                <button class="quest-sort-btn" id="quest-select-btn" onclick="toggleQuestSelectMode()"
+                        title="Select several quests">
+                  <i data-lucide="list-checks"></i>
+                </button>
                 <button class="quest-new-btn" onclick="createNewQuest()" title="New Quest">
                   <i data-lucide="plus"></i>
                 </button>
@@ -44,8 +54,10 @@ function questTemplate() {
             <div class="quest-search-wrap">
               <i data-lucide="search" class="quest-search-icon"></i>
               <input type="text" id="quest-search-input" class="quest-search-input"
-                placeholder="Search quests..." oninput="renderQuestList()" />
+                placeholder="Search quests..." oninput="questState.search = this.value; renderQuestList();" />
             </div>
+            <!-- Only rendered into when a selection or the Done tab needs it. -->
+            <div id="quest-bulk-bar"></div>
             <div class="quest-tab-row">
               <button class="quest-tab" id="tab-active" onclick="setQuestTab('active')">
                 <i data-lucide="swords"></i> Active
