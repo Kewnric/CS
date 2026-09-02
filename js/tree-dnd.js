@@ -905,3 +905,84 @@ document.addEventListener('dragleave', (e) => {
   _treeStopSpring();
   _treeStopScroll();
 }, false);
+
+
+/* -- Long names ------------------------------------------------
+   A name wider than the pane got an ellipsis and no way to read the rest: the
+   rows carry no title attribute, so the only way to see the end of "10 -
+   Functions and recursion" in a narrow tree was to drag the pane wider.
+
+   Hovering the row scrolls its label instead. The measuring has to happen in
+   JS -- how far to travel is per label -- but it happens once per hover on one
+   element, not for every row on every render, which would be sixty forced
+   layouts each time the tree redraws.
+
+   The row is the trigger, not the label: the label is only part of the row's
+   width, and hovering the badge or the icon is still hovering the name. */
+const LABEL_SCROLL_SPEED = 55;    // px per second, whatever the name's length
+const LABEL_SCROLL_LEG = 0.35;    // share of the cycle spent travelling, per leg
+
+function _treeReducedMotion() {
+  return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+
+function _treeLabelStart(row) {
+  const el = row.querySelector('.tree-node-label');
+  // dataset.fits caches "measured, does not overflow" for the length of this
+  // hover. Without it every mousemove inside the row re-reads scrollWidth,
+  // which forces a layout on each one.
+  if (!el || el.classList.contains('is-scrolling') || el.dataset.fits) return;
+
+  const dist = el.scrollWidth - el.clientWidth;
+  if (dist <= 1) { el.dataset.fits = '1'; return; }
+
+  if (_treeReducedMotion()) {
+    // Motion is the wrong answer here, but the name still has to be readable.
+    if (!el.title) el.title = el.textContent.trim();
+    el.dataset.fits = '1';
+    return;
+  }
+
+  /* The text gets a wrapper to move, and only while it is moving. Idle labels
+     keep the markup their renderer wrote, ellipsis and all. innerHTML rather
+     than textContent because one caller (the library root heading) puts markup
+     in the label. */
+  const inner = document.createElement('span');
+  inner.className = 'tree-label-run';
+  inner.innerHTML = el.innerHTML;
+  el.textContent = '';
+  el.appendChild(inner);
+
+  // A couple of pixels past the end so the last glyph clears the edge.
+  const travel = Math.min(Math.max(dist / LABEL_SCROLL_SPEED, 1), 12);
+  el.style.setProperty('--label-scroll-dist', -(dist + 2) + 'px');
+  el.style.setProperty('--label-scroll-time', (travel / LABEL_SCROLL_LEG).toFixed(2) + 's');
+  el.classList.add('is-scrolling');
+}
+
+function _treeLabelStop(row) {
+  const el = row.querySelector('.tree-node-label');
+  if (!el) return;
+  el.classList.remove('is-scrolling');
+  const inner = el.querySelector(':scope > .tree-label-run');
+  if (inner) el.innerHTML = inner.innerHTML;   // put the label back as it was
+  el.style.removeProperty('--label-scroll-dist');
+  el.style.removeProperty('--label-scroll-time');
+  // Dropped rather than kept: the pane can be resized between hovers, and a
+  // stale "it fits" would leave the name unreadable with no way to retry.
+  delete el.dataset.fits;
+}
+
+document.addEventListener('mouseover', (e) => {
+  const row = e.target.closest && e.target.closest('.tree-node-row');
+  if (row) _treeLabelStart(row);
+}, true);
+
+document.addEventListener('mouseout', (e) => {
+  const row = e.target.closest && e.target.closest('.tree-node-row');
+  if (!row) return;
+  // mouseout also fires moving between children of the same row; that is not
+  // leaving it.
+  if (e.relatedTarget && row.contains(e.relatedTarget)) return;
+  _treeLabelStop(row);
+}, true);

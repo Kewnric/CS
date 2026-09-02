@@ -948,6 +948,47 @@ details[open]>.snippet-folder-summary>.folder-icon {
   transition: color var(--transition-fast);
 }
 
+/* A name too long for the pane was an ellipsis and nothing else -- no tooltip,
+   no way to read the end of it short of dragging the pane wider. Hovering the
+   row now walks the text left far enough to show the end, holds there, and
+   walks back.
+
+   The moving part is a span wrapped around the text on hover and unwrapped on
+   the way out, so an idle label is untouched markup with its ellipsis intact
+   and none of the five renderers that write these labels has to change.
+
+   It animates transform rather than text-indent. text-indent looked like the
+   tidier answer -- it needs no wrapper at all -- and it does move the layout:
+   a Range over the text reported it shifting from x=161 to x=-4. It just does
+   not paint. Verified against a screenshot with the frame proven fresh, the
+   text sat unshifted at the start of the box. transform paints, and stays on
+   the compositor besides.
+
+   The two travelling legs are the same share of the cycle and the cycle length
+   comes from the distance, so a long name and a barely-too-long one move at
+   the same speed rather than one whipping past. Below ~55px of overrun the
+   minimum duration takes over and it moves slower still, which is wanted: a
+   few pixels of travel should not read as a twitch. The hold at 0-12% doubles
+   as a start delay, so sweeping the pointer down the tree does not set off a
+   wave of motion behind it. */
+.tree-node-label.is-scrolling { text-overflow: clip; }
+.tree-node-label.is-scrolling .tree-label-run {
+  display: inline-block;
+  white-space: nowrap;
+  will-change: transform;
+  animation: treeLabelScroll var(--label-scroll-time, 5s) ease-in-out infinite;
+}
+@keyframes treeLabelScroll {
+  0%, 12%   { transform: translateX(0); }
+  47%, 59%  { transform: translateX(var(--label-scroll-dist, 0px)); }
+  94%, 100% { transform: translateX(0); }
+}
+/* Reduced motion gets the name as a tooltip instead -- see _treeLabelStart. */
+@media (prefers-reduced-motion: reduce) {
+  .tree-node-label.is-scrolling { text-overflow: ellipsis; }
+  .tree-node-label.is-scrolling .tree-label-run { animation: none; }
+}
+
 .tree-node-badge {
   background: var(--bg-surface-hover);
   padding: 0.125rem 0.375rem;
