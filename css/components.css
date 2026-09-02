@@ -3755,3 +3755,70 @@ body[data-route="visualization"] .settings-fab { display: none; }
   .dlg-choice { padding: 0.75rem 0.8rem; gap: 0.65rem; }
   .dlg-choice-detail { font-size: 0.72rem; }
 }
+
+
+/* ── Icon picker ──────────────────────────────────────────────
+   Wide, because the point is to see a lot of icons at once, and a fixed-height
+   scroller so the dialog does not resize as you type. */
+.dialog-icons .modal-content { max-width: 620px; text-align: left; }
+.dialog-icons .modal-icon, .dialog-icons .modal-title { text-align: center; }
+.dialog-icons .modal-desc { text-align: center; margin-bottom: 0.9rem; }
+.dialog-icons .modal-actions { display: block; }
+
+.iconpick { display: flex; flex-direction: column; gap: 0.7rem; }
+.iconpick-search { width: 100%; }
+
+.iconpick-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
+  gap: 6px;
+  height: 260px;
+  overflow-y: auto;
+  padding: 4px;
+  border-radius: 10px;
+  background: var(--bg-surface, #16161c);
+  border: 1px solid var(--border-color, #2f2f3a);
+}
+
+.iconpick-cell {
+  display: inline-flex; align-items: center; justify-content: center;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--text-secondary, #a8a8b8);
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.iconpick-cell svg { width: 19px; height: 19px; }
+.iconpick-cell:hover { background: var(--bg-surface-hover, #22222c); color: var(--text-primary); }
+.iconpick-cell.is-on {
+  border-color: var(--color-primary, #6366f1);
+  background: color-mix(in srgb, var(--color-primary, #6366f1) 18%, transparent);
+  color: var(--color-primary, #6366f1);
+}
+.iconpick-cell:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+
+.iconpick-more {
+  grid-column: 1 / -1;
+  padding: 0.6rem 0.2rem;
+  font-size: 0.72rem;
+  color: var(--text-tertiary, #7c7c8a);
+  text-align: center;
+}
+
+.iconpick-foot { display: flex; align-items: center; gap: 0.45rem; }
+.iconpick-spacer { flex: 1; }
+.iconpick-current { display: inline-flex; align-items: center; gap: 0.4rem; min-width: 0; }
+.iconpick-current svg { width: 17px; height: 17px; color: var(--color-primary, #6366f1); }
+.iconpick-current code {
+  font-size: 0.72rem; color: var(--text-secondary, #a8a8b8);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.iconpick-none { font-size: 0.72rem; color: var(--text-tertiary, #7c7c8a); }
+
+@media (max-width: 520px) {
+  .iconpick-grid { height: 200px; }
+  .iconpick-foot { flex-wrap: wrap; }
+  .iconpick-spacer { flex-basis: 100%; height: 0; }
+}

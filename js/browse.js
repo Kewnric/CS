@@ -1950,11 +1950,16 @@ function browseSetLevel(id) {
 function browseSetIcon(id) {
   const it = browseFindItem(id);
   if (!it) return;
-  showInputDialog('Change icon', 'A Lucide icon name, for example "rocket".', 'Icon', it.icon || '', function (v) {
+  const apply = function (v) {
     const name = (v || '').trim();
     if (name) it.icon = name; else delete it.icon;
     saveData(); invalidateBrowseCache(); renderBrowse();
-  });
+  };
+  if (typeof showIconPicker === 'function') {
+    showIconPicker('Change icon', 'Search and pick one, or clear it.', it.icon || '', apply);
+  } else {
+    showInputDialog('Change icon', 'A Lucide icon name, for example "rocket".', 'Icon', it.icon || '', apply);
+  }
 }
 
 function browseCollapseAll(collapse) {

@@ -378,6 +378,161 @@ function closeResultModal() {
 // ── showInputDialog — replaces native prompt() ──
 // onConfirm receives the trimmed non-empty string the user typed.
 /** Replaces native prompt(). @param {string} title @param {string|null} message @param {string} placeholder @param {string} defaultValue @param {function(string): void} onConfirm called only with non-empty trimmed value */
+/* ── Icon picker ─────────────────────────────────────────────
+   Asking for "a Lucide icon name" in a text box put the whole burden on the
+   person typing: you had to know the set had 1,663 icons in it, know what any
+   of them were called, and get the spelling exactly right, with a blank result
+   and no message when you did not. Nobody knows those names by heart.
+
+   So: search the real set, see the icons, click one.
+
+   NAMES COME FROM THE LIBRARY, not from a list kept here -- lucide.icons has
+   every icon in whatever build is loaded, so this cannot go stale or offer
+   something that will not render.
+
+   Lucide exposes them in PascalCase and data-lucide wants kebab, and the
+   conversion is the one thing here that can silently produce a broken icon.
+   Two rules rather than one: a digit needs a break in front of it or Grid2x2
+   comes out as grid2x2, and a capital run needs breaking before its last
+   letter or AArrowDown comes out as aarrow-down. Every name is then checked
+   against the library before it is offered. */
+
+const ICON_PICKER_SUGGESTED = [
+  'folder', 'folder-open', 'file', 'file-text', 'file-code', 'code', 'code-2',
+  'terminal', 'braces', 'binary', 'bug', 'git-branch', 'database', 'server',
+  'book', 'book-open', 'library', 'graduation-cap', 'notebook-pen', 'pencil',
+  'star', 'heart', 'flame', 'rocket', 'zap', 'sparkles', 'crown', 'trophy',
+  'target', 'flag', 'bookmark', 'pin', 'tag', 'hash', 'key', 'lock',
+  'lightbulb', 'brain', 'puzzle', 'layers', 'box', 'package', 'archive',
+  'list', 'list-checks', 'check', 'circle-check', 'clock', 'calendar',
+  'bar-chart', 'trending-up', 'activity', 'gauge', 'timer', 'hourglass',
+  'cpu', 'memory-stick', 'hard-drive', 'network', 'link', 'globe',
+  'sun', 'moon', 'cloud', 'wind', 'droplet', 'leaf', 'mountain', 'compass'
+];
+
+function _iconPickerToKebab(name) {
+  return String(name)
+    .replace(/([a-zA-Z])(\d)/g, '$1-$2')
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/([A-Z])([A-Z][a-z])/g, '$1-$2')
+    .toLowerCase();
+}
+
+/** Every icon the loaded Lucide build actually has, in data-lucide form. */
+function iconPickerNames() {
+  if (typeof lucide === 'undefined' || !lucide.icons) return ICON_PICKER_SUGGESTED.slice();
+  if (!iconPickerNames._cache) {
+    iconPickerNames._cache = Object.keys(lucide.icons).map(_iconPickerToKebab).sort();
+  }
+  return iconPickerNames._cache;
+}
+
+/**
+ * @param {string} current  the icon already set, pre-selected if it exists
+ * @param {function} onConfirm  called with the chosen name, or '' to clear
+ */
+function showIconPicker(title, message, current, onConfirm) {
+  const all = iconPickerNames();
+  const known = new Set(all);
+  let picked = (current || '').trim();
+
+  const modal = document.getElementById('dialog-modal');
+  if (!modal) {
+    const v = prompt(message || title, picked);
+    if (v !== null) onConfirm(v.trim());
+    return;
+  }
+  modal.classList.add('dialog-icons');
+  document.getElementById('dialog-title').innerText = title;
+  document.getElementById('dialog-msg').innerText = message || '';
+  document.getElementById('dialog-icon').innerHTML =
+    '<i data-lucide="image" class="modal-icon-svg" style="color:var(--color-primary);"></i>';
+
+  document.getElementById('dialog-actions').innerHTML =
+    '<div class="iconpick">'
+    + '<input id="iconpick-q" class="form-input iconpick-search" type="search" autocomplete="off"'
+    + ' placeholder="Search ' + all.length + ' icons…" />'
+    + '<div id="iconpick-grid" class="iconpick-grid" role="listbox" aria-label="Icons"></div>'
+    + '<div class="iconpick-foot">'
+    + '<span id="iconpick-current" class="iconpick-current"></span>'
+    + '<span class="iconpick-spacer"></span>'
+    + '<button id="dlg-clear" class="btn btn-ghost btn-sm" type="button">No icon</button>'
+    + '<button id="dlg-cancel" class="btn btn-secondary btn-sm" type="button">Cancel</button>'
+    + '<button id="dlg-confirm" class="btn btn-primary btn-sm" type="button">Confirm</button>'
+    + '</div></div>';
+
+  const grid = document.getElementById('iconpick-grid');
+  const q = document.getElementById('iconpick-q');
+  const foot = document.getElementById('iconpick-current');
+
+  /* Capped. 1,663 inline SVGs is several thousand DOM nodes and a visibly
+     locked tab; a search that cannot show everything is not a problem, because
+     nobody scrolls past a hundred icons looking for one. */
+  const LIMIT = 140;
+
+  function paint() {
+    const term = q.value.trim().toLowerCase();
+    let list;
+    if (!term) {
+      // Something to look at before typing, rather than a wall or a blank.
+      list = ICON_PICKER_SUGGESTED.filter(nm => known.has(nm));
+      if (picked && known.has(picked) && list.indexOf(picked) === -1) list.unshift(picked);
+    } else {
+      list = all.filter(nm => nm.indexOf(term) !== -1);
+      // Whole-word and prefix matches first: "book" should not bury `book`
+      // under `bookmark` and `book-open`.
+      list.sort((a, b) => {
+        const ap = a === term ? 0 : a.indexOf(term) === 0 ? 1 : 2;
+        const bp = b === term ? 0 : b.indexOf(term) === 0 ? 1 : 2;
+        return ap !== bp ? ap - bp : a.localeCompare(b);
+      });
+    }
+    const shown = list.slice(0, LIMIT);
+    grid.innerHTML = shown.length
+      ? shown.map(nm =>
+          '<button type="button" class="iconpick-cell' + (nm === picked ? ' is-on' : '') + '"'
+          + ' data-icon="' + nm + '" title="' + nm + '" role="option"'
+          + ' aria-selected="' + (nm === picked) + '">'
+          + '<i data-lucide="' + nm + '"></i></button>').join('')
+        + (list.length > shown.length
+            ? '<div class="iconpick-more">' + (list.length - shown.length) + ' more — keep typing</div>'
+            : '')
+      : '<div class="iconpick-more">Nothing matches “' + escapeHTML(term) + '”</div>';
+    if (typeof lucide !== 'undefined') lucide.createIcons({ root: grid });
+    foot.innerHTML = picked
+      ? '<i data-lucide="' + picked + '"></i><code>' + escapeHTML(picked) + '</code>'
+      : '<span class="iconpick-none">No icon selected</span>';
+    if (picked && typeof lucide !== 'undefined') lucide.createIcons({ root: foot });
+  }
+
+  grid.addEventListener('click', e => {
+    const cell = e.target.closest && e.target.closest('.iconpick-cell');
+    if (!cell) return;
+    picked = cell.getAttribute('data-icon');
+    paint();
+  });
+  q.addEventListener('input', paint);
+
+  const close = () => { modal.classList.remove('dialog-icons'); closeModalSmooth(modal); };
+  document.getElementById('dlg-cancel').onclick = close;
+  document.getElementById('dlg-clear').onclick = () => { close(); onConfirm(''); };
+  document.getElementById('dlg-confirm').onclick = () => { close(); onConfirm(picked); };
+  q.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault();
+      // Enter on an exact name takes it even without a click.
+      const t = q.value.trim().toLowerCase();
+      if (known.has(t)) picked = t;
+      if (picked) { close(); onConfirm(picked); }
+    }
+  });
+
+  paint();
+  modal.classList.remove('hidden');
+  _trapFocus(modal);
+  lucide.createIcons({ root: modal });
+  setTimeout(() => q.focus(), 50);
+}
+
 function showInputDialog(title, message, placeholder, defaultValue, onConfirm) {
   const modal = document.getElementById('dialog-modal');
   if (!modal) {
