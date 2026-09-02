@@ -1,9 +1,9 @@
 /* ============================================================
    PRACTICE-SFX.JS — the attempt's cues
    ------------------------------------------------------------
-   Five sounds, for the five moments the attempt already marks visually:
-   waiting on a build, a test case failing, one passing, every one passing,
-   and finishing the attempt. Each is tied to the effect it belongs to, so the
+   Sounds for the moments the attempt already marks visually: waiting on a
+   build, a test case failing, one passing, every one passing, and finishing
+   the attempt. Each is tied to the effect it belongs to, so the
    sound and the picture are the same event rather than two things that
    happen to coincide.
 
@@ -21,9 +21,8 @@
 const PSFX_LEVEL = 2.6;
 
 let _psfxOut = null;
-let _psfxWorkTimer = null;
+let _psfxWorkVoice = null;   // the live graph while a build runs
 let _psfxWorkCap = null;
-let _psfxWorkStep = 0;
 
 /** The cue bus, kept in step with the shared volume slider on every use. */
 function _psfxBus() {
@@ -85,25 +84,82 @@ function psfxTone(o) {
 }
 
 /* ── Waiting on a build ───────────────────────────────────────
-   A quiet two-note pulse that repeats until the check finishes. Deliberately
-   low and soft: it is there to say the machine is still thinking, and
-   anything attention-grabbing would be wrong for a sound that might run for
-   several seconds.
+   A warm, slowly breathing hum that holds until the check finishes.
+
+   IT USED TO BE A CLOCK, and that is the thing being fixed. Two notes, 262
+   and 196, alternating on a setInterval every 340ms: a fixed period with two
+   pitches in it is a tick-tock however it is described, and once the ear has
+   named it a clock the sound is telling you that time is passing rather than
+   that work is happening. Waiting for a compiler is already the part of the
+   loop that feels slow; a metronome counting it out makes it worse.
+
+   So there is no repeating event here at all. One sustained voice starts when
+   the build does and stops when it ends, and everything that moves in it is
+   driven by two LFOs at 0.24 and 0.17 Hz -- deliberately not multiples of
+   each other, so the filter sweep and the level swell drift in and out of
+   phase and the sound never repeats a state. Nothing has an onset, so there
+   is nothing for the ear to count.
+
+   Low and quiet on purpose: it says the machine is still thinking, and it may
+   run for several seconds, so anything that asks for attention would be the
+   wrong sound. The two near-unison voices a whisker apart (116 and 116.9 Hz)
+   beat against each other about once a second, which is what gives it life
+   without giving it a pulse.
    ------------------------------------------------------------ */
 function psfxWorkStart() {
   if (!_psfxOn()) return;
   psfxWorkStop();
-  _psfxWorkStep = 0;
-  const tick = () => {
-    // Alternating, so it reads as a loop turning over rather than a metronome.
-    const up = (_psfxWorkStep++ % 2) === 0;
-    psfxTone({ freq: up ? 262 : 196, type: 'sine', dur: 0.1, gain: 0.075, lowpass: 1200 });
-  };
-  tick();
-  _psfxWorkTimer = setInterval(tick, 340);
+  const bus = _psfxBus();
+  if (!bus) return;
+  const ctx = _sfxContext();
+  const t = ctx.currentTime;
+
+  const out = ctx.createGain();
+  out.gain.setValueAtTime(0.0001, t);
+  out.gain.linearRampToValueAtTime(0.052, t + 0.35);   // fade in, never a click
+
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.setValueAtTime(560, t);
+  /* Q of 1.1, not 5. A resonant peak sweeping across the octave at 232 Hz
+     boosted it every time it passed, so the sweep itself became a pulse --
+     measured as part of an 11x swing between peak and trough. Gentle here;
+     the movement should be felt, not heard arriving. */
+  lp.Q.value = 1.1;
+
+  /* Two voices a fraction apart, plus a quiet octave for body.
+     THE PAIR IS DELIBERATELY UNEQUAL. At matched amplitude, 116 and 116.9 Hz
+     beat all the way to full cancellation roughly once a second -- the hum
+     dropped to near silence and came back, which is a slow throb and exactly
+     the kind of countable pulse this sound exists to avoid. At 0.45 the
+     second voice the beat runs between about 1.45 and 0.55 of the first:
+     audible as shimmer, never as a gap. */
+  const a = ctx.createOscillator(); a.type = 'sine';     a.frequency.value = 116;
+  const b = ctx.createOscillator(); b.type = 'sine';     b.frequency.value = 116.9;
+  const bGain = ctx.createGain(); bGain.gain.value = 0.45;
+  const c = ctx.createOscillator(); c.type = 'triangle'; c.frequency.value = 232;
+  const cGain = ctx.createGain(); cGain.gain.value = 0.26;
+
+  // The sweep. Slow enough that no single pass reads as an event.
+  const lfoF = ctx.createOscillator(); lfoF.type = 'sine'; lfoF.frequency.value = 0.24;
+  const lfoFAmt = ctx.createGain(); lfoFAmt.gain.value = 170;
+  lfoF.connect(lfoFAmt); lfoFAmt.connect(lp.frequency);
+
+  // The swell, on its own unrelated period so the two never line up.
+  const lfoG = ctx.createOscillator(); lfoG.type = 'sine'; lfoG.frequency.value = 0.17;
+  const lfoGAmt = ctx.createGain(); lfoGAmt.gain.value = 0.011;
+  lfoG.connect(lfoGAmt); lfoGAmt.connect(out.gain);
+
+  a.connect(lp); b.connect(bGain); bGain.connect(lp); c.connect(cGain); cGain.connect(lp);
+  lp.connect(out); out.connect(bus);
+
+  const voices = [a, b, c, lfoF, lfoG];
+  voices.forEach(n => n.start(t));
+  _psfxWorkVoice = { out, voices };
+
   /* A cap, because "started" and "finished" are wired at different call sites
      and a build has several ways to end — an exception, a navigation, an
-     engine that never answers. A pulse still going a minute later would be
+     engine that never answers. A hum still going a minute later would be
      worse than one that stops slightly early.
 
      The handle is KEPT, which it was not. An uncancelled cap belongs to the
@@ -115,9 +171,23 @@ function psfxWorkStart() {
 }
 
 function psfxWorkStop() {
-  if (_psfxWorkTimer) { clearInterval(_psfxWorkTimer); _psfxWorkTimer = null; }
   clearTimeout(_psfxWorkCap);
   _psfxWorkCap = null;
+  const v = _psfxWorkVoice;
+  _psfxWorkVoice = null;
+  if (!v) return;
+  const ctx = (typeof _sfxContext === 'function') ? _sfxContext() : null;
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  try {
+    /* Released rather than cut. Stopping the oscillators outright ends the
+       waveform mid-cycle, and a hum that stops at a non-zero sample is a
+       click — the one thing a sound this quiet cannot afford. */
+    v.out.gain.cancelScheduledValues(t);
+    v.out.gain.setValueAtTime(Math.max(0.0001, v.out.gain.value), t);
+    v.out.gain.exponentialRampToValueAtTime(0.0001, t + 0.26);
+    v.voices.forEach(n => { try { n.stop(t + 0.3); } catch (e) { /* already stopped */ } });
+  } catch (e) { /* context closed under us */ }
 }
 
 /* ── A test case failed ───────────────────────────────────────
