@@ -1376,7 +1376,14 @@ function retryPractice() {
 // matching how submissions are actually graded (computeDiffs strips comments too).
 // Otherwise comments would move the boss health bar.
 function _bossNormalize(code) {
-  const stripped = (typeof stripComments === 'function') ? stripComments(code || '') : (code || '');
+  let stripped = (typeof stripComments === 'function') ? stripComments(code || '') : (code || '');
+  /* Renamed the same way the diff renames, so the two agree. Without this the
+     bar could sit short of full on a submission the review screen calls
+     identical -- and the bar is the thing you watch while typing, so it is
+     the one that has to be right first. */
+  if (typeof alphaNormalizeC === 'function' && typeof _diffCanonC === 'function') {
+    stripped = alphaNormalizeC(_diffCanonC(stripped));
+  }
   return stripped.replace(/\s+/g, '');
 }
 

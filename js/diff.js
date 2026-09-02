@@ -219,6 +219,79 @@ function computeCharDiffs(actualLine, expectedLine) {
   return { actualChars, expectedChars, ratio };
 }
 
+/* ============================================================
+   NAMES ARE NOT THE ANSWER
+   ------------------------------------------------------------
+   A submission that passes every test and scores 100% was still being shown
+   as five "minor differences", because it declared `int x, y` where the
+   reference declared `int a, b`. Nothing was wrong with it. The comparison
+   was reading identifiers literally, so every line mentioning a variable came
+   back as almost-but-not-quite, and the one screen whose job is to tell you
+   what you got wrong was pointing at things you got right.
+
+   Alpha-renaming fixes that properly rather than by loosening the threshold.
+   Each side is walked once, its own identifiers are numbered in order of
+   first appearance, and the comparison runs on the numbered form:
+
+       int x, y;  scanf("%d", &x);   ->   int v1, v2;  scanf("%d", &v1);
+       int a, b;  scanf("%d", &a);   ->   int v1, v2;  scanf("%d", &v1);
+
+   Identical, which is what they always were. Note that this is CONSISTENT
+   renaming, not blanking: a program that swaps two variables' roles still
+   differs, because v1 and v2 land in different places. Blanking every name to
+   the same token would have called those equal, which would be worse than the
+   bug being fixed.
+
+   WHAT IS LEFT ALONE. Keywords and the standard library keep their names, or
+   `printf` would match `scanf` and a wrong call would read as right. String
+   and character literals are untouched, so a prompt is still compared word
+   for word and `"%d"` never becomes `"%v1"`. Preprocessor lines are skipped
+   whole, because `#include <stdio.h>` is not a variable declaration.
+   ============================================================ */
+
+/* Renaming these would let one stand in for another, which is the one thing
+   this must never do. Types are included: `int` matching `float` would hide a
+   real mistake. */
+const DIFF_C_RESERVED = new Set((
+  'auto break case char const continue default do double else enum extern float for goto if ' +
+  'inline int long register restrict return short signed sizeof static struct switch typedef ' +
+  'union unsigned void volatile while bool true false NULL EOF size_t FILE ' +
+  'main printf scanf fprintf fscanf sprintf sscanf snprintf puts gets putchar getchar fgets fputs ' +
+  'fopen fclose fread fwrite fseek ftell rewind fflush feof remove rename tmpfile ' +
+  'malloc calloc realloc free exit abort atexit system qsort bsearch abs labs rand srand ' +
+  'strlen strcpy strncpy strcat strncat strcmp strncmp strchr strrchr strstr strtok ' +
+  'memcpy memset memmove memcmp atoi atof atol strtol strtod ' +
+  'sqrt pow ceil floor round fabs log log10 sin cos tan time clock ' +
+  'isalpha isdigit isalnum isupper islower isspace toupper tolower'
+).split(' '));
+
+/**
+ * Number every user-chosen identifier by order of first appearance.
+ * Newlines are preserved exactly, so line i of the result is still line i.
+ */
+function alphaNormalizeC(code) {
+  const src = String(code || '');
+  const map = new Map();
+  let next = 1;
+  return src.replace(
+    /("(?:[^"\\\n]|\\.)*")|('(?:[^'\\\n]|\\.)*')|(^[ \t]*#[^\n]*)|\b([A-Za-z_]\w*)\b/gm,
+    (m, str, chr, pre, id) => {
+      if (str || chr || pre) return m;          // literals and directives: as written
+      if (DIFF_C_RESERVED.has(id)) return m;
+      let to = map.get(id);
+      if (!to) { to = 'v' + (next++); map.set(id, to); }
+      return to;
+    }
+  );
+}
+
+/* `int main()` and `int main(void)` are the same function. They were being
+   reported as a difference on line 2 of a correct submission, which is noise
+   of exactly the kind this pass exists to remove. */
+function _diffCanonC(code) {
+  return String(code || '').replace(/\(\s*void\s*\)/g, '()');
+}
+
 /**
  * Line-level alignment.
  *
@@ -228,6 +301,8 @@ function computeCharDiffs(actualLine, expectedLine) {
  *   .ignoreComments  strip `//` and `/* *\/` before comparing (default true)
  *   .ignoreWhitespace  collapse all whitespace before comparing (default true);
  *                      when false, indentation and inner spacing count
+ *   .ignoreNames     number identifiers by first appearance before comparing
+ *                      (default true), so `int x, y` matches `int a, b`
  *
  * Every returned row carries the ORIGINAL 1-based line number it came from in
  * each file (actualLine / expectedLine) plus the untouched source line
@@ -239,12 +314,21 @@ function computeDiffs(userCode, expectedCode, opts) {
   const o = opts || {};
   const ignoreComments = o.ignoreComments !== false;
   const ignoreWhitespace = o.ignoreWhitespace !== false;
+  const ignoreNames = o.ignoreNames !== false;
 
   const rawULines = String(userCode || '').split('\n');
   const rawCLines = String(expectedCode || '').split('\n');
   // stripComments preserves newlines, so stripped line i is still raw line i.
-  const strippedUser = ignoreComments ? stripComments(userCode) : String(userCode || '');
-  const strippedExpected = ignoreComments ? stripComments(expectedCode) : String(expectedCode || '');
+  let strippedUser = ignoreComments ? stripComments(userCode) : String(userCode || '');
+  let strippedExpected = ignoreComments ? stripComments(expectedCode) : String(expectedCode || '');
+  /* Only what is COMPARED is renamed. rawULines / rawCLines below are the
+     untouched source and are what gets displayed, so the panels still show
+     the names you actually wrote. Both passes preserve newlines, so line i
+     here is still line i there. */
+  if (ignoreNames) {
+    strippedUser = alphaNormalizeC(_diffCanonC(strippedUser));
+    strippedExpected = alphaNormalizeC(_diffCanonC(strippedExpected));
+  }
 
   const normalizeLine = ignoreWhitespace
     ? (s => s.replace(/\s+/g, '').trim())

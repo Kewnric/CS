@@ -26,7 +26,7 @@ let _solActiveFile = 0;
 let _diffMode = 'side-by-side';
 let _diffFilterActive = false;
 let _solGran = 'char';           // 'char' | 'word'
-let _solOpts = { ignoreComments: true, ignoreWhitespace: true, showComments: true, explain: true };
+let _solOpts = { ignoreComments: true, ignoreWhitespace: true, ignoreNames: true, showComments: true, explain: true };
 let _solSummary = null;
 let _solHistoryOptions = [];
 let _solCompareAgainst = 'reference';   // 'reference' | a history entry id
@@ -227,7 +227,8 @@ function _solRecompute(opts) {
     if (!f.canRecompute) return;
     f.diffs = computeDiffs(_solLeftCode(f), _solRightCode(f), {
       ignoreComments: _solOpts.ignoreComments,
-      ignoreWhitespace: _solOpts.ignoreWhitespace
+      ignoreWhitespace: _solOpts.ignoreWhitespace,
+      ignoreNames: _solOpts.ignoreNames
     }).diffs;
   });
   _solutionFileDiffs = _solFiles;
@@ -407,6 +408,7 @@ function _solRenderOptions() {
     <span class="sol-opt-label">Compare</span>
     ${row('opt-ignore-comments', 'Ignore comments', _solOpts.ignoreComments, 'Strip // and /* */ before comparing. Off means comments must match too.', !canRecompute)}
     ${row('opt-ignore-ws', 'Ignore whitespace', _solOpts.ignoreWhitespace, 'Collapse all spacing before comparing. Off means indentation counts.', !canRecompute)}
+    ${row('opt-ignore-names', 'Ignore variable names', _solOpts.ignoreNames, 'Number identifiers by first appearance, so int x, y matches int a, b. Keywords, the standard library and text inside quotes are never renamed.', !canRecompute)}
     <span class="ed-tool-sep" aria-hidden="true"></span>
     <span class="sol-opt-label">Show</span>
     ${row('opt-show-comments', "Reference's comments", _solOpts.showComments, "Display comments from the source beside each line, greyed out — they never affect the comparison.")}
@@ -424,6 +426,7 @@ function solSetOpt(id, val) {
   const map = {
     'opt-ignore-comments': 'ignoreComments',
     'opt-ignore-ws': 'ignoreWhitespace',
+    'opt-ignore-names': 'ignoreNames',
     'opt-show-comments': 'showComments',
     'opt-explain': 'explain'
   };
