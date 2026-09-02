@@ -224,16 +224,35 @@ function _ambFill(host) {
     gust.style.setProperty('--gd', delay.toFixed(2) + 's');
     gust.style.setProperty('--gspin', (_ambRand(90, 210) * (Math.random() < 0.5 ? -1 : 1)).toFixed(0) + 'deg');
 
-    // Fanned around one heading: blown together, not scattered from a point.
+    /* Fanned around one heading, and set off IN ORDER along it.
+
+       They used to leave within 0.3s of each other in whatever order the
+       random offsets happened to give, which at this scale is one event: five
+       things appearing at once. The gust had no direction you could watch, so
+       the swirl was something you noticed afterwards rather than something
+       passing through.
+
+       Now member i waits i*step, and is placed i steps further along the
+       heading -- so the one that leaves first is also the one furthest back,
+       and the disturbance travels from one end of the group to the other.
+       That ordering is what makes it read as a wave rather than a burst; the
+       small random slop on top only keeps it from looking counted out.
+
+       step is per gust, so one drops through quickly and the next rolls. */
     const heading = _ambRand(0, 360);
+    const rad = heading * Math.PI / 180;
     const members = 5;
+    const step = _ambRand(0.11, 0.22);      // seconds between neighbours
+    const spread = _ambRand(14, 26);        // px between them along the heading
     for (let i = 0; i < members; i++) {
+      // Centred on the gust, so it does not drift off its own origin.
+      const along = (i - (members - 1) / 2) * spread;
       gust.appendChild(shardAt(
-        Math.round(_ambRand(-34, 34)) + 'px',
-        Math.round(_ambRand(-34, 34)) + 'px',
+        Math.round(along * Math.cos(rad) + _ambRand(-11, 11)) + 'px',
+        Math.round(along * Math.sin(rad) + _ambRand(-11, 11)) + 'px',
         heading + _ambRand(-38, 38),
         cycle,
-        delay + _ambRand(-0.3, 0.3)
+        delay + i * step + _ambRand(-0.025, 0.025)
       ));
     }
     layer.appendChild(gust);
