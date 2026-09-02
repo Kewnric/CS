@@ -37,6 +37,22 @@ const OST_KEY_TRACK = 'ssp.ost.track';
 const OST_KEY_VOL = 'ssp.ost.vol';
 const OST_KEY_POS = 'ssp.ost.pos';
 const OST_KEY_MODE = 'ssp.ost.mode';     // 'all' | 'one' | 'shuffle'
+const OST_KEY_AUTO = 'ssp.ost.autoplay';
+
+/** Start on load? On by default. */
+function ostAutoplayOn() {
+  try { return localStorage.getItem(OST_KEY_AUTO) !== '0'; } catch (e) { return true; }
+}
+
+function toggleOstAutoplay() {
+  const next = !ostAutoplayOn();
+  try { localStorage.setItem(OST_KEY_AUTO, next ? '1' : '0'); } catch (e) { /* private mode */ }
+  if (next) _ostTryAutoplay(); else _ostDisarmAutoplay();
+  _ostSync();
+  if (typeof toast === 'function') {
+    toast(next ? 'Music starts with the page' : 'Music waits to be started', { type: 'info', duration: 1800 });
+  }
+}
 
 let _ostAudio = null;
 let _ostIndex = 0;
@@ -76,14 +92,20 @@ function _ostEl() {
 
   if (OST_TRACKS.length) {
     a.src = _ostSrc(_ostIndex);
-    // Where you left off, but NOT playing: a page that starts making noise on
-    // its own is a page people close. The browser would refuse anyway.
+    /* Where you left off, and playing from there if autoplay is on. This used
+       to refuse to start on principle -- a page that makes noise on its own is
+       a page people close -- but it is asked for now, it is a preference, and
+       the seek has to happen BEFORE the play or the track restarts from zero
+       every reload. */
     const pos = _ostReadInt(OST_KEY_POS, 0);
-    if (pos > 0) a.addEventListener('loadedmetadata', function once() {
+    a.addEventListener('loadedmetadata', function once() {
       a.removeEventListener('loadedmetadata', once);
-      if (pos < _ostEnd() - 1) { try { a.currentTime = pos; } catch (e) {} }
+      if (pos > 0 && pos < _ostEnd() - 1) { try { a.currentTime = pos; } catch (e) {} }
       _ostSync();
+      _ostTryAutoplay();
     });
+    // Metadata may already be there on a warm cache, where the event never fires.
+    if (a.readyState >= 1) _ostTryAutoplay();
   }
 
   a.addEventListener('play', _ostSync);
@@ -117,6 +139,42 @@ function _ostEnd() {
 function _ostSrc(i) {
   const t = OST_TRACKS[i];
   return t ? OST_DIR + encodeURIComponent(t.file) : '';
+}
+
+/* ── Starting on its own ──────────────────────────────────────
+   Every browser blocks audio until the page has been interacted with, and no
+   amount of asking changes that -- play() returns a promise that simply
+   rejects. So this is two-stage: try, and if the try is refused, wait for the
+   first click or keypress and go then. On a page you have used before, Chrome
+   often allows the first attempt outright and the fallback never runs.
+
+   The fallback disarms itself the moment you touch the player, so pausing
+   deliberately and then clicking somewhere else cannot restart the music --
+   which is the failure mode that would make this feel broken rather than
+   convenient. */
+let _ostDisarmAutoplay = () => {};
+
+function _ostTryAutoplay() {
+  const a = _ostAudio;
+  if (!a || !ostAutoplayOn() || !OST_TRACKS.length) return;
+  const p = a.play();
+  if (p && typeof p.catch === 'function') p.catch(() => _ostArmFirstGesture());
+}
+
+function _ostArmFirstGesture() {
+  _ostDisarmAutoplay();
+  const go = () => {
+    _ostDisarmAutoplay();
+    if (ostAutoplayOn() && _ostAudio && _ostAudio.paused) _ostAudio.play().catch(() => {});
+  };
+  // Capture, so it still hears the gesture if something else stops it later.
+  document.addEventListener('pointerdown', go, true);
+  document.addEventListener('keydown', go, true);
+  _ostDisarmAutoplay = () => {
+    document.removeEventListener('pointerdown', go, true);
+    document.removeEventListener('keydown', go, true);
+    _ostDisarmAutoplay = () => {};
+  };
 }
 
 function _ostRemember() {
@@ -153,6 +211,7 @@ function ostIsPlaying() {
 }
 
 function ostPlayPause() {
+  _ostDisarmAutoplay();      // an explicit press settles it; stop waiting
   const a = _ostEl();
   if (!OST_TRACKS.length) return;
   if (a.paused) {
@@ -324,6 +383,21 @@ function _ostSync() {
   const vol = document.getElementById('ost-vol');
   if (vol && a) vol.value = String(Math.round(a.volume * 100));
 
+  const auto = document.getElementById('ost-auto');
+  if (auto) {
+    const on = ostAutoplayOn();
+    auto.classList.toggle('is-on', on);
+    const al = on ? 'Starts with the page' : 'Waits to be started';
+    auto.title = al; auto.setAttribute('aria-label', al);
+  }
+  /* The label says where the button GOES, not where you are -- a switch
+     labelled with the thing you are already looking at reads as a status. */
+  const srcLabel = document.getElementById('ost-source-label');
+  if (srcLabel && typeof ostSourceIsSpotify === 'function') {
+    srcLabel.textContent = ostSourceIsSpotify() ? 'Switch to OST' : 'Switch to Spotify';
+  }
+  if (typeof _spotSync === 'function') _spotSync();
+
   document.querySelectorAll('.ost-item').forEach(el => {
     el.classList.toggle('is-current', +el.dataset.i === _ostIndex);
   });
@@ -356,6 +430,17 @@ function ostButtonTemplate() {
         <span class="ost-disc" aria-hidden="true"></span>
       </button>
       <div class="ost-pop" role="dialog" aria-label="Music player">
+        <div class="ost-source-row">
+          <button type="button" class="ost-source-btn" id="ost-source-btn" onclick="ostSwitchSource()">
+            <i data-lucide="repeat-2" style="width:14px;height:14px;"></i>
+            <span id="ost-source-label">Switch to Spotify</span>
+          </button>
+          <button type="button" class="ost-btn ost-auto-btn" id="ost-auto" onclick="toggleOstAutoplay()"
+                  title="Start with the page" aria-label="Start with the page">
+            <i data-lucide="power" style="width:14px;height:14px;"></i>
+          </button>
+        </div>
+        <div class="ost-body">
         <div class="ost-now">
           <div class="ost-now-art" aria-hidden="true"></div>
           <div class="ost-now-text">
@@ -385,6 +470,8 @@ function ostButtonTemplate() {
                  aria-label="Music volume" oninput="ostSetVolume(this.value)">
         </div>
         <div class="ost-list">${rows}</div>
+        </div>
+        ${typeof spotifyPanelTemplate === 'function' ? spotifyPanelTemplate() : ''}
       </div>
     </div>`;
 }

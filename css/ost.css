@@ -233,3 +233,122 @@
   .ost-disc { animation: none; }
   .ost-waves { display: none; }
 }
+
+
+/* ── Two sources, one popup ───────────────────────────────────
+   The OST list and the Spotify panel occupy the same space and only one is
+   ever shown; .is-spotify on the control decides which. Keeping both in the
+   DOM means the switch is a class toggle rather than a rebuild, so nothing
+   loses its scroll position or its focus when you flip between them. */
+.ost-source-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.55rem;
+}
+.ost-source-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 7px;
+  border: 1px solid var(--border-color, #2f2f3a);
+  background: var(--bg-surface-hover, #22222c);
+  color: var(--text-secondary, #a8a8b8);
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.14s ease, border-color 0.14s ease, background 0.14s ease;
+}
+.ost-source-btn:hover {
+  color: #1db954;                       /* Spotify green, only on the way in */
+  border-color: rgba(29, 185, 84, 0.55);
+  background: rgba(29, 185, 84, 0.10);
+}
+.ost-auto-btn.is-on { color: var(--color-primary, #6366f1); }
+
+.ost-control.is-spotify .ost-body { display: none; }
+.ost-control:not(.is-spotify) .spot-panel { display: none; }
+
+/* Only one stage of the Spotify panel shows at a time: enter an id, sign in,
+   or play. data-stage on the container picks it. */
+.spot-panel { display: flex; flex-direction: column; gap: 0.5rem; }
+.spot-stage > div { display: none; }
+.spot-stage[data-stage="id"] .spot-setup,
+.spot-stage[data-stage="login"] .spot-login,
+.spot-stage[data-stage="player"] .spot-player { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.spot-hint { margin: 0; font-size: 0.7rem; line-height: 1.45; color: var(--text-tertiary, #7c7c8a); }
+.spot-hint-dim { opacity: 0.75; }
+.spot-redirect {
+  display: block;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.66rem;
+  padding: 0.35rem 0.45rem;
+  border-radius: 5px;
+  background: var(--bg-surface, #16161c);
+  border: 1px solid var(--border-color, #2f2f3a);
+  color: var(--text-secondary, #a8a8b8);
+  word-break: break-all;
+}
+.spot-input {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #2f2f3a);
+  background: var(--bg-surface, #16161c);
+  color: var(--text-primary, #e6e6ee);
+  font: inherit;
+  font-size: 0.74rem;
+}
+.spot-connect {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: 999px;
+  border: none;
+  background: #1db954;
+  color: #062313;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: filter 0.14s ease, transform 0.14s ease;
+}
+.spot-connect:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.spot-link {
+  background: none; border: none; padding: 0.15rem;
+  color: var(--text-tertiary, #7c7c8a);
+  font: inherit; font-size: 0.68rem; text-decoration: underline; cursor: pointer;
+}
+.spot-link:hover { color: var(--text-secondary, #a8a8b8); }
+
+.spot-now { display: flex; align-items: center; gap: 0.55rem; }
+.spot-art {
+  width: 46px; height: 46px; flex-shrink: 0;
+  border-radius: 6px;
+  background: var(--bg-surface-hover, #22222c) center/cover no-repeat;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+}
+.spot-now-text { min-width: 0; }
+.spot-now-title {
+  font-size: 0.8rem; font-weight: 700; color: var(--text-primary, #e6e6ee);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.spot-now-artist {
+  font-size: 0.68rem; color: var(--text-tertiary, #7c7c8a);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.spot-error {
+  font-size: 0.68rem;
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.10);
+  border: 1px solid rgba(239, 68, 68, 0.28);
+  border-radius: 6px;
+  padding: 0.35rem 0.45rem;
+}
