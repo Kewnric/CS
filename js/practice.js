@@ -393,6 +393,47 @@ function _practiceAutoSave() {
  * of step, and the chip disagreeing with what is on disk is exactly the bug
  * this shortcut exists to remove.
  */
+/* ── Keeping history from filling the store ──────────────────
+   A graded attempt stores the source four times over: userCode, expectedCode,
+   userFiles and targetFiles. Measured against this app's own starter pack
+   that is 3.6 KB for an average program and 14.8 KB for the multi-file list
+   ADT ones -- and nothing has ever trimmed state.history.
+
+   localStorage is about 5 MB and holds everything else too, so that is roughly
+   1,400 attempts at the average and about 350 if the work is mostly the
+   multi-file coursework. Three hundred attempts on the folder you are
+   revising for is not a hypothetical number. When it runs out, saveData
+   starts throwing and the warning in state.js fires -- loudly, but by then
+   the session cannot save.
+
+   So: metadata is kept forever, and the CODE is kept for the most recent
+   attempts only. Everything the analytics draw -- scores, dates, durations,
+   streaks, per-program counts -- lives in the metadata and is untouched, so
+   no chart loses a point. What goes is the ability to re-read the source of
+   an attempt from months ago, which is what the review screens show.
+
+   That is safe rather than lucky: both readers already handle entries with no
+   code, because legacy entries never had any. analytics-review.js filters its
+   list on the presence of a payload, and history.js falls back. Old attempts
+   simply stop offering a diff. */
+const PRACTICE_CODE_KEEP = 80;
+
+function _practiceTrimHistoryCode() {
+  const h = state.history;
+  if (!Array.isArray(h) || h.length <= PRACTICE_CODE_KEEP) return 0;
+  let freed = 0;
+  for (let i = PRACTICE_CODE_KEEP; i < h.length; i++) {
+    const e = h[i];
+    if (!e || e.codeTrimmed) continue;        // already done on an earlier save
+    let had = false;
+    for (const k of ['userCode', 'expectedCode', 'userFiles', 'targetFiles']) {
+      if (e[k] != null) { freed += JSON.stringify(e[k]).length; delete e[k]; had = true; }
+    }
+    if (had) e.codeTrimmed = true;            // so the readers can say why
+  }
+  return freed;
+}
+
 function practiceSaveNow() {
   if (!state.userFiles || !state.activeChallenge || !state.activeVariant) return false;
   _practiceAutoSave();          // ends in _bossMarkSaved(), which paints #ed-save-state
@@ -1198,6 +1239,7 @@ async function submitCode() {
   if (state.history.length >= 49 && !state.badges.includes('Marathoner')) { state.badges.push('Marathoner'); earnedBadges.push({ name: 'Marathoner', icon: '🏃', desc: '50+ Total Submissions' }); }
 
   state.history.unshift(historyEntry);
+  _practiceTrimHistoryCode();
   state.activeAttempts[state.activeChallenge.id] = isPerfect ? 0 : attemptCounter;
   _practiceClearDraft();   // graded: the draft is not wanted on the next visit
   // Spaced-repetition: schedule the next review based on this attempt's score.

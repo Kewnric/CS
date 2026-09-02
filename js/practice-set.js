@@ -873,6 +873,9 @@ async function _psetDoSubmit() {
       testsPassed,
       testsTotal
     });
+    /* The same trim as the single-problem page; a set can add several
+       entries in one sitting. */
+    if (typeof _practiceTrimHistoryCode === 'function') _practiceTrimHistoryCode();
     if (isLib) {
       state.activeAttempts[p.challengeId] = score === 100 ? 0 : attemptCounter;
       if (typeof recordReview === 'function') recordReview('challenge', p.challengeId, score);
