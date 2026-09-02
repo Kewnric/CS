@@ -1769,7 +1769,10 @@ function _bossBarPaint(healthPercent, opts) {
   if (ghost) {
     clearTimeout(_bossGhostTimer);
     if (instant || clamped >= prev) {
-      // No damage (or a reset) — park the red flush with the fill, silently.
+      // No damage (or a reset) — park it flush with the fill, silently. The
+      // band that shows while .sao-fill eases up to meet it is HP returning,
+      // so it is tinted green for as long as that takes.
+      ghost.classList.toggle('is-heal', !instant && clamped > prev);
       ghost.style.transition = 'none';
       ghost.style.width = clamped + '%';
       ghost.dataset.pct = String(clamped);
@@ -1778,6 +1781,7 @@ function _bossBarPaint(healthPercent, opts) {
       // hasn't finished receding, so a burst of typing builds one red chunk
       // instead of each hit clipping the last one short.
       const pinTo = Math.max(prev, parseFloat(ghost.dataset.pct || '0'));
+      ghost.classList.remove('is-heal');       // this one really is damage
       ghost.style.transition = 'none';
       ghost.style.width = pinTo + '%';
       ghost.dataset.pct = String(pinTo);
@@ -1817,9 +1821,13 @@ function _bossBarPaint(healthPercent, opts) {
     const perChar = _bossMaxHp > 0 ? 100 / _bossMaxHp : 1.2;
     const trigger = Math.max(0.05, perChar * 0.9);
     if (_bossDmgAccum >= trigger) {
-      if (_bossDamageShards(clamped, _bossDmgAccum, 'damage')) _bossDmgAccum = 0;
+      if (_bossDamageShards(clamped, _bossDmgAccum, 'damage')) {
+        _bossDmgAccum = 0; _bossPulseReadout('is-hit');
+      }
     } else if (_bossHealAccum >= trigger) {
-      if (_bossDamageShards(clamped, _bossHealAccum, 'heal')) _bossHealAccum = 0;
+      if (_bossDamageShards(clamped, _bossHealAccum, 'heal')) {
+        _bossHealAccum = 0; _bossPulseReadout('is-heal');
+      }
     }
   }
 
@@ -1908,6 +1916,20 @@ function bossLockOn() {
  * Shards are appended to the nameplate (not the track — that clips its children)
  * and remove themselves when the animation ends.
  */
+/**
+ * Restart the readout's tint. Both classes come off first and the layout is
+ * read in between: re-adding a class the element already carries does NOT
+ * restart a CSS animation, so without that the second hit in a row -- which is
+ * every hit while typing -- would not flash at all.
+ */
+function _bossPulseReadout(cls) {
+  const el = document.getElementById('boss-health-hp');
+  if (!el) return;
+  el.classList.remove('is-hit', 'is-heal');
+  void el.offsetWidth;
+  el.classList.add(cls);
+}
+
 let _bossShardCooldown = 0;
 /* Un-emitted HP movement, in percentage points, kept per direction.
 
@@ -1953,6 +1975,20 @@ function _bossDamageShards(healthPercent, damage, kind) {
 
   // They linger for ~2s each, so cap how many can be in the air at once.
   if (wrap.querySelectorAll('.sao-shard').length > 55) return false;
+
+  /* One bloom on the boundary, in the burst's colour. Sized off the track so
+     it stays in proportion when the bar is narrow, and centred on the same x
+     the shards are shed from, so the flash and the debris agree about where
+     the hit landed. */
+  const bloom = document.createElement('div');
+  bloom.className = 'sao-bloom';
+  const bs = Math.max(22, tr.height * 3.2);
+  bloom.style.cssText =
+    `left:${x}px; top:${yTop + tr.height / 2}px; width:${bs}px; height:${bs}px;` +
+    `background:radial-gradient(circle, ${heal ? 'rgba(52,211,153,0.85)' : 'rgba(248,113,113,0.85)'} 0%, ` +
+    `${heal ? 'rgba(16,185,129,0.35)' : 'rgba(239,68,68,0.35)'} 45%, transparent 72%);`;
+  bloom.addEventListener('animationend', () => bloom.remove(), { once: true });
+  wrap.appendChild(bloom);
 
   // Bigger hits shed more petals.
   const COUNT = Math.max(5, Math.min(13, Math.round(4 + (damage || 2) * 0.8)));
