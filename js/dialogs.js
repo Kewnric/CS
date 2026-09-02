@@ -127,42 +127,66 @@ function showConfirm(title, message, onConfirm) {
  * attempt is exactly that: keeping the work and throwing it away are both
  * legitimate, and the app should not choose.
  *
- * @param {object} o  { title, message, primary, secondary, danger, onPrimary, onSecondary }
- *   `primary` is the safe one and is styled as such; `secondary` carries the
- *   destructive styling when `danger` is set.
+ * LAID OUT AS ROWS, not as buttons side by side. Two pills of five words each,
+ * in a 420px box, made the reader work out the difference from the labels
+ * alone -- and the labels are the shortest part of the answer. Each option
+ * gets its own row with the consequence written underneath, which is the
+ * sentence that actually decides it. Rows also stop the two from being one
+ * mis-aim apart, which matters when one of them destroys work.
+ *
+ * @param {object} o
+ *   { title, message,
+ *     primary:   { label, detail, icon },
+ *     secondary: { label, detail, icon },
+ *     danger, onPrimary, onSecondary }
+ *   Strings are still accepted for primary/secondary, for callers that only
+ *   want labels.
  */
 function showChoice(o) {
+  const asOpt = (v) => (typeof v === 'string') ? { label: v, detail: '', icon: '' } : (v || {});
+  const primary = asOpt(o.primary);
+  const secondary = asOpt(o.secondary);
+
   const modal = document.getElementById('dialog-modal');
   if (!modal) {
     // No modal host: fall back to the browser's one question, and take the
     // SAFE branch on cancel rather than the destructive one.
-    if (confirm(o.title + ': ' + o.message + '\n\nOK = ' + o.primary + ', Cancel = stay')) o.onPrimary();
+    if (confirm(o.title + ': ' + o.message + '\n\nOK = ' + primary.label + ', Cancel = stay')) o.onPrimary();
     return;
   }
   modal.setAttribute('role', 'alertdialog');
   modal.setAttribute('aria-modal', 'true');
   modal.setAttribute('aria-label', o.title);
+  modal.classList.add('dialog-choice');
   document.getElementById('dialog-title').innerText = o.title;
-  document.getElementById('dialog-msg').innerText = o.message;
+  document.getElementById('dialog-msg').innerText = o.message || '';
   document.getElementById('dialog-icon').innerHTML =
     '<i data-lucide="help-circle" class="modal-icon-svg" style="color: var(--color-warning);"></i>';
 
+  const row = (id, opt, kind) =>
+    '<button id="' + id + '" class="dlg-choice' + (kind ? ' ' + kind : '') + '" type="button">'
+    + (opt.icon ? '<span class="dlg-choice-ic"><i data-lucide="' + opt.icon + '"></i></span>' : '')
+    + '<span class="dlg-choice-text">'
+    + '<span class="dlg-choice-label">' + escapeHTML(opt.label || '') + '</span>'
+    + (opt.detail ? '<span class="dlg-choice-detail">' + escapeHTML(opt.detail) + '</span>' : '')
+    + '</span>'
+    + '<span class="dlg-choice-go" aria-hidden="true"><i data-lucide="arrow-right"></i></span>'
+    + '</button>';
+
+  /* The safe option first: it is the one most people want, and putting the
+     destructive one under the cursor's resting place is how accidents happen. */
   const btnContainer = document.getElementById('dialog-actions');
   btnContainer.innerHTML =
-    '<button id="dlg-cancel" class="btn btn-ghost" style="flex:1;">Cancel</button>'
-    + '<button id="dlg-second" class="btn ' + (o.danger ? 'btn-danger' : 'btn-secondary')
-    + '" style="flex:1;">' + escapeHTML(o.secondary) + '</button>'
-    + '<button id="dlg-primary" class="btn btn-primary" style="flex:1;">' + escapeHTML(o.primary) + '</button>';
+    '<div class="dlg-choice-list">'
+    + row('dlg-primary', primary, 'is-primary')
+    + row('dlg-second', secondary, o.danger ? 'is-danger' : '')
+    + '</div>'
+    + '<button id="dlg-cancel" class="dlg-choice-cancel" type="button">Cancel</button>';
 
-  document.getElementById('dlg-cancel').onclick = () => closeModalSmooth(modal);
-  document.getElementById('dlg-second').onclick = () => {
-    closeModalSmooth(modal);
-    if (o.onSecondary) o.onSecondary();
-  };
-  document.getElementById('dlg-primary').onclick = () => {
-    closeModalSmooth(modal);
-    if (o.onPrimary) o.onPrimary();
-  };
+  const close = () => { modal.classList.remove('dialog-choice'); closeModalSmooth(modal); };
+  document.getElementById('dlg-cancel').onclick = close;
+  document.getElementById('dlg-second').onclick = () => { close(); if (o.onSecondary) o.onSecondary(); };
+  document.getElementById('dlg-primary').onclick = () => { close(); if (o.onPrimary) o.onPrimary(); };
 
   modal.classList.remove('hidden');
   _trapFocus(modal);

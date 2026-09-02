@@ -645,10 +645,17 @@ function practiceConfirmExit() {
      work kept can still be discarded later. */
   showChoice({
     title: 'Leave attempt?',
-    message: 'Keep it and the code, timer and restore points are all waiting when you come back. '
-           + 'Discard and this attempt is gone — nothing is graded either way.',
-    secondary: 'Discard attempt',
-    primary: 'Keep and leave',
+    message: 'Nothing is graded either way — the attempt is only recorded when you finish it.',
+    primary: {
+      label: 'Keep and leave',
+      detail: 'Your code, the timer and every restore point are waiting when you come back.',
+      icon: 'save'
+    },
+    secondary: {
+      label: 'Discard attempt',
+      detail: 'Throws this attempt away and starts you from scratch next time. Cannot be undone.',
+      icon: 'trash-2'
+    },
     danger: true,
     onSecondary: () => practiceDiscardAttempt(),
     onPrimary: () => spaNavigate('browse')
