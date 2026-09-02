@@ -143,9 +143,11 @@ Coding Library header swaps the whole library. Whatever is live is parked in
 always means "what is on screen". Only the challenge scope moves. Nothing can
 leak between the two because only one is ever loaded.
 
-The pack is 8 folders / 25 programs. Every program has a reference solution in
-`coding-starter-solutions.js` that has been **compiled and run against its own
-tests**. If you add one, do the same — a reference that fails its own tests
+The pack is 12 folders / 43 programs plus four exam practice sets. Every program has a reference solution in
+`coding-starter-solutions.js` (or `-advanced-solutions.js`) that has been
+**compiled and run against its own tests** by `tools/verify-pack.js`, which also
+checks every minimum requirement against that same reference. Run it after any
+pack change: `node tools/verify-pack.js .`. If you add a program, do the same — a reference that fails its own tests
 marks correct work wrong, silently.
 
 ---

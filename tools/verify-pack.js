@@ -26,9 +26,12 @@ const ROOT = process.argv[2] || '.';
 const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'packverify-'));
 
 const files = [
+  'js/utils.js',
   'js/coding-starter-solutions.js',
   'js/coding-starter.js',
   'js/coding-starter-c.js',
+  'js/coding-starter-advanced-solutions.js',
+  'js/coding-starter-advanced.js',
   'js/coding-starter-lists-expected.js',
   'js/coding-starter-lists.js'
 ];
@@ -90,6 +93,22 @@ for (const ch of pack.challenges) {
     continue;
   }
 
+  /* A minimum requirement the reference itself fails would mark correct work
+     wrong -- the student writes the right thing, the checker demands a
+     construct the model answer does not use, and the cross is unexplainable.
+     So every requirement is run against its own reference here. */
+  const reqs = (v.minRequirements || []).map(r => r.type);
+  for (const rq of reqs) {
+    let ok = true;
+    try { ok = vm.runInContext('evalMinRequirement(' + JSON.stringify(rq) + ', ' +
+                               JSON.stringify(srcFiles[0].code) + ')', sandbox); }
+    catch (e) { ok = 'threw: ' + e.message; }
+    if (ok !== true) {
+      failures.push({ prog: ch.title, id: ch.id, stage: 'minRequirement',
+                      detail: 'reference does not satisfy "' + rq + '"' });
+    }
+  }
+
   for (const t of tests) {
     ran++;
     const r = spawnSync(exe, [], { cwd: dir, input: t.stdin || '',
@@ -108,6 +127,7 @@ console.log(JSON.stringify({
   testsPassed: passed,
   testsFailed: ran - passed,
   compileFailures: failures.filter(f => f.stage === 'compile').length,
+  requirementFailures: failures.filter(f => f.stage === 'minRequirement').length,
   skipped,
   failures: failures.slice(0, 25)
 }, null, 2));

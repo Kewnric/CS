@@ -57,8 +57,56 @@ function codingLibraryIsStarter() { return codingLibraryMode() === 'starter'; }
  * of them lives in coding-starter-solutions.js, compiled and run against its
  * own tests before being put there.
  */
-function _csProgram(id, folder, title, description, samples, tests) {
-  const solution = (typeof CS_SOLUTIONS !== 'undefined' && CS_SOLUTIONS[id]) || '';
+/**
+ * One pack program.
+ *
+ * @param reqs  minimum-requirement types (see MIN_REQ_DEFS in utils.js). These
+ *   are what make a task about the TECHNIQUE rather than about the output: a
+ *   program that asks for recursion fails an iterative answer even when every
+ *   test passes. Left empty on the early folders, where any working solution
+ *   is the right one.
+ */
+/* Requirements for the first eight folders, as a table rather than a seventh
+   argument on twenty-two call sites. Deliberately modest: these folders teach
+   one idea each, and a requirement should name the idea the exercise is FOR,
+   not every construct that happens to appear in the reference. Anything
+   claimed here is checked against that reference by tools/verify-pack.js. */
+const CS_REQS = {
+  'hello':        ['printf'],
+  'echo-number':  ['scanf', 'printf'],
+  'add-two':      ['scanf', 'printf'],
+
+  'odd-even':     ['ifelse'],
+  'largest':      ['if'],
+  'grade':        ['ifelse'],
+
+  'countdown':    ['loop'],
+  'sum-to-n':     ['loop'],
+  'times-table':  ['loop'],
+
+  'arr-sum':      ['function', 'array', 'loop'],
+  'arr-largest':  ['function', 'array', 'loop'],
+  'arr-sentinel': ['function', 'array', 'loop'],
+
+  'ptr-swap':     ['function', 'pointer'],
+  'ptr-reverse':  ['pointer', 'loop'],
+  'ptr-minmax':   ['function', 'pointer'],
+
+  'mem-fill':     ['pointer', 'loop'],
+  'mem-return':   ['function', 'pointer'],
+  'mem-multiples':['function', 'pointer', 'loop'],
+  'mem-pairs':    ['function', 'pointer', 'loop'],
+
+  'struct-one':   ['scanf', 'printf'],
+  'struct-team':  ['array', 'loop'],
+  'poke-bag':     ['array', 'loop']
+};
+
+function _csProgram(id, folder, title, description, samples, tests, reqs) {
+  reqs = reqs || CS_REQS[id] || [];
+  const solution = (typeof CS_SOLUTIONS !== 'undefined' && CS_SOLUTIONS[id])
+                || (typeof CS_ADV_SOLUTIONS !== 'undefined' && CS_ADV_SOLUTIONS[id])
+                || '';
   return {
     id: 'starter-' + id,
     title: title,
@@ -76,7 +124,7 @@ function _csProgram(id, folder, title, description, samples, tests) {
                 starterCode: '', code: solution }],
       samples: samples || [],
       tests: tests || [],
-      minRequirements: []
+      minRequirements: (reqs || []).map(t => ({ id: 'starter-' + id + '-req-' + t, type: t }))
     }]
   };
 }
@@ -143,7 +191,7 @@ function updateCodingStarterPack() {
   const byId = {};
   (target.challenges || []).forEach(c => { byId[c.id] = c; });
 
-  let folders = 0, added = 0, refreshed = 0, kept = 0;
+  let folders = 0, added = 0, refreshed = 0, kept = 0, sets = 0;
 
   fresh.nodes.forEach(n => {
     if (!haveNode.has(n.id)) { target.nodes.push(n); haveNode.add(n.id); folders++; }
@@ -161,6 +209,22 @@ function updateCodingStarterPack() {
     refreshed++;
   });
 
+  /* Sets too. They were missed the first time round, which meant an existing
+     pack could gain every new folder and still have no exams in it -- the
+     merge walked nodes and challenges and simply never looked at this list.
+     Matched by id like the rest; a set you have edited keeps your version. */
+  target.sets = target.sets || [];
+  (fresh.sets || []).forEach(fs => {
+    const have = target.sets.find(s => s.id === fs.id);
+    if (!have) { target.sets.push(fs); sets++; return; }
+    /* A pack set is a list of pointers into the library, so refreshing one is
+       safe unless the problem list itself was changed. */
+    if (JSON.stringify(have.problems || []) === JSON.stringify(fs.problems || [])) return;
+    if (have.userEdited) { kept++; return; }
+    target.sets[target.sets.indexOf(have)] = fs;
+    sets++;
+  });
+
   if (inStarter) _csPlace(target); else state.codingStash = target;
   saveData();
 
@@ -169,13 +233,14 @@ function updateCodingStarterPack() {
   _csSyncBtn();
 
   if (typeof toast === 'function') {
-    if (!folders && !added && !refreshed) {
+    if (!folders && !added && !refreshed && !sets) {
       toast(kept ? 'Already up to date. ' + kept + ' program' + (kept === 1 ? '' : 's') + ' you edited were left alone.'
                  : 'Already up to date.', { type: 'success', duration: 3200 });
     } else {
       const bits = [];
       if (added) bits.push(added + ' new program' + (added === 1 ? '' : 's'));
       if (folders) bits.push(folders + ' new folder' + (folders === 1 ? '' : 's'));
+      if (sets) bits.push(sets + ' practice set' + (sets === 1 ? '' : 's'));
       if (refreshed) bits.push(refreshed + ' updated');
       if (kept) bits.push(kept + ' of yours kept');
       toast(bits.join(', ') + '.' + (inStarter ? '' : ' Switch to the pack to see them.'),
@@ -299,7 +364,63 @@ function codingStarterPack() {
     allCh = allCh.concat(lists.challenges);
     allNodes = allNodes.concat(lists.nodes);
   }
-  return _csStamp({ challenges: allCh, nodes: allNodes, sets: [] });
+  /* Strings, recursion, grids and files -- the rest of a first C course, and
+     the two topics the final is built on. */
+  if (typeof codingStarterAdvanced === 'function') {
+    const adv = codingStarterAdvanced();
+    allCh = allCh.concat(adv.challenges);
+    allNodes = allNodes.concat(adv.nodes);
+  }
+
+  return _csStamp({ challenges: allCh, nodes: allNodes, sets: _csExamSets(allCh) });
+}
+
+/* ── The four exams ──────────────────────────────────────────
+   A practice set is a run of problems in one sitting, which is the shape an
+   exam actually has -- the pressure of a paper is not any single question, it
+   is not being able to stop and look one up.
+
+   The four follow the course: Pre-Midterm is everything before structures,
+   Midterm adds them, Pre-Final adds strings, recursion and grids, and Finals
+   is the file work with the rest behind it. Each is built from programs that
+   already exist in the pack, so a set never drifts from the folder it came
+   from, and anything the pack does not have is simply not in a set. */
+function _csExamSets(allCh) {
+  const has = id => allCh.some(c => c.id === 'starter-' + id);
+  const mk = (setId, title, description, ids) => {
+    const problems = ids.filter(has).map(id => ({
+      id: 'starter-set-' + setId + '-' + id,
+      source: 'library',
+      challengeId: 'starter-' + id,
+      variantId: 'starter-' + id + '-v1'
+    }));
+    return { id: 'starter-set-' + setId, title, description, parentId: null, problems };
+  };
+
+  return [
+    mk('premid', 'Pre-Midterm · Foundations',
+       'Input, decisions, loops and arrays — everything before structures. '
+       + 'Six problems in one sitting.',
+       ['echo-number', 'odd-even', 'grade', 'sum-to-n', 'times-table', 'arr-sum']),
+
+    mk('midterm', 'Midterm · Arrays, pointers, structures',
+       'The midterm list: pointers by reference, dynamic memory, and structures '
+       + 'as members and as arrays.',
+       ['arr-largest', 'arr-sentinel', 'ptr-swap', 'ptr-minmax', 'mem-return',
+        'struct-one', 'struct-team']),
+
+    mk('prefinal', 'Pre-Final · Strings, recursion, grids',
+       'Strings without the library, recursion where a loop will not be accepted, '
+       + 'and two-dimensional arrays.',
+       ['str-length', 'str-palindrome', 'str-wordcount', 'rec-factorial', 'rec-gcd',
+        'fn-swap-ref', 'grid-rowsums', 'grid-transpose']),
+
+    mk('finals', 'Finals · Files and everything behind them',
+       'The final list: files of structures, fseek and rewind, multi-dimensional '
+       + 'arrays, and a last pass over pointers and memory.',
+       ['file-write-read', 'file-lines', 'file-structs', 'file-seek',
+        'grid-diagonal', 'mem-pairs', 'poke-bag'])
+  ];
 }
 
 /* ── The switch ───────────────────────────────────────────── */
