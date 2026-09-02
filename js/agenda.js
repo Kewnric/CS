@@ -463,13 +463,16 @@ function agMountFlag() {
   root.id = 'ag-flag-root';
   root.className = 'ag-root';
   root.innerHTML = `
-    <button class="ag-flag" id="ag-flag" type="button" onclick="agTogglePanel()"
-            aria-haspopup="dialog" aria-expanded="false" aria-controls="ag-panel"
-            title="Agenda — deadlines, events and what is due">
-      <i data-lucide="bookmark" class="ag-flag-icon" aria-hidden="true"></i>
-      <span class="ag-flag-count" id="ag-flag-count" hidden></span>
-      <i data-lucide="chevron-down" class="ag-flag-pull" aria-hidden="true"></i>
-    </button>
+    <div class="ag-flag-wrap">
+      <button class="ag-flag" id="ag-flag" type="button" onclick="agTogglePanel()"
+              aria-haspopup="dialog" aria-expanded="false" aria-controls="ag-panel"
+              title="Agenda — deadlines, events and what is due">
+        <i data-lucide="bookmark" class="ag-flag-icon" aria-hidden="true"></i>
+        <span class="ag-flag-dot" aria-hidden="true"></span>
+        <span class="ag-flag-count" id="ag-flag-count" hidden></span>
+        <i data-lucide="chevron-down" class="ag-flag-pull" aria-hidden="true"></i>
+      </button>
+    </div>
     <div class="ag-panel" id="ag-panel" role="dialog" aria-modal="false"
          aria-label="Agenda" hidden></div>`;
   document.body.appendChild(root);
@@ -499,6 +502,9 @@ function agPaintFlag() {
   const c = agCounts();
   el.textContent = c.badge > 99 ? '99+' : String(c.badge);
   el.hidden = c.badge === 0;
+  // The dot is the resting signal; the number only appears once the flag is
+  // dropped and there is room to read it without the notch cutting through it.
+  flag.classList.toggle('has-items', c.badge > 0);
   flag.classList.toggle('has-overdue', c.overdue > 0);
   flag.setAttribute('title', c.badge === 0
     ? 'Agenda — nothing due'

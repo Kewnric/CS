@@ -21,34 +21,76 @@
 /* The attempt screens are their own world — no app chrome over an editor. */
 body.route-focused .ag-root { display: none; }
 
-/* ── The flag ─────────────────────────────────────────────── */
+/* -- The flag ---------------------------------------------- */
+
+/* The wrapper exists only to carry the shadow. clip-path clips a box-shadow
+   away along with everything else outside the shape -- checked side by side:
+   this exact notched ribbon with `box-shadow: 0 6px 18px` paints no shadow at
+   all, while the same shape inside a wrapper with drop-shadow paints one that
+   follows the notch. So the flag had been flat since it was written.
+
+   Three layers rather than one: a tight contact shadow that pins it to the
+   page, a mid one for the body, and a wide soft one for ambient depth. A
+   single large blur on its own reads as a smudge under the shape. */
+.ag-flag-wrap {
+  filter:
+    drop-shadow(0 1px 1px rgba(0, 0, 0, 0.32))
+    drop-shadow(0 4px 7px rgba(0, 0, 0, 0.30))
+    drop-shadow(0 12px 20px rgba(0, 0, 0, 0.26));
+  transition: filter 0.24s ease;
+}
+.ag-flag-wrap:hover,
+.ag-root.is-open .ag-flag-wrap {
+  filter:
+    drop-shadow(0 2px 2px rgba(0, 0, 0, 0.36))
+    drop-shadow(0 8px 14px rgba(0, 0, 0, 0.34))
+    drop-shadow(0 20px 32px rgba(0, 0, 0, 0.32));
+}
 
 .ag-flag {
   position: relative;
-  width: 44px;
-  height: 40px;
-  padding: 6px 0 0;
-  border: none;
-  cursor: pointer;
+  /* flex-start, explicitly: a button centres its content vertically whatever
+     its display is, which put the icon at 15.5px in a flag whose notch starts
+     at 31px -- the glyph sat in the cut. */
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  justify-content: flex-start;
+  width: 46px;
+  height: 42px;
+  padding: 7px 0 0;
+  border: none;
+  cursor: pointer;
   color: var(--text-on-dark);
-  background: linear-gradient(180deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+  /* A sheen over the body colour rather than a flat ramp: the top edge catches
+     light, the bottom falls away into the notch. */
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.20) 0%, rgba(255, 255, 255, 0) 58%),
+    linear-gradient(180deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
   /* The notch. Cut from the bottom edge, which is what makes it read as a
      bookmark rather than a tab. */
   clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 11px), 0 100%);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
-  transition: height 0.24s cubic-bezier(0.34, 1.4, 0.64, 1),
+  /* Inset only. An outer shadow here would be clipped away with the corners --
+     that is what the wrapper is for. These are the lit top edge, the two side
+     bevels, and a wash that stops the notch reading as flat paper. */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.32),
+    inset 1px 0 0 rgba(255, 255, 255, 0.10),
+    inset -1px 0 0 rgba(0, 0, 0, 0.18),
+    inset 0 -18px 20px -14px rgba(0, 0, 0, 0.42);
+  transition: height 0.26s cubic-bezier(0.34, 1.4, 0.64, 1),
               filter 0.2s ease;
 }
 
-.ag-flag:hover,
+/* Driven from the wrapper so the drop and the shadow move together. The button
+   is clipped, so its notch triangle is not hit-testable; the wrapper is not,
+   and hovering there would otherwise deepen the shadow under a flag that had
+   not dropped. */
+.ag-flag-wrap:hover .ag-flag,
 .ag-flag:focus-visible,
 .ag-root.is-open .ag-flag {
-  height: 62px;
-  filter: brightness(1.08);
+  height: 70px;
+  filter: brightness(1.06);
 }
 
 .ag-flag:focus-visible {
@@ -56,27 +98,63 @@ body.route-focused .ag-root { display: none; }
   outline-offset: 3px;
 }
 
-/* Red once something is actually late — the count alone does not say which. */
+/* Red once something is actually late - the count alone does not say which. */
 .ag-flag.has-overdue {
-  background: linear-gradient(180deg, var(--color-danger) 0%, var(--color-danger-hover) 100%);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.20) 0%, rgba(255, 255, 255, 0) 58%),
+    linear-gradient(180deg, var(--color-danger) 0%, var(--color-danger-hover) 100%);
 }
 
 .ag-flag-icon {
+  display: block;
+  margin: 0 auto;
   width: 18px;
   height: 18px;
-  flex-shrink: 0;
 }
 
+/* At rest the flag says THAT something is waiting, not how many. The count used
+   to sit in the resting stack, where the notch cut through it: 7.4px of an
+   11px digit was drawn inside the V, so what showed was a sliced glyph that
+   read as a rendering fault rather than a number. A dot cannot be half-cut. */
+.ag-flag-dot {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.24);
+  opacity: 0;
+  transform: scale(0.5);
+  transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.ag-flag.has-items .ag-flag-dot { opacity: 1; transform: scale(1); }
+
+/* All three are absolutely placed so that appearing costs no layout: the icon
+   stays exactly where it is and the flag grows downward past it. */
 .ag-flag-count {
-  font-size: 0.65rem;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 29px;
+  text-align: center;
+  font-size: 0.68rem;
   font-weight: 800;
   line-height: 1;
   letter-spacing: 0.02em;
   font-family: var(--font-sans);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.16s ease, transform 0.22s cubic-bezier(0.34, 1.4, 0.64, 1);
 }
+.ag-flag-count[hidden] { display: none; }
 
-/* Hidden until the flag is dropped, so the resting state stays a clean ribbon. */
 .ag-flag-pull {
+  position: absolute;
+  left: 50%;
+  top: 44px;
+  margin-left: -7px;
   width: 14px;
   height: 14px;
   opacity: 0;
@@ -84,14 +162,29 @@ body.route-focused .ag-root { display: none; }
   transition: opacity 0.18s ease, transform 0.24s cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
-.ag-flag:hover .ag-flag-pull,
-.ag-flag:focus-visible .ag-flag-pull,
-.ag-root.is-open .ag-flag-pull {
-  opacity: 0.95;
-  transform: translateY(0);
-}
+/* The number replaces the dot once there is room to read it, and the chevron
+   that says "pull me down" only turns up once the flag is already down. */
+.ag-flag-wrap:hover .ag-flag-dot,
+.ag-flag:focus-visible .ag-flag-dot,
+.ag-root.is-open .ag-flag-dot { opacity: 0; transform: scale(0.5); }
 
-.ag-root.is-open .ag-flag-pull { transform: rotate(180deg); }
+.ag-flag-wrap:hover .ag-flag-count,
+.ag-flag:focus-visible .ag-flag-count,
+.ag-root.is-open .ag-flag-count { opacity: 1; transform: translateY(0); }
+
+.ag-flag-wrap:hover .ag-flag-pull,
+.ag-flag:focus-visible .ag-flag-pull,
+.ag-root.is-open .ag-flag-pull { opacity: 0.95; transform: translateY(0); }
+
+.ag-root.is-open .ag-flag-pull { transform: translateY(0) rotate(180deg); }
+
+@media (prefers-reduced-motion: reduce) {
+  .ag-flag,
+  .ag-flag-wrap,
+  .ag-flag-dot,
+  .ag-flag-count,
+  .ag-flag-pull { transition: none; }
+}
 
 /* ── The panel ────────────────────────────────────────────── */
 

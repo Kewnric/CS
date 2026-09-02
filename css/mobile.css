@@ -161,7 +161,9 @@
 
   /* The floating settings gear and the agenda flag both sit in corners the
      thumb reaches for; keep them clear of the menu button. */
-  .ag-flag-root { right: 6px; }
+  /* .ag-flag-root was the id, not a class -- this rule matched nothing and the
+     flag kept its desktop 26px inset on a phone. */
+  .ag-root { right: 10px; }
 
   /* ── THE ATTEMPT SCREEN ─────────────────────────────────────
      Two things here were not "cramped", they were unusable.
