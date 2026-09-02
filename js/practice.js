@@ -2368,7 +2368,10 @@ function _termClose(byUser) {
 function runCodeWithPiston(seedStdin) {
   const textarea = document.getElementById('editor-textarea');
   if (!textarea) return;
-  if (typeof psfxWorkStart === 'function') psfxWorkStart();
+  /* No anvil here. The strike marks Check Code, which is the graded
+     event; Run Code is a scratch run you may do a dozen times in a row
+     while poking at output, and a cue on every one of those turns a
+     signal into a noise. ppRunAllChecks() is the only caller. */
   // The whole file, not what happens to be on screen — a collapsed block is
   // parked outside the textarea (see fold.js).
   const code = (typeof edFullSource === 'function') ? edFullSource(textarea) : textarea.value;
