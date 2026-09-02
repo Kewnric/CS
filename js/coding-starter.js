@@ -193,73 +193,94 @@ function codingStarterPack() {
 
   const challenges = [
     _csProgram('hello', 1, 'Say hello',
-      'Print the line <code>Hello, World!</code> and nothing else. Mind the comma and the exclamation mark — the checker compares your output exactly.',
+      'Print the line <code>Hello, World!</code> and nothing else. Mind the comma and the exclamation mark \u2014 the checker compares your output exactly.',
       [{ title: 'Sample 1', content: 'Output:\nHello, World!' }],
       [{ name: 'prints the greeting', stdin: '', expected: 'Hello, World!' }]),
 
     _csProgram('echo-number', 1, 'Read a number back',
-      'Read one whole number from the user and print it on its own line. This is the smallest program that has an input: get <code>scanf</code> working here and the rest of the pack is mostly variations on it.',
-      [{ title: 'Sample 1', content: 'Input:\n7\nOutput:\n7' }],
-      [{ name: 'echoes 7', stdin: '7\n', expected: '7' },
-       { name: 'echoes a negative', stdin: '-40\n', expected: '-40' }]),
+      'Ask for one whole number and print it back, labelled.<br><br>'
+      + 'Prompt with exactly <code>Enter a number: </code> (with the trailing space, no newline), then print '
+      + '<code>Your number is: N</code>.<br><br>'
+      + 'The prompt is part of your output, so it is part of what is compared \u2014 typing it in is not enough, '
+      + 'it has to be printed. Notice in the sample that the Output already contains the prompt: what you '
+      + 'type never appears in your program\'s output, only what you print does.',
+      [{ title: 'Sample 1', content: 'Input:\n7\nOutput:\nEnter a number: Your number is: 7' }],
+      [{ name: 'echoes 7', stdin: '7\n', expected: 'Enter a number: Your number is: 7' },
+       { name: 'echoes a negative', stdin: '-40\n', expected: 'Enter a number: Your number is: -40' }]),
 
     _csProgram('add-two', 1, 'Add two numbers',
-      'Read two whole numbers and print their sum on one line. Nothing else — no labels, no spaces around it.',
-      [{ title: 'Sample 1', content: 'Input:\n3 4\nOutput:\n7' }],
-      [{ name: 'three and four', stdin: '3 4\n', expected: '7' },
-       { name: 'crossing zero', stdin: '-9 4\n', expected: '-5' }]),
+      'Ask for two whole numbers, one at a time, and print their sum.<br><br>'
+      + 'Prompts: <code>Enter the first number: </code> then <code>Enter the second number: </code>.<br>'
+      + 'Answer: <code>The sum is: N</code>.',
+      [{ title: 'Sample 1', content: 'Input:\n3\n4\nOutput:\nEnter the first number: Enter the second number: The sum is: 7' }],
+      [{ name: 'three and four', stdin: '3\n4\n', expected: 'Enter the first number: Enter the second number: The sum is: 7' },
+       { name: 'crossing zero', stdin: '-9\n4\n', expected: 'Enter the first number: Enter the second number: The sum is: -5' }]),
 
     _csProgram('odd-even', 2, 'Odd or even',
-      'Read a whole number. Print <code>Even</code> if it divides by two exactly, otherwise print <code>Odd</code>. Remember that zero is even.',
-      [{ title: 'Sample 1', content: 'Input:\n10\nOutput:\nEven' },
-       { title: 'Sample 2', content: 'Input:\n7\nOutput:\nOdd' }],
-      [{ name: 'ten is even', stdin: '10\n', expected: 'Even' },
-       { name: 'seven is odd', stdin: '7\n', expected: 'Odd' },
-       { name: 'zero is even', stdin: '0\n', expected: 'Even' },
-       { name: 'negatives too', stdin: '-3\n', expected: 'Odd' }]),
+      'Ask for a whole number and say whether it is even or odd.<br><br>'
+      + 'Prompt: <code>Enter a number: </code>. Answer: <code>N is Even</code> or <code>N is Odd</code>, '
+      + 'with the number in it.<br><br>'
+      + 'Remember that zero is even, and that <code>-3 % 2</code> is <code>-1</code> in C \u2014 not <code>1</code>. '
+      + 'Compare against <code>0</code> and both signs behave.',
+      [{ title: 'Sample 1', content: 'Input:\n10\nOutput:\nEnter a number: 10 is Even' },
+       { title: 'Sample 2', content: 'Input:\n7\nOutput:\nEnter a number: 7 is Odd' }],
+      [{ name: 'ten is even', stdin: '10\n', expected: 'Enter a number: 10 is Even' },
+       { name: 'seven is odd', stdin: '7\n', expected: 'Enter a number: 7 is Odd' },
+       { name: 'zero is even', stdin: '0\n', expected: 'Enter a number: 0 is Even' },
+       { name: 'negatives too', stdin: '-3\n', expected: 'Enter a number: -3 is Odd' }]),
 
     _csProgram('largest', 2, 'The largest of three',
-      'Read three whole numbers and print the largest of them. If two are tied for largest, that value is still the answer.',
-      [{ title: 'Sample 1', content: 'Input:\n4 9 2\nOutput:\n9' }],
-      [{ name: 'middle one wins', stdin: '4 9 2\n', expected: '9' },
-       { name: 'last one wins', stdin: '1 2 3\n', expected: '3' },
-       { name: 'a tie', stdin: '5 5 1\n', expected: '5' },
-       { name: 'all negative', stdin: '-7 -2 -9\n', expected: '-2' }]),
+      'Ask for three whole numbers on one line and print the largest.<br><br>'
+      + 'Prompt: <code>Enter three numbers: </code>. Answer: <code>The largest is: N</code>.<br><br>'
+      + 'If two are tied for largest, that value is still the answer.',
+      [{ title: 'Sample 1', content: 'Input:\n4 9 2\nOutput:\nEnter three numbers: The largest is: 9' }],
+      [{ name: 'middle one wins', stdin: '4 9 2\n', expected: 'Enter three numbers: The largest is: 9' },
+       { name: 'last one wins', stdin: '1 2 3\n', expected: 'Enter three numbers: The largest is: 3' },
+       { name: 'a tie', stdin: '5 5 1\n', expected: 'Enter three numbers: The largest is: 5' },
+       { name: 'all negative', stdin: '-7 -2 -9\n', expected: 'Enter three numbers: The largest is: -2' }]),
 
     _csProgram('grade', 2, 'Turn a score into a grade',
-      'Read a score from 0 to 100 and print one letter:<br>'
+      'Ask for a score from 0 to 100 and print the letter grade.<br><br>'
+      + 'Prompt: <code>Enter a score: </code>. Answer: <code>Your grade is: X</code>.<br><br>'
       + '90 and above <code>A</code>, 80 to 89 <code>B</code>, 70 to 79 <code>C</code>, '
       + '60 to 69 <code>D</code>, below 60 <code>F</code>.<br>'
-      + 'The boundaries are where this one goes wrong, so test 90, 80, 70 and 60 yourself before checking.',
-      [{ title: 'Sample 1', content: 'Input:\n83\nOutput:\nB' }],
-      [{ name: 'a clear B', stdin: '83\n', expected: 'B' },
-       { name: 'exactly 90', stdin: '90\n', expected: 'A' },
-       { name: 'exactly 60', stdin: '60\n', expected: 'D' },
-       { name: 'just under', stdin: '59\n', expected: 'F' },
-       { name: 'full marks', stdin: '100\n', expected: 'A' }]),
+      + 'The boundaries are where this one goes wrong, so try 90, 80, 70 and 60 yourself before checking.',
+      [{ title: 'Sample 1', content: 'Input:\n83\nOutput:\nEnter a score: Your grade is: B' }],
+      [{ name: 'a clear B', stdin: '83\n', expected: 'Enter a score: Your grade is: B' },
+       { name: 'exactly 90', stdin: '90\n', expected: 'Enter a score: Your grade is: A' },
+       { name: 'exactly 60', stdin: '60\n', expected: 'Enter a score: Your grade is: D' },
+       { name: 'just under', stdin: '59\n', expected: 'Enter a score: Your grade is: F' },
+       { name: 'full marks', stdin: '100\n', expected: 'Enter a score: Your grade is: A' }]),
 
     _csProgram('countdown', 3, 'Count down',
-      'Read a whole number <code>n</code> and print every number from <code>n</code> down to 1, one per line. If <code>n</code> is below 1, print nothing at all.',
-      [{ title: 'Sample 1', content: 'Input:\n5\nOutput:\n5\n4\n3\n2\n1' }],
-      [{ name: 'from five', stdin: '5\n', expected: '5\n4\n3\n2\n1' },
-       { name: 'from one', stdin: '1\n', expected: '1' },
-       { name: 'nothing to count', stdin: '0\n', expected: '' }]),
+      'Ask for a whole number <code>n</code> and print every number from <code>n</code> down to 1, '
+      + 'one per line.<br><br>'
+      + 'Prompt: <code>Enter a number: </code>. If <code>n</code> is below 1, print the prompt and nothing after it.',
+      [{ title: 'Sample 1', content: 'Input:\n5\nOutput:\nEnter a number: 5\n4\n3\n2\n1' }],
+      [{ name: 'from five', stdin: '5\n', expected: 'Enter a number: 5\n4\n3\n2\n1' },
+       { name: 'from one', stdin: '1\n', expected: 'Enter a number: 1' },
+       { name: 'nothing to count', stdin: '0\n', expected: 'Enter a number:' }]),
 
     _csProgram('sum-to-n', 3, 'Add up to n',
-      'Read a whole number <code>n</code> and print the total of every number from 1 to <code>n</code>. For 5 that is 1+2+3+4+5, so 15. If <code>n</code> is below 1, the total is 0.',
-      [{ title: 'Sample 1', content: 'Input:\n5\nOutput:\n15' }],
-      [{ name: 'up to five', stdin: '5\n', expected: '15' },
-       { name: 'up to one', stdin: '1\n', expected: '1' },
-       { name: 'nothing to add', stdin: '0\n', expected: '0' },
-       { name: 'a bigger one', stdin: '100\n', expected: '5050' }]),
+      'Ask for a whole number <code>n</code> and print the total of every number from 1 to <code>n</code>.<br><br>'
+      + 'Prompt: <code>Enter a number: </code>. Answer: <code>The total is: N</code>.<br><br>'
+      + 'For 5 that is 1+2+3+4+5, so 15. If <code>n</code> is below 1, the total is 0.',
+      [{ title: 'Sample 1', content: 'Input:\n5\nOutput:\nEnter a number: The total is: 15' }],
+      [{ name: 'up to five', stdin: '5\n', expected: 'Enter a number: The total is: 15' },
+       { name: 'up to one', stdin: '1\n', expected: 'Enter a number: The total is: 1' },
+       { name: 'nothing to add', stdin: '0\n', expected: 'Enter a number: The total is: 0' },
+       { name: 'a bigger one', stdin: '100\n', expected: 'Enter a number: The total is: 5050' }]),
 
     _csProgram('times-table', 3, 'A times table',
-      'Read a whole number <code>n</code> and print its table from 1 to 10, one line each, in the form <code>n x i = product</code> — for example <code>3 x 4 = 12</code>. Use a lower-case x with a space either side.',
-      [{ title: 'Sample 1', content: 'Input:\n3\nOutput:\n3 x 1 = 3\n3 x 2 = 6\n3 x 3 = 9\n3 x 4 = 12\n3 x 5 = 15\n3 x 6 = 18\n3 x 7 = 21\n3 x 8 = 24\n3 x 9 = 27\n3 x 10 = 30' }],
+      'Ask for a whole number <code>n</code> and print its table from 1 to 10, one line each, '
+      + 'in the form <code>n x i = product</code> \u2014 for example <code>3 x 4 = 12</code>. '
+      + 'Use a lower-case x with a space either side.<br><br>'
+      + 'Prompt: <code>Enter a number: </code>.',
+      [{ title: 'Sample 1', content: 'Input:\n3\nOutput:\nEnter a number: 3 x 1 = 3\n3 x 2 = 6\n3 x 3 = 9\n3 x 4 = 12\n3 x 5 = 15\n3 x 6 = 18\n3 x 7 = 21\n3 x 8 = 24\n3 x 9 = 27\n3 x 10 = 30' }],
       [{ name: 'the three times table', stdin: '3\n',
-         expected: '3 x 1 = 3\n3 x 2 = 6\n3 x 3 = 9\n3 x 4 = 12\n3 x 5 = 15\n3 x 6 = 18\n3 x 7 = 21\n3 x 8 = 24\n3 x 9 = 27\n3 x 10 = 30' },
+         expected: 'Enter a number: 3 x 1 = 3\n3 x 2 = 6\n3 x 3 = 9\n3 x 4 = 12\n3 x 5 = 15\n3 x 6 = 18\n3 x 7 = 21\n3 x 8 = 24\n3 x 9 = 27\n3 x 10 = 30' },
        { name: 'zero all the way down', stdin: '0\n',
-         expected: '0 x 1 = 0\n0 x 2 = 0\n0 x 3 = 0\n0 x 4 = 0\n0 x 5 = 0\n0 x 6 = 0\n0 x 7 = 0\n0 x 8 = 0\n0 x 9 = 0\n0 x 10 = 0' }])
+         expected: 'Enter a number: 0 x 1 = 0\n0 x 2 = 0\n0 x 3 = 0\n0 x 4 = 0\n0 x 5 = 0\n0 x 6 = 0\n0 x 7 = 0\n0 x 8 = 0\n0 x 9 = 0\n0 x 10 = 0' }])
   ];
 
   /* The second half lives in its own file: arrays, pointers, memory and the

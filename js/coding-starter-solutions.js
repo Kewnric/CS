@@ -28,52 +28,61 @@ const CS_SOLUTIONS = {
     '#include <stdio.h>\n\nint main(void) {\n    printf("Hello, World!\\n");\n    return 0;\n}\n',
 
   'echo-number':
-    '#include <stdio.h>\n\nint main(void) {\n    int n;\n    scanf("%d", &n);\n'
-    + '    printf("%d\\n", n);\n    return 0;\n}\n',
+    '#include <stdio.h>\n\nint main(void) {\n    int n;\n\n'
+    + '    printf("Enter a number: ");\n    scanf("%d", &n);\n\n'
+    + '    printf("Your number is: %d\\n", n);\n    return 0;\n}\n',
 
   'add-two':
-    '#include <stdio.h>\n\nint main(void) {\n    int a, b;\n    scanf("%d %d", &a, &b);\n'
-    + '    printf("%d\\n", a + b);\n    return 0;\n}\n',
+    '#include <stdio.h>\n\nint main(void) {\n    int a, b;\n\n'
+    + '    printf("Enter the first number: ");\n    scanf("%d", &a);\n\n'
+    + '    printf("Enter the second number: ");\n    scanf("%d", &b);\n\n'
+    + '    printf("The sum is: %d\\n", a + b);\n    return 0;\n}\n',
 
-  /* ── 2 · Making decisions ─────────────────────────────────── */
+  /* -- 2 . Making decisions ---------------------------------- */
 
   'odd-even':
-    '#include <stdio.h>\n\nint main(void) {\n    int n;\n    scanf("%d", &n);\n'
-    + '    if (n % 2 == 0) {\n        printf("Even\\n");\n    } else {\n'
-    + '        printf("Odd\\n");\n    }\n    return 0;\n}\n',
+    '#include <stdio.h>\n\nint main(void) {\n    int n;\n\n'
+    + '    printf("Enter a number: ");\n    scanf("%d", &n);\n\n'
+    + '    if (n % 2 == 0) {\n        printf("%d is Even\\n", n);\n    } else {\n'
+    + '        printf("%d is Odd\\n", n);\n    }\n    return 0;\n}\n',
 
   'largest':
-    '#include <stdio.h>\n\nint main(void) {\n    int a, b, c, largest;\n'
-    + '    scanf("%d %d %d", &a, &b, &c);\n    largest = a;\n'
+    '#include <stdio.h>\n\nint main(void) {\n    int a, b, c, largest;\n\n'
+    + '    printf("Enter three numbers: ");\n    scanf("%d %d %d", &a, &b, &c);\n\n'
+    + '    largest = a;\n'
     + '    if (b > largest) {\n        largest = b;\n    }\n'
-    + '    if (c > largest) {\n        largest = c;\n    }\n'
-    + '    printf("%d\\n", largest);\n    return 0;\n}\n',
+    + '    if (c > largest) {\n        largest = c;\n    }\n\n'
+    + '    printf("The largest is: %d\\n", largest);\n    return 0;\n}\n',
 
   'grade':
-    '#include <stdio.h>\n\nint main(void) {\n    int score;\n    char grade;\n'
-    + '    scanf("%d", &score);\n'
+    '#include <stdio.h>\n\nint main(void) {\n    int score;\n    char grade;\n\n'
+    + '    printf("Enter a score: ");\n    scanf("%d", &score);\n\n'
     + '    if (score >= 90) {\n        grade = \'A\';\n'
     + '    } else if (score >= 80) {\n        grade = \'B\';\n'
     + '    } else if (score >= 70) {\n        grade = \'C\';\n'
     + '    } else if (score >= 60) {\n        grade = \'D\';\n'
-    + '    } else {\n        grade = \'F\';\n    }\n'
-    + '    printf("%c\\n", grade);\n    return 0;\n}\n',
+    + '    } else {\n        grade = \'F\';\n    }\n\n'
+    + '    printf("Your grade is: %c\\n", grade);\n    return 0;\n}\n',
 
-  /* ── 3 · Repeating work ───────────────────────────────────── */
+  /* -- 3 . Repeating work ------------------------------------ */
 
   'countdown':
-    '#include <stdio.h>\n\nint main(void) {\n    int n, i;\n    scanf("%d", &n);\n'
+    '#include <stdio.h>\n\nint main(void) {\n    int n, i;\n\n'
+    + '    printf("Enter a number: ");\n    scanf("%d", &n);\n\n'
     + '    for (i = n; i >= 1; i--) {\n        printf("%d\\n", i);\n    }\n'
     + '    return 0;\n}\n',
 
   'sum-to-n':
-    '#include <stdio.h>\n\nint main(void) {\n    int n, i, total = 0;\n    scanf("%d", &n);\n'
-    + '    for (i = 1; i <= n; i++) {\n        total += i;\n    }\n'
-    + '    printf("%d\\n", total);\n    return 0;\n}\n',
+    '#include <stdio.h>\n\nint main(void) {\n    int n, i, total = 0;\n\n'
+    + '    printf("Enter a number: ");\n    scanf("%d", &n);\n\n'
+    + '    for (i = 1; i <= n; i++) {\n        total += i;\n    }\n\n'
+    + '    printf("The total is: %d\\n", total);\n    return 0;\n}\n',
 
   'times-table':
-    '#include <stdio.h>\n\nint main(void) {\n    int n, i;\n    scanf("%d", &n);\n'
-    + '    for (i = 1; i <= 10; i++) {\n        printf("%d x %d = %d\\n", n, i, n * i);\n    }\n'
+    '#include <stdio.h>\n\nint main(void) {\n    int n, i;\n\n'
+    + '    printf("Enter a number: ");\n    scanf("%d", &n);\n\n'
+    + '    for (i = 1; i <= 10; i++) {\n'
+    + '        printf("%d x %d = %d\\n", n, i, n * i);\n    }\n'
     + '    return 0;\n}\n',
 
   /* ── 4 · Arrays ───────────────────────────────────────────── */
