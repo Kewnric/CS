@@ -25,10 +25,17 @@
 
    SETUP, once, at developer.spotify.com/dashboard:
      1. Create an app, copy its Client ID.
-     2. Add redirect URIs matching where this runs, EXACTLY:
+     2. Tick BOTH "Web API" and "Web Playback SDK".
+     3. Add redirect URIs matching where this runs, EXACTLY:
           https://kewnric.github.io/CS/
-          http://localhost:8754/
-     3. Paste the Client ID into the player popup.
+          http://127.0.0.1:8754/     <- for local work, NOT localhost
+        Spotify requires https everywhere except the loopback literals
+        127.0.0.1 and [::1]; the hostname "localhost" is rejected outright.
+        So to sign in locally the preview has to be opened on 127.0.0.1 too,
+        or the address bar and the registered URI will not match. Both are
+        secure contexts as far as crypto.subtle is concerned, so the PKCE
+        challenge works either way -- this is purely Spotify's rule.
+     4. Paste the Client ID into the player popup.
    ============================================================ */
 
 const SPOT_CLIENT_KEY  = 'ssp.spotify.clientId';
@@ -103,9 +110,10 @@ async function spotifyLogin() {
   const id = spotifyClientId();
   if (!id) { _spotError = 'Enter your Spotify Client ID first.'; _spotSync(); return; }
   if (!window.isSecureContext) {
-    // crypto.subtle is unavailable over plain http except on localhost, and the
-    // failure would otherwise look like a Spotify problem.
-    _spotError = 'Sign-in needs https (or localhost).'; _spotSync(); return;
+    // crypto.subtle is unavailable over plain http except on loopback, and the
+    // failure would otherwise look like a Spotify problem rather than a
+    // browser one.
+    _spotError = 'Sign-in needs https, or 127.0.0.1 locally.'; _spotSync(); return;
   }
   const verifier = _spotRandomString(96);
   try { localStorage.setItem(SPOT_VERIFIER_KEY, verifier); } catch (e) { /* private mode */ }
@@ -447,7 +455,9 @@ function spotifyPanelTemplate() {
 
         <div class="spot-setup">
           <p class="spot-hint">Paste your Spotify app's <b>Client ID</b>. Add this exact
-             redirect URI in the Spotify dashboard first:</p>
+             redirect URI in the Spotify dashboard first — Spotify rejects
+             <code>localhost</code>, so locally you must open this page on
+             <code>127.0.0.1</code>:</p>
           <code class="spot-redirect" id="spot-redirect"></code>
           <input type="text" class="spot-input" id="spot-client-id" placeholder="Client ID"
                  spellcheck="false" autocomplete="off"
