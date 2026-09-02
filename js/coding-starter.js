@@ -81,6 +81,109 @@ function _csProgram(id, folder, title, description, samples, tests) {
   };
 }
 
+/* ── Keeping an installed pack current ───────────────────────
+   The pack is generated fresh every time it is switched on, but once it is
+   installed it becomes ordinary library data and stops tracking this file.
+   Adding a folder here would never reach anyone who already had the pack --
+   which is the whole problem the update below exists to solve.
+
+   The hard part is not adding what is missing; it is knowing what NOT to
+   touch. The banner promises that anything you change in the pack stays, so
+   an update that overwrote everything would be a data loss dressed as a
+   feature. So each program is stamped with a fingerprint of its own content
+   when it ships. On update, a program whose fingerprint still matches its
+   content has not been touched since it arrived and can be refreshed; one
+   that no longer matches has been edited, and is left exactly as it is.
+
+   PROGRESS IS SAFE either way. History is keyed by challenge id and lives in
+   state.history, not on the challenge, so replacing the object by id keeps
+   every attempt, score and streak attached to it. */
+
+/** A cheap, stable hash of the fields the pack owns. */
+function _csFingerprint(ch) {
+  const v = (ch.variants && ch.variants[0]) || {};
+  const parts = [
+    ch.title || '', ch.description || '', ch.parentId || '',
+    JSON.stringify(v.samples || []),
+    JSON.stringify(v.tests || []),
+    JSON.stringify((v.files || []).map(f => [f.name, f.ext, f.starterCode || '', f.code || ''])),
+    v.code || ''
+  ].join('\u0001');
+  // djb2. Not a checksum against tampering -- just a same-or-different test.
+  let h = 5381;
+  for (let i = 0; i < parts.length; i++) h = ((h * 33) ^ parts.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
+function _csStamp(pack) {
+  (pack.challenges || []).forEach(c => { c.packFp = _csFingerprint(c); });
+  return pack;
+}
+
+/**
+ * Merge the pack as it is written now into the pack as it was installed.
+ *
+ * Works whichever library is on screen: in starter mode it updates what you
+ * are looking at, otherwise it updates the parked copy so the new material is
+ * there the next time you switch over.
+ */
+function updateCodingStarterPack() {
+  const inStarter = codingLibraryIsStarter();
+  const target = inStarter ? _csLift() : (state.codingStash || null);
+  if (!target || !(target.challenges || []).some(c => String(c.id).indexOf('starter-') === 0)) {
+    if (typeof toast === 'function') {
+      toast('No starter pack installed yet — switch it on and it arrives complete.',
+            { type: 'info', duration: 4000 });
+    }
+    return;
+  }
+
+  const fresh = _csStamp(codingStarterPack());
+  const haveNode = new Set((target.nodes || []).map(n => n.id));
+  const byId = {};
+  (target.challenges || []).forEach(c => { byId[c.id] = c; });
+
+  let folders = 0, added = 0, refreshed = 0, kept = 0;
+
+  fresh.nodes.forEach(n => {
+    if (!haveNode.has(n.id)) { target.nodes.push(n); haveNode.add(n.id); folders++; }
+  });
+
+  fresh.challenges.forEach(f => {
+    const have = byId[f.id];
+    if (!have) { target.challenges.push(f); added++; return; }
+    /* No stamp means it predates this mechanism. Those were installed before
+       anything could edit them through the pack UI, so treat them as
+       untouched rather than freezing them out of every future update. */
+    const untouched = !have.packFp || have.packFp === _csFingerprint(have);
+    if (!untouched) { kept++; return; }
+    target.challenges[target.challenges.indexOf(have)] = f;
+    refreshed++;
+  });
+
+  if (inStarter) _csPlace(target); else state.codingStash = target;
+  saveData();
+
+  if (typeof invalidateBrowseCache === 'function') invalidateBrowseCache();
+  if (typeof renderBrowse === 'function') renderBrowse();
+  _csSyncBtn();
+
+  if (typeof toast === 'function') {
+    if (!folders && !added && !refreshed) {
+      toast(kept ? 'Already up to date. ' + kept + ' program' + (kept === 1 ? '' : 's') + ' you edited were left alone.'
+                 : 'Already up to date.', { type: 'success', duration: 3200 });
+    } else {
+      const bits = [];
+      if (added) bits.push(added + ' new program' + (added === 1 ? '' : 's'));
+      if (folders) bits.push(folders + ' new folder' + (folders === 1 ? '' : 's'));
+      if (refreshed) bits.push(refreshed + ' updated');
+      if (kept) bits.push(kept + ' of yours kept');
+      toast(bits.join(', ') + '.' + (inStarter ? '' : ' Switch to the pack to see them.'),
+            { type: 'success', duration: 4500 });
+    }
+  }
+}
+
 function codingStarterPack() {
   const nodes = [
     { id: 'starter-folder-1', type: 'folder', name: '1 · Printing and reading', parentId: null, scope: 'challenge', order: 0 },
@@ -175,7 +278,7 @@ function codingStarterPack() {
     allCh = allCh.concat(lists.challenges);
     allNodes = allNodes.concat(lists.nodes);
   }
-  return { challenges: allCh, nodes: allNodes, sets: [] };
+  return _csStamp({ challenges: allCh, nodes: allNodes, sets: [] });
 }
 
 /* ── The switch ───────────────────────────────────────────── */
@@ -275,5 +378,8 @@ function codingStarterBannerTemplate() {
        + '<i data-lucide="package-open"></i>'
        + '<span><strong>Starter pack.</strong> Your own programs are put aside and come back when you switch off. '
        + 'Anything you add or change here stays in the pack.</span>'
+       + '<button type="button" class="cs-update-btn" onclick="updateCodingStarterPack()"'
+       + ' title="Add anything new and refresh what you have not edited">'
+       + '<i data-lucide="refresh-cw"></i> Update</button>'
        + '</div>';
 }
