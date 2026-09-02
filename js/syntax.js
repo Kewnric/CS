@@ -32,6 +32,26 @@ function syntaxHighlight(code) {
     }
   );
 
+  /* Phase 1b: names the program itself introduces as TYPES.
+
+     VS Code gives these their own colour (teal) rather than lumping them in
+     with variables, and it matters more in C than it looks: `Point p` reads
+     as two unrelated words until the first one is visibly a type. Collected
+     from the source before anything is marked, so a declaration anywhere in
+     the file colours every later use.
+
+     Three shapes cover it: the tag in `struct/union/enum X`, the name a
+     typedef ends on, and the name a `} X;` closes a definition with. */
+  const userTypes = new Set();
+  const rawSrc = String(code);
+  let mt;
+  const tagRe = /\b(?:struct|union|enum)\s+([A-Za-z_]\w*)/g;
+  while ((mt = tagRe.exec(rawSrc))) userTypes.add(mt[1]);
+  const tdRe = /\btypedef\b[^;{]*?([A-Za-z_]\w*)\s*;/g;
+  while ((mt = tdRe.exec(rawSrc))) userTypes.add(mt[1]);
+  const closeRe = /\}\s*([A-Za-z_]\w*)\s*;/g;
+  while ((mt = closeRe.exec(rawSrc))) userTypes.add(mt[1]);
+
   // Phase 2: Highlight C Standard Library functions
   escaped = escaped.replace(
     /\b(printf|scanf|fprintf|fscanf|sprintf|sscanf|snprintf|vprintf|vfprintf|vsprintf|vsnprintf|malloc|calloc|realloc|free|fgets|fputs|fopen|fclose|fread|fwrite|fseek|ftell|rewind|fflush|feof|ferror|clearerr|remove|rename|tmpfile|tmpnam|strlen|strcpy|strncpy|strcat|strncat|strcmp|strncmp|strchr|strrchr|strstr|strtok|strdup|memcpy|memset|memmove|memcmp|atoi|atof|atol|strtol|strtod|strtoul|strtof|strtold|abs|labs|fabs|sqrt|pow|ceil|floor|round|log|log10|log2|sin|cos|tan|asin|acos|atan|atan2|exp|ldexp|frexp|modf|fmod|rand|srand|time|clock|difftime|mktime|localtime|gmtime|strftime|asctime|ctime|getchar|putchar|puts|gets|getline|exit|abort|atexit|system|getenv|isalpha|isdigit|isalnum|isupper|islower|toupper|tolower|isspace|ispunct|isprint|iscntrl|isxdigit|qsort|bsearch|perror|signal|raise|setjmp|longjmp|assert)\b(?=\s*\()/g,
@@ -76,7 +96,10 @@ function syntaxHighlight(code) {
 
   // Phase 8: Numbers
   escaped = escaped.replace(
-    /\b(\d+(?:\.\d+)?(?:[eE][+-]?\d+)?[fFlLuU]?\b|0[xX][0-9a-fA-F]+\b|0[bB][01]+\b)/g,
+    /* Suffixes are part of the literal: `10UL` is one number, and matching
+       only the `10` left `UL` sitting outside as unstyled text. Longest
+       alternatives first, or `0x1F` matches as `0` followed by `x1F`. */
+    /\b(0[xX][0-9a-fA-F]+(?:[uUlL]+)?|0[bB][01]+(?:[uUlL]+)?|(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?(?:[fFlLuU]+)?)\b/g,
     '\uE006$1\uE00F'
   );
 
@@ -110,10 +133,24 @@ function syntaxHighlight(code) {
          Flags, width, precision and length modifiers all belong to the
          specifier -- `%-5.2f` and `%ld` are each one thing -- and `%%` counts
          because a literal percent is an escape, not text. */
-      replacement = '\uE009' + t.match.replace(
-        /%[-+ #0']*[0-9*]*(?:\.[0-9*]+)?(?:hh|h|ll|l|L|j|z|t)?[diouxXeEfFgGaAcspn%]/g,
-        '\uE00D$&\uE00F'
-      ) + '\uE00F';
+      /* Escapes get their own colour too, for the same reason the specifier
+         does: `\n` is not the letter n, it is a newline, and a beginner
+         reading a string as one flat run has no way to see that. VS Code
+         colours them gold; this follows.
+
+         Applied BEFORE the specifier pass. They cannot overlap -- an escape
+         starts with a backslash and a specifier with a percent -- but doing
+         escapes first means the specifier regex never has to reason about a
+         backslash sitting in front of it. */
+      replacement = '\uE009' + t.match
+        .replace(
+          /\\(?:x[0-9a-fA-F]+|[0-7]{1,3}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|.)/g,
+          '\uE00E$&\uE00F'
+        )
+        .replace(
+          /%[-+ #0']*[0-9*]*(?:\.[0-9*]+)?(?:hh|h|ll|l|L|j|z|t)?[diouxXeEfFgGaAcspn%]/g,
+          '\uE00D$&\uE00F'
+        ) + '\uE00F';
     } else if (t.type === 'comment') {
       replacement = `\uE00A${t.match}\uE00F`;
     } else if (t.type === 'preproc') {
@@ -127,6 +164,43 @@ function syntaxHighlight(code) {
 
     escaped = escaped.replace(t.id, replacement);
   }
+
+  /* Phase 11b: everything still bare is an identifier.
+
+     Before this, a C file was mostly UNCOLOURED -- keywords, calls, numbers
+     and strings were lit and every variable, parameter, struct member and
+     field name was plain body text. An audit of a file exercising the usual
+     constructs found 45 distinct tokens with no colour at all, which is why
+     the editor looked flat next to VS Code however many keywords it knew.
+
+     It runs last, on the marked-up text, and only rewrites the stretches
+     BETWEEN markers -- otherwise it would re-wrap the word inside every span
+     already placed, including the ones holding strings and comments. The
+     depth counter is what keeps it out of them.
+
+     Struct members are deliberately not separated out: VS Code Dark+ gives
+     members and variables the same light blue, so `p.x` wants one colour and
+     splitting them would be a distinction the theme does not make. */
+  escaped = (function markIdentifiers(s) {
+    const OPEN = /[\uE000-\uE00E\uE010\uE011]/;
+    let out = '', depth = 0, last = 0;
+    const re = /[\uE000-\uE00E\uE00F\uE010\uE011]/g;
+    const bare = seg => seg.replace(/\b([A-Za-z_]\w*)\b/g, function (m, name) {
+      if (userTypes.has(name)) return '\uE011' + name + '\uE00F';
+      return '\uE010' + name + '\uE00F';
+    });
+    let m;
+    while ((m = re.exec(s))) {
+      const seg = s.slice(last, m.index);
+      out += depth === 0 ? bare(seg) : seg;
+      out += m[0];
+      depth += (m[0] === '\uE00F') ? -1 : 1;
+      if (depth < 0) depth = 0;
+      last = m.index + 1;
+    }
+    out += depth === 0 ? bare(s.slice(last)) : s.slice(last);
+    return out;
+  })(escaped);
 
   // Phase 12: Resolve Unicode tokens to final HTML classes
   return escaped
@@ -144,5 +218,8 @@ function syntaxHighlight(code) {
     .replace(/\uE00B/g, '<span class="syntax-preproc">')
     .replace(/\uE00C/g, '<span class="syntax-header">')
     .replace(/\uE00D/g, '<span class="syntax-format">')
+    .replace(/\uE00E/g, '<span class="syntax-escape">')
+    .replace(/\uE010/g, '<span class="syntax-var">')
+    .replace(/\uE011/g, '<span class="syntax-usertype">')
     .replace(/\uE00F/g, '</span>');
 }

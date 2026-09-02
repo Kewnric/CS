@@ -124,6 +124,15 @@
    own confusion. This is the app's accent cyan, so it is a colour the
    interface already uses rather than a twelfth one invented here. */
 .syntax-format { color: #22d3ee; }
+/* An escape is not the letter after the backslash. VS Code Dark+ gives
+   these their own gold so the newline in "%d\n" is visible as a thing
+   rather than reading as two characters of text. */
+.syntax-escape { color: #d7ba7d; }
+/* Identifiers. Everything the program names itself: variables, parameters,
+   struct members, fields. Dark+ paints these light blue and gives the types
+   a program DEFINES a teal of their own -- Point should not look like p. */
+.syntax-var { color: #9cdcfe; }
+.syntax-usertype { color: #4ec9b0; }
 .syntax-preproc { color: #c586c0; }
 .syntax-header { color: #ce9178; }
 .syntax-operator { color: #c586c0; }
