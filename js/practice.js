@@ -1800,8 +1800,28 @@ function _bossBarPaint(healthPercent, opts) {
      than it was. Green for the rise and red for the fall is what was asked
      for and it is also the honest signal -- the bar is the boss's health, and
      the boss recovering is the thing you just undid. */
-  if (!instant && dropped > 1.2) _bossDamageShards(clamped, dropped, 'damage');
-  else if (!instant && clamped - prev > 1.2) _bossDamageShards(clamped, clamped - prev, 'heal');
+  if (instant) {
+    _bossHealAccum = _bossDmgAccum = 0;      // a reset is not a hit
+  } else {
+    const delta = clamped - prev;            // + = the boss recovered
+    if (delta > 0) { _bossHealAccum += delta; _bossDmgAccum = 0; }
+    else if (delta < 0) { _bossDmgAccum -= delta; _bossHealAccum = 0; }
+
+    /* Scaled to the program, not to the bar. _bossMaxHp IS the reference's
+       significant-character count, so 100/_bossMaxHp is what one character is
+       worth in percentage points; firing at nine tenths of that means any
+       single character you add or delete shows, on a short program and a long
+       one alike. The 220ms cooldown inside the burst still caps the rate, and
+       because the accumulator is only cleared when a burst actually EMITS, a
+       change refused by that cooldown is kept and spent on the next one. */
+    const perChar = _bossMaxHp > 0 ? 100 / _bossMaxHp : 1.2;
+    const trigger = Math.max(0.05, perChar * 0.9);
+    if (_bossDmgAccum >= trigger) {
+      if (_bossDamageShards(clamped, _bossDmgAccum, 'damage')) _bossDmgAccum = 0;
+    } else if (_bossHealAccum >= trigger) {
+      if (_bossDamageShards(clamped, _bossHealAccum, 'heal')) _bossHealAccum = 0;
+    }
+  }
 
   // Combo: consecutive hits with no healing in between.
   if (!instant) {
@@ -1889,6 +1909,17 @@ function bossLockOn() {
  * and remove themselves when the animation ends.
  */
 let _bossShardCooldown = 0;
+/* Un-emitted HP movement, in percentage points, kept per direction.
+
+   A single keystroke moves the bar by one character's worth of the reference:
+   about 0.9 points on a 111-character program and under 0.2 on a long one.
+   The old flat 1.2-point gate was above BOTH, so holding a key down changed
+   the bar continuously and never once threw a particle. Small changes now add
+   up here until they are worth a burst, and the total is what sizes it -- so
+   eight taps that each move a fifth of a point produce one burst of the size
+   those eight taps earned, rather than nothing at all. */
+let _bossHealAccum = 0;
+let _bossDmgAccum = 0;
 /**
  * The burst off the HP boundary, in one of two moods.
  *
@@ -1904,24 +1935,24 @@ let _bossShardCooldown = 0;
  */
 function _bossDamageShards(healthPercent, damage, kind) {
   const heal = kind === 'heal';
-  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
   const now = Date.now();
-  if (now - _bossShardCooldown < 220) return;   // typing fires damage constantly
+  if (now - _bossShardCooldown < 220) return false;   // typing fires damage constantly
   _bossShardCooldown = now;
 
   const wrap = document.getElementById('boss-health-wrapper');
   const track = wrap && wrap.querySelector('.sao-track');
-  if (!wrap || !track) return;
+  if (!wrap || !track) return false;
 
   const tr = track.getBoundingClientRect();
   const wr = wrap.getBoundingClientRect();
-  if (!tr.width) return;
+  if (!tr.width) return false;
   const x = (tr.left - wr.left) + tr.width * (Math.max(0, Math.min(100, healthPercent)) / 100);
   const yTop = tr.top - wr.top;
   const yBot = yTop + tr.height;
 
   // They linger for ~2s each, so cap how many can be in the air at once.
-  if (wrap.querySelectorAll('.sao-shard').length > 55) return;
+  if (wrap.querySelectorAll('.sao-shard').length > 55) return false;
 
   // Bigger hits shed more petals.
   const COUNT = Math.max(5, Math.min(13, Math.round(4 + (damage || 2) * 0.8)));
@@ -1954,6 +1985,7 @@ function _bossDamageShards(healthPercent, damage, kind) {
     frag.appendChild(s);
   }
   wrap.appendChild(frag);
+  return true;
 }
 
 /**
