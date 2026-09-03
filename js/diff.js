@@ -358,14 +358,37 @@ function computeDiffs(userCode, expectedCode, opts) {
   const n = uLinesData.length;
   const m = cLinesData.length;
 
-  // Memoize per-pair line similarity: each pair is needed once in the DP fill
-  // and again during traceback, and the underlying char-LCS is expensive.
-  // The cheap upper bound (2·min/(len sum) — the best LCS can ever score)
-  // skips the char-LCS entirely when even a perfect subsequence couldn't
-  // clear the 0.5 "partial" threshold.
+  /* Memoize per-pair line similarity: each pair is needed once in the DP fill
+     and again during traceback, and the underlying char-LCS is expensive.
+     The cheap upper bound (2·min/(len sum) — the best LCS can ever score)
+     skips the char-LCS entirely when even a perfect subsequence couldn't
+     clear the 0.5 "partial" threshold.
+
+     KEYED BY CONTENT, NOT POSITION. Indices made every pair look distinct, so
+     a program that says `printf("%d\n", x);` in ten places compared ten
+     identical pairs against each of the reference's. Interning the compared
+     text to an integer collapses those to one char-LCS while keeping the key a
+     number, which real code hits constantly — the repeated line is the norm in
+     a teaching exercise, not the exception. */
+  const uIntern = new Map(), cIntern = new Map();
+  const uId = new Array(n), cId = new Array(m);
+  for (let i = 0; i < n; i++) {
+    const t = uLinesData[i].stripped;
+    let id = uIntern.get(t);
+    if (id === undefined) { id = uIntern.size; uIntern.set(t, id); }
+    uId[i] = id;
+  }
+  for (let j = 0; j < m; j++) {
+    const t = cLinesData[j].stripped;
+    let id = cIntern.get(t);
+    if (id === undefined) { id = cIntern.size; cIntern.set(t, id); }
+    cId[j] = id;
+  }
+  const cSpan = cIntern.size + 1;
+
   const simCache = new Map();
   function simAt(i, j) {
-    const key = i * (m + 1) + j;
+    const key = uId[i] * cSpan + cId[j];
     let s = simCache.get(key);
     if (s === undefined) {
       const a = uLinesData[i].norm, b = cLinesData[j].norm;
@@ -389,14 +412,25 @@ function computeDiffs(userCode, expectedCode, opts) {
       if (normU === normC) {
         dp[i][j] = dp[i - 1][j - 1];
       } else {
-        const sim = simAt(i - 1, j - 1);
-        const subCost = sim > 0.5 ? 0.5 : 2;
+        /* DO NOT MEASURE A SIMILARITY THAT CANNOT CHANGE THE ANSWER.
+           Substitution costs 0.5 at best and 2 at worst, so when even the best
+           of those cannot beat inserting or deleting, the cell is `best`
+           whatever the similarity turns out to be — and the char-LCS behind it
+           is the expensive part of this whole function. The traceback asks for
+           the ones it actually walks, which is O(n+m) cells, and the memo
+           serves them then.
 
-        dp[i][j] = Math.min(
-          dp[i - 1][j] + 1,
-          dp[i][j - 1] + 1,
-          dp[i - 1][j - 1] + subCost
-        );
+           Exact, not an approximation: skipping only where both possible
+           substitution costs land on or above `best` leaves every dp value
+           identical to what the unconditional version produced. */
+        const best = Math.min(dp[i - 1][j], dp[i][j - 1]) + 1;
+        if (dp[i - 1][j - 1] + 0.5 >= best) {
+          dp[i][j] = best;
+        } else {
+          const sim = simAt(i - 1, j - 1);
+          const subCost = sim > 0.5 ? 0.5 : 2;
+          dp[i][j] = Math.min(best, dp[i - 1][j - 1] + subCost);
+        }
       }
     }
   }
