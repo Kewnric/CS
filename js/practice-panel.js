@@ -356,8 +356,10 @@ async function ppRunAllChecks() {
   } else {
     // No tests → compile-check so the score still means something.
     let ok = false;
-    try { const res = await _godboltCompileRun(codeNow, ''); ok = !!(res && res.didExecute); }
-    catch (e) { try { const r2 = await _gradeRunJSCPP(codeNow, ''); ok = !!(r2 && r2.didExecute); } catch (e2) { ok = false; } }
+    // Through runTestCases' cache, and through its Godbolt-to-JSCPP fallback,
+    // rather than a second copy of both here.
+    try { const probe = await runCompileProbe(codeNow); ok = !!(probe && probe.didExecute); }
+    catch (e) { ok = false; }
     testResults = [{ name: 'Compiles & runs', hidden: false, passed: ok, expected: '', actual: '', error: ok ? '' : 'Does not compile' }];
     testsPassed = ok ? 1 : 0;
     compileOk = ok;   // remembered so a later per-row ▶ can't zero this half (_ppRecount)
@@ -432,7 +434,7 @@ async function ppRunTest(ti) {
   if (!t) return;
   const codeNow = _ppCtx.code();
   let res;
-  try { res = (await runTestCases([t], codeNow))[0]; }
+  try { res = (await runTestCases([t], codeNow, { fresh: true }))[0]; }
   catch (e) { res = { name: t.name, hidden: t.hidden, passed: false, expected: t.expected, actual: '', error: 'Could not run' }; }
 
   const check = (_ppCtx.getCheck && _ppCtx.getCheck()) || { ts: Date.now(), codeKey: codeNow, reqs: [], tests: tests.map(() => null), passed: 0, total: 0 };

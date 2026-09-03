@@ -3804,31 +3804,105 @@ function _gradeRunJSCPP(processedSource, stdin) {
  * @param {Array} tests  [{ name, stdin, expected, hidden }]
  * @returns {Promise<Array<{name,hidden,passed,stdin,expected,actual,error}>>}
  */
-async function runTestCases(tests, sourceOverride) {
+/* Engine results for ONE source, keyed by the stdin that produced them.
+   Every test compiles and runs the same program; only the input differs. So
+   the cache is per source -- a different source means a different map -- and
+   within it a run is identified by its stdin alone.
+
+   It does three jobs at once. A second Check with nothing edited costs no
+   requests at all (measured before: six tests, six requests, then six more).
+   Two tests that happen to share an input are one run, not two. And because
+   entries are stored as the in-flight promise rather than the settled value,
+   two workers reaching the same input at the same moment share one request
+   instead of racing. */
+let _rtcSource = null;
+let _rtcCache = new Map();
+
+/**
+ * "Does it build and run at all", through the same cache as the tests.
+ *
+ * A program with no test cases is graded by reference match, so Check Code
+ * compiles it once just to know it works -- and did that again on every press.
+ * It is the same source and the same empty input as a test would use, so it is
+ * the same cache entry.
+ */
+async function runCompileProbe(source) {
+  if (source !== _rtcSource) { _rtcSource = source; _rtcCache = new Map(); }
+  const got = await _rtcRun(source, '', { useJSCPP: false });
+  return got.res;
+}
+
+/**
+ * One engine call, answered from the cache when the same source has already
+ * been run on the same input.
+ *
+ * The entry stored is the in-flight promise, not the settled value, so two
+ * workers arriving at the same input at the same moment share one request
+ * rather than racing to make two.
+ */
+async function _rtcRun(merged, stdin, engine) {
+  let entry = _rtcCache.get(stdin);
+  if (!entry) {
+    entry = (async () => {
+      let r = null, err = '';
+      try {
+        if (!engine.useJSCPP) {
+          try {
+            r = await _godboltCompileRun(merged, stdin);
+          } catch (e) {
+            engine.useJSCPP = true; // Godbolt down — switch for this and the rest
+          }
+        }
+        if (engine.useJSCPP) {
+          r = await _gradeRunJSCPP(merged, stdin);
+        }
+      } catch (e) {
+        r = null;
+        err = (e && e.message) ? e.message : String(e);
+      }
+      return { res: r, error: err };
+    })();
+    _rtcCache.set(stdin, entry);
+  }
+  const got = await entry;
+  /* A run that never produced a result was a network problem, not an answer.
+     Keeping it would let one dropped request mark the test unrunnable for as
+     long as the source stays put. */
+  if (!got.res) _rtcCache.delete(stdin);
+  return got;
+}
+
+async function runTestCases(tests, sourceOverride, opts) {
   const merged = sourceOverride != null ? sourceOverride : _buildSubmissionSource();
-  let useJSCPP = false;
+  const fresh = !!(opts && opts.fresh);
+  if (merged !== _rtcSource) { _rtcSource = merged; _rtcCache = new Map(); }
+  // The row's own play button is a request to run it again, so it must not be
+  // answered from a cache -- that is the one place "again" is the whole point.
+  if (fresh) tests.forEach(t => _rtcCache.delete(t.stdin || ''));
+
+  const engine = { useJSCPP: false };
   const results = new Array(tests.length);
   let done = 0;
+
+  /* One failed build settles every test. The source is the same for all of
+     them, so once it does not compile the remaining inputs cannot tell us
+     anything new -- and each was costing its own round trip to be told the
+     same thing. Measured before: a program with a syntax error and six tests
+     sent six compile requests. */
+  let buildFailure = null;
 
   async function runOne(i) {
     const t = tests[i];
     const stdin = t.stdin || '';
     let res = null, error = '';
 
-    try {
-      if (!useJSCPP) {
-        try {
-          res = await _godboltCompileRun(merged, stdin);
-        } catch (e) {
-          useJSCPP = true; // Godbolt down — switch engines for this and remaining tests
-        }
-      }
-      if (useJSCPP) {
-        res = await _gradeRunJSCPP(merged, stdin);
-      }
-    } catch (e) {
-      res = null;
-      error = (e && e.message) ? e.message : String(e);
+    if (buildFailure) {
+      res = buildFailure;
+    } else {
+      const got = await _rtcRun(merged, stdin, engine);
+      res = got.res;
+      error = got.error;
+      if (res && res.didExecute === false) buildFailure = res;
     }
 
     let passed = false, actual = '';
