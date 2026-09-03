@@ -53,19 +53,19 @@ const HOME_STAT_LIBS = [
     key: 'coding', label: 'Programs', icon: 'code', accent: 'var(--color-primary)',
     count: () => (state.challenges || []).length,
     done: () => homeCountDone('coding'),
-    doneNoun: 'programs'
+    doneNoun: 'programs', solvedLabel: 'Coding'
   },
   {
     key: 'notebooks', label: 'Notebooks', icon: 'book-open', accent: 'var(--color-warning)',
     count: () => (state.notebooks || []).length,
     done: () => homeCountDone('notebooks'),
-    doneNoun: 'notebooks'
+    doneNoun: 'notebooks', solvedLabel: 'Notebook'
   },
   {
     key: 'snippets', label: 'Snippets', icon: 'file-code', accent: 'var(--color-accent)',
     count: () => (state.snippets || []).length,
     done: () => homeCountDone('snippets'),
-    doneNoun: 'snippets'
+    doneNoun: 'snippets', solvedLabel: 'Snippet'
   }
 ];
 
@@ -102,6 +102,41 @@ function homeCountDone(key) {
   return (state.snippets || []).filter(sn => best[sn.id] === 100).length;
 }
 
+/**
+ * Mean score across every attempt in a library.
+ *
+ * The same measure history.js already calls "Avg Score", so the dashboard and
+ * the history pages cannot disagree about how well you are doing. Notebook
+ * attempts store correct/total per section rather than one score, so they are
+ * reduced the same way homeCountDone does it.
+ *
+ * No attempts is not 0% -- nothing has been got wrong. It returns null and the
+ * card shows a dash rather than a number that reads as failure.
+ */
+function homeAccuracy(key) {
+  const pcts = [];
+  if (key === 'coding') {
+    (state.history || []).forEach(h => {
+      if (h.isArchived || !h.challengeId) return;
+      pcts.push(h.score || 0);
+    });
+  } else if (key === 'notebooks') {
+    (state.notebookHistory || []).forEach(h => {
+      if (h.isArchived || !h.notebookId) return;
+      let c = 0, t = 0;
+      (h.sections || []).forEach(sec => { c += sec.correct || 0; t += sec.total || 0; });
+      if (t) pcts.push(Math.round((c / t) * 100));
+    });
+  } else {
+    (state.snippetHistory || []).forEach(h => {
+      if (h.isArchived || !h.snippetId) return;
+      pcts.push(h.score || 0);
+    });
+  }
+  if (!pcts.length) return null;
+  return Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length);
+}
+
 let _homeStatLibIdx = 0;
 let _homeStatTimer = null;
 
@@ -109,8 +144,9 @@ let _homeStatTimer = null;
 function homeApplyStatLib(animate) {
   const lib = HOME_STAT_LIBS[_homeStatLibIdx];
   const card = document.getElementById('home-stat-lib');
-  const bestCard = document.getElementById('home-stat-best');
-  if (!card || !bestCard) return;
+  const solvedCard = document.getElementById('home-stat-solved');
+  const accCard = document.getElementById('home-stat-accuracy');
+  if (!card || !solvedCard || !accCard) return;
 
   const swap = (el, html) => {
     if (!el) return;
@@ -123,23 +159,41 @@ function homeApplyStatLib(animate) {
     <div class="stat-icon" style="color:${lib.accent};"><i data-lucide="${lib.icon}"></i></div>
     <div class="stat-value">${lib.count()}</div>
     <div class="stat-label">${lib.label}</div>`);
-  // Completion of the whole library, not one lucky attempt: "best score" was
-  // 100% the moment a single program was finished, which said nothing about
-  // how far through anything you were.
+  /* Solved is a COUNT, not a percentage of the library. A percentage answers
+     "how much of this library is behind me", which is a different question from
+     "how much have I solved" and reads as a failing grade while a library is
+     still being filled. The count only ever goes up.
+
+     Green regardless of which library is showing: it is the same idea in all
+     three, and taking the library's accent made the notebook one yellow, which
+     reads as a warning about something that is going well. The library is named
+     in the label instead, so the card still says what it is counting. */
   const total = lib.count();
   const done = lib.done();
-  const pct = total ? Math.round((done / total) * 100) : 0;
-  swap(bestCard.querySelector('.stat-face'), `
-    <div class="stat-icon" style="color:${lib.accent};"><i data-lucide="circle-check-big"></i></div>
-    <div class="stat-value">${pct}%</div>
-    <div class="stat-label">${done}/${total} ${escapeHTML(lib.doneNoun)} done</div>`);
+  swap(solvedCard.querySelector('.stat-face'), `
+    <div class="stat-icon" style="color:var(--color-success);"><i data-lucide="circle-check-big"></i></div>
+    <div class="stat-value">${done}</div>
+    <div class="stat-label">${escapeHTML(lib.solvedLabel)} solved</div>`);
+
+  /* No inline colour: accuracy is not a per-library idea the way the count of
+     programs is, so it keeps the card's own colour rather than being repainted
+     three times. Tinting the glyph by library left a cyan tile with an indigo
+     icon in it. */
+  const acc = homeAccuracy(lib.key);
+  swap(accCard.querySelector('.stat-face'), `
+    <div class="stat-icon"><i data-lucide="target"></i></div>
+    <div class="stat-value">${acc === null ? '&ndash;' : acc + '%'}</div>
+    <div class="stat-label">Accuracy</div>`);
 
   card.style.setProperty('--stat-accent', lib.accent);
-  bestCard.style.setProperty('--stat-accent', lib.accent);
+  // Solved keeps the green it is drawn in, so its top rule agrees with its icon.
+  solvedCard.style.setProperty('--stat-accent', 'var(--color-success)');
+  accCard.style.removeProperty('--stat-accent');
   setTimeout(() => {
     if (typeof lucide !== 'undefined') {
       lucide.createIcons({ el: card });
-      lucide.createIcons({ el: bestCard });
+      lucide.createIcons({ el: solvedCard });
+      lucide.createIcons({ el: accCard });
     }
   }, animate ? 190 : 0);
 }

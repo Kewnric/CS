@@ -113,8 +113,6 @@ function renderStatsRow() {
 
   const risk = homeStreakAtRisk();
   const streak = risk.risk ? risk.length : homeStreakAllLibraries();
-  const badges = typeof anBadgeState === 'function' ? anBadgeState() : [];
-  const earned = badges.filter(b => b.earned).length;
 
   // The day's target, and how much of it is done.
   const goal = homeDailyGoal();
@@ -129,7 +127,6 @@ function renderStatsRow() {
         ${HOME_STAT_LIBS.map((l, i) => `<span class="stat-dot${i === 0 ? ' active' : ''}"></span>`).join('')}
       </div>
     </button>
-    <div class="home-stat-card" id="home-stat-best"><div class="stat-face"></div></div>
     <button class="home-stat-card is-clickable${risk.risk ? ' at-risk' : ''}" onclick="homeOpenStreakCalendar()"
             title="${risk.risk ? 'Practice today to keep this streak' : 'See which days you practiced'}">
       <div class="stat-face">
@@ -142,14 +139,10 @@ function renderStatsRow() {
         <span class="stat-goal-txt">${doneToday}/${goal} today</span>
       </div>
     </button>
-    <button class="home-stat-card is-clickable" onclick="homeOpenBadges()"
-            title="See every badge and how close you are">
-      <div class="stat-face">
-        <div class="stat-icon"><i data-lucide="award"></i></div>
-        <div class="stat-value">${earned}</div>
-        <div class="stat-label">Badges</div>
-      </div>
-    </button>
+    <!-- Solved and Accuracy both describe whichever library the first card is
+         showing, so homeApplyStatLib paints all three together. -->
+    <div class="home-stat-card" id="home-stat-solved"><div class="stat-face"></div></div>
+    <div class="home-stat-card" id="home-stat-accuracy"><div class="stat-face"></div></div>
   `;
   lucide.createIcons({ root: container });
   homeApplyStatLib(false);
