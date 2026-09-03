@@ -170,7 +170,14 @@
       </div>
 
       <div class="sidebar-menu" role="navigation" aria-label="Main navigation">
-        <a class="sidebar-link active" id="nav-home" role="link" tabindex="0" onclick="spaNavigate('home')" aria-label="Home">
+        <!-- No `active` here. The router sets it from the route's navId, and
+             hardcoding Home meant every reload onto another route painted Home
+             highlighted first and then moved the highlight. Scripts are deferred,
+             so that gap is a whole paint rather than a few parse steps. The map
+             from route to nav id lives in register.js and is not duplicated here
+             to guess earlier -- an unhighlighted rail for one frame is better than
+             a confidently wrong one. -->
+        <a class="sidebar-link" id="nav-home" role="link" tabindex="0" onclick="spaNavigate('home')" aria-label="Home">
           <i data-lucide="home" aria-hidden="true"></i> <span class="sidebar-label">Home</span>
         </a>
         <a class="sidebar-link" id="nav-library" role="link" tabindex="0" onclick="spaNavigate('library')" aria-label="Library">
