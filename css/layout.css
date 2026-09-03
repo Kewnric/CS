@@ -961,11 +961,14 @@ details[open]>.snippet-folder-summary>.folder-icon {
    or it jumps 5px sideways whenever the pointer crosses it. */
 .tree-node-row.active:hover { transform: translateX(-3px); }
 
+/* No labelPop here. It ran the label 0 -> +4px and settled at +2px while the
+   row itself slides -3px the other way, so one click moved two things in
+   opposite directions and left the text off its own baseline. The row's own
+   movement is the feedback; the label just changes weight and colour. */
 .tree-node-row.active .tree-node-label {
   font-weight: 700;
   color: #f2f9ff;
   transition: color 0.25s ease;
-  animation: labelPop 0.32s var(--ease-spring) both;
 }
 
 /* The depth rail is already drawn per level below. Selection turns it into the
@@ -982,8 +985,7 @@ details[open]>.snippet-folder-summary>.folder-icon {
 
 @media (prefers-reduced-motion: reduce) {
   .tree-node-row.active,
-  .tree-node-row.active::after,
-  .tree-node-row.active .tree-node-label { animation: none !important; }
+  .tree-node-row.active::after { animation: none !important; }
 }
 
 .tree-node-row.active .tree-node-icon {
