@@ -62,6 +62,30 @@
   display: none;
 }
 
+/* The HUD is chrome for the same reason and had the same fault: it is fixed to
+   the viewport and identical before and after a navigation, but the root
+   snapshot animates from opacity 0, so it faded out and back in on every route
+   change -- reading as the HUD blinking rather than the page changing.
+
+   Lifting it into its own group with no animation leaves it drawn once, in
+   place. Dropping the outgoing copy matters more here than it does for the
+   sidebar: the whole layer is translucent strokes, and two of them stacked at
+   full opacity would show as the chrome briefly doubling in weight. */
+.hud-layer {
+  view-transition-name: ssp-hud;
+}
+::view-transition-group(ssp-hud) {
+  animation: none;
+}
+::view-transition-old(ssp-hud),
+::view-transition-new(ssp-hud) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-old(ssp-hud) {
+  display: none;
+}
+
 /* ----------------------------------------------------------------
    2. SCROLL REVEAL — elements with [data-reveal] fade/slide in once
    they enter the viewport (driven by Motion.scan() + IntersectionObserver).

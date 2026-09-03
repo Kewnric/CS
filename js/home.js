@@ -131,11 +131,11 @@ function renderStatsRow() {
     </button>
     <div class="home-stat-card" id="home-stat-best"><div class="stat-face"></div></div>
     <button class="home-stat-card is-clickable${risk.risk ? ' at-risk' : ''}" onclick="homeOpenStreakCalendar()"
-            title="${risk.risk ? 'Practise today to keep this streak' : 'See which days you practised'}">
+            title="${risk.risk ? 'Practice today to keep this streak' : 'See which days you practiced'}">
       <div class="stat-face">
         <div class="stat-icon"><i data-lucide="flame"></i></div>
         <div class="stat-value">${streak}</div>
-        <div class="stat-label">${risk.risk ? 'Practise today!' : 'Day Streak'}</div>
+        <div class="stat-label">${risk.risk ? 'Practice today!' : 'Day Streak'}</div>
       </div>
       <div class="stat-goal" title="${doneToday} of ${goal} today">
         <span class="stat-goal-bar"><span style="width:${goalPct}%"></span></span>

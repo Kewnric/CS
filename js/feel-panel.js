@@ -106,15 +106,7 @@ function _feelAmbRows() {
     })).join('')
     + _feelOpt({ name: 'Off', hint: 'no motion behind the panes', on: !on,
                  title: 'Stop the background motion entirely',
-                 onclick: 'if (ambEnabled()) toggleAmbient();' })
-    /* The HUD is background too -- decoration behind the work rather than a
-       theme, so it belongs on this page and not on a button of its own. It is
-       a switch rather than one of a set, so it sits below them. */
-    + (typeof hudEnabled === 'function'
-        ? _feelOpt({ name: 'HUD chrome', hint: 'frame, brackets and scan lines',
-                     on: hudEnabled(), onclick: 'toggleHud()',
-                     title: 'Decorative HUD over the whole window' })
-        : '');
+                 onclick: 'if (ambEnabled()) toggleAmbient();' });
 }
 
 /* Order is the order you meet them: the sound you hear as you type, then what

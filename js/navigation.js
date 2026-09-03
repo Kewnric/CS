@@ -74,6 +74,7 @@ function openSettingsModal() {
   // Full screen can have been entered or left with F11 while this was closed,
   // so the row is brought up to date on open rather than only when toggled.
   if (typeof _syncFullscreenBtn === 'function') _syncFullscreenBtn();
+  if (typeof _syncHudSettingsRow === 'function') _syncHudSettingsRow();
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: modal });
 }
 

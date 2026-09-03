@@ -23,9 +23,30 @@ function hudSetEnabled(on) {
 function toggleHud() {
   const next = !hudEnabled();
   hudSetEnabled(next);
-  if (typeof feelSync === 'function') feelSync();
+  _syncHudSettingsRow();
   if (typeof toast === 'function') {
     toast(next ? 'HUD chrome on' : 'HUD chrome off', { type: 'info', duration: 1600 });
+  }
+}
+
+/**
+ * Keep the Settings row reading what the switch actually is.
+ *
+ * Called on toggle and again when the sheet opens: the preference is stored,
+ * so it can have been changed in another tab since this one last drew the row.
+ * The same reason _syncFullscreenBtn runs on open rather than only on click.
+ */
+function _syncHudSettingsRow() {
+  const on = hudEnabled();
+  const row = document.getElementById('settings-hud-item');
+  if (!row) return;
+  row.setAttribute('aria-pressed', String(on));
+  const label = document.getElementById('settings-hud-label');
+  const desc = document.getElementById('settings-hud-desc');
+  if (label) label.textContent = on ? 'HUD Chrome On' : 'HUD Chrome Off';
+  if (desc) desc.textContent = on ? 'Frame, brackets and scan lines' : 'No chrome over the page';
+  if (typeof _setLucideIcon === 'function') {
+    _setLucideIcon(document.getElementById('settings-hud-icon'), on ? 'scan' : 'scan-line');
   }
 }
 

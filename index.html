@@ -244,6 +244,19 @@
           </span>
           <i data-lucide="chevron-right" class="settings-item-chevron" aria-hidden="true"></i>
         </button>
+        <!-- The HUD is drawn over every screen, so its switch belongs with the
+             other display settings rather than in the attempt topbar's Feel
+             panel -- which only exists on the attempt screens, the one place
+             the HUD is deliberately hidden. -->
+        <button onclick="toggleHud()" class="settings-item" type="button" id="settings-hud-item"
+                aria-label="HUD chrome" aria-pressed="true">
+          <span class="settings-item-icon"><i data-lucide="scan" id="settings-hud-icon" aria-hidden="true"></i></span>
+          <span class="settings-item-info">
+            <span class="settings-item-label" id="settings-hud-label">HUD Chrome On</span>
+            <span class="settings-item-desc" id="settings-hud-desc">Frame, brackets and scan lines</span>
+          </span>
+          <i data-lucide="chevron-right" class="settings-item-chevron" aria-hidden="true"></i>
+        </button>
         <button onclick="toggleAppSound()" class="settings-item" type="button" id="settings-sound-item"
                 aria-label="Sound" aria-pressed="true">
           <span class="settings-item-icon"><i data-lucide="volume-2" id="settings-sound-icon" aria-hidden="true"></i></span>
