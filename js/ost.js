@@ -417,6 +417,40 @@ function _ostSync() {
 }
 
 /** Called after the topbar is (re)built, to fill the new button in. */
+/**
+ * Stop whatever this player is making noise with, and remember where it got to.
+ *
+ * The <audio> is appended to <body>, so it outlives any route -- but the only
+ * controls for it live in the two attempt topbars. Leaving an attempt therefore
+ * left a track playing with nothing on the page able to pause it: measured on
+ * the library screen afterwards, still advancing, and no .ost-control in the
+ * DOM. Short of reloading there was no way to make it stop.
+ *
+ * Spotify gets the same treatment. It plays through an in-page device whose
+ * only transport is inside this popup, so leaving strands it in exactly the
+ * same way.
+ *
+ * Where the track got to is kept, so autoplay picks it up where it left off on
+ * the next attempt rather than starting the album again.
+ */
+function ostStop() {
+  let stopped = false;
+  if (_ostAudio) {
+    if (!_ostAudio.paused) { try { _ostAudio.pause(); stopped = true; } catch (e) { /* nothing to do */ } }
+    _ostRemember();
+  }
+  if (typeof _spotPlayer !== 'undefined' && _spotPlayer) {
+    try {
+      const r = _spotPlayer.pause();
+      // pause() is async; an unhandled rejection here would surface as a page
+      // error on the way out of a route.
+      if (r && typeof r.catch === 'function') r.catch(() => {});
+      stopped = true;
+    } catch (e) { /* the SDK's listeners report it */ }
+  }
+  return stopped;
+}
+
 function ostMount() {
   if (!document.querySelector('.ost-control')) return;
   _ostEl();

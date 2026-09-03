@@ -99,5 +99,6 @@ function practiceSetDestroy() {
   if (typeof ppClearFx === 'function') ppClearFx();
   if (typeof _timerMenuClose === 'function') _timerMenuClose();
   if (typeof psfxWorkStop === 'function') psfxWorkStop();
+  if (typeof ostStop === 'function') ostStop();
   if (typeof practiceCloseDescription === 'function') practiceCloseDescription();
 }
