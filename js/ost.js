@@ -451,6 +451,29 @@ function ostStop() {
   return stopped;
 }
 
+/**
+ * Send the current track back to 0:00.
+ *
+ * A fresh attempt gets the music from the top; a resumed one keeps where it
+ * was, because resuming is meant to put you back exactly where you left off
+ * and the soundtrack is part of that. The track itself is not changed -- only
+ * the position within it -- so a fresh run does not also throw away which
+ * song you had chosen.
+ *
+ * The stored position is written as well as the live element being moved,
+ * because the <audio> is built lazily by ostMount(), which runs AFTER the
+ * attempt's init has worked out whether this is a resume. On the first attempt
+ * of a page load there is no element yet, and the stored 0 is what _ostEl()
+ * seeks to when it does build one.
+ */
+function ostRewind() {
+  _ostWrite(OST_KEY_POS, 0);
+  if (_ostAudio) {
+    // Throws if the media is not seekable yet; the stored 0 covers that case.
+    try { _ostAudio.currentTime = 0; } catch (e) { /* handled by the stored 0 */ }
+  }
+}
+
 function ostMount() {
   if (!document.querySelector('.ost-control')) return;
   _ostEl();

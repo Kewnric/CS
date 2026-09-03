@@ -57,6 +57,13 @@ function initPractice() {
       _restoredFromDisk = disk;
     }
   }
+
+  /* Fresh attempt, fresh music. `autoSaved` is the one thing that knows whether
+     this is a resume -- it covers the session copy and the disk draft both, and
+     every way into this screen goes through here, so the decision is made once
+     rather than at each of the four entry points. A resume leaves the position
+     alone: coming back is meant to put you where you were, soundtrack included. */
+  if (!autoSaved && typeof ostRewind === 'function') ostRewind();
   /* WHICH files exist is the save's business, not the variant's.
 
      This used to rebuild the list by walking variant.files and looking up each
@@ -1455,6 +1462,10 @@ function retryPractice() {
   // Fresh attempt: reset the persisted timer anchor too
   setSessionParam('practiceStartTime', state.sessionData.startTime);
   clearSessionParam('autoSavedFiles');
+  /* And the music, for the same reason. A retry does not leave and re-enter the
+     route, so the rewind in initPractice never sees it -- but it resets the
+     code, the clock and the hints, which is what "a fresh attempt" means. */
+  if (typeof ostRewind === 'function') ostRewind();
 
   _submitInProgress = false;
   _practiceSubmitted = false;

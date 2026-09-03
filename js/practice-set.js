@@ -30,6 +30,9 @@ function psetInit() {
   const restore = saved && saved.setId === set.id ? saved : null;
   if (saved && !restore) clearSessionParam('psetAutosave');
 
+  // Fresh attempt, fresh music -- same rule as the single-program screen.
+  if (!restore && typeof ostRewind === 'function') ostRewind();
+
   const problems = _psetResolveProblems(set, restore);
   if (!problems.length) {
     if (typeof showMessage === 'function') showMessage('Unavailable', 'None of the problems in this set could be loaded (programs may have been deleted).', true);
