@@ -3804,19 +3804,31 @@ function _gradeRunJSCPP(processedSource, stdin) {
  * @param {Array} tests  [{ name, stdin, expected, hidden }]
  * @returns {Promise<Array<{name,hidden,passed,stdin,expected,actual,error}>>}
  */
-/* Engine results for ONE source, keyed by the stdin that produced them.
-   Every test compiles and runs the same program; only the input differs. So
-   the cache is per source -- a different source means a different map -- and
-   within it a run is identified by its stdin alone.
+/* In-flight compile-and-run requests, so two callers arriving at the same
+   work at the same moment share one request instead of racing to make two.
+   Settled results do NOT live here -- they go to the terminal's LRU, which is
+   the same cache Run Code has always used.
 
-   It does three jobs at once. A second Check with nothing edited costs no
-   requests at all (measured before: six tests, six requests, then six more).
-   Two tests that happen to share an input are one run, not two. And because
-   entries are stored as the in-flight promise rather than the settled value,
-   two workers reaching the same input at the same moment share one request
-   instead of racing. */
-let _rtcSource = null;
-let _rtcCache = new Map();
+   THE TWO FEATURES SEND THE SAME REQUESTS. Measured: Check Code on a program
+   with no tests and Run Code on the same program produce byte-identical
+   bodies -- same source, same `-Wall -lm -std=gnu17`, same empty stdin -- and
+   each was paying for it separately because each kept its own cache. Sharing
+   one means pressing Check and then Run costs one compile between them rather
+   than two, in either order, and every test whose input the terminal has
+   already run is free.
+
+   termCacheKey is already keyed on exactly the three things that decide the
+   answer, and termCacheGet/Set carry an LRU, so there is nothing to add. */
+const _rtcInflight = new Map();
+
+function _rtcArgs() {
+  return (typeof termCompilerArgs === 'function') ? termCompilerArgs() : '-Wall -lm';
+}
+function _rtcKey(source, stdin) {
+  return (typeof termCacheKey === 'function')
+    ? termCacheKey(source, stdin, _rtcArgs())
+    : null;
+}
 
 /**
  * "Does it build and run at all", through the same cache as the tests.
@@ -3827,7 +3839,6 @@ let _rtcCache = new Map();
  * the same cache entry.
  */
 async function runCompileProbe(source) {
-  if (source !== _rtcSource) { _rtcSource = source; _rtcCache = new Map(); }
   const got = await _rtcRun(source, '', { useJSCPP: false });
   return got.res;
 }
@@ -3841,14 +3852,21 @@ async function runCompileProbe(source) {
  * rather than racing to make two.
  */
 async function _rtcRun(merged, stdin, engine) {
-  let entry = _rtcCache.get(stdin);
+  const key = _rtcKey(merged, stdin);
+  if (key && typeof termCacheGet === 'function') {
+    const hit = termCacheGet(key);
+    if (hit) return { res: hit, error: '' };
+  }
+  const flightKey = key || stdin;
+  let entry = _rtcInflight.get(flightKey);
   if (!entry) {
     entry = (async () => {
-      let r = null, err = '';
+      let r = null, err = '', viaGcc = false;
       try {
         if (!engine.useJSCPP) {
           try {
             r = await _godboltCompileRun(merged, stdin);
+            viaGcc = true;
           } catch (e) {
             engine.useJSCPP = true; // Godbolt down — switch for this and the rest
           }
@@ -3860,25 +3878,34 @@ async function _rtcRun(merged, stdin, engine) {
         r = null;
         err = (e && e.message) ? e.message : String(e);
       }
+      /* Only GCC answers are shared. The terminal's cache is read back by Run
+         Code, which compiles with gcc, and the in-browser interpreter is not
+         the same compiler -- a result from one should not be handed out as if
+         it came from the other. A run that produced nothing was a network
+         problem rather than an answer, and is not stored either. */
+      if (r && viaGcc && key && typeof termCacheSet === 'function') termCacheSet(key, r);
       return { res: r, error: err };
     })();
-    _rtcCache.set(stdin, entry);
+    _rtcInflight.set(flightKey, entry);
   }
-  const got = await entry;
-  /* A run that never produced a result was a network problem, not an answer.
-     Keeping it would let one dropped request mark the test unrunnable for as
-     long as the source stays put. */
-  if (!got.res) _rtcCache.delete(stdin);
-  return got;
+  try {
+    return await entry;
+  } finally {
+    _rtcInflight.delete(flightKey);
+  }
 }
 
 async function runTestCases(tests, sourceOverride, opts) {
   const merged = sourceOverride != null ? sourceOverride : _buildSubmissionSource();
   const fresh = !!(opts && opts.fresh);
-  if (merged !== _rtcSource) { _rtcSource = merged; _rtcCache = new Map(); }
   // The row's own play button is a request to run it again, so it must not be
   // answered from a cache -- that is the one place "again" is the whole point.
-  if (fresh) tests.forEach(t => _rtcCache.delete(t.stdin || ''));
+  if (fresh && typeof _termCache !== 'undefined') {
+    tests.forEach(t => {
+      const k = _rtcKey(merged, t.stdin || '');
+      if (k) _termCache.delete(k);
+    });
+  }
 
   const engine = { useJSCPP: false };
   const results = new Array(tests.length);
