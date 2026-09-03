@@ -310,6 +310,7 @@ function _adminCreateCategory() {
       return;
     }
     const node = createNode(t, 'folder', null, 'challenge');
+    if (!node) return;                 // refused: the pack is on screen
     _adminPendingFolders.push(node.id);
 
     // Selected straight away — creating it here means you want to use it.
@@ -399,6 +400,9 @@ function saveAdminForm(opts = {}) {
   const saved = JSON.parse(JSON.stringify(toSave));
   const exists = state.challenges.some(c => c.id === saved.id);
   if (!exists) {
+    // A NEW program only. Editing one that is already here is fine in either
+    // library -- a pack program keeps its pack id and cannot mix.
+    if (typeof csCanAddHere === 'function' && !csCanAddHere('program')) return;
     state.challenges.push(saved);
   } else {
     state.challenges = state.challenges.map(c => c.id === saved.id ? saved : c);

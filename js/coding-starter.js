@@ -476,10 +476,7 @@ function _csLooksLikeMine(lib) {
  * Only a genuine mix is dangerous, because only then can a pack update reach
  * something you wrote.
  */
-function _csIsMixed(lib) {
-  const cs = (lib && lib.challenges) || [];
-  return cs.some(_csIsPackId) && cs.some(c => !_csIsPackId(c));
-}
+function _csIsMixed(lib) { return !csLibraryIsClean(lib); }
 
 /**
  * Make the flag agree with what is actually on screen.
@@ -558,7 +555,7 @@ function repairCodingLibraries() {
      filing all 43 programs away would be the literal reading of "sort them by
      which library they came from" and a terrible answer to it. */
   if (!mine.challenges.length && pack.challenges.length) {
-    _csPlace(pack);
+    if (!_csPlace(pack)) return { mine: 0, pack: 0, rehomed: 0 };
     state.codingMode = 'starter';
     saveData();
     if (typeof invalidateBrowseCache === 'function') invalidateBrowseCache();
@@ -617,29 +614,86 @@ function _csLift() {
   };
 }
 
-/** Put a lifted set back, leaving every other scope's folders alone. */
+/**
+ * THE INVARIANT: a program, set or folder whose id is not the pack's may never
+ * live in the pack library.
+ *
+ * Ownership used to be positional -- a thing belonged to whichever array it
+ * happened to sit in -- so anything created while the pack was on screen became
+ * part of the pack. Measured: one program added that way took a clean library
+ * of 43 straight to "mixed". That is the loop where Repair cleans it, the next
+ * program you add dirties it, and the warning comes back.
+ *
+ * Held at the two places that can break it: creation (see csCanAddHere, called
+ * by the admin form, duplicate and shared-link import) and the swap below.
+ */
+function csLibraryIsClean(lib) {
+  const cs = (lib && lib.challenges) || [];
+  return !(cs.some(_csIsPackId) && cs.some(c => !_csIsPackId(c)));
+}
+
+/** Put a lifted set back, leaving every other scope's folders alone.
+ *
+ *  Every swap goes through here, which makes it the one place worth checking:
+ *  a mixed library must never be written as though it were one of the two.
+ *  Refusing costs a click; writing it costs the separation. */
 function _csPlace(set) {
+  if (!csLibraryIsClean(set)) {
+    console.error('[CodingStarter] Refused to place a mixed library.');
+    if (typeof toast === 'function') {
+      toast('Stopped: that library holds both your programs and the starter pack. Nothing was changed.',
+            { type: 'error', duration: 6000 });
+    }
+    return false;
+  }
   const others = (state.nodes || []).filter(n => n.scope !== 'challenge');
   state.challenges = (set && set.challenges) || [];
   state.codingSets = (set && set.sets) || [];
   state.nodes = others.concat((set && set.nodes) || []);
+  return true;
+}
+
+/**
+ * May something of your own be created into the library on screen right now?
+ *
+ * No, while that library is the starter pack. The pack is a fixed set that this
+ * file rebuilds and updates, and a program of yours sitting inside it is both
+ * the thing that mixes the two and the thing an update would then have to
+ * reason about. Switching is one click and puts you somewhere your work is
+ * safe, so the answer is to say where it belongs rather than to file it wrongly
+ * and warn about it afterwards.
+ *
+ * EDITING a pack program stays allowed. Its id is still the pack's, so it
+ * cannot mix, and packFp already keeps your edit from being overwritten.
+ *
+ * @param {string} [what] noun for the message, e.g. 'program', 'folder'
+ */
+function csCanAddHere(what) {
+  if (!codingLibraryIsStarter()) return true;
+  if (typeof toast === 'function') {
+    toast('You are viewing the starter pack, so a new ' + (what || 'item')
+        + ' cannot be added here. Switch to your own library first — the pack button in the header.',
+        { type: 'warning', duration: 6000 });
+  }
+  return false;
 }
 
 function toggleCodingLibraryMode() {
   // What is on screen decides which way "the other one" is, not a stale flag.
   _csReconcileMode();
   const to = codingLibraryIsStarter() ? 'mine' : 'starter';
-  const parked = state.codingStash || null;
+  /* An empty personal library is a real answer, not a missing one.
 
-  /* Refuse rather than guess. Going back to your own library with nothing
-     parked would replace the starter pack with an empty library and look
-     exactly like your programs had been deleted. */
-  if (to === 'mine' && !parked) {
-    if (typeof toast === 'function') {
-      toast('Cannot find your library to switch back to. Nothing was changed.', { type: 'error', duration: 5000 });
-    }
-    return;
-  }
+     This used to refuse when nothing was parked, on the grounds that loading
+     an empty library would look like the programs had been deleted. That is
+     true of YOUR library, which cannot be rebuilt -- but the thing on screen
+     in this branch is the pack, which is written in this file and comes back
+     whole on the next press. So the switch is reversible either way, and
+     refusing only left the pack showing with no way past it: the admin list
+     reads the live library, so the pack was all you could reach or edit.
+
+     Nothing parked simply means you have not made anything yet. */
+  const parked = state.codingStash || { challenges: [], sets: [], nodes: [] };
 
   const live = _csLift();
 
@@ -660,7 +714,10 @@ function toggleCodingLibraryMode() {
     return;
   }
 
-  _csPlace(to === 'starter' ? (parked || codingStarterPack()) : parked);
+  const target = to === 'starter'
+    ? ((parked && parked.challenges && parked.challenges.length) ? parked : codingStarterPack())
+    : parked;
+  if (!_csPlace(target)) return;      // refused: nothing has been parked yet
   state.codingStash = live;
   state.codingMode = to;
   saveData();
@@ -681,10 +738,13 @@ function toggleCodingLibraryMode() {
   _csSyncBtn();
 
   if (typeof toast === 'function') {
+    const mineCount = (state.challenges || []).length;
     toast(to === 'starter'
       ? 'Showing the starter pack. Your own programs are put aside, not deleted.'
-      : 'Back to your own programs.',
-      { type: 'info', duration: 3200 });
+      : (mineCount
+          ? 'Back to your own programs.'
+          : 'Your library is empty. Add programs in Admin, or switch back for the starter pack.'),
+      { type: 'info', duration: mineCount || to === 'starter' ? 3200 : 5000 });
   }
 }
 

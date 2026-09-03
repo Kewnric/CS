@@ -425,6 +425,12 @@ function isDescendantOf(nodeId, ancestorId) {
 
 // --- CRUD Operations ---
 function createNode(name, type, parentId, scope) {
+  /* Only the coding library has two of itself, so only its scope is gated: a
+     folder made while the starter pack is on screen would be yours, filed
+     inside the pack, and would follow it into the stash on the next swap.
+     Notes, snippets and the wings are unaffected. */
+  if ((scope || 'challenge') === 'challenge' &&
+      typeof csCanAddHere === 'function' && !csCanAddHere('folder')) return null;
   const node = { id: generateId(), type, name, parentId: parentId || null, scope: scope || 'challenge' };
   state.nodes.push(node);
   saveData();

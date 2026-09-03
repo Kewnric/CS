@@ -1624,6 +1624,7 @@ function ctxNewFolder() {
 
   showInputDialog('New Folder', null, 'Folder name', '', (name) => {
     const node = createNode(name, 'folder', parentId, scope);
+    if (!node) return;                 // refused: the pack is on screen
     if (parentId && !isNodeExpanded(parentId)) toggleNodeExpanded(parentId);
     renderBrowse();
   });
@@ -1836,6 +1837,8 @@ function importSharedChallenge(shared) {
     }))
   };
 
+  // A shared program is someone else's, so it is certainly not the pack's.
+  if (typeof csCanAddHere === 'function' && !csCanAddHere('shared program')) return;
   if (!state.challenges) state.challenges = [];
   state.challenges.unshift(tempChallenge);
   saveData();

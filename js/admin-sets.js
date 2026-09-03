@@ -248,6 +248,7 @@ function _sbCreateCategory() {
       return;
     }
     const node = createNode(t, 'folder', null, 'challenge');
+    if (!node) return;                 // refused: the pack is on screen
     _sbPendingFolders.push(node.id);
     setBuilderState.parentId = node.id;
     _sbSyncNativeCategory(node.id);

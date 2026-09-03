@@ -163,6 +163,8 @@ function _adminApplyBulkMove(folderId) {
 function adminBulkDuplicate() {
   const ids = [...adminSelection];
   if (!ids.length) return;
+  // A copy gets a fresh id, so it would be yours sitting in the pack.
+  if (typeof csCanAddHere === 'function' && !csCanAddHere('copy')) return;
   const copies = (state.challenges || []).filter(c => ids.includes(c.id)).map(c => {
     const copy = JSON.parse(JSON.stringify(c));
     copy.id = generateId();
