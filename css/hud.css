@@ -102,12 +102,9 @@ body.hud-off .hud-layer { display: none; }
   background: linear-gradient(90deg, rgba(var(--hud), 0.45) 0%, transparent 100%);
 }
 
-.hud-panel-a {
-  position: absolute; bottom: 60px; right: 40px;
-  width: 120px; height: 64px;
-  border: 1px solid rgba(var(--hud), 0.08);
-  border-radius: 3px;
-}
+/* The second panel outline that used to sit at bottom: 60px / right: 40px is
+   gone. It landed directly behind the settings button, so the two read as one
+   broken control rather than as chrome behind a control. */
 .hud-panel-b {
   position: absolute; top: 46%; right: 26px;
   width: 54px; height: 110px;

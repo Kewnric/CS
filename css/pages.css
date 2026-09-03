@@ -152,13 +152,36 @@
   position: relative;
   overflow: hidden;
   transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
-  animation: smoothReveal 0.4s ease-out backwards;
 }
 
-.home-stat-card:nth-child(1) { animation-delay: 0.05s; }
-.home-stat-card:nth-child(2) { animation-delay: 0.1s; }
-.home-stat-card:nth-child(3) { animation-delay: 0.15s; }
-.home-stat-card:nth-child(4) { animation-delay: 0.2s; }
+/* ── The home screen enters like the library cards ─────────────
+   adminCardIn is the library's own card entrance (css/library.css): the card
+   arrives from slightly left and below, at 0.34s on the same curve. Reused by
+   name rather than copied, so the two cannot drift apart -- the name is only
+   where it started, not where it belongs.
+
+   The hero leads at 0ms and the four tiles follow left to right, 70ms apart,
+   so the row reads as one sweep rather than four things arriving together.
+   Delays live here as nth-child rather than being set from JS the way the
+   library sets --card-in-delay: the library has a variable number of cards and
+   has to count them, this row is always four. */
+.home-hero {
+  animation: adminCardIn 0.34s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+
+.home-stat-card {
+  animation: adminCardIn 0.34s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+}
+
+.home-stat-card:nth-child(1) { animation-delay: 0.09s; }
+.home-stat-card:nth-child(2) { animation-delay: 0.16s; }
+.home-stat-card:nth-child(3) { animation-delay: 0.23s; }
+.home-stat-card:nth-child(4) { animation-delay: 0.30s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .home-hero,
+  .home-stat-card { animation: none !important; }
+}
 
 .home-stat-card:hover {
   transform: translateY(-4px);

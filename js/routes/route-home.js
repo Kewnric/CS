@@ -3,7 +3,7 @@ function homeTemplate() {
   return `
     <div class="home-content">
       <div class="home-scroll">
-        <section class="home-hero fade-in-up" style="position: relative;">
+        <section class="home-hero" style="position: relative;">
           <button class="tutorial-trigger-btn" onclick="GuidedTutorial.start()" title="Show Page Tour"
             style="position: absolute; top: 1rem; right: 1rem;">
             <i data-lucide="graduation-cap"></i>
@@ -20,7 +20,7 @@ function homeTemplate() {
             </button>
           </div>
         </section>
-        <section class="home-stats-grid stagger-children" id="home-stats"></section>
+        <section class="home-stats-grid" id="home-stats"></section>
         <!-- Only present when something was left unfinished, and only until its
              countdown runs out. Sits under the stats so the numbers stay put. -->
         <section id="home-continue"></section>

@@ -81,7 +81,6 @@ function hudMount() {
     +     '<span style="width:26px"></span><span style="width:8px"></span>'
     +   '</div>'
     +   '<div class="hud-rule"></div>'
-    +   '<div class="hud-panel-a"></div>'
     +   '<div class="hud-panel-b"></div>'
     +   '<div class="hud-pulse"></div>'
     + '</div>';
