@@ -71,6 +71,14 @@ function browseTemplate() {
 }
 
 function browseInit() {
+  /* Put the library's label in step with its contents before anything reads
+     it. renderBrowse returns early when its container is not mounted, so the
+     refresh at the end of it is not somewhere this can be relied on. */
+  if (typeof _csReconcileMode === 'function') _csReconcileMode();
+  // The template above was built from the label as it was; repaint it from the
+  // label as it now is.
+  if (typeof csRefreshBanner === 'function') csRefreshBanner();
+  if (typeof _csSyncBtn === 'function') _csSyncBtn();
   // Sync any detail target set by another page (home carousel, search, or
   // returning from a practice/practice-set attempt). A practice set takes
   // priority, then a single program; otherwise show the folder view.

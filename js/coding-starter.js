@@ -463,6 +463,46 @@ function _csLooksLikeMine(lib) {
 }
 
 /**
+ * RUN TOGETHER means one library holding both kinds of program at once.
+ *
+ * Not the same thing as the mode flag disagreeing with the content, which is
+ * what this used to test and which is harmless: a library that is cleanly the
+ * pack, labelled "mine", is a wrong label on intact data. Treating the two as
+ * one condition put a red "these have run together" warning over a perfectly
+ * ordinary library of 43 pack programs and 0 of the reader's own, disabled the
+ * pack switch, and offered a Repair that would have moved all 43 out and left
+ * the screen empty.
+ *
+ * Only a genuine mix is dangerous, because only then can a pack update reach
+ * something you wrote.
+ */
+function _csIsMixed(lib) {
+  const cs = (lib && lib.challenges) || [];
+  return cs.some(_csIsPackId) && cs.some(c => !_csIsPackId(c));
+}
+
+/**
+ * Make the flag agree with what is actually on screen.
+ *
+ * state.codingMode is bookkeeping, and it can fall out of step with the
+ * content -- an import, a cloud sync, a save that did not land. When the live
+ * library is cleanly one thing or the other there is no ambiguity about which
+ * it is, so the flag is simply corrected rather than reported. Left alone when
+ * the library is empty (nothing to read it from) or genuinely mixed (the
+ * banner and Repair handle that).
+ */
+function _csReconcileMode() {
+  if (typeof state === 'undefined' || !state) return;
+  const live = _csLift();
+  if (!live.challenges.length || _csIsMixed(live)) return;
+  const should = _csLooksLikePack(live) ? 'starter' : 'mine';
+  if (state.codingMode !== should) {
+    state.codingMode = should;
+    if (typeof saveData === 'function') saveData();
+  }
+}
+
+/**
  * Put the two libraries back where they belong after they have been mixed or
  * swapped.
  *
@@ -513,6 +553,25 @@ function repairCodingLibraries() {
     if (x.parentId && !packNodes.has(x.parentId)) x.parentId = null;
   });
 
+  /* If everything turned out to be the pack's, then the pack IS the library on
+     screen and there is nothing of yours to put back. Emptying the screen and
+     filing all 43 programs away would be the literal reading of "sort them by
+     which library they came from" and a terrible answer to it. */
+  if (!mine.challenges.length && pack.challenges.length) {
+    _csPlace(pack);
+    state.codingMode = 'starter';
+    saveData();
+    if (typeof invalidateBrowseCache === 'function') invalidateBrowseCache();
+    if (typeof renderBrowse === 'function') renderBrowse();
+    csRefreshBanner();
+    _csSyncBtn();
+    if (typeof toast === 'function') {
+      toast('Nothing was mixed — every program here is from the starter pack, so the library is '
+            + 'left exactly as it was.', { type: 'success', duration: 6000 });
+    }
+    return { mine: 0, pack: pack.challenges.length, rehomed: 0 };
+  }
+
   _csPlace(mine);
   state.codingStash = pack.challenges.length ? pack : null;
   state.codingMode = 'mine';
@@ -542,10 +601,9 @@ function repairCodingLibraries() {
   return { mine: mine.challenges.length, pack: pack.challenges.length, rehomed: rehomed };
 }
 
-/** Are the two libraries mixed up right now? Drives the Repair button. */
+/** Are the two libraries actually run together? Drives the Repair button. */
 function codingLibrariesLookMixed() {
-  const live = _csLift();
-  return codingLibraryIsStarter() ? !_csLooksLikePack(live) : !_csLooksLikeMine(live);
+  return _csIsMixed(_csLift()) || _csIsMixed(state && state.codingStash);
 }
 
 /* ── The switch ───────────────────────────────────────────── */
@@ -568,6 +626,8 @@ function _csPlace(set) {
 }
 
 function toggleCodingLibraryMode() {
+  // What is on screen decides which way "the other one" is, not a stale flag.
+  _csReconcileMode();
   const to = codingLibraryIsStarter() ? 'mine' : 'starter';
   const parked = state.codingStash || null;
 
@@ -583,19 +643,18 @@ function toggleCodingLibraryMode() {
 
   const live = _csLift();
 
-  /* CHECK THE FLAG AGAINST WHAT IS ACTUALLY THERE before parking anything.
-     state.codingMode was the only record of which library was on screen, and
-     nothing ever verified it. Once it disagreed with the content -- an import,
-     a cloud sync, a save that did not land -- the swap parked the wrong
-     library, and from then on the app called your programs "the pack" and the
-     pack "your programs". Every later toggle and update worked on the wrong
-     one. Parking is destructive (it overwrites the stash), so it does not
-     happen on an assumption that can be tested first. */
-  const flagFits = codingLibraryIsStarter() ? _csLooksLikePack(live) : _csLooksLikeMine(live);
-  if (!flagFits) {
+  /* Parking overwrites the stash, so it must not happen while one library
+     holds both kinds of program -- that is the case where the wrong thing ends
+     up under the label "the pack" and a later update can reach your work.
+
+     A flag that merely disagrees with the content is NOT that case. It is a
+     wrong label on intact data, and _csReconcileMode above has already put it
+     right, so the swap below acts on what is really there. Refusing that too
+     is what left a library of 43 pack programs unable to use its own switch. */
+  if (_csIsMixed(live)) {
     if (typeof toast === 'function') {
-      toast('Stopped: the library on screen is not the one the app thinks it is, so switching would '
-            + 'put the wrong one away. Nothing was changed — use Repair to sort them out.',
+      toast('Stopped: this library holds both your programs and the starter pack, so putting it away '
+            + 'would file your work under the pack. Nothing was changed — use Repair first.',
             { type: 'error', duration: 8000 });
     }
     return;
@@ -665,6 +724,11 @@ function codingStarterButtonTemplate() {
 function csRefreshBanner() {
   const banner = document.getElementById('browse-starter-banner');
   if (!banner) return;
+  /* Put the label right before drawing it. A flag left over from an import or
+     a sync would otherwise keep calling the pack "your programs" until someone
+     pressed the switch -- and the switch is the thing the wrong label makes
+     confusing. */
+  _csReconcileMode();
   const html = codingStarterBannerTemplate();
   if (banner.innerHTML === html) return;      // nothing to do, and no icon churn
   banner.innerHTML = html;
