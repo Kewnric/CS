@@ -1032,13 +1032,28 @@ function _timerMenuKey(e) {
 }
 
 /** @param {MouseEvent} e right-click on the timer chip */
+/* The clock the menu edits. Same seam as the description editor: the menu was
+   reading state.sessionData directly, so on the set screen -- which keeps its
+   clock on _pset -- it returned at the first line and right-clicking did
+   nothing at all. */
+let _timerCtx = null;
+function setPracticeTimerCtx(ctx) { _timerCtx = ctx; }
+function practiceTimerCtx() {
+  return _timerCtx || {
+    active: () => !!state.sessionData,
+    getLimit: () => (state.sessionData && state.sessionData.timeLimit) || 0,
+    apply: (secs, restart) => applyPracticeTimer(secs, restart)
+  };
+}
+
 function openTimerMenu(e) {
   if (e) e.preventDefault();
-  if (!state.sessionData) return;
+  const ctx = practiceTimerCtx();
+  if (!ctx.active()) return;
   // Right-clicking again is "put it away", not "open it a second time".
   if (document.getElementById('timer-menu')) { _timerMenuClose(); return; }
 
-  const limit = state.sessionData.timeLimit || 0;
+  const limit = ctx.getLimit() || 0;
   const h = Math.floor(limit / 3600), m = Math.floor((limit % 3600) / 60), s = limit % 60;
   const mode = limit > 0 ? 'down' : 'up';
 
@@ -1132,7 +1147,7 @@ function openTimerMenu(e) {
         (parseInt(el.querySelector('#tm-m').value, 10) || 0) * 60 +
         (parseInt(el.querySelector('#tm-s').value, 10) || 0)
       : 0;
-    applyPracticeTimer(secs, restart.checked);
+    practiceTimerCtx().apply(secs, restart.checked);
     _timerMenuClose();
   };
 
@@ -4007,10 +4022,29 @@ function getDifficultyBadgeHTML(challenge) {
    next time too — that is the point of fixing it rather than noting it. */
 
 let _pdQuill = null;
+let _pdTarget = null;
 
-window.practiceEditDescription = function () {
+/**
+ * Where a description is read from and written to.
+ *
+ * The modal was wired straight to state.activeVariant, which the set screen
+ * deliberately nulls so the shared run/boss helpers see raw editor content.
+ * That made this editor single-program-only for no reason other than where it
+ * happened to look. A target is three functions, and the set supplies its own.
+ */
+function _pdDefaultTarget() {
   const variant = state.activeVariant;
-  if (!variant) return;
+  if (!variant) return null;
+  return {
+    read: () => variant.description || (state.activeChallenge && state.activeChallenge.description) || '',
+    write: (html) => { variant.description = html; },
+    paintInto: 'practice-desc'
+  };
+}
+
+window.practiceEditDescription = function (target) {
+  _pdTarget = target || _pdDefaultTarget();
+  if (!_pdTarget) return;
 
   let ov = document.getElementById('practice-desc-modal');
   if (!ov) {
@@ -4052,7 +4086,7 @@ window.practiceEditDescription = function () {
       modules: { toolbar: typeof AF_DESC_TOOLBAR !== 'undefined' ? AF_DESC_TOOLBAR : true }
     });
     _pdQuill = q;
-    const current = variant.description || (state.activeChallenge && state.activeChallenge.description) || '';
+    const current = _pdTarget.read() || '';
     q.clipboard.dangerouslyPasteHTML(
       typeof afDescToHTML === 'function' ? afDescToHTML(current) : current, 'silent');
     if (typeof afLabelToolbar === 'function') afLabelToolbar(q.getModule('toolbar').container);
@@ -4063,20 +4097,22 @@ window.practiceEditDescription = function () {
 };
 
 window.practiceSaveDescription = function () {
-  const variant = state.activeVariant;
-  if (!variant) { practiceCloseDescription(); return; }
+  const target = _pdTarget;
+  if (!target) { practiceCloseDescription(); return; }
+  let html = target.read();
   if (_pdQuill) {
     // Same rule as the admin form: an empty Quill document is "<p><br></p>",
     // which would read as a description that exists and says nothing.
-    variant.description = _pdQuill.getText().trim() ? _pdQuill.root.innerHTML : '';
+    html = _pdQuill.getText().trim() ? _pdQuill.root.innerHTML : '';
+    target.write(html);
   }
   if (typeof saveData === 'function') saveData();
 
-  const el = document.getElementById('practice-desc');
+  const el = document.getElementById(target.paintInto || 'practice-desc');
   if (el) {
     el.innerHTML = (typeof formatRichText === 'function'
-      ? formatRichText(variant.description)
-      : escapeHTML(variant.description)) || 'No description provided.';
+      ? formatRichText(html)
+      : escapeHTML(html)) || 'No description provided.';
   }
   practiceCloseDescription();
   if (typeof toast === 'function') toast('Description updated.', { type: 'success' });
@@ -4085,6 +4121,7 @@ window.practiceSaveDescription = function () {
 window.practiceCloseDescription = function () {
   const ov = document.getElementById('practice-desc-modal');
   _pdQuill = null;
+  _pdTarget = null;
   if (ov) { ov.classList.add('hidden'); ov.innerHTML = ''; ov.onclick = null; }
 };
 

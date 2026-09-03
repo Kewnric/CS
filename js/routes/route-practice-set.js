@@ -26,7 +26,7 @@ function practiceSetTemplate() {
           <button class="btn btn-ghost practice-icon-btn" onclick="toggleFullscreen()" title="Full screen" id="fullscreen-toggle-btn" aria-label="Full screen" aria-pressed="false">
             <i data-lucide="maximize" style="width:16px;height:16px;" aria-hidden="true"></i>
           </button>
-          <div class="timer-display">
+          <div class="timer-display" oncontextmenu="openTimerMenu(event)" title="Right-click to change the timer">
             <i data-lucide="clock"></i><span id="pset-timer">00:00</span>
             <button class="btn-pause-timer" id="pset-pause-btn" onclick="psetTogglePause()" title="Pause/Resume Timer">
               <i data-lucide="pause" id="pset-pause-icon" style="width:14px;height:14px;"></i>
@@ -45,7 +45,19 @@ function practiceSetTemplate() {
             <h1 class="practice-program-title" id="pset-problem-title">Problem</h1>
             <span class="practice-program-version" id="pset-set-name"></span>
           </header>
-          <div><h2>Description</h2><p id="pset-desc"></p></div>
+          <div>
+            <div class="practice-desc-head">
+              <h2>Description</h2>
+              <button class="practice-desc-edit" onclick="psetEditDescription()"
+                      title="Edit this description" aria-label="Edit this description">
+                <i data-lucide="pencil"></i>
+              </button>
+            </div>
+            <!-- A div, not a p, for the same reason as the program screen: a
+                 description can hold lists and code blocks and neither is legal
+                 inside a paragraph. -->
+            <div id="pset-desc" class="practice-desc-body"></div>
+          </div>
           <div id="pset-samples" style="display:flex; flex-direction:column; gap:1rem;"></div>
           <div id="pset-hints-container"></div>
           <div class="practice-footer">
@@ -81,5 +93,11 @@ function practiceSetInit() {
 
 function practiceSetDestroy() {
   psetDestroy();
-  if (typeof ppClearFx === 'function') ppClearFx();   // it lives on <body>, not in the route
+  // All of these live on <body> or on a timer, not inside the route, so the
+  // route being replaced does not take them with it. The program screen has
+  // torn these down for a while; this one only did the confetti.
+  if (typeof ppClearFx === 'function') ppClearFx();
+  if (typeof _timerMenuClose === 'function') _timerMenuClose();
+  if (typeof psfxWorkStop === 'function') psfxWorkStop();
+  if (typeof practiceCloseDescription === 'function') practiceCloseDescription();
 }

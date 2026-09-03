@@ -102,6 +102,19 @@ function psetInit() {
 
   // Keyboard: Ctrl+Enter = check, Ctrl+Shift+Enter = finish, Alt+←/→ = switch
   window._psetKeyHandler = function (e) {
+    /* Answered BEFORE the guards below, same as the program screen. Those
+       guards hand the keyboard to an open modal, the run terminal and the find
+       bar -- so while you were reading run output, Ctrl+S fell through to the
+       browser's "Save page" dialog. Saving is safe from all three: it reads the
+       editor and writes a draft. */
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey &&
+        (e.key === 's' || e.key === 'S')) {
+      e.preventDefault();
+      if (psetSaveNow() && typeof toast === 'function') {
+        toast('Saved', { type: 'success', duration: 1400 });
+      }
+      return;
+    }
     if (document.querySelector('.modal-overlay:not(.hidden)')) return;
     if (document.getElementById('run-code-overlay')) return;
     const findBar = document.getElementById('ed-find-bar');
@@ -154,6 +167,15 @@ function psetInit() {
     });
   }
 
+  // The shared timer menu edits whichever clock is registered here.
+  if (typeof setPracticeTimerCtx === 'function') {
+    setPracticeTimerCtx({
+      active: () => !!_pset,
+      getLimit: () => (_pset && _pset.timeLimit) || 0,
+      apply: (secs, restart) => psetApplyTimer(secs, restart)
+    });
+  }
+
   _psetLoadProblem(0);
   if (typeof renderPracticePanel === 'function') renderPracticePanel();
   if (typeof applyEditorViewSettings === 'function') applyEditorViewSettings();
@@ -169,9 +191,13 @@ function psetDestroy() {
   clearTimeout(_psetBossDebounce);
   // Flush before tearing down. psetExit() autosaves on its way out, but the sidebar
   // links and the browser Back button bypass it, dropping up to 20 s of work.
-  if (_pset && !_pset.submitted) {
+  // Skipped while discarding, where this would write back the draft that was
+  // just deleted -- the same trap the program screen hit.
+  if (_pset && !_pset.submitted && !_psetDiscarding) {
     try { _psetAutosave(); } catch (e) { console.error('[PracticeSet] Autosave on exit failed:', e); }
   }
+  if (typeof setPracticeTimerCtx === 'function') setPracticeTimerCtx(null);
+  if (typeof _stopSavedTicker === 'function') _stopSavedTicker();
   _psetStopLoops();
   if (typeof edCloseFind === 'function') edCloseFind();
   if (typeof closeCheatsheet === 'function') closeCheatsheet();   // it lives on <body>, not in the route
@@ -245,6 +271,7 @@ function _psetResolveProblems(set, restore) {
 
       out.push({
         key,
+        srcIndex: pi,
         source: 'library',
         challengeId: c.id,
         variantId: v.id,
@@ -268,6 +295,7 @@ function _psetResolveProblems(set, restore) {
       const { files, activeFileIndex } = _psetBuildFiles('solution', '.c', mainStarter, p.referenceCode || '', restored);
       out.push({
         key,
+        srcIndex: pi,
         source: 'manual',
         title: p.title || 'Untitled problem',
         variantName: '',
@@ -949,13 +977,98 @@ function _psetGoLibrary(setId) {
   spaNavigate('browse');
 }
 
-function psetExit() {
-  if (_pset && !_pset.submitted) {
-    showConfirm('Leave session?', 'Your code is auto-saved for this set, but nothing will be graded until you submit. Leave anyway?', () => {
-      _psetAutosave();
-      _psetGoLibrary();
-    });
-    return;
+/** Ctrl+S. Returns false when there is nothing to save, so the toast is honest. */
+function psetSaveNow() {
+  if (!_pset) return false;
+  _psetAutosave();        // ends in _bossMarkSaved(), which paints #ed-save-state
+  return true;
+}
+
+/** The timer menu's Apply, for this screen's clock. */
+function psetApplyTimer(secs, restart) {
+  if (!_pset) return;
+  _pset.timeLimit = secs || 0;
+  if (restart) _pset.startTime = Date.now();
+  try { setSessionParam('codingSetTimeLimit', String(_pset.timeLimit)); } catch (e) { /* full */ }
+  _psetTick();
+  if (typeof toast === 'function') {
+    toast(secs ? 'Countdown set.' : 'Counting up.', { type: 'success', duration: 1600 });
+  }
+}
+
+/* ── Editing the description mid-attempt ──────────────────────
+   The same editor the program screen opens, pointed at this problem. A set
+   problem can come from the library or be written into the set itself, and the
+   correction is written back to whichever one it actually came from -- so it is
+   still there next time, which is the point of fixing it rather than noting it. */
+function _psetDescTarget(p) {
+  return {
+    read: () => p.description || '',
+    write: (html) => {
+      p.description = html;
+      if (p.source === 'library') {
+        const c = (state.challenges || []).find(ch => ch.id === p.challengeId);
+        const v = c && (c.variants || []).find(x => x.id === p.variantId);
+        if (v) v.description = html;
+      } else if (_pset && _pset.set && _pset.set.problems) {
+        const entry = _pset.set.problems[p.srcIndex];
+        if (entry) entry.description = html;
+      }
+    },
+    paintInto: 'pset-desc'
+  };
+}
+
+function psetEditDescription() {
+  const p = _pset && _pset.problems[_pset.current];
+  if (!p || typeof practiceEditDescription !== 'function') return;
+  practiceEditDescription(_psetDescTarget(p));
+}
+
+/* Set while an attempt is being thrown away, and read by psetDestroy: the
+   route's teardown flushes an autosave on the way out, so without this the
+   draft just deleted would be written straight back. */
+let _psetDiscarding = false;
+
+/** Throw this attempt away: the draft and the clock. Nothing graded is touched. */
+function psetDiscardAttempt() {
+  _psetDiscarding = true;
+  try {
+    clearSessionParam('psetAutosave');
+    _psetStopLoops();
+    if (_pset) _pset.submitted = true;   // belt and braces against a late flush
+  } catch (e) {
+    console.error('[PracticeSet] Discard failed:', e);
+  }
+  if (typeof toast === 'function') {
+    toast('Attempt discarded — nothing was saved.', { type: 'info', duration: 3000 });
   }
   _psetGoLibrary();
+  setTimeout(() => { _psetDiscarding = false; }, 0);
+}
+
+function psetExit() {
+  if (!_pset || _pset.submitted) { _psetGoLibrary(); return; }
+
+  /* Two real answers, so two buttons -- the program screen already asks it this
+     way. Leaving used to always leave a resumable attempt behind, and starting
+     genuinely fresh meant finding your way back and clearing it by hand. Keep is
+     the primary because it is the one you can still undo: work kept can be
+     discarded later, work discarded cannot be brought back. */
+  if (typeof showChoice !== 'function') {
+    showConfirm('Leave session?',
+      'Your code is auto-saved for this set, but nothing will be graded until you submit. Leave anyway?',
+      () => { _psetAutosave(); _psetGoLibrary(); });
+    return;
+  }
+  showChoice({
+    title: 'Leave attempt?',
+    message: 'Keep it and the code, timer and restore points are all waiting when you come back. '
+           + 'Discard and this attempt is gone — nothing is graded either way.',
+    secondary: 'Discard attempt',
+    primary: 'Keep and leave',
+    danger: true,
+    onSecondary: () => psetDiscardAttempt(),
+    onPrimary: () => { _psetAutosave(); _psetGoLibrary(); }
+  });
 }
