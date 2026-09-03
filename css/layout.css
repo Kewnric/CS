@@ -849,7 +849,6 @@ details[open]>.snippet-folder-summary>.folder-icon {
   background: var(--color-primary);
   box-shadow: -2px 0 8px rgba(34, 211, 238, 0.4);
   border-radius: 4px 0 0 4px;
-  opacity: 0.8;
 }
 
 .tree-node[data-level="1"]>.tree-node-row::after {
@@ -862,7 +861,6 @@ details[open]>.snippet-folder-summary>.folder-icon {
   background: var(--color-accent);
   box-shadow: -2px 0 8px rgba(168, 85, 247, 0.4);
   border-radius: 4px 0 0 4px;
-  opacity: 0.8;
 }
 
 .tree-node[data-level="2"]>.tree-node-row::after {
@@ -875,7 +873,6 @@ details[open]>.snippet-folder-summary>.folder-icon {
   background: var(--color-success);
   box-shadow: -2px 0 8px rgba(34, 197, 94, 0.4);
   border-radius: 4px 0 0 4px;
-  opacity: 0.8;
 }
 
 .tree-node[data-level="3"]>.tree-node-row::after {
@@ -888,8 +885,13 @@ details[open]>.snippet-folder-summary>.folder-icon {
   background: var(--color-warning);
   box-shadow: -2px 0 8px rgba(245, 158, 11, 0.4);
   border-radius: 4px 0 0 4px;
-  opacity: 0.8;
 }
+
+/* The rail is quiet until you are near it: 0.55 at rest, 0.9 under the pointer,
+   full on selection. It was a flat 0.8, which made every row's rail compete
+   with the one that mattered. */
+.tree-node-row::after { opacity: 0.55; transition: opacity 0.25s ease; }
+.tree-node-row:hover::after { opacity: 0.9; }
 
 .tree-node[data-level="4"]>.tree-node-row::after,
 .tree-node[data-level="5"]>.tree-node-row::after {
@@ -902,7 +904,6 @@ details[open]>.snippet-folder-summary>.folder-icon {
   background: var(--color-danger);
   box-shadow: -2px 0 8px rgba(239, 68, 68, 0.4);
   border-radius: 4px 0 0 4px;
-  opacity: 0.8;
 }
 
 .tree-node-row {
@@ -927,23 +928,62 @@ details[open]>.snippet-folder-summary>.folder-icon {
   transform: translateX(1px) scale(0.99);
 }
 
-/* Selection is a box, not a tint. A flat fill the same colour as hover left
-   the two states nearly indistinguishable; the gradient runs light-to-dark
-   left to right so the row reads as a solid object with a lit leading edge,
-   and the tighter radius squares it off against its neighbours. */
+/* ── Selection, from the design system's TreeNode ──────────────
+   Converted from the kit's React inline styles. The wash is a cyan radial
+   anchored at the RIGHT edge, not a left-to-right ramp: the row's depth rail
+   lives on that side, so the light comes from the rail rather than across the
+   text. The row also moves LEFT on selection while hover moves right, which is
+   what separates the two states without either needing more colour.
+
+   The kit tracked hover and a 340ms just-landed flag in component state; here
+   :hover and an animation on .active do the same with no JavaScript. */
+.tree-node-row {
+  /* Everything not selected is set back a touch, so selection reads as coming
+     forward rather than merely being tinted. */
+  transform: scale(0.99);
+  transition: background 0.25s var(--ease-standard),
+              color 0.25s var(--ease-standard),
+              box-shadow 0.25s var(--ease-standard),
+              transform 0.28s var(--ease-spring);
+}
+
 .tree-node-row.active {
   background:
-    linear-gradient(90deg,
-      rgba(99, 102, 241, 0.22) 0%,
-      rgba(56, 89, 168, 0.13) 45%,
-      rgba(30, 45, 92, 0.06) 100%),
+    radial-gradient(circle at right center, rgba(34, 211, 238, 0.10) 0%, transparent 72%),
     var(--bg-surface-hover);
-  border-radius: 8px;
-  box-shadow:
-    inset 0 1px 0 rgba(190, 220, 255, 0.10),
-    inset 0 0 0 1px rgba(120, 150, 235, 0.16);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transform: translateX(-3px);
   color: var(--color-primary);
   animation: smoothReveal 0.25s ease-out;
+}
+
+/* Hover must not fight selection: a selected row stays where selection put it,
+   or it jumps 5px sideways whenever the pointer crosses it. */
+.tree-node-row.active:hover { transform: translateX(-3px); }
+
+.tree-node-row.active .tree-node-label {
+  font-weight: 700;
+  color: #f2f9ff;
+  transition: color 0.25s ease;
+  animation: labelPop 0.32s var(--ease-spring) both;
+}
+
+/* The depth rail is already drawn per level below. Selection turns it into the
+   same travelling gradient the sidebar's rail uses, so the two selections in
+   the app read as one idea. */
+.tree-node[data-level] > .tree-node-row.active::after,
+.tree-node-row.active::after {
+  background: linear-gradient(180deg, #67e8f9 0%, #22d3ee 25%, #0891b2 50%, #22d3ee 75%, #67e8f9 100%);
+  background-size: 100% 200%;
+  opacity: 1;
+  box-shadow: none;
+  animation: railFlow 2.4s linear infinite, railBreathe 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tree-node-row.active,
+  .tree-node-row.active::after,
+  .tree-node-row.active .tree-node-label { animation: none !important; }
 }
 
 .tree-node-row.active .tree-node-icon {
