@@ -178,10 +178,30 @@ function _csStamp(pack) {
 function updateCodingStarterPack() {
   const inStarter = codingLibraryIsStarter();
   const target = inStarter ? _csLift() : (state.codingStash || null);
-  if (!target || !(target.challenges || []).some(c => String(c.id).indexOf('starter-') === 0)) {
+  if (!target || !(target.challenges || []).some(_csIsPackId)) {
     if (typeof toast === 'function') {
       toast('No starter pack installed yet — switch it on and it arrives complete.',
             { type: 'info', duration: 4000 });
+    }
+    return;
+  }
+
+  /* REFUSE A TARGET THAT IS NOT THE PACK.
+     The old test was "does this contain at least one starter- id", which is
+     true of a library of your own that has a single starter program in it for
+     any reason -- an import, a shared link, or an earlier swap. Merging then
+     pushed all 43 programs and 12 folders of the pack into your own library:
+     reproduced, 3 programs became 45.
+
+     The pack's invariant is that everything in it is the pack's. Anything else
+     in there means we are pointed at the wrong library, and the answer to that
+     is to stop, not to merge. */
+  const foreign = (target.challenges || []).filter(c => !_csIsPackId(c));
+  if (foreign.length) {
+    if (typeof toast === 'function') {
+      toast('Stopped: that library has ' + foreign.length + ' program' + (foreign.length === 1 ? '' : 's')
+            + ' of your own in it, so it is not the starter pack. Nothing was changed — use Repair to separate them.',
+            { type: 'error', duration: 8000 });
     }
     return;
   }
@@ -423,6 +443,111 @@ function _csExamSets(allCh) {
   ];
 }
 
+/* ── Telling the two libraries apart ───────────────────────
+   Every single thing the pack owns -- all 43 programs, 12 folders and 4 sets --
+   has an id beginning "starter-". Nothing of yours does. That is what makes the
+   two separable after they have been mixed, and it is the only test any of this
+   should ever have relied on. */
+function _csIsPackId(x) { return !!x && String(x.id).indexOf('starter-') === 0; }
+
+/** The pack: not empty, and nothing in it but the pack's own programs. */
+function _csLooksLikePack(lib) {
+  const cs = (lib && lib.challenges) || [];
+  return cs.length > 0 && cs.every(_csIsPackId);
+}
+
+/** Yours: nothing of the pack's in it. An empty library qualifies. */
+function _csLooksLikeMine(lib) {
+  const cs = (lib && lib.challenges) || [];
+  return !cs.some(_csIsPackId);
+}
+
+/**
+ * Put the two libraries back where they belong after they have been mixed or
+ * swapped.
+ *
+ * Takes everything that exists -- what is on screen and what is parked -- and
+ * sorts it by id: the pack's things go to the pack, everything else is yours.
+ * Nothing is deleted by this; a program can only move from one library to the
+ * other, and duplicates collapse to one.
+ */
+function repairCodingLibraries() {
+  const live = _csLift();
+  const parked = state.codingStash || { challenges: [], sets: [], nodes: [] };
+
+  // Live first, so where the same id exists twice the copy you were looking at
+  // is the one that survives.
+  const mergeById = (a, b) => {
+    const out = [], seen = new Set();
+    (a || []).concat(b || []).forEach(x => {
+      if (x && x.id != null && !seen.has(x.id)) { seen.add(x.id); out.push(x); }
+    });
+    return out;
+  };
+  const allCh = mergeById(live.challenges, parked.challenges);
+  const allSets = mergeById(live.sets, parked.sets);
+  const allNodes = mergeById(live.nodes, parked.nodes);
+
+  const mine = {
+    challenges: allCh.filter(c => !_csIsPackId(c)),
+    sets: allSets.filter(s => !_csIsPackId(s)),
+    nodes: allNodes.filter(n => !_csIsPackId(n))
+  };
+  const pack = {
+    challenges: allCh.filter(_csIsPackId),
+    sets: allSets.filter(_csIsPackId),
+    nodes: allNodes.filter(_csIsPackId)
+  };
+
+  /* A program of yours that ended up inside a starter folder would follow that
+     folder into the pack and be invisible in your library. Anything whose
+     parent did not come with it goes to the top level, where it can be seen and
+     moved, rather than nowhere. */
+  const mineNodes = new Set(mine.nodes.map(x => x.id));
+  let rehomed = 0;
+  mine.challenges.concat(mine.sets).forEach(x => {
+    if (x.parentId && !mineNodes.has(x.parentId)) { x.parentId = null; rehomed++; }
+  });
+  const packNodes = new Set(pack.nodes.map(x => x.id));
+  pack.challenges.concat(pack.sets).forEach(x => {
+    if (x.parentId && !packNodes.has(x.parentId)) x.parentId = null;
+  });
+
+  _csPlace(mine);
+  state.codingStash = pack.challenges.length ? pack : null;
+  state.codingMode = 'mine';
+  saveData();
+
+  if (typeof clearSessionParam === 'function') {
+    clearSessionParam('browseActiveNode');
+    clearSessionParam('browseActiveProgram');
+    clearSessionParam('browseActiveSet');
+  }
+  if (typeof browseActiveNodeId !== 'undefined') browseActiveNodeId = null;
+  if (typeof browseActiveProgramId !== 'undefined') browseActiveProgramId = null;
+  if (typeof browseActiveSetId !== 'undefined') browseActiveSetId = null;
+  if (typeof invalidateBrowseCache === 'function') invalidateBrowseCache();
+  if (typeof renderBrowse === 'function') renderBrowse();
+  csRefreshBanner();
+  _csSyncBtn();
+
+  if (typeof toast === 'function') {
+    toast('Your library: ' + mine.challenges.length + ' program' + (mine.challenges.length === 1 ? '' : 's')
+          + ', ' + mine.nodes.length + ' folder' + (mine.nodes.length === 1 ? '' : 's') + '. '
+          + pack.challenges.length + ' starter program' + (pack.challenges.length === 1 ? '' : 's')
+          + ' put back in the pack'
+          + (rehomed ? ', ' + rehomed + ' moved to your top level' : '') + '.',
+          { type: 'success', duration: 7000 });
+  }
+  return { mine: mine.challenges.length, pack: pack.challenges.length, rehomed: rehomed };
+}
+
+/** Are the two libraries mixed up right now? Drives the Repair button. */
+function codingLibrariesLookMixed() {
+  const live = _csLift();
+  return codingLibraryIsStarter() ? !_csLooksLikePack(live) : !_csLooksLikeMine(live);
+}
+
 /* ── The switch ───────────────────────────────────────────── */
 
 /** Everything the coding library owns, lifted out of state. */
@@ -457,6 +582,25 @@ function toggleCodingLibraryMode() {
   }
 
   const live = _csLift();
+
+  /* CHECK THE FLAG AGAINST WHAT IS ACTUALLY THERE before parking anything.
+     state.codingMode was the only record of which library was on screen, and
+     nothing ever verified it. Once it disagreed with the content -- an import,
+     a cloud sync, a save that did not land -- the swap parked the wrong
+     library, and from then on the app called your programs "the pack" and the
+     pack "your programs". Every later toggle and update worked on the wrong
+     one. Parking is destructive (it overwrites the stash), so it does not
+     happen on an assumption that can be tested first. */
+  const flagFits = codingLibraryIsStarter() ? _csLooksLikePack(live) : _csLooksLikeMine(live);
+  if (!flagFits) {
+    if (typeof toast === 'function') {
+      toast('Stopped: the library on screen is not the one the app thinks it is, so switching would '
+            + 'put the wrong one away. Nothing was changed — use Repair to sort them out.',
+            { type: 'error', duration: 8000 });
+    }
+    return;
+  }
+
   _csPlace(to === 'starter' ? (parked || codingStarterPack()) : parked);
   state.codingStash = live;
   state.codingMode = to;
@@ -474,11 +618,7 @@ function toggleCodingLibraryMode() {
 
   if (typeof invalidateBrowseCache === 'function') invalidateBrowseCache();
   if (typeof renderBrowse === 'function') renderBrowse();
-  const banner = document.getElementById('browse-starter-banner');
-  if (banner) {
-    banner.innerHTML = codingStarterBannerTemplate();
-    if (typeof lucide !== 'undefined') lucide.createIcons({ root: banner });
-  }
+  csRefreshBanner();
   _csSyncBtn();
 
   if (typeof toast === 'function') {
@@ -513,8 +653,40 @@ function codingStarterButtonTemplate() {
        + '<i data-lucide="' + (on ? 'package-open' : 'package') + '"></i></button>';
 }
 
+/**
+ * Repaint the banner in place.
+ *
+ * It used to be written once when the route rendered and once more on a
+ * toggle, which was enough while it only ever said which library was on
+ * screen. It now also carries the mixed-libraries warning, and that can become
+ * true while the page is already open -- so it is repainted wherever the tree
+ * is, or the warning would wait for a navigation to appear.
+ */
+function csRefreshBanner() {
+  const banner = document.getElementById('browse-starter-banner');
+  if (!banner) return;
+  const html = codingStarterBannerTemplate();
+  if (banner.innerHTML === html) return;      // nothing to do, and no icon churn
+  banner.innerHTML = html;
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: banner });
+}
+
 /** A standing reminder of which library is on screen. */
 function codingStarterBannerTemplate() {
+  /* Shown in either mode when the two have run together, because that is
+     exactly the state in which you cannot trust what you are looking at and
+     the switch has been disabled. */
+  if (typeof codingLibrariesLookMixed === 'function' && codingLibrariesLookMixed()) {
+    return '<div class="cs-banner cs-banner-warn" role="alert">'
+         + '<i data-lucide="alert-triangle"></i>'
+         + '<span><strong>These two libraries have run together.</strong> Some starter programs are '
+         + 'sitting in your library or the other way round. Nothing has been deleted — Repair sorts '
+         + 'them by which library they came from and puts each one back.</span>'
+         + '<button type="button" class="cs-update-btn" onclick="repairCodingLibraries()"'
+         + ' title="Sort the programs back into the library each came from">'
+         + '<i data-lucide="wrench"></i> Repair</button>'
+         + '</div>';
+  }
   if (!codingLibraryIsStarter()) return '';
   return '<div class="cs-banner" role="status">'
        + '<i data-lucide="package-open"></i>'

@@ -701,6 +701,15 @@
 }
 .cs-update-btn:hover { background: color-mix(in srgb, var(--color-primary, #6366f1) 22%, transparent); }
 .cs-update-btn svg { width: 13px !important; height: 13px !important; margin-top: 0 !important; }
+/* The mixed-libraries warning. Red, because it is not information about which
+   library is on screen -- it is a report that the app can no longer tell. */
+.cs-banner-warn {
+  border-color: rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.10);
+}
+.cs-banner-warn strong,
+.cs-banner-warn svg { color: var(--color-danger, #ef4444); }
+
 .cs-banner strong { color: var(--color-primary, #6366f1); }
 .cs-banner svg { width: 15px; height: 15px; flex: 0 0 auto; margin-top: 1px; color: var(--color-primary, #6366f1); }
 

@@ -445,7 +445,7 @@ function renderTreeRecursive(parentId, scope, depth, query, activeId, itemsOnly,
                oncontextmenu="treeContextMenu(event, '${set.id}', 'browse')"
                onclick="browseSelectSet('${set.id}')">
             <i class="tree-node-chevron invisible"></i>
-            <i data-lucide="layout-grid" class="tree-node-icon" style="width:14px;height:14px;color:var(--color-accent);"></i>
+            <i data-lucide="${escapeHTML(set.icon || 'layout-grid')}" class="tree-node-icon" style="width:14px;height:14px;color:var(--color-accent);"></i>
             <span class="tree-node-label" style="font-weight:400; font-size:0.875rem;">${escapeHTML(set.title)}</span>
             <span class="tree-node-badge" title="${n} problem${n !== 1 ? 's' : ''}">${n}</span>
           </div>
@@ -1007,7 +1007,7 @@ function _renderSetDetail(container, set) {
   container.innerHTML = breadcrumbHtml + `
     <div class="animate-fade-in prog-detail">
       <div class="prog-detail-header">
-        <div class="prog-detail-icon" style="background:rgba(6,182,212,0.14); color:var(--color-accent);"><i data-lucide="layout-grid"></i></div>
+        <div class="prog-detail-icon" style="background:rgba(6,182,212,0.14); color:var(--color-accent);"><i data-lucide="${escapeHTML(set.icon || 'layout-grid')}"></i></div>
         <div style="flex:1; min-width:0;">
           <h1 class="prog-detail-title">${escapeHTML(set.title)}</h1>
           <div style="display:flex; flex-wrap:wrap; gap:0.375rem; margin-top:0.5rem;">
@@ -1207,7 +1207,7 @@ function _renderProgramDetail(container, c) {
     <div class="animate-fade-in prog-detail">
       ${coverHtml}
       <div class="prog-detail-header">
-        <div class="prog-detail-icon"><i data-lucide="file-code"></i></div>
+        <div class="prog-detail-icon"><i data-lucide="${escapeHTML(c.icon || 'file-code')}"></i></div>
         <div style="flex:1; min-width:0;">
           <h1 class="prog-detail-title">${escapeHTML(c.title)} ${getLevelBadgeHTML(c)} ${typeof getDifficultyBadgeHTML === 'function' ? getDifficultyBadgeHTML(c) : ''}</h1>
           ${_progStatsHTML(c, { attempts: attemptsCount, best: bestScore, lastScore: lastScore,
@@ -1536,6 +1536,8 @@ function renderBrowseContent() {
   }, 50);
 
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: container });
+  // The starter banner carries a warning that can turn true mid-session.
+  if (typeof csRefreshBanner === 'function') csRefreshBanner();
   window.disableNextStagger = false;
 }
 
