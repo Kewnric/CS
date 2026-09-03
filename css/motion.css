@@ -507,3 +507,34 @@ textarea:focus-visible,
     transform: none;
   }
 }
+
+
+/* ============================================================
+   FROM THE DESIGN SYSTEM — the active-state rail
+   ------------------------------------------------------------
+   Imported from the Claude Design export and converted from the kit's React
+   inline styles to plain classes. Three parts run together: the rail's
+   gradient travels along its length, its glow breathes brighter and dimmer,
+   and the row pops forward when selection lands on it.
+
+   The export's other animations are deliberately not here. cellIn, drawLine
+   and growBar are re-derivations of things this app already does -- ac-draw
+   on .ac-line and ac-bar-grow on .ac-dist-bar, on the same curves -- and
+   importing them would put a second animation on the same element.
+   ============================================================ */
+
+@keyframes railFlow { 0% { background-position: 0 0; } 100% { background-position: 0 -200%; } }
+@keyframes railBreathe {
+  0%, 100% { opacity: 0.7; box-shadow: 2px 0 6px rgba(34, 211, 238, 0.35); }
+  50% { opacity: 1; box-shadow: 3px 0 14px rgba(34, 211, 238, 0.75), 6px 0 26px rgba(34, 211, 238, 0.25); }
+}
+@keyframes selectPop {
+  0% { transform: translateX(0) scale(1); }
+  45% { transform: translateX(7px) scale(1.035); }
+  100% { transform: translateX(4px) scale(1); }
+}
+@keyframes labelPop {
+  0% { transform: translateX(0); }
+  50% { transform: translateX(4px); }
+  100% { transform: translateX(2px); }
+}
