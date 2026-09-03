@@ -21,14 +21,18 @@ function homeTemplate() {
           </div>
         </section>
         <section class="home-stats-grid" id="home-stats"></section>
-        <!-- Only present when something was left unfinished, and only until its
-             countdown runs out. Sits under the stats so the numbers stay put. -->
-        <section id="home-continue"></section>
         <!-- Quick Actions is a fixed list of six links, so it is sized to its
              content and the heatmap and carousel take the rest — they are the
              two things on this page that actually benefit from width. -->
         <section class="home-two-col home-two-col-wide">
           <div style="display: flex; flex-direction: column; gap: 1.5rem; min-width: 0;">
+            <!-- Only present when something was left unfinished, and only until
+                 its countdown runs out. It sits in this column rather than
+                 across the page so it is the heatmap's width and Quick Actions
+                 keeps its own height: a full-width bar above the row pushed
+                 that column down too, for something that has nothing to do
+                 with it. Empty, it is display:none, so the column closes up. -->
+            <section id="home-continue"></section>
             <div class="home-card" id="home-heatmap"></div>
             <div id="home-notebook-carousel"></div>
           </div>

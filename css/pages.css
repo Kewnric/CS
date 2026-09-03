@@ -2134,9 +2134,14 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
    thin border, a blinking cursor pointing at the entry, and a materia orb for
    the library it came from. One row, ~54px, against the three stacked lines
    and 40px tile it replaced. */
+/* A flex child still takes a gap slot when it has nothing in it, so an empty
+   host would hold 1.5rem open above the heatmap for a card that is not there.
+   :empty matches exactly the state the renderer leaves behind (innerHTML = ''),
+   so the column closes up the moment the card goes. */
+#home-continue:empty { display: none; }
+
 .home-continue-card {
   position: relative;
-  margin-bottom: 1rem;
   /* The same corner as the stat cards it sits under, rather than the game's own
      chamfer — the point is to belong to this page. --radius-xl is 24px, which
      is rounder than its neighbours, not the same as them. */
