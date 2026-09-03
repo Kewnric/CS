@@ -89,6 +89,9 @@ function practiceSetTemplate() {
 function practiceSetInit() {
   if (typeof GuidedTutorial !== 'undefined' && GuidedTutorial.end) GuidedTutorial.end();
   psetInit();
+  // This screen renders the OST control but never mounted it, so the player
+  // showed stale state here and had nothing to resume it after an exit.
+  if (typeof ostMount === 'function') ostMount();
 }
 
 function practiceSetDestroy() {

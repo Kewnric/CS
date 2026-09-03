@@ -61,6 +61,18 @@ let _ostMode = 'all';
    instant; without this the cut would be taken more than once. */
 let _ostCapping = false;
 
+/* Set when leaving an attempt pauses a track that was playing, and read when
+   the next attempt mounts.
+
+   Without it, stopping on the way out had no counterpart on the way back in:
+   _ostTryAutoplay() only runs where _ostEl() BUILDS the element, and on the
+   second attempt of a page load the element already exists, so the mount
+   returned early and the music stayed paused.
+
+   It is deliberately not "autoplay is on, so play": pausing with the player's
+   own button clears this, so a track you stopped on purpose stays stopped. */
+let _ostResumeOnReturn = false;
+
 /* ── State that outlives the button ──────────────────────── */
 
 function _ostReadInt(key, fallback) {
@@ -234,6 +246,8 @@ function ostPlayPause() {
     if (p && p.catch) p.catch(() => _ostSync());
   } else {
     a.pause();
+    // Stopped on purpose: do not start it again on the next attempt.
+    _ostResumeOnReturn = false;
   }
   _ostSync();
 }
@@ -436,7 +450,12 @@ function _ostSync() {
 function ostStop() {
   let stopped = false;
   if (_ostAudio) {
-    if (!_ostAudio.paused) { try { _ostAudio.pause(); stopped = true; } catch (e) { /* nothing to do */ } }
+    if (!_ostAudio.paused) {
+      // Remembered BEFORE the pause, so the next mount can tell "the exit
+      // stopped this" from "you stopped this".
+      _ostResumeOnReturn = true;
+      try { _ostAudio.pause(); stopped = true; } catch (e) { /* nothing to do */ }
+    }
     _ostRemember();
   }
   if (typeof _spotPlayer !== 'undefined' && _spotPlayer) {
@@ -476,7 +495,19 @@ function ostRewind() {
 
 function ostMount() {
   if (!document.querySelector('.ost-control')) return;
-  _ostEl();
+  const a = _ostEl();
+  /* Put back what leaving the last attempt took away. _ostEl() only tries
+     autoplay on the mount that builds the element, so from the second attempt
+     of a page load onwards there was nothing here to start it again. */
+  if (_ostResumeOnReturn && a && a.paused && OST_TRACKS.length &&
+      !(typeof ostSourceIsSpotify === 'function' && ostSourceIsSpotify())) {
+    _ostResumeOnReturn = false;
+    if (!a.src) a.src = _ostSrc(_ostIndex);
+    // Blocked autoplay rejects rather than throwing; fall back to the same
+    // first-gesture arming the initial load uses.
+    const pr = a.play();
+    if (pr && typeof pr.catch === 'function') pr.catch(() => _ostArmFirstGesture());
+  }
   _ostSync();
 }
 
