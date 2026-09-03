@@ -497,6 +497,7 @@ function toggleEditorFx() {
     _edfxLive = [];
   }
   _syncEditorFxBtn();
+  if (typeof feelSync === 'function') feelSync();
   if (typeof toast === 'function') {
     toast(next ? 'Letter animation on' : 'Letter animation off', { type: 'info', duration: 1800 });
   }
@@ -514,6 +515,8 @@ function toggleEditorFxOverlay() {
   if (typeof toast === 'function') {
     toast(next ? 'Letters draw over the text' : 'Letters become the text', { type: 'info', duration: 1800 });
   }
+
+  if (typeof feelSync === 'function') feelSync();
 }
 
 /** The soft start on or off. */
@@ -524,6 +527,8 @@ function toggleEditorFxBlur() {
   if (typeof toast === 'function') {
     toast(next ? 'Letters resolve out of a blur' : 'Letters land sharp', { type: 'info', duration: 1800 });
   }
+
+  if (typeof feelSync === 'function') feelSync();
 }
 
 /** The lean on or off. */
@@ -534,6 +539,8 @@ function toggleEditorFxTilt() {
   if (typeof toast === 'function') {
     toast(next ? 'Letters lean as they land' : 'Letters land upright', { type: 'info', duration: 1800 });
   }
+
+  if (typeof feelSync === 'function') feelSync();
 }
 
 function _syncEditorFxBtn() {

@@ -4051,3 +4051,149 @@ body.is-resizing .practice-panel { transition: none; }
   border-color: var(--color-primary);
   color: var(--color-primary);
 }
+
+/* ── The Feel panel, and the strip it sits in ──────────────────
+   Three 36px buttons became one. The right-hand cluster measured 671px for
+   nine controls and 718px once a cheat sheet existed, six of them identical
+   icons with nothing separating one kind from another.
+
+   The panel opens on CLICK only. The old edfx and sfx popovers opened on
+   :hover while their button toggled the effect, and since the panel hangs
+   directly under the button you have to cross, opening one switched it off on
+   the way. Every option including Off is a row in here now, and the button
+   only opens. */
+.feel-control {
+  position: relative;
+  display: inline-flex;
+}
+
+.feel-pop {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 60;
+  margin-top: 6px;
+  width: 260px;
+  max-height: min(78vh, 620px);
+  overflow: hidden;               /* the scroller inside does the scrolling */
+  padding: 0.4rem;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-6px);
+  transition: opacity 0.14s ease, transform 0.16s ease, visibility 0.14s;
+}
+.feel-scroll {
+  overflow-y: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.feel-scroll::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+/* Lit only while there is more in that direction. */
+.feel-pop::before,
+.feel-pop::after {
+  content: "";
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  height: 26px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 2;
+}
+.feel-pop::before { top: 1px;    background: linear-gradient(to bottom, var(--bg-elevated) 30%, transparent); }
+.feel-pop::after  { bottom: 1px; background: linear-gradient(to top,    var(--bg-elevated) 30%, transparent); }
+.feel-pop.can-up::before,
+.feel-pop.can-down::after { opacity: 1; }
+.feel-control.is-open .feel-pop {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+/* Three sections in one level, not a menu inside a menu. */
+.feel-sec + .feel-sec {
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--border-color);
+}
+.feel-sec-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.25rem 0.45rem 0.3rem;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.feel-sec-head svg { width: 12px; height: 12px; }
+
+.feel-opt {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  width: 100%;
+  padding: 0.32rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.13s ease, color 0.13s ease, border-color 0.13s ease;
+}
+.feel-opt:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+.feel-opt:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.feel-opt.is-on {
+  color: var(--color-primary);
+  border-color: color-mix(in srgb, var(--color-primary) 45%, transparent);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
+.feel-opt-name { font-size: 0.78rem; font-weight: 700; line-height: 1.25; }
+.feel-opt-hint { font-size: 0.65rem; line-height: 1.25; color: var(--text-tertiary); }
+.feel-opt.is-on .feel-opt-hint { color: color-mix(in srgb, var(--color-primary) 70%, var(--text-tertiary)); }
+
+.feel-vol-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0.5rem 0.45rem;
+}
+.feel-vol-row .sfx-vol-range { flex: 1; min-width: 0; }
+
+/* A hairline between kinds of control, so ten dots read as four groups. */
+.topbar-div {
+  width: 1px;
+  align-self: stretch;
+  margin: 0.35rem 0.15rem;
+  background: var(--border-color);
+  flex: 0 0 auto;
+}
+
+/* On a phone the panel is a sheet, the same as the popovers it replaces. */
+@media (max-width: 640px) {
+  .feel-control.is-open .feel-pop {
+    position: fixed;
+    top: auto;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: auto;
+    max-height: 62vh;
+  }
+}

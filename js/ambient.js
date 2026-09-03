@@ -284,6 +284,8 @@ function toggleAmbient() {
   if (typeof toast === 'function') {
     toast(next ? 'Background motion on' : 'Background motion off', { type: 'info', duration: 1800 });
   }
+
+  if (typeof feelSync === 'function') feelSync();
 }
 
 /* Click opens the panel rather than long-press, which is what the two controls
@@ -318,6 +320,8 @@ function setAmbTheme(id) {
   if (typeof toast === 'function') {
     toast(theme.name + ' background', { type: 'info', duration: 1800 });
   }
+
+  if (typeof feelSync === 'function') feelSync();
 }
 
 function _syncAmbientBtn() {

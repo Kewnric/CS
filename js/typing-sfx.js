@@ -193,6 +193,8 @@ function sfxVoiceDef() { return SFX_VOICES[sfxVoiceId()]; }
 function sfxPickVoice(id) {
   if (!SFX_VOICES[id] || sfxVoiceId() === id) return;
   _sfxApplyVoice(id);
+
+  if (typeof feelSync === 'function') feelSync();
 }
 
 /** Cycle to the next voice, for a keyboard shortcut or a single-button UI. */
@@ -523,6 +525,7 @@ function toggleTypingSfx() {
   const next = !sfxEnabled();
   try { localStorage.setItem(SFX_KEY, next ? '1' : '0'); } catch (e) { /* private mode */ }
   _syncTypingSfxBtn();
+  if (typeof feelSync === 'function') feelSync();
   if (next) {
     // Play the thing being switched on, so the button proves itself.
     const v = sfxKeyVoice('a'), w = sfxKeyVoice(' ');

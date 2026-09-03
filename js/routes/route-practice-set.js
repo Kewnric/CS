@@ -13,19 +13,19 @@ function practiceSetTemplate() {
           ${bossBarTemplate()}
         </div>
         <div class="practice-topbar-right">
-          <button class="btn btn-ghost practice-icon-btn" onclick="psetToggleBoss()" title="Toggle Boss Health Bar" id="boss-bar-toggle-btn" aria-label="Toggle Boss Health Bar">
+          <button class="btn btn-ghost practice-icon-btn" onclick="psetToggleBoss()" title="Boss health bar" id="boss-bar-toggle-btn" aria-label="Boss health bar" aria-pressed="true">
             <i data-lucide="swords" style="width:16px;height:16px;" aria-hidden="true"></i>
           </button>
+          ${feelButtonTemplate()}
+          ${ostButtonTemplate()}
+          <span class="topbar-div" aria-hidden="true"></span>
           <button class="btn btn-ghost practice-icon-btn" onclick="openCheatsheet()" title="Cheat sheet" id="cheatsheet-toggle-btn" aria-label="Cheat sheet" style="display:none;">
             <i data-lucide="book-open" style="width:16px;height:16px;" aria-hidden="true"></i>
           </button>
-          ${typingSfxButtonTemplate()}
-          ${editorFxButtonTemplate()}
-          ${ambientButtonTemplate()}
-          ${ostButtonTemplate()}
           <button class="btn btn-ghost practice-icon-btn" onclick="toggleFullscreen()" title="Full screen" id="fullscreen-toggle-btn" aria-label="Full screen" aria-pressed="false">
             <i data-lucide="maximize" style="width:16px;height:16px;" aria-hidden="true"></i>
           </button>
+          <span class="topbar-div" aria-hidden="true"></span>
           <div class="timer-display" oncontextmenu="openTimerMenu(event)" title="Right-click to change the timer">
             <i data-lucide="clock"></i><span id="pset-timer">00:00</span>
             <button class="btn-pause-timer" id="pset-pause-btn" onclick="psetTogglePause()" title="Pause/Resume Timer">

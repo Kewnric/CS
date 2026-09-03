@@ -64,26 +64,28 @@ function practiceTemplate() {
           ${bossBarTemplate()}
         </div>
         <div class="practice-topbar-right">
-          <button class="btn btn-ghost practice-icon-btn" onclick="toggleBossHealthBar()" title="Toggle Boss Health Bar" id="boss-bar-toggle-btn" aria-label="Toggle Boss Health Bar">
+          <button class="btn btn-ghost practice-icon-btn" onclick="toggleBossHealthBar()" title="Boss health bar" id="boss-bar-toggle-btn" aria-label="Boss health bar" aria-pressed="true">
             <i data-lucide="swords" style="width:16px;height:16px;" aria-hidden="true"></i>
           </button>
+          ${feelButtonTemplate()}
+          ${ostButtonTemplate()}
+          <span class="topbar-div" aria-hidden="true"></span>
           <button class="btn btn-ghost practice-icon-btn" onclick="openCheatsheet()" title="Cheat sheet" id="cheatsheet-toggle-btn" aria-label="Cheat sheet" style="display:none;">
             <i data-lucide="book-open" style="width:16px;height:16px;" aria-hidden="true"></i>
           </button>
-          ${typingSfxButtonTemplate()}
-          ${editorFxButtonTemplate()}
-          ${ambientButtonTemplate()}
-          ${ostButtonTemplate()}
           <button class="btn btn-ghost practice-icon-btn" onclick="toggleFullscreen()" title="Full screen" id="fullscreen-toggle-btn" aria-label="Full screen" aria-pressed="false">
             <i data-lucide="maximize" style="width:16px;height:16px;" aria-hidden="true"></i>
           </button>
+          <span class="topbar-div" aria-hidden="true"></span>
           <div class="timer-display" oncontextmenu="openTimerMenu(event)" title="Right-click to change the timer">
             <i data-lucide="clock"></i><span id="practice-timer">00:00</span>
             <button class="btn-pause-timer" id="pause-timer-btn" onclick="togglePauseTimer()" title="Pause/Resume Timer">
               <i data-lucide="pause" id="pause-timer-icon" style="width:14px;height:14px;"></i>
             </button>
           </div>
-          <button class="btn btn-secondary practice-action-btn" onclick="retryPractice()"><i data-lucide="rotate-ccw"></i> Retry</button>
+          <button class="btn btn-ghost practice-action-btn" onclick="retryPractice()"
+                  title="Start this attempt over — resets the code, the clock and the hints">
+            <i data-lucide="rotate-ccw"></i> Retry</button>
           <button class="btn btn-secondary practice-action-btn pp-check-btn" id="pp-check-btn" onclick="ppRunAllChecks()"
                   title="Run the minimum requirements + test cases — does NOT submit">
             <i data-lucide="check-circle"></i> Check Code
