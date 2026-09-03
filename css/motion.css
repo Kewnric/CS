@@ -557,8 +557,17 @@ textarea:focus-visible,
   45% { transform: translateX(7px) scale(1.035); }
   100% { transform: translateX(4px) scale(1); }
 }
+/* Was 0 -> +4px -> +2px on --ease-spring, and jittered for two reasons at
+   once: the keyframes overshoot and reverse, and that easing curve
+   overshoots on its own (the 1.56 control point), so the label bounced
+   twice. It also finished at +2px, leaving the text permanently off its
+   own baseline.
+
+   Now it settles: one direction, from slightly behind and soft, arriving
+   at exactly where the label sits anyway. Nothing to come back from, so
+   there is nothing to judder -- and because it ends at 0 it can sit on a
+   row that is itself moving without the two fighting. */
 @keyframes labelPop {
-  0% { transform: translateX(0); }
-  50% { transform: translateX(4px); }
-  100% { transform: translateX(2px); }
+  from { transform: translateX(-3px); opacity: 0.55; }
+  to   { transform: translateX(0);    opacity: 1; }
 }

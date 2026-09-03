@@ -431,7 +431,7 @@ function renderAnalyticsTreeItem(item, logs, scope, depth) {
 
   const completionBadge = completions > 1 ? `<span style="font-size:0.65rem; color:var(--color-primary); background:rgba(59,130,246,0.1); padding:2px 6px; border-radius:12px; margin-right:0.5rem; font-weight:700;">${completions}x Completed</span>` : '';
   const indent = (depth + 1) * 0.75;
-  const itemIcon = scope === 'challenge' ? 'file-code' : (scope === 'notebook' ? 'book' : 'code');
+  const itemIcon = scope === 'challenge' ? 'file-code-2' : (scope === 'notebook' ? 'book' : 'code');
 
   return `<div class="tree-node tree-item-node ${isActive ? 'active' : ''} ${bulkResetMode ? 'bulk-mode' : ''}" data-level="${depth + 1}" data-node-id="${item.id}">
       <div class="tree-node-row ${isActive ? 'active' : ''}"

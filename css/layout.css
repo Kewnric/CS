@@ -253,7 +253,7 @@
 }
 
 .sidebar-link.active .sidebar-label {
-  animation: labelPop 0.32s var(--ease-spring) both;
+  animation: labelPop 0.36s var(--ease-expo-out) both;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -910,6 +910,12 @@ details[open]>.snippet-folder-summary>.folder-icon {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  /* Every row is the same height, folder or program. Equal padding got them to
+     within 2px, but a program's label is set a size smaller inline by each
+     renderer, so its line box is shorter and no amount of padding closes that
+     without touching five render sites. One floor does it, and 44px is also the
+     target size a finger expects. */
+  min-height: 2.75rem;
   padding: 0.625rem 0.75rem;
   border-radius: var(--radius-md);
   cursor: pointer;

@@ -420,7 +420,7 @@ function renderTreeRecursive(parentId, scope, depth, query, activeId, itemsOnly,
                oncontextmenu="treeContextMenu(event, '${item.id}', 'browse')"
                onclick="browseSelectProgram('${item.id}')">
             <i class="tree-node-chevron invisible"></i>
-            <i data-lucide="${item.icon || 'file-code'}" class="tree-node-icon item-icon-color" style="width:14px;height:14px;"></i>
+            <i data-lucide="${item.icon || 'file-code-2'}" class="tree-node-icon item-icon-color" style="width:14px;height:14px;"></i>
             <span class="tree-node-label" style="font-weight:400; font-size:0.875rem;">${escapeHTML(item.title)}</span>
             ${browseShow('level') && item.level != null ? `<span class="tree-badge-level">L${item.level}</span>` : ''}
             ${browseShow('tags') && (item.tags || []).length ? `<span class="tree-badge-tag">${escapeHTML(item.tags[0])}</span>` : ''}
@@ -506,7 +506,7 @@ function _buildChallengeCard(c, query) {
   const slipped = lastScore >= 0 && bestScore >= 0 && lastScore < bestScore;
   const coverHtml = c.coverImage
     ? `<div class="nb-card-cover"><img src="${c.coverImage}" alt="" loading="lazy" /></div>`
-    : libCoverFallbackHTML(c.title, 'file-code');
+    : libCoverFallbackHTML(c.title, 'file-code-2');
   const resumable = browseHasResumable(c);
   const selecting = libSelectMode('browse');
   return `
@@ -1207,7 +1207,7 @@ function _renderProgramDetail(container, c) {
     <div class="animate-fade-in prog-detail">
       ${coverHtml}
       <div class="prog-detail-header">
-        <div class="prog-detail-icon"><i data-lucide="${escapeHTML(c.icon || 'file-code')}"></i></div>
+        <div class="prog-detail-icon"><i data-lucide="${escapeHTML(c.icon || 'file-code-2')}"></i></div>
         <div style="flex:1; min-width:0;">
           <h1 class="prog-detail-title">${escapeHTML(c.title)} ${getLevelBadgeHTML(c)} ${typeof getDifficultyBadgeHTML === 'function' ? getDifficultyBadgeHTML(c) : ''}</h1>
           ${_progStatsHTML(c, { attempts: attemptsCount, best: bestScore, lastScore: lastScore,

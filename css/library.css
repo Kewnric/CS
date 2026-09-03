@@ -11,7 +11,11 @@
    A leaf has no chevron, but it still reserved the full 18px slot, which added
    a second level of apparent indentation on top of its padding. Narrow it. */
 .tree-item-node .tree-node-chevron.invisible { width: 9px; min-width: 9px; }
-.tree-item-node .tree-node-row { padding-top: 0.45rem; padding-bottom: 0.45rem; }
+/* Programs used to sit in a shorter row than the folders above them -- 36px
+   against 44px -- which made them read as secondary and gave them a smaller
+   target than the thing that merely contains them. They take the same
+   padding as any other row now; the smaller icon and lighter label are what
+   carry the hierarchy, not a cramped row. */
 
 /* --- Collapsible filter shell --- */
 .lib-filter-shell { margin-bottom: 1rem; }
