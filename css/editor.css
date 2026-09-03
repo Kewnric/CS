@@ -4123,24 +4123,74 @@ body.is-resizing .practice-panel { transition: none; }
   transform: translateY(0);
 }
 
-/* Three sections in one level, not a menu inside a menu. */
-.feel-sec + .feel-sec {
-  margin-top: 0.35rem;
-  padding-top: 0.35rem;
-  border-top: 1px solid var(--border-color);
-}
-.feel-sec-head {
+/* ── The pager ──────────────────────────────────────────────
+   One page at a time, so a section is read whole rather than scrolled past.
+   The header names the page and carries the way to the next; the dots say how
+   many there are and let you jump. */
+.feel-head {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.25rem 0.45rem 0.3rem;
-  font-size: 0.66rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-tertiary);
+  gap: 0.25rem;
+  padding: 0.1rem 0.1rem 0.3rem;
 }
-.feel-sec-head svg { width: 12px; height: 12px; }
+.feel-head-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.feel-head-title span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feel-head-title svg { width: 13px; height: 13px; flex: 0 0 auto; color: var(--color-primary); }
+
+/* A 28px target for a 14px glyph — these get pressed repeatedly. */
+.feel-nav {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: background 0.13s ease, color 0.13s ease;
+}
+.feel-nav:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+.feel-nav:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.feel-nav svg { width: 15px; height: 15px; }
+
+.feel-dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0 0 0.4rem;
+  margin-bottom: 0.3rem;
+  border-bottom: 1px solid var(--border-color);
+}
+.feel-dot {
+  width: 16px;
+  height: 4px;
+  padding: 0;
+  border: none;
+  border-radius: 2px;
+  background: var(--border-color);
+  cursor: pointer;
+  transition: background 0.15s ease, width 0.18s ease;
+}
+.feel-dot:hover { background: var(--text-tertiary); }
+.feel-dot.is-on { width: 22px; background: var(--color-primary); }
+.feel-dot:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+.feel-page { display: flex; flex-direction: column; gap: 0.15rem; }
 
 .feel-opt {
   display: flex;
