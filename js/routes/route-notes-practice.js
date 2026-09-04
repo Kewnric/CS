@@ -12,6 +12,9 @@ function notesPracticeTemplate() {
           <button id="np-align-btn" onclick="toggleNpTextAlign()" class="tutorial-trigger-btn" title="Text: Centered" style="color: silver;"><i data-lucide="align-center"></i></button>
           <button id="np-flag-btn" onclick="npToggleFlag(currentSectionIdx, currentQuestionNum)" class="tutorial-trigger-btn" title="Flag for review (F)" aria-pressed="false" style="color: silver;"><i data-lucide="flag"></i></button>
           <button id="np-cheat-btn" onclick="openCheatsheet()" class="tutorial-trigger-btn" title="Cheat sheet" style="color: silver;"><i data-lucide="book-open-check"></i></button>
+          <button id="np-voice-btn" onclick="npToggleAutoVoice()" class="tutorial-trigger-btn"
+                  title="Read questions aloud" aria-label="Read questions aloud" aria-pressed="false"
+                  style="color: silver;"><i data-lucide="volume-x"></i></button>
           <!-- Shared with the coding attempt. Both templates read their state
                from the same modules, so they need no wiring here beyond the
                ostMount/ostStop pair below: feel-panel keeps itself in step
@@ -122,6 +125,7 @@ function notesPracticeInit() {
   // here -- the same call practiceInit makes. Without it the disc is drawn but
   // a track left playing from a previous attempt never picks back up.
   if (typeof ostMount === 'function') ostMount();
+  if (typeof _npSyncVoiceBtn === 'function') _npSyncVoiceBtn();
   npSyncMobileChrome();
   _npChromeMq = window.matchMedia('(max-width: 640px)');
   _npChromeSync = () => npSyncMobileChrome();

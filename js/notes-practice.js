@@ -983,6 +983,75 @@ function npUnbindKeys() {
 /* ----------------------------------------------------------
    RENDERING — QUESTION + BUBBLES
    ---------------------------------------------------------- */
+/* ── Reading the questions out ──────────────────────────────────────────────
+   The same switch Free run has: with it on, each question reads itself as it
+   arrives and an answer speaks when the pointer lands on it, so a notebook can
+   be worked through by ear.
+
+   Per device rather than per notebook, because it is about how you want to
+   study rather than anything about the material. */
+const NP_VOICE_KEY = 'ssp.np.autoVoice';
+
+/** The question last read, so a repaint does not read it again. */
+let _npSpokenQ = '';
+
+function npAutoVoice() {
+  try { return localStorage.getItem(NP_VOICE_KEY) === '1'; } catch (e) { return false; }
+}
+
+function npToggleAutoVoice() {
+  const next = !npAutoVoice();
+  try { localStorage.setItem(NP_VOICE_KEY, next ? '1' : '0'); } catch (e) { /* private mode */ }
+  if (!next && typeof speechStop === 'function') speechStop();
+  _npSyncVoiceBtn();
+  // Turning it on should prove itself rather than wait for the next question.
+  if (next) { _npSpokenQ = ''; npSpeakQuestion(); }
+}
+
+function _npSyncVoiceBtn() {
+  const btn = document.getElementById('np-voice-btn');
+  if (!btn) return;
+  const on = npAutoVoice();
+  btn.setAttribute('aria-pressed', String(on));
+  btn.style.color = on ? 'var(--color-primary)' : 'silver';
+  btn.title = on ? 'Reading questions aloud' : 'Read questions aloud';
+  btn.innerHTML = '<i data-lucide="' + (on ? 'volume-2' : 'volume-x') + '"></i>';
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: btn });
+}
+
+/**
+ * Read the question on screen, once.
+ *
+ * Guarded on the question id rather than the text: renderQuestion runs again
+ * for a selection, a grade and the timer, and speaking on each would restart
+ * the same sentence. Two questions can also share wording, so the id is what
+ * distinguishes them.
+ */
+function npSpeakQuestion(text) {
+  if (!npAutoVoice() || typeof speak !== 'function') return;
+  const key = currentSectionIdx + '-' + currentQuestionNum;
+  if (key === _npSpokenQ) return;
+  /* Taken from the answer key, not from the element. The question is typed out
+     a character at a time by npQuestionAnimator, so reading the DOM here would
+     catch it empty or halfway through. */
+  let said = String(text == null ? '' : text).trim();
+  if (!said) {
+    const el = document.getElementById('np-q-text');
+    said = (el && el.textContent || '').trim();
+  }
+  if (!said) return;
+  _npSpokenQ = key;
+  speak(said);
+}
+
+/** An answer speaks when the pointer reaches it. Mouse only: on a touch screen
+    the tap IS the answer, and reading each one on the way past would be noise. */
+function npHoverSpeak(el) {
+  if (!npAutoVoice() || typeof speak !== 'function' || !el) return;
+  const said = (el.textContent || '').trim();
+  if (said) speak(said);
+}
+
 function renderQuestion() {
   const heading = document.getElementById('np-q-heading');
   const reviewStatus = document.getElementById('np-review-status');
@@ -1081,6 +1150,12 @@ function renderQuestion() {
       qImage.src = '';
       qImageContainer.classList.add('hidden');
     }
+  }
+
+  // Read it as it arrives, if that is switched on. Guarded on the question id,
+  // so the repaints for a selection, a grade or the clock do not restart it.
+  if (typeof npSpeakQuestion === 'function') {
+    npSpeakQuestion(correctObj && correctObj.question);
   }
 
   const qTextDiv = document.getElementById('np-q-text');
@@ -1344,7 +1419,7 @@ function renderQuestion() {
       return `
         <div style="display:flex; flex-direction:column; gap:0.25rem; text-align:left; width: 100%;">
           <span style="font-size:0.75rem; font-weight:700; color:var(--text-tertiary); margin-left:0.25rem;">${letter}.</span>
-          <button class="${cls}" style="width:100%; height:auto; border-radius:var(--radius-md); padding:1rem 1.25rem; text-align:${npTextAlignCenter ? 'center' : 'left'}; font-size:1rem; min-height:54px; display:flex; justify-content:${npTextAlignCenter ? 'center' : 'flex-start'}; align-items:center; white-space:normal; word-wrap:break-word; overflow-wrap:break-word;" ${onclick}>
+          <button class="${cls}" onpointerenter="if(event.pointerType==='mouse') npHoverSpeak(this)" style="width:100%; height:auto; border-radius:var(--radius-md); padding:1rem 1.25rem; text-align:${npTextAlignCenter ? 'center' : 'left'}; font-size:1rem; min-height:54px; display:flex; justify-content:${npTextAlignCenter ? 'center' : 'flex-start'}; align-items:center; white-space:normal; word-wrap:break-word; overflow-wrap:break-word;" ${onclick}>
             ${choiceText ? escapeHTML(choiceText) : letter}
           </button>
         </div>

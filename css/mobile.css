@@ -465,8 +465,12 @@
      as full-screen as it gets. THE THEME SELECT, because at 75px it is the
      widest control on the strip and the only one that is a standing preference
      rather than a thing you do to this attempt -- it is set once, from
-     Settings, and stays set. Both remain on every wider screen. */
+     Settings, and stays set. AND THE TEXT-ALIGN TOGGLE, which centres or
+     left-aligns the question -- also a preference, and the least essential of
+     the row once reading aloud earned a place in it. All three remain on every
+     wider screen. */
   body[data-route="notes-practice"] #np-fullscreen-btn,
+  body[data-route="notes-practice"] #np-align-btn,
   body[data-route="notes-practice"] #theme-selector { display: none; }
 
   /* ── The action bar ─────────────────────────────────────────
