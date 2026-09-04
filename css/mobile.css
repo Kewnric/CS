@@ -489,6 +489,57 @@
     padding: 1.25rem 1rem !important;
   }
 
+  /* ── DETAIL PANES: NOTEBOOK AND PROGRAM ─────────────────────
+     Both are built from the same .prog-* blocks, and both were laid out for a
+     pane about twice this wide. Measured on the notebook detail at 375px.
+
+     THE SECTION ROW WAS EATING ITSELF. .nb-section-stat carries a 120px
+     min-width for its progress bar; with the number column and the gaps that
+     left .prog-variant-info exactly 90px of a 293px row, so "3 questions" and
+     "4 choices (A-D)" -- one comfortable line at any sane width -- broke onto
+     two, the row grew to 121px, and the vertically centred "01" ended up level
+     with the second line instead of the title. It read as overlapping text.
+
+     The status moves to its own line under the title, indented to align with
+     it, and the min-width goes: on a phone there is no width to reserve. */
+  .prog-variant-row {
+    flex-wrap: wrap;
+    /* The row's 0.9rem gap is a COLUMN gap by intent; once the row wraps it
+       applies to both axes and charges 14px between the title and the status
+       line on top of the margin below. */
+    row-gap: 0;
+  }
+  .nb-section-stat {
+    min-width: 0;
+    flex: 1 1 100%;
+    align-items: flex-start;
+    /* Aligned under the title rather than under the number: the number column
+       is 20px and the row's gap is 0.9rem. */
+    padding-left: calc(20px + 0.9rem);
+    margin-top: 0.25rem;
+  }
+
+  /* 1.9rem over 209px of column set "Quick Start Quiz" on two lines and gave
+     the header 201px before a word of the notebook had been read. */
+  .prog-detail-title { font-size: 1.4rem; }
+  .prog-detail-icon { width: 52px; height: 52px; min-width: 52px; }
+  .prog-detail-header { gap: 0.875rem; }
+
+  /* The breadcrumb runs the full content width, and the agenda flag is pinned
+     over its right end -- measured overlapping from x=319 while the breadcrumb
+     reached 334. Keeping clear of it is cheaper than moving the flag, which is
+     deliberately in that corner on every route. */
+  .breadcrumb-nav {
+    padding-right: 52px;
+    row-gap: 0.25rem;
+  }
+
+  /* The settings button floats over the bottom-right corner, so the last card
+     in a pane scrolled underneath it and could not be read or tapped. */
+  .messenger-pane-2 .pane-2-content,
+  .messenger-pane-2 { scroll-padding-bottom: 72px; }
+  .prog-variant-list { padding-bottom: 56px; }
+
   /* ── TOUCH TARGETS ──────────────────────────────────────────
      Measured across every route: the back button in each library was 64x23,
      and a handful of others sat between 20 and 26px tall. Thumbs are about
