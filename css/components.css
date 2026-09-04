@@ -3909,21 +3909,21 @@ body[data-route="visualization"] .settings-fab { display: none; }
    Three actions, three tones, keyed off the same test that picks the label so
    the two can never disagree:
 
-     green   nothing has been run yet -- a fresh attempt
+     indigo  nothing has been run yet -- a fresh attempt
      amber   an unfinished attempt is waiting to be picked back up
-     indigo  solved once already; this starts it over
+     green   solved once already; this starts it over
 
    Colour on the border and the glyph rather than a filled block: these sit
    three to a row beside a status pill, and three saturated fills would read as
    the loudest thing on the page. */
 .card-compact-action.is-fresh {
-  color: #34d399;
-  border-color: rgba(16, 185, 129, 0.38);
-  background: rgba(16, 185, 129, 0.10);
+  color: var(--color-primary);
+  border-color: rgba(99, 102, 241, 0.42);
+  background: rgba(99, 102, 241, 0.12);
 }
 .card-compact-action.is-fresh:hover {
-  background: rgba(16, 185, 129, 0.18);
-  border-color: rgba(16, 185, 129, 0.6);
+  background: rgba(99, 102, 241, 0.2);
+  border-color: rgba(99, 102, 241, 0.65);
 }
 .card-compact-action.is-resume {
   color: #fbbf24;
@@ -3934,12 +3934,16 @@ body[data-route="visualization"] .settings-fab { display: none; }
   background: rgba(245, 158, 11, 0.2);
   border-color: rgba(245, 158, 11, 0.65);
 }
-/* Indigo is .btn-practice's own colour, so "solved, run it again" keeps the
-   button the rest of the app already uses for practice. */
+/* Green reads as "this one is behind you" -- the same colour the Solved pill
+   beside it uses, so a solved card agrees with itself across the row. */
 .card-compact-action.is-retry {
-  color: var(--color-primary);
-  border-color: rgba(99, 102, 241, 0.42);
-  background: rgba(99, 102, 241, 0.12);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.38);
+  background: rgba(16, 185, 129, 0.10);
+}
+.card-compact-action.is-retry:hover {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: rgba(16, 185, 129, 0.6);
 }
 
 .card-compact-action {
