@@ -509,6 +509,14 @@ function _buildChallengeCardCompact(c) {
   const logs = (_browseHistoryIndex && _browseHistoryIndex[c.id]) || [];
   const bestScore = logs.length ? Math.max(...logs.map(l => l.score)) : -1;
   const selecting = libSelectMode('browse');
+  /* The same three states the detailed card's button has, and the same two
+     handlers -- an unfinished attempt is picked up rather than thrown away, and
+     a solved program says Retry rather than pretending you have not been here.
+     Kept to the icon and one word: the row it sits in already carries the
+     version count and the status, and a full-width button underneath would undo
+     the height this layout exists to save. */
+  const resumable = browseHasResumable(c);
+  const actionLabel = resumable ? 'Resume' : bestScore === 100 ? 'Retry' : 'Practice';
   return `
     <div class="card card-compact${libIsSelected('browse', c.id) ? ' lib-selected' : ''}" id="card-${c.id}"
          onclick="${selecting ? `libToggleSelect('browse','${c.id}')` : `browseSelectProgram('${c.id}')`}" style="cursor:pointer;">
@@ -520,6 +528,11 @@ function _buildChallengeCardCompact(c) {
       <div class="card-compact-meta">
         <span class="version-pill">${vCount} version${vCount !== 1 ? 's' : ''}</span>
         ${_browseSolvedPill(bestScore, logs.length)}
+        <button class="btn btn-practice card-compact-action"
+                onclick="event.stopPropagation(); ${resumable ? `browseResume('${c.id}')` : `browseStartFresh('${c.id}')`}"
+                title="${actionLabel} — ${escapeHTML(c.title)}" aria-label="${actionLabel} ${escapeHTML(c.title)}">
+          <i data-lucide="play" style="width:15px;height:15px;fill:currentColor;"></i>
+        </button>
       </div>
     </div>`;
 }

@@ -3886,6 +3886,30 @@ body[data-route="visualization"] .settings-fab { display: none; }
   margin-top: auto;
 }
 
+/* Pushed to the end of the row, so the pills read left to right and the action
+   sits where the eye finishes. It shrinks before the pills do -- the status is
+   what you are scanning for, the button is what you press once you have found
+   the right card. */
+/* A square at the end of the row. .btn-practice is `width: 100%`, which is
+   right for the detailed card where it spans the footer and wrong here -- it
+   made the button claim the whole meta row and wrap onto its own line, taking
+   the card from 109px to 143px. The width is overridden rather than the class
+   dropped, so it keeps the same colours and hover as the detailed card's.
+
+   Icon only: the label it replaced repeated what the status pill beside it
+   already says, and the action is on the title in `title` and `aria-label`. */
+.card-compact-action {
+  margin-left: auto;
+  flex: 0 0 auto;
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* ── The Solved tag ─────────────────────────────────────────────────────────
    Carried by both layouts. On the detailed card it joins the stat row beside
    the attempt count; the green check in the corner says the same thing, but a
