@@ -4077,3 +4077,46 @@ body[data-route="visualization"] .settings-fab { display: none; }
   .rp-w.is-now .rp-c { animation: none; color: var(--rp-hot); }
   .rp-c { will-change: auto; }
 }
+
+/* ── Speakers across the language library ───────────────────────────────────
+   Two shapes for one job. The button stands on its own in a toolbar or beside a
+   heading; the chip goes INSIDE another button — a drill tile, an option, a
+   dialogue line — where a nested <button> would be invalid and would break the
+   one containing it. */
+.lang-speak-btn svg { width: 15px; height: 15px; }
+
+.lang-speak-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-left: 0.4rem;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  opacity: 0.55;
+  cursor: pointer;
+  vertical-align: middle;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.lang-speak-chip svg { width: 13px; height: 13px; }
+
+/* Quiet until wanted: these sit on tiles and options that are themselves the
+   thing to press, so a bright icon on every one would compete with the answer. */
+.lang-speak-chip:hover,
+.lang-speak-chip:focus-visible {
+  opacity: 1;
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+  outline: none;
+}
+.lang-speak-chip:focus-visible { box-shadow: 0 0 0 2px var(--color-primary-glow); }
+
+/* In the dialogue box the line is the content, so the speaker trails it. */
+.lq-line .lang-speak-chip { opacity: 0.4; }
+.lq-line .lang-speak-chip:hover { opacity: 1; }
+
+/* Beside an example sentence, aligned to the text rather than the row. */
+.lang-examples .lang-speak-chip,
+.lang-ex-text + .lang-speak-btn { vertical-align: baseline; }

@@ -247,6 +247,7 @@ function langDictionaryHTML() {
           ${f.restrictions ? `<div class="lang-entry-warn"><i data-lucide="alert-triangle"></i> ${escapeHTML(f.restrictions)}</div>` : ''}
         </div>
         <div class="lang-entry-tools">
+          ${langSpeakBtn(langHeadword(w, study), study)}
           <button class="ag-icon-btn" type="button" onclick="langShowExamples('${w.id}')"
                   title="${exCount ? exCount + ' example sentence' + (exCount !== 1 ? 's' : '') : 'No examples recorded'}"
                   ${exCount ? '' : 'disabled'}>
@@ -351,7 +352,7 @@ function langShowExamples(id) {
         <div class="lang-pop-head"><span class="lang-col-code">${escapeHTML(langShort(c))}</span> ${escapeHTML(langName(c))}</div>
         <ul class="lang-examples">
           ${f.examples.map(e => `<li>
-            <span class="lang-ex-text">${escapeHTML(e.text)}</span>
+            <span class="lang-ex-text">${escapeHTML(e.text)}</span>${langSpeakBtn(e.text, c)}
             ${e.gloss ? `<span class="lang-ex-gloss">${escapeHTML(e.gloss)}</span>` : ''}
           </li>`).join('')}
         </ul>
@@ -447,14 +448,14 @@ function langFormColumnHTML(w, code, isStudy) {
         <span class="lang-col-role">${isStudy ? 'learning' : 'reference'}</span>
       </div>
       ${empty ? `<div class="lang-col-empty">Nothing recorded in ${escapeHTML(langName(code))} yet.</div>` : `
-        <div class="lang-term">${escapeHTML(f.term)}${f.pos ? `<span class="lang-pos">${escapeHTML(f.pos)}</span>` : ''}</div>
+        <div class="lang-term">${escapeHTML(f.term)}${f.pos ? `<span class="lang-pos">${escapeHTML(f.pos)}</span>` : ''}${langSpeakBtn(f.term, code)}</div>
         ${f.definition ? `<p class="lang-def">${escapeHTML(f.definition)}</p>` : ''}
         ${(f.examples || []).length ? `
           <div class="lang-block">
             <h4><i data-lucide="quote"></i> Examples</h4>
             <ul class="lang-examples">
               ${f.examples.map(e => `<li>
-                <span class="lang-ex-text">${escapeHTML(e.text)}</span>
+                <span class="lang-ex-text">${escapeHTML(e.text)}</span>${langSpeakBtn(e.text, code)}
                 ${e.gloss ? `<span class="lang-ex-gloss">${escapeHTML(e.gloss)}</span>` : ''}
               </li>`).join('')}
             </ul>

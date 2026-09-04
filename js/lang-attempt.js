@@ -131,11 +131,14 @@ function laCurrent() { return _la && _la.queue[_la.idx]; }
    approximation rather than a pronunciation guide. */
 const LA_SPEECH_TAG = { en: 'en-US', fil: 'fil-PH', ceb: 'ceb-PH', war: 'war-PH' };
 
-/** Which language the current card is asking about, if it says. */
+/** The language being learnt -- which is what these drills are built from. */
 function _laSpeechLang() {
-  const code = (_la && (_la.studyCode || _la.study)) || '';
+  const code = typeof langStudy === 'function' ? langStudy() : '';
   return LA_SPEECH_TAG[code] || undefined;
 }
+
+/** The same code, for the shared chip helper. */
+function _laStudyCode() { return typeof langStudy === 'function' ? langStudy() : ''; }
 
 /** Read a word from the card out loud. */
 function laSpeak(text) {
@@ -233,12 +236,12 @@ function laQuestionHTML(it) {
     return `
       ${sentence}
       <div class="la-lane" id="la-lane">
-        ${_la.picked.map(t => `<button class="la-tile is-placed" type="button" onclick="laUnpick('${t.id}')">${escapeHTML(t.text)}</button>`).join('')
+        ${_la.picked.map(t => `<button class="la-tile is-placed" type="button" onclick="laUnpick('${t.id}')">${escapeHTML(t.text)}${langSpeakChip(t.text, _laStudyCode())}</button>`).join('')
           || '<span class="la-lane-hint">Tap the words below in order</span>'}
       </div>
       <div class="la-pool">
         ${_la.pool.filter(t => !_la.picked.some(p => p.id === t.id))
-          .map(t => `<button class="la-tile" type="button" onclick="laPick('${t.id}')">${escapeHTML(t.text)}</button>`).join('')}
+          .map(t => `<button class="la-tile" type="button" onclick="laPick('${t.id}')">${escapeHTML(t.text)}${langSpeakChip(t.text, _laStudyCode())}</button>`).join('')}
       </div>`;
   }
 
@@ -248,6 +251,7 @@ function laQuestionHTML(it) {
         <button class="la-option${_la.choice === i ? ' is-picked' : ''}" type="button" onclick="laChoose(${i})">
           <span class="la-option-key">${String.fromCharCode(65 + i)}</span>
           <span>${escapeHTML(o.text)}</span>
+          ${langSpeakChip(o.text, _laStudyCode())}
         </button>`).join('')}
     </div>`;
   }
@@ -270,12 +274,12 @@ function laQuestionHTML(it) {
       <div class="la-match-col">
         ${(_la.matchA || []).map(a => `
           <button class="la-match-btn${_la.matchLeft === a.i ? ' is-picked' : ''}${_la.matchPairs[a.i] != null ? ' is-done' : ''}"
-                  type="button" onclick="laMatchLeft(${a.i})">${escapeHTML(a.text)}</button>`).join('')}
+                  type="button" onclick="laMatchLeft(${a.i})">${escapeHTML(a.text)}${langSpeakChip(a.text, _laStudyCode())}</button>`).join('')}
       </div>
       <div class="la-match-col">
         ${(_la.matchB || []).map(b => `
           <button class="la-match-btn${takenB.indexOf(b.i) > -1 ? ' is-done' : ''}"
-                  type="button" onclick="laMatchRight(${b.i})">${escapeHTML(b.text)}</button>`).join('')}
+                  type="button" onclick="laMatchRight(${b.i})">${escapeHTML(b.text)}${langSpeakChip(b.text, _laStudyCode())}</button>`).join('')}
       </div>
     </div>`;
   }

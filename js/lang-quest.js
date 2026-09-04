@@ -373,8 +373,14 @@ function lqRender() {
     const who = line && line.who;
     speaker.innerHTML = who ? `<span class="lq-name${line.cls === 'foe' ? ' is-foe' : ''}">${escapeHTML(who)}</span>` : '';
   }
+  /* The dialogue can be heard as well as read. The chip rather than the button,
+     because the whole box is clickable to advance -- and the chip stops the
+     click, so hearing a line does not skip past it. lqMarkup renders emphasis,
+     so the speaker is handed the raw text instead. */
   box.innerHTML = line
-    ? `<p class="lq-line">${lqMarkup(line.text)}</p>${_lq.say.length ? '<span class="lq-next">▼</span>' : '<span class="lq-next">▼</span>'}`
+    ? `<p class="lq-line">${lqMarkup(line.text)}${typeof langSpeakChip === 'function'
+          ? langSpeakChip(line.text, typeof langStudy === 'function' ? langStudy() : '') : ''}</p>`
+      + `<span class="lq-next">▼</span>`
     : (_lq.scene === 'over' ? lqSummaryHTML() : '<p class="lq-line lq-dim">…</p>');
   box.classList.toggle('is-clickable', !!line);
 

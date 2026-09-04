@@ -252,6 +252,93 @@ const LANG_PUZZLE_TYPES = [
     hint: 'Two columns to pair up, built from your own words.' }
 ];
 
+/* ── Hearing the language ───────────────────────────────────────────────────
+   Every surface in this library shows words in a language being learnt, so
+   every surface can say them. Rather than a handler per screen, anything that
+   wants a speaker emits langSpeakBtn and one delegated listener reads it: the
+   dictionary, the compare columns, each drill type and the adventure all go
+   through the same two functions.
+
+   The library's four languages as tags a speech engine might recognise. Only
+   English is a safe bet -- Filipino ships as fil-PH on some platforms and
+   tl-PH on others, and Cebuano and Waray almost certainly have no voice
+   anywhere, so those fall back to the chosen voice reading the spelling. Close
+   enough to be recognisable, and honest about being an approximation. */
+const LANG_SPEECH_TAG = { en: 'en-US', fil: 'fil-PH', ceb: 'ceb-PH', war: 'war-PH' };
+
+function langSpeechTag(code) { return LANG_SPEECH_TAG[code] || undefined; }
+
+/**
+ * A speaker button for one piece of text.
+ *
+ * @param {string} text what to say
+ * @param {string} [code] which of the four languages it is in
+ * @param {string} [cls] extra classes, so a caller can size it to its row
+ * @returns {string} HTML, or nothing when there is nothing to say
+ */
+function langSpeakBtn(text, code, cls) {
+  const say = String(text == null ? '' : text).trim();
+  if (!say) return '';
+  return '<button type="button" class="ag-icon-btn lang-speak-btn ' + (cls || '') + '"'
+       + ' data-speak="' + escapeHTML(say) + '"'
+       + (code ? ' data-speak-lang="' + escapeHTML(code) + '"' : '')
+       + ' title="Hear this" aria-label="Hear this">'
+       + '<i data-lucide="volume-2"></i></button>';
+}
+
+/**
+ * A speaker for use INSIDE another button -- a drill tile, an option, a pair.
+ *
+ * A span rather than a button, because a button inside a button is invalid and
+ * browsers recover from it by breaking the outer one. It keeps role and
+ * tabindex so it is still reachable and announced, and the delegate below
+ * answers Enter and Space for it since a span does not do that by itself.
+ *
+ * @returns {string} HTML, or nothing when there is nothing to say
+ */
+function langSpeakChip(text, code) {
+  const say = String(text == null ? '' : text).trim();
+  if (!say) return '';
+  return '<span class="lang-speak-chip" role="button" tabindex="0"'
+       + ' data-speak="' + escapeHTML(say) + '"'
+       + (code ? ' data-speak-lang="' + escapeHTML(code) + '"' : '')
+       + ' title="Hear this" aria-label="Hear this">'
+       + '<i data-lucide="volume-2"></i></span>';
+}
+
+/**
+ * One listener for every speaker in the library.
+ *
+ * Delegated on the document because these buttons are rendered by a dozen
+ * different functions into containers that are replaced constantly -- binding
+ * per button would mean re-binding on every repaint, and missing the ones drawn
+ * by a screen nobody has visited yet.
+ *
+ * ON THE CAPTURE PHASE, WHICH IS THE WHOLE TRICK. Chips sit inside things that
+ * are themselves clickable -- a drill tile, an option, the adventure's dialogue
+ * box, which advances on any click. Listening on the bubble phase means those
+ * handlers have already run by the time this one sees the event, so
+ * stopPropagation arrives too late: hearing a line also skipped past it, and
+ * hearing a tile also played it. Capturing puts this first, so the chip can
+ * stop the click before it reaches whatever it is sitting on.
+ */
+function langSpeakDelegate(e) {
+  const btn = e.target && e.target.closest && e.target.closest('[data-speak]');
+  if (!btn) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (typeof speak !== 'function') return;
+  speak(btn.dataset.speak, { lang: langSpeechTag(btn.dataset.speakLang) });
+}
+
+document.addEventListener('click', langSpeakDelegate, true);
+/* Space and Enter, for the chips -- a <span role="button"> gets neither free. */
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const chip = e.target && e.target.closest && e.target.closest('.lang-speak-chip[data-speak]');
+  if (chip) langSpeakDelegate(e);
+});
+
 function langPuzzleMeta(type) {
   return LANG_PUZZLE_TYPES.find(p => p.type === type) || LANG_PUZZLE_TYPES[0];
 }
