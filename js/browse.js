@@ -420,8 +420,8 @@ function renderTreeRecursive(parentId, scope, depth, query, activeId, itemsOnly,
                oncontextmenu="treeContextMenu(event, '${item.id}', 'browse')"
                onclick="browseSelectProgram('${item.id}')">
             <i class="tree-node-chevron invisible"></i>
-            <i data-lucide="${item.icon || 'file-code-2'}" class="tree-node-icon item-icon-color" style="width:14px;height:14px;"></i>
-            <span class="tree-node-label" style="font-weight:400; font-size:0.875rem;">${escapeHTML(item.title)}</span>
+            <i data-lucide="${item.icon || 'file-code-2'}" class="tree-node-icon item-icon-color"></i>
+            <span class="tree-node-label">${escapeHTML(item.title)}</span>
             ${browseShow('level') && item.level != null ? `<span class="tree-badge-level">L${item.level}</span>` : ''}
             ${browseShow('tags') && (item.tags || []).length ? `<span class="tree-badge-tag">${escapeHTML(item.tags[0])}</span>` : ''}
             ${item.favorite ? '<i data-lucide="star" class="tree-node-star"></i>' : ''}
@@ -445,8 +445,8 @@ function renderTreeRecursive(parentId, scope, depth, query, activeId, itemsOnly,
                oncontextmenu="treeContextMenu(event, '${set.id}', 'browse')"
                onclick="browseSelectSet('${set.id}')">
             <i class="tree-node-chevron invisible"></i>
-            <i data-lucide="${escapeHTML(set.icon || 'layout-grid')}" class="tree-node-icon" style="width:14px;height:14px;color:var(--color-accent);"></i>
-            <span class="tree-node-label" style="font-weight:400; font-size:0.875rem;">${escapeHTML(set.title)}</span>
+            <i data-lucide="${escapeHTML(set.icon || 'layout-grid')}" class="tree-node-icon" style="color:var(--color-accent);"></i>
+            <span class="tree-node-label">${escapeHTML(set.title)}</span>
             <span class="tree-node-badge" title="${n} problem${n !== 1 ? 's' : ''}">${n}</span>
           </div>
         </div>

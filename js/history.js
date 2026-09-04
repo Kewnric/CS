@@ -440,8 +440,8 @@ function renderAnalyticsTreeItem(item, logs, scope, depth) {
            onclick="${onClick}">
         <i class="tree-node-chevron invisible"></i>
         ${bulkResetMode ? `<input type="checkbox" class="bulk-reset-cb" value="${item.id}" style="width:14px;height:14px;accent-color:var(--color-danger);cursor:pointer;margin-right:0.375rem;">` : ''}
-        <i data-lucide="${itemIcon}" class="tree-node-icon item-icon-color" style="width:14px;height:14px;"></i>
-        <span class="tree-node-label" style="font-weight:400; font-size:0.875rem; flex:1;">${escapeHTML(title)}</span>
+        <i data-lucide="${itemIcon}" class="tree-node-icon item-icon-color"></i>
+        <span class="tree-node-label" style="flex:1;">${escapeHTML(title)}</span>
         <div style="display:flex; align-items:center; flex-shrink:0;">
           ${completionBadge}
           <span class="score-badge ${bestScore === 100 ? 'score-perfect' : 'score-partial'}" style="font-size:0.65rem;">${bestScore}%</span>
@@ -470,8 +470,8 @@ function renderAnalyticsTreeSetItem(set, logs, depth) {
            onclick="${onClick}">
         <i class="tree-node-chevron invisible"></i>
         ${bulkResetMode ? `<input type="checkbox" class="bulk-reset-cb" value="${set.id}" style="width:14px;height:14px;accent-color:var(--color-danger);cursor:pointer;margin-right:0.375rem;">` : ''}
-        <i data-lucide="layout-grid" class="tree-node-icon" style="width:14px;height:14px;color:var(--color-accent);"></i>
-        <span class="tree-node-label" style="font-weight:400; font-size:0.875rem; flex:1;">${escapeHTML(title)}</span>
+        <i data-lucide="layout-grid" class="tree-node-icon" style="color:var(--color-accent);"></i>
+        <span class="tree-node-label" style="flex:1;">${escapeHTML(title)}</span>
         <div style="display:flex; align-items:center; flex-shrink:0;">
           ${completionBadge}
           <span class="score-badge ${bestScore === 100 ? 'score-perfect' : 'score-partial'}" style="font-size:0.65rem;">${bestScore}%</span>

@@ -960,7 +960,12 @@ details[open]>.snippet-folder-summary>.folder-icon {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.05);
   transform: translateX(-3px);
   color: var(--color-primary);
-  animation: smoothReveal 0.25s ease-out;
+  /* No keyframe animation here, and that IS the pop.
+     smoothReveal animates transform from translateY(8px), so while it ran it
+     owned the property outright and the spring transition above could not move
+     the row at all -- selection dropped in from below instead of springing
+     sideways. The export drives this purely from the transition, on
+     --ease-spring, whose overshoot is the pop. */
 }
 
 /* Hover must not fight selection: a selected row stays where selection put it,
@@ -990,7 +995,7 @@ details[open]>.snippet-folder-summary>.folder-icon {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tree-node-row.active,
+  .tree-node-row { transition: none !important; }
   .tree-node-row.active::after { animation: none !important; }
 }
 

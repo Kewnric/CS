@@ -177,8 +177,8 @@ function renderNotebookTreeRecursive(parentId, depth, query, itemsOnly, rootList
              oncontextmenu="treeContextMenu(event, '${nb.id}', 'notes')"
              onclick="notesSelectNotebook('${nb.id}')">
           <i class="tree-node-chevron invisible"></i>
-          <i data-lucide="${nb.icon || 'book'}" class="tree-node-icon item-icon-color" style="width:14px;height:14px;"></i>
-          <span class="tree-node-label" style="font-weight:400; font-size:0.875rem;">${escapeHTML(nb.title)}</span>
+          <i data-lucide="${nb.icon || 'book'}" class="tree-node-icon item-icon-color"></i>
+          <span class="tree-node-label">${escapeHTML(nb.title)}</span>
           ${notesShow('questions') && qCount ? `<span class="tree-badge-level">${qCount}Q</span>` : ''}
           ${notesShow('tags') && (nb.tags || []).length ? `<span class="tree-badge-tag">${escapeHTML(nb.tags[0])}</span>` : ''}
           ${nb.favorite ? '<i data-lucide="star" class="tree-node-star"></i>' : ''}

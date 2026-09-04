@@ -183,8 +183,8 @@ function renderSnippetTreeRecursive(parentId, depth, query, itemsOnly, rootList)
              oncontextmenu="treeContextMenu(event, '${sn.id}', 'snippets')"
              onclick="selectSnippet('${sn.id}')">
           <i class="tree-node-chevron invisible"></i>
-          <i data-lucide="code" class="tree-node-icon item-icon-color" style="width:14px;height:14px;"></i>
-          <span class="tree-node-label" style="font-weight:400; font-size:0.875rem;">${escapeHTML(sn.title)}</span>
+          <i data-lucide="code" class="tree-node-icon item-icon-color"></i>
+          <span class="tree-node-label">${escapeHTML(sn.title)}</span>
           ${snipShow('tags') && (sn.tags || []).length ? `<span class="tree-badge-tag">${escapeHTML(sn.tags[0])}</span>` : ''}
           ${sn.favorite ? '<i data-lucide="star" class="tree-node-star"></i>' : ''}
         </div>
