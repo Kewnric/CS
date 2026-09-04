@@ -889,9 +889,38 @@ details[open]>.snippet-folder-summary>.folder-icon {
 
 /* The rail is quiet until you are near it: 0.55 at rest, 0.9 under the pointer,
    full on selection. It was a flat 0.8, which made every row's rail compete
-   with the one that mattered. */
-.tree-node-row::after { opacity: 0.55; transition: opacity 0.25s ease; }
-.tree-node-row:hover::after { opacity: 0.9; }
+   with the one that mattered.
+
+   IT ALSO GROWS NOW. Hover used to change opacity and nothing else, so a rail
+   that is 3px of a 43.9px row -- inset 10-25% top and bottom by level, leaving
+   about 26px of bar -- looked the same size whether you were on it or not, and
+   read as unresponsive rather than subtle.
+
+   Driven entirely by transform, for two reasons: the per-level rules that set
+   `width: 3px` are `.tree-node[data-level="N"] > .tree-node-row::after`, which
+   outranks any `:hover` selector short of repeating the whole chain, so a
+   `width` here would simply lose; and transform neither reflows the row nor
+   collides with railFlow/railBreathe, which only touch background-position,
+   opacity and box-shadow.
+
+   The 2px of travel is bounded by measurement, not taste: the row's right edge
+   sits ~2px inside the tree container's content edge, and the container is a
+   scroll box, so a rail that crossed that edge would add horizontal scroll
+   range to a container whose scrollbar is deliberately hidden -- an invisible
+   sideways scroll. Verified after: scrollWidth still equals clientWidth. */
+.tree-node-row::after {
+  opacity: 0.55;
+  transform-origin: right center;
+  transition: opacity 0.25s ease, transform 0.28s var(--ease-spring);
+}
+.tree-node-row:hover::after {
+  opacity: 0.9;
+  transform: translateX(2px) scaleY(1.35) scaleX(1.3);
+}
+/* Selection is the fullest the rail gets, so it still outreads a hovered row. */
+.tree-node-row.active::after {
+  transform: translateX(2px) scaleY(1.55) scaleX(1.35);
+}
 
 .tree-node[data-level="4"]>.tree-node-row::after,
 .tree-node[data-level="5"]>.tree-node-row::after {
@@ -996,6 +1025,7 @@ details[open]>.snippet-folder-summary>.folder-icon {
 
 @media (prefers-reduced-motion: reduce) {
   .tree-node-row { transition: none !important; }
+  .tree-node-row::after { transition: none !important; }
   .tree-node-row.active::after { animation: none !important; }
 }
 
