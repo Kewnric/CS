@@ -117,13 +117,23 @@ function speak(text, opts) {
   u.rate = Math.min(4, Math.max(0.1, Number(prefs.rate) || 1));
   u.volume = Math.min(1, Math.max(0, Number(prefs.volume)));
   if (typeof opts.onstart === 'function') u.onstart = opts.onstart;
+  /* Not every engine fires this -- Safari historically does not -- so anything
+     that reads along has to work when it never arrives. */
+  if (typeof opts.onboundary === 'function') u.onboundary = opts.onboundary;
   if (typeof opts.onend === 'function') { u.onend = opts.onend; u.onerror = opts.onend; }
   window.speechSynthesis.speak(u);
   return true;
 }
 
-/** Stop mid-sentence. Safe to call when nothing is speaking. */
+/**
+ * Stop mid-sentence. Safe to call when nothing is speaking.
+ *
+ * Takes the read-along markup down with it, so every route that stops speech
+ * on the way out also hands its text back intact -- leaving mid-read would
+ * otherwise strand a description as a pile of per-letter spans.
+ */
 function speechStop() {
+  if (typeof speechReadAlongStop === 'function') speechReadAlongStop();
   if (!speechSupported()) return;
   try { window.speechSynthesis.cancel(); } catch (e) { /* nothing to cancel */ }
 }
@@ -256,4 +266,164 @@ function _speechPaintPanel(voices) {
 /** Say a line in the current settings, so the sliders can be judged by ear. */
 function speechPreview() {
   speak('Hi! This is how I will read your descriptions and words.');
+}
+
+/* ── Reading along ──────────────────────────────────────────────────────────
+   speechSynthesis reports where it has got to through `boundary` events, which
+   carry a charIndex into the text being spoken. That is the only real timing
+   signal there is: it fires per WORD, and there is nothing per letter.
+
+   So words are driven by the engine and letters are interpolated inside them.
+   A word lights when its boundary arrives; its letters sweep across the gap
+   until the next one, using a duration estimated from the word's length and the
+   speaking rate. If the next boundary lands early the sweep is cut short, so
+   the engine always wins the argument and the letters never run ahead of it.
+
+   THE SPOKEN STRING IS BUILT FROM THE SPANS, not cleaned separately. charIndex
+   is an offset into whatever was handed to the utterance, so the only way for
+   it to point at the right word is for the text and the markup to come from one
+   pass over the same nodes. */
+
+let _readAlongHost = null;
+let _readAlongHTML = '';
+let _readAlongWords = [];
+let _readAlongAt = -1;
+
+/** Undo the markup and put the element back exactly as it was. */
+function speechReadAlongStop() {
+  /* Only ever restores something. This writes over the element it marked up,
+     so an empty snapshot would erase the text rather than hand it back -- and
+     a half-initialised state is exactly when this gets called by mistake. */
+  if (_readAlongHost) {
+    if (_readAlongHTML) _readAlongHost.innerHTML = _readAlongHTML;
+    _readAlongHost.classList.remove('rp-reading');
+  }
+  _readAlongHost = null;
+  _readAlongHTML = '';
+  _readAlongWords = [];
+  _readAlongAt = -1;
+}
+
+/* Whitespace is significant inside <pre>, and inline-block letters would change
+   it, so those subtrees are spoken but never marked up. */
+function _rpSkip(node) {
+  for (let el = node.parentElement; el; el = el.parentElement) {
+    if (el.tagName === 'PRE') return true;
+    if (el === _readAlongHost) return false;
+  }
+  return false;
+}
+
+/**
+ * Wrap every word in `host` and return the exact string those words spell.
+ * Each entry records where its word starts in that string, so a charIndex can
+ * be resolved back to the span that produced it.
+ */
+function _rpMarkUp(host) {
+  const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT, null);
+  const texts = [];
+  let n;
+  while ((n = walker.nextNode())) texts.push(n);
+
+  const words = [];
+  let spoken = '';
+  let lastBlock = null;
+
+  texts.forEach((node) => {
+    const raw = node.nodeValue;
+    if (!raw || !raw.trim()) return;
+
+    /* A sentence break where the layout has one: crossing into a new block
+       should sound like a full stop, the way the eye reads it as a new line. */
+    const block = node.parentElement && node.parentElement.closest('p,li,div,h1,h2,h3,h4,h5,h6,pre,td');
+    if (lastBlock && block !== lastBlock && !/[.!?]\s*$/.test(spoken)) spoken += '. ';
+    lastBlock = block;
+
+    if (_rpSkip(node)) { spoken += raw.replace(/\s+/g, ' '); return; }
+
+    const frag = document.createDocumentFragment();
+    raw.split(/(\s+)/).forEach((tok) => {
+      if (!tok) return;
+      if (!tok.trim()) { frag.appendChild(document.createTextNode(tok)); spoken += ' '; return; }
+      const w = document.createElement('span');
+      w.className = 'rp-w';
+      // Letters get their own spans so the sweep has something to move across.
+      for (let i = 0; i < tok.length; i++) {
+        const c = document.createElement('span');
+        c.className = 'rp-c';
+        c.style.setProperty('--rp-i', String(i));
+        c.textContent = tok[i];
+        w.appendChild(c);
+      }
+      words.push({ el: w, at: spoken.length, len: tok.length });
+      spoken += tok;
+      frag.appendChild(w);
+    });
+    node.parentNode.replaceChild(frag, node);
+  });
+
+  return { words, text: spoken.replace(/\s+/g, ' ').trim() ? spoken : '' };
+}
+
+/** The word a charIndex falls in: the last one that starts at or before it. */
+function _rpWordAt(charIndex) {
+  let lo = 0, hi = _readAlongWords.length - 1, hit = -1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (_readAlongWords[mid].at <= charIndex) { hit = mid; lo = mid + 1; }
+    else hi = mid - 1;
+  }
+  return hit;
+}
+
+function _rpLight(idx, rate) {
+  if (idx < 0 || idx === _readAlongAt) return;
+  const prev = _readAlongWords[_readAlongAt];
+  if (prev) { prev.el.classList.remove('is-now'); prev.el.classList.add('is-said'); }
+  _readAlongAt = idx;
+  const w = _readAlongWords[idx];
+  if (!w) return;
+  /* ~62ms per character at rate 1 is close to conversational pace; the sweep
+     only has to look right, and the next boundary corrects it either way. */
+  const per = 62 / Math.max(0.1, rate || 1);
+  w.el.style.setProperty('--rp-step', per.toFixed(1) + 'ms');
+  w.el.style.setProperty('--rp-dur', Math.max(180, per * 2.2).toFixed(0) + 'ms');
+  w.el.classList.add('is-now');
+}
+
+/**
+ * Read an element's text aloud and light it up as the voice moves through it.
+ *
+ * @param {Element} host
+ * @param {{lang?: string, onend?: Function}} [opts]
+ * @returns {boolean} false when there was nothing to read
+ */
+function speakElementAlong(host, opts) {
+  opts = opts || {};
+  if (!host || !speechSupported()) return false;
+  speechReadAlongStop();
+
+  const originalHTML = host.innerHTML;
+  const built = _rpMarkUp(host);
+  if (!built.text.trim() || !built.words.length) { host.innerHTML = originalHTML; return false; }
+
+  _readAlongHost = host;
+  _readAlongHTML = originalHTML;
+  _readAlongWords = built.words;
+  _readAlongAt = -1;
+  host.classList.add('rp-reading');
+
+  const prefs = speechPrefs();
+  const done = () => { speechReadAlongStop(); if (typeof opts.onend === 'function') opts.onend(); };
+
+  const said = speak(built.text, {
+    lang: opts.lang,
+    onend: done,
+    onboundary: (e) => {
+      if (e && e.name === 'sentence') return;   // words only; sentences double up
+      _rpLight(_rpWordAt(e.charIndex), prefs.rate);
+    }
+  });
+  if (!said) { speechReadAlongStop(); return false; }
+  return true;
 }

@@ -4033,3 +4033,47 @@ body[data-route="visualization"] .settings-fab { display: none; }
 }
 .speech-row input[type="range"] { width: 100%; accent-color: var(--color-primary); }
 .speech-loading { color: var(--text-tertiary); font-size: 0.875rem; padding: 0.5rem 0; }
+
+/* ── Reading along ──────────────────────────────────────────────────────────
+   Karaoke without the karaoke box: no background, no bar sweeping across a
+   block of colour. Each letter brightens and grows as the voice reaches it and
+   settles back a shade darker once it has been said, so the reading position is
+   carried by the type itself rather than by something drawn behind it. */
+.rp-reading {
+  --rp-hot: var(--color-primary);
+  --rp-said: var(--text-tertiary);
+}
+
+/* Letters are inline-block so they can be scaled -- which also lets the browser
+   break a line between them, so the word holds itself together. */
+.rp-w { white-space: nowrap; }
+.rp-c {
+  display: inline-block;
+  transform-origin: center bottom;
+  will-change: transform;
+}
+
+/* Already read: stepped back, so the eye is drawn to where the voice is now
+   rather than to everything it has covered. */
+.rp-w.is-said .rp-c { color: var(--rp-said); transition: color 0.25s ease; }
+
+/* Being read: the letters take their turn. --rp-i is the letter's position in
+   the word and --rp-step how long each one gets, both written by _rpLight from
+   the word's length and the speaking rate. */
+.rp-w.is-now .rp-c {
+  animation: rpSweep var(--rp-dur, 260ms) cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation-delay: calc(var(--rp-i, 0) * var(--rp-step, 62ms));
+}
+
+@keyframes rpSweep {
+  0%   { color: inherit;        transform: scale(1); }
+  28%  { color: var(--rp-hot);  transform: scale(1.42); }
+  100% { color: var(--rp-said); transform: scale(1); }
+}
+
+/* The sweep is the whole feature, so with reduced motion the position still
+   has to be legible -- it just stops moving and says it in colour alone. */
+@media (prefers-reduced-motion: reduce) {
+  .rp-w.is-now .rp-c { animation: none; color: var(--rp-hot); }
+  .rp-c { will-change: auto; }
+}

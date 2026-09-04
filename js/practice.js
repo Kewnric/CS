@@ -2326,15 +2326,17 @@ function practiceSpeakDescription() {
   }
   if (typeof speechIsSpeaking === 'function' && speechIsSpeaking()) {
     speechStop();
+    if (typeof speechReadAlongStop === 'function') speechReadAlongStop();
     paint(false);
     return;
   }
   const el = document.getElementById('practice-desc');
   if (!el) return;
-  /* The rendered HTML rather than the stored source: what is on screen is what
-     was asked to be read, and formatRichText has already resolved whatever the
-     description was authored in. */
-  const said = speak(el.innerHTML, { onend: () => paint(false) });
+  /* Reads the element rather than a string, so the words on screen light up as
+     the voice reaches them -- see speakElementAlong. It marks the description up,
+     speaks exactly what that markup spells, and puts the original HTML back when
+     it finishes or is stopped. */
+  const said = speakElementAlong(el, { onend: () => paint(false) });
   if (said) paint(true);
   else if (typeof toast === 'function') toast('Nothing to read here.', { type: 'info' });
 }
