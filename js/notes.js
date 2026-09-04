@@ -48,15 +48,14 @@ function notesRenderSidebar() {
   }
   
   if (filteredRoot.length > 0 || state.nodes.filter(n => n.scope === 'notebook').length === 0) {
-    const isActive = !activeNotebookId && activeNotebookFolderId === '__root__';
     const count = filteredRoot.length;
     if (count > 0 || !html) {
       // A real row: expandable, droppable, with a menu (see browse.js).
       const rootOpen = isNodeExpanded('__root__');
       html += `
         <div class="tree-node" data-level="0" data-node-id="__root__">
-          <div class="tree-node-row ${isActive ? 'active' : ''}"
-               ${treeRowAttrs({ ns: 'notes', id: '__root__', kind: 'folder', level: 0, expanded: rootOpen, selected: isActive, draggable: false })}
+          <div class="tree-node-row"
+               ${treeRowAttrs({ ns: 'notes', id: '__root__', kind: 'folder', level: 0, expanded: rootOpen, draggable: false })}
                oncontextmenu="treeContextMenu(event, '__root__', 'notes')"
                onclick="selectNotebookFolder('__root__')">
             <i data-lucide="chevron-right" class="tree-node-chevron ${count > 0 ? (rootOpen ? 'expanded' : '') : 'invisible'}"
@@ -75,14 +74,16 @@ function notesRenderSidebar() {
     }
   }
 
-  if (!html) {
-    container.innerHTML = `
+  /* Selection is applied as a class after the markup is committed, never baked
+     into it -- see treeCommit. That is what lets a row survive a selection
+     change and actually transition. */
+  const markup = html
+    ? html + treeRootDropHTML('notes')
+    : `
       <div class="empty-state" style="padding: 2rem;">
         <p style="color:var(--text-tertiary); font-size:0.875rem;">No folders. Right-click to create one.</p>
       </div>`;
-  } else {
-    container.innerHTML = html + treeRootDropHTML('notes');
-  }
+  const rebuilt = treeCommit(container, markup, activeNotebookId || activeNotebookFolderId);
   container.dataset.treeNs = 'notes';
   container.setAttribute('role', 'tree');
   container.setAttribute('aria-label', 'Notebook folders');
@@ -104,7 +105,7 @@ function notesRenderSidebar() {
   };
   container.addEventListener('contextmenu', _notebookContainerCtxHandler);
 
-  lucide.createIcons({ root: container });
+  if (rebuilt) lucide.createIcons({ root: container });
 }
 
 /**
@@ -129,7 +130,6 @@ function renderNotebookTreeRecursive(parentId, depth, query, itemsOnly, rootList
       const hasChildren = getChildFolders(folder.id, 'notebook').length > 0;
       const expanded = isNodeExpanded(folder.id);
       // Only one row highlights: the selected notebook, or (if none) the folder.
-      const isActive = !activeNotebookId && activeNotebookFolderId === folder.id;
       if (query && !folderHasMatchingNotebooks(folder.id, query)) return;
       const chevronClass = (hasChildren || totalItems > 0) ? (expanded ? 'expanded' : '') : 'invisible';
       // "Set prerequisites..." has always been offered on notebook folders, but
@@ -139,8 +139,8 @@ function renderNotebookTreeRecursive(parentId, depth, query, itemsOnly, rootList
 
       html += `
         <div class="tree-node" data-level="${depth}" data-node-id="${folder.id}">
-          <div class="tree-node-row ${isActive ? 'active' : ''}"
-               ${treeRowAttrs({ ns: 'notes', id: folder.id, kind: 'folder', level: depth, expanded: expanded, selected: isActive })}
+          <div class="tree-node-row"
+               ${treeRowAttrs({ ns: 'notes', id: folder.id, kind: 'folder', level: depth, expanded: expanded })}
                style="padding-left: calc(0.5rem + 0rem)"
                oncontextmenu="treeContextMenu(event, '${folder.id}', 'notes')"
                onclick="selectNotebookFolder('${folder.id}')">
@@ -164,15 +164,14 @@ function renderNotebookTreeRecursive(parentId, depth, query, itemsOnly, rootList
     // Notebook files — clicking one opens its detail view in pane 2.
     const nb = node;
     if (query && !libMatches(nb, query, 'notebook')) return;
-    const isActive = activeNotebookId === nb.id;
     // A favourited notebook showed no star anywhere in the tree, and the
     // per-item colour the coding tree got was missing here entirely.
     const qCount = (nb.sections || []).reduce((n, sec) => n + ((sec.questions || []).length), 0);
     const hue = nb.color && typeof treeColorOf === 'function' ? ` style="--row-accent:${treeColorOf(nb.color)}"` : '';
     html += `
       <div class="tree-node tree-item-node${nb.color ? ' has-accent' : ''}" data-level="${depth + 1}" data-node-id="${nb.id}"${hue}>
-        <div class="tree-node-row ${isActive ? 'active' : ''}"
-             ${treeRowAttrs({ ns: 'notes', id: nb.id, kind: 'item', level: depth + 1, selected: isActive })}
+        <div class="tree-node-row"
+             ${treeRowAttrs({ ns: 'notes', id: nb.id, kind: 'item', level: depth + 1 })}
              style="padding-left: calc(0.5rem + ${TREE_ITEM_INSET}rem)"
              oncontextmenu="treeContextMenu(event, '${nb.id}', 'notes')"
              onclick="notesSelectNotebook('${nb.id}')">

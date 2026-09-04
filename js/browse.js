@@ -180,6 +180,12 @@ function toggleBrowseExpand(nodeId, e) {
         if (chevron) chevron.classList.remove('expanded');
       }
     }
+    /* The DOM was just changed without going through treeCommit, so the cached
+       markup now describes the previous expand state. Re-record it, or the next
+       selection would see a mismatch and rebuild -- losing both this animation
+       and the selection fade. */
+    const container = document.getElementById('browse-category-list');
+    if (container) treeSyncMarkup(container, browseBuildTreeHtml());
   } else {
     renderBrowseTree();
   }
@@ -247,23 +253,25 @@ function toggleBrowseTreeItems() {
   }
 }
 
-function renderBrowseTree() {
-  const container = document.getElementById('browse-category-list');
-  if (!container) return;
-
+/**
+ * The tree's markup, with no selection in it.
+ *
+ * Separate from renderBrowseTree so toggleBrowseExpand can refresh the markup
+ * cache after it expands a folder by hand. Without that the cache would still
+ * describe the collapsed tree, and the next click -- usually on a program
+ * inside the folder just opened -- would rebuild instead of animating.
+ */
+function browseBuildTreeHtml() {
   const searchInput = document.getElementById('browse-search');
   const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
-  // Build tree HTML recursively. When a program/set is selected, only that row
-  // highlights — passing null suppresses the folder highlight.
-  let html = renderTreeRecursive(null, 'challenge', 0, query, (browseActiveProgramId || browseActiveSetId) ? null : browseActiveNodeId);
+  let html = renderTreeRecursive(null, 'challenge', 0, query, null);
 
   // The pseudo-folder: uncategorized items, or your favourites — right-click
   // the row to switch (see libRootMode).
   const rootList = libRootItems('browse', state.challenges, state.codingSets || []);
   const rootMeta = libRootMeta('browse');
   if (rootList.length > 0 || state.nodes.filter(n => n.scope === 'challenge').length === 0) {
-    const isActive = !browseActiveProgramId && !browseActiveSetId && browseActiveNodeId === '__root__';
     const count = rootList.length;
     if (count > 0 || !html) {
       // A real row: it expands, it takes drops, and it has a menu. It used to be
@@ -272,8 +280,8 @@ function renderBrowseTree() {
       const rootOpen = isNodeExpanded('__root__');
       html += `
         <div class="tree-node" data-level="0" data-node-id="__root__">
-          <div class="tree-node-row ${isActive ? 'active' : ''}"
-               ${treeRowAttrs({ ns: 'browse', id: '__root__', kind: 'folder', level: 0, expanded: rootOpen, selected: isActive, draggable: false })}
+          <div class="tree-node-row"
+               ${treeRowAttrs({ ns: 'browse', id: '__root__', kind: 'folder', level: 0, expanded: rootOpen, draggable: false })}
                oncontextmenu="treeContextMenu(event, '__root__', 'browse')"
                onclick="selectBrowseNode('__root__')">
             <i data-lucide="chevron-right" class="tree-node-chevron ${count > 0 ? (rootOpen ? 'expanded' : '') : 'invisible'}"
@@ -298,7 +306,17 @@ function renderBrowseTree() {
     </div>`;
   }
 
-  container.innerHTML = html + treeRootDropHTML('browse');
+  return html + treeRootDropHTML('browse');
+}
+
+function renderBrowseTree() {
+  const container = document.getElementById('browse-category-list');
+  if (!container) return;
+
+  /* Only one row is ever selected: a program or set suppresses the folder
+     highlight, so these cannot both win. */
+  const selectedId = browseActiveProgramId || browseActiveSetId || browseActiveNodeId;
+  const rebuilt = treeCommit(container, browseBuildTreeHtml(), selectedId);
   container.dataset.treeNs = 'browse';
   container.setAttribute('role', 'tree');
   container.setAttribute('aria-label', 'Coding library folders');
@@ -323,7 +341,7 @@ function renderBrowseTree() {
   };
   container.addEventListener('contextmenu', _browseContainerCtxHandler);
 
-  if (typeof lucide !== 'undefined') lucide.createIcons({ root: container });
+  if (rebuilt && typeof lucide !== 'undefined') lucide.createIcons({ root: container });
 }
 
 /**
@@ -352,7 +370,6 @@ function renderTreeRecursive(parentId, scope, depth, query, activeId, itemsOnly,
       const totalItems = countItemsRecursive(folder.id, scope);
       const hasChildren = getChildFolders(folder.id, scope).length > 0;
       const expanded = isNodeExpanded(folder.id);
-      const isActive = activeId === folder.id;
 
       // If searching, skip folders with no matching items
       if (query && !folderHasMatchingItems(folder.id, scope, query)) return;
@@ -374,8 +391,8 @@ function renderTreeRecursive(parentId, scope, depth, query, activeId, itemsOnly,
 
       html += `
         <div class="tree-node" data-level="${depth}" data-node-id="${folder.id}">
-          <div class="tree-node-row ${isActive ? 'active' : ''}"
-               ${treeRowAttrs({ ns: 'browse', id: folder.id, kind: 'folder', level: depth, expanded, selected: isActive })}
+          <div class="tree-node-row"
+               ${treeRowAttrs({ ns: 'browse', id: folder.id, kind: 'folder', level: depth, expanded })}
                style="padding-left: calc(0.75rem + 0rem)"
                oncontextmenu="treeContextMenu(event, '${folder.id}', 'browse')"
                onclick="selectBrowseNode('${folder.id}')">
@@ -407,15 +424,14 @@ function renderTreeRecursive(parentId, scope, depth, query, activeId, itemsOnly,
       // Must use the same predicate as folderHasMatchingItems (title OR tag), or a
       // folder kept by a tag match renders with no rows under it.
       if (query && !itemMatchesQuery(item, query)) return;
-      const isActive = browseActiveProgramId === item.id;
       // A favourited program showed no star anywhere in the tree — the only
       // clue was on its card. The row now carries the star, the per-item
       // highlight colour, and whichever badges the view toggles ask for.
       const hue = item.color ? ` style="--row-accent:${treeColorOf(item.color)}"` : '';
       html += `
         <div class="tree-node tree-item-node${item.color ? ' has-accent' : ''}" data-level="${depth + 1}" data-node-id="${item.id}"${hue}>
-          <div class="tree-node-row ${isActive ? 'active' : ''}"
-               ${treeRowAttrs({ ns: 'browse', id: item.id, kind: 'item', level: depth + 1, selected: isActive })}
+          <div class="tree-node-row"
+               ${treeRowAttrs({ ns: 'browse', id: item.id, kind: 'item', level: depth + 1 })}
                style="padding-left: calc(0.75rem + ${TREE_ITEM_INSET}rem)"
                oncontextmenu="treeContextMenu(event, '${item.id}', 'browse')"
                onclick="browseSelectProgram('${item.id}')">
@@ -435,12 +451,11 @@ function renderTreeRecursive(parentId, scope, depth, query, activeId, itemsOnly,
     if (entry.kind === 'set') {
       const set = node;
       if (query && !fuzzyMatch(set.title, query)) return;
-      const isActive = browseActiveSetId === set.id;
       const n = (set.problems || []).length;
       html += `
         <div class="tree-node tree-item-node tree-set-node" data-level="${depth + 1}" data-node-id="${set.id}">
-          <div class="tree-node-row ${isActive ? 'active' : ''}"
-               ${treeRowAttrs({ ns: 'browse', id: set.id, kind: 'set', level: depth + 1, selected: isActive })}
+          <div class="tree-node-row"
+               ${treeRowAttrs({ ns: 'browse', id: set.id, kind: 'set', level: depth + 1 })}
                style="padding-left: calc(0.75rem + ${TREE_ITEM_INSET}rem)"
                oncontextmenu="treeContextMenu(event, '${set.id}', 'browse')"
                onclick="browseSelectSet('${set.id}')">

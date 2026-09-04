@@ -612,6 +612,64 @@ function treeRowAttrs(o) {
     ` ondrop="treeDrop(event, '${o.id}', '${o.ns}')"`;
 }
 
+/* ── Committing a tree's markup ─────────────────────────────────────────────
+   SELECTION IS NOT MARKUP. It used to be: every renderer baked `active` and
+   aria-selected into the HTML string and then replaced the whole tree with
+   `container.innerHTML = html` on each click. That is why selecting a row had
+   no animation whatsoever. The row you clicked was not a row that changed
+   state -- it was a brand new element created already active, so its
+   transitions had nothing to transition FROM, and the row you left was
+   destroyed outright, so it could not fade out. The CSS was correct the whole
+   time and simply never got the chance to run.
+
+   So the markup carries structure only, and selection is a class applied after.
+   When a click changes nothing but which row is selected the generated string
+   is identical, the DOM is left alone, and toggling the class lets the existing
+   transitions play in both directions. A real structural change -- expanding a
+   folder, renaming, adding -- still writes, because then the string differs.
+
+   Keyed on the container so several trees can be live at once. WeakMap, so a
+   container that goes away takes its entry with it. */
+const _treeMarkup = new WeakMap();
+
+/**
+ * Write `html` into `container` only if it differs from what is already there,
+ * then mark `selectedId` as the selected row.
+ *
+ * Returns true when the DOM was actually rebuilt, so callers can skip
+ * re-running icon rendering over markup that never changed.
+ */
+function treeCommit(container, html, selectedId) {
+  const rebuilt = _treeMarkup.get(container) !== html || !container.firstChild;
+  if (rebuilt) {
+    container.innerHTML = html;
+    _treeMarkup.set(container, html);
+  }
+  treeApplySelection(container, selectedId);
+  return rebuilt;
+}
+
+/**
+ * Record markup as current without writing it.
+ *
+ * For the renderers that change the DOM by hand -- the expand toggles animate
+ * in place rather than re-rendering -- so the cache keeps describing what is
+ * actually on screen and the next commit can still skip the write.
+ */
+function treeSyncMarkup(container, html) {
+  _treeMarkup.set(container, html);
+}
+
+/** The one place a tree row becomes selected. */
+function treeApplySelection(container, selectedId) {
+  container.querySelectorAll('.tree-node-row').forEach(row => {
+    const on = selectedId != null && row.dataset.nodeId === String(selectedId);
+    row.classList.toggle('active', on);
+    if (on) row.setAttribute('aria-selected', 'true');
+    else row.removeAttribute('aria-selected');
+  });
+}
+
 /** The always-present drop target under a tree that means "top level". */
 function treeRootDropHTML(ns) {
   return `<div class="tree-root-drop" data-tree-root="${ns}">

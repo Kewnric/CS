@@ -58,15 +58,14 @@ function renderSnippetList() {
   }
 
   if (filteredRoot.length > 0 || state.nodes.filter(n => n.scope === 'snippet').length === 0) {
-    const isActive = !activeSnippetId && activeSnippetFolderId === '__root__';
     const count = filteredRoot.length;
     if (count > 0 || !html) {
       // A real row: expandable, droppable, with a menu (see browse.js).
       const rootOpen = isNodeExpanded('__root__');
       html += `
         <div class="tree-node" data-level="0" data-node-id="__root__">
-          <div class="tree-node-row ${isActive ? 'active' : ''}"
-               ${treeRowAttrs({ ns: 'snippets', id: '__root__', kind: 'folder', level: 0, expanded: rootOpen, selected: isActive, draggable: false })}
+          <div class="tree-node-row"
+               ${treeRowAttrs({ ns: 'snippets', id: '__root__', kind: 'folder', level: 0, expanded: rootOpen, draggable: false })}
                oncontextmenu="treeContextMenu(event, '__root__', 'snippets')"
                onclick="selectSnippetFolder('__root__')">
             <i data-lucide="chevron-right" class="tree-node-chevron ${count > 0 ? (rootOpen ? 'expanded' : '') : 'invisible'}"
@@ -85,14 +84,16 @@ function renderSnippetList() {
     }
   }
 
-  if (!html) {
-    container.innerHTML = `
+  /* Selection is applied as a class after the markup is committed, never baked
+     into it -- see treeCommit. That is what lets a row survive a selection
+     change and actually transition. */
+  const markup = html
+    ? html + treeRootDropHTML('snippets')
+    : `
       <div class="empty-state" style="padding: 2rem;">
         <p style="color:var(--text-tertiary); font-size:0.875rem;">No folders. Right-click to create one.</p>
       </div>`;
-  } else {
-    container.innerHTML = html + treeRootDropHTML('snippets');
-  }
+  const rebuilt = treeCommit(container, markup, activeSnippetId || activeSnippetFolderId);
   container.dataset.treeNs = 'snippets';
   container.setAttribute('role', 'tree');
   container.setAttribute('aria-label', 'Snippet folders');
@@ -120,7 +121,7 @@ function renderSnippetList() {
     if (pane1) pane1.scrollTop = getSessionParam('studySidebarScroll') || 0;
   }, 50);
 
-  if (typeof lucide !== 'undefined') lucide.createIcons({ root: container });
+  if (rebuilt && typeof lucide !== 'undefined') lucide.createIcons({ root: container });
 }
 
 /**
@@ -144,14 +145,13 @@ function renderSnippetTreeRecursive(parentId, depth, query, itemsOnly, rootList)
       const totalItems = countItemsRecursive(folder.id, 'snippet');
       const hasChildren = getChildFolders(folder.id, 'snippet').length > 0;
       const expanded = isNodeExpanded(folder.id);
-      const isActive = !activeSnippetId && activeSnippetFolderId === folder.id;
       if (query && !folderHasMatchingSnippets(folder.id, query)) return;
       const chevronClass = (hasChildren || totalItems > 0) ? (expanded ? 'expanded' : '') : 'invisible';
 
       html += `
         <div class="tree-node" data-level="${depth}" data-node-id="${folder.id}">
-          <div class="tree-node-row ${isActive ? 'active' : ''}"
-               ${treeRowAttrs({ ns: 'snippets', id: folder.id, kind: 'folder', level: depth, expanded: expanded, selected: isActive })}
+          <div class="tree-node-row"
+               ${treeRowAttrs({ ns: 'snippets', id: folder.id, kind: 'folder', level: depth, expanded: expanded })}
                style="padding-left: calc(0.5rem + 0rem)"
                oncontextmenu="treeContextMenu(event, '${folder.id}', 'snippets')"
                onclick="selectSnippetFolder('${folder.id}')">
@@ -174,11 +174,10 @@ function renderSnippetTreeRecursive(parentId, depth, query, itemsOnly, rootList)
     // Snippet files — clicking one opens its detail view in pane 2.
     const sn = node;
     if (query && !libMatches(sn, query, 'snippet')) return;
-    const isActive = activeSnippetId === sn.id;
     html += `
       <div class="tree-node tree-item-node${sn.color ? ' has-accent' : ''}" data-level="${depth + 1}" data-node-id="${sn.id}"${sn.color && typeof treeColorOf === 'function' ? ` style="--row-accent:${treeColorOf(sn.color)}"` : ''}>
-        <div class="tree-node-row ${isActive ? 'active' : ''}"
-             ${treeRowAttrs({ ns: 'snippets', id: sn.id, kind: 'item', level: depth + 1, selected: isActive })}
+        <div class="tree-node-row"
+             ${treeRowAttrs({ ns: 'snippets', id: sn.id, kind: 'item', level: depth + 1 })}
              style="padding-left: calc(0.5rem + ${TREE_ITEM_INSET}rem)"
              oncontextmenu="treeContextMenu(event, '${sn.id}', 'snippets')"
              onclick="selectSnippet('${sn.id}')">
