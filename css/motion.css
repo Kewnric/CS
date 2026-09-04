@@ -568,3 +568,25 @@ textarea:focus-visible,
 .label-pop { animation: labelPop 0.36s var(--ease-expo-out) both; }
   to   { transform: translateX(0);    opacity: 1; }
 }
+
+/* ── The tree fanning in, row by row ───────────────────────────────────────
+   Ends at scale(0.99), which is the row's OWN resting transform, so the last
+   frame of the animation and the first frame after it are the same -- ending
+   at `none` would have snapped every row 1% larger the moment it finished.
+
+   Selected rows sit this out. They rest at translateX(-3px), and an animation
+   owns the transform outright while it runs, so a selected row would have
+   arrived at scale(0.99) and then jumped sideways into place. */
+@keyframes treeRowIn {
+  from { opacity: 0; transform: translateY(-9px) scale(0.99); }
+  to   { opacity: 1; transform: scale(0.99); }
+}
+
+.tree-animate-in .tree-node-row:not(.active) {
+  animation: treeRowIn 0.32s cubic-bezier(0.22, 0.61, 0.36, 1) backwards;
+  animation-delay: var(--tree-in-delay, 0ms);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tree-animate-in .tree-node-row:not(.active) { animation: none; }
+}

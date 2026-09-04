@@ -71,6 +71,22 @@ function browseTemplate() {
 }
 
 function browseInit() {
+  /* THE TREE OPENS CLOSED WHEN YOU COME BACK TO IT. Expansion is saved state,
+     so leaving the library and returning used to show it exactly as deep as you
+     left it, which is rarely where you want to start.
+
+     Coming back FROM AN ATTEMPT is the exception: that is the same piece of
+     work continuing, and collapsing the folder you just practised out of would
+     lose your place. The router sets cm_currentRawHash at the very end of
+     handleRoute, after this runs, so it still holds the route being left.
+
+     Runs before the target selection below, so whatever you are opening still
+     expands its own path afterwards. */
+  const cameFrom = String(window.cm_currentRawHash || '').split('?')[0];
+  if (['practice', 'practice-set', 'solution', 'browse'].indexOf(cameFrom) === -1
+      && typeof collapseAllFolders === 'function') {
+    collapseAllFolders('challenge');
+  }
   /* Put the library's label in step with its contents before anything reads
      it. renderBrowse returns early when its container is not mounted, so the
      refresh at the end of it is not somewhere this can be relied on. */

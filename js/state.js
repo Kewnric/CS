@@ -565,6 +565,22 @@ function setNodeExpanded(nodeId, open) {
   saveData();
 }
 
+/**
+ * Close every folder in one library.
+ *
+ * Scoped, because expandedNodes is one flat list shared by all of them and
+ * closing the coding tree must not close the notes tree with it.
+ */
+function collapseAllFolders(scope) {
+  if (!state.expandedNodes || !state.expandedNodes.length) return;
+  const mine = new Set((state.nodes || []).filter(n => n.scope === scope).map(n => n.id));
+  let changed = false;
+  for (let i = state.expandedNodes.length - 1; i >= 0; i--) {
+    if (mine.has(state.expandedNodes[i])) { state.expandedNodes.splice(i, 1); changed = true; }
+  }
+  if (changed) saveData();
+}
+
 function toggleNodeExpanded(nodeId) {
   setNodeExpanded(nodeId, !isNodeExpanded(nodeId));
 }

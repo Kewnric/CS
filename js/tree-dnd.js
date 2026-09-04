@@ -644,6 +644,7 @@ function treeCommit(container, html, selectedId) {
   if (rebuilt) {
     container.innerHTML = html;
     _treeMarkup.set(container, html);
+    treeStaggerIn(container);
   }
   treeApplySelection(container, selectedId);
   return rebuilt;
@@ -658,6 +659,32 @@ function treeCommit(container, html, selectedId) {
  */
 function treeSyncMarkup(container, html) {
   _treeMarkup.set(container, html);
+}
+
+/* ── The tree arrives top to bottom ────────────────────────────────────────
+   The card grid fans in left to right; a tree is a column, so it fans down.
+   The delay is written per row rather than baked into CSS because the rows are
+   nested -- :nth-child only counts within one level, and a folder with three
+   programs in it would restart the count. Capped, so a library of sixty rows
+   does not spend two seconds arriving.
+
+   Only on a real rebuild. treeCommit skips the write when nothing structural
+   changed, so selecting a row -- which is now just a class -- cannot replay
+   this, and neither can expanding a folder, which patches the DOM in place. */
+let _treeAnimTimer = null;
+
+function treeStaggerIn(container) {
+  const rows = container.querySelectorAll('.tree-node-row');
+  if (!rows.length) return;
+  const step = rows.length > 26 ? 10 : 26;
+  rows.forEach((row, i) => {
+    row.style.setProperty('--tree-in-delay', Math.min(i * step, 560) + 'ms');
+  });
+  container.classList.add('tree-animate-in');
+  clearTimeout(_treeAnimTimer);
+  // Taken off once it has played, so nothing that re-reads the class later
+  // finds a tree permanently mid-entrance.
+  _treeAnimTimer = setTimeout(() => container.classList.remove('tree-animate-in'), 1200);
 }
 
 /** The one place a tree row becomes selected. */

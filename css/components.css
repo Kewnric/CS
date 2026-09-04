@@ -3858,6 +3858,13 @@ body[data-route="visualization"] .settings-fab { display: none; }
   min-height: 0;             /* the detailed card sets a floor it does not need */
 }
 
+/* Select mode puts a 22px checkbox at top-left of the card. The detailed card
+   has a cover image there and swallows it; this one starts with the title, so
+   the box sat on the words. The head steps aside for exactly as long as the box
+   is in the DOM -- it is only rendered in select mode, so the sibling selector
+   is the same condition without JS having to say so twice. */
+.lib-select-box ~ .card-compact-head { padding-left: 30px; }
+
 .card-compact-head {
   display: flex;
   align-items: flex-start;
@@ -3898,6 +3905,43 @@ body[data-route="visualization"] .settings-fab { display: none; }
 
    Icon only: the label it replaced repeated what the status pill beside it
    already says, and the action is on the title in `title` and `aria-label`. */
+/* ── What the play button is about to do, in colour ────────────────────────
+   Three actions, three tones, keyed off the same test that picks the label so
+   the two can never disagree:
+
+     green   nothing has been run yet -- a fresh attempt
+     amber   an unfinished attempt is waiting to be picked back up
+     indigo  solved once already; this starts it over
+
+   Colour on the border and the glyph rather than a filled block: these sit
+   three to a row beside a status pill, and three saturated fills would read as
+   the loudest thing on the page. */
+.card-compact-action.is-fresh {
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.38);
+  background: rgba(16, 185, 129, 0.10);
+}
+.card-compact-action.is-fresh:hover {
+  background: rgba(16, 185, 129, 0.18);
+  border-color: rgba(16, 185, 129, 0.6);
+}
+.card-compact-action.is-resume {
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.42);
+  background: rgba(245, 158, 11, 0.12);
+}
+.card-compact-action.is-resume:hover {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: rgba(245, 158, 11, 0.65);
+}
+/* Indigo is .btn-practice's own colour, so "solved, run it again" keeps the
+   button the rest of the app already uses for practice. */
+.card-compact-action.is-retry {
+  color: var(--color-primary);
+  border-color: rgba(99, 102, 241, 0.42);
+  background: rgba(99, 102, 241, 0.12);
+}
+
 .card-compact-action {
   margin-left: auto;
   flex: 0 0 auto;

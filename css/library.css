@@ -544,6 +544,18 @@
 }
 .lib-hub-search svg { width: 16px; height: 16px; color: var(--text-tertiary); flex-shrink: 0; }
 .lib-hub-search .search-input { border: none; background: transparent; padding: 0.6rem 0; flex: 1; }
+
+/* THE RING BELONGS TO THE PILL, NOT TO THE FIELD INSIDE IT. .search-input
+   carries its own focus ring and keeps `border-radius: var(--radius-full)` even
+   here, where the rule above strips its border and background -- so focusing
+   drew a rounded rectangle around the TEXT box, which sits inset from the pill
+   by the icon and the padding. The ring cut across the pill instead of tracing
+   it. It moves to the wrapper, which is the shape you can actually see. */
+.lib-hub-search:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-glow);
+}
+.lib-hub-search .search-input:focus { box-shadow: none; border-color: transparent; }
 .lib-hub-results { display: none; max-width: 520px; margin: 0.5rem auto 0; text-align: left; }
 .lib-hub-results.open {
   display: flex;

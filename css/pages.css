@@ -1277,7 +1277,7 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
   content: '';
   display: block;
   height: 3px;
-  width: clamp(72px, 38%, 220px);
+  width: clamp(140px, 62%, 420px);
   margin-top: 0.4rem;
   border-radius: 4px;
   background: linear-gradient(90deg, var(--color-primary), transparent);

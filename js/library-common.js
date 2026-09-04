@@ -385,7 +385,7 @@ function libFilterShellHTML(o) {
   // change never has to re-run the icon library.
   return `
     <div class="lib-filter-shell${open ? ' open' : ''}" data-ns="${o.ns}">
-      <div class="lib-filter-head">
+      <div class="lib-filter-head stagger-children">
         <button class="lib-filter-toggle${active.length ? ' has-active' : ''}"
                 onclick="libToggleFilters('${o.ns}')" aria-expanded="${open}">
           <i data-lucide="sliders-horizontal" style="width:13px;height:13px;"></i>

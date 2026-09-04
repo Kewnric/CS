@@ -516,7 +516,11 @@ function _buildChallengeCardCompact(c) {
      version count and the status, and a full-width button underneath would undo
      the height this layout exists to save. */
   const resumable = browseHasResumable(c);
+  /* Colour follows the ACTION, not the score, so the button and its own label
+     can never disagree: amber picks an attempt back up, indigo starts a solved
+     program over, green is a run from nothing. */
   const actionLabel = resumable ? 'Resume' : bestScore === 100 ? 'Retry' : 'Practice';
+  const actionTone = resumable ? 'is-resume' : bestScore === 100 ? 'is-retry' : 'is-fresh';
   return `
     <div class="card card-compact${libIsSelected('browse', c.id) ? ' lib-selected' : ''}" id="card-${c.id}"
          onclick="${selecting ? `libToggleSelect('browse','${c.id}')` : `browseSelectProgram('${c.id}')`}" style="cursor:pointer;">
@@ -528,7 +532,7 @@ function _buildChallengeCardCompact(c) {
       <div class="card-compact-meta">
         <span class="version-pill">${vCount} version${vCount !== 1 ? 's' : ''}</span>
         ${_browseSolvedPill(bestScore, logs.length)}
-        <button class="btn btn-practice card-compact-action"
+        <button class="btn btn-practice card-compact-action ${actionTone}"
                 onclick="event.stopPropagation(); ${resumable ? `browseResume('${c.id}')` : `browseStartFresh('${c.id}')`}"
                 title="${actionLabel} — ${escapeHTML(c.title)}" aria-label="${actionLabel} ${escapeHTML(c.title)}">
           <i data-lucide="play" style="width:15px;height:15px;fill:currentColor;"></i>
