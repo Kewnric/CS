@@ -143,7 +143,7 @@ function _laStudyCode() { return typeof langStudy === 'function' ? langStudy() :
 /** Read a word from the card out loud. */
 function laSpeak(text) {
   if (typeof speak !== 'function') return;
-  speak(text, { lang: _laSpeechLang() });
+  speak(text, { lang: _laSpeechLang(), langCode: _laStudyCode() });
 }
 
 /** Read back whatever is in the answer box right now. */
@@ -154,7 +154,7 @@ function laSpeakTyped() {
     if (typeof toast === 'function') toast('Type something first.', { type: 'info', duration: 2000 });
     return;
   }
-  if (typeof speak === 'function') speak(said, { lang: _laSpeechLang() });
+  if (typeof speak === 'function') speak(said, { lang: _laSpeechLang(), langCode: _laStudyCode() });
 }
 
 function laLoadQuestion() {

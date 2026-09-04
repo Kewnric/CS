@@ -449,7 +449,8 @@ function lqSpeakCurrentLine() {
   if (!lqAutoVoice() || typeof speak !== 'function') return;
   const line = _lq && _lq.say && _lq.say[0];
   if (!line || !line.text) return;
-  speak(line.text, { lang: typeof langSpeechTag === 'function' ? langSpeechTag(langStudy()) : undefined });
+  const code = typeof langStudy === 'function' ? langStudy() : '';
+  speak(line.text, { lang: typeof langSpeechTag === 'function' ? langSpeechTag(code) : undefined, langCode: code });
 }
 
 /** The switch, sitting with the scene rather than in a settings screen. */
@@ -469,7 +470,8 @@ function lqHoverSpeak(i) {
   if (!lqAutoVoice() || typeof speak !== 'function') return;
   const m = _lq && _lq.menu && _lq.menu[i];
   if (!m || m.off || !m.label) return;
-  speak(m.label, { lang: typeof langSpeechTag === 'function' ? langSpeechTag(langStudy()) : undefined });
+  const code = typeof langStudy === 'function' ? langStudy() : '';
+  speak(m.label, { lang: typeof langSpeechTag === 'function' ? langSpeechTag(code) : undefined, langCode: code });
 }
 
 function lqMenuHTML() {

@@ -107,10 +107,29 @@ function speak(text, opts) {
   if (!clean) return false;
 
   window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(clean);
-  const voice = _speechPickVoice(prefs);
-  if (voice) { u.voice = voice; u.lang = opts.lang || voice.lang; }
-  else if (opts.lang) { u.lang = opts.lang; }
+
+  /* A voice that already has these vowels beats the chosen one for a language
+     it cannot read. Nobody has a Cebuano voice, but a Filipino, Spanish or
+     Italian one reads the spelling almost correctly, and that is a far bigger
+     improvement than anything done to the text. The chosen voice still wins
+     for everything else, including English. */
+  let voice = null;
+  if (opts.langCode && prefs.matchVoice !== false) voice = speechVoiceForLang(opts.langCode);
+  if (!voice) voice = _speechPickVoice(prefs);
+
+  /* Only if we ended up somewhere that cannot read it: respell so the voice we
+     do have produces the right sounds. */
+  const said = opts.langCode ? speechShapeFor(clean, opts.langCode, voice) : clean;
+
+  const u = new SpeechSynthesisUtterance(said);
+  /* Assigning a voice the engine no longer recognises throws, and an exception
+     here means nothing is said at all -- the whole feature goes silent because
+     one voice went stale. Losing the voice is survivable; losing the speech is
+     not, so it falls back to the engine default. */
+  if (voice) {
+    try { u.voice = voice; u.lang = opts.lang || voice.lang; }
+    catch (e) { if (opts.lang) u.lang = opts.lang; }
+  } else if (opts.lang) { u.lang = opts.lang; }
   // The spec's ranges: pitch 0–2, rate 0.1–10. Clamped because a stored value
   // outside them makes the whole utterance fail silently rather than clip.
   u.pitch = Math.min(2, Math.max(0, Number(prefs.pitch) || 1));
@@ -269,6 +288,13 @@ function _speechPaintPanel(voices) {
       <span class="speech-row-label">Volume <em id="speech-vol-val">${Math.round(p.volume * 100)}%</em></span>
       <input type="range" id="speech-vol" min="0" max="100" step="5" value="${Math.round(p.volume * 100)}"
              oninput="document.getElementById('speech-vol-val').textContent = this.value + '%'; speechSetPref({ volume: parseInt(this.value, 10) / 100 });" />
+    </label>
+    <label class="speech-row speech-row-check">
+      <input type="checkbox" id="speech-match" ${p.matchVoice === false ? '' : 'checked'}
+             onchange="speechSetPref({ matchVoice: this.checked })" />
+      <span><strong>Match the voice to the language</strong>
+        <em>Bisaya, Waray and Filipino borrow a Filipino, Spanish or Italian voice if you have one &mdash;
+        they share the same five vowels. Without one, the spelling is adjusted instead.</em></span>
     </label>
     <button class="btn btn-secondary" style="width:100%;margin-top:0.25rem;" onclick="speechPreview()">
       <i data-lucide="play"></i> Hear it
@@ -453,4 +479,162 @@ function speakElementAlong(host, opts) {
   });
   if (!said) { speechReadAlongStop(); return false; }
   return true;
+}
+
+/* ── Making Bisaya sound like Bisaya ────────────────────────────────────────
+   No platform ships a Cebuano or Waray voice, so asking for ceb-PH gets you
+   whatever voice you had, reading Cebuano spelling with that language's rules.
+   An English voice turns "maayong buntag" into something unrecognisable,
+   because English vowels are diphthongs and Cebuano's are pure.
+
+   Two answers, in order of how well they work.
+
+   FIRST, BORROW A VOICE THAT ALREADY HAS THE RIGHT VOWELS. Cebuano, Waray and
+   Filipino share a five-vowel system with Spanish and Italian, and a Tagalog
+   voice is near enough to be the real thing. So the search runs down a chain of
+   languages that read this orthography correctly rather than stopping at the
+   one nobody has.
+
+   SECOND, IF ONLY ENGLISH IS INSTALLED, CHANGE THE SPELLING. An English voice
+   cannot be told to use different vowels, but it can be handed spelling that
+   produces them: "salamat" read as "sah-lah-maht" comes out close. Syllable
+   breaks are kept as hyphens because engines pause very slightly at them, which
+   is what stops a word running together into one blur. */
+
+const SPEECH_VOWELS = 'aeiou';
+
+/* Ordered by how closely the language's own reading rules match Cebuano's. */
+const SPEECH_VOICE_CHAIN = {
+  ceb: ['ceb', 'fil', 'tl', 'es', 'it'],
+  war: ['war', 'ceb', 'fil', 'tl', 'es', 'it'],
+  fil: ['fil', 'tl', 'ceb', 'es', 'it'],
+  en:  ['en']
+};
+
+/** Languages whose reading rules suit this orthography without respelling. */
+const SPEECH_FRIENDLY = ['ceb', 'war', 'fil', 'tl', 'es', 'it'];
+
+function _speechLangIs(tag, prefix) {
+  return String(tag || '').toLowerCase().indexOf(prefix) === 0;
+}
+
+/**
+ * The best installed voice for one of the app's languages.
+ * @returns {SpeechSynthesisVoice|null} null when nothing in the chain exists
+ */
+function speechVoiceForLang(code) {
+  const chain = SPEECH_VOICE_CHAIN[code];
+  if (!chain || !_speechVoices.length) return null;
+  for (let i = 0; i < chain.length; i++) {
+    const hit = _speechVoices.find(v => _speechLangIs(v.lang, chain[i]));
+    if (hit) return hit;
+  }
+  return null;
+}
+
+/**
+ * Split a Cebuano/Waray/Filipino word into syllables.
+ *
+ * The rule these languages actually follow: every syllable is one vowel, with
+ * at most one consonant in front and at most one behind. So between two vowels,
+ * a single consonant belongs to the SECOND syllable (ba-lay, not bal-ay), two
+ * consonants split one each (bun-tag), and none at all means the vowels are
+ * separate syllables (ma-a-yong).
+ *
+ * "ng" is one consonant, not two -- treating it as two puts a break inside it
+ * and turns "ngano" into "n-gano". The hyphen that marks a glottal stop in
+ * spellings like "kanus-a" is already a syllable break, so it is kept as one.
+ *
+ * @returns {string[]}
+ */
+function speechSyllables(word) {
+  const w = String(word || '').toLowerCase();
+  if (!w) return [];
+
+  // Units, so "ng" travels as a single consonant.
+  const units = [];
+  for (let i = 0; i < w.length; i++) {
+    if (w[i] === 'n' && w[i + 1] === 'g') { units.push('ng'); i++; }
+    else units.push(w[i]);
+  }
+  const isV = (u) => u.length === 1 && SPEECH_VOWELS.indexOf(u) > -1;
+  const vowelAt = units.map(isV);
+  if (!vowelAt.some(Boolean)) return [w];
+
+  const out = [];
+  let cur = '';
+  for (let i = 0; i < units.length; i++) {
+    const u = units[i];
+    if (u === '-') { if (cur) { out.push(cur); cur = ''; } continue; }
+    cur += u;
+    if (!isV(u)) continue;
+
+    // How many consonants until the next vowel decides where the break goes.
+    let j = i + 1, cons = 0, dash = false;
+    while (j < units.length && !vowelAt[j]) {
+      if (units[j] === '-') { dash = true; break; }
+      cons++; j++;
+    }
+
+    if (!dash && j >= units.length) {
+      /* No vowel left, so everything after this one is the coda and the word
+         ends here. Breaking out without taking it dropped the final consonant
+         of every word that has one -- salamat came back as sa-la-ma. */
+      cur += units.slice(i + 1).join('');
+      break;
+    }
+    if (dash) {
+      /* A written glottal stop is already a syllable break, and the
+         consonants before it close the syllable: kanus-a is ka-nus-a. */
+      cur += units.slice(i + 1, i + 1 + cons).join('');
+      out.push(cur);
+      cur = '';
+      i += cons;
+      continue;
+    }
+    if (cons >= 2) { cur += units[i + 1]; i += 1; }   // one consonant closes this syllable
+    out.push(cur);
+    cur = '';
+  }
+  if (cur) out.push(cur);
+  return out.filter(Boolean);
+}
+
+/* Pure vowels, spelled the way an English voice reads them.
+
+   ONE PASS, NOT A LIST OF PASSES. Running these in sequence re-processes what
+   the earlier ones produced: ay -> ai, and then the a and the i rules turn
+   that into "ahee", so balay came out bah-lahee. A single alternation consumes
+   each letter once, and the diphthongs are listed first so they win over their
+   own first vowel.
+
+   ay is "ie" rather than "ai" because Cebuano /aj/ is the vowel in English
+   "lie", not the one in "lay" -- balay is bah-LIE. */
+const SPEECH_RESPELL_RE = /ay$|aw$|oy$|iw$|[aeiou]/g;
+const SPEECH_RESPELL_MAP = {
+  ay: 'ie', aw: 'ow', oy: 'oy', iw: 'ew',
+  a: 'ah', e: 'eh', i: 'ee', o: 'oh', u: 'oo'
+};
+
+/**
+ * Rewrite one word so an English voice reads it with Cebuano vowels.
+ * Only ever a last resort — a voice that already has these vowels is better.
+ */
+function speechRespell(word) {
+  return speechSyllables(word)
+    .map(syl => syl.replace(SPEECH_RESPELL_RE, m => SPEECH_RESPELL_MAP[m] || m))
+    .join('-');
+}
+
+/**
+ * Prepare a phrase for whichever voice is going to read it.
+ * Left alone when the voice's own language already reads this orthography.
+ */
+function speechShapeFor(text, code, voice) {
+  const say = String(text == null ? '' : text);
+  if (!say.trim() || !code || code === 'en') return say;
+  const friendly = voice && SPEECH_FRIENDLY.some(p => _speechLangIs(voice.lang, p));
+  if (friendly) return say;
+  // Punctuation and spacing are kept; only the words are respelled.
+  return say.replace(/[A-Za-z\u00C0-\u024F-]+/g, (w) => speechRespell(w));
 }

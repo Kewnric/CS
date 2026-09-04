@@ -4160,3 +4160,22 @@ body[data-route="visualization"] .settings-fab { display: none; }
   border-color: rgba(99, 102, 241, 0.55);
   background: rgba(99, 102, 241, 0.16);
 }
+
+/* The one checkbox in the Read Aloud panel sits beside its label rather than
+   above it, the way the other rows stack their control under theirs. */
+.speech-row.speech-row-check {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.55rem;
+  cursor: pointer;
+}
+.speech-row-check input { margin-top: 0.15rem; flex-shrink: 0; }
+.speech-row-check strong { display: block; font-size: 0.8125rem; color: var(--text-secondary); }
+.speech-row-check em {
+  display: block;
+  font-style: normal;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+  margin-top: 0.15rem;
+}

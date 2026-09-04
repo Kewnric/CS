@@ -328,7 +328,8 @@ function langSpeakDelegate(e) {
   e.preventDefault();
   e.stopPropagation();
   if (typeof speak !== 'function') return;
-  speak(btn.dataset.speak, { lang: langSpeechTag(btn.dataset.speakLang) });
+  speak(btn.dataset.speak, { lang: langSpeechTag(btn.dataset.speakLang),
+                             langCode: btn.dataset.speakLang });
 }
 
 document.addEventListener('click', langSpeakDelegate, true);
