@@ -529,13 +529,48 @@ function moveItemToFolder(itemId, itemType, newFolderId) {
  * close it in the other two trees at the same time. It is left out of the
  * accordion rather than given a wrong answer.
  */
-function siblingFolderIds(nodeId) {
+/**
+ * Where the "Uncategorised" row's open/shut state is kept.
+ *
+ * Every library paints one and they all call it "__root__", so storing it under
+ * that bare id made the three share a single switch: opening Uncategorised in
+ * the coding tree would have opened it in notes and snippets too. The key
+ * carries the library, so each has its own.
+ */
+function rootExpansionKey(scope) { return '__root__:' + (scope || 'challenge'); }
+
+/** The id a node's expansion is stored under. Only the root row differs. */
+function expansionKeyFor(nodeId, scope) {
+  return nodeId === '__root__' ? rootExpansionKey(scope) : nodeId;
+}
+
+/**
+ * The folders beside this one: same parent, same library.
+ *
+ * Both halves matter. Parent alone would treat every top-level folder in the
+ * app as one group -- coding, notebook and snippet folders all sit at
+ * parentId null -- so opening a coding folder would collapse the notes tree.
+ *
+ * THE UNCATEGORISED ROW COUNTS AS ONE OF THEM. It is drawn level with the
+ * top-level folders and behaves like one, so it shuts when a real folder opens
+ * and takes them with it when it opens. It is not in state.nodes -- it is
+ * painted from whatever has no folder -- so it has to be named rather than
+ * found, which is why the scope is passed in for it.
+ */
+function siblingFolderIds(nodeId, scope) {
+  if (nodeId === '__root__') {
+    return (state.nodes || [])
+      .filter(n => n.scope === scope && !n.parentId)
+      .map(n => n.id);
+  }
   const node = (state.nodes || []).find(n => n.id === nodeId);
   if (!node) return [];
   const parent = node.parentId || null;
-  return (state.nodes || [])
+  const sibs = (state.nodes || [])
     .filter(n => n.id !== nodeId && n.scope === node.scope && (n.parentId || null) === parent)
     .map(n => n.id);
+  if (!parent) sibs.push(rootExpansionKey(node.scope));
+  return sibs;
 }
 
 /**
@@ -550,17 +585,18 @@ function siblingFolderIds(nodeId) {
  * rendered while it is shut, so clearing it would only mean losing your place
  * when you come back.
  */
-function setNodeExpanded(nodeId, open) {
+function setNodeExpanded(nodeId, open, scope) {
   if (!state.expandedNodes) state.expandedNodes = [];
+  const key = expansionKeyFor(nodeId, scope);
   const drop = (id) => {
     const i = state.expandedNodes.indexOf(id);
     if (i >= 0) state.expandedNodes.splice(i, 1);
   };
   if (!open) {
-    drop(nodeId);
+    drop(key);
   } else {
-    siblingFolderIds(nodeId).forEach(drop);
-    if (!state.expandedNodes.includes(nodeId)) state.expandedNodes.push(nodeId);
+    siblingFolderIds(nodeId, scope).forEach(drop);
+    if (!state.expandedNodes.includes(key)) state.expandedNodes.push(key);
   }
   saveData();
 }
@@ -574,6 +610,7 @@ function setNodeExpanded(nodeId, open) {
 function collapseAllFolders(scope) {
   if (!state.expandedNodes || !state.expandedNodes.length) return;
   const mine = new Set((state.nodes || []).filter(n => n.scope === scope).map(n => n.id));
+  mine.add(rootExpansionKey(scope));   // Uncategorised shuts with the rest
   let changed = false;
   for (let i = state.expandedNodes.length - 1; i >= 0; i--) {
     if (mine.has(state.expandedNodes[i])) { state.expandedNodes.splice(i, 1); changed = true; }
@@ -581,8 +618,8 @@ function collapseAllFolders(scope) {
   if (changed) saveData();
 }
 
-function toggleNodeExpanded(nodeId) {
-  setNodeExpanded(nodeId, !isNodeExpanded(nodeId));
+function toggleNodeExpanded(nodeId, scope) {
+  setNodeExpanded(nodeId, !isNodeExpanded(nodeId, scope), scope);
 }
 
 /**
@@ -619,8 +656,8 @@ function expandNodePath(nodeId) {
   saveData();
 }
 
-function isNodeExpanded(nodeId) {
-  return state.expandedNodes.includes(nodeId);
+function isNodeExpanded(nodeId, scope) {
+  return state.expandedNodes.includes(expansionKeyFor(nodeId, scope));
 }
 
 function updateTreeOrder(parentId, scope, sortedIds) {

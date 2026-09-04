@@ -708,12 +708,18 @@ function treeApplySelection(container, selectedId) {
  *
  * Item rows have no children container and are skipped.
  */
+/* The tree's namespace as the node scope that matches it. Only the
+   Uncategorised row needs this -- every other row is found in state.nodes,
+   which carries its own scope. */
+const TREE_NS_SCOPE = { browse: 'challenge', notes: 'notebook', snippets: 'snippet' };
+
 function treeSyncExpansion(container) {
   if (!container) return;
+  const scope = TREE_NS_SCOPE[container.dataset.treeNs] || 'challenge';
   container.querySelectorAll('.tree-node[data-node-id]').forEach((nodeEl) => {
     const kids = nodeEl.querySelector(':scope > .tree-children');
     if (!kids) return;
-    const open = isNodeExpanded(nodeEl.dataset.nodeId);
+    const open = isNodeExpanded(nodeEl.dataset.nodeId, scope);
     kids.classList.toggle('collapsed', !open);
     const row = nodeEl.querySelector(':scope > .tree-node-row');
     if (!row) return;

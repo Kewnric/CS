@@ -62,7 +62,7 @@ function snippetsBuildTreeHtml() {
     const count = filteredRoot.length;
     if (count > 0 || !html) {
       // A real row: expandable, droppable, with a menu (see browse.js).
-      const rootOpen = isNodeExpanded('__root__');
+      const rootOpen = isNodeExpanded('__root__', 'snippet');
       html += `
         <div class="tree-node" data-level="0" data-node-id="__root__">
           <div class="tree-node-row"
@@ -216,7 +216,7 @@ function renderSnippetItem(s, depth) {
 
 function toggleSnippetFolder(nodeId, e) {
   if (e) { e.stopPropagation(); e.preventDefault(); }
-  toggleNodeExpanded(nodeId);
+  toggleNodeExpanded(nodeId, 'snippet');
 
   /* Opening a folder now also closes the ones beside it, so the whole tree is
      synced from state rather than just the row that was clicked. Still done in

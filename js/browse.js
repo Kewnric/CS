@@ -143,7 +143,7 @@ function browseStartVariant(challengeId, variantId) {
 
 function toggleBrowseExpand(nodeId, e) {
   if (e) { e.stopPropagation(); e.preventDefault(); }
-  toggleNodeExpanded(nodeId);
+  toggleNodeExpanded(nodeId, 'challenge');
 
   /* Opening a folder now also closes the ones beside it, so the whole tree is
      synced from state rather than just the row that was clicked. Still done in
@@ -245,7 +245,7 @@ function browseBuildTreeHtml() {
       // A real row: it expands, it takes drops, and it has a menu. It used to be
       // a bare label, so the one place items came FROM was the one place they
       // could never be dragged back to.
-      const rootOpen = isNodeExpanded('__root__');
+      const rootOpen = isNodeExpanded('__root__', 'challenge');
       html += `
         <div class="tree-node" data-level="0" data-node-id="__root__">
           <div class="tree-node-row"
