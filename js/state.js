@@ -204,7 +204,42 @@ function loadData() {
       // no seed to merge any more, and a deletion is now permanent.
 
     } catch (e) {
-      console.error("Failed to parse local storage", e);
+      /* THE SAVE THAT FOLLOWS THIS WOULD HAVE ERASED IT.
+         A parse failure used to be logged and shrugged off: the app carried on
+         with default state, looked empty, and the first autosave wrote that
+         empty state straight over the bytes that failed to parse. A truncated
+         write, a crash mid-save or a quota-clipped string is usually MOSTLY
+         intact and recoverable by hand -- but only if it still exists.
+         So the bytes are copied aside, saving is refused until the user
+         decides, and they are told rather than left looking at an empty app. */
+      console.error('Failed to parse local storage', e);
+      _loadFailed = true;
+      try {
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        localStorage.setItem(getAppStorageKey() + '.corrupt.' + stamp, saved);
+      } catch (e2) {
+        // Out of room to keep a copy: the original is still where it was, and
+        // refusing to save is what protects it.
+        console.error('Could not set aside the unreadable save', e2);
+      }
+      /* Asked, not announced. The message has to name a way out or saving stays
+         paused forever, and the only two are: put a backup in, or start again.
+         Starting again is offered as a button rather than described, because a
+         description would have to tell someone to clear their own site data. */
+      if (typeof _showThreeButtonDialog === 'function') {
+        _showThreeButtonDialog('Saved data could not be read',
+          'Your data is still on this device but could not be understood, so nothing has been overwritten and saving is paused until you decide. A copy has been set aside either way.',
+          [
+            { label: 'Leave it, I will import a backup', action: 'keep' },
+            { label: 'Start fresh', danger: true, action: 'fresh' }
+          ],
+          (choice) => {
+            if (choice === 'fresh') startFreshAfterUnreadableSave();
+          });
+      } else if (typeof showMessage === 'function') {
+        showMessage('Saved data could not be read',
+          'Your data could not be understood, so nothing has been overwritten and saving is paused. Import a backup to carry on.', true);
+      }
     }
   } else {
     // ── Seed default/example content for first-time users ──
@@ -267,6 +302,35 @@ let _saveDataPending = false;
 let _breadcrumbCache = new Map();
 let _quotaWarned = false; // ensures the "storage full" warning shows only once per session
 
+/* Set when the saved data could not be parsed. While it is true nothing is
+   written, so the unreadable-but-probably-recoverable bytes stay where they
+   are. Cleared only by an explicit Start Fresh or a successful Import. */
+let _loadFailed = false;
+
+/** True when saving is paused because the stored data could not be read. */
+function saveIsBlocked() { return _loadFailed; }
+
+/**
+ * Let saving resume, after the user has chosen what to do about the bad data.
+ * Import calls this once it has replaced state; Start Fresh calls it after
+ * clearing. Nothing else should -- the flag is the only thing standing between
+ * a recoverable file and an empty one.
+ */
+function allowSavingAgain() { _loadFailed = false; }
+
+/**
+ * Begin again after data that could not be read.
+ *
+ * Removes only the live key. The copy set aside when the read failed is left
+ * alone, so "start fresh" is still not the same as "destroy it" -- the bytes
+ * remain on the device for anyone who wants to pick through them later.
+ */
+function startFreshAfterUnreadableSave() {
+  try { localStorage.removeItem(getAppStorageKey()); } catch (e) { /* nothing to remove */ }
+  allowSavingAgain();
+  location.reload();
+}
+
 window.addEventListener('beforeunload', () => {
   if (_saveDataPending) { clearTimeout(saveTimeout); _flushSaveData(); }
 });
@@ -299,6 +363,10 @@ function _flushSaveData() {
     langHistory: state.langHistory || [],
     wings: state.wings || {}
   };
+  /* Never write over data we could not read. Everything above is default state
+     when the load failed, so this would be the write that turns a recoverable
+     file into an empty one. */
+  if (_loadFailed) return;
   try {
     localStorage.setItem(getAppStorageKey(), JSON.stringify(dataToSave));
   } catch (e) {

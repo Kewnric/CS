@@ -162,9 +162,13 @@ function _speechPlainText(input) {
     // reliably insert breaks for elements that were never laid out.
     s = s.replace(/<\/(p|div|li|h[1-6]|pre|tr)>/gi, '. ')
          .replace(/<br\s*\/?>/gi, '. ');
-    const box = document.createElement('div');
-    box.innerHTML = s;
-    s = box.textContent || '';
+    /* DOMParser, NOT a detached div. Assigning HTML to an element runs its
+       handlers even when it is not in the document -- measured: an
+       <img onerror> fires on the assignment alone. Descriptions can arrive
+       from someone else through a share link, so "just to read the text out"
+       would have been enough to run their code. parseFromString builds an
+       inert document: no handlers, no requests, same text back. */
+    s = new DOMParser().parseFromString(s, 'text/html').body.textContent || '';
   }
   s = s
     .replace(/`{1,3}/g, ' ')       // code fences and inline ticks
@@ -338,6 +342,15 @@ function _rpMarkUp(host) {
   let spoken = '';
   let lastBlock = null;
 
+  /* Letters cost a span each, and past a certain length that stops being worth
+     it: measured at 1200 words the split produced 8,490 spans and took 14ms,
+     which is a visible hitch before the voice even starts. Long text keeps the
+     word-level highlight -- which is the part the engine actually drives -- and
+     drops the sweep inside each word. Short text, which is nearly everything,
+     is unaffected. */
+  const bulk = texts.reduce((n, t) => n + (t.nodeValue || '').length, 0);
+  const perLetter = bulk <= 2600;
+
   texts.forEach((node) => {
     const raw = node.nodeValue;
     if (!raw || !raw.trim()) return;
@@ -357,12 +370,17 @@ function _rpMarkUp(host) {
       const w = document.createElement('span');
       w.className = 'rp-w';
       // Letters get their own spans so the sweep has something to move across.
-      for (let i = 0; i < tok.length; i++) {
-        const c = document.createElement('span');
-        c.className = 'rp-c';
-        c.style.setProperty('--rp-i', String(i));
-        c.textContent = tok[i];
-        w.appendChild(c);
+      if (perLetter) {
+        for (let i = 0; i < tok.length; i++) {
+          const c = document.createElement('span');
+          c.className = 'rp-c';
+          c.style.setProperty('--rp-i', String(i));
+          c.textContent = tok[i];
+          w.appendChild(c);
+        }
+      } else {
+        w.classList.add('rp-w-plain');
+        w.textContent = tok;
       }
       words.push({ el: w, at: spoken.length, len: tok.length });
       spoken += tok;

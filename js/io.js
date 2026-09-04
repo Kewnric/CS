@@ -113,6 +113,12 @@ function handleDataImport(e) {
           return;
         }
 
+        /* The state below replaces whatever could not be read, so this is the
+           point at which writing is safe again. Before it, saveData is a no-op
+           -- see _loadFailed -- and the import would appear to work and then be
+           gone on the next load. */
+        if (typeof allowSavingAgain === 'function') allowSavingAgain();
+
         state.challenges = migrateLegacyData(parsed.challenges);
         state.codingSets = parsed.codingSets || [];
         state.snippets = parsed.snippets || [];

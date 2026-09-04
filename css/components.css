@@ -4050,8 +4050,19 @@ body[data-route="visualization"] .settings-fab { display: none; }
 .rp-c {
   display: inline-block;
   transform-origin: center bottom;
-  will-change: transform;
 }
+
+/* will-change ONLY on the word being read. It asks the compositor for a layer
+   per element, and a long description is thousands of letters -- a layer each
+   is a lot of memory to hold for text that is not moving. One word is at most
+   a dozen. */
+.rp-w.is-now .rp-c { will-change: transform; }
+
+/* Long text keeps the word highlight and drops the per-letter sweep, so it
+   carries the colours the letters would otherwise have shown. */
+.rp-w.rp-w-plain { transition: color 0.12s ease; }
+.rp-w.rp-w-plain.is-now { color: var(--rp-hot); }
+.rp-w.rp-w-plain.is-said { color: var(--rp-said); }
 
 /* Already read: stepped back, so the eye is drawn to where the voice is now
    rather than to everything it has covered. */
