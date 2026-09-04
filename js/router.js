@@ -140,6 +140,13 @@ const SpaRouter = (() => {
       try { routes[currentRoute].destroyFn(); } catch (e) { console.error('[Router] Destroy error:', e); }
     }
 
+    /* The route being left, published before it is overwritten.
+       cm_currentRawHash below is NOT this: it is assigned at the end of
+       handleRoute, but startViewTransition defers renderAndInit past that
+       point, so by the time an initFn runs it already reads as the route
+       being entered. Anything that wants to know where the user came from
+       wants this. null on the first route of a page load. */
+    window.cm_prevRoute = currentRoute;
     currentRoute = hash;
 
     // Update document title

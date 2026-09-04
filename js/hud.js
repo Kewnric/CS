@@ -11,8 +11,12 @@
 
 const HUD_KEY = 'ssp.hud';
 
+/* Off unless it has been switched on. The chrome is decoration over every
+   screen, so it is opt-in: a first run should show the app, not a frame around
+   it. Reading for '1' rather than not-'0' also means an absent key and a
+   cleared one both mean off, which is what "default" should mean. */
 function hudEnabled() {
-  try { return localStorage.getItem(HUD_KEY) !== '0'; } catch (e) { return true; }
+  try { return localStorage.getItem(HUD_KEY) === '1'; } catch (e) { return false; }
 }
 
 function hudSetEnabled(on) {

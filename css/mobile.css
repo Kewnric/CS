@@ -733,3 +733,22 @@
   .pane-1-content { max-height: 46vh; }
   .home-scroll, .lib-hub, .pane-1-header { padding-top: 50px; }
 }
+
+/* ── Dialogs on a phone ───────────────────────────────────────
+   The cap that keeps a dialog on screen lives in components.css and applies
+   everywhere. This is the part that is only true of a small screen: 32px of
+   card padding plus 24px of overlay padding is 31% of a 360px width spent on
+   empty margin, which is what pushed these panels past the viewport in the
+   first place. Give it back to the content and re-cap against the smaller
+   inset. */
+@media (max-width: 640px) {
+  .modal-overlay { padding: 12px; }
+  .modal-content {
+    padding: var(--space-lg);
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px);
+  }
+  /* Long bodies inside a now-scrolling card should not also scroll: nested
+     scrollers on a touch screen are a coin toss over which one moves. */
+  .modal-content .speech-body { max-height: none; overflow: visible; }
+}

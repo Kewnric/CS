@@ -223,8 +223,18 @@
     width: auto; margin: 0; transform: none;
     z-index: 400;
     padding: 0.9rem;
+    /* Anchored to the bottom with no top, this sheet grows upward off the
+       screen once the track list is long or the Spotify stage is open --
+       and being fixed, nothing can scroll it back down. Cap it and let it
+       scroll itself, the same rule dialogs follow. */
+    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
-  .ost-list { max-height: 40vh; }
+  /* The list gives up its own scroller: with the sheet scrolling, two nested
+     scrollers just fight each other under a thumb. */
+  .ost-list { max-height: none; overflow: visible; }
   .ost-item { padding: 0.55rem 0.45rem; font-size: 0.8rem; }
 }
 

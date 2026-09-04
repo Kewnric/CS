@@ -112,6 +112,12 @@ function snippetsTemplate() {
 }
 
 function snippetsInit() {
+  // Arrive with the tree closed — see notesInit for why these two are exempt.
+  const cameFrom = String(window.cm_prevRoute || '').split('?')[0];
+  if (['snippet-attempt', 'snippets'].indexOf(cameFrom) === -1
+      && typeof collapseAllFolders === 'function') {
+    collapseAllFolders('snippet');
+  }
   renderSnippetList();
 
   const targetSnippetId = getSessionParam('activeSnippetId');

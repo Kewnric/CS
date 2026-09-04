@@ -254,7 +254,7 @@ function _ppTestsHtml() {
       reqs.map((r, ri) => {
         const res = check && check.reqs ? check.reqs.find(x => x.type === r.type) : null;
         const state = res ? (res.ok ? 'ok' : 'no') : 'idle';
-        return `<div class="pp-row ${state}">
+        return `<div class="pp-row ${state}" data-ri="${ri}">
           ${_ppReqIcon(state)}
           <span class="pp-row-label">${escapeHTML(minReqLabel(r.type))}</span>
           <button class="pp-run-btn" onclick="ppRunMinReq(${ri})" title="Check this requirement"><i data-lucide="play" style="width:12px;height:12px;"></i></button>
@@ -392,9 +392,14 @@ async function ppRunAllChecks() {
 
   if (typeof psfxWorkStop === 'function') psfxWorkStop();
 
-  // React per row, then once for the whole run if everything landed.
+  /* React per row, then once for the whole run if everything landed.
+     Requirements are checked by Check Code too and used to report in silence --
+     they went first here because they sit above the tests in the panel, so the
+     reaction runs down the list in the order it is read. */
+  reqs.forEach((r, ri) => ppCelebrateReq(ri, !!r.ok, ri * 90));
+  const reqLead = reqs.length * 90;
   if (tests.length) {
-    testResults.forEach((r, ti) => ppCelebrateRow(ti, !!r.passed, ti * 90));
+    testResults.forEach((r, ti) => ppCelebrateRow(ti, !!r.passed, reqLead + ti * 90));
     if (testsPassed === tests.length) ppStarfall();
   }
 }
@@ -464,6 +469,8 @@ function ppRunMinReq(ri) {
   _ppRecount(check);
   if (_ppCtx.setCheck) _ppCtx.setCheck(check);
   _ppRenderTabBody();
+  // After the render, so the row it anchors to is the one now on screen.
+  ppCelebrateReq(ri, ok);
 }
 
 function ppRestore(execIdx) {
@@ -544,11 +551,65 @@ function ppCelebrateRow(ti, ok, delay) {
 
   if (_ppReduceMotion()) return;
   const wrap = document.querySelector(`.pp-row-wrap[data-ti="${ti}"]`);
-  if (!wrap) return;
-  const r = wrap.getBoundingClientRect();
-  if (!r.width || r.bottom < 0 || r.top > window.innerHeight) return;   // scrolled out of view
+  const r = _ppFxAnchor(wrap);
+  if (!r) return;
   const run = () => (ok ? _ppConfettiBurst(r) : _ppCrossRain(r));
   if (delay) setTimeout(run, delay); else run();
+}
+
+/**
+ * Where to throw the effect from.
+ *
+ * A row is the natural anchor, but on a phone the results panel is a sheet
+ * collapsed to about 94px: the rows are laid out inside something with almost
+ * no height, so their boxes are empty or off the bottom of the screen. The old
+ * rule -- no visible box, no effect -- meant the celebration NEVER played on a
+ * phone, which is the case it was most worth having.
+ *
+ * So an unusable row falls back to the top edge of the panel, which is where
+ * the result appeared. Only if there is no panel either does it give up.
+ *
+ * @returns {DOMRect|{left:number,top:number,width:number,height:number,bottom:number}|null}
+ */
+/**
+ * Celebrate a minimum requirement, the way a test case is celebrated.
+ *
+ * Requirements had no effect at all: they are checked instantly with no
+ * compile, so the only signal a check had happened was the icon quietly
+ * changing state. Passing one is the same kind of small win as passing a test
+ * and reads as nothing without it.
+ */
+function ppCelebrateReq(ri, ok, delay) {
+  const say = () => {
+    if (typeof psfxPass !== 'function') return;
+    ok ? psfxPass() : psfxFail();
+  };
+  if (delay) setTimeout(say, delay); else say();
+
+  if (_ppReduceMotion()) return;
+  const r = _ppFxAnchor(document.querySelector(`.pp-row[data-ri="${ri}"]`));
+  if (!r) return;
+  const run = () => (ok ? _ppConfettiBurst(r) : _ppCrossRain(r));
+  if (delay) setTimeout(run, delay); else run();
+}
+
+function _ppFxAnchor(wrap) {
+  const usable = (b) => b && b.width > 0 && b.bottom > 0 && b.top < window.innerHeight;
+  if (wrap) {
+    const b = wrap.getBoundingClientRect();
+    if (usable(b)) return b;
+  }
+  const panel = document.querySelector('.practice-panel');
+  if (panel) {
+    const p = panel.getBoundingClientRect();
+    if (p.width > 0 && p.top < window.innerHeight) {
+      // A shallow band along the top of the sheet, so pieces rise into the
+      // screen rather than out of the bottom of it.
+      return { left: p.left, top: Math.max(0, p.top), width: p.width, height: 1,
+               bottom: Math.max(0, p.top) + 1, right: p.right };
+    }
+  }
+  return null;
 }
 
 /**

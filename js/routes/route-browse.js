@@ -77,12 +77,19 @@ function browseInit() {
 
      Coming back FROM AN ATTEMPT is the exception: that is the same piece of
      work continuing, and collapsing the folder you just practised out of would
-     lose your place. The router sets cm_currentRawHash at the very end of
-     handleRoute, after this runs, so it still holds the route being left.
+     lose your place. Re-entering browse from browse is the other exception --
+     opening a program from the tree routes to #/browse?id=..., which lands
+     here again, and collapsing there would shut the tree under the click.
+
+     cm_prevRoute is the route being left. This used to read cm_currentRawHash,
+     which the router assigns at the END of handleRoute -- but startViewTransition
+     defers rendering past that assignment, so by the time this ran it always
+     already said "browse" and the collapse never once happened.
+     null means a fresh page load, which is also a first arrival: collapse.
 
      Runs before the target selection below, so whatever you are opening still
      expands its own path afterwards. */
-  const cameFrom = String(window.cm_currentRawHash || '').split('?')[0];
+  const cameFrom = String(window.cm_prevRoute || '').split('?')[0];
   if (['practice', 'practice-set', 'solution', 'browse'].indexOf(cameFrom) === -1
       && typeof collapseAllFolders === 'function') {
     collapseAllFolders('challenge');

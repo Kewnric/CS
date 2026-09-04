@@ -9,6 +9,15 @@ let _notebookContainerCtxHandler = null;
 
 // --- Init & Render ---
 function notesInit() {
+  /* Arrive with the tree closed, exactly as the coding library does. The
+     exceptions are the same shape: an attempt you are returning from is the
+     same piece of work continuing, and re-entering study from study is how
+     picking a notebook routes. null = fresh page load, which is an arrival. */
+  const cameFrom = String(window.cm_prevRoute || '').split('?')[0];
+  if (['notes-practice', 'notes-solution', 'study'].indexOf(cameFrom) === -1
+      && typeof collapseAllFolders === 'function') {
+    collapseAllFolders('notebook');
+  }
   notesRenderSidebar();
   notesRenderDetail();
 }

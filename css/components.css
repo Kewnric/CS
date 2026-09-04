@@ -817,6 +817,24 @@
   animation: modalRise 0.34s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* A DIALOG MUST NEVER BE TALLER THAN THE SCREEN IT IS ON.
+   The overlay centres with align-items:center, and a too-tall child in a
+   centred flex box overflows BOTH ends -- the top goes above the viewport,
+   where no amount of scrolling on the overlay can reach it. Measured on a
+   360x640 phone: the Read Aloud panel stood 686px tall with its title 23px
+   off the top of the screen and no way to bring it back.
+
+   Cap the card and let it scroll itself. `auto` is inert for every dialog
+   that already fits, so this changes nothing on a desktop. dvh follows the
+   phone browser chrome as it slides away; the vh line above it is the
+   fallback for anything that does not know dvh. */
+.modal-content {
+  max-height: calc(100vh - var(--space-lg) * 2);
+  max-height: calc(100dvh - var(--space-lg) * 2);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 @keyframes modalRise {
   from { opacity: 0; transform: translateY(12px) scale(0.985); }
   to   { opacity: 1; transform: none; }
