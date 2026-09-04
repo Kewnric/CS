@@ -795,7 +795,64 @@ function csRefreshBanner() {
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: banner });
 }
 
-/** A standing reminder of which library is on screen. */
+/* The shipped pack, built and fingerprinted once.
+   codingStarterPack() builds ~43 programs from scratch and _csStamp hashes
+   every one of them; the banner is repainted on every browse render, so doing
+   that each time would be work per keystroke in the search box. Cached for
+   reading only -- updateCodingStarterPack still builds its own, because the
+   merge hands these objects INTO the library and must not hand out the copy
+   everything else is comparing against. */
+let _csFreshCache = null;
+function _csFreshPack() {
+  if (!_csFreshCache) _csFreshCache = _csStamp(codingStarterPack());
+  return _csFreshCache;
+}
+
+/**
+ * How many changes Update would actually make, without making them.
+ *
+ * The same three comparisons the merge runs, with one correction: the merge
+ * rewrites every program you have not edited and counts each as "refreshed",
+ * whether or not it differs from the shipped one, so its own counter says 43
+ * for a pack that is already current. That is harmless when it is only
+ * narrating a click, and useless as a test of whether the click is worth
+ * offering. Here a program counts only when it is untouched AND its
+ * fingerprint differs from what shipped.
+ *
+ * Returns 0 for a library that is not the pack; sorting that out is Repair's
+ * job and the warning above already says so.
+ */
+function codingStarterPendingCount() {
+  const target = codingLibraryIsStarter() ? _csLift() : (state.codingStash || null);
+  const cs = (target && target.challenges) || [];
+  if (!cs.length || !cs.some(_csIsPackId) || cs.some(c => !_csIsPackId(c))) return 0;
+
+  const fresh = _csFreshPack();
+  let count = 0;
+
+  const haveNode = new Set((target.nodes || []).map(x => x.id));
+  (fresh.nodes || []).forEach(x => { if (!haveNode.has(x.id)) count++; });
+
+  const byId = {};
+  cs.forEach(c => { byId[c.id] = c; });
+  (fresh.challenges || []).forEach(f => {
+    const have = byId[f.id];
+    if (!have) { count++; return; }
+    const untouched = !have.packFp || have.packFp === _csFingerprint(have);
+    if (untouched && have.packFp !== f.packFp) count++;
+  });
+
+  (fresh.sets || []).forEach(fs => {
+    const have = (target.sets || []).find(x => x.id === fs.id);
+    if (!have) { count++; return; }
+    if (JSON.stringify(have.problems || []) === JSON.stringify(fs.problems || [])) return;
+    if (!have.userEdited) count++;
+  });
+
+  return count;
+}
+
+/** Shown when there is something to say, and otherwise not at all. */
 function codingStarterBannerTemplate() {
   /* Shown in either mode when the two have run together, because that is
      exactly the state in which you cannot trust what you are looking at and
@@ -811,11 +868,25 @@ function codingStarterBannerTemplate() {
          + '<i data-lucide="wrench"></i> Repair</button>'
          + '</div>';
   }
+  /* THE STANDING REMINDER IS GONE. It said which library was on screen for as
+     long as you were in it, which is a fact the switch beside it already
+     carries -- that button is lit, captioned "Showing the starter pack", and
+     drawn with an open-box icon. A permanent notice that repeats the control
+     next to it is not information, it is furniture, and it sat above the tree
+     on every render.
+
+     What only the banner had was the Update button, so the banner now appears
+     exactly when that button would do something: when the shipped pack really
+     has moved on from the installed one. Up to date, there is nothing to say
+     and nothing is drawn. */
   if (!codingLibraryIsStarter()) return '';
+  const pending = codingStarterPendingCount();
+  if (!pending) return '';
   return '<div class="cs-banner" role="status">'
        + '<i data-lucide="package-open"></i>'
-       + '<span><strong>Starter pack.</strong> Your own programs are put aside and come back when you switch off. '
-       + 'Anything you add or change here stays in the pack.</span>'
+       + '<span><strong>Starter pack update.</strong> ' + pending + ' item'
+       + (pending === 1 ? ' is' : 's are') + ' new or changed since this pack was installed. '
+       + 'Anything you have edited yourself is kept as it is.</span>'
        + '<button type="button" class="cs-update-btn" onclick="updateCodingStarterPack()"'
        + ' title="Add anything new and refresh what you have not edited">'
        + '<i data-lucide="refresh-cw"></i> Update</button>'
