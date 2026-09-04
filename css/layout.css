@@ -943,14 +943,19 @@ details[open]>.snippet-folder-summary>.folder-icon {
   width: 5px;
 }
 
-/* Selection is the fullest the rail gets, so a selected row still outreads a
-   hovered one. */
+/* Selection matches hover's SIZE and differs in colour. Making it the fullest
+   the rail gets put it at 39.87px of a 43.87px row and 6px wide -- 91% of the
+   row height, and half again the resting thickness -- which read as oversized
+   rather than as emphasis. It does not need the size: .active swaps the flat
+   per-level colour for the animated cyan gradient, takes opacity to 1, and runs
+   railFlow/railBreathe, none of which hover does. That is already the loudest
+   thing in the tree. */
 .tree-node[data-level] > .tree-node-row.active::after,
 .tree-node-row.active::after {
   opacity: 1;
-  top: 2px;
-  bottom: 2px;
-  width: 6px;
+  top: 4px;
+  bottom: 4px;
+  width: 5px;
 }
 
 /* ── Folders are the exception, and they have to be ────────────────────────
@@ -974,8 +979,8 @@ details[open]>.snippet-folder-summary>.folder-icon {
   top: 10%;
   bottom: 10%;
 }
-.tree-node[data-level="0"] > .tree-node-row:hover::after { width: 4px; }
-.tree-node[data-level="0"] > .tree-node-row.active::after { width: 5px; }
+.tree-node[data-level="0"] > .tree-node-row:hover::after,
+.tree-node[data-level="0"] > .tree-node-row.active::after { width: 4px; }
 
 .tree-node-row {
   display: flex;
