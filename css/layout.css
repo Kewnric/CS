@@ -953,6 +953,30 @@ details[open]>.snippet-folder-summary>.folder-icon {
   width: 6px;
 }
 
+/* ── Folders are the exception, and they have to be ────────────────────────
+   The insets above are uniform, which is right for the levels that hold
+   programs but wrong for level 0. A folder's rail is already 79.8% of its row
+   at rest (35.03px of 43.87) against a program's 59.6% (26.15px), because the
+   per-level blocks inset it 10% rather than 20%. So the same 4px hover inset
+   that grows a program by 37% grows a folder by 0.84px -- no useful feedback --
+   while still widening it 3px -> 5px, and a bar that is nearly row-height and
+   suddenly two thirds thicker just reads as oversized.
+
+   Level 0 keeps its resting length in every state and answers in width alone.
+   That also preserves the depth hierarchy the per-level insets exist to draw:
+   if hover flattened every level to one size, a hovered program would be
+   exactly as long as the folder above it.
+
+   Same (0,4,1) specificity as the rules it refines, so it has to sit after
+   them rather than merely be more specific. */
+.tree-node[data-level="0"] > .tree-node-row:hover::after,
+.tree-node[data-level="0"] > .tree-node-row.active::after {
+  top: 10%;
+  bottom: 10%;
+}
+.tree-node[data-level="0"] > .tree-node-row:hover::after { width: 4px; }
+.tree-node[data-level="0"] > .tree-node-row.active::after { width: 5px; }
+
 .tree-node-row {
   display: flex;
   align-items: center;
