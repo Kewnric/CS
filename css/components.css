@@ -2929,9 +2929,23 @@
   left: 100%;
 }
 
-/* --- Card Entrance Animation --- */
-.card-grid .card,
-.card-grid .subfolder-card {
+/* --- Card Entrance Animation ---
+   Only for grids that did NOT ask to stagger.
+
+   This rule and the `stagger-children` class on the browse, notes, snippets and
+   analytics card grids both date to the first commit, and this one has been
+   quietly winning ever since: `.card-grid .card` is (0,2,0) against
+   `.stagger-children > *` at (0,1,0), so every card in those grids got the same
+   smoothReveal -- and because `animation` is a shorthand it also reset the
+   per-child animation-delay to 0, flattening the nth-child delays that make the
+   entrance run left to right. Four grids asked for a staggered entrance and all
+   four played as a single simultaneous fade.
+
+   The :not() hands staggered grids back to .stagger-children while leaving
+   plain card grids -- browse renders one when disableNextStagger is set -- with
+   the entrance they have always had. */
+.card-grid:not(.stagger-children) .card,
+.card-grid:not(.stagger-children) .subfolder-card {
   animation: smoothReveal 0.35s ease-out backwards;
 }
 
