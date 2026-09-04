@@ -1315,9 +1315,58 @@ function _renderProgramDetail(container, c) {
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: container });
 }
 
+/* ── Painting pane 2 in regions ─────────────────────────────────────────────
+   The pane used to be one innerHTML write wrapped in .animate-fade-in, which
+   is `animation: fadeInHalf 0.5s`. So every filter chip, every sort change and
+   every layout switch destroyed the breadcrumb, the folder title, its
+   description and the progress bar, built them again, and faded the lot back
+   in -- the blink. None of that had changed; only the cards had.
+
+   Three regions, each written only when its own markup differs:
+
+     #browse-head     breadcrumb, title, description, progress
+     #browse-filters  the Filters / View / sort toolbar
+     #browse-body     subfolders, the card grid, pagination, the bulk bar
+
+   Changing a filter leaves the head untouched, so it is not rewritten, its
+   icons are not rebuilt, and it cannot flash. The cards still animate: the grid
+   carries stagger-children, which is the card entrance and always was -- the
+   wrapper fade was a second animation over the top of it, and it is gone.
+
+   Falling back to a full rebuild whenever #browse-head is absent is what keeps
+   this honest with the other branches of renderBrowseContent (locked folder,
+   empty folder), which write the container themselves: after one of those the
+   marker is gone, so the next paint rebuilds and re-seeds the cache. */
+let _browseRegions = { head: null, filters: null, body: null };
+
+function _browsePaintRegions(container, head, filters, body) {
+  if (!container.querySelector('#browse-head')) {
+    container.innerHTML = '<div id="browse-head"></div>'
+                        + '<div id="browse-filters"></div>'
+                        + '<div id="browse-body"></div>';
+    _browseRegions = { head: null, filters: null, body: null };
+  }
+  const paint = (key, html) => {
+    if (_browseRegions[key] === html) return;
+    const el = container.querySelector('#browse-' + key);
+    if (!el) return;
+    el.innerHTML = html;
+    _browseRegions[key] = html;
+    // Icons only for what was actually rewritten; running lucide over the whole
+    // container replaces every <i> in the head as well, which is its own flicker.
+    if (typeof lucide !== 'undefined') lucide.createIcons({ root: el });
+  };
+  paint('head', head);
+  paint('filters', filters);
+  paint('body', body);
+}
+
 function renderBrowseContent() {
   const container = document.getElementById('browse-challenges-container');
   if (!container) return;
+  /* The other branches below write the container themselves and still need the
+     icon pass at the end; the region painter does its own. */
+  let paintedInRegions = false;
 
   const searchInput = document.getElementById('browse-search');
   const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
@@ -1538,8 +1587,7 @@ function renderBrowseContent() {
     const paginationHtml = ladderHtml ? '' : _buildPaginationBar(totalChallenges, currentPage, 'browsePage');
     const bulkBarHtml = libSelectionBarHTML('browse', pageChallenges.map(c => c.id));
 
-    container.innerHTML = breadcrumbHtml + `
-      <div class="animate-fade-in">
+    const headHtml = breadcrumbHtml + `
         <div class="browse-folder-header">
           <div class="browse-folder-info">
             <h2 class="browse-folder-title" ${headerFolder ? `onclick="browseEditFolderTitle('${headerFolder.id}')" title="Click to edit title"` : ''}>${escapeHTML(folderName)}</h2>
@@ -1560,14 +1608,10 @@ function renderBrowseContent() {
             </div>`}
             ${libSelectToggleHTML('browse')}
           </div>
-        </div>
-        ${filterBarHtml}
-        ${hideSubfolders ? '' : subfoldersHtml}
-        ${gridHtml}
-        ${paginationHtml}
-        ${bulkBarHtml}
-      </div>
-    `;
+        </div>`;
+    const bodyHtml = `${hideSubfolders ? '' : subfoldersHtml}${gridHtml}${paginationHtml}${bulkBarHtml}`;
+    _browsePaintRegions(container, headHtml, filterBarHtml, bodyHtml);
+    paintedInRegions = true;
   }
 
   // Restore scroll
@@ -1576,7 +1620,10 @@ function renderBrowseContent() {
     if (pane2) pane2.scrollTop = getSessionParam('browseScroll') || 0;
   }, 50);
 
-  if (typeof lucide !== 'undefined') lucide.createIcons({ root: container });
+  // The region painter has already done the icons for whatever it rewrote.
+  // Repeating it over the container here would rebuild the head's icons on
+  // every filter change, which is the flicker this is meant to remove.
+  if (!paintedInRegions && typeof lucide !== 'undefined') lucide.createIcons({ root: container });
   // The starter banner carries a warning that can turn true mid-session.
   if (typeof csRefreshBanner === 'function') csRefreshBanner();
   window.disableNextStagger = false;
