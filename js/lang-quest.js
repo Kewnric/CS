@@ -366,6 +366,7 @@ function lqRender() {
     ${_lq.scene === 'battle' && _lq.enemy ? lqFoeHTML() : ''}
     ${_lq.scene === 'battle' && !_lq.say.length && _lq.menu === null ? lqCommandBarHTML() : ''}
     ${_lq.menu && !_lq.say.length ? lqMenuHTML() : ''}
+    ${lqVoiceToggleHTML()}
     <div class="lq-help" title="Placeholder art — backdrops and portraits are stand-ins">?</div>`;
 
   const line = _lq.say[0] || null;
@@ -383,6 +384,16 @@ function lqRender() {
       + `<span class="lq-next">▼</span>`
     : (_lq.scene === 'over' ? lqSummaryHTML() : '<p class="lq-line lq-dim">…</p>');
   box.classList.toggle('is-clickable', !!line);
+
+  /* Read a line ONCE, when it first appears. lqRender runs on every change of
+     state -- a hit, a step, a stat ticking -- and speaking here unguarded would
+     restart the same sentence each time. Compared by object reference rather
+     than by text, because the queue holds the same object until it is shifted
+     and two identical lines in a row are still two lines. */
+  if (line !== _lqSpokenLine) {
+    _lqSpokenLine = line;
+    if (line) lqSpeakCurrentLine();
+  }
 
   if (typeof lucide !== 'undefined' && shell) lucide.createIcons({ root: shell });
   lqScheduleAuto();
@@ -408,11 +419,64 @@ function lqFoeHTML() {
     </div>`;
 }
 
+/* ── Voice-over ─────────────────────────────────────────────────────────────
+   With this on, the run reads itself: every line that appears is spoken as it
+   appears, and an option speaks when the pointer lands on it -- so a menu can
+   be heard by moving across it rather than clicked through.
+
+   Kept per device rather than per save, because it is about how you want to
+   play rather than anything about the run. */
+const LQ_VOICE_KEY = 'ssp.lang.autoVoice';
+
+/** The line last read, so a repaint does not read it again. */
+let _lqSpokenLine = null;
+
+function lqAutoVoice() {
+  try { return localStorage.getItem(LQ_VOICE_KEY) === '1'; } catch (e) { return false; }
+}
+
+function lqToggleAutoVoice() {
+  const next = !lqAutoVoice();
+  try { localStorage.setItem(LQ_VOICE_KEY, next ? '1' : '0'); } catch (e) { /* private mode */ }
+  if (!next && typeof speechStop === 'function') speechStop();
+  lqRender();
+  // Turning it on should prove itself rather than wait for the next line.
+  if (next) lqSpeakCurrentLine();
+}
+
+/** Say whatever line the box is showing. */
+function lqSpeakCurrentLine() {
+  if (!lqAutoVoice() || typeof speak !== 'function') return;
+  const line = _lq && _lq.say && _lq.say[0];
+  if (!line || !line.text) return;
+  speak(line.text, { lang: typeof langSpeechTag === 'function' ? langSpeechTag(langStudy()) : undefined });
+}
+
+/** The switch, sitting with the scene rather than in a settings screen. */
+function lqVoiceToggleHTML() {
+  const on = lqAutoVoice();
+  return '<button type="button" class="lq-voice' + (on ? ' is-on' : '') + '"'
+       + ' onclick="lqToggleAutoVoice()" aria-pressed="' + on + '"'
+       + ' title="' + (on ? 'Voice-over on — lines read themselves, options speak on hover' : 'Voice-over off') + '"'
+       + ' aria-label="Voice-over">'
+       + '<i data-lucide="' + (on ? 'volume-2' : 'volume-x') + '"></i></button>';
+}
+
+/* Hovering an option reads it. Pointer events rather than mouseenter so a
+   touch device does not fire this on every tap -- there, the tap is the
+   choice, and reading it aloud on the way past would be noise. */
+function lqHoverSpeak(i) {
+  if (!lqAutoVoice() || typeof speak !== 'function') return;
+  const m = _lq && _lq.menu && _lq.menu[i];
+  if (!m || m.off || !m.label) return;
+  speak(m.label, { lang: typeof langSpeechTag === 'function' ? langSpeechTag(langStudy()) : undefined });
+}
+
 function lqMenuHTML() {
   return `<div class="lq-menu">
     ${_lq.menu.map((m, i) => `
       <button class="lq-mi${m.danger ? ' is-danger' : ''}${m.off ? ' is-off' : ''}" type="button"
-              ${m.off ? 'disabled' : `onclick="lqPick(${i})"`}>${escapeHTML(m.label)}</button>`).join('')}
+              ${m.off ? 'disabled' : `onclick="lqPick(${i})" onpointerenter="if(event.pointerType==='mouse') lqHoverSpeak(${i})"`}>${escapeHTML(m.label)}</button>`).join('')}
   </div>`;
 }
 

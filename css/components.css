@@ -4120,3 +4120,32 @@ body[data-route="visualization"] .settings-fab { display: none; }
 /* Beside an example sentence, aligned to the text rather than the row. */
 .lang-examples .lang-speak-chip,
 .lang-ex-text + .lang-speak-btn { vertical-align: baseline; }
+
+/* The voice-over switch, in the scene's top corner beside the art marker so it
+   travels with the run rather than living in a settings screen you would have
+   to leave the run to reach. */
+.lq-voice {
+  position: absolute;
+  top: 0.6rem;
+  right: 2.6rem;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: var(--radius-sm);
+  background: rgba(2, 6, 23, 0.55);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.lq-voice svg { width: 14px; height: 14px; }
+.lq-voice:hover { color: var(--text-primary); border-color: rgba(148, 163, 184, 0.5); }
+.lq-voice.is-on {
+  color: var(--color-primary);
+  border-color: rgba(99, 102, 241, 0.55);
+  background: rgba(99, 102, 241, 0.16);
+}

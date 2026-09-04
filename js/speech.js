@@ -115,7 +115,11 @@ function speak(text, opts) {
   // outside them makes the whole utterance fail silently rather than clip.
   u.pitch = Math.min(2, Math.max(0, Number(prefs.pitch) || 1));
   u.rate = Math.min(4, Math.max(0.1, Number(prefs.rate) || 1));
-  u.volume = Math.min(1, Math.max(0, Number(prefs.volume)));
+  /* Not `|| 1`: a volume of 0 is a real setting -- silence -- and would be
+     thrown away by a falsy check. NaN from a missing or corrupt value is the
+     case that needs the fallback, and it is the only one. */
+  const vol = Number(prefs.volume);
+  u.volume = Math.min(1, Math.max(0, isFinite(vol) ? vol : 1));
   if (typeof opts.onstart === 'function') u.onstart = opts.onstart;
   /* Not every engine fires this -- Safari historically does not -- so anything
      that reads along has to work when it never arrives. */
@@ -256,6 +260,11 @@ function _speechPaintPanel(voices) {
       <span class="speech-row-label">Speed <em id="speech-rate-val">${p.rate}</em></span>
       <input type="range" id="speech-rate" min="0.5" max="2" step="0.05" value="${p.rate}"
              oninput="document.getElementById('speech-rate-val').textContent = this.value; speechSetPref({ rate: parseFloat(this.value) });" />
+    </label>
+    <label class="speech-row">
+      <span class="speech-row-label">Volume <em id="speech-vol-val">${Math.round(p.volume * 100)}%</em></span>
+      <input type="range" id="speech-vol" min="0" max="100" step="5" value="${Math.round(p.volume * 100)}"
+             oninput="document.getElementById('speech-vol-val').textContent = this.value + '%'; speechSetPref({ volume: parseInt(this.value, 10) / 100 });" />
     </label>
     <button class="btn btn-secondary" style="width:100%;margin-top:0.25rem;" onclick="speechPreview()">
       <i data-lucide="play"></i> Hear it
