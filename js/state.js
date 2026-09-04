@@ -516,13 +516,90 @@ function moveItemToFolder(itemId, itemType, newFolderId) {
 }
 
 // Toggle expand/collapse
-function toggleNodeExpanded(nodeId) {
-  const idx = state.expandedNodes.indexOf(nodeId);
-  if (idx >= 0) {
-    state.expandedNodes.splice(idx, 1);
+/**
+ * The folders beside this one: same parent, same library.
+ *
+ * Both halves matter. Parent alone would treat every top-level folder in the
+ * app as one group -- coding, notebook and snippet folders all sit at
+ * parentId null -- so opening a coding folder would collapse the notes tree.
+ *
+ * Returns nothing for a node that is not in state.nodes. That is deliberate:
+ * "__root__" is a pseudo-folder each library paints for its uncategorised
+ * items, and all three libraries share that one id, so collapsing it here would
+ * close it in the other two trees at the same time. It is left out of the
+ * accordion rather than given a wrong answer.
+ */
+function siblingFolderIds(nodeId) {
+  const node = (state.nodes || []).find(n => n.id === nodeId);
+  if (!node) return [];
+  const parent = node.parentId || null;
+  return (state.nodes || [])
+    .filter(n => n.id !== nodeId && n.scope === node.scope && (n.parentId || null) === parent)
+    .map(n => n.id);
+}
+
+/**
+ * Open or close one folder.
+ *
+ * Opening closes the folders BESIDE it and none above it -- an accordion per
+ * level rather than one for the whole tree. Ancestors are never siblings of
+ * their own descendant, so a subfolder opens inside a parent that stays open,
+ * and the tree settles into a single path from the root to wherever you are.
+ *
+ * A collapsed folder keeps whatever was open inside it. Its subtree is not
+ * rendered while it is shut, so clearing it would only mean losing your place
+ * when you come back.
+ */
+function setNodeExpanded(nodeId, open) {
+  if (!state.expandedNodes) state.expandedNodes = [];
+  const drop = (id) => {
+    const i = state.expandedNodes.indexOf(id);
+    if (i >= 0) state.expandedNodes.splice(i, 1);
+  };
+  if (!open) {
+    drop(nodeId);
   } else {
-    state.expandedNodes.push(nodeId);
+    siblingFolderIds(nodeId).forEach(drop);
+    if (!state.expandedNodes.includes(nodeId)) state.expandedNodes.push(nodeId);
   }
+  saveData();
+}
+
+function toggleNodeExpanded(nodeId) {
+  setNodeExpanded(nodeId, !isNodeExpanded(nodeId));
+}
+
+/**
+ * Open every folder from the top down to nodeId, closing the ones beside each
+ * on the way -- the same accordion, applied to a whole path at once.
+ *
+ * Used where a folder is revealed rather than clicked: selecting a program,
+ * jumping to a search hit. Those used to push each ancestor onto expandedNodes
+ * directly, which left every folder passed through on the way to a previous
+ * selection still hanging open.
+ *
+ * Folders on the path never close each other -- an ancestor and its descendant
+ * are not siblings, and any sibling that is itself on the path is kept -- and
+ * the whole walk saves once rather than once per level.
+ */
+function expandNodePath(nodeId) {
+  if (!state.expandedNodes) state.expandedNodes = [];
+  const chain = [];
+  let curr = (state.nodes || []).find(n => n.id === nodeId);
+  while (curr) {
+    chain.push(curr.id);
+    curr = (state.nodes || []).find(n => n.id === curr.parentId);
+  }
+  if (!chain.length) return;
+  const onPath = new Set(chain);
+  chain.forEach((id) => {
+    siblingFolderIds(id).forEach((sib) => {
+      if (onPath.has(sib)) return;
+      const i = state.expandedNodes.indexOf(sib);
+      if (i >= 0) state.expandedNodes.splice(i, 1);
+    });
+    if (!state.expandedNodes.includes(id)) state.expandedNodes.push(id);
+  });
   saveData();
 }
 

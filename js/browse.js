@@ -25,17 +25,9 @@ function navigateToFolderAndFocus(parentId, itemId) {
   // Select folder
   selectBrowseNode(parentId === '__root__' ? null : parentId);
 
-  // Expand parent folders to ensure it is visible in the tree
+  // Open the path to it, and close what is beside that path.
   if (parentId && parentId !== '__root__') {
-    let curr = state.nodes.find(n => n.id === parentId);
-    while (curr) {
-      if (!state.expandedNodes) state.expandedNodes = [];
-      if (!state.expandedNodes.includes(curr.id)) {
-        state.expandedNodes.push(curr.id);
-      }
-      curr = state.nodes.find(n => n.id === curr.parentId);
-    }
-    saveData();
+    expandNodePath(parentId);
     renderBrowseTree();
   }
 
@@ -117,12 +109,7 @@ function browseSelectSet(setId) {
   setSessionParam('browseActiveNode', browseActiveNodeId);
   setSessionParam('browseScroll', 0);
 
-  let curr = state.nodes.find(n => n.id === set.parentId);
-  while (curr) {
-    if (!state.expandedNodes) state.expandedNodes = [];
-    if (!state.expandedNodes.includes(curr.id)) state.expandedNodes.push(curr.id);
-    curr = state.nodes.find(n => n.id === curr.parentId);
-  }
+  expandNodePath(set.parentId);
   saveData();
   renderBrowse();
 }
@@ -140,13 +127,8 @@ function browseSelectProgram(programId) {
   setSessionParam('browseActiveNode', browseActiveNodeId);
   setSessionParam('browseScroll', 0);
 
-  // Expand ancestor folders so the selected file is visible in the tree
-  let curr = state.nodes.find(n => n.id === challenge.parentId);
-  while (curr) {
-    if (!state.expandedNodes) state.expandedNodes = [];
-    if (!state.expandedNodes.includes(curr.id)) state.expandedNodes.push(curr.id);
-    curr = state.nodes.find(n => n.id === curr.parentId);
-  }
+  // Open the path down to the selected file, and close what is beside it.
+  expandNodePath(challenge.parentId);
   saveData();
   renderBrowse();
 }
@@ -162,33 +144,19 @@ function browseStartVariant(challengeId, variantId) {
 function toggleBrowseExpand(nodeId, e) {
   if (e) { e.stopPropagation(); e.preventDefault(); }
   toggleNodeExpanded(nodeId);
-  
-  const nodeEl = document.querySelector(`.tree-node[data-node-id="${nodeId}"]`);
-  if (nodeEl) {
-    const childrenContainer = nodeEl.querySelector(':scope > .tree-children');
-    const chevron = nodeEl.querySelector(':scope > .tree-node-row .tree-node-chevron');
-    // Keep the accessible state in step with the visual one — this toggles in
-    // place rather than re-rendering, so aria-expanded was left stale.
-    const row = nodeEl.querySelector(':scope > .tree-node-row');
-    if (row && row.hasAttribute('aria-expanded')) row.setAttribute('aria-expanded', String(isNodeExpanded(nodeId)));
-    if (childrenContainer) {
-      if (isNodeExpanded(nodeId)) {
-        childrenContainer.classList.remove('collapsed');
-        if (chevron) chevron.classList.add('expanded');
-      } else {
-        childrenContainer.classList.add('collapsed');
-        if (chevron) chevron.classList.remove('expanded');
-      }
-    }
-    /* The DOM was just changed without going through treeCommit, so the cached
-       markup now describes the previous expand state. Re-record it, or the next
-       selection would see a mismatch and rebuild -- losing both this animation
-       and the selection fade. */
-    const container = document.getElementById('browse-category-list');
-    if (container) treeSyncMarkup(container, browseBuildTreeHtml());
-  } else {
+
+  /* Opening a folder now also closes the ones beside it, so the whole tree is
+     synced from state rather than just the row that was clicked. Still done in
+     place: a re-render would replace every row and take the expand animation --
+     and the selection transitions -- with it. */
+  const container = document.getElementById('browse-category-list');
+  if (!container || !container.querySelector(`.tree-node[data-node-id="${nodeId}"]`)) {
     renderBrowseTree();
+    return;
   }
+  treeSyncExpansion(container);
+  // The DOM changed outside treeCommit, so re-record what it now looks like.
+  treeSyncMarkup(container, browseBuildTreeHtml());
 }
 
 let _browseHistoryIndex = null; // Pre-indexed map: challengeId → [history entries]

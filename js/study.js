@@ -38,10 +38,11 @@ function toggleSnippetsTreeItems() {
   if (icon) { icon.setAttribute('data-lucide', hidden ? 'eye-off' : 'eye'); if (typeof lucide !== 'undefined') lucide.createIcons({ root: icon.parentElement }); }
 }
 
-function renderSnippetList() {
-  const container = document.getElementById('snippet-list-container');
-  if (!container) return;
-
+/**
+ * The tree's markup, with no selection in it. Split out so the expand toggle can
+ * re-record the markup cache after changing the DOM by hand -- see treeCommit.
+ */
+function snippetsBuildTreeHtml() {
   const searchInput = document.getElementById('snippet-search');
   const query = searchInput ? searchInput.value.trim() : '';
 
@@ -84,16 +85,22 @@ function renderSnippetList() {
     }
   }
 
-  /* Selection is applied as a class after the markup is committed, never baked
-     into it -- see treeCommit. That is what lets a row survive a selection
-     change and actually transition. */
-  const markup = html
+  return html
     ? html + treeRootDropHTML('snippets')
     : `
       <div class="empty-state" style="padding: 2rem;">
         <p style="color:var(--text-tertiary); font-size:0.875rem;">No folders. Right-click to create one.</p>
       </div>`;
-  const rebuilt = treeCommit(container, markup, activeSnippetId || activeSnippetFolderId);
+}
+
+function renderSnippetList() {
+  const container = document.getElementById('snippet-list-container');
+  if (!container) return;
+
+  /* Selection is applied as a class after the markup is committed, never baked
+     into it -- see treeCommit. That is what lets a row survive a selection
+     change and actually transition. */
+  const rebuilt = treeCommit(container, snippetsBuildTreeHtml(), activeSnippetId || activeSnippetFolderId);
   container.dataset.treeNs = 'snippets';
   container.setAttribute('role', 'tree');
   container.setAttribute('aria-label', 'Snippet folders');
@@ -208,27 +215,19 @@ function renderSnippetItem(s, depth) {
 function toggleSnippetFolder(nodeId, e) {
   if (e) { e.stopPropagation(); e.preventDefault(); }
   toggleNodeExpanded(nodeId);
-  
-  const nodeEl = document.querySelector(`.tree-node[data-node-id="${nodeId}"]`);
-  if (nodeEl) {
-    const childrenContainer = nodeEl.querySelector(':scope > .tree-children');
-    const chevron = nodeEl.querySelector(':scope > .tree-node-row .tree-node-chevron');
-    // Keep the accessible state in step with the visual one — this toggles in
-    // place rather than re-rendering, so aria-expanded was left stale.
-    const row = nodeEl.querySelector(':scope > .tree-node-row');
-    if (row && row.hasAttribute('aria-expanded')) row.setAttribute('aria-expanded', String(isNodeExpanded(nodeId)));
-    if (childrenContainer) {
-      if (isNodeExpanded(nodeId)) {
-        childrenContainer.classList.remove('collapsed');
-        if (chevron) chevron.classList.add('expanded');
-      } else {
-        childrenContainer.classList.add('collapsed');
-        if (chevron) chevron.classList.remove('expanded');
-      }
-    }
-  } else {
+
+  /* Opening a folder now also closes the ones beside it, so the whole tree is
+     synced from state rather than just the row that was clicked. Still done in
+     place: a re-render would replace every row and take the expand animation --
+     and the selection transitions -- with it. */
+  const container = document.getElementById('snippet-list-container');
+  if (!container || !container.querySelector(`.tree-node[data-node-id="${nodeId}"]`)) {
     renderSnippetList();
+    return;
   }
+  treeSyncExpansion(container);
+  // The DOM changed outside treeCommit, so re-record what it now looks like.
+  treeSyncMarkup(container, snippetsBuildTreeHtml());
 }
 
 function selectSnippetFolder(folderId) {
@@ -263,16 +262,7 @@ function selectSnippet(id) {
       setSessionParam('studyOpenCat', activeSnippetFolderId);
 
       // Expand tree
-      if (activeSnippetFolderId) {
-        let curr = state.nodes.find(n => n.id === activeSnippetFolderId);
-        while (curr) {
-          if (!state.expandedNodes) state.expandedNodes = [];
-          if (!state.expandedNodes.includes(curr.id)) {
-            state.expandedNodes.push(curr.id);
-          }
-          curr = state.nodes.find(n => n.id === curr.parentId);
-        }
-      }
+      if (activeSnippetFolderId) expandNodePath(activeSnippetFolderId);
     }
   }
 

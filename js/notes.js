@@ -23,17 +23,16 @@ function toggleStudyTreeItems() {
   if (icon) { icon.setAttribute('data-lucide', hidden ? 'eye-off' : 'eye'); if (typeof lucide !== 'undefined') lucide.createIcons({ root: icon.parentElement }); }
 }
 
-function notesRenderSidebar() {
-  const container = document.getElementById('notes-sidebar-container');
-  if (!container) return;
-
+/**
+ * The tree's markup, with no selection in it. Split out so the expand toggle can
+ * re-record the markup cache after changing the DOM by hand -- see treeCommit.
+ * Returns null when there are no notebooks at all.
+ */
+function notesBuildTreeHtml() {
   const searchInput = document.getElementById('snippet-search');
   const query = searchInput ? searchInput.value.trim().toLowerCase() : '';
 
-  if (!state.notebooks || state.notebooks.length === 0) {
-    container.innerHTML = '<div class="empty-state" style="padding: 2rem;">No notebooks available.</div>';
-    return;
-  }
+  if (!state.notebooks || state.notebooks.length === 0) return null;
 
   let html = renderNotebookTreeRecursive(null, 0, query);
 
@@ -74,15 +73,27 @@ function notesRenderSidebar() {
     }
   }
 
-  /* Selection is applied as a class after the markup is committed, never baked
-     into it -- see treeCommit. That is what lets a row survive a selection
-     change and actually transition. */
-  const markup = html
+  return html
     ? html + treeRootDropHTML('notes')
     : `
       <div class="empty-state" style="padding: 2rem;">
         <p style="color:var(--text-tertiary); font-size:0.875rem;">No folders. Right-click to create one.</p>
       </div>`;
+}
+
+function notesRenderSidebar() {
+  const container = document.getElementById('notes-sidebar-container');
+  if (!container) return;
+
+  const markup = notesBuildTreeHtml();
+  if (markup === null) {
+    container.innerHTML = '<div class="empty-state" style="padding: 2rem;">No notebooks available.</div>';
+    return;
+  }
+
+  /* Selection is applied as a class after the markup is committed, never baked
+     into it -- see treeCommit. That is what lets a row survive a selection
+     change and actually transition. */
   const rebuilt = treeCommit(container, markup, activeNotebookId || activeNotebookFolderId);
   container.dataset.treeNs = 'notes';
   container.setAttribute('role', 'tree');
@@ -224,27 +235,19 @@ function renderNotebookItem(nb, depth) {
 function toggleNotebookFolder(nodeId, e) {
   if (e) { e.stopPropagation(); e.preventDefault(); }
   toggleNodeExpanded(nodeId);
-  
-  const nodeEl = document.querySelector(`.tree-node[data-node-id="${nodeId}"]`);
-  if (nodeEl) {
-    const childrenContainer = nodeEl.querySelector(':scope > .tree-children');
-    const chevron = nodeEl.querySelector(':scope > .tree-node-row .tree-node-chevron');
-    // Keep the accessible state in step with the visual one — this toggles in
-    // place rather than re-rendering, so aria-expanded was left stale.
-    const row = nodeEl.querySelector(':scope > .tree-node-row');
-    if (row && row.hasAttribute('aria-expanded')) row.setAttribute('aria-expanded', String(isNodeExpanded(nodeId)));
-    if (childrenContainer) {
-      if (isNodeExpanded(nodeId)) {
-        childrenContainer.classList.remove('collapsed');
-        if (chevron) chevron.classList.add('expanded');
-      } else {
-        childrenContainer.classList.add('collapsed');
-        if (chevron) chevron.classList.remove('expanded');
-      }
-    }
-  } else {
+
+  /* Opening a folder now also closes the ones beside it, so the whole tree is
+     synced from state rather than just the row that was clicked. Still done in
+     place: a re-render would replace every row and take the expand animation --
+     and the selection transitions -- with it. */
+  const container = document.getElementById('notes-sidebar-container');
+  if (!container || !container.querySelector(`.tree-node[data-node-id="${nodeId}"]`)) {
     notesRenderSidebar();
+    return;
   }
+  treeSyncExpansion(container);
+  // The DOM changed outside treeCommit, so re-record what it now looks like.
+  treeSyncMarkup(container, notesBuildTreeHtml());
 }
 
 function selectNotebookFolder(folderId) {
@@ -281,16 +284,7 @@ function notesSelectNotebook(id) {
       setSessionParam('studyOpenCat', activeNotebookFolderId);
 
       // Expand tree
-      if (activeNotebookFolderId) {
-        let curr = state.nodes.find(n => n.id === activeNotebookFolderId);
-        while (curr) {
-          if (!state.expandedNodes) state.expandedNodes = [];
-          if (!state.expandedNodes.includes(curr.id)) {
-            state.expandedNodes.push(curr.id);
-          }
-          curr = state.nodes.find(n => n.id === curr.parentId);
-        }
-      }
+      if (activeNotebookFolderId) expandNodePath(activeNotebookFolderId);
     }
   }
 

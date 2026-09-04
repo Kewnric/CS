@@ -670,6 +670,32 @@ function treeApplySelection(container, selectedId) {
   });
 }
 
+/**
+ * Make every folder in a rendered tree match state.expandedNodes.
+ *
+ * The expand toggles animate in place instead of re-rendering, and each used to
+ * touch only the folder that was clicked. That was enough while a click changed
+ * exactly one folder; opening one now also closes the ones beside it, and those
+ * are just as much part of the gesture. Syncing the whole tree from state keeps
+ * the DOM honest without giving up the animation a rebuild would destroy.
+ *
+ * Item rows have no children container and are skipped.
+ */
+function treeSyncExpansion(container) {
+  if (!container) return;
+  container.querySelectorAll('.tree-node[data-node-id]').forEach((nodeEl) => {
+    const kids = nodeEl.querySelector(':scope > .tree-children');
+    if (!kids) return;
+    const open = isNodeExpanded(nodeEl.dataset.nodeId);
+    kids.classList.toggle('collapsed', !open);
+    const row = nodeEl.querySelector(':scope > .tree-node-row');
+    if (!row) return;
+    if (row.hasAttribute('aria-expanded')) row.setAttribute('aria-expanded', String(open));
+    const chevron = row.querySelector('.tree-node-chevron');
+    if (chevron) chevron.classList.toggle('expanded', open);
+  });
+}
+
 /** The always-present drop target under a tree that means "top level". */
 function treeRootDropHTML(ns) {
   return `<div class="tree-root-drop" data-tree-root="${ns}">
