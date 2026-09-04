@@ -58,7 +58,11 @@ function languageInit() {
   renderLangLibrary();
 }
 
-function languageDestroy() { }
+function languageDestroy() {
+  // Same reason as the other two attempt routes: the utterance queue lives on
+  // window, so a word left mid-sentence would follow you off the screen.
+  if (typeof speechStop === 'function') speechStop();
+}
 
 /* ── The language pair ────────────────────────────────────── */
 

@@ -101,6 +101,10 @@ function practiceTemplate() {
           <div>
             <div class="practice-desc-head">
               <h2>Description</h2>
+              <button class="practice-desc-edit" id="practice-desc-speak" onclick="practiceSpeakDescription()"
+                      title="Read this description aloud" aria-label="Read this description aloud">
+                <i data-lucide="volume-2"></i>
+              </button>
               <button class="practice-desc-edit" onclick="practiceEditDescription()"
                       title="Edit this description" aria-label="Edit this description">
                 <i data-lucide="pencil"></i>
@@ -158,6 +162,9 @@ function practiceDestroy() {
   // The OST <audio> lives on <body> too, and its only transport is the topbar
   // that is about to be replaced -- leaving it playing left it unstoppable.
   if (typeof ostStop === 'function') ostStop();
+  // speechSynthesis is on window too, so a description left mid-sentence would
+  // keep talking over the next screen with nothing left to stop it.
+  if (typeof speechStop === 'function') speechStop();
   // Flush the autosave before tearing down: Back/Esc/sidebar all leave the page
   // between the 30 s ticks, which used to drop up to half a minute of typing.
   // Skipped after a submit — that attempt is graded and its autosave cleared.

@@ -264,6 +264,18 @@
           </span>
           <i data-lucide="chevron-right" class="settings-item-chevron" aria-hidden="true"></i>
         </button>
+        <!-- Read-aloud sits with the other sound settings. The voice list is the
+             machine's own, so the row opens a panel rather than toggling: which
+             voice, and how high and fast it talks. -->
+        <button onclick="openSpeechPanel()" class="settings-item" type="button" id="settings-speech-item"
+                aria-label="Read aloud">
+          <span class="settings-item-icon"><i data-lucide="mic-vocal" id="settings-speech-icon" aria-hidden="true"></i></span>
+          <span class="settings-item-info">
+            <span class="settings-item-label" id="settings-speech-label">Read Aloud</span>
+            <span class="settings-item-desc" id="settings-speech-desc">Voice, pitch and speed</span>
+          </span>
+          <i data-lucide="chevron-right" class="settings-item-chevron" aria-hidden="true"></i>
+        </button>
         <button onclick="toggleAppSound()" class="settings-item" type="button" id="settings-sound-item"
                 aria-label="Sound" aria-pressed="true">
           <span class="settings-item-icon"><i data-lucide="volume-2" id="settings-sound-icon" aria-hidden="true"></i></span>
@@ -479,6 +491,7 @@
   <script defer src="js/brackets.js"></script>
   <script defer src="js/ambient.js"></script>
   <script defer src="js/ost.js"></script>
+  <script defer src="js/speech.js"></script>
   <script defer src="js/spotify.js"></script>
   <script defer src="js/dialogs.js"></script>
   <script defer src="js/file-dialog.js"></script>

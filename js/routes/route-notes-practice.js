@@ -145,6 +145,7 @@ function notesPracticeDestroy() {
   if (typeof closeCheatsheet === 'function') closeCheatsheet();
   if (typeof _timerMenuClose === 'function') _timerMenuClose();
   if (typeof ostStop === 'function') ostStop();
+  if (typeof speechStop === 'function') speechStop();
   if (typeof timerInterval !== 'undefined' && timerInterval) { clearInterval(timerInterval); timerInterval = null; }
   if (typeof gradeAdvanceTimer !== 'undefined' && gradeAdvanceTimer) { clearTimeout(gradeAdvanceTimer); gradeAdvanceTimer = null; }
   // Leaving mid-attempt keeps the draft; the keys go with the page.

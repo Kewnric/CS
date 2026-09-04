@@ -2302,6 +2302,43 @@ function isFullscreen() {
   return !!(document.fullscreenElement || document.webkitFullscreenElement);
 }
 
+/**
+ * Read the problem description out loud, and stop it if it is already going.
+ *
+ * One button for both, because the thing you want while a voice is talking is
+ * almost always to make it stop, and a separate stop control would sit dead on
+ * the screen the rest of the time. The icon follows the state so the button
+ * says which of the two it will do.
+ */
+function practiceSpeakDescription() {
+  const btn = document.getElementById('practice-desc-speak');
+  const paint = (speaking) => {
+    if (!btn) return;
+    btn.innerHTML = '<i data-lucide="' + (speaking ? 'square' : 'volume-2') + '"></i>';
+    btn.title = speaking ? 'Stop reading' : 'Read this description aloud';
+    btn.setAttribute('aria-label', btn.title);
+    if (typeof lucide !== 'undefined') lucide.createIcons({ root: btn });
+  };
+
+  if (typeof speechSupported === 'function' && !speechSupported()) {
+    if (typeof toast === 'function') toast('This browser has no speech engine.', { type: 'warning' });
+    return;
+  }
+  if (typeof speechIsSpeaking === 'function' && speechIsSpeaking()) {
+    speechStop();
+    paint(false);
+    return;
+  }
+  const el = document.getElementById('practice-desc');
+  if (!el) return;
+  /* The rendered HTML rather than the stored source: what is on screen is what
+     was asked to be read, and formatRichText has already resolved whatever the
+     description was authored in. */
+  const said = speak(el.innerHTML, { onend: () => paint(false) });
+  if (said) paint(true);
+  else if (typeof toast === 'function') toast('Nothing to read here.', { type: 'info' });
+}
+
 function toggleFullscreen() {
   if (isFullscreen()) {
     const exit = document.exitFullscreen || document.webkitExitFullscreen;

@@ -121,6 +121,39 @@ function laExit() {
 
 function laCurrent() { return _la && _la.queue[_la.idx]; }
 
+/* The library's four languages as tags a speech engine might recognise.
+
+   Only English is a safe bet. Filipino ships on some platforms as fil-PH and
+   on others as tl-PH; Cebuano and Waray almost certainly have no voice
+   anywhere, and the engine falls back to the chosen voice reading them as
+   though they were its own language. That is still useful -- the spelling is
+   close enough to come out recognisable -- and it is honest about being an
+   approximation rather than a pronunciation guide. */
+const LA_SPEECH_TAG = { en: 'en-US', fil: 'fil-PH', ceb: 'ceb-PH', war: 'war-PH' };
+
+/** Which language the current card is asking about, if it says. */
+function _laSpeechLang() {
+  const code = (_la && (_la.studyCode || _la.study)) || '';
+  return LA_SPEECH_TAG[code] || undefined;
+}
+
+/** Read a word from the card out loud. */
+function laSpeak(text) {
+  if (typeof speak !== 'function') return;
+  speak(text, { lang: _laSpeechLang() });
+}
+
+/** Read back whatever is in the answer box right now. */
+function laSpeakTyped() {
+  const el = document.getElementById('la-input');
+  const said = (el && el.value) || (_la && _la.typed) || '';
+  if (!said.trim()) {
+    if (typeof toast === 'function') toast('Type something first.', { type: 'info', duration: 2000 });
+    return;
+  }
+  if (typeof speak === 'function') speak(said, { lang: _laSpeechLang() });
+}
+
 function laLoadQuestion() {
   if (!_la) return;
   const it = laCurrent();
@@ -175,7 +208,11 @@ function laRender() {
   body.innerHTML = `
     <div class="la-card">
       <div class="la-kind"><i data-lucide="${meta.icon}"></i> ${escapeHTML(meta.name)}</div>
-      ${it.prompt ? `<h2 class="la-prompt">${escapeHTML(it.prompt)}</h2>` : ''}
+      ${it.prompt ? `<h2 class="la-prompt">${escapeHTML(it.prompt)}
+        <button type="button" class="la-speak" onclick="laSpeak(this.dataset.say)"
+                data-say="${escapeHTML(it.prompt)}"
+                title="Hear this" aria-label="Hear this"><i data-lucide="volume-2"></i></button>
+      </h2>` : ''}
       ${laQuestionHTML(it)}
       ${_la.state === 'checked' ? laFeedbackHTML(it) : ''}
     </div>`;
@@ -220,6 +257,10 @@ function laQuestionHTML(it) {
       <input type="text" id="la-input" class="form-input" autocomplete="off" spellcheck="false"
              placeholder="Type your answer…" value="${escapeHTML(_la.typed)}"
              oninput="_la.typed = this.value" onkeydown="if(event.key==='Enter'){event.preventDefault(); laPrimary();}" />
+      <!-- Hearing what you have written is much of the point of writing it in a
+           language you are learning, so this reads the BOX, not the answer. -->
+      <button type="button" class="la-speak la-speak-input" onclick="laSpeakTyped()"
+              title="Hear what you typed" aria-label="Hear what you typed"><i data-lucide="volume-2"></i></button>
     </div>`;
   }
 
