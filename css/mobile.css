@@ -347,6 +347,105 @@
   .practice-sidebar { max-height: 34vh; overflow-y: auto; }
   .practice-editor-area { min-height: 46vh; }
 
+  /* ── THE NOTEBOOK ATTEMPT ───────────────────────────────────
+     It reuses .practice-layout / .practice-body / .practice-sidebar from the
+     coding attempt, so it inherited a phone layout written for a screen the
+     coding attempt has and this one does not. Measured at 375x812 before this
+     block: 94px reserved at the bottom for a panel that is not in the DOM, a
+     55px dead strip down the right, and the question -- the only thing on the
+     screen that matters -- left with 347px of 812.
+
+     Scoped on the route rather than on :has(.practice-panel), because the
+     router already stamps document.body.dataset.route and that is a fact
+     rather than an inference. */
+
+  /* 1. No bottom sheet here, so no room held for one. .practice-body reserves
+        --pp-collapsed-h for the coding attempt's results panel; this route has
+        no .practice-panel at all, and the padding was simply 94px of nothing. */
+  body[data-route="notes-practice"] .practice-body { padding-bottom: 0; }
+
+  /* 2. Full width. The sidebar carries inline width:320px; min-width:320px --
+        right for a 320px rail beside an editor, wrong for a stacked column on a
+        375px phone, where it left 55px of the row empty. Inline styles only
+        yield to !important. */
+  body[data-route="notes-practice"] .practice-sidebar {
+    width: auto !important;
+    min-width: 0 !important;
+    /* Content height, not 380px of it. The desktop rule is `flex: 0 1 380px`,
+       which is a WIDTH for a rail standing beside the question -- stacked into a
+       column it becomes a height request, and the panel held 243px to show
+       about 145px of chips and numbers. The max-height stays as the ceiling for
+       a notebook with many sections. */
+    flex: 0 0 auto;
+    max-height: 30vh;
+    padding: 0.75rem 1rem;
+    /* 1.5rem between blocks is right beside an editor and expensive stacked:
+       two gaps alone were 48px of a panel meant to be about 180. */
+    gap: 0.5rem;
+  }
+
+  /* The "Sections" heading names what is directly under it -- the chips say it
+     themselves, and stacked it cost 32px plus a gap. */
+  body[data-route="notes-practice"] .practice-sidebar > div:first-child { display: none; }
+
+  /* The divider block above the question grid, tightened to match. */
+  body[data-route="notes-practice"] #np-current-section-title { margin-bottom: 0.5rem !important; }
+
+  /* 3. The section chips run across, not down. Stacked, two sections already
+        cost 110px of a panel that had 275px to give. */
+  body[data-route="notes-practice"] #np-sections-tabs {
+    flex-direction: row !important;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 0.25rem;
+    margin-bottom: 0.75rem !important;
+  }
+  body[data-route="notes-practice"] #np-sections-tabs::-webkit-scrollbar { display: none; }
+  /* The chips are built for a vertical stack -- .np-sidebar-tab-dark is
+     `width: 100%`, so laid in a row every one of them still asked for the full
+     width and the first was stretched across the strip and clipped to 22px,
+     cutting off its own second line. Across, they size to their text. */
+  body[data-route="notes-practice"] #np-sections-tabs {
+    align-items: flex-start;
+  }
+  body[data-route="notes-practice"] #np-sections-tabs > * {
+    flex: 0 0 auto;
+    width: auto !important;
+    min-width: 4.5rem;
+  }
+
+  /* 4. The keyboard legend goes. It reads "Keys: 1-9/A-E answer, N/P or arrows
+        move, F flag, H hint" and cost 63px on a device with no keyboard to
+        press any of them on. */
+  body[data-route="notes-practice"] .practice-footer { display: none; }
+
+  /* 5. SUBMIT WAS OFF THE SCREEN. The topbar's right group is one nowrap row in
+        an overflow-x:auto strip: at 375px its seven controls measured 476px, so
+        the timer was cut in half and the submit button sat at x=391 -- entirely
+        past the edge, reachable only by discovering a sideways scroll on a strip
+        that shows no scrollbar. The attempt could not be submitted on a phone.
+
+        It wraps now, so no control can ever be pushed out of reach no matter how
+        many the topbar grows. The gap comes down to buy back a row's worth of
+        width first. Both are !important because the group carries its display,
+        alignment and gap inline. */
+  body[data-route="notes-practice"] .practice-topbar-right {
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+    justify-content: flex-end;
+    overflow-x: visible;
+  }
+
+  /* Submit measured 29px tall, under the 34px floor the TOUCH TARGETS block
+     below sets for far less important buttons. It ends the attempt; it should
+     not be the hardest thing on the screen to hit. */
+  body[data-route="notes-practice"] #np-submit-btn { min-height: 34px; }
+
+  /* 6. Give the reclaimed space to the question rather than to padding. */
+  body[data-route="notes-practice"] .np-question-pane > div {
+    padding: 1.25rem 1rem !important;
+  }
+
   /* ── TOUCH TARGETS ──────────────────────────────────────────
      Measured across every route: the back button in each library was 64x23,
      and a handful of others sat between 20 and 26px tall. Thumbs are about
