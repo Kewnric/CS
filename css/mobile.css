@@ -388,8 +388,15 @@
      themselves, and stacked it cost 32px plus a gap. */
   body[data-route="notes-practice"] .practice-sidebar > div:first-child { display: none; }
 
-  /* The divider block above the question grid, tightened to match. */
+  /* The divider block above the question grid, tightened to match. Its inline
+     margin-bottom is spacing for a block that had the keyboard legend under it;
+     with that gone it is the last thing in the panel and the margin is padding
+     the panel out from the inside. */
   body[data-route="notes-practice"] #np-current-section-title { margin-bottom: 0.5rem !important; }
+  body[data-route="notes-practice"] .practice-sidebar > div:nth-child(3) {
+    padding-top: 0.625rem !important;
+    margin-bottom: 0 !important;
+  }
 
   /* 3. The section chips run across, not down. Stacked, two sections already
         cost 110px of a panel that had 275px to give. */
@@ -436,10 +443,46 @@
     overflow-x: visible;
   }
 
-  /* Submit measured 29px tall, under the 34px floor the TOUCH TARGETS block
-     below sets for far less important buttons. It ends the attempt; it should
-     not be the hardest thing on the screen to hit. */
-  body[data-route="notes-practice"] #np-submit-btn { min-height: 34px; }
+  /* ── The action bar ─────────────────────────────────────────
+     Previous, Next and Submit in a bar pinned to the bottom, the way the coding
+     attempt keeps Run Code and Finish attempt in one. npSyncMobileChrome moves
+     Submit in here on phones.
+
+     This is what unclutters the screen rather than merely shrinking it. The
+     three controls that ACT on the attempt are in one place at thumb height,
+     the topbar goes back to holding only what it describes, and the question
+     pane scrolls nothing but the question and its answers -- Previous and Next
+     used to scroll away with the content they were meant to move through. */
+  body[data-route="notes-practice"] #np-nav-row {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 0 !important;
+    padding: 0.5rem 0.75rem !important;
+    padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px)) !important;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-surface, #0d1117);
+  }
+  body[data-route="notes-practice"] #np-nav-row > * {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    /* The 34px floor the TOUCH TARGETS block below sets for far less important
+       buttons; Submit measured 29px. These end and move through the attempt. */
+    min-height: 40px;
+  }
+  /* Submit is the one that finishes, so it reads as the primary of the three. */
+  body[data-route="notes-practice"] #np-nav-row #np-submit-btn { flex: 1.2 1 0; }
+
+  /* Nothing hides behind the bar. */
+  body[data-route="notes-practice"] .np-question-pane {
+    padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  }
 
   /* 6. Give the reclaimed space to the question rather than to padding. */
   body[data-route="notes-practice"] .np-question-pane > div {

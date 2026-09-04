@@ -55,7 +55,7 @@ function notesPracticeTemplate() {
 
             </div>
             <div id="np-bubbles-container" style="display:flex; flex-direction:column; gap:0.75rem; align-items:center; width:100%;"></div>
-            <div style="display:flex; justify-content:space-between; margin-top:2.5rem; padding-top:1.5rem; border-top:1px solid #21262d;">
+            <div id="np-nav-row" style="display:flex; justify-content:space-between; margin-top:2.5rem; padding-top:1.5rem; border-top:1px solid #21262d;">
               <button id="np-btn-prev" onclick="npPrevQuestion()" class="btn btn-ghost" style="font-weight:600;"><i data-lucide="chevron-left" style="width:18px;height:18px;"></i> Previous</button>
               <button id="np-btn-next" onclick="npNextQuestion()" class="btn btn-ghost" style="font-weight:600;">Next <i data-lucide="chevron-right" style="width:18px;height:18px;"></i></button>
             </div>
@@ -77,7 +77,53 @@ function notesPracticeTemplate() {
     </div>
   `;
 }
-function notesPracticeInit() { initNotesPracticeSession(); }
+/* ── The phone's action bar ────────────────────────────────────────────────
+   On a phone the primary action moves out of the topbar and down beside
+   Previous/Next, the way the coding attempt keeps Run Code and Finish attempt
+   in a bar of their own. Two things go wrong when Submit stays up top: the
+   topbar's controls measure wider than the screen, so it was pushed off the
+   right edge entirely and the attempt could not be finished; and the one button
+   that ends the session sits in the busiest strip on the page.
+
+   Done by moving the node rather than in CSS, because the two live in different
+   containers and no amount of positioning makes one a child of the other. The
+   button keeps its id, its handler and its listeners -- appendChild moves it,
+   it is not a copy -- so nothing else has to know this happened.
+
+   Watched rather than read once: a phone rotating to landscape crosses the
+   breakpoint, and the button has to go back where it came from. */
+let _npChromeMq = null;
+let _npChromeSync = null;
+
+function npSyncMobileChrome() {
+  const submit = document.getElementById('np-submit-btn');
+  const navRow = document.getElementById('np-nav-row');
+  const topbarRight = document.querySelector('#np-topbar-practice .practice-topbar-right');
+  if (!submit || !navRow || !topbarRight) return;
+  const narrow = window.matchMedia('(max-width: 640px)').matches;
+  if (narrow) {
+    // Last in the row, so the order reads Previous, Next, Submit.
+    if (submit.parentElement !== navRow) navRow.appendChild(submit);
+  } else if (submit.parentElement !== topbarRight) {
+    topbarRight.appendChild(submit);
+  }
+}
+
+function notesPracticeInit() {
+  initNotesPracticeSession();
+  npSyncMobileChrome();
+  _npChromeMq = window.matchMedia('(max-width: 640px)');
+  _npChromeSync = () => npSyncMobileChrome();
+  // addEventListener on a MediaQueryList is not in older Safari; addListener is.
+  if (_npChromeMq.addEventListener) _npChromeMq.addEventListener('change', _npChromeSync);
+  else if (_npChromeMq.addListener) _npChromeMq.addListener(_npChromeSync);
+  /* And resize, because the media-query change event is the precise signal but
+     not a reliable one everywhere -- crossing the breakpoint under viewport
+     emulation left the button in the bar with matchMedia already reporting
+     false. npSyncMobileChrome compares against the current parent before
+     touching anything, so firing it on every resize costs a boolean. */
+  window.addEventListener('resize', _npChromeSync);
+}
 // FIX: Explicitly clear intervals referencing the correct variables to prevent memory leaks
 function notesPracticeDestroy() {
   if (typeof timerInterval !== 'undefined' && timerInterval) { clearInterval(timerInterval); timerInterval = null; }
@@ -85,4 +131,11 @@ function notesPracticeDestroy() {
   // Leaving mid-attempt keeps the draft; the keys go with the page.
   if (typeof npFlushProgress === 'function') npFlushProgress();
   if (typeof npUnbindKeys === 'function') npUnbindKeys();
+  if (_npChromeMq && _npChromeSync) {
+    if (_npChromeMq.removeEventListener) _npChromeMq.removeEventListener('change', _npChromeSync);
+    else if (_npChromeMq.removeListener) _npChromeMq.removeListener(_npChromeSync);
+  }
+  if (_npChromeSync) window.removeEventListener('resize', _npChromeSync);
+  _npChromeMq = null;
+  _npChromeSync = null;
 }
