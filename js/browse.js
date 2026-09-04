@@ -475,7 +475,57 @@ function browseHasResumable(c) {
   return !!(saved && saved.challengeId === c.id);
 }
 
+/** Compact or detailed? Remembered per library, like the other View settings. */
+function browseCardLayout() { return getLibPref('browse.cardLayout', 'detailed'); }
+function setBrowseCardLayout(v) {
+  setLibPref('browse.cardLayout', v);
+  renderBrowseContent();
+}
+
+/**
+ * Solved means a full-marks attempt, which is the same test the detailed card's
+ * green check has always used -- best score of 100. Written as a word here
+ * because a bare tick reads as decoration at this size, and because "Not
+ * attempted" needs a counterpart that says what it is the absence of.
+ */
+function _browseSolvedPill(bestScore, attempts) {
+  if (bestScore === 100) return '<span class="card-solved is-solved">Solved</span>';
+  if (attempts > 0) return '<span class="card-solved is-partial">' + bestScore + '%</span>';
+  return '<span class="card-solved">Not attempted</span>';
+}
+
+/**
+ * The dense reading of the same list.
+ *
+ * The detailed card leads with a cover image and carries description, tags,
+ * score bar, last-attempt date and three buttons -- worth it when you are
+ * choosing what to work on, expensive when you are looking for one program you
+ * already know the name of. This keeps the title, how many versions there are
+ * and where you got to, and nothing else. Same click target, same selection
+ * behaviour; only the reading changes.
+ */
+function _buildChallengeCardCompact(c) {
+  const vCount = c.variants.length;
+  const logs = (_browseHistoryIndex && _browseHistoryIndex[c.id]) || [];
+  const bestScore = logs.length ? Math.max(...logs.map(l => l.score)) : -1;
+  const selecting = libSelectMode('browse');
+  return `
+    <div class="card card-compact${libIsSelected('browse', c.id) ? ' lib-selected' : ''}" id="card-${c.id}"
+         onclick="${selecting ? `libToggleSelect('browse','${c.id}')` : `browseSelectProgram('${c.id}')`}" style="cursor:pointer;">
+      ${libSelectBoxHTML('browse', c.id)}
+      <div class="card-compact-head">
+        <h3 class="card-compact-title">${escapeHTML(c.title)}</h3>
+        ${getLevelBadgeHTML(c)}${typeof getDifficultyBadgeHTML === 'function' ? getDifficultyBadgeHTML(c) : ''}
+      </div>
+      <div class="card-compact-meta">
+        <span class="version-pill">${vCount} version${vCount !== 1 ? 's' : ''}</span>
+        ${_browseSolvedPill(bestScore, logs.length)}
+      </div>
+    </div>`;
+}
+
 function _buildChallengeCard(c, query) {
+  if (browseCardLayout() === 'compact') return _buildChallengeCardCompact(c);
   const vCount = c.variants.length;
   const logs = (_browseHistoryIndex && _browseHistoryIndex[c.id]) || [];
   const attemptsCount = logs.length;
@@ -509,6 +559,7 @@ function _buildChallengeCard(c, query) {
       <div class="card-stat-row">
         ${libReviewChipHTML('challenge', c.id)}
         ${resumable ? '<span class="badge lib-resume-badge" title="You left an attempt unfinished"><i data-lucide="play-circle" style="width:12px;height:12px;margin-right:2px;"></i>In progress</span>' : ''}
+        ${isPerfect ? '<span class="card-solved is-solved">Solved</span>' : ''}
         <span class="card-stat" title="${attemptsCount} attempt${attemptsCount !== 1 ? 's' : ''}"><i data-lucide="rotate-ccw" style="width:11px;height:11px;"></i>${attemptsCount}</span>
         ${bestScore >= 0 ? `<span class="card-stat ${scoreClass}" title="Best score"><i data-lucide="${isPerfect ? 'check-circle' : 'target'}" style="width:11px;height:11px;"></i>${bestScore}%</span>` : ''}
         ${slipped ? `<span class="card-stat lib-last-badge" title="Your most recent attempt scored lower than your best">Last ${lastScore}%</span>` : ''}
@@ -761,6 +812,13 @@ function _renderBrowseFilterBar(total, shown, pool) {
       <input type="checkbox" ${ladder ? 'checked' : ''} onchange="toggleBrowseLadder()" />
       <span><strong>Level ladder</strong><em>Group the programs by level instead of a card grid</em></span>
     </label>` : ''}
+    <div class="lib-view-row lib-view-seg">
+      <span><strong>Cards</strong></span>
+      <span class="lib-kind-toggle">
+        ${libChipHTML(browseCardLayout() !== 'compact', "setBrowseCardLayout('detailed')", 'Detailed')}
+        ${libChipHTML(browseCardLayout() === 'compact', "setBrowseCardLayout('compact')", 'Compact')}
+      </span>
+    </div>
     <div class="lib-view-row lib-view-seg">
       <span><strong>Show</strong></span>
       <span class="lib-kind-toggle">
@@ -1464,7 +1522,7 @@ function renderBrowseContent() {
     const gridHtml = ladderHtml
       ? ladderHtml
       : (progCardsHtml || setCardsHtml)
-        ? `<div class="card-grid ${window.disableNextStagger ? '' : 'stagger-children'}" id="browse-card-grid">
+        ? `<div class="card-grid${browseCardLayout() === 'compact' ? ' is-compact' : ''} ${window.disableNextStagger ? '' : 'stagger-children'}" id="browse-card-grid">
             ${setCardsHtml}${progCardsHtml}
           </div>`
         : (_preFilterChallenges.length > 0
