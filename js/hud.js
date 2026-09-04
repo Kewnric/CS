@@ -105,6 +105,14 @@ function hudMount() {
     +   '<div class="hud-panel-b"></div>'
     +   '<div class="hud-pulse"></div>'
     + '</div>';
+  /* Set BEFORE the layer is in the document, or the first frame paints the
+     chrome around the storage picker and it is hidden a moment later -- the
+     brief flash this is here to prevent. hud.js is deferred ahead of
+     firebase-auth.js, but function declarations share one global scope and
+     this runs at DOMContentLoaded, by which point both have executed. */
+  if (typeof storagePickerWillShow === 'function') {
+    document.body.classList.toggle('picker-open', storagePickerWillShow());
+  }
   document.body.appendChild(layer);
   document.body.classList.toggle('hud-off', !hudEnabled());
   hudSyncNav();

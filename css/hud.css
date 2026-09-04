@@ -32,6 +32,16 @@
 body.route-focused .hud-layer,
 body.hud-off .hud-layer { display: none; }
 
+/* The storage picker is a gate in front of the whole app, and the HUD is not
+   part of the app it decorates -- hudMount appends the layer to <body>, so it
+   is a SIBLING of .app-layout and the picker's `visibility: hidden` on that
+   element never reached it. The chrome painted around the dialog.
+
+   A body class rather than hiding the node in showStorageModePicker, because
+   the picker and hudMount both run around DOMContentLoaded in no guaranteed
+   order: whichever lands first, the rule applies the moment the layer exists. */
+body.picker-open .hud-layer { display: none; }
+
 /* ── Ambient: soft only, may cross everything ─────────────── */
 .hud-scan {
   position: absolute;

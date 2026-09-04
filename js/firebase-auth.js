@@ -269,11 +269,33 @@ function _pickerKeydown(e) {
 
 let _pickerOnlineHandler = null;
 
+/**
+ * Will this load open on the storage picker rather than the app?
+ *
+ * bootApp decides that from savedMode, but it runs after every deferred script,
+ * so anything that paints at DOMContentLoaded -- the HUD does -- would flash
+ * before being told. Same reads as the check in bootApp, and no side effects,
+ * so it can be asked early and asked twice.
+ */
+function storagePickerWillShow() {
+  try {
+    if (sessionStorage.getItem('ssp.pendingRedirect')) return true;
+    const saved = sessionStorage.getItem('storageMode')
+      || (typeof authRemembered === 'function' ? authRemembered() : null);
+    return saved !== 'local';   // 'online' restores behind the picker; null is a first visit
+  } catch (e) {
+    return false;               // storage blocked: assume the app, not the gate
+  }
+}
+
 function showStorageModePicker() {
   const popup = document.getElementById('storage-mode-popup');
   if (popup) popup.classList.remove('hidden');
   const appLayout = document.querySelector('.app-layout');
   if (appLayout) { appLayout.style.visibility = 'hidden'; appLayout.setAttribute('aria-hidden', 'true'); }
+  // The HUD layer lives on <body>, outside .app-layout, so hiding the app above
+  // leaves its chrome painting around the dialog. See css/hud.css.
+  document.body.classList.add('picker-open');
   _showSigninChooseView();
   _paintPicker();
 
@@ -295,6 +317,7 @@ function hideStorageModePicker() {
   if (popup) popup.classList.add('hidden');
   const appLayout = document.querySelector('.app-layout');
   if (appLayout) { appLayout.style.visibility = ''; appLayout.removeAttribute('aria-hidden'); }
+  document.body.classList.remove('picker-open');
   document.removeEventListener('keydown', _pickerKeydown, true);
   if (_pickerOnlineHandler) {
     window.removeEventListener('online', _pickerOnlineHandler);
@@ -326,6 +349,12 @@ function _showSigninLoadingView() {
 function finishBoot() {
   if (_appBooted) return;
   _appBooted = true;
+  /* The safety net for picker-open. hudMount sets it from storagePickerWillShow
+     before the picker exists, and hideStorageModePicker clears it -- but a boot
+     path that reaches the app WITHOUT ever showing the picker would never call
+     that, and the HUD would stay hidden for the whole session. This is the one
+     point every path passes through on its way to a visible app. */
+  document.body.classList.remove('picker-open');
   SpaRouter.init();
   _attachUnloadGuard();
   _updateCloudStatusUI();
