@@ -427,7 +427,7 @@ function notesRenderDetail() {
   })();
 
   let html = `
-    <div class="animate-fade-in prog-detail">
+    <div class="prog-detail stagger-children">
       ${breadcrumbHtml}
       <div class="prog-detail-header">
         <div class="prog-detail-icon"><i data-lucide="${escapeHTML(nb.icon || 'book')}"></i></div>

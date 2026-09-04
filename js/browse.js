@@ -1063,7 +1063,7 @@ function _renderSetDetail(container, set) {
   }
 
   container.innerHTML = breadcrumbHtml + `
-    <div class="animate-fade-in prog-detail">
+    <div class="prog-detail stagger-children">
       <div class="prog-detail-header">
         <div class="prog-detail-icon" style="background:rgba(6,182,212,0.14); color:var(--color-accent);"><i data-lucide="${escapeHTML(set.icon || 'layout-grid')}"></i></div>
         <div style="flex:1; min-width:0;">
@@ -1262,7 +1262,7 @@ function _renderProgramDetail(container, c) {
   const hasDeadline = !!dueText;
 
   container.innerHTML = breadcrumbHtml + `
-    <div class="animate-fade-in prog-detail">
+    <div class="prog-detail stagger-children">
       ${coverHtml}
       <div class="prog-detail-header">
         <div class="prog-detail-icon"><i data-lucide="${escapeHTML(c.icon || 'file-code-2')}"></i></div>

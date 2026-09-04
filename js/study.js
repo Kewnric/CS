@@ -366,7 +366,7 @@ function renderSnippetDetail() {
     </div>`;
 
   container.innerHTML = `
-    <div class="snippet-detail animate-fade-in">
+    <div class="snippet-detail stagger-children">
       <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 1.5rem; margin-bottom: 1.5rem;">
         ${breadcrumbHtml}
         <div style="display:flex; align-items:flex-start; gap:1rem;">
