@@ -455,6 +455,20 @@
     overflow-x: visible;
   }
 
+  /* Two controls stand down on a phone so the other seven, the timer included,
+     fit one line -- 385px of controls plus 64px of gaps against a 359px row
+     wrapped to two, and the topbar went from 95px to 141px the moment the OST,
+     Feel and full-screen buttons arrived.
+
+     FULL SCREEN, because it does nothing here: iOS Safari does not implement
+     requestFullscreen on anything but a <video>, and a phone browser is already
+     as full-screen as it gets. THE THEME SELECT, because at 75px it is the
+     widest control on the strip and the only one that is a standing preference
+     rather than a thing you do to this attempt -- it is set once, from
+     Settings, and stays set. Both remain on every wider screen. */
+  body[data-route="notes-practice"] #np-fullscreen-btn,
+  body[data-route="notes-practice"] #theme-selector { display: none; }
+
   /* ── The action bar ─────────────────────────────────────────
      Previous, Next and Submit in a bar pinned to the bottom, the way the coding
      attempt keeps Run Code and Finish attempt in one. npSyncMobileChrome moves

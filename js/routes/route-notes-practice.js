@@ -12,6 +12,13 @@ function notesPracticeTemplate() {
           <button id="np-align-btn" onclick="toggleNpTextAlign()" class="tutorial-trigger-btn" title="Text: Centered" style="color: silver;"><i data-lucide="align-center"></i></button>
           <button id="np-flag-btn" onclick="npToggleFlag(currentSectionIdx, currentQuestionNum)" class="tutorial-trigger-btn" title="Flag for review (F)" aria-pressed="false" style="color: silver;"><i data-lucide="flag"></i></button>
           <button id="np-cheat-btn" onclick="openCheatsheet()" class="tutorial-trigger-btn" title="Cheat sheet" style="color: silver;"><i data-lucide="book-open-check"></i></button>
+          <!-- Shared with the coding attempt. Both templates read their state
+               from the same modules, so they need no wiring here beyond the
+               ostMount/ostStop pair below: feel-panel keeps itself in step
+               through feelSync, and the OST audio element lives on <body>. -->
+          ${typeof feelButtonTemplate === 'function' ? feelButtonTemplate() : ''}
+          ${typeof ostButtonTemplate === 'function' ? ostButtonTemplate() : ''}
+          <button id="np-fullscreen-btn" onclick="toggleFullscreen()" class="tutorial-trigger-btn" title="Full screen" aria-label="Full screen" style="color: silver;"><i data-lucide="maximize"></i></button>
           <select id="theme-selector" class="form-select" onchange="changeTheme(this.value)" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; width: auto;">
             <option value="dark">Night</option><option value="light">Day</option><option value="purple">Purple</option><option value="green">Green</option>
           </select>
@@ -111,6 +118,10 @@ function npSyncMobileChrome() {
 
 function notesPracticeInit() {
   initNotesPracticeSession();
+  // The topbar is built with the route, so the OST transport is mounted once
+  // here -- the same call practiceInit makes. Without it the disc is drawn but
+  // a track left playing from a previous attempt never picks back up.
+  if (typeof ostMount === 'function') ostMount();
   npSyncMobileChrome();
   _npChromeMq = window.matchMedia('(max-width: 640px)');
   _npChromeSync = () => npSyncMobileChrome();
@@ -126,6 +137,14 @@ function notesPracticeInit() {
 }
 // FIX: Explicitly clear intervals referencing the correct variables to prevent memory leaks
 function notesPracticeDestroy() {
+  /* These three live on <body>, not in the route, so replacing the route left
+     them behind: the cheat sheet stayed open over the library, the timer's
+     right-click menu stayed on screen, and the OST kept playing with its only
+     transport -- the topbar about to be replaced -- gone with the route. The
+     coding attempt has cleared all three for a while; this one never did. */
+  if (typeof closeCheatsheet === 'function') closeCheatsheet();
+  if (typeof _timerMenuClose === 'function') _timerMenuClose();
+  if (typeof ostStop === 'function') ostStop();
   if (typeof timerInterval !== 'undefined' && timerInterval) { clearInterval(timerInterval); timerInterval = null; }
   if (typeof gradeAdvanceTimer !== 'undefined' && gradeAdvanceTimer) { clearTimeout(gradeAdvanceTimer); gradeAdvanceTimer = null; }
   // Leaving mid-attempt keeps the draft; the keys go with the page.
