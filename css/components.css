@@ -3843,14 +3843,18 @@ body[data-route="visualization"] .settings-fab { display: none; }
    choosing what to work on rather than finding something you can already name.
    Narrower tracks, so three sit where two did. */
 .card-grid.is-compact {
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  /* 300, not 210: at 210 a folder of five packed four to a row and each card
+     was barely wider than its own title, which is denser than the reference and
+     reads as cramped rather than compact. Three roomy tracks across a library
+     pane is the shape being copied. */
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
 }
 
 .card.card-compact {
   display: flex;
   flex-direction: column;
-  gap: 0.625rem;
-  padding: 0.875rem 1rem;
+  gap: 0.875rem;
+  padding: 1.25rem 1.375rem;
   min-height: 0;             /* the detailed card sets a floor it does not need */
 }
 
@@ -3863,7 +3867,7 @@ body[data-route="visualization"] .settings-fab { display: none; }
 
 .card-compact-title {
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 1.0625rem;
   line-height: 1.3;
   color: var(--text-primary);
   /* Two lines then ellipsis: one line cut half the starter pack's titles, and
@@ -3887,10 +3891,10 @@ body[data-route="visualization"] .settings-fab { display: none; }
    the attempt count; the green check in the corner says the same thing, but a
    tick is a symbol you have to have learnt and this is a word. */
 .card-solved {
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.02em;
-  padding: 0.2rem 0.5rem;
+  padding: 0.3rem 0.6rem;
   border-radius: 999px;
   border: 1px solid var(--border-color);
   color: var(--text-tertiary);

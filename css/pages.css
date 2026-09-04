@@ -2410,3 +2410,10 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
    collection gets its own. */
 .lib-card-language { --lib-accent: #a855f7; }
 .lib-card-language .lib-card-icon { background: rgba(168, 85, 247, 0.14); color: #a855f7; }
+
+/* The Coding Library's pane-1 header carries a starter-pack banner that the
+   other libraries have no equivalent of, and that banner is now empty whenever
+   there is no update to install. An empty div is still a flex item: it took a
+   full gap below the mini-stats, which is the space the notes library does not
+   have there and the coding one did. */
+#browse-starter-banner:empty { display: none; }
