@@ -889,37 +889,14 @@ details[open]>.snippet-folder-summary>.folder-icon {
 
 /* The rail is quiet until you are near it: 0.55 at rest, 0.9 under the pointer,
    full on selection. It was a flat 0.8, which made every row's rail compete
-   with the one that mattered.
-
-   IT ALSO GROWS NOW. Hover used to change opacity and nothing else, so a rail
-   that is 3px of a 43.9px row -- inset 10-25% top and bottom by level, leaving
-   about 26px of bar -- looked the same size whether you were on it or not, and
-   read as unresponsive rather than subtle.
-
-   Driven entirely by transform, for two reasons: the per-level rules that set
-   `width: 3px` are `.tree-node[data-level="N"] > .tree-node-row::after`, which
-   outranks any `:hover` selector short of repeating the whole chain, so a
-   `width` here would simply lose; and transform neither reflows the row nor
-   collides with railFlow/railBreathe, which only touch background-position,
-   opacity and box-shadow.
-
-   The 2px of travel is bounded by measurement, not taste: the row's right edge
-   sits ~2px inside the tree container's content edge, and the container is a
-   scroll box, so a rail that crossed that edge would add horizontal scroll
-   range to a container whose scrollbar is deliberately hidden -- an invisible
-   sideways scroll. Verified after: scrollWidth still equals clientWidth. */
+   with the one that mattered. The growth rules are below the per-level blocks,
+   which they have to outrank. */
 .tree-node-row::after {
   opacity: 0.55;
-  transform-origin: right center;
-  transition: opacity 0.25s ease, transform 0.28s var(--ease-spring);
-}
-.tree-node-row:hover::after {
-  opacity: 0.9;
-  transform: translateX(2px) scaleY(1.35) scaleX(1.3);
-}
-/* Selection is the fullest the rail gets, so it still outreads a hovered row. */
-.tree-node-row.active::after {
-  transform: translateX(2px) scaleY(1.55) scaleX(1.35);
+  transition: opacity 0.25s ease,
+              top 0.28s var(--ease-spring),
+              bottom 0.28s var(--ease-spring),
+              width 0.28s var(--ease-spring);
 }
 
 .tree-node[data-level="4"]>.tree-node-row::after,
@@ -933,6 +910,47 @@ details[open]>.snippet-folder-summary>.folder-icon {
   background: var(--color-danger);
   box-shadow: -2px 0 8px rgba(239, 68, 68, 0.4);
   border-radius: 4px 0 0 4px;
+}
+
+/* ── The rail grows when you reach it ──────────────────────────────────────
+   Hover used to change opacity and nothing else, so a 3px bar that is only
+   about 26px of a 44px row looked identical whether the pointer was on it or
+   not, and read as unresponsive rather than restrained.
+
+   IT GROWS INWARD, NOT OUTWARD, and that is forced rather than chosen. The rail
+   is an ::after of .tree-node-row, and the row is `overflow: hidden` -- it has
+   to be, that clip is what keeps a long name from spilling past the row while
+   the label marquee scrolls it. So anything that moves the rail past the row's
+   right edge is not merely invisible, it is cut off the bar: a previous attempt
+   pushed it 2px right and lost 2 of its 3.9px, which is why hovering made the
+   highlight look SMALLER. Width grows from a right-anchored edge and reaches
+   left, which is inside the clip and survives.
+
+   EXPLICIT PIXELS, NOT A SCALE FACTOR. Each depth insets the rail by a
+   different percentage -- 10% at level 0 down to 25% at level 4 -- so rest
+   heights run 35.1px to 22.0px. One multiplier applied to all of them keeps
+   that spread and would overshoot the row's own height at level 0 while barely
+   moving level 4. Fixed insets land every level on the same size.
+
+   The chain is repeated to outrank `.tree-node[data-level="N"] > ...::after`,
+   which sets the width and insets these override and beats a bare `:hover` on
+   its own. */
+.tree-node[data-level] > .tree-node-row:hover::after,
+.tree-node-row:hover::after {
+  opacity: 0.9;
+  top: 4px;
+  bottom: 4px;
+  width: 5px;
+}
+
+/* Selection is the fullest the rail gets, so a selected row still outreads a
+   hovered one. */
+.tree-node[data-level] > .tree-node-row.active::after,
+.tree-node-row.active::after {
+  opacity: 1;
+  top: 2px;
+  bottom: 2px;
+  width: 6px;
 }
 
 .tree-node-row {
