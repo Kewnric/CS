@@ -82,6 +82,8 @@ function notesBuildTreeHtml() {
 }
 
 function notesRenderSidebar() {
+  invalidateNotesHistoryIndex();
+
   const container = document.getElementById('notes-sidebar-container');
   if (!container) return;
 
@@ -311,6 +313,8 @@ function notesSelectNotebook(id) {
 }
 
 function notesRenderDetail() {
+  invalidateNotesHistoryIndex();
+
   const container = document.getElementById('notes-detail-container');
   const emptyState = document.getElementById('notes-empty-state');
   const sectionsArea = document.getElementById('notes-sections-area');
@@ -620,7 +624,36 @@ function notesConfirmStart() {
 // ============================================================
 // NOTEBOOK FILTER & SORT (parity with Coding Library)
 // ============================================================
-function _notebookRecords(nb) { return (state.notebookHistory || []).filter(r => r.notebookId === nb.id); }
+/* Attempts bucketed by notebook, built once per render.
+
+   This used to filter the whole of state.notebookHistory for every notebook it
+   was asked about, and it is asked about a lot: once per card, again for the
+   best score, again for the last timestamp, and -- worst -- twice per
+   comparison when the list is sorted by attempts or score, which makes a sort
+   O(n log n) passes over the entire history. The Coding Library has kept a
+   _browseHistoryIndex for exactly this reason; this is the same idea.
+
+   Buckets keep the order they had in the source array, which is unshift order,
+   so recs[0] is still the newest attempt and every caller that relies on that
+   keeps working. */
+let _notesHistoryIndex = null;
+
+function _notesBuildHistoryIndex() {
+  const idx = Object.create(null);
+  (state.notebookHistory || []).forEach(r => {
+    (idx[r.notebookId] || (idx[r.notebookId] = [])).push(r);
+  });
+  _notesHistoryIndex = idx;
+  return idx;
+}
+
+/** Drop the index so the next read rebuilds it. Called when a render starts. */
+function invalidateNotesHistoryIndex() { _notesHistoryIndex = null; }
+
+function _notebookRecords(nb) {
+  const idx = _notesHistoryIndex || _notesBuildHistoryIndex();
+  return idx[nb.id] || [];
+}
 /** Records that covered the WHOLE notebook. A drill only runs the questions you
     missed, so scoring 40% on three hard questions must not read as a 40% run. */
 function _notebookFullRecords(nb) { return _notebookRecords(nb).filter(r => !r.isDrill); }

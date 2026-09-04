@@ -94,6 +94,8 @@ function snippetsBuildTreeHtml() {
 }
 
 function renderSnippetList() {
+  invalidateSnippetHistoryIndex();
+
   const container = document.getElementById('snippet-list-container');
   if (!container) return;
 
@@ -303,6 +305,8 @@ window.snippetGoBack = function (folderId) {
 };
 
 function renderSnippetDetail() {
+  invalidateSnippetHistoryIndex();
+
   const container = document.getElementById('snippet-detail-container');
   const snippet = (state.snippets || []).find(s => s.id === activeSnippetId);
 
@@ -465,13 +469,51 @@ function getSnippetLanguage(s) {
   return ext || '';
 }
 
+/* Attempts bucketed by snippet, built once per render.
+
+   The filter this replaces ran over the whole of state.snippetHistory every
+   time it was asked about one snippet. Sorting was the expensive part: sorting
+   by attempts calls it twice per comparison, and sorting by best score did that
+   AND mapped and Math.max-ed the result each time -- measured at 7.2ms for 60
+   snippets against 1500 rows, all of it repeated work. The Coding Library has
+   kept a _browseHistoryIndex for exactly this reason.
+
+   Archived attempts are left out here, as the filter did, so every caller sees
+   the same set it always saw; bucket order is source order, so newest-first
+   still holds. */
+let _snippetHistoryIndex = null;
+
+function _snippetsBuildHistoryIndex() {
+  const idx = Object.create(null);
+  (state.snippetHistory || []).forEach(h => {
+    if (h.isArchived) return;
+    (idx[h.snippetId] || (idx[h.snippetId] = [])).push(h);
+  });
+  _snippetHistoryIndex = idx;
+  return idx;
+}
+
+/** Drop the index so the next read rebuilds it. Called when a render starts. */
+function invalidateSnippetHistoryIndex() { _snippetHistoryIndex = null; }
+
 /** Try-Coding attempts recorded against this snippet. */
 function _snippetAttempts(s) {
-  return (state.snippetHistory || []).filter(h => h.snippetId === s.id && !h.isArchived);
+  const idx = _snippetHistoryIndex || _snippetsBuildHistoryIndex();
+  return idx[s.id] || [];
 }
+
+/* Best score per snippet, memoised alongside the index. The sort comparators
+   ask for the same snippet on both sides of every comparison, so without this
+   the Math.max is recomputed O(n log n) times over the same array. */
+let _snippetBestMemo = null;
 function _snippetBestPct(s) {
+  if (!_snippetBestMemo || !_snippetHistoryIndex) _snippetBestMemo = Object.create(null);
+  const hit = _snippetBestMemo[s.id];
+  if (hit !== undefined) return hit;
   const a = _snippetAttempts(s);
-  return a.length ? Math.max(...a.map(x => x.score || 0)) : -1;
+  const best = a.length ? Math.max(...a.map(x => x.score || 0)) : -1;
+  _snippetBestMemo[s.id] = best;
+  return best;
 }
 
 /**
