@@ -460,13 +460,65 @@ function debounce(fn, wait) {
   };
 }
 
-/** Highlights "Label:" prefix and [[color:text]] tokens in plain text. @returns {string} HTML */
+/**
+ * Highlight a worked sample: its section labels, the input it is fed and the
+ * output it produces, plus any [[color:text]] tokens the author wrote.
+ *
+ * A LABEL IS A WHOLE LINE, NOT ANYTHING BEFORE A COLON. The old rule painted
+ * the text before the FIRST colon on EVERY line. In a transcript that is mostly
+ * program output, so a sample reading
+ *
+ *   Output:
+ *   Enter a number: 3 x 1 = 3
+ *   3 x 2 = 6
+ *
+ * had "Enter a number:" coloured as though it were a section heading, while the
+ * identical lines under it -- which happen to carry no colon -- stayed plain.
+ * The highlighting marked a prompt as structure and split one block of output
+ * in two. A label now has to be the entire line, which is also the shape
+ * _sampleStdin parses when it hunts for the input block, so the two agree about
+ * what a sample looks like.
+ *
+ * WHAT YOU TYPE AND WHAT THE PROGRAM SAYS READ DIFFERENTLY. Everything under
+ * Input: is tinted, everything under Output: takes the foreground colour, so a
+ * sample reads as a transcript rather than as one grey wall.
+ *
+ * @returns {string} HTML
+ */
 function formatSampleText(text) {
   if (!text) return '';
-  let html = escapeHTML(text);
-  html = html.replace(/^([^:\n]+):/gm, '<span class="sample-label">$1:</span>');
-  html = html.replace(/\[\[([^:]+):(.*?)\]\]/g, '<span style="color: $1;">$2</span>');
-  return html;
+  // A heading on a line of its own -- any word, since authors name their own
+  // sections and only the shape can be relied on.
+  const OWN_LINE = /^([ \t]*)([A-Za-z][A-Za-z0-9 _+-]{0,23}):([ \t]*)$/;
+  /* A heading with its value on the same line. This one cannot go by shape --
+     'Enter a number: 3' has it too -- so it goes by name, and only the words
+     that actually head a section count. That is the whole difference between
+     structure and a prompt that happens to end in a colon. */
+  const NAMED = /^([ \t]*)(input|output|expected|result|explanation|note|sample|example|constraints)([ \t]*:)/i;
+  const sectionOf = (word) => {
+    const w = word.trim().toLowerCase();
+    return w === 'input' ? 'in' : (w === 'output' || w === 'expected' || w === 'result') ? 'out' : '';
+  };
+  let section = '';
+  const html = escapeHTML(text).split('\n').map((line) => {
+    const own = line.match(OWN_LINE);
+    if (own) {
+      section = sectionOf(own[2]);
+      return '<span class="sample-label">' + line + '</span>';
+    }
+    const named = line.match(NAMED);
+    if (named) {
+      section = sectionOf(named[2]);
+      const rest = line.slice(named[0].length);
+      const head = '<span class="sample-label">' + named[1] + named[2] + named[3] + '</span>';
+      if (!rest.trim()) return head;
+      return head + (section ? '<span class="sample-' + section + '">' + rest + '</span>' : rest);
+    }
+    if (!line.trim() || !section) return line;
+    return '<span class="sample-' + section + '">' + line + '</span>';
+  }).join('\n');
+  // Author tokens last, so a colour name is never mistaken for a label.
+  return html.replace(/\[\[([^:\]]+):(.*?)\]\]/g, '<span style="color: $1;">$2</span>');
 }
 
 /** Subsequence match — true if all chars of pattern appear in order within str. @returns {boolean} */

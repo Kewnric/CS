@@ -203,8 +203,25 @@
 }
 
 /* Colored text inside samples */
+
+/* The section headings -- Input:, Output:, and whatever else an author writes
+   on a line of its own. Weight as well as colour, because at 13px monospace a
+   hue change alone did not separate them from the transcript under them. */
 .sample-content .sample-label {
   color: #ffa657;
+  font-weight: 700;
+}
+
+/* What the program is fed. Tinted, and set apart from the output so a sample
+   reads as a conversation: this is the half you would have typed. */
+.sample-content .sample-in {
+  color: #79c0ff;
+}
+
+/* What the program says back. The point of the sample, so it takes the
+   foreground rather than the block's muted default. */
+.sample-content .sample-out {
+  color: #e6edf3;
 }
 
 /* --- Practice Top Bar --- */
