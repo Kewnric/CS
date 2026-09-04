@@ -377,7 +377,18 @@
        about 145px of chips and numbers. The max-height stays as the ceiling for
        a notebook with many sections. */
     flex: 0 0 auto;
-    max-height: 30vh;
+    /* ONE SCROLLING NAV BOX, capped. The section strip and the question grid
+       are the two things you navigate with, and together they are allowed a
+       fifth of the screen; past that they scroll as a pair and the answers keep
+       the rest. Before this the panel simply grew, and a notebook with several
+       sections would have pushed the question down the screen. */
+    max-height: 22vh;
+    overflow-y: auto;
+    /* No track down the edge, the same call as the library trees: a bar beside
+       a 179px box of chips and numbers is more seam than affordance. Wheel,
+       trackpad, touch and keyboard all still scroll it. */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
     padding: 0.75rem 1rem;
     /* 1.5rem between blocks is right beside an editor and expensive stacked:
        two gaps alone were 48px of a panel meant to be about 180. */
@@ -407,7 +418,8 @@
     padding-bottom: 0.25rem;
     margin-bottom: 0.75rem !important;
   }
-  body[data-route="notes-practice"] #np-sections-tabs::-webkit-scrollbar { display: none; }
+  body[data-route="notes-practice"] #np-sections-tabs::-webkit-scrollbar,
+  body[data-route="notes-practice"] .practice-sidebar::-webkit-scrollbar { width: 0; height: 0; display: none; }
   /* The chips are built for a vertical stack -- .np-sidebar-tab-dark is
      `width: 100%`, so laid in a row every one of them still asked for the full
      width and the first was stretched across the strip and clipped to 22px,

@@ -1666,3 +1666,12 @@ details[open]>.snippet-folder-summary>.folder-icon {
     margin-left: 0 !important;
   }
 }
+
+/* The notebook attempt's section strip is hidden when there is only one section
+   to switch to (see renderSidebar). The block under it opens with a rule and a
+   pad that separated it FROM that strip, so on its own it drew a line across
+   the top of the panel with nothing above it. */
+.practice-sidebar.np-single-section > div:nth-child(3) {
+  border-top: none !important;
+  padding-top: 0 !important;
+}

@@ -794,6 +794,20 @@ function renderSidebar() {
     `;
   }).join('');
 
+  /* The section switcher earns its space only when there is somewhere to
+     switch TO. Its buttons call switchSection(idx); with a single section the
+     only one on offer is the section already open, so the card sits there
+     costing height and doing nothing -- and the heading below it already names
+     the current section. Hidden in that case, on every screen, since it is
+     redundant rather than merely cramped.
+
+     The class goes on the panel so the divider under the strip can go with it;
+     left alone it would draw a rule across the top of an empty panel. */
+  const oneSection = (activeNotebook.sections || []).length < 2;
+  tabsContainer.style.display = oneSection ? 'none' : '';
+  const panel = tabsContainer.closest('.practice-sidebar');
+  if (panel) panel.classList.toggle('np-single-section', oneSection);
+
   // Grid
   const sec = activeNotebook.sections[currentSectionIdx];
   const sectionTitle = document.getElementById('np-current-section-title');
