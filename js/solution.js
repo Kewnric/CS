@@ -546,6 +546,22 @@ function renderCharSpans(chars, fallbackText) {
 }
 
 /** Greyed-out trailing comment from the original source, when it was stripped. */
+/* WHAT A PANEL SHOWS is the code minus its comments, with the names as they
+   were written -- never the comparison's renamed form. The rename exists so
+   `int x` and `int score` line up as the same line; it was never meant to
+   reach the screen, and when it did it also broke the comment slot below,
+   which recovers a trailing comment by walking the common prefix of the raw
+   line and this one. Handed the renamed text, that prefix ended at the first
+   identifier and the whole rest of the line came back as a fake comment. */
+function _solText(line, side) {
+  if (side === 'actual') {
+    if (line.actualPlain != null) return line.actualPlain;
+    return line.actualRaw != null ? line.actualRaw : (line.actual || '');
+  }
+  if (line.expectedPlain != null) return line.expectedPlain;
+  return line.expectedRaw != null ? line.expectedRaw : (line.expected || '');
+}
+
 function _solCommentHTML(raw, stripped) {
   if (!_solOpts.showComments || !raw) return '';
   const c = typeof diffLineComment === 'function' ? diffLineComment(raw, stripped || '') : '';
@@ -606,17 +622,18 @@ function renderDiffPanels(diffs) {
 
     if (!line.actualChars && !line.expectedChars) {
       if (lineStatus === 'partial' || lineStatus === 'wrong') {
+        const aTxt = _solText(line, 'actual'), eTxt = _solText(line, 'expected');
         const charResult = typeof computeLineDiffs === 'function'
-          ? computeLineDiffs(line.actual || '', line.expected || '', _solGran)
-          : computeCharDiffs(line.actual || '', line.expected || '');
+          ? computeLineDiffs(aTxt, eTxt, _solGran)
+          : computeCharDiffs(aTxt, eTxt);
         line.actualChars = charResult.actualChars;
         line.expectedChars = charResult.expectedChars;
       } else if (lineStatus === 'perfect') {
-        line.actualChars = (line.actual || '').split('').map(c => ({ char: c, status: 'match' }));
+        line.actualChars = _solText(line, 'actual').split('').map(c => ({ char: c, status: 'match' }));
       } else if (lineStatus === 'extra') {
-        line.actualChars = (line.actual || '').split('').map(c => ({ char: c, status: 'wrong' }));
+        line.actualChars = _solText(line, 'actual').split('').map(c => ({ char: c, status: 'wrong' }));
       } else if (lineStatus === 'missing') {
-        line.expectedChars = (line.expected || '').split('').map(c => ({ char: c, status: 'missing' }));
+        line.expectedChars = _solText(line, 'expected').split('').map(c => ({ char: c, status: 'missing' }));
       }
     }
 
@@ -626,19 +643,19 @@ function renderDiffPanels(diffs) {
     if (lineStatus === 'missing') {
       actualHTML += `<div class="diff-line missing" data-row="${i}"><span class="diff-line-number"></span><span class="diff-line-content diff-char-placeholder">— missing —</span></div>`;
     } else {
-      const charHTML = line.actualChars ? renderCharSpans(line.actualChars) : `<span class="diff-char-neutral">${escapeHTML(line.actual || '')}</span>`;
-      actualHTML += `<div class="diff-line ${lineStatus}" data-row="${i}">${_solNumHTML(line.actualLine, 'actual')}<span class="diff-line-content">${charHTML || '&nbsp;'}${_solCommentHTML(line.actualRaw, line.actual)}</span></div>`;
+      const charHTML = line.actualChars ? renderCharSpans(line.actualChars) : `<span class="diff-char-neutral">${escapeHTML(_solText(line, 'actual'))}</span>`;
+      actualHTML += `<div class="diff-line ${lineStatus}" data-row="${i}">${_solNumHTML(line.actualLine, 'actual')}<span class="diff-line-content">${charHTML || '&nbsp;'}${_solCommentHTML(line.actualRaw, _solText(line, 'actual'))}</span></div>`;
     }
 
     // EXPECTED PANEL
     if (lineStatus === 'extra') {
       expectedHTML += `<div class="diff-line extra-expected" data-row="${i}"><span class="diff-line-number"></span><span class="diff-line-content diff-char-placeholder">— extra line —</span></div>`;
     } else if (lineStatus === 'perfect') {
-      const syntaxHTML = typeof syntaxHighlight === 'function' ? syntaxHighlight(line.expected || '') : escapeHTML(line.expected || '');
-      expectedHTML += `<div class="diff-line perfect" data-row="${i}">${_solNumHTML(line.expectedLine, 'expected')}<span class="diff-line-content">${syntaxHTML || '&nbsp;'}${_solCommentHTML(line.expectedRaw, line.expected)}</span></div>`;
+      const syntaxHTML = typeof syntaxHighlight === 'function' ? syntaxHighlight(_solText(line, 'expected')) : escapeHTML(_solText(line, 'expected'));
+      expectedHTML += `<div class="diff-line perfect" data-row="${i}">${_solNumHTML(line.expectedLine, 'expected')}<span class="diff-line-content">${syntaxHTML || '&nbsp;'}${_solCommentHTML(line.expectedRaw, _solText(line, 'expected'))}</span></div>`;
     } else {
-      const charHTML = line.expectedChars ? renderCharSpans(line.expectedChars) : `<span class="diff-char-neutral">${escapeHTML(line.expected || '')}</span>`;
-      expectedHTML += `<div class="diff-line expected-highlight ${lineStatus}" data-row="${i}">${_solNumHTML(line.expectedLine, 'expected')}<span class="diff-line-content">${charHTML || '&nbsp;'}${_solCommentHTML(line.expectedRaw, line.expected)}</span></div>`;
+      const charHTML = line.expectedChars ? renderCharSpans(line.expectedChars) : `<span class="diff-char-neutral">${escapeHTML(_solText(line, 'expected'))}</span>`;
+      expectedHTML += `<div class="diff-line expected-highlight ${lineStatus}" data-row="${i}">${_solNumHTML(line.expectedLine, 'expected')}<span class="diff-line-content">${charHTML || '&nbsp;'}${_solCommentHTML(line.expectedRaw, _solText(line, 'expected'))}</span></div>`;
     }
 
     // UNIFIED PANEL — each side keeps its own line number, so a - row and the
@@ -646,14 +663,14 @@ function renderDiffPanels(diffs) {
     const aNum = line.actualLine != null ? line.actualLine : '';
     const eNum = line.expectedLine != null ? line.expectedLine : '';
     if (lineStatus === 'perfect') {
-      unifiedHTML += `<div class="diff-line perfect" data-row="${i}"><span class="diff-line-number">${eNum}</span><span class="diff-line-prefix"> </span><span class="diff-line-content">${typeof syntaxHighlight === 'function' ? syntaxHighlight(line.expected || '') : escapeHTML(line.expected || '')}${_solCommentHTML(line.expectedRaw, line.expected)}</span></div>`;
+      unifiedHTML += `<div class="diff-line perfect" data-row="${i}"><span class="diff-line-number">${eNum}</span><span class="diff-line-prefix"> </span><span class="diff-line-content">${typeof syntaxHighlight === 'function' ? syntaxHighlight(_solText(line, 'expected')) : escapeHTML(_solText(line, 'expected'))}${_solCommentHTML(line.expectedRaw, _solText(line, 'expected'))}</span></div>`;
     } else if (lineStatus === 'missing') {
-      unifiedHTML += `<div class="diff-line missing" data-row="${i}"><span class="diff-line-number">${eNum}</span><span class="diff-line-prefix add">+</span><span class="diff-line-content">${renderCharSpans(line.expectedChars) || escapeHTML(line.expected || '')}</span></div>`;
+      unifiedHTML += `<div class="diff-line missing" data-row="${i}"><span class="diff-line-number">${eNum}</span><span class="diff-line-prefix add">+</span><span class="diff-line-content">${renderCharSpans(line.expectedChars) || escapeHTML(_solText(line, 'expected'))}</span></div>`;
     } else if (lineStatus === 'extra') {
-      unifiedHTML += `<div class="diff-line extra" data-row="${i}"><span class="diff-line-number">${aNum}</span><span class="diff-line-prefix del">-</span><span class="diff-line-content">${renderCharSpans(line.actualChars) || escapeHTML(line.actual || '')}</span></div>`;
+      unifiedHTML += `<div class="diff-line extra" data-row="${i}"><span class="diff-line-number">${aNum}</span><span class="diff-line-prefix del">-</span><span class="diff-line-content">${renderCharSpans(line.actualChars) || escapeHTML(_solText(line, 'actual'))}</span></div>`;
     } else {
-      unifiedHTML += `<div class="diff-line wrong" data-row="${i}"><span class="diff-line-number">${aNum}</span><span class="diff-line-prefix del">-</span><span class="diff-line-content">${renderCharSpans(line.actualChars) || escapeHTML(line.actual || '')}</span></div>`;
-      unifiedHTML += `<div class="diff-line expected-highlight" data-row="${i}"><span class="diff-line-number">${eNum}</span><span class="diff-line-prefix add">+</span><span class="diff-line-content">${renderCharSpans(line.expectedChars) || escapeHTML(line.expected || '')}</span></div>`;
+      unifiedHTML += `<div class="diff-line wrong" data-row="${i}"><span class="diff-line-number">${aNum}</span><span class="diff-line-prefix del">-</span><span class="diff-line-content">${renderCharSpans(line.actualChars) || escapeHTML(_solText(line, 'actual'))}</span></div>`;
+      unifiedHTML += `<div class="diff-line expected-highlight" data-row="${i}"><span class="diff-line-number">${eNum}</span><span class="diff-line-prefix add">+</span><span class="diff-line-content">${renderCharSpans(line.expectedChars) || escapeHTML(_solText(line, 'expected'))}</span></div>`;
     }
 
     // EXPLANATION — written into BOTH side-by-side panels so the rows stay

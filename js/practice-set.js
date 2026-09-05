@@ -681,15 +681,7 @@ function _psetLoadProblem(i) {
   const descEl = document.getElementById('pset-desc');
   if (descEl) descEl.innerHTML = (typeof formatRichText === 'function' ? formatRichText(p.description) : escapeHTML(p.description)) || 'No description provided.';
 
-  const samplesEl = document.getElementById('pset-samples');
-  if (samplesEl) {
-    samplesEl.innerHTML = (p.samples || []).map(s => `
-      <div style="margin-bottom:0.5rem;">
-        <h3 class="sample-title">${escapeHTML(s.title)}</h3>
-        <div class="sample-content">${typeof formatSampleText === 'function' ? formatSampleText(s.content) : escapeHTML(s.content)}</div>
-      </div>
-    `).join('');
-  }
+  psetRenderSamples(p);
 
   if (typeof renderHintsBlock === 'function') {
     renderHintsBlock('pset-hints-container', p.hints || [], p.hintsUsed || 0, 'psetRevealNextHint');
@@ -1004,6 +996,64 @@ function psetApplyTimer(secs, restart) {
    problem can come from the library or be written into the set itself, and the
    correction is written back to whichever one it actually came from -- so it is
    still there next time, which is the point of fixing it rather than noting it. */
+/* Samples are editable here too, through the same editor the single-program
+   attempt uses. The write-back is the description's, note for note: a problem
+   pulled from the library owns nothing, so the edit has to land on the variant
+   it came from, and a problem written into the set lands on the set. */
+function _psetSampleTarget(p) {
+  return {
+    read: () => (p.samples || (p.samples = [])),
+    write: (list) => {
+      p.samples = list;
+      if (p.source === 'library') {
+        const c = (state.challenges || []).find(ch => ch.id === p.challengeId);
+        const v = c && (c.variants || []).find(x => x.id === p.variantId);
+        if (v) v.samples = list;
+      } else if (_pset && _pset.set && _pset.set.problems) {
+        const entry = _pset.set.problems[p.srcIndex];
+        if (entry) entry.samples = list;
+      }
+    },
+    repaint: () => psetRenderSamples(p)
+  };
+}
+
+/** Paint the set screen's sample list, with the same edit affordances. */
+function psetRenderSamples(p) {
+  const host = document.getElementById('pset-samples');
+  if (!host || !p) return;
+  const samples = p.samples || [];
+  const fmt = (c) => (typeof formatSampleText === 'function' ? formatSampleText(c) : escapeHTML(c));
+  host.innerHTML = samples.map((s, si) => `
+      <div style="margin-bottom:0.5rem;">
+        <div class="sample-head">
+          <h3 class="sample-title">${escapeHTML(s.title)}</h3>
+          <button class="sample-edit-btn is-first" onclick="psetEditSample(${si})"
+                  title="Edit this sample" aria-label="Edit this sample">
+            <i data-lucide="pencil" style="width:11px;height:11px;"></i>
+          </button>
+        </div>
+        <div class="sample-content">${fmt(s.content)}</div>
+      </div>`).join('') + `
+      <button class="sample-add-btn" onclick="psetAddSample()">
+        <i data-lucide="plus" style="width:12px;height:12px;"></i>
+        ${samples.length ? 'Add another sample' : 'Add a sample'}
+      </button>`;
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
+}
+
+window.psetEditSample = function (si) {
+  const p = _pset && _pset.problems[_pset.current];
+  if (!p || typeof practiceEditSample !== 'function') return;
+  practiceEditSample(si, _psetSampleTarget(p));
+};
+
+window.psetAddSample = function () {
+  const p = _pset && _pset.problems[_pset.current];
+  if (!p || typeof practiceAddSample !== 'function') return;
+  practiceAddSample(_psetSampleTarget(p));
+};
+
 function _psetDescTarget(p) {
   return {
     read: () => p.description || '',

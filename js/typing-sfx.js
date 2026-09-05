@@ -144,12 +144,15 @@ const SFX_VOICE_KEY = 'ssp.typingSfxVoice';
    dull one because it is the key you hit when something went wrong.
    ============================================================ */
 
+/* The engines are crossed against what the labels suggest, on purpose: the
+   recording in audio/voice.MP3 IS Mita, so the Mita entry is the one that
+   plays it, and the synthesised blip sits under Recorded. The order and the
+   labels are what the picker has always shown -- only which audio each one
+   reaches for was swapped. */
 const SFX_VOICES = {
-  mita:   { id: 'mita',   label: 'Mita',   hint: 'The dialogue blip',      engine: 'voice' },
+  mita:   { id: 'mita',   label: 'Mita',   hint: 'From audio/voice.MP3',   engine: 'sample' },
   keys:   { id: 'keys',   label: 'Keys',   hint: 'A mechanical keyboard',  engine: 'keys' },
-  /* The recorded one: audio/voice.MP3, played whole. It does not fall back to
-     a synthesised blip — this voice is the recording. See js/audio-samples.js. */
-  sample: { id: 'sample', label: 'Recorded', hint: 'From audio/voice.MP3', engine: 'sample' }
+  sample: { id: 'sample', label: 'Recorded', hint: 'The dialogue blip',    engine: 'voice' }
 };
 
 const SFX_VOICE_ORDER = ['mita', 'keys', 'sample'];

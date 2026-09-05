@@ -135,26 +135,7 @@ function initPractice() {
   bossSetName(typeof getProgramAlias === 'function' ? getProgramAlias(challenge) : challenge.title);
   document.getElementById('practice-desc').innerHTML = formatRichText(variant.description || challenge.description) || 'No description provided.';
 
-  const samplesContainer = document.getElementById('practice-samples-container');
-  if (variant.samples && variant.samples.length > 0) {
-    samplesContainer.innerHTML = variant.samples.map((s, si) => {
-      // If the sample carries an Input: block, offer to run with it rather than
-      // making the student retype it into the terminal every time.
-      const stdin = _sampleStdin(s.content);
-      return `
-      <div style="margin-bottom:0.5rem;">
-        <div class="sample-head">
-          <h3 class="sample-title">${escapeHTML(s.title)}</h3>
-          ${stdin ? `<button class="sample-run-btn" onclick="practiceRunSample(${si})" title="Run your code with this sample's input">
-            <i data-lucide="play" style="width:11px;height:11px;"></i> Run this
-          </button>` : ''}
-        </div>
-        <div class="sample-content">${formatSampleText(s.content)}</div>
-      </div>`;
-    }).join('');
-  } else {
-    samplesContainer.innerHTML = '';
-  }
+  practiceRenderSamples();
 
   // Hints
   state.sessionData.hintsUsed = 0;
@@ -1578,6 +1559,7 @@ const BOSS_MAX_LEVEL = 100;
 let _bossMaxHp = 0;      // characters in the reference solution — set by the painter
 let _bossGhostTimer = null;  // holds the red damage chunk before it recedes
 let _bossShatterAt = 0;      // last break, so a flicker at 0 HP can't stack them
+let _bossName = '';          // the alias on the plate, reused by the off-bar chip
 
 /**
  * Markup for the boss bar, shared by the practice and practice-set templates so
@@ -1665,7 +1647,11 @@ function bossBarTemplate() {
         <span class="sao-hp" id="boss-health-hp">— / —</span>
         <span class="sao-lv" id="boss-health-lv" onclick="bossPromptLevel()" title="Click to set this program's level">LV. 1</span>
       </div>
-    </div>`;
+    </div>
+    <!-- Stands in for the bar when the bar is switched off. Emitted here, not
+         in the routes, so all three attempt screens keep the same topbar
+         without three copies of it. -->
+    <span class="boss-nick" id="boss-nick" hidden></span>`;
 }
 
 /** Show/hide the crystal + nameplate together (they're siblings in the topbar). */
@@ -1678,6 +1664,8 @@ function bossSetVisible(on) {
   // topbar, so the badge only appears when the bar is switched off.
   const center = document.querySelector('.practice-topbar-center');
   if (center) center.classList.toggle('boss-on', !!on);
+  // Read after the bar has been hidden or shown: the chip is its stand-in.
+  _bossSyncNick();
 }
 
 function bossIsVisible() {
@@ -1707,12 +1695,29 @@ function bossSetLevel(level) {
 
 /** The name plate at the left of the bar — the program's alias, or its title. */
 function bossSetName(text) {
-  const el = document.getElementById('boss-plate-name');
-  if (!el) return;
   const name = (text || '').trim();
-  el.textContent = name;
-  el.title = name;
-  el.style.display = name ? '' : 'none';
+  _bossName = name;
+  const el = document.getElementById('boss-plate-name');
+  if (el) {
+    el.textContent = name;
+    el.title = name;
+    el.style.display = name ? '' : 'none';
+  }
+  _bossSyncNick();
+}
+
+/* Switching the bar off used to leave the middle of the topbar empty. The
+   name was already known — it just had nowhere to go once the plate carrying
+   it was hidden — so it moves into a chip of its own instead. Shown only when
+   the bar is off AND there is a name to show, so an unnamed program still
+   gets a clean bar rather than an empty pill. */
+function _bossSyncNick() {
+  const chip = document.getElementById('boss-nick');
+  if (!chip) return;
+  const show = !!_bossName && !bossIsVisible();
+  chip.textContent = _bossName;
+  chip.title = _bossName;
+  chip.hidden = !show;
 }
 
 /** Click the LV. cell to set the level without going to Admin. */
@@ -4285,6 +4290,181 @@ document.addEventListener('keydown', (e) => {
   e.stopPropagation();
   practiceCloseDescription();
 }, true);
+
+/* ============================================================
+   SAMPLES — editable from inside the attempt
+   ------------------------------------------------------------
+   The description has been editable here since the point of a correction is
+   that you make it while you are looking at the mistake. Samples are worth the
+   same: a sample with a typo in its expected output teaches the typo, and
+   until now the only way to fix one was to leave the attempt for Admin.
+
+   Same target shape as the description editor, for the same reason — the set
+   screen holds problems, not variants, and writes back through its own path.
+   ============================================================ */
+
+let _psmpTarget = null;   // { read(), repaint() } — whose samples are being edited
+let _psmpIndex = -1;      // which one; -1 while adding
+
+function _psmpDefaultTarget() {
+  const variant = state.activeVariant;
+  if (!variant) return null;
+  return {
+    read: () => (variant.samples || (variant.samples = [])),
+    repaint: () => practiceRenderSamples()
+  };
+}
+
+/** Paint the sample list in the single-program attempt. */
+function practiceRenderSamples() {
+  const host = document.getElementById('practice-samples-container');
+  if (!host) return;
+  const samples = (state.activeVariant && state.activeVariant.samples) || [];
+
+  host.innerHTML = samples.map((s, si) => {
+    // If the sample carries an Input: block, offer to run with it rather than
+    // making the student retype it into the terminal every time.
+    const stdin = _sampleStdin(s.content);
+    return `
+      <div style="margin-bottom:0.5rem;">
+        <div class="sample-head">
+          <h3 class="sample-title">${escapeHTML(s.title)}</h3>
+          ${stdin ? `<button class="sample-run-btn" onclick="practiceRunSample(${si})" title="Run your code with this sample's input">
+            <i data-lucide="play" style="width:11px;height:11px;"></i> Run this
+          </button>` : ''}
+          <button class="sample-edit-btn${stdin ? '' : ' is-first'}" onclick="practiceEditSample(${si})"
+                  title="Edit this sample" aria-label="Edit this sample">
+            <i data-lucide="pencil" style="width:11px;height:11px;"></i>
+          </button>
+        </div>
+        <div class="sample-content">${formatSampleText(s.content)}</div>
+      </div>`;
+  }).join('') + `
+      <button class="sample-add-btn" onclick="practiceAddSample()">
+        <i data-lucide="plus" style="width:12px;height:12px;"></i>
+        ${samples.length ? 'Add another sample' : 'Add a sample'}
+      </button>`;
+
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
+}
+
+/** Open the editor on one sample. `target` lets another screen supply its own list. */
+window.practiceEditSample = function (si, target) {
+  _psmpTarget = target || _psmpDefaultTarget();
+  if (!_psmpTarget) return;
+  const list = _psmpTarget.read() || [];
+  const s = list[si];
+  if (!s) return;
+  _psmpIndex = si;
+  _psmpOpen(s.title || '', s.content || '', false);
+};
+
+/** Add one, then open it — an empty sample nobody fills in is just clutter. */
+window.practiceAddSample = function (target) {
+  _psmpTarget = target || _psmpDefaultTarget();
+  if (!_psmpTarget) return;
+  const list = _psmpTarget.read() || [];
+  _psmpIndex = -1;
+  _psmpOpen('Sample ' + (list.length + 1), 'Input:\n\nOutput:\n', true);
+};
+
+function _psmpOpen(title, content, isNew) {
+  let ov = document.getElementById('practice-sample-modal');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'practice-sample-modal';
+    ov.className = 'modal-overlay';
+    document.body.appendChild(ov);
+  }
+  ov.classList.remove('hidden');
+  ov.innerHTML = `
+    <div class="modal-content pd-modal psmp-modal" onclick="event.stopPropagation()">
+      <div class="pd-head">
+        <h2><i data-lucide="pencil"></i> ${isNew ? 'Add a sample' : 'Edit sample'}</h2>
+        <button class="btn btn-ghost pd-close" onclick="practiceCloseSample()" aria-label="Close">
+          <i data-lucide="x"></i>
+        </button>
+      </div>
+      <label class="form-label psmp-label" for="psmp-title">Title</label>
+      <input id="psmp-title" class="form-input" maxlength="40" value="${escapeHTML(title)}" placeholder="e.g. Sample 1">
+      <label class="form-label psmp-label" for="psmp-body">Body</label>
+      <textarea id="psmp-body" class="form-input psmp-body" rows="9" spellcheck="false">${escapeHTML(content)}</textarea>
+      <p class="pd-note">
+        <i data-lucide="info"></i>
+        Put the stdin under a line reading <code>Input:</code> and the expected text under <code>Output:</code>.
+        That is what gives a sample its <strong>Run this</strong> button — with no Input: block there is
+        nothing to feed the program.
+      </p>
+      <div class="pd-actions">
+        ${isNew ? '' : `<button class="btn btn-ghost psmp-delete" onclick="practiceDeleteSample()">
+          <i data-lucide="trash-2"></i> Delete
+        </button>`}
+        <button class="btn btn-secondary" onclick="practiceCloseSample()">Cancel</button>
+        <button class="btn btn-primary" onclick="practiceSaveSample()">
+          <i data-lucide="check"></i> ${isNew ? 'Add sample' : 'Save sample'}
+        </button>
+      </div>
+    </div>`;
+  ov.onclick = () => practiceCloseSample();
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: ov });
+  const t = document.getElementById('psmp-title');
+  if (t) { t.focus(); t.select(); }
+}
+
+window.practiceSaveSample = function () {
+  const target = _psmpTarget;
+  if (!target) { practiceCloseSample(); return; }
+  const title = (document.getElementById('psmp-title') || {}).value || '';
+  const content = (document.getElementById('psmp-body') || {}).value || '';
+  const list = target.read() || [];
+
+  /* A sample with neither a name nor a body is not a sample. Adding one and
+     saving it blank should leave the list as it was, not grow an empty card. */
+  if (!title.trim() && !content.trim()) { practiceCloseSample(); return; }
+
+  const entry = { title: title.trim() || ('Sample ' + (list.length + 1)), content: content };
+  if (_psmpIndex >= 0 && list[_psmpIndex]) list[_psmpIndex] = entry;
+  else list.push(entry);
+
+  if (typeof target.write === 'function') target.write(list);
+  if (typeof saveData === 'function') saveData();
+  if (typeof target.repaint === 'function') target.repaint();
+  practiceCloseSample();
+  if (typeof toast === 'function') toast('Sample saved.', { type: 'success' });
+};
+
+window.practiceDeleteSample = function () {
+  const target = _psmpTarget;
+  if (!target || _psmpIndex < 0) { practiceCloseSample(); return; }
+  const list = target.read() || [];
+  const gone = list[_psmpIndex];
+  list.splice(_psmpIndex, 1);
+  if (typeof target.write === 'function') target.write(list);
+  if (typeof saveData === 'function') saveData();
+  if (typeof target.repaint === 'function') target.repaint();
+  practiceCloseSample();
+  if (typeof toast === 'function') {
+    toast('Deleted ' + (gone && gone.title ? '"' + gone.title + '"' : 'the sample') + '.', { type: 'info' });
+  }
+};
+
+window.practiceCloseSample = function () {
+  const ov = document.getElementById('practice-sample-modal');
+  _psmpTarget = null;
+  _psmpIndex = -1;
+  if (ov) { ov.classList.add('hidden'); ov.innerHTML = ''; ov.onclick = null; }
+};
+
+/* Escape closes this first, like the description editor — otherwise it falls
+   through to zen mode or the terminal. */
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  const ov = document.getElementById('practice-sample-modal');
+  if (!ov || ov.classList.contains('hidden')) return;
+  e.stopPropagation();
+  practiceCloseSample();
+}, true);
+
 
 /**
  * The run's verdict, said once.

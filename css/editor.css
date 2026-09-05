@@ -263,6 +263,28 @@
   gap: 0.6rem;
 }
 
+/* The program name, standing where the boss bar stands when the bar is off.
+   Sized to the text rather than the strip: this is a label, and a label
+   stretched across a third of the topbar reads as a broken bar. It truncates
+   instead of wrapping, because the topbar is one row high. */
+.boss-nick {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: min(340px, 100%);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0.4rem 0.85rem;
+  border-radius: 9px;
+  border: 1px solid var(--border-color, #2f2f3a);
+  background: var(--bg-elevated, #1c1c24);
+  color: var(--text-primary, #e6e6ef);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+}
+
 .practice-title-badge {
   flex: 0 1 auto;
   min-width: 0;
@@ -3419,6 +3441,71 @@ body.is-resizing .practice-panel { transition: none; }
   color: var(--color-success, #10b981);
   background: rgba(16, 185, 129, 0.1);
 }
+
+/* Edit / add, kept quiet. These sit beside the sample all the time, and a
+   sample is read far more often than it is corrected -- so they stay at the
+   weight of the run pill and only pick up colour under the pointer.
+   .is-first takes over the margin when there is no Run this to push against. */
+.sample-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.sample-edit-btn.is-first { margin-left: auto; }
+.sample-edit-btn:hover {
+  border-color: var(--border-color);
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}
+
+.sample-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px dashed var(--border-color);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.sample-add-btn:hover {
+  border-style: solid;
+  border-color: var(--color-primary, #6366f1);
+  color: var(--color-primary, #6366f1);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+/* The sample editor. The body is code-shaped -- whitespace in it is the
+   expected output -- so it gets a monospace face and keeps its own line
+   breaks rather than being reflowed like prose. */
+.psmp-modal { text-align: left; }
+.psmp-label { display: block; margin: 0.75rem 0 0.3rem; }
+.psmp-body {
+  width: 100%;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+  resize: vertical;
+}
+.psmp-delete { margin-right: auto; color: var(--color-danger, #ef4444); }
+.psmp-delete:hover { background: rgba(239, 68, 68, 0.12); }
 
 /* --- Boss: combo chip + personal-best marker --- */
 .sao-combo {

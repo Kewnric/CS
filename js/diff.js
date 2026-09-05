@@ -325,6 +325,17 @@ function computeDiffs(userCode, expectedCode, opts) {
      untouched source and are what gets displayed, so the panels still show
      the names you actually wrote. Both passes preserve newlines, so line i
      here is still line i there. */
+  /* Snapshot before the renaming: comments gone, names as written. THIS is
+     what the panels display and what the explanations quote. Rendering the
+     renamed form instead is what put `int v1;` on screen where the student
+     wrote `int score;`, and, worse, made diffLineComment below hand back the
+     whole rest of the line as if it were a trailing comment -- it recovers a
+     comment by walking the common prefix of raw and stripped, and renaming
+     ends that prefix at the first identifier. Both panels were showing the
+     comparison's own scratch names plus a fake comment made of the real ones. */
+  const plainULines = strippedUser.split('\n');
+  const plainCLines = strippedExpected.split('\n');
+
   if (ignoreNames) {
     strippedUser = alphaNormalizeC(_diffCanonC(strippedUser));
     strippedExpected = alphaNormalizeC(_diffCanonC(strippedExpected));
@@ -341,7 +352,7 @@ function computeDiffs(userCode, expectedCode, opts) {
     const stripped = stripULines[i];
     const norm = normalizeLine(stripped);
     if (norm.trim() !== '') {
-      uLinesData.push({ stripped: stripped, norm: norm, raw: rawULines[i] != null ? rawULines[i] : stripped, lineNo: i + 1 });
+      uLinesData.push({ stripped: stripped, norm: norm, raw: rawULines[i] != null ? rawULines[i] : stripped, plain: plainULines[i] != null ? plainULines[i] : stripped, lineNo: i + 1 });
     }
   }
 
@@ -351,7 +362,7 @@ function computeDiffs(userCode, expectedCode, opts) {
     const stripped = stripCLines[i];
     const norm = normalizeLine(stripped);
     if (norm.trim() !== '') {
-      cLinesData.push({ stripped: stripped, norm: norm, raw: rawCLines[i] != null ? rawCLines[i] : stripped, lineNo: i + 1 });
+      cLinesData.push({ stripped: stripped, norm: norm, raw: rawCLines[i] != null ? rawCLines[i] : stripped, plain: plainCLines[i] != null ? plainCLines[i] : stripped, lineNo: i + 1 });
     }
   }
 
@@ -450,7 +461,8 @@ function computeDiffs(userCode, expectedCode, opts) {
           actual: uData.stripped,
           expected: cData.stripped,
           actualLine: uData.lineNo, expectedLine: cData.lineNo,
-          actualRaw: uData.raw, expectedRaw: cData.raw
+          actualRaw: uData.raw, expectedRaw: cData.raw,
+          actualPlain: uData.plain, expectedPlain: cData.plain
         });
         totalScore += 1;
         i2--; j2--;
@@ -468,7 +480,8 @@ function computeDiffs(userCode, expectedCode, opts) {
           actual: uData.stripped,
           expected: cData.stripped,
           actualLine: uData.lineNo, expectedLine: cData.lineNo,
-          actualRaw: uData.raw, expectedRaw: cData.raw
+          actualRaw: uData.raw, expectedRaw: cData.raw,
+          actualPlain: uData.plain, expectedPlain: cData.plain
         });
         totalScore += (sim > 0.5 ? 0.8 : 0);
         i2--; j2--;
@@ -482,7 +495,8 @@ function computeDiffs(userCode, expectedCode, opts) {
         actual: uLinesData[i2 - 1].stripped,
         expected: null,
         actualLine: uLinesData[i2 - 1].lineNo, expectedLine: null,
-        actualRaw: uLinesData[i2 - 1].raw, expectedRaw: null
+        actualRaw: uLinesData[i2 - 1].raw, expectedRaw: null,
+        actualPlain: uLinesData[i2 - 1].plain, expectedPlain: null
       });
       i2--;
     } else {
@@ -491,7 +505,8 @@ function computeDiffs(userCode, expectedCode, opts) {
         actual: null,
         expected: cLinesData[j2 - 1].stripped,
         actualLine: null, expectedLine: cLinesData[j2 - 1].lineNo,
-        actualRaw: null, expectedRaw: cLinesData[j2 - 1].raw
+        actualRaw: null, expectedRaw: cLinesData[j2 - 1].raw,
+        actualPlain: null, expectedPlain: cLinesData[j2 - 1].plain
       });
       j2--;
     }
@@ -534,8 +549,11 @@ function _diffCount(s, ch) {
  */
 function explainDiffLine(row) {
   if (!row || row.status === 'perfect') return null;
-  const a = (row.actual || '').trim();
-  const e = (row.expected || '').trim();
+  /* Read the names as written. On the renamed form the one rule that quotes
+     identifiers could only ever say "the reference calls this v1, you wrote
+     v1" -- true of the comparison, meaningless to the reader. */
+  const a = (row.actualPlain != null ? row.actualPlain : (row.actual || '')).trim();
+  const e = (row.expectedPlain != null ? row.expectedPlain : (row.expected || '')).trim();
 
   if (row.status === 'missing') {
     if (/^#include/.test(e)) {
