@@ -107,10 +107,7 @@ function renderAdminVariantForm() {
             <div style="flex:1; display:flex; flex-direction:column; gap:0.5rem;">
               <input value="${escapeHTML(s.title || '')}" oninput="updateSampleField(${sampleIdx}, 'title', this.value)" placeholder="Sample Title" class="form-input" style="font-weight:600; font-size:0.8125rem; padding:0.375rem 0.5rem;" />
               <div class="stb-wrap">
-                ${typeof sampleToolbarHTML === 'function' ? sampleToolbarHTML('admin-sample-body-' + sampleIdx) : ''}
-                <div class="stb-field">
-                  <textarea id="admin-sample-body-${sampleIdx}" rows="2" oninput="updateSampleField(${sampleIdx}, 'content', this.value)" placeholder="Sample content..." class="form-textarea af-grow" style="min-height:40px;">${escapeHTML(s.content || '')}</textarea>
-                </div>
+                ${typeof sampleFieldHTML === 'function' ? sampleFieldHTML('admin-sample-body-' + sampleIdx, s.content || '') : ''}
               </div>
             </div>
             <button onclick="deleteAdminSample(${sampleIdx})" class="btn btn-ghost" style="padding:0.25rem;" title="Delete Sample">
@@ -246,7 +243,7 @@ function renderAdminVariantForm() {
 
   // The form is rebuilt wholesale, so every sample field is a fresh element
   // needing its highlighted backdrop back.
-  if (typeof sampleSyncHighlights === 'function') sampleSyncHighlights(document);
+  _adminWireSampleEditors();
 }
 
 function switchAdminVariant(idx) {
@@ -339,6 +336,23 @@ function updateActiveVariantField(field, value) {
       }
     }
   }
+}
+
+/* Each sample body is a formatted editor, not a textarea, so what it holds
+   is read out rather than taken off .value -- and it says so with a change
+   event, since redrawing itself is not something the form should have to
+   know about. */
+function _adminWireSampleEditors() {
+  if (typeof sampleEditorAttach !== 'function') return;
+  document.querySelectorAll('.stb-editor[id^="admin-sample-body-"]').forEach((el) => {
+    sampleEditorAttach(el);
+    if (el._adminWired) return;
+    el._adminWired = true;
+    const idx = parseInt(el.id.replace('admin-sample-body-', ''), 10);
+    el.addEventListener('change', () => {
+      if (typeof updateSampleField === 'function') updateSampleField(idx, 'content', sampleEditorValue(el));
+    });
+  });
 }
 
 function addAdminSample() {

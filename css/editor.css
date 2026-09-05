@@ -203,7 +203,7 @@
 }
 
 /* Colored text inside samples.
-   Each rule names the editor overlay (.stb-hl) as well as the card, because
+   Each rule names the editor (.stb-editor) as well as the card, because
    the field is meant to show the colours the card will show -- one source
    for both, so they cannot drift into disagreeing about a sample. */
 
@@ -211,7 +211,7 @@
    on a line of its own. Weight as well as colour, because at 13px monospace a
    hue change alone did not separate them from the transcript under them. */
 .sample-content .sample-label,
-.stb-hl .sample-label {
+.stb-editor .sample-label {
   color: #ffa657;
   font-weight: 700;
 }
@@ -219,14 +219,14 @@
 /* What the program is fed. Tinted, and set apart from the output so a sample
    reads as a conversation: this is the half you would have typed. */
 .sample-content .sample-in,
-.stb-hl .sample-in {
+.stb-editor .sample-in {
   color: #79c0ff;
 }
 
 /* What the program says back. The point of the sample, so it takes the
    foreground rather than the block's muted default. */
 .sample-content .sample-out,
-.stb-hl .sample-out {
+.stb-editor .sample-out {
   color: #e6edf3;
 }
 
@@ -3509,58 +3509,12 @@ body.is-resizing .practice-panel { transition: none; }
   border-top-right-radius: 0;
 }
 
-/* ── The field shows the colours the card will show ──────────
-   The same arrangement as the code editor: a <pre> painted underneath and a
-   transparent textarea over it. Every metric that decides where a glyph
-   lands -- font, size, line-height, padding, border, wrapping -- has to be
-   identical on both, or the caret drifts away from the text under it.
+/* ── The body you edit ───────────────────────────────────────
+   Editable rich text, drawn on the same ground the card uses, so what you
+   are looking at is the sample rather than the notation behind it. The
+   colours themselves come from the .sample-* rules above -- one source for
+   the card and the editor both.
    ------------------------------------------------------------ */
-.stb-field { position: relative; display: block; }
-
-.stb-hl,
-.stb-field textarea {
-  margin: 0;
-  padding: 0.625rem 0.75rem;
-  border: 1px solid transparent;
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-  font-size: 0.8rem;
-  line-height: 1.5;
-  white-space: pre;
-  overflow-wrap: normal;
-  tab-size: 4;
-}
-
-.stb-hl {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-  z-index: 1;
-  border-radius: 0 0 var(--radius-md) var(--radius-md);
-  color: #b1bac4;
-}
-
-/* The token brackets stay on screen -- hiding them would shift every glyph
-   after them out from under the caret -- but they step back so the text they
-   wrap is what you read. */
-.stb-hl-mark { color: #4c566a; }
-
-.stb-field textarea {
-  position: relative;
-  z-index: 2;
-  width: 100%;
-  background: transparent;
-  color: transparent;
-  caret-color: #58a6ff;
-  resize: vertical;
-}
-
-/* With the text itself transparent, a solid selection would paint over the
-   only visible copy. Semi-transparent, it tints it instead. */
-.stb-field textarea::selection { background: rgba(88, 166, 255, 0.32); }
-.stb-field textarea::-moz-selection { background: rgba(88, 166, 255, 0.32); }
-
-/* The ground and the frame belong to the stack, not to either layer. */
 .stb-field {
   background: #0d1117;
   border: 1px solid var(--border-color);
@@ -3568,6 +3522,31 @@ body.is-resizing .practice-panel { transition: none; }
   border-radius: 0 0 var(--radius-md) var(--radius-md);
 }
 .stb-field:focus-within { border-color: var(--color-primary); }
+
+.stb-editor {
+  min-height: 8.5rem;
+  max-height: 40vh;
+  overflow: auto;
+  padding: 0.625rem 0.75rem;
+  outline: none;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: #b1bac4;
+  /* The transcript is compared exactly, so its spacing is content: it must
+     not be collapsed, and a long line scrolls rather than re-wraps. */
+  white-space: pre;
+  tab-size: 4;
+}
+.stb-editor .stb-line { min-height: 1.2em; }
+.stb-editor:empty::before,
+.stb-editor .stb-line:only-child:empty::before {
+  content: attr(data-placeholder);
+  color: #484f58;
+}
+
+/* The admin rows sit in a narrower column and hold less. */
+.af-form .stb-editor { min-height: 5.5rem; }
 .stb-btn {
   display: inline-flex;
   align-items: center;
@@ -3597,29 +3576,42 @@ body.is-resizing .practice-panel { transition: none; }
   margin: 0 4px;
   background: var(--border-color);
 }
-/* The swatch pickers: a native select laid invisibly over the icon, so the
-   list is the platform's own and the control still looks like the others. */
-.stb-pick {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 5px;
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: color 0.13s, background 0.13s;
-}
-.stb-pick:hover { color: var(--color-primary, #6366f1); background: rgba(99, 102, 241, 0.12); }
-.stb-pick svg { width: 14px; height: 14px; }
-.stb-pick select {
+/* The palette: the colours themselves, in boxes. A list of names told you
+   nothing about what you were about to get. */
+.stb-pick { position: relative; display: inline-flex; }
+.stb-palette {
+  display: none;
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
+  top: calc(100% + 5px);
+  left: 0;
+  z-index: 30;
+  width: 108px;
+  padding: 5px;
+  gap: 4px;
+  flex-wrap: wrap;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: var(--bg-elevated, #1c1c24);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+}
+.stb-pick.is-open .stb-palette { display: flex; }
+.stb-swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
   cursor: pointer;
+  transition: transform 0.1s, border-color 0.1s;
+}
+.stb-swatch:hover { transform: scale(1.12); border-color: #fff; }
+/* "None" has no colour to show, so it shows the absence of one. */
+.stb-swatch-none {
+  background:
+    linear-gradient(to bottom right, transparent calc(50% - 1px),
+      var(--color-danger, #ef4444) calc(50% - 1px), var(--color-danger, #ef4444) calc(50% + 1px),
+      transparent calc(50% + 1px)),
+    #0d1117;
 }
 .psmp-delete { margin-right: auto; color: var(--color-danger, #ef4444); }
 .psmp-delete:hover { background: rgba(239, 68, 68, 0.12); }

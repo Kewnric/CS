@@ -4381,10 +4381,7 @@ function _psmpOpen(title, content) {
       <input id="psmp-title" class="form-input" maxlength="40" value="${escapeHTML(title)}" placeholder="e.g. Sample 1">
       <label class="form-label psmp-label" for="psmp-body">Body</label>
       <div class="stb-wrap">
-        ${typeof sampleToolbarHTML === 'function' ? sampleToolbarHTML('psmp-body') : ''}
-        <div class="stb-field">
-          <textarea id="psmp-body" class="form-input psmp-body" rows="9" spellcheck="false">${escapeHTML(content)}</textarea>
-        </div>
+      ${typeof sampleFieldHTML === 'function' ? sampleFieldHTML('psmp-body', content) : ''}
       </div>
       <p class="pd-note">
         <i data-lucide="info"></i>
@@ -4403,7 +4400,7 @@ function _psmpOpen(title, content) {
       </div>
     </div>`;
   ov.onclick = () => practiceCloseSample();
-  if (typeof sampleSyncHighlights === 'function') sampleSyncHighlights(ov);
+  if (typeof sampleEditorAttach === 'function') sampleEditorAttach('psmp-body');
   if (typeof lucide !== 'undefined') lucide.createIcons({ el: ov });
   const t = document.getElementById('psmp-title');
   if (t) { t.focus(); t.select(); }
@@ -4413,7 +4410,7 @@ window.practiceSaveSample = function () {
   const target = _psmpTarget;
   if (!target) { practiceCloseSample(); return; }
   const title = (document.getElementById('psmp-title') || {}).value || '';
-  const content = (document.getElementById('psmp-body') || {}).value || '';
+  const content = typeof sampleEditorValue === 'function' ? sampleEditorValue('psmp-body') : '';
   const list = target.read() || [];
 
   /* A sample with neither a name nor a body is not a sample. Emptying one
