@@ -215,11 +215,39 @@ function updateCodingStarterPack() {
   const byId = {};
   (target.challenges || []).forEach(c => { byId[c.id] = c; });
 
-  let folders = 0, added = 0, refreshed = 0, kept = 0, sets = 0;
+  let folders = 0, added = 0, refreshed = 0, kept = 0, sets = 0, restructured = 0, rehomed = 0;
 
+  /* FOLDERS ARE REFRESHED, NOT JUST ADDED. This used to push a folder only
+     when its id was new, which meant the pack could never reorganise itself:
+     a library installed once kept the first layout for ever, and a rename or
+     a re-parent in the pack simply never arrived. The visible result was the
+     old flat folders sitting beside the new ones, teaching the same topics
+     twice.
+
+     Only the three properties the pack owns are written -- what it is called,
+     where it sits and what order it comes in. Nothing about the programs
+     inside is touched. */
+  const nodeById = {};
+  (target.nodes || []).forEach(n => { nodeById[n.id] = n; });
   fresh.nodes.forEach(n => {
-    if (!haveNode.has(n.id)) { target.nodes.push(n); haveNode.add(n.id); folders++; }
+    const have = nodeById[n.id];
+    if (!have) { target.nodes.push(n); haveNode.add(n.id); nodeById[n.id] = n; folders++; return; }
+    const moved = have.name !== n.name
+               || (have.parentId || null) !== (n.parentId || null)
+               || have.order !== n.order;
+    if (!moved) return;
+    have.name = n.name;
+    have.parentId = n.parentId;
+    have.order = n.order;
+    restructured++;
   });
+
+  /* A program whose folder no longer exists lands in Uncategorized, where it
+     is invisible in the course it belongs to. Pack programs know where they
+     go, so put back any that drifted -- including ones you have edited, since
+     moving a program is not the same as overwriting it. */
+  const freshParent = {};
+  fresh.challenges.forEach(f => { freshParent[f.id] = f.parentId; });
 
   fresh.challenges.forEach(f => {
     const have = byId[f.id];
@@ -228,7 +256,15 @@ function updateCodingStarterPack() {
        anything could edit them through the pack UI, so treat them as
        untouched rather than freezing them out of every future update. */
     const untouched = !have.packFp || have.packFp === _csFingerprint(have);
-    if (!untouched) { kept++; return; }
+    if (!untouched) {
+      // Yours to keep -- but it still belongs in the folder the pack gives it.
+      if (freshParent[f.id] && have.parentId !== freshParent[f.id]) {
+        have.parentId = freshParent[f.id];
+        rehomed++;
+      }
+      kept++;
+      return;
+    }
     target.challenges[target.challenges.indexOf(have)] = f;
     refreshed++;
   });
@@ -257,12 +293,14 @@ function updateCodingStarterPack() {
   _csSyncBtn();
 
   if (typeof toast === 'function') {
-    if (!folders && !added && !refreshed && !sets) {
+    if (!folders && !added && !refreshed && !sets && !restructured && !rehomed) {
       toast(kept ? 'Already up to date. ' + kept + ' program' + (kept === 1 ? '' : 's') + ' you edited were left alone.'
                  : 'Already up to date.', { type: 'success', duration: 3200 });
     } else {
       const bits = [];
       if (added) bits.push(added + ' new program' + (added === 1 ? '' : 's'));
+      if (restructured) bits.push(restructured + ' folder' + (restructured === 1 ? '' : 's') + ' reorganised');
+      if (rehomed) bits.push(rehomed + ' moved into place');
       if (folders) bits.push(folders + ' new folder' + (folders === 1 ? '' : 's'));
       if (sets) bits.push(sets + ' practice set' + (sets === 1 ? '' : 's'));
       if (refreshed) bits.push(refreshed + ' updated');
