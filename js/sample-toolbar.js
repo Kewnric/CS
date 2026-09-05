@@ -227,3 +227,98 @@ function sampleStripTokens(text) {
   }
   return s;
 }
+
+/* ============================================================
+   THE FIELD SHOWS WHAT THE SAMPLE WILL LOOK LIKE
+   ------------------------------------------------------------
+   Editing was monochrome while the card beside it was coloured, so the one
+   place you choose a colour was the one place you could not see one. The
+   colouring is the card's own: the same section rules, the same token styles.
+
+   Same trick the code editor uses (see .editor-pre / .editor-textarea) — a
+   <pre> painted underneath and a transparent textarea on top, aligned
+   character for character so the caret lands where the glyph is. That means
+   the highlighted copy must contain EXACTLY the characters the field holds,
+   token brackets included; they are dimmed rather than hidden, because hiding
+   them would move every glyph after them out from under the caret.
+   ============================================================ */
+
+/** One line's worth of token spans, over text that is already HTML-escaped. */
+function _stbPaintTokens(escaped) {
+  return escaped.replace(/\[\[([^:\]]+):(.*?)\]\]/g, (m, key, body) => {
+    const style = typeof sampleTokenStyle === 'function' ? sampleTokenStyle(key) : '';
+    if (!style) return m;
+    return '<span class="stb-hl-mark">[[' + key + ':</span>'
+         + '<span style="' + style + '">' + body + '</span>'
+         + '<span class="stb-hl-mark">]]</span>';
+  });
+}
+
+/** The editor's backdrop: the field's text, coloured the way the card colours it. */
+function sampleEditorHighlightHTML(text) {
+  const src = String(text == null ? '' : text);
+  let section = '';
+  const out = src.split(String.fromCharCode(10)).map(line => {
+    const esc = typeof escapeHTML === 'function' ? escapeHTML(line) : line;
+
+    const own = line.match(SAMPLE_OWN_LINE);
+    if (own) {
+      section = sampleSectionOf(own[2]);
+      return '<span class="sample-label">' + esc + '</span>';
+    }
+    const named = line.match(SAMPLE_NAMED);
+    if (named) {
+      section = sampleSectionOf(named[2]);
+      const headLen = named[0].length;
+      const head = typeof escapeHTML === 'function' ? escapeHTML(line.slice(0, headLen)) : line.slice(0, headLen);
+      const rest = _stbPaintTokens(
+        typeof escapeHTML === 'function' ? escapeHTML(line.slice(headLen)) : line.slice(headLen));
+      const headHTML = '<span class="sample-label">' + head + '</span>';
+      if (!line.slice(headLen).trim()) return headHTML;
+      return headHTML + (section ? '<span class="sample-' + section + '">' + rest + '</span>' : rest);
+    }
+    const painted = _stbPaintTokens(esc);
+    if (!line.trim() || !section) return painted;
+    return '<span class="sample-' + section + '">' + painted + '</span>';
+  }).join(String.fromCharCode(10));
+
+  /* A trailing newline leaves the <pre> one line shorter than the textarea,
+     which slides the backdrop up by a line as soon as the caret goes there. */
+  return out + String.fromCharCode(10);
+}
+
+/** Repaint one field's backdrop, and keep it scrolled where the field is. */
+function sampleRepaintHighlight(ta) {
+  if (!ta) return;
+  const pre = ta.parentElement && ta.parentElement.querySelector('.stb-hl');
+  if (!pre) return;
+  pre.innerHTML = sampleEditorHighlightHTML(ta.value);
+  pre.scrollTop = ta.scrollTop;
+  pre.scrollLeft = ta.scrollLeft;
+}
+
+/**
+ * Give every sample field under `root` its backdrop, once.
+ * Safe to call again — re-rendered forms hand over fresh elements, and the
+ * ones already wired are left alone.
+ */
+function sampleSyncHighlights(root) {
+  const scope = root || document;
+  const fields = scope.querySelectorAll ? scope.querySelectorAll('.stb-field textarea') : [];
+  Array.prototype.forEach.call(fields, (ta) => {
+    if (!ta._stbHl) {
+      ta._stbHl = true;
+      const pre = document.createElement('pre');
+      pre.className = 'stb-hl';
+      pre.setAttribute('aria-hidden', 'true');
+      ta.parentElement.insertBefore(pre, ta);
+      // input covers typing and the toolbar, which fires its own input event.
+      ta.addEventListener('input', () => sampleRepaintHighlight(ta));
+      ta.addEventListener('scroll', () => {
+        pre.scrollTop = ta.scrollTop;
+        pre.scrollLeft = ta.scrollLeft;
+      });
+    }
+    sampleRepaintHighlight(ta);
+  });
+}

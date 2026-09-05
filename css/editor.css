@@ -202,25 +202,31 @@
   line-height: 1.5;
 }
 
-/* Colored text inside samples */
+/* Colored text inside samples.
+   Each rule names the editor overlay (.stb-hl) as well as the card, because
+   the field is meant to show the colours the card will show -- one source
+   for both, so they cannot drift into disagreeing about a sample. */
 
 /* The section headings -- Input:, Output:, and whatever else an author writes
    on a line of its own. Weight as well as colour, because at 13px monospace a
    hue change alone did not separate them from the transcript under them. */
-.sample-content .sample-label {
+.sample-content .sample-label,
+.stb-hl .sample-label {
   color: #ffa657;
   font-weight: 700;
 }
 
 /* What the program is fed. Tinted, and set apart from the output so a sample
    reads as a conversation: this is the half you would have typed. */
-.sample-content .sample-in {
+.sample-content .sample-in,
+.stb-hl .sample-in {
   color: #79c0ff;
 }
 
 /* What the program says back. The point of the sample, so it takes the
    foreground rather than the block's muted default. */
-.sample-content .sample-out {
+.sample-content .sample-out,
+.stb-hl .sample-out {
   color: #e6edf3;
 }
 
@@ -3474,22 +3480,6 @@ body.is-resizing .practice-panel { transition: none; }
 .psmp-modal { text-align: left; }
 .psmp-label { display: block; margin: 0.75rem 0 0.3rem; }
 
-/* The same ground the sample is drawn on (.sample-content), so the box shows
-   the thing as it will look rather than as a form field that happens to hold
-   it. :focus repeats the colours because .form-input:focus repaints them. */
-.psmp-body,
-.psmp-body:focus {
-  width: 100%;
-  background: #0d1117;
-  color: #c9d1d9;
-  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-  font-size: 0.8rem;
-  line-height: 1.5;
-  white-space: pre;
-  overflow-wrap: normal;
-  overflow-x: auto;
-  resize: vertical;
-}
 
 /* ── The sample formatting toolbar ───────────────────────────
    Shaped after the rich-text toolbar on the description editor, because it
@@ -3518,6 +3508,66 @@ body.is-resizing .practice-panel { transition: none; }
   border-top-left-radius: 0;
   border-top-right-radius: 0;
 }
+
+/* ── The field shows the colours the card will show ──────────
+   The same arrangement as the code editor: a <pre> painted underneath and a
+   transparent textarea over it. Every metric that decides where a glyph
+   lands -- font, size, line-height, padding, border, wrapping -- has to be
+   identical on both, or the caret drifts away from the text under it.
+   ------------------------------------------------------------ */
+.stb-field { position: relative; display: block; }
+
+.stb-hl,
+.stb-field textarea {
+  margin: 0;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid transparent;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  white-space: pre;
+  overflow-wrap: normal;
+  tab-size: 4;
+}
+
+.stb-hl {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 1;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  color: #b1bac4;
+}
+
+/* The token brackets stay on screen -- hiding them would shift every glyph
+   after them out from under the caret -- but they step back so the text they
+   wrap is what you read. */
+.stb-hl-mark { color: #4c566a; }
+
+.stb-field textarea {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  background: transparent;
+  color: transparent;
+  caret-color: #58a6ff;
+  resize: vertical;
+}
+
+/* With the text itself transparent, a solid selection would paint over the
+   only visible copy. Semi-transparent, it tints it instead. */
+.stb-field textarea::selection { background: rgba(88, 166, 255, 0.32); }
+.stb-field textarea::-moz-selection { background: rgba(88, 166, 255, 0.32); }
+
+/* The ground and the frame belong to the stack, not to either layer. */
+.stb-field {
+  background: #0d1117;
+  border: 1px solid var(--border-color);
+  border-top: none;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+.stb-field:focus-within { border-color: var(--color-primary); }
 .stb-btn {
   display: inline-flex;
   align-items: center;

@@ -4382,7 +4382,9 @@ function _psmpOpen(title, content) {
       <label class="form-label psmp-label" for="psmp-body">Body</label>
       <div class="stb-wrap">
         ${typeof sampleToolbarHTML === 'function' ? sampleToolbarHTML('psmp-body') : ''}
-        <textarea id="psmp-body" class="form-input psmp-body" rows="9" spellcheck="false">${escapeHTML(content)}</textarea>
+        <div class="stb-field">
+          <textarea id="psmp-body" class="form-input psmp-body" rows="9" spellcheck="false">${escapeHTML(content)}</textarea>
+        </div>
       </div>
       <p class="pd-note">
         <i data-lucide="info"></i>
@@ -4401,6 +4403,7 @@ function _psmpOpen(title, content) {
       </div>
     </div>`;
   ov.onclick = () => practiceCloseSample();
+  if (typeof sampleSyncHighlights === 'function') sampleSyncHighlights(ov);
   if (typeof lucide !== 'undefined') lucide.createIcons({ el: ov });
   const t = document.getElementById('psmp-title');
   if (t) { t.focus(); t.select(); }

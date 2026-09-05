@@ -108,7 +108,9 @@ function renderAdminVariantForm() {
               <input value="${escapeHTML(s.title || '')}" oninput="updateSampleField(${sampleIdx}, 'title', this.value)" placeholder="Sample Title" class="form-input" style="font-weight:600; font-size:0.8125rem; padding:0.375rem 0.5rem;" />
               <div class="stb-wrap">
                 ${typeof sampleToolbarHTML === 'function' ? sampleToolbarHTML('admin-sample-body-' + sampleIdx) : ''}
-                <textarea id="admin-sample-body-${sampleIdx}" rows="2" oninput="updateSampleField(${sampleIdx}, 'content', this.value)" placeholder="Sample content..." class="form-textarea af-grow af-code-field stb-field" style="min-height:40px;">${escapeHTML(s.content || '')}</textarea>
+                <div class="stb-field">
+                  <textarea id="admin-sample-body-${sampleIdx}" rows="2" oninput="updateSampleField(${sampleIdx}, 'content', this.value)" placeholder="Sample content..." class="form-textarea af-grow" style="min-height:40px;">${escapeHTML(s.content || '')}</textarea>
+                </div>
               </div>
             </div>
             <button onclick="deleteAdminSample(${sampleIdx})" class="btn btn-ghost" style="padding:0.25rem;" title="Delete Sample">
@@ -241,6 +243,10 @@ function renderAdminVariantForm() {
   }
 
   lucide.createIcons();
+
+  // The form is rebuilt wholesale, so every sample field is a fresh element
+  // needing its highlighted backdrop back.
+  if (typeof sampleSyncHighlights === 'function') sampleSyncHighlights(document);
 }
 
 function switchAdminVariant(idx) {

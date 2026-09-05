@@ -485,20 +485,27 @@ function debounce(fn, wait) {
  *
  * @returns {string} HTML
  */
+/* The shape of a sample: a heading on a line of its own -- any word, since
+   authors name their own sections and only the shape can be relied on. */
+const SAMPLE_OWN_LINE = /^([ \t]*)([A-Za-z][A-Za-z0-9 _+-]{0,23}):([ \t]*)$/;
+
+/* A heading with its value on the same line. This one cannot go by shape --
+   'Enter a number: 3' has it too -- so it goes by name, and only the words
+   that actually head a section count. That is the whole difference between
+   structure and a prompt that happens to end in a colon. */
+const SAMPLE_NAMED = /^([ \t]*)(input|output|expected|result|explanation|note|sample|example|constraints)([ \t]*:)/i;
+
+/** Which half of the transcript a heading opens: what is typed, or what is said back. */
+function sampleSectionOf(word) {
+  const w = String(word || '').trim().toLowerCase();
+  return w === 'input' ? 'in' : (w === 'output' || w === 'expected' || w === 'result') ? 'out' : '';
+}
+
 function formatSampleText(text) {
   if (!text) return '';
-  // A heading on a line of its own -- any word, since authors name their own
-  // sections and only the shape can be relied on.
-  const OWN_LINE = /^([ \t]*)([A-Za-z][A-Za-z0-9 _+-]{0,23}):([ \t]*)$/;
-  /* A heading with its value on the same line. This one cannot go by shape --
-     'Enter a number: 3' has it too -- so it goes by name, and only the words
-     that actually head a section count. That is the whole difference between
-     structure and a prompt that happens to end in a colon. */
-  const NAMED = /^([ \t]*)(input|output|expected|result|explanation|note|sample|example|constraints)([ \t]*:)/i;
-  const sectionOf = (word) => {
-    const w = word.trim().toLowerCase();
-    return w === 'input' ? 'in' : (w === 'output' || w === 'expected' || w === 'result') ? 'out' : '';
-  };
+  const OWN_LINE = SAMPLE_OWN_LINE;
+  const NAMED = SAMPLE_NAMED;
+  const sectionOf = sampleSectionOf;
   let section = '';
   const html = escapeHTML(text).split('\n').map((line) => {
     const own = line.match(OWN_LINE);
