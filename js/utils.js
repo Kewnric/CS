@@ -517,8 +517,49 @@ function formatSampleText(text) {
     if (!line.trim() || !section) return line;
     return '<span class="sample-' + section + '">' + line + '</span>';
   }).join('\n');
-  // Author tokens last, so a colour name is never mistaken for a label.
-  return html.replace(/\[\[([^:\]]+):(.*?)\]\]/g, '<span style="color: $1;">$2</span>');
+  /* Author tokens last, so a colour name is never mistaken for a label.
+     The style is inline and the section colouring above is a class, so a
+     colour applied by hand wins over the Input:/Output: tint of the line it
+     sits in -- the two never fight over the same words. */
+  return html.replace(/\[\[([^:\]]+):(.*?)\]\]/g, (m, key, body) => {
+    const style = sampleTokenStyle(key);
+    return style ? '<span style="' + style + '">' + body + '</span>' : body;
+  });
+}
+
+/* A token key is one or more words: b / i / u / s for the marks, bg-<colour>
+   for a highlight, and anything else as a text colour -- which is what the
+   key has always been, so `[[red:hi]]` written before any of this still
+   renders exactly as it did. Values are checked against a shape rather than
+   pasted into the style attribute as given. */
+function sampleSafeColor(v) {
+  const c = String(v || '').trim();
+  if (/^#[0-9A-Fa-f]{3,8}$/.test(c)) return c;
+  if (/^[A-Za-z]{3,20}$/.test(c)) return c;
+  return '';
+}
+
+function sampleTokenStyle(key) {
+  const out = [];
+  const deco = [];
+  String(key || '').trim().split(/\s+/).forEach(w => {
+    const lw = w.toLowerCase();
+    if (lw === 'b' || lw === 'bold') out.push('font-weight:700');
+    else if (lw === 'i' || lw === 'italic') out.push('font-style:italic');
+    else if (lw === 'u' || lw === 'underline') deco.push('underline');
+    else if (lw === 's' || lw === 'strike') deco.push('line-through');
+    else if (lw.slice(0, 3) === 'bg-') {
+      const c = sampleSafeColor(w.slice(3));
+      if (c) out.push('background-color:' + c);
+    } else {
+      const c = sampleSafeColor(w);
+      if (c) out.push('color:' + c);
+    }
+  });
+  // Underline and strike are one property, so they are collected and written
+  // once -- as two declarations the second silently dropped the first.
+  if (deco.length) out.push('text-decoration:' + deco.join(' '));
+  return out.join(';');
 }
 
 /** Subsequence match — true if all chars of pattern appear in order within str. @returns {boolean} */

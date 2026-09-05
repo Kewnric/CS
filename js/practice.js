@@ -664,7 +664,12 @@ function confirmFinishAttempt() {
 
 /** Pull the stdin out of a sample's "Input: … Output: …" body. */
 function _sampleStdin(content) {
-  const m = String(content || '').match(/input\s*:?[ \t]*\r?\n([\s\S]*?)(?:\r?\n[ \t]*output\s*:|$)/i);
+  /* Formatting tokens are decoration, not input. Left in, a coloured value
+     would feed the program the literal token instead of the number in it. */
+  const plain = typeof sampleStripTokens === 'function'
+    ? sampleStripTokens(content)
+    : String(content || '');
+  const m = plain.match(/input\s*:?[ \t]*\r?\n([\s\S]*?)(?:\r?\n[ \t]*output\s*:|$)/i);
   if (!m) return '';
   const body = m[1].replace(/\s+$/, '');
   return body ? body + '\n' : '';
@@ -4339,11 +4344,7 @@ function practiceRenderSamples() {
         </div>
         <div class="sample-content">${formatSampleText(s.content)}</div>
       </div>`;
-  }).join('') + `
-      <button class="sample-add-btn" onclick="practiceAddSample()">
-        <i data-lucide="plus" style="width:12px;height:12px;"></i>
-        ${samples.length ? 'Add another sample' : 'Add a sample'}
-      </button>`;
+  }).join('');
 
   if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
 }
@@ -4356,19 +4357,10 @@ window.practiceEditSample = function (si, target) {
   const s = list[si];
   if (!s) return;
   _psmpIndex = si;
-  _psmpOpen(s.title || '', s.content || '', false);
+  _psmpOpen(s.title || '', s.content || '');
 };
 
-/** Add one, then open it — an empty sample nobody fills in is just clutter. */
-window.practiceAddSample = function (target) {
-  _psmpTarget = target || _psmpDefaultTarget();
-  if (!_psmpTarget) return;
-  const list = _psmpTarget.read() || [];
-  _psmpIndex = -1;
-  _psmpOpen('Sample ' + (list.length + 1), 'Input:\n\nOutput:\n', true);
-};
-
-function _psmpOpen(title, content, isNew) {
+function _psmpOpen(title, content) {
   let ov = document.getElementById('practice-sample-modal');
   if (!ov) {
     ov = document.createElement('div');
@@ -4380,7 +4372,7 @@ function _psmpOpen(title, content, isNew) {
   ov.innerHTML = `
     <div class="modal-content pd-modal psmp-modal" onclick="event.stopPropagation()">
       <div class="pd-head">
-        <h2><i data-lucide="pencil"></i> ${isNew ? 'Add a sample' : 'Edit sample'}</h2>
+        <h2><i data-lucide="pencil"></i> Edit sample</h2>
         <button class="btn btn-ghost pd-close" onclick="practiceCloseSample()" aria-label="Close">
           <i data-lucide="x"></i>
         </button>
@@ -4388,20 +4380,23 @@ function _psmpOpen(title, content, isNew) {
       <label class="form-label psmp-label" for="psmp-title">Title</label>
       <input id="psmp-title" class="form-input" maxlength="40" value="${escapeHTML(title)}" placeholder="e.g. Sample 1">
       <label class="form-label psmp-label" for="psmp-body">Body</label>
-      <textarea id="psmp-body" class="form-input psmp-body" rows="9" spellcheck="false">${escapeHTML(content)}</textarea>
+      <div class="stb-wrap">
+        ${typeof sampleToolbarHTML === 'function' ? sampleToolbarHTML('psmp-body') : ''}
+        <textarea id="psmp-body" class="form-input psmp-body" rows="9" spellcheck="false">${escapeHTML(content)}</textarea>
+      </div>
       <p class="pd-note">
         <i data-lucide="info"></i>
-        Put the stdin under a line reading <code>Input:</code> and the expected text under <code>Output:</code>.
-        That is what gives a sample its <strong>Run this</strong> button — with no Input: block there is
-        nothing to feed the program.
+        <span>Put the stdin under a line reading <code>Input:</code> and the expected text under
+        <code>Output:</code>. That is what gives a sample its <strong>Run this</strong> button —
+        with no Input: block there is nothing to feed the program.</span>
       </p>
       <div class="pd-actions">
-        ${isNew ? '' : `<button class="btn btn-ghost psmp-delete" onclick="practiceDeleteSample()">
+        <button class="btn btn-ghost psmp-delete" onclick="practiceDeleteSample()">
           <i data-lucide="trash-2"></i> Delete
-        </button>`}
+        </button>
         <button class="btn btn-secondary" onclick="practiceCloseSample()">Cancel</button>
         <button class="btn btn-primary" onclick="practiceSaveSample()">
-          <i data-lucide="check"></i> ${isNew ? 'Add sample' : 'Save sample'}
+          <i data-lucide="check"></i> Save sample
         </button>
       </div>
     </div>`;
@@ -4418,13 +4413,14 @@ window.practiceSaveSample = function () {
   const content = (document.getElementById('psmp-body') || {}).value || '';
   const list = target.read() || [];
 
-  /* A sample with neither a name nor a body is not a sample. Adding one and
-     saving it blank should leave the list as it was, not grow an empty card. */
+  /* A sample with neither a name nor a body is not a sample. Emptying one
+     is not how you remove it either -- Delete is right there. */
   if (!title.trim() && !content.trim()) { practiceCloseSample(); return; }
 
-  const entry = { title: title.trim() || ('Sample ' + (list.length + 1)), content: content };
-  if (_psmpIndex >= 0 && list[_psmpIndex]) list[_psmpIndex] = entry;
-  else list.push(entry);
+  // Adding belongs to Admin; this dialog corrects what is already there. If
+  // the entry went away underneath it, there is nothing to write back to.
+  if (_psmpIndex < 0 || !list[_psmpIndex]) { practiceCloseSample(); return; }
+  list[_psmpIndex] = { title: title.trim() || ('Sample ' + (_psmpIndex + 1)), content: content };
 
   if (typeof target.write === 'function') target.write(list);
   if (typeof saveData === 'function') saveData();

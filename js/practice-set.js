@@ -1034,11 +1034,7 @@ function psetRenderSamples(p) {
           </button>
         </div>
         <div class="sample-content">${fmt(s.content)}</div>
-      </div>`).join('') + `
-      <button class="sample-add-btn" onclick="psetAddSample()">
-        <i data-lucide="plus" style="width:12px;height:12px;"></i>
-        ${samples.length ? 'Add another sample' : 'Add a sample'}
-      </button>`;
+      </div>`).join('');
   if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
 }
 
@@ -1048,11 +1044,6 @@ window.psetEditSample = function (si) {
   practiceEditSample(si, _psetSampleTarget(p));
 };
 
-window.psetAddSample = function () {
-  const p = _pset && _pset.problems[_pset.current];
-  if (!p || typeof practiceAddSample !== 'function') return;
-  practiceAddSample(_psetSampleTarget(p));
-};
 
 function _psetDescTarget(p) {
   return {

@@ -3467,35 +3467,21 @@ body.is-resizing .practice-panel { transition: none; }
   background: var(--bg-elevated);
 }
 
-.sample-add-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  align-self: flex-start;
-  font-size: 0.7rem;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px dashed var(--border-color);
-  background: transparent;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
-}
-.sample-add-btn:hover {
-  border-style: solid;
-  border-color: var(--color-primary, #6366f1);
-  color: var(--color-primary, #6366f1);
-  background: rgba(99, 102, 241, 0.08);
-}
 
 /* The sample editor. The body is code-shaped -- whitespace in it is the
    expected output -- so it gets a monospace face and keeps its own line
    breaks rather than being reflowed like prose. */
 .psmp-modal { text-align: left; }
 .psmp-label { display: block; margin: 0.75rem 0 0.3rem; }
-.psmp-body {
+
+/* The same ground the sample is drawn on (.sample-content), so the box shows
+   the thing as it will look rather than as a form field that happens to hold
+   it. :focus repeats the colours because .form-input:focus repaints them. */
+.psmp-body,
+.psmp-body:focus {
   width: 100%;
+  background: #0d1117;
+  color: #c9d1d9;
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: 0.8rem;
   line-height: 1.5;
@@ -3503,6 +3489,87 @@ body.is-resizing .practice-panel { transition: none; }
   overflow-wrap: normal;
   overflow-x: auto;
   resize: vertical;
+}
+
+/* ── The sample formatting toolbar ───────────────────────────
+   Shaped after the rich-text toolbar on the description editor, because it
+   is the same gesture in a different medium -- but it writes author tokens
+   into plain text rather than markup, since a sample body has to stay the
+   characters the program will be fed. See js/sample-toolbar.js.
+   ------------------------------------------------------------ */
+.sample-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1px;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--border-color);
+  border-bottom: none;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: var(--bg-elevated, var(--bg-surface));
+}
+/* Joined to the field under it, so the two read as one control. The wrapper
+   is what does the joining: as plain siblings the whitespace between the two
+   tags became a 14px line box under the toolbar, and in the admin form the
+   surrounding column's gap added more. */
+.stb-wrap { display: flex; flex-direction: column; }
+.stb-wrap textarea {
+  display: block;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+.stb-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.13s, background 0.13s;
+}
+.stb-btn svg { width: 14px; height: 14px; }
+.stb-btn:hover { color: var(--color-primary, #6366f1); background: rgba(99, 102, 241, 0.12); }
+.stb-text {
+  padding: 0 7px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.stb-div {
+  width: 1px;
+  height: 15px;
+  margin: 0 4px;
+  background: var(--border-color);
+}
+/* The swatch pickers: a native select laid invisibly over the icon, so the
+   list is the platform's own and the control still looks like the others. */
+.stb-pick {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color 0.13s, background 0.13s;
+}
+.stb-pick:hover { color: var(--color-primary, #6366f1); background: rgba(99, 102, 241, 0.12); }
+.stb-pick svg { width: 14px; height: 14px; }
+.stb-pick select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
 }
 .psmp-delete { margin-right: auto; color: var(--color-danger, #ef4444); }
 .psmp-delete:hover { background: rgba(239, 68, 68, 0.12); }

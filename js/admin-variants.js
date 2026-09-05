@@ -106,7 +106,10 @@ function renderAdminVariantForm() {
           <div class="sample-item">
             <div style="flex:1; display:flex; flex-direction:column; gap:0.5rem;">
               <input value="${escapeHTML(s.title || '')}" oninput="updateSampleField(${sampleIdx}, 'title', this.value)" placeholder="Sample Title" class="form-input" style="font-weight:600; font-size:0.8125rem; padding:0.375rem 0.5rem;" />
-              <textarea rows="2" oninput="updateSampleField(${sampleIdx}, 'content', this.value)" placeholder="Sample content..." class="form-textarea af-grow af-code-field" style="min-height:40px;">${escapeHTML(s.content || '')}</textarea>
+              <div class="stb-wrap">
+                ${typeof sampleToolbarHTML === 'function' ? sampleToolbarHTML('admin-sample-body-' + sampleIdx) : ''}
+                <textarea id="admin-sample-body-${sampleIdx}" rows="2" oninput="updateSampleField(${sampleIdx}, 'content', this.value)" placeholder="Sample content..." class="form-textarea af-grow af-code-field stb-field" style="min-height:40px;">${escapeHTML(s.content || '')}</textarea>
+              </div>
             </div>
             <button onclick="deleteAdminSample(${sampleIdx})" class="btn btn-ghost" style="padding:0.25rem;" title="Delete Sample">
               <i data-lucide="trash-2" style="width:16px;height:16px;color:var(--color-danger);"></i>
