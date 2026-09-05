@@ -904,11 +904,19 @@ window.afInitDescEditor = function () {
   // screen would be dead. The snippet editor hit exactly this.
   if (afDescQuill && afDescQuill.root && host.contains(afDescQuill.root)) return;
 
+  /* The app's own toolbar, wired to Quill. Same controls, same swatches and
+     same chrome as the sample editor next door -- see formatToolbarHTML. */
+  const bar = document.createElement('div');
+  bar.innerHTML = typeof descToolbarHTML === 'function' ? descToolbarHTML('admin-variant-desc-editor') : '';
+  const barEl = bar.firstElementChild;
+  if (barEl) host.parentNode.insertBefore(barEl, host);
+
   const q = new Quill(host, {
     theme: 'snow',
     placeholder: 'What should the student write? Steps, constraints, and anything they must match exactly.',
-    modules: { toolbar: AF_DESC_TOOLBAR }
+    modules: { toolbar: barEl || AF_DESC_TOOLBAR }
   });
+  if (typeof formatToolbarPolish === 'function') formatToolbarPolish(barEl);
   afDescQuill = q;
 
   // 'silent' — loading the saved value must not read as typing, or opening a

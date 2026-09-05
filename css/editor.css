@@ -3638,6 +3638,46 @@ body.is-resizing .practice-panel { transition: none; }
 
 /* The swatches themselves keep their own grid so the row below sits clear. */
 .stb-grid { display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* ── The same toolbar over Quill ─────────────────────────────
+   Quill binds any element carrying a ql-* class, so the description editor
+   gets this markup with those classes on it. What is left is to keep Quill's
+   own styling from painting over it, and to map its active state onto ours. */
+.sample-toolbar.ql-toolbar { border: 1px solid var(--border-color); border-bottom: none; }
+.sample-toolbar.ql-toolbar.ql-snow { padding: 0.3rem 0.4rem; }
+.sample-toolbar .stb-btn.ql-active,
+.sample-toolbar .stb-btn:hover {
+  color: var(--color-primary, #6366f1);
+  background: rgba(99, 102, 241, 0.12);
+}
+.sample-toolbar .stb-btn.ql-active { background: rgba(99, 102, 241, 0.18); }
+/* formatToolbarPolish replaces Quill's icons with ours, so these normally
+   match nothing. They are the safety net: if it ever does not run, Quill's
+   own glyphs still take the toolbar's colour instead of staying near-black. */
+.sample-toolbar .ql-stroke { stroke: currentColor; }
+.sample-toolbar .ql-fill { fill: currentColor; }
+.sample-toolbar button svg { width: 14px; height: 14px; }
+
+/* Inline code, in the editor and on the page, on the ground the rest of the
+   app uses. quill.snow.css paints it #f0f0f0 -- a white chip on a dark
+   modal -- and the description is the one place <code> is used constantly. */
+.ql-editor code,
+.practice-desc-body code,
+.ql-snow .ql-editor code {
+  background: #0d1117;
+  border: 1px solid #21262d;
+  border-radius: 4px;
+  padding: 0.05em 0.35em;
+  color: #79c0ff;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 0.9em;
+}
+
+/* The description body, framed like the sample body under it. */
+.af-rich-block .sample-toolbar + .ql-container.ql-snow,
+.sample-toolbar + .ql-container.ql-snow {
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
 .psmp-delete { margin-right: auto; color: var(--color-danger, #ef4444); }
 .psmp-delete:hover { background: rgba(239, 68, 68, 0.12); }
 

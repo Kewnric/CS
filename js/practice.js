@@ -4228,6 +4228,7 @@ window.practiceEditDescription = function (target) {
           <i data-lucide="x"></i>
         </button>
       </div>
+      ${typeof descToolbarHTML === 'function' ? descToolbarHTML('practice-desc-editor') : ''}
       <div class="af-rich" id="practice-desc-editor"></div>
       <p class="pd-note">
         <i data-lucide="info"></i>
@@ -4244,11 +4245,13 @@ window.practiceEditDescription = function (target) {
   ov.onclick = () => practiceCloseDescription();
 
   if (window.Quill) {
+    const bar = ov.querySelector('.sample-toolbar');
     const q = new Quill('#practice-desc-editor', {
       theme: 'snow',
       placeholder: 'What should this program do?',
-      modules: { toolbar: typeof AF_DESC_TOOLBAR !== 'undefined' ? AF_DESC_TOOLBAR : true }
+      modules: { toolbar: bar || (typeof AF_DESC_TOOLBAR !== 'undefined' ? AF_DESC_TOOLBAR : true) }
     });
+    if (typeof formatToolbarPolish === 'function') formatToolbarPolish(bar);
     _pdQuill = q;
     const current = _pdTarget.read() || '';
     q.clipboard.dangerouslyPasteHTML(

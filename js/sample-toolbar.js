@@ -417,64 +417,129 @@ function _stbInsertText(el, text) {
 
 /* ── The toolbar ─────────────────────────────────────────── */
 
-/**
- * The toolbar's markup, bound to one editor by id.
- * Every control cancels mousedown so the editor keeps focus: a contenteditable
- * loses its selection the moment something else takes focus, and the selection
- * is the thing being formatted.
- */
-function sampleToolbarHTML(targetId) {
-  const t = String(targetId);
-  const marks = SAMPLE_FMT_MARKS.map(([key, icon, label]) => `
+/* ============================================================
+   ONE TOOLBAR, TWO EDITORS
+   ------------------------------------------------------------
+   The description editor is Quill and the sample editor is this app's own,
+   and while they were built apart they grew two different toolbars -- one
+   with dropdown colour lists, one with swatches. Same gesture, two vocabularies.
+
+   This renders both. The controls, the chrome and the palettes are identical;
+   only what a click reaches for differs, and it differs in the markup rather
+   than in a second component: Quill binds any element carrying a ql-* class,
+   so the description toolbar is this markup with those classes on it, and the
+   sample toolbar is the same markup calling this file's own commands.
+
+   Each keeps one control the other has no use for -- Input:/Output: openers
+   for a sample, inline code for a description.
+   ============================================================ */
+
+/** The formatting toolbar, for `kind` of 'sample' or 'desc'. */
+function formatToolbarHTML(targetId, kind) {
+  const t = String(targetId || '');
+  const desc = kind === 'desc';
+
+  const mark = ([key, icon, label]) => (desc
+    ? `
+    <button type="button" class="stb-btn ql-${key === 'b' ? 'bold' : key === 'i' ? 'italic' : key === 'u' ? 'underline' : 'strike'}"
+            data-icon="${icon}" title="${label}" aria-label="${label}"></button>`
+    : `
     <button type="button" class="stb-btn" data-mark="${key}" title="${label}" aria-label="${label}"
             aria-pressed="false"
             onmousedown="event.preventDefault()" onclick="sampleFmtMark('${t}', '${key}')">
       <i data-lucide="${icon}"></i>
-    </button>`).join('');
+    </button>`);
+  const marks = SAMPLE_FMT_MARKS.map(mark).join('');
 
   /* The way back off is a labelled row, not a ninth tile. As a dark square
      among eight colours it read as another colour and people could not find
      the way to remove one. */
-  const swatches = (bg) => `
+  const swatches = (bg) => {
+    const cls = bg ? 'ql-background' : 'ql-color';
+    const set = (v) => (desc
+      ? `class="stb-swatch ${cls}" value="${v}"`
+      : `class="stb-swatch" onmousedown="event.preventDefault()" onclick="sampleFmtColor('${t}', '${v}', ${bg})"`);
+    const clear = desc
+      ? `class="stb-clear-row ${cls}" value="" data-icon="ban" data-label="${bg ? 'No highlight' : 'No colour'}"`
+      : `class="stb-clear-row" onmousedown="event.preventDefault()" onclick="sampleFmtColor('${t}', '', ${bg})"`;
+    return `
         <span class="stb-grid">${SAMPLE_FMT_COLORS.map(([v, label]) => `
-          <button type="button" class="stb-swatch" title="${label}" aria-label="${label}"
-                  style="background:${v}" onmousedown="event.preventDefault()"
-                  onclick="sampleFmtColor('${t}', '${v}', ${bg})"></button>`).join('')}</span>
-        <button type="button" class="stb-clear-row" onmousedown="event.preventDefault()"
-                onclick="sampleFmtColor('${t}', '', ${bg})">
+          <button type="button" ${set(v)} title="${label}" aria-label="${label}"
+                  style="background:${v}"></button>`).join('')}</span>
+        <button type="button" ${clear}>
           <i data-lucide="ban"></i> ${bg ? 'No highlight' : 'No colour'}
         </button>`;
+  };
+
+  const pick = (title, icon, bg) => `
+      <span class="stb-pick">
+        <button type="button" class="stb-btn" title="${title}" aria-label="${title}"
+                onmousedown="event.preventDefault()" onclick="sampleFmtOpenPalette(this)">
+          <i data-lucide="${icon}"></i>
+        </button>
+        <span class="stb-palette">${swatches(bg)}</span>
+      </span>`;
+
+  // What only one of them has any use for.
+  const extras = desc
+    ? `
+      <button type="button" class="stb-btn ql-code" data-icon="code" title="Inline code" aria-label="Inline code"></button>`
+    : `
+      <button type="button" class="stb-btn stb-text" title="Start an Input: section"
+              onmousedown="event.preventDefault()" onclick="sampleFmtSection('${t}', 'Input')">Input:</button>
+      <button type="button" class="stb-btn stb-text" title="Start an Output: section"
+              onmousedown="event.preventDefault()" onclick="sampleFmtSection('${t}', 'Output')">Output:</button>`;
+
+  const clearAll = desc
+    ? `
+      <button type="button" class="stb-btn ql-clean" data-icon="remove-formatting" title="Remove formatting" aria-label="Remove formatting"></button>`
+    : `
+      <button type="button" class="stb-btn" title="Remove formatting" aria-label="Remove formatting"
+              onmousedown="event.preventDefault()" onclick="sampleFmtClear('${t}')">
+        <i data-lucide="remove-formatting"></i>
+      </button>`;
 
   return `
     <div class="sample-toolbar" data-target="${t}">
       ${marks}
       <span class="stb-div" aria-hidden="true"></span>
-      <span class="stb-pick">
-        <button type="button" class="stb-btn" title="Text colour" aria-label="Text colour"
-                onmousedown="event.preventDefault()" onclick="sampleFmtOpenPalette(this)">
-          <i data-lucide="baseline"></i>
-        </button>
-        <span class="stb-palette">${swatches(false)}</span>
-      </span>
-      <span class="stb-pick">
-        <button type="button" class="stb-btn" title="Highlight" aria-label="Highlight"
-                onmousedown="event.preventDefault()" onclick="sampleFmtOpenPalette(this)">
-          <i data-lucide="highlighter"></i>
-        </button>
-        <span class="stb-palette">${swatches(true)}</span>
-      </span>
+      ${pick('Text colour', 'baseline', false)}
+      ${pick('Highlight', 'highlighter', true)}
       <span class="stb-div" aria-hidden="true"></span>
-      <button type="button" class="stb-btn stb-text" title="Start an Input: section"
-              onmousedown="event.preventDefault()" onclick="sampleFmtSection('${t}', 'Input')">Input:</button>
-      <button type="button" class="stb-btn stb-text" title="Start an Output: section"
-              onmousedown="event.preventDefault()" onclick="sampleFmtSection('${t}', 'Output')">Output:</button>
+      ${extras}
       <span class="stb-div" aria-hidden="true"></span>
-      <button type="button" class="stb-btn" title="Remove formatting" aria-label="Remove formatting"
-              onmousedown="event.preventDefault()" onclick="sampleFmtClear('${t}')">
-        <i data-lucide="remove-formatting"></i>
-      </button>
+      ${clearAll}
     </div>`;
 }
+
+/**
+ * Put our glyphs back after Quill has had the toolbar.
+ *
+ * Quill replaces the contents of every button it recognises with its own SVG,
+ * which is exactly the divergence this shared toolbar exists to end -- and it
+ * also swallowed the words off the "No colour" row. Each control carries what
+ * it should show in data-icon/data-label, so it can be put back.
+ */
+function formatToolbarPolish(bar) {
+  if (!bar) return;
+  /* A swatch is the colour and nothing else. Quill stamps its own letter-A
+     glyph into every colour button, which both hid the colour and made the
+     tiles wide enough to break the palette onto more rows. */
+  bar.querySelectorAll('.stb-swatch').forEach((el) => { el.innerHTML = ''; });
+  bar.querySelectorAll('[data-icon]').forEach((el) => {
+    const icon = el.getAttribute('data-icon');
+    const label = el.getAttribute('data-label');
+    el.innerHTML = '<i data-lucide="' + icon + '"></i>' + (label ? ' ' + label : '');
+  });
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: bar });
+}
+
+/** The sample editor's toolbar. */
+function sampleToolbarHTML(targetId) { return formatToolbarHTML(targetId, 'sample'); }
+
+/** The description editor's toolbar — the same one, wired to Quill. */
+function descToolbarHTML(targetId) { return formatToolbarHTML(targetId, 'desc'); }
+
 
 /* Which marks are on where the caret is. Without this the only way to learn
    that a button toggles was to press it twice and watch. */
