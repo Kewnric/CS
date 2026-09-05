@@ -2961,6 +2961,14 @@
   left: 100%;
 }
 
+/* The subfolder tiles sit in a card grid so they animate with everything
+   else, but they are smaller than a program card and should stay that way. */
+.card-grid.subfolder-grid {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
 /* --- Card Entrance Animation ---
    Only for grids that did NOT ask to stagger.
 

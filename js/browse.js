@@ -1512,7 +1512,10 @@ function renderBrowseContent() {
   // Subfolders cards
   let subfoldersHtml = '';
   if (childFolders.length > 0) {
-    subfoldersHtml = `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem;">`;
+    /* The same grid classes the program cards use, so the subfolder tiles get
+       the same left-to-right entrance. They were an inline-styled div, which
+       is why they were the one row on the page that just appeared. */
+    subfoldersHtml = `<div class="card-grid subfolder-grid ${window.disableNextStagger ? '' : 'stagger-children'}">`;
     childFolders.forEach(sf => {
       const sfCount = countItemsRecursive(sf.id, 'challenge');
       subfoldersHtml += `
@@ -1561,7 +1564,11 @@ function renderBrowseContent() {
     ).length;
     const folderPct = folderChallenges.length > 0 ? Math.round((folderCompleted / folderChallenges.length) * 100) : 0;
 
-    const filterBarHtml = _preFilterChallenges.length > 0
+    /* The toolbar appears for a folder of SUBFOLDERS too, not only one with
+       programs in it. The Subfolders toggle lives in there, so a tier like
+       "0 · Before you start" -- five subfolders, no direct programs -- had no
+       toolbar at all, and therefore no way to switch its own tiles off. */
+    const filterBarHtml = (_preFilterChallenges.length > 0 || childFolders.length > 0)
       ? _renderBrowseFilterBar(_preFilterChallenges.length, challenges.length, _preFilterChallenges)
       : '';
 

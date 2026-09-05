@@ -219,7 +219,32 @@ function psetDestroy() {
  * the student added). Restores from autosave when present. file[0] is always the
  * main solution; p.userCode mirrors it for boss-bar/similarity/history.
  */
-function _psetBuildFiles(mainName, mainExt, mainStarter, mainRef, restored) {
+function _psetBuildFiles(mainName, mainExt, mainStarter, mainRef, restored, variantFiles) {
+  /* THE PROBLEM'S OTHER FILES COME TOO. This used to build the main file and
+     nothing else -- a companion only ever appeared if a saved draft happened
+     to carry one -- so a multi-file program put into a set arrived with its
+     header and its utilities missing and could not compile. The workshops are
+     four files each; they were the ones that showed it. */
+  if (variantFiles && variantFiles.length) {
+    const base = variantFiles.map(f => ({
+      id: generateId(),
+      name: f.name || 'file', ext: f.ext || '.c',
+      starterCode: f.starterCode || '', code: f.code || '',
+      locked: !!f.locked,
+      userCode: f.starterCode || ''
+    }));
+    /* A draft is merged by name, and never over a file you were GIVEN -- a
+       locked file always reads as issued. */
+    if (restored && Array.isArray(restored.files)) {
+      restored.files.forEach(sv => {
+        const hit = base.find(b => b.name === sv.name && b.ext === sv.ext);
+        if (hit && !hit.locked && typeof sv.userCode === 'string') hit.userCode = sv.userCode;
+      });
+    }
+    const at = restored && restored.activeFileIndex;
+    return { files: base, activeFileIndex: Math.max(0, Math.min(at || 0, base.length - 1)) };
+  }
+
   // restored may be: string (legacy main-only), {files:[...],activeFileIndex}, or {fileKey:code}
   if (restored && Array.isArray(restored.files) && restored.files.length) {
     const files = restored.files.map(f => {
@@ -270,7 +295,7 @@ function _psetResolveProblems(set, restore) {
       const mainExt = file0.ext || '.c';
       const mainStarter = file0.starterCode || v.starterCode || '';
       const mainRef = file0.code || v.code || '';
-      const { files, activeFileIndex } = _psetBuildFiles(mainName, mainExt, mainStarter, mainRef, restored);
+      const { files, activeFileIndex } = _psetBuildFiles(mainName, mainExt, mainStarter, mainRef, restored, v.files);
 
       out.push({
         key,
@@ -336,6 +361,8 @@ function _psetSyncEditor() {
   if (!ta || !p) return;
   const f = _psetActiveFile(p);
   // Never ta.value — a collapsed block is not in it (see savePracticeFileCode).
+  // A locked file is handout material and has no version of yours to save.
+  if (f && f.locked) return;
   if (f) f.userCode = (typeof edFullSource === 'function') ? edFullSource(ta) : ta.value;
   if (p.activeFileIndex === 0 && p.files[0]) p.userCode = p.files[0].userCode;
 }
@@ -520,20 +547,36 @@ function psetSwitch(i) {
 }
 
 /** Render the file-tab bar for the current problem: tabs + reset + "Add Header File". */
+/** Read-only, and visibly so, when the file on screen was given to you. */
+function _psetApplyLock(p) {
+  const ta = document.getElementById('editor-textarea');
+  if (!ta || !p) return;
+  const f = _psetActiveFile(p);
+  const locked = !!(f && f.locked);
+  ta.readOnly = locked;
+  ta.classList.toggle('is-locked', locked);
+}
+
 function _psetRenderFileTabs(p) {
   const host = document.getElementById('pset-file-label');
   if (!host) return;
   const tabs = (p.files || []).map((f, fi) => `
-    <div class="file-tab ${fi === p.activeFileIndex ? 'active' : ''}" onclick="psetSwitchFile(${fi})" oncontextmenu="event.preventDefault(); ${fi === 0 ? '' : `psetRenameFile(${fi}, this)`}" title="${fi === 0 ? 'Main solution file' : 'Header / companion file (right-click to rename)'}">
+    <div class="file-tab ${fi === p.activeFileIndex ? 'active' : ''}${f.locked ? ' is-locked' : ''}"
+         onclick="psetSwitchFile(${fi})"
+         oncontextmenu="event.preventDefault(); ${(fi === 0 || f.locked) ? '' : `psetRenameFile(${fi}, this)`}"
+         title="${f.locked ? 'Given to you — read only' : (fi === 0 ? 'Main solution file' : 'Header / companion file (right-click to rename)')}">
       <span class="file-tab-name">${escapeHTML(f.name + f.ext)}</span>
-      <button class="file-tab-reset" onclick="event.stopPropagation(); psetResetFile(${fi})" title="${fi === 0 ? 'Reset to starter code' : 'Remove this file'}">
-        <i data-lucide="${fi === 0 ? 'rotate-ccw' : 'x'}" style="width:11px;height:11px;"></i>
-      </button>
+      ${f.locked
+        ? `<span class="file-tab-lock" aria-label="Read only"><i data-lucide="lock" style="width:11px;height:11px;"></i></span>`
+        : `<button class="file-tab-reset" onclick="event.stopPropagation(); psetResetFile(${fi})" title="${fi === 0 ? 'Reset to starter code' : 'Remove this file'}">
+             <i data-lucide="${fi === 0 ? 'rotate-ccw' : 'x'}" style="width:11px;height:11px;"></i>
+           </button>`}
     </div>
   `).join('');
   host.innerHTML = tabs +
     `<button class="file-tab-add" onclick="psetAddFile(this)" title="Add a header / companion file"><i data-lucide="plus" style="width:13px;height:13px;"></i></button>`;
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: host });
+  _psetApplyLock(p);
 }
 
 /** Switch the active file within the current problem (code retained per file). */
@@ -1105,12 +1148,23 @@ function psetExit() {
       () => { _psetAutosave(); _psetGoLibrary(); });
     return;
   }
+  /* The same shape the program screen asks it in. Passing the labels as bare
+     strings dropped the icons and the line under each one that says what the
+     choice actually costs -- so the same question was asked twice in the app
+     and answered with less information on the screen that has more at stake. */
   showChoice({
     title: 'Leave attempt?',
-    message: 'Keep it and the code, timer and restore points are all waiting when you come back. '
-           + 'Discard and this attempt is gone — nothing is graded either way.',
-    secondary: 'Discard attempt',
-    primary: 'Keep and leave',
+    message: 'Nothing is graded either way — the set is only recorded when you finish it.',
+    primary: {
+      label: 'Keep and leave',
+      detail: 'Your code, the timer and every restore point are waiting when you come back.',
+      icon: 'save'
+    },
+    secondary: {
+      label: 'Discard attempt',
+      detail: 'Throws this whole set away and starts you from scratch next time. Cannot be undone.',
+      icon: 'trash-2'
+    },
     danger: true,
     onSecondary: () => psetDiscardAttempt(),
     onPrimary: () => { _psetAutosave(); _psetGoLibrary(); }
