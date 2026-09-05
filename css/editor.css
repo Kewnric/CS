@@ -3503,11 +3503,6 @@ body.is-resizing .practice-panel { transition: none; }
    tags became a 14px line box under the toolbar, and in the admin form the
    surrounding column's gap added more. */
 .stb-wrap { display: flex; flex-direction: column; }
-.stb-wrap textarea {
-  display: block;
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
-}
 
 /* ── The body you edit ───────────────────────────────────────
    Editable rich text, drawn on the same ground the card uses, so what you
@@ -3539,10 +3534,18 @@ body.is-resizing .practice-panel { transition: none; }
   tab-size: 4;
 }
 .stb-editor .stb-line { min-height: 1.2em; }
-.stb-editor:empty::before,
-.stb-editor .stb-line:only-child:empty::before {
+
+/* The hint, while there is nothing in the box. It cannot key off :empty --
+   an "empty" contenteditable still holds a line with a <br> in it for the
+   caret to sit on -- so the editor says when it is empty and this listens. */
+.stb-editor { position: relative; }
+.stb-editor.is-empty::before {
   content: attr(data-placeholder);
+  position: absolute;
+  left: 0.75rem;
+  top: 0.625rem;
   color: #484f58;
+  pointer-events: none;
 }
 
 /* The admin rows sit in a narrower column and hold less. */
@@ -3563,6 +3566,12 @@ body.is-resizing .practice-panel { transition: none; }
 }
 .stb-btn svg { width: 14px; height: 14px; }
 .stb-btn:hover { color: var(--color-primary, #6366f1); background: rgba(99, 102, 241, 0.12); }
+/* On, and visibly so: the buttons toggle, and nothing said which were already
+   applied to what the caret is sitting in. */
+.stb-btn.is-on {
+  color: var(--color-primary, #6366f1);
+  background: rgba(99, 102, 241, 0.18);
+}
 .stb-text {
   padding: 0 7px;
   font-family: var(--font-mono, monospace);
@@ -3585,10 +3594,9 @@ body.is-resizing .practice-panel { transition: none; }
   top: calc(100% + 5px);
   left: 0;
   z-index: 30;
-  width: 108px;
+  width: 116px;
   padding: 5px;
-  gap: 4px;
-  flex-wrap: wrap;
+  flex-direction: column;
   border: 1px solid var(--border-color);
   border-radius: 7px;
   background: var(--bg-elevated, #1c1c24);
@@ -3605,14 +3613,31 @@ body.is-resizing .practice-panel { transition: none; }
   transition: transform 0.1s, border-color 0.1s;
 }
 .stb-swatch:hover { transform: scale(1.12); border-color: #fff; }
-/* "None" has no colour to show, so it shows the absence of one. */
-.stb-swatch-none {
-  background:
-    linear-gradient(to bottom right, transparent calc(50% - 1px),
-      var(--color-danger, #ef4444) calc(50% - 1px), var(--color-danger, #ef4444) calc(50% + 1px),
-      transparent calc(50% + 1px)),
-    #0d1117;
+/* The way back off, said in words. It was a ninth tile -- a dark square in a
+   row of colours, which is exactly what a colour swatch looks like, so it
+   read as "black" and the way to remove a colour looked like it was missing. */
+.stb-clear-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 5px;
+  padding: 5px 6px;
+  border: none;
+  border-top: 1px solid var(--border-color);
+  border-radius: 0 0 5px 5px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
 }
+.stb-clear-row:hover { color: var(--color-danger, #ef4444); background: rgba(239, 68, 68, 0.1); }
+.stb-clear-row svg { width: 12px; height: 12px; }
+
+/* The swatches themselves keep their own grid so the row below sits clear. */
+.stb-grid { display: flex; flex-wrap: wrap; gap: 4px; }
 .psmp-delete { margin-right: auto; color: var(--color-danger, #ef4444); }
 .psmp-delete:hover { background: rgba(239, 68, 68, 0.12); }
 

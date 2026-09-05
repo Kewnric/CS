@@ -1023,7 +1023,7 @@ function psetRenderSamples(p) {
   const host = document.getElementById('pset-samples');
   if (!host || !p) return;
   const samples = p.samples || [];
-  const fmt = (c) => (typeof formatSampleText === 'function' ? formatSampleText(c) : escapeHTML(c));
+  const draw = (smp) => (typeof formatSampleText === 'function' ? formatSampleText(smp) : escapeHTML(smp.content || ''));
   host.innerHTML = samples.map((s, si) => `
       <div style="margin-bottom:0.5rem;">
         <div class="sample-head">
@@ -1033,7 +1033,7 @@ function psetRenderSamples(p) {
             <i data-lucide="pencil" style="width:11px;height:11px;"></i>
           </button>
         </div>
-        <div class="sample-content">${fmt(s.content)}</div>
+        <div class="sample-content">${draw(s)}</div>
       </div>`).join('');
   if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
 }

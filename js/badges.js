@@ -161,15 +161,15 @@ const BADGE_CATALOG = [
   { id: 's_perfect', icon: 'check-check', name: 'Snippet Perfect', hint: 'Ten snippets at 100%', goal: 10, get: () => badgeStats().doneS },
 
   /* ── Streaks and timing ───────────────────────────────── */
-  { id: 'k_roll', icon: 'flame', name: 'On a Roll', hint: 'Practise five days running', goal: 5, get: () => badgeStats().longestStreak },
+  { id: 'k_roll', icon: 'flame', name: 'On a Roll', hint: 'Practice five days running', goal: 5, get: () => badgeStats().longestStreak },
   { id: 'k_fortnight', icon: 'calendar-check', name: 'Fortnight', hint: 'A fourteen-day streak', goal: 14, get: () => badgeStats().longestStreak },
   { id: 'k_iron', icon: 'shield', name: 'Iron Will', hint: 'A thirty-day streak', goal: 30, get: () => badgeStats().longestStreak },
   { id: 'k_hundred', icon: 'flame-kindling', name: 'Unbroken', hint: 'A hundred-day streak', goal: 100, get: () => badgeStats().longestStreak },
   { id: 'k_current', icon: 'trending-up', name: 'Warm', hint: 'Be on a seven-day streak right now', goal: 7, get: () => badgeStats().currentStreak },
-  { id: 'k_night', icon: 'moon', name: 'Night Owl', hint: 'Practise after midnight', goal: 1, get: () => badgeStats().lateNight },
+  { id: 'k_night', icon: 'moon', name: 'Night Owl', hint: 'Practice after midnight', goal: 1, get: () => badgeStats().lateNight },
   { id: 'k_night10', icon: 'moon-star', name: 'Nocturnal', hint: 'Ten sessions after midnight', goal: 10, get: () => badgeStats().lateNight },
-  { id: 'k_early', icon: 'sunrise', name: 'Early Bird', hint: 'Practise before seven in the morning', goal: 1, get: () => badgeStats().earlyBird },
-  { id: 'k_weekend', icon: 'calendar-days', name: 'Weekend Warrior', hint: 'Practise on ten weekend days', goal: 10, get: () => badgeStats().weekendDays },
+  { id: 'k_early', icon: 'sunrise', name: 'Early Bird', hint: 'Practice before seven in the morning', goal: 1, get: () => badgeStats().earlyBird },
+  { id: 'k_weekend', icon: 'calendar-days', name: 'Weekend Warrior', hint: 'Practice on ten weekend days', goal: 10, get: () => badgeStats().weekendDays },
   { id: 'k_days50', icon: 'calendar-range', name: 'Regular', hint: 'Fifty active days', goal: 50, get: () => badgeStats().activeDays },
   { id: 'k_days200', icon: 'calendar-heart', name: 'Devoted', hint: 'Two hundred active days', goal: 200, get: () => badgeStats().activeDays },
 

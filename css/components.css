@@ -2872,6 +2872,20 @@
   gap: 0.5rem;
 }
 
+/* Sits at the end of the section label, so it reads as part of the heading
+   rather than as another control competing with the badges under it. */
+.badge-see-all {
+  margin-left: auto;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  letter-spacing: inherit;
+  color: var(--color-primary, #6366f1);
+  cursor: pointer;
+}
+.badge-see-all:hover { text-decoration: underline; }
+
 .analytics-stat-card {
   background: var(--bg-surface-hover);
   border: 1px solid var(--border-color);

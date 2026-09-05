@@ -237,6 +237,43 @@
      nobody reads mid-attempt. Minutes and seconds still fit. */
   .practice-topbar-right .timer-display { font-size: 0.75rem; padding: 0.2rem 0.4rem; }
 
+  /* MEASURED, 375px: the strip wanted 547px of a 357px row, which put Retry
+     at x=320 and Check Code at x=416 -- the button the whole attempt is for,
+     entirely off screen, behind a 190px swipe with nothing to suggest it was
+     there. The strip still scrolls; these just stop the primary action from
+     starting past the edge, and say that there is more to the right. */
+
+  /* Full screen is a desktop affordance. On a phone the browser chrome owns
+     that, and the button is 36px of a row that has none to spare. */
+  .practice-topbar-right #fullscreen-toggle-btn { display: none; }
+
+  /* Retry keeps its icon and drops its label: it is the one action here that
+     is recognisable without words, and the label cost 56px. */
+  .practice-topbar-right .practice-action-btn:not(.pp-check-btn) {
+    font-size: 0;
+    gap: 0;
+    padding: 0.3rem 0.45rem;
+  }
+  .practice-topbar-right .practice-action-btn:not(.pp-check-btn) svg {
+    font-size: 1rem;
+    width: 16px;
+    height: 16px;
+  }
+
+  /* The edge of a strip that has more in it. Painted over the topbar rather
+     than inside the scroller, so it stays put while the contents move. */
+  .practice-topbar { position: relative; }
+  .practice-topbar::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 26px;
+    height: 40px;
+    pointer-events: none;
+    background: linear-gradient(to right, rgba(22, 27, 34, 0), #161b22);
+  }
+
   /* The boss bar is the exception. It is hidden by default and costs nothing
      then, but switched ON it measured 307px — most of a 375px screen — and
      pushed the action buttons that far further out of reach. It shrinks here

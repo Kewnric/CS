@@ -662,13 +662,16 @@ function confirmFinishAttempt() {
   showConfirm('Finish attempt?', detail + ' This records the attempt and stops the timer.', () => submitCode());
 }
 
-/** Pull the stdin out of a sample's "Input: … Output: …" body. */
-function _sampleStdin(content) {
-  /* Formatting tokens are decoration, not input. Left in, a coloured value
-     would feed the program the literal token instead of the number in it. */
-  const plain = typeof sampleStripTokens === 'function'
-    ? sampleStripTokens(content)
-    : String(content || '');
+/**
+ * Pull the stdin out of a sample's "Input: … Output: …" body.
+ *
+ * Takes the sample, not its text: formatting is stored beside the characters
+ * now, and sampleModel is what knows how to read a sample written either way.
+ */
+function _sampleStdin(sample) {
+  const plain = typeof sampleModel === 'function'
+    ? sampleModel(sample).text
+    : String((sample && sample.content) || sample || '');
   const m = plain.match(/input\s*:?[ \t]*\r?\n([\s\S]*?)(?:\r?\n[ \t]*output\s*:|$)/i);
   if (!m) return '';
   const body = m[1].replace(/\s+$/, '');
@@ -679,7 +682,7 @@ function _sampleStdin(content) {
 function practiceRunSample(si) {
   const s = (state.activeVariant && state.activeVariant.samples || [])[si];
   if (!s) return;
-  runCodeWithPiston(_sampleStdin(s.content));
+  runCodeWithPiston(_sampleStdin(s));
 }
 
 function switchPracticeFile(fi) { loadPracticeFile(fi); }
@@ -4329,7 +4332,7 @@ function practiceRenderSamples() {
   host.innerHTML = samples.map((s, si) => {
     // If the sample carries an Input: block, offer to run with it rather than
     // making the student retype it into the terminal every time.
-    const stdin = _sampleStdin(s.content);
+    const stdin = _sampleStdin(s);
     return `
       <div style="margin-bottom:0.5rem;">
         <div class="sample-head">
@@ -4342,7 +4345,7 @@ function practiceRenderSamples() {
             <i data-lucide="pencil" style="width:11px;height:11px;"></i>
           </button>
         </div>
-        <div class="sample-content">${formatSampleText(s.content)}</div>
+        <div class="sample-content">${formatSampleText(s)}</div>
       </div>`;
   }).join('');
 
@@ -4357,10 +4360,10 @@ window.practiceEditSample = function (si, target) {
   const s = list[si];
   if (!s) return;
   _psmpIndex = si;
-  _psmpOpen(s.title || '', s.content || '');
+  _psmpOpen(s.title || '', s);
 };
 
-function _psmpOpen(title, content) {
+function _psmpOpen(title, body) {
   let ov = document.getElementById('practice-sample-modal');
   if (!ov) {
     ov = document.createElement('div');
@@ -4381,7 +4384,7 @@ function _psmpOpen(title, content) {
       <input id="psmp-title" class="form-input" maxlength="40" value="${escapeHTML(title)}" placeholder="e.g. Sample 1">
       <label class="form-label psmp-label" for="psmp-body">Body</label>
       <div class="stb-wrap">
-      ${typeof sampleFieldHTML === 'function' ? sampleFieldHTML('psmp-body', content) : ''}
+      ${typeof sampleFieldHTML === 'function' ? sampleFieldHTML('psmp-body', body) : ''}
       </div>
       <p class="pd-note">
         <i data-lucide="info"></i>
@@ -4410,7 +4413,10 @@ window.practiceSaveSample = function () {
   const target = _psmpTarget;
   if (!target) { practiceCloseSample(); return; }
   const title = (document.getElementById('psmp-title') || {}).value || '';
-  const content = typeof sampleEditorValue === 'function' ? sampleEditorValue('psmp-body') : '';
+  const body = typeof sampleEditorValue === 'function'
+    ? sampleEditorValue('psmp-body')
+    : { content: '', fmt: [] };
+  const content = body.content;
   const list = target.read() || [];
 
   /* A sample with neither a name nor a body is not a sample. Emptying one
@@ -4420,7 +4426,8 @@ window.practiceSaveSample = function () {
   // Adding belongs to Admin; this dialog corrects what is already there. If
   // the entry went away underneath it, there is nothing to write back to.
   if (_psmpIndex < 0 || !list[_psmpIndex]) { practiceCloseSample(); return; }
-  list[_psmpIndex] = { title: title.trim() || ('Sample ' + (_psmpIndex + 1)), content: content };
+  list[_psmpIndex] = { title: title.trim() || ('Sample ' + (_psmpIndex + 1)),
+                       content: content, fmt: body.fmt };
 
   if (typeof target.write === 'function') target.write(list);
   if (typeof saveData === 'function') saveData();

@@ -435,7 +435,7 @@ function sanitizeUserHTML(html) {
 }
 
 // Custom Rich Text + Markdown Support
-/** Renders markdown + [[color:text]] syntax to sanitized HTML. @returns {string} */
+/** Renders a description (markdown + the markup it holds) to sanitized HTML. @returns {string} */
 function formatRichText(text) {
   if (!text) return '';
   let html;
@@ -446,8 +446,14 @@ function formatRichText(text) {
   } else {
     html = escapeHTML(text);
   }
-  // Keep custom color syntax: [[color:text]] → <span style="color: color;">text</span>
-  html = html.replace(/\[\[([a-zA-Z#0-9(),.\s%]+):([\s\S]*?)\]\]/g, '<span style="color: $1;">$2</span>');
+  /* A description saved while the markup detector was too narrow had its own
+     tags escaped into words -- `&lt;code&gt;` where <code> was written. Put
+     those back so it reads correctly again; the next save stores it fixed. */
+  if (typeof afDescRepair === 'function') html = afDescRepair(html);
+  /* The `[[colour:text]]` notation is gone. It existed so a description could
+     be coloured before there was a toolbar to do it; the toolbar does it now,
+     and leaving the notation in means a description that legitimately writes
+     `[[x:y]]` loses those characters. */
   return html;
 }
 
@@ -501,44 +507,176 @@ function sampleSectionOf(word) {
   return w === 'input' ? 'in' : (w === 'output' || w === 'expected' || w === 'result') ? 'out' : '';
 }
 
-function formatSampleText(text) {
-  if (!text) return '';
-  const OWN_LINE = SAMPLE_OWN_LINE;
-  const NAMED = SAMPLE_NAMED;
-  const sectionOf = sampleSectionOf;
-  let section = '';
-  const html = escapeHTML(text).split('\n').map((line) => {
-    const own = line.match(OWN_LINE);
-    if (own) {
-      section = sectionOf(own[2]);
-      return '<span class="sample-label">' + line + '</span>';
-    }
-    const named = line.match(NAMED);
-    if (named) {
-      section = sectionOf(named[2]);
-      const rest = line.slice(named[0].length);
-      const head = '<span class="sample-label">' + named[1] + named[2] + named[3] + '</span>';
-      if (!rest.trim()) return head;
-      return head + (section ? '<span class="sample-' + section + '">' + rest + '</span>' : rest);
-    }
-    if (!line.trim() || !section) return line;
-    return '<span class="sample-' + section + '">' + line + '</span>';
-  }).join('\n');
-  /* Author tokens last, so a colour name is never mistaken for a label.
-     The style is inline and the section colouring above is a class, so a
-     colour applied by hand wins over the Input:/Output: tint of the line it
-     sits in -- the two never fight over the same words. */
-  return html.replace(/\[\[([^:\]]+):(.*?)\]\]/g, (m, key, body) => {
-    const style = sampleTokenStyle(key);
-    return style ? '<span style="' + style + '">' + body + '</span>' : body;
+/* ============================================================
+   HOW A SAMPLE IS STORED
+   ------------------------------------------------------------
+   `content` is the sample exactly as it reads -- the characters, and nothing
+   else. Formatting lives beside it in `fmt`, a list of [start, end, words]
+   runs over those characters.
+
+   IT USED TO LIVE INSIDE THE TEXT, as `[[gold:7]]`, back when the only way to
+   colour a sample was to type that yourself. The toolbar does it now, so the
+   notation has been withdrawn: nothing writes it any more, and nothing reads
+   it out of new content. That matters beyond tidiness -- Run this feeds the
+   Input: block straight to the program, and a sample whose expected output
+   legitimately contains `[[x:y]]` had those characters silently eaten. With
+   the two kept apart, sample text is only ever itself.
+
+   Content written before the change still holds tokens, so sampleModel falls
+   back to reading them. Such a sample renders exactly as it always did, and
+   is rewritten into the new shape the first time it is saved.
+   ============================================================ */
+
+/** [start, end, words] runs → a style-word list per character. */
+function sampleAttrsFromRuns(length, runs) {
+  const attrs = new Array(length);
+  for (let i = 0; i < length; i++) attrs[i] = [];
+  (runs || []).forEach((run) => {
+    if (!run) return;
+    const from = Math.max(0, run[0] | 0);
+    const to = Math.min(length, run[1] | 0);
+    const words = String(run[2] || '').trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return;
+    for (let i = from; i < to; i++) attrs[i] = words;
   });
+  return attrs;
 }
 
-/* A token key is one or more words: b / i / u / s for the marks, bg-<colour>
-   for a highlight, and anything else as a text colour -- which is what the
-   key has always been, so `[[red:hi]]` written before any of this still
-   renders exactly as it did. Values are checked against a shape rather than
-   pasted into the style attribute as given. */
+/** A style-word list per character → the compact runs that get stored. */
+function sampleRunsFromAttrs(attrs) {
+  const runs = [];
+  const n = (attrs || []).length;
+  let i = 0;
+  while (i < n) {
+    const key = (attrs[i] || []).join(' ');
+    if (!key) { i++; continue; }
+    let j = i;
+    while (j < n && (attrs[j] || []).join(' ') === key) j++;
+    runs.push([i, j, key]);
+    i = j;
+  }
+  return runs;
+}
+
+/**
+ * A sample, as text plus the style words on each character.
+ * Takes the stored object, or a bare string for callers that only have one.
+ */
+function sampleModel(sample, maybeAttrs) {
+  if (typeof sample === 'string') {
+    if (maybeAttrs) return { text: sample, attrs: maybeAttrs };
+    // A bare string with no formatting beside it is old content: read tokens.
+    return typeof sampleParseTokens === 'function'
+      ? sampleParseTokens(sample)
+      : { text: sample, attrs: [] };
+  }
+  const s = sample || {};
+  const text = String(s.content == null ? '' : s.content);
+  if (s.fmt && s.fmt.length) return { text: text, attrs: sampleAttrsFromRuns(text.length, s.fmt) };
+  if (typeof sampleParseTokens === 'function' && text.indexOf('[[') !== -1) {
+    return sampleParseTokens(text);          // written before fmt existed
+  }
+  return { text: text, attrs: sampleAttrsFromRuns(text.length, []) };
+}
+
+/**
+ * `[[gold:7]]` → characters + the words on them.
+ * ONLY for content written before formatting moved out of the text. Nothing
+ * produces this notation any more.
+ */
+function sampleParseTokens(tokenText) {
+  const src = String(tokenText == null ? '' : tokenText);
+  const chars = [], attrs = [];
+  let i = 0;
+  while (i < src.length) {
+    const m = src.slice(i).match(/^\[\[([^:\]]+):(.*?)\]\]/);
+    if (m && m[2] !== '' && sampleTokenStyle(m[1])) {
+      const words = m[1].trim().split(/\s+/).filter(Boolean);
+      const inner = sampleParseTokens(m[2]);
+      for (let k = 0; k < inner.text.length; k++) {
+        chars.push(inner.text[k]);
+        attrs.push(words.concat(inner.attrs[k] || []));
+      }
+      i += m[0].length;
+      continue;
+    }
+    chars.push(src[i]);
+    attrs.push([]);
+    i++;
+  }
+  return { text: chars.join(''), attrs: attrs };
+}
+
+/** Spans for each run of identically-styled characters in [from, to). */
+function sampleRunsHTML(text, attrs, from, to, withData) {
+  let out = '';
+  let i = from;
+  while (i < to) {
+    const key = ((attrs && attrs[i]) || []).join(' ');
+    let j = i;
+    while (j < to && ((attrs && attrs[j]) || []).join(' ') === key) j++;
+    const body = escapeHTML(text.slice(i, j));
+    if (!key) {
+      out += body;
+    } else {
+      const style = sampleTokenStyle(key);
+      // data-fmt is what the editor reads back; the style is only how it looks.
+      out += '<span' + (withData ? ' data-fmt="' + escapeHTML(key) + '"' : '')
+           + (style ? ' style="' + style + '"' : '') + '>' + body + '</span>';
+    }
+    i = j;
+  }
+  return out;
+}
+
+/**
+ * A sample as HTML.
+ *
+ * WHAT YOU TYPE AND WHAT THE PROGRAM SAYS READ DIFFERENTLY. Everything under
+ * Input: is tinted, everything under Output: takes the foreground colour, so a
+ * sample reads as a transcript rather than as one grey wall. A colour chosen
+ * from the toolbar is inline and the section tint is a class, so the two never
+ * fight over the same words -- the chosen one wins.
+ *
+ * @param {object|string} sample  the stored sample, or its text
+ * @param {Array} [maybeAttrs]    style words per character, if not on the sample
+ * @returns {string} HTML
+ */
+function formatSampleText(sample, maybeAttrs) {
+  const model = sampleModel(sample, maybeAttrs);
+  const text = model.text, attrs = model.attrs;
+  if (!text) return '';
+
+  let at = 0;
+  let section = '';
+  return text.split('\n').map((line) => {
+    const start = at;
+    at += line.length + 1;
+    const end = start + line.length;
+
+    const own = line.match(SAMPLE_OWN_LINE);
+    if (own) {
+      section = sampleSectionOf(own[2]);
+      return '<span class="sample-label">' + sampleRunsHTML(text, attrs, start, end) + '</span>';
+    }
+    const named = line.match(SAMPLE_NAMED);
+    if (named) {
+      section = sampleSectionOf(named[2]);
+      const cut = start + named[0].length;
+      const head = '<span class="sample-label">' + sampleRunsHTML(text, attrs, start, cut) + '</span>';
+      const rest = sampleRunsHTML(text, attrs, cut, end);
+      if (!line.slice(named[0].length).trim()) return head;
+      return head + (section ? '<span class="sample-' + section + '">' + rest + '</span>' : rest);
+    }
+    const runs = sampleRunsHTML(text, attrs, start, end);
+    if (!line.trim() || !section) return runs;
+    return '<span class="sample-' + section + '">' + runs + '</span>';
+  }).join('\n');
+}
+
+/* A style word is one of the marks, bg-<colour> for a highlight, or a colour.
+   Values are checked against a shape rather than pasted into the style
+   attribute as given. */
 function sampleSafeColor(v) {
   const c = String(v || '').trim();
   if (/^#[0-9A-Fa-f]{3,8}$/.test(c)) return c;

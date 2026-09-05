@@ -107,7 +107,7 @@ function renderAdminVariantForm() {
             <div style="flex:1; display:flex; flex-direction:column; gap:0.5rem;">
               <input value="${escapeHTML(s.title || '')}" oninput="updateSampleField(${sampleIdx}, 'title', this.value)" placeholder="Sample Title" class="form-input" style="font-weight:600; font-size:0.8125rem; padding:0.375rem 0.5rem;" />
               <div class="stb-wrap">
-                ${typeof sampleFieldHTML === 'function' ? sampleFieldHTML('admin-sample-body-' + sampleIdx, s.content || '') : ''}
+                ${typeof sampleFieldHTML === 'function' ? sampleFieldHTML('admin-sample-body-' + sampleIdx, s) : ''}
               </div>
             </div>
             <button onclick="deleteAdminSample(${sampleIdx})" class="btn btn-ghost" style="padding:0.25rem;" title="Delete Sample">
@@ -350,7 +350,10 @@ function _adminWireSampleEditors() {
     el._adminWired = true;
     const idx = parseInt(el.id.replace('admin-sample-body-', ''), 10);
     el.addEventListener('change', () => {
-      if (typeof updateSampleField === 'function') updateSampleField(idx, 'content', sampleEditorValue(el));
+      if (typeof updateSampleField !== 'function') return;
+      const v = sampleEditorValue(el);
+      updateSampleField(idx, 'content', v.content);
+      updateSampleField(idx, 'fmt', v.fmt);
     });
   });
 }
@@ -849,10 +852,35 @@ const AF_DESC_TOOLBAR = [
  * would be swallowed as a tag — so anything that is not already markup is
  * escaped and split into paragraphs before it is loaded.
  */
-function afDescToHTML(value) {
+/* The tags a description may be made of. This list is what decides whether a
+   stored value is ALREADY markup -- and anything missing from it was treated
+   as plain text and escaped, which is how a description written with <code>
+   came to show its tags as words the moment the editor opened on it. The pack
+   ships 266 of those. Keep this in step with what the editor can produce. */
+const AF_DESC_TAGS = 'p|br|ol|ul|li|h[1-6]|strong|b|em|i|u|s|span|code|pre|blockquote|div|a|small|sup|sub|mark|kbd';
+const AF_DESC_IS_HTML = new RegExp('<(?:' + AF_DESC_TAGS + ')' + String.fromCharCode(92) + 'b', 'i');
+const AF_DESC_ESCAPED = new RegExp('&lt;(/?(?:' + AF_DESC_TAGS + '))&gt;', 'gi');
+
+/**
+ * Put back tags a previous version escaped into text.
+ *
+ * Only the tags above, and only when the value carries no real markup of its
+ * own -- so a description that genuinely means to SHOW `&lt;code&gt;` as words,
+ * alongside actual markup, is left alone.
+ */
+function afDescRepair(value) {
   const raw = String(value == null ? '' : value);
+  if (!raw || raw.indexOf('&lt;') === -1) return raw;
+  AF_DESC_ESCAPED.lastIndex = 0;
+  if (!AF_DESC_ESCAPED.test(raw)) return raw;
+  AF_DESC_ESCAPED.lastIndex = 0;
+  return raw.replace(AF_DESC_ESCAPED, '<$1>');
+}
+
+function afDescToHTML(value) {
+  const raw = afDescRepair(value);
   if (!raw.trim()) return '';
-  if (/<(p|br|ol|ul|li|h[1-6]|strong|em|u|s|span|pre|blockquote|div)\b/i.test(raw)) return raw;
+  if (AF_DESC_IS_HTML.test(raw)) return raw;
   return raw.split(/\n/)
     .map(line => (line.trim() ? '<p>' + escapeHTML(line) + '</p>' : '<p><br></p>'))
     .join('');

@@ -535,7 +535,15 @@ function renderHistory() {
 
   if (activeAnalyticsTab === 'practice') {
     if (state.badges && state.badges.length > 0) {
-      sidebarHTML += `<div style="margin-bottom: 0.5rem;"><div class="analytics-section-label"><i data-lucide="award" style="width:14px;height:14px;"></i> Achievement Badges</div>${renderBadges()}</div>`;
+      /* "See all" opens the fuller overview in home-stats.js -- earned,
+         in progress and locked, each with how far along it is. That view was
+         written for a dashboard card that no longer exists, so it sat there
+         complete and unreachable; this is the section it belongs to. */
+      sidebarHTML += `<div style="margin-bottom: 0.5rem;">
+        <div class="analytics-section-label">
+          <i data-lucide="award" style="width:14px;height:14px;"></i> Achievement Badges
+          ${typeof homeOpenBadges === 'function' ? `<button class="badge-see-all" onclick="homeOpenBadges()">See all</button>` : ''}
+        </div>${renderBadges()}</div>`;
     }
 
     sidebarHTML += `<div style="margin-bottom: 0.5rem;"><div class="analytics-section-label" style="color: var(--color-warning);"><i data-lucide="brain" style="width:14px;height:14px;"></i> Daily Review (SRS)</div><p style="font-size: 0.75rem; color: var(--text-tertiary); margin-bottom: 0.75rem;">Challenges you scored lowest on.</p>${renderSRSQueue()}</div>`;

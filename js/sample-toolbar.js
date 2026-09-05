@@ -1,34 +1,33 @@
 /* ============================================================
    SAMPLE EDITOR — formatting you can see
    ------------------------------------------------------------
-   A sample body is not prose and never became rich text: `Run this` feeds the
-   Input: block straight to the program, so what is STORED has to stay the
-   characters the program will read. Formatting is therefore kept as author
-   tokens — `[[gold b:7]]` — which formatSampleText turns into spans when the
-   sample is drawn on its card.
+   A sample body is not prose and never became rich text: `Run this` feeds
+   the Input: block straight to the program, so the sample text has to stay
+   the characters the program will read — only those. Formatting is stored
+   beside it as runs over those characters (see sampleModel in utils.js).
 
-   That is a storage format, not something to read. Showing it in the field was
-   the mistake this file exists to undo: you picked a colour and got `[[gold:`
-   back. What you edit now is coloured text; the tokens are written and read
-   behind it and never appear on screen.
+   There WAS a notation for writing formatting into the text by hand,
+   `[[gold:7]]`. It is withdrawn: the toolbar is how formatting is applied,
+   nothing writes tokens any more, and a sample whose output legitimately
+   contains `[[x:y]]` now keeps those characters instead of losing them.
+   Old content is still read (sampleParseTokens) and is rewritten into the
+   new shape the first time it is saved.
 
-   HOW IT WORKS. The text is held as characters plus, per character, the style
-   words that apply to it — the ordinary way to model formatted text, and the
-   reason overlapping, partial and repeated formatting all behave. Three pure
-   functions move between that model and the two things it has to be:
+   HOW IT WORKS. The text is held as characters plus, per character, the
+   style words that apply to it — the ordinary way to model formatted text,
+   and the reason overlapping, partial and repeated formatting all behave.
 
-       tokens  ──sampleParseTokens──▶  {text, attrs}  ──sampleRenderEditor──▶  DOM
-       tokens  ◀─sampleSerialize────  {text, attrs}   ◀──sampleReadEditor───  DOM
+       stored {content, fmt}  ──sampleModel──▶  {text, attrs}  ──▶  DOM
+       stored {content, fmt}  ◀──────────────  {text, attrs}  ◀──  DOM
 
-   Typing edits the DOM; every input reads it back to the model, redraws, and
-   puts the caret where it was. Section colouring (Input:/Output:) is derived
-   from the line each time rather than stored, so it follows what you type and
-   can never be saved into the sample by accident.
+   Typing edits the DOM; every input reads it back to the model, redraws,
+   and puts the caret where it was. Section colouring (Input:/Output:) is
+   derived from the line each time rather than stored, so it follows what
+   you type and can never be saved into the sample by accident.
    ============================================================ */
 
-/* The palette, as swatches. Named CSS colours: they survive a round trip
-   through the token text as words, and read as themselves if anyone ever does
-   look at the stored string. */
+/* The palette, as swatches. Named CSS colours: they are stored as words, so
+   a saved sample still reads as itself if anyone ever looks at the data. */
 const SAMPLE_FMT_COLORS = [
   ['tomato', 'Red'],
   ['orange', 'Orange'],
@@ -49,7 +48,6 @@ const SAMPLE_FMT_MARKS = [
 ];
 
 const _STB_NL = String.fromCharCode(10);
-const _STB_TOKEN_AT = /^\[\[([^:\]]+):(.*?)\]\]/;
 
 /* ── The model ───────────────────────────────────────────── */
 
@@ -72,87 +70,11 @@ function _stbNormWords(words) {
   return out;
 }
 
-/**
- * Stored tokens → characters + the style words on each.
- * Nested tokens (hand-written, or left by an older version) flatten here, the
- * inner one winning the colour it is nearer to.
- */
-function sampleParseTokens(tokenText) {
-  const src = String(tokenText == null ? '' : tokenText);
-  const chars = [], attrs = [];
-  let i = 0;
-  while (i < src.length) {
-    const m = src.slice(i).match(_STB_TOKEN_AT);
-    if (m && m[2] !== '') {
-      const words = m[1].trim().split(/\s+/).filter(Boolean);
-      const inner = sampleParseTokens(m[2]);
-      for (let k = 0; k < inner.text.length; k++) {
-        chars.push(inner.text[k]);
-        attrs.push(_stbNormWords(words.concat(inner.attrs[k] || [])));
-      }
-      i += m[0].length;
-      continue;
-    }
-    chars.push(src[i]);
-    attrs.push([]);
-    i++;
-  }
-  return { text: chars.join(''), attrs: attrs };
-}
-
-/**
- * Characters + style words → stored tokens.
- * Runs are grouped per line, because formatSampleText wraps each line in its
- * own section span and a token straddling a newline would interleave with it.
- */
-function sampleSerializeTokens(text, attrs) {
-  const s = String(text || '');
-  let out = '';
-  let i = 0;
-  while (i < s.length) {
-    if (s[i] === _STB_NL) { out += s[i]; i++; continue; }
-    const key = ((attrs && attrs[i]) || []).join(' ');
-    if (!key) { out += s[i]; i++; continue; }
-    let j = i;
-    while (j < s.length && s[j] !== _STB_NL && ((attrs && attrs[j]) || []).join(' ') === key) j++;
-    const body = s.slice(i, j);
-    /* `]]` inside a body would end the token early and corrupt everything
-       after it. Losing a colour is recoverable; corrupting the sample is not. */
-    out += (body.indexOf(']]') === -1 && body.indexOf('[[') === -1)
-      ? '[[' + key + ':' + body + ']]'
-      : body;
-    i = j;
-  }
-  return out;
-}
-
 /* ── Drawing the editor ──────────────────────────────────── */
 
 function _stbEsc(s) {
   return typeof escapeHTML === 'function' ? escapeHTML(s)
     : String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-/** Spans for each run of identically-styled characters in [from, to). */
-function _stbRunsHTML(text, attrs, from, to) {
-  let out = '';
-  let i = from;
-  while (i < to) {
-    const key = ((attrs && attrs[i]) || []).join(' ');
-    let j = i;
-    while (j < to && ((attrs && attrs[j]) || []).join(' ') === key) j++;
-    const body = _stbEsc(text.slice(i, j));
-    if (!key) {
-      out += body;
-    } else {
-      const style = typeof sampleTokenStyle === 'function' ? sampleTokenStyle(key) : '';
-      // data-fmt is what survives the round trip; the style is only how it looks.
-      out += '<span data-fmt="' + _stbEsc(key) + '"' + (style ? ' style="' + style + '"' : '') + '>'
-           + body + '</span>';
-    }
-    i = j;
-  }
-  return out;
 }
 
 /** The editable DOM for one sample: a line per line, coloured as the card is. */
@@ -169,20 +91,20 @@ function sampleRenderEditor(text, attrs) {
     if (own) {
       section = sampleSectionOf(own[2]);
       return '<div class="stb-line"><span class="sample-label">'
-           + _stbRunsHTML(text, attrs, start, start + line.length) + '</span></div>';
+           + sampleRunsHTML(text, attrs, start, start + line.length, true) + '</span></div>';
     }
     const named = line.match(SAMPLE_NAMED);
     if (named) {
       section = sampleSectionOf(named[2]);
       const cut = start + named[0].length;
-      const head = '<span class="sample-label">' + _stbRunsHTML(text, attrs, start, cut) + '</span>';
-      const rest = _stbRunsHTML(text, attrs, cut, start + line.length);
+      const head = '<span class="sample-label">' + sampleRunsHTML(text, attrs, start, cut, true) + '</span>';
+      const rest = sampleRunsHTML(text, attrs, cut, start + line.length, true);
       const tail = line.slice(named[0].length).trim()
         ? (section ? '<span class="sample-' + section + '">' + rest + '</span>' : rest)
         : rest;
       return '<div class="stb-line">' + head + tail + '</div>';
     }
-    const runs = _stbRunsHTML(text, attrs, start, start + line.length);
+    const runs = sampleRunsHTML(text, attrs, start, start + line.length, true);
     return '<div class="stb-line">'
          + (line.trim() && section ? '<span class="sample-' + section + '">' + runs + '</span>' : runs)
          + '</div>';
@@ -203,15 +125,29 @@ function _stbWordsAt(node, root) {
   return [];
 }
 
-/** DOM → model. Each block child is a line; a block's trailing <br> is filler. */
+/**
+ * DOM → model. Each block child is a line; a block's trailing <br> is filler.
+ *
+ * Text sitting at the top level, between or beside those blocks, counts too.
+ * Reading only element children dropped it silently — the browser can leave a
+ * bare text node there while editing, and text typed into it simply vanished.
+ */
 function sampleReadEditor(root) {
   const chars = [], attrs = [];
-  const lines = root.children.length
-    ? Array.prototype.slice.call(root.children)
-    : [root];
+  const kids = Array.prototype.slice.call(root.childNodes)
+    .filter(n => n.nodeType !== 3 || n.nodeValue !== '');
+  const lines = kids.length ? kids : [root];
 
-  lines.forEach((line, li) => {
-    if (li) { chars.push(_STB_NL); attrs.push([]); }
+  let first = true;
+  lines.forEach((line) => {
+    const isBlock = line.nodeType === 1 && (line.nodeName === 'DIV' || line.nodeName === 'P');
+    if (isBlock && !first) { chars.push(_STB_NL); attrs.push([]); }
+    first = false;
+    if (line.nodeType === 3) {
+      const w = _stbWordsAt(line, root);
+      for (let k = 0; k < line.nodeValue.length; k++) { chars.push(line.nodeValue[k]); attrs.push(w); }
+      return;
+    }
     const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT + NodeFilter.SHOW_ELEMENT, null);
     let n;
     while ((n = walker.nextNode())) {
@@ -327,33 +263,84 @@ function _stbSelectRange(root, start, end) {
 /* ── The element ─────────────────────────────────────────── */
 
 /** Markup for one sample field: toolbar above, editable body below. */
-function sampleFieldHTML(id, tokenText) {
-  const parsed = sampleParseTokens(tokenText);
+function sampleFieldHTML(id, sample) {
+  const m = sampleModel(sample);
   return sampleToolbarHTML(id)
-    + '<div class="stb-field"><div class="stb-editor" id="' + id + '" contenteditable="true" '
-    + 'spellcheck="false" role="textbox" aria-multiline="true">'
-    + sampleRenderEditor(parsed.text, parsed.attrs)
+    + '<div class="stb-field"><div class="stb-editor' + (m.text ? '' : ' is-empty') + '" id="' + id + '" '
+    + 'contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true" '
+    + 'data-placeholder="Sample content…">'
+    + sampleRenderEditor(m.text, m.attrs)
     + '</div></div>';
+}
+
+/**
+ * Draw a state, and remember the one it replaced so it can be undone.
+ *
+ * Everything that changes the editor goes through here, which is what makes
+ * undo possible at all: redrawing from the model on every keystroke throws
+ * the browser's own undo stack away, so the editor has to keep its own.
+ * Consecutive typing coalesces into one step — undo should take back a word,
+ * not a letter.
+ */
+function _stbPaint(el, text, attrs, opts) {
+  const o = opts || {};
+  if (!o.silent) {
+    const now = Date.now();
+    const coalescing = o.coalesce && el._stbUndoAt && (now - el._stbUndoAt) < 700;
+    if (!coalescing && el._stbText != null) {
+      el._stbUndo = el._stbUndo || [];
+      el._stbUndo.push({ text: el._stbText, attrs: el._stbAttrs, caret: el._stbCaret });
+      if (el._stbUndo.length > 120) el._stbUndo.shift();
+      el._stbRedo = [];
+    }
+    el._stbUndoAt = now;
+  }
+  el._stbText = text;
+  el._stbAttrs = attrs;
+  el.innerHTML = sampleRenderEditor(text, attrs);
+  el.classList.toggle('is-empty', !text);
+}
+
+/** Step back, or forward again. */
+function _stbHistory(el, redo) {
+  const from = redo ? el._stbRedo : el._stbUndo;
+  if (!from || !from.length) return false;
+  const to = redo ? (el._stbUndo = el._stbUndo || []) : (el._stbRedo = el._stbRedo || []);
+  to.push({ text: el._stbText, attrs: el._stbAttrs, caret: _stbCaretOffset(el) });
+  const state = from.pop();
+  _stbPaint(el, state.text, state.attrs, { silent: true });
+  _stbSetCaret(el, state.caret == null ? state.text.length : state.caret);
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+  return true;
 }
 
 function _stbEl(idOrEl) {
   return typeof idOrEl === 'string' ? document.getElementById(idOrEl) : idOrEl;
 }
 
-/** What to store: the sample with its formatting as tokens. */
+/** What to store: the sample text, and the formatting beside it. */
 function sampleEditorValue(idOrEl) {
   const el = _stbEl(idOrEl);
-  if (!el) return '';
+  if (!el) return { content: '', fmt: [] };
   const m = sampleReadEditor(el);
-  return sampleSerializeTokens(m.text, m.attrs);
+  return { content: m.text, fmt: sampleRunsFromAttrs(m.attrs) };
 }
 
-/** Load stored text into the editor. */
-function sampleEditorSetValue(idOrEl, tokenText) {
+/**
+ * Load a stored sample into the editor.
+ *
+ * This starts a new history rather than adding to the old one: a different
+ * sample is a different document, and undo should not walk back into the
+ * text of the one before it.
+ */
+function sampleEditorSetValue(idOrEl, sample) {
   const el = _stbEl(idOrEl);
   if (!el) return;
-  const parsed = sampleParseTokens(tokenText);
-  el.innerHTML = sampleRenderEditor(parsed.text, parsed.attrs);
+  const m = sampleModel(sample);
+  _stbPaint(el, m.text, m.attrs, { silent: true });
+  el._stbUndo = [];
+  el._stbRedo = [];
+  el._stbUndoAt = 0;
 }
 
 /* Redraw from the model after every change, so section colouring follows what
@@ -363,7 +350,8 @@ function _stbRefresh(el, keepSelection) {
   const sel = keepSelection ? _stbSelection(el) : null;
   const caret = sel ? null : _stbCaretOffset(el);
   const m = sampleReadEditor(el);
-  el.innerHTML = sampleRenderEditor(m.text, m.attrs);
+  el._stbCaret = caret;
+  _stbPaint(el, m.text, m.attrs, { coalesce: true });
   if (sel) _stbSelectRange(el, sel.start, sel.end);
   else _stbSetCaret(el, caret);
   el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -375,11 +363,26 @@ function sampleEditorAttach(idOrEl) {
   const el = _stbEl(idOrEl);
   if (!el || el._stbReady) return;
   el._stbReady = true;
+  const start = sampleReadEditor(el);
+  el._stbText = start.text;
+  el._stbAttrs = start.attrs;
+  el._stbUndo = [];
+  el._stbRedo = [];
+  el.classList.toggle('is-empty', !start.text);
 
   let composing = false;
   el.addEventListener('compositionstart', () => { composing = true; });
   el.addEventListener('compositionend', () => { composing = false; _stbRefresh(el); });
   el.addEventListener('input', () => { if (!composing) _stbRefresh(el); });
+
+  /* The browser cannot undo for us — the redraw replaces its DOM every time
+     — so the editor answers these itself. */
+  el.addEventListener('keydown', (e) => {
+    const mod = e.ctrlKey || e.metaKey;
+    if (!mod || e.key.toLowerCase() !== 'z' && e.key.toLowerCase() !== 'y') return;
+    const redo = e.key.toLowerCase() === 'y' || e.shiftKey;
+    if (_stbHistory(el, redo)) e.preventDefault();
+  });
 
   // Plain text only: pasted markup would arrive with styles this cannot read
   // back, and the sample would look one way and store another.
@@ -407,7 +410,7 @@ function _stbInsertText(el, text) {
   const attrs = m.attrs.slice(0, at.start)
     .concat(inserted.split('').map(c => (c === _STB_NL ? [] : attrsAt)))
     .concat(m.attrs.slice(at.end));
-  el.innerHTML = sampleRenderEditor(before + inserted + after, attrs);
+  _stbPaint(el, before + inserted + after, attrs);
   _stbSetCaret(el, at.start + inserted.length);
   el.dispatchEvent(new Event('change', { bubbles: true }));
 }
@@ -423,19 +426,24 @@ function _stbInsertText(el, text) {
 function sampleToolbarHTML(targetId) {
   const t = String(targetId);
   const marks = SAMPLE_FMT_MARKS.map(([key, icon, label]) => `
-    <button type="button" class="stb-btn" title="${label}" aria-label="${label}"
+    <button type="button" class="stb-btn" data-mark="${key}" title="${label}" aria-label="${label}"
+            aria-pressed="false"
             onmousedown="event.preventDefault()" onclick="sampleFmtMark('${t}', '${key}')">
       <i data-lucide="${icon}"></i>
     </button>`).join('');
 
-  const swatches = (bg) => SAMPLE_FMT_COLORS.map(([v, label]) => `
-        <button type="button" class="stb-swatch" title="${label}" aria-label="${label}"
-                style="background:${v}" onmousedown="event.preventDefault()"
-                onclick="sampleFmtColor('${t}', '${v}', ${bg})"></button>`).join('')
-    + `
-        <button type="button" class="stb-swatch stb-swatch-none" title="None" aria-label="None"
-                onmousedown="event.preventDefault()"
-                onclick="sampleFmtColor('${t}', '', ${bg})"></button>`;
+  /* The way back off is a labelled row, not a ninth tile. As a dark square
+     among eight colours it read as another colour and people could not find
+     the way to remove one. */
+  const swatches = (bg) => `
+        <span class="stb-grid">${SAMPLE_FMT_COLORS.map(([v, label]) => `
+          <button type="button" class="stb-swatch" title="${label}" aria-label="${label}"
+                  style="background:${v}" onmousedown="event.preventDefault()"
+                  onclick="sampleFmtColor('${t}', '${v}', ${bg})"></button>`).join('')}</span>
+        <button type="button" class="stb-clear-row" onmousedown="event.preventDefault()"
+                onclick="sampleFmtColor('${t}', '', ${bg})">
+          <i data-lucide="ban"></i> ${bg ? 'No highlight' : 'No colour'}
+        </button>`;
 
   return `
     <div class="sample-toolbar" data-target="${t}">
@@ -467,6 +475,36 @@ function sampleToolbarHTML(targetId) {
       </button>
     </div>`;
 }
+
+/* Which marks are on where the caret is. Without this the only way to learn
+   that a button toggles was to press it twice and watch. */
+function sampleSyncToolbar(el) {
+  const bar = document.querySelector('.sample-toolbar[data-target="' + el.id + '"]');
+  if (!bar) return;
+  const m = sampleReadEditor(el);
+  const r = _stbRange(el, m);
+  const on = {};
+  SAMPLE_FMT_MARKS.forEach(([w]) => { on[w] = r.end > r.start; });
+  for (let i = r.start; i < r.end; i++) {
+    if (m.text[i] === _STB_NL) continue;
+    const words = m.attrs[i] || [];
+    SAMPLE_FMT_MARKS.forEach(([w]) => { if (words.indexOf(w) === -1) on[w] = false; });
+  }
+  bar.querySelectorAll('.stb-btn[data-mark]').forEach((b) => {
+    const active = !!on[b.getAttribute('data-mark')];
+    b.classList.toggle('is-on', active);
+    b.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+}
+
+document.addEventListener('selectionchange', () => {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount) return;
+  let node = sel.getRangeAt(0).startContainer;
+  node = node.nodeType === 3 ? node.parentNode : node;
+  const el = node && node.closest ? node.closest('.stb-editor') : null;
+  if (el) sampleSyncToolbar(el);
+});
 
 /** Open one palette, closing any other. */
 window.sampleFmtOpenPalette = function (btn) {
@@ -506,7 +544,7 @@ function _stbApply(targetId, change) {
     if (m.text[i] === _STB_NL) continue;
     attrs[i] = _stbNormWords(change(attrs[i] || []));
   }
-  el.innerHTML = sampleRenderEditor(m.text, attrs);
+  _stbPaint(el, m.text, attrs);
   _stbSelectRange(el, r.start, r.end);
   el.focus();
   el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -560,13 +598,9 @@ window.sampleFmtSection = function (targetId, word) {
   const attrs = m.attrs.slice(0, lineStart)
     .concat(insert.split('').map(() => []))
     .concat(m.attrs.slice(lineStart));
-  el.innerHTML = sampleRenderEditor(text, attrs);
+  _stbPaint(el, text, attrs);
   _stbSetCaret(el, lineStart + insert.length);
   el.focus();
   el.dispatchEvent(new Event('change', { bubbles: true }));
 };
 
-/** `[[red:hi]]` → `hi`. What a program would actually receive. */
-function sampleStripTokens(text) {
-  return sampleParseTokens(text).text;
-}
