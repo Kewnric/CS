@@ -20,9 +20,9 @@
 function codingStarterFundamentals() {
   const nodes = [
     { id: 'starter-folder-4', type: 'folder', name: 'E · Harder',              parentId: 'starter-folder-ar', scope: 'challenge', order: 4 },
-    { id: 'starter-folder-5', type: 'folder', name: 'D · Harder',              parentId: 'starter-folder-ptr', scope: 'challenge', order: 3 },
-    { id: 'starter-folder-6', type: 'folder', name: '8 · Memory you ask for',  parentId: null, scope: 'challenge', order: -2 },
-    { id: 'starter-folder-7', type: 'folder', name: '7 · Structs and a bag',   parentId: null, scope: 'challenge', order: -3 }
+    { id: 'starter-folder-5', type: 'folder', name: 'H · Harder, with pointers', parentId: 'starter-folder-ar', scope: 'challenge', order: 7 },
+    { id: 'starter-folder-6', type: 'folder', name: '7 · Memory you ask for',  parentId: null, scope: 'challenge', order: -3 },
+    { id: 'starter-folder-7', type: 'folder', name: '8 · Structs and a bag',   parentId: null, scope: 'challenge', order: -2 }
   ];
 
   const challenges = [

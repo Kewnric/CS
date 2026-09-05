@@ -31,7 +31,7 @@ function codingStarterPointers() {
     { id: 'starter-folder-fn-value',  type: 'folder', name: 'B · Giving an answer back', parentId: 'starter-folder-fn', scope: 'challenge', order: 1 },
     { id: 'starter-folder-ptr-what',  type: 'folder', name: 'A · A second name for a box', parentId: 'starter-folder-ptr', scope: 'challenge', order: 0 },
     { id: 'starter-folder-ptr-fn',    type: 'folder', name: 'B · Into a function',    parentId: 'starter-folder-ptr', scope: 'challenge', order: 1 },
-    { id: 'starter-folder-ptr-arr',   type: 'folder', name: 'C · Pointers and arrays', parentId: 'starter-folder-ptr', scope: 'challenge', order: 2 }
+    { id: 'starter-folder-ptr-arr',   type: 'folder', name: 'G · Together with pointers', parentId: 'starter-folder-ar', scope: 'challenge', order: 6 }
   ];
 
   const challenges = [

@@ -212,8 +212,13 @@ function updateCodingStarterPack() {
 
   const fresh = _csStamp(codingStarterPack());
   const haveNode = new Set((target.nodes || []).map(n => n.id));
+  /* Position by id, once. Refreshing used to locate each program with an
+     indexOf inside the loop -- a scan of the whole library per program, so
+     the work grew with the SQUARE of the pack. At 149 programs that is over
+     twenty thousand comparisons to do a job that needs one pass. */
   const byId = {};
-  (target.challenges || []).forEach(c => { byId[c.id] = c; });
+  const posById = {};
+  (target.challenges || []).forEach((c, i) => { byId[c.id] = c; posById[c.id] = i; });
 
   let folders = 0, added = 0, refreshed = 0, kept = 0, sets = 0, restructured = 0, rehomed = 0;
 
@@ -265,7 +270,7 @@ function updateCodingStarterPack() {
       kept++;
       return;
     }
-    target.challenges[target.challenges.indexOf(have)] = f;
+    target.challenges[posById[f.id]] = f;
     refreshed++;
   });
 
@@ -274,14 +279,16 @@ function updateCodingStarterPack() {
      merge walked nodes and challenges and simply never looked at this list.
      Matched by id like the rest; a set you have edited keeps your version. */
   target.sets = target.sets || [];
+  const setPos = {};
+  target.sets.forEach((x, i) => { setPos[x.id] = i; });
   (fresh.sets || []).forEach(fs => {
-    const have = target.sets.find(s => s.id === fs.id);
-    if (!have) { target.sets.push(fs); sets++; return; }
+    const have = setPos[fs.id] === undefined ? null : target.sets[setPos[fs.id]];
+    if (!have) { setPos[fs.id] = target.sets.length; target.sets.push(fs); sets++; return; }
     /* A pack set is a list of pointers into the library, so refreshing one is
        safe unless the problem list itself was changed. */
     if (JSON.stringify(have.problems || []) === JSON.stringify(fs.problems || [])) return;
     if (have.userEdited) { kept++; return; }
-    target.sets[target.sets.indexOf(have)] = fs;
+    target.sets[setPos[fs.id]] = fs;
     sets++;
   });
 
@@ -568,8 +575,54 @@ function _csIsMixed(lib) { return !csLibraryIsClean(lib); }
  * the library is empty (nothing to read it from) or genuinely mixed (the
  * banner and Repair handle that).
  */
+/* ── The pack reorganising itself ────────────────────────────
+   A library installed under an older layout keeps that layout until an
+   update runs, and an update only runs when someone presses the button. So a
+   reorganisation could sit in the code, correct and invisible, while the
+   library on screen still showed the folders it was meant to replace.
+
+   Structure is the pack's to own, so it is brought up to date on sight.
+   Only three properties are written -- what a folder is called, where it
+   sits and what order it comes in. Nothing about the programs is touched.
+
+   CHEAP ENOUGH TO CALL ON EVERY VISIT: the stamp is compared first, and only
+   a mismatch builds the pack. Once migrated it is an integer comparison. */
+const CS_LAYOUT_VERSION = 3;
+
+function _csMigrateLayout() {
+  if (typeof state === 'undefined' || !state) return 0;
+  if (state.codingPackLayout === CS_LAYOUT_VERSION) return 0;
+
+  const groups = [state.nodes || [], (state.codingStash && state.codingStash.nodes) || []];
+  const anyPackFolder = groups.some(g => g.some(n => String(n.id).indexOf('starter-folder-') === 0));
+  if (!anyPackFolder) { state.codingPackLayout = CS_LAYOUT_VERSION; return 0; }
+  if (typeof codingStarterPack !== 'function') return 0;
+
+  const fresh = {};
+  codingStarterPack().nodes.forEach(n => { fresh[n.id] = n; });
+
+  let moved = 0;
+  groups.forEach(list => {
+    list.forEach(n => {
+      const f = fresh[n.id];
+      if (!f) return;
+      if (n.name === f.name && (n.parentId || null) === (f.parentId || null) && n.order === f.order) return;
+      n.name = f.name;
+      n.parentId = f.parentId;
+      n.order = f.order;
+      moved++;
+    });
+  });
+
+  state.codingPackLayout = CS_LAYOUT_VERSION;
+  if (typeof saveData === 'function') saveData();
+  if (moved && typeof invalidateBrowseCache === 'function') invalidateBrowseCache();
+  return moved;
+}
+
 function _csReconcileMode() {
   if (typeof state === 'undefined' || !state) return;
+  _csMigrateLayout();
   const live = _csLift();
   if (!live.challenges.length || _csIsMixed(live)) return;
   const should = _csLooksLikePack(live) ? 'starter' : 'mine';
