@@ -106,6 +106,10 @@ function _csProgram(id, folder, title, description, samples, tests, reqs) {
   reqs = reqs || CS_REQS[id] || [];
   const solution = (typeof CS_SOLUTIONS !== 'undefined' && CS_SOLUTIONS[id])
                 || (typeof CS_ADV_SOLUTIONS !== 'undefined' && CS_ADV_SOLUTIONS[id])
+                || (typeof CS_CORE_SOLUTIONS !== 'undefined' && CS_CORE_SOLUTIONS[id])
+                || (typeof CS_PTR_SOLUTIONS !== 'undefined' && CS_PTR_SOLUTIONS[id])
+                || (typeof CS_ARR_SOLUTIONS !== 'undefined' && CS_ARR_SOLUTIONS[id])
+                || (typeof CS_LOOP_SOLUTIONS !== 'undefined' && CS_LOOP_SOLUTIONS[id])
                 || '';
   return {
     id: 'starter-' + id,
@@ -271,9 +275,9 @@ function updateCodingStarterPack() {
 
 function codingStarterPack() {
   const nodes = [
-    { id: 'starter-folder-1', type: 'folder', name: '1 · Printing and reading', parentId: null, scope: 'challenge', order: 0 },
-    { id: 'starter-folder-2', type: 'folder', name: '2 · Making decisions',     parentId: null, scope: 'challenge', order: 1 },
-    { id: 'starter-folder-3', type: 'folder', name: '3 · Repeating work',       parentId: null, scope: 'challenge', order: 2 }
+    { id: 'starter-folder-1', type: 'folder', name: 'E · First whole programs', parentId: 'starter-folder-core', scope: 'challenge', order: 4 },
+    { id: 'starter-folder-2', type: 'folder', name: '1 · Making choices',       parentId: null, scope: 'challenge', order: -9 },
+    { id: 'starter-folder-3', type: 'folder', name: 'C · Harder',               parentId: 'starter-folder-lp', scope: 'challenge', order: 2 }
   ];
 
   const challenges = [
@@ -372,6 +376,44 @@ function codingStarterPack() {
      bag. Kept apart because that half is a course of its own and this one is
      the warm-up before it. */
   let allCh = challenges, allNodes = nodes;
+  /* Tier 0 sorts ahead of folder 1 by its negative order. It is the ground
+     this file used to assume the reader already stood on. */
+  if (typeof codingStarterCore === 'function') {
+    const core = codingStarterCore();
+    allCh = core.challenges.concat(allCh);
+    allNodes = core.nodes.concat(allNodes);
+  }
+
+  /* Functions and pointers, taken apart. They sit between tier 0 and folder 1
+     because folder 5 used to open on swap() with three programs to teach it. */
+  if (typeof codingStarterPointers === 'function') {
+    const pt = codingStarterPointers();
+    allCh = pt.challenges.concat(allCh);
+    allNodes = pt.nodes.concat(allNodes);
+  }
+
+  /* Arrays, including the four operations a course asks for by name. */
+  if (typeof codingStarterArrays === 'function') {
+    const ar = codingStarterArrays();
+    allCh = ar.challenges.concat(allCh);
+    allNodes = ar.nodes.concat(allNodes);
+  }
+
+  /* Loops, and the patterns that make nested ones visible. Sits between tier 0
+     and functions because everything after it needs a loop. */
+  if (typeof codingStarterLoops === 'function') {
+    const lp = codingStarterLoops();
+    allCh = lp.challenges.concat(allCh);
+    allNodes = lp.nodes.concat(allNodes);
+  }
+
+  /* The handout-shaped ones: given files, one stub to fill in. They go last
+     because each needs a whole tier behind it. */
+  if (typeof codingStarterWorkshops === 'function') {
+    const ws = codingStarterWorkshops();
+    allCh = allCh.concat(ws.challenges);
+    allNodes = allNodes.concat(ws.nodes);
+  }
   if (typeof codingStarterFundamentals === 'function') {
     const more = codingStarterFundamentals();
     allCh = allCh.concat(more.challenges);

@@ -28,7 +28,17 @@ const OUT = fs.mkdtempSync(path.join(os.tmpdir(), 'packverify-'));
 const files = [
   'js/utils.js',
   'js/coding-starter-solutions.js',
+  'js/coding-starter-core-solutions.js',
+  'js/coding-starter-ptr-solutions.js',
+  'js/coding-starter-arr-solutions.js',
+  'js/coding-starter-loop-solutions.js',
+  'js/coding-starter-workshop-files.js',
   'js/coding-starter.js',
+  'js/coding-starter-core.js',
+  'js/coding-starter-ptr.js',
+  'js/coding-starter-arr.js',
+  'js/coding-starter-loop.js',
+  'js/coding-starter-workshop.js',
   'js/coding-starter-c.js',
   'js/coding-starter-advanced-solutions.js',
   'js/coding-starter-advanced.js',
@@ -59,6 +69,16 @@ for (const f of files) {
 const pack = vm.runInContext('codingStarterPack()', sandbox);
 const folders = {};
 pack.nodes.forEach(n => { folders[n.id] = n.name; });
+
+/* Two programs sharing an id is silent and nasty: _csProgram resolves the
+   reference by id, so the second one gets the first one's solution and the
+   library holds two entries the dedupe cannot tell apart. Caught here. */
+const seenIds = new Map();
+const duplicateIds = [];
+pack.challenges.forEach(c => {
+  if (seenIds.has(c.id)) duplicateIds.push({ id: c.id, titles: [seenIds.get(c.id), c.title] });
+  else seenIds.set(c.id, c.title);
+});
 
 let progs = 0, ran = 0, passed = 0;
 const failures = [];
@@ -113,8 +133,16 @@ for (const ch of pack.challenges) {
     ran++;
     const r = spawnSync(exe, [], { cwd: dir, input: t.stdin || '',
                                    encoding: 'utf8', timeout: 5000 });
-    const got = (r.stdout || '').replace(/\r\n/g, '\n').trim();
-    const want = String(t.expected == null ? '' : t.expected).replace(/\r\n/g, '\n').trim();
+    /* The same normalisation the app applies (_normalizeOutput in
+       practice.js): trailing whitespace goes, per line and at the end. This
+       was a bare trim(), which made the verifier STRICTER than the checker a
+       student is marked by -- a reference printing "1 2 3 " per row was
+       rejected here and accepted there. The verifier has to ask exactly what
+       the app asks, or it is testing a different program. */
+    const norm = (x) => String(x == null ? '' : x)
+      .replace(/\r\n/g, '\n').replace(/[ \t]+$/gm, '').replace(/\s+$/, '');
+    const got = norm(r.stdout);
+    const want = norm(t.expected);
     if (got === want) { passed++; }
     else failures.push({ prog: ch.title, id: ch.id, test: t.name,
                          want, got: got.slice(0, 200) });
@@ -123,6 +151,7 @@ for (const ch of pack.challenges) {
 
 console.log(JSON.stringify({
   programs: progs,
+  duplicateIds,
   testsRun: ran,
   testsPassed: passed,
   testsFailed: ran - passed,

@@ -27,10 +27,10 @@
 
 function codingStarterAdvanced() {
   const nodes = [
-    { id: 'starter-folder-9',  type: 'folder', name: '9 · Strings',              parentId: null, scope: 'challenge', order: 8 },
-    { id: 'starter-folder-10', type: 'folder', name: '10 · Functions and recursion', parentId: null, scope: 'challenge', order: 9 },
-    { id: 'starter-folder-11', type: 'folder', name: '11 · Grids',               parentId: null, scope: 'challenge', order: 10 },
-    { id: 'starter-folder-12', type: 'folder', name: '12 · Files',               parentId: null, scope: 'challenge', order: 11 }
+    { id: 'starter-folder-9',  type: 'folder', name: '6 · Strings',              parentId: null, scope: 'challenge', order: -4 },
+    { id: 'starter-folder-10', type: 'folder', name: 'C · Recursion and harder',     parentId: 'starter-folder-fn', scope: 'challenge', order: 2 },
+    { id: 'starter-folder-11', type: 'folder', name: 'F · Grids, harder',        parentId: 'starter-folder-ar', scope: 'challenge', order: 5 },
+    { id: 'starter-folder-12', type: 'folder', name: '10 · Files',               parentId: null, scope: 'challenge', order: 0 }
   ];
 
   const challenges = [

@@ -324,8 +324,8 @@ function _cslProgram(id, title, description, driverKey, headerName, headerKey, t
 
 function codingStarterLists() {
   return {
-    nodes: [{ id: 'starter-folder-8', type: 'folder', name: '8 · Lists (ADT)',
-              parentId: null, scope: 'challenge', order: 7 }],
+    nodes: [{ id: 'starter-folder-8', type: 'folder', name: '9 · Lists (ADT)',
+              parentId: null, scope: 'challenge', order: -1 }],
     challenges: [
       _cslProgram('list-array', 'A list in an array',
         'The handout version, with two files: <code>main.c</code> is the driver and '
