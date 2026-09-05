@@ -526,7 +526,67 @@ function _csExamSets(allCh) {
        'The final list: files of structures, fseek and rewind, multi-dimensional '
        + 'arrays, and a last pass over pointers and memory.',
        ['file-write-read', 'file-lines', 'file-structs', 'file-seek',
-        'grid-diagonal', 'mem-pairs', 'poke-bag'])
+        'grid-diagonal', 'mem-pairs', 'poke-bag']),
+
+    /* ── Drills ──────────────────────────────────────────────
+       An exam is a mixed paper under time. A DRILL is the opposite: one idea,
+       several times, close together, which is how something stops being a
+       thing you can follow and starts being a thing you can write. Each is
+       built from one tier of the course, so a drill never drifts from the
+       folder it came out of.
+       -------------------------------------------------------- */
+
+    mk('warmup', 'Drill · Your first hour',
+       'Print something, keep a value in a box, read one in, do arithmetic to '
+       + 'it. If you have never written C before, start here and nowhere else.',
+       ['c-print-line', 'c-print-int', 'c-var-int', 'c-var-cast', 'c-in-int',
+        'c-in-sum-avg', 'c-op-intdiv', 'c-op-seconds']),
+
+    mk('patterns', 'Drill · Loops and patterns',
+       'Nested loops until the shape stops being a puzzle: a line, a triangle, '
+       + 'a pyramid, a diamond, a hollow square.',
+       ['lp-count-up', 'lp-sum-n', 'lp-stars-line', 'lp-half-pyramid',
+        'lp-number-triangle', 'lp-pyramid', 'lp-diamond', 'lp-square']),
+
+    mk('funcs', 'Drill · Functions',
+       'Write one, hand it a value, get one back, build one out of another — '
+       + 'and watch one fail to change its caller.',
+       ['fn-hello', 'fn-param', 'fn-return', 'fn-return-use', 'fn-max2',
+        'fn-max3', 'fn-scope', 'fn-sum-recursive']),
+
+    mk('ptrs', 'Drill · Pointers',
+       'A second name for a box, then the same idea crossing into a function. '
+       + 'Ends on swap, which should feel like nothing by the time you reach it.',
+       ['ptr-declare', 'ptr-change', 'ptr-two-pointers', 'ptr-param',
+        'ptr-swap-intro', 'ptr-two-results', 'ptr-minmax-out']),
+
+    mk('arrops', 'Drill · Array operations',
+       'The four a course asks for by name — search, insert, delete, reverse — '
+       + 'and the two beside them that catch people.',
+       ['ar-search', 'ar-search-count', 'ar-insert', 'ar-delete',
+        'ar-delete-value', 'ar-reverse-place', 'ar-rotate']),
+
+    mk('arrfn', 'Drill · Arrays and functions',
+       'Where arrays stop behaving like every other value: passed by address, '
+       + 'changed by the callee, and sizeof answering about a pointer.',
+       ['ar-fn-sum', 'ar-fn-sizeof', 'ar-fn-modify', 'ar-fn-fill',
+        'ptr-array-name', 'ptr-arith', 'ptr-sum-walk']),
+
+    mk('grids', 'Drill · Two dimensions',
+       'Rows, then columns, then the whole grid at once.',
+       ['ar-2d-print', 'ar-2d-rowsum', 'ar-2d-colsum', 'ar-2d-max',
+        'grid-read-print', 'grid-rowsums', 'grid-transpose', 'grid-diagonal']),
+
+    /* The handout-shaped ones are a SET rather than a folder, because that is
+       how they are actually met: a sitting with several papers in it, not a
+       topic you browse. The programs still live in the library -- a set is a
+       list of pointers into it -- they just no longer take a folder of their
+       own at the top level. */
+    mk('workshops', 'Workshops · Handout practice',
+       'Given a header, a driver and the utilities, fill in the one file that '
+       + 'is stubbed. Delete from an array list, delete from a linked list, '
+       + 'then count-then-allocate over one.',
+       ['ws-rsvp', 'ws-lobby', 'ws-flights'])
   ];
 }
 
@@ -587,7 +647,7 @@ function _csIsMixed(lib) { return !csLibraryIsClean(lib); }
 
    CHEAP ENOUGH TO CALL ON EVERY VISIT: the stamp is compared first, and only
    a mismatch builds the pack. Once migrated it is an integer comparison. */
-const CS_LAYOUT_VERSION = 3;
+const CS_LAYOUT_VERSION = 4;
 
 function _csMigrateLayout() {
   if (typeof state === 'undefined' || !state) return 0;

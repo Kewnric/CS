@@ -29,8 +29,12 @@ function renderAdminVariantForm() {
   function fileTabsHTML(prefix, actionAdd) {
     return `<div class="file-tab-bar">
       ${activeVar.files.map((f, fi) => `
-        <div class="file-tab ${fi === activeVar.activeFileIndex ? 'active' : ''}" onclick="adminSwitchFile(${fi})">
+        <div class="file-tab ${fi === activeVar.activeFileIndex ? 'active' : ''}${f.locked ? ' is-locked' : ''}" onclick="adminSwitchFile(${fi})">
           <span class="file-tab-name">${escapeHTML(f.name + f.ext)}</span>
+          <span class="file-tab-lockbtn" onclick="event.stopPropagation(); adminToggleFileLock(${fi})"
+                title="${f.locked ? 'Given to the student — read only. Click to unlock.' : 'Click to lock: the student can read it but not edit it.'}">
+            <i data-lucide="${f.locked ? 'lock' : 'unlock'}" style="width:11px;height:11px;"></i>
+          </span>
           ${activeVar.files.length > 1 ? `<span class="file-tab-x" onclick="event.stopPropagation(); adminDeleteFile(${fi})">×</span>` : ''}
         </div>
       `).join('')}
@@ -267,6 +271,26 @@ function addAdminVariant() {
   adminState.activeVariantIndex = adminState.variants.length - 1;
   _adminMarkDirty();
   renderAdminVariantForm();
+}
+
+/**
+ * Lock or unlock one file.
+ *
+ * A locked file is handout material -- a header, a driver, the utilities --
+ * that the student reads but cannot edit, rename or delete. Marking them is
+ * what turns a pile of files into an exercise with an obvious place to work.
+ */
+function adminToggleFileLock(fi) {
+  const v = adminState.variants[adminState.activeVariantIndex];
+  if (!v || !v.files || !v.files[fi]) return;
+  v.files[fi].locked = !v.files[fi].locked;
+  if (typeof _adminMarkDirty === 'function') _adminMarkDirty();
+  if (typeof renderAdminVariantForm === 'function') renderAdminVariantForm();
+  if (typeof toast === 'function') {
+    const f = v.files[fi];
+    toast(f.name + f.ext + (f.locked ? ' is now read-only for the student.' : ' can be edited again.'),
+          { type: 'info', duration: 2600 });
+  }
 }
 
 function adminSwitchFile(fi) {

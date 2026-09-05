@@ -3423,6 +3423,87 @@ body.is-resizing .practice-panel { transition: none; }
   .practice-shortcuts[open] > summary svg { transform: none; }
 }
 
+/* ── A file you were given ───────────────────────────────────
+   Locked files are handout material: the header, the driver, the utilities.
+   They read as quieter than the file you are meant to be in, which is the
+   whole point -- the tab bar should tell you where the work is before you
+   have read a line of it. */
+.file-tab.is-locked { opacity: 0.72; }
+.file-tab.is-locked .file-tab-name { font-style: italic; }
+/* The file tab menu. Right-click was doing something useful and saying so
+   only in a title attribute nobody hovers long enough to read. */
+.file-menu {
+  position: fixed;
+  z-index: 900;
+  min-width: 210px;
+  padding: 5px;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: var(--bg-elevated, #1c1c24);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+}
+.file-menu-title {
+  padding: 4px 8px 6px;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 4px;
+}
+.file-menu-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.78rem;
+  text-align: left;
+  cursor: pointer;
+}
+.file-menu-item:hover { background: rgba(99, 102, 241, 0.14); }
+.file-menu-item svg { width: 14px; height: 14px; margin-top: 2px; flex-shrink: 0; }
+.file-menu-item strong { display: block; font-weight: 600; }
+/* The reason, under the action, so the choice is informed rather than brave. */
+.file-menu-item em {
+  display: block;
+  margin-top: 1px;
+  font-style: normal;
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+}
+.file-menu-item.is-danger { color: var(--color-danger, #ef4444); }
+.file-menu-item.is-danger:hover { background: rgba(239, 68, 68, 0.12); }
+
+/* Admin gets a clickable version of the same thing. */
+.file-tab-lockbtn {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s, color 0.15s;
+}
+.file-tab-lockbtn:hover { opacity: 1; color: var(--color-warning, #f59e0b); }
+.file-tab.is-locked .file-tab-lockbtn { opacity: 1; color: var(--color-warning, #f59e0b); }
+
+.file-tab-lock {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  color: var(--text-tertiary);
+}
+.file-tab.is-locked.active { opacity: 1; }
+.file-tab.is-locked.active .file-tab-lock { color: var(--color-warning, #f59e0b); }
+
+/* The caret would otherwise sit there blinking as though typing would work. */
+.editor-textarea.is-locked { caret-color: transparent; cursor: default; }
+
 /* --- Runnable sample header --- */
 .sample-head { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; }
 .sample-head .sample-title { margin: 0; }

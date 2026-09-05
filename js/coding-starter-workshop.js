@@ -51,10 +51,15 @@ function _cswProgram(id, title, description, folder) {
       starterCode: first.starterCode,
       code: first.code,
       activeFileIndex: 0,
+      /* Everything you were GIVEN is locked. The stub is the one file whose
+         starter differs from its reference, and it is the only one you can
+         type in -- which is the exercise stated in the tab bar rather than in
+         a paragraph someone has to read. */
       files: ordered.map((f, i) => ({
         id: 'starter-' + id + '-f' + (i + 1),
         name: f.name, ext: f.ext,
-        starterCode: f.starterCode, code: f.code
+        starterCode: f.starterCode, code: f.code,
+        locked: f.starterCode === f.code
       })),
       samples: [],
       tests: tests,
@@ -65,7 +70,10 @@ function _cswProgram(id, title, description, folder) {
 
 function codingStarterWorkshops() {
   const nodes = [
-    { id: 'starter-folder-ws', type: 'folder', name: '11 · Workshops', parentId: null, scope: 'challenge', order: 1 }
+    /* A sub-folder of Lists, not a tier of its own. All three are list
+       exercises, and they are MET as a practice set -- see the workshops set
+       in coding-starter.js -- so they do not need a top-level slot as well. */
+    { id: 'starter-folder-ws', type: 'folder', name: 'B · Workshops', parentId: 'starter-folder-8', scope: 'challenge', order: 1 }
   ];
 
   const challenges = [

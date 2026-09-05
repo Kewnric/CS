@@ -90,11 +90,16 @@ function initPractice() {
     if (v) usedSaves.add(v);
     return v || null;
   };
+  /* A LOCKED FILE HAS NO SAVED VERSION. It is handout material, so it always
+     loads as given -- a draft written before it was locked, or by anything
+     that once got past the guards, must not come back as the header the rest
+     of the program is compiled against. */
   state.userFiles = (autoSaved && autoSaved.length)
     ? autoSaved.map(sv => {
         const v = variantFor(sv);
         return v
-          ? { ...v, name: sv.name, ext: sv.ext, userCode: sv.userCode || '' }
+          ? { ...v, name: sv.name, ext: sv.ext,
+              userCode: v.locked ? (v.starterCode || '') : (sv.userCode || '') }
           : { id: sv.id || generateId(), name: sv.name, ext: sv.ext,
               starterCode: '', code: '', userCode: sv.userCode || '' };
       })
@@ -692,16 +697,26 @@ function renderPracticeFileTabs() {
   if (!tabBar || !state.userFiles) return;
   // The main file (index 0) can be reset but never deleted — everything else is
   // a companion file you added, so it gets a remove button instead.
+  /* A LOCKED FILE IS GIVEN, NOT WRITTEN. Workshop exercises hand you a header,
+     a driver and utilities and ask you to fill in one file; those given files
+     are locked, so the tab offers a padlock rather than a reset or a delete
+     and the editor will not take edits. It is a signpost as much as a guard --
+     it says where the work is. */
   tabBar.innerHTML = state.userFiles.map((f, fi) => `
-    <div class="file-tab ${fi === state.activeFileIndex ? 'active' : ''}" onclick="switchPracticeFile(${fi})" oncontextmenu="event.preventDefault(); practiceRenameFile(${fi}, this)" title="${fi === 0 ? 'Main file (right-click to rename)' : 'Companion file (right-click to rename)'}">
+    <div class="file-tab ${fi === state.activeFileIndex ? 'active' : ''}${f.locked ? ' is-locked' : ''}"
+         onclick="switchPracticeFile(${fi})"
+         oncontextmenu="practiceFileMenu(${fi}, this, event)"
+         title="${f.locked ? 'Given to you — read only. Right-click for options.' : 'Right-click for options'}">
       <span class="file-tab-name">${escapeHTML(f.name + f.ext)}</span>
-      ${fi === 0
-        ? `<button class="file-tab-reset" onclick="event.stopPropagation(); resetSingleFile(${fi})" title="Reset this file to starter code">
-             <i data-lucide="rotate-ccw" style="width:11px;height:11px;"></i>
-           </button>`
-        : `<button class="file-tab-reset" onclick="event.stopPropagation(); practiceDeleteFile(${fi})" title="Delete this file">
-             <i data-lucide="x" style="width:11px;height:11px;"></i>
-           </button>`}
+      ${f.locked
+        ? `<span class="file-tab-lock" aria-label="Read only"><i data-lucide="lock" style="width:11px;height:11px;"></i></span>`
+        : (fi === 0
+          ? `<button class="file-tab-reset" onclick="event.stopPropagation(); resetSingleFile(${fi})" title="Reset this file to starter code">
+               <i data-lucide="rotate-ccw" style="width:11px;height:11px;"></i>
+             </button>`
+          : `<button class="file-tab-reset" onclick="event.stopPropagation(); practiceDeleteFile(${fi})" title="Delete this file">
+               <i data-lucide="x" style="width:11px;height:11px;"></i>
+             </button>`)}
     </div>
   `).join('') + `<button class="file-tab-add" onclick="practiceAddFile(this)" title="Add a header / companion file"><i data-lucide="plus" style="width:13px;height:13px;"></i></button>`;
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: tabBar });
@@ -710,6 +725,11 @@ function renderPracticeFileTabs() {
 function savePracticeFileCode() {
   const textarea = document.getElementById('editor-textarea');
   if (!textarea || !state.userFiles) return;
+  /* Belt and braces. The textarea is read-only so it should not have changed,
+     but this is the one function that can overwrite a file wholesale, and a
+     given file being quietly rewritten is exactly what the lock is for. */
+  const active = state.userFiles[state.activeFileIndex];
+  if (active && active.locked) return;
   // Never textarea.value — a collapsed block is not in it. This is the funnel
   // Run, Check, Finish and autosave all reach the code through.
   const full = (typeof edFullSource === 'function') ? edFullSource(textarea) : textarea.value;
@@ -748,12 +768,25 @@ function loadPracticeFile(fi, opts) {
     setupSpecificEditor('editor-textarea', 'editor-pre', 'editor-code', true);
   }
 
+  /* readOnly rather than disabled: the text stays selectable and copyable,
+     which is the point of a file you were given to read. */
+  textarea.readOnly = !!file.locked;
+  textarea.classList.toggle('is-locked', !!file.locked);
+  const area = document.querySelector('.editor-container');
+  if (area) area.classList.toggle('has-locked-file', !!file.locked);
+
   // Update boss bar for this file. Both reads go through the reconstructed
   // source: with a block collapsed the textarea is only part of the file, and
   // writing that into userCode would delete the folded lines for good.
   const handler = () => {
+    /* The textarea is read-only for a locked file, so this should not fire --
+       but it is the other path that writes a file wholesale, and anything that
+       dispatches an input event would otherwise overwrite handout material
+       that the student is not even able to see change. */
+    const on = state.userFiles[state.activeFileIndex];
+    if (on && on.locked) return;
     const full = (typeof edFullSource === 'function') ? edFullSource(textarea) : textarea.value;
-    state.userFiles[state.activeFileIndex].userCode = full;
+    on.userCode = full;
     updateBossHealthBar(full);
   };
   textarea.removeEventListener('input', textarea._inputHandler);
@@ -804,8 +837,124 @@ function practiceAddFile(anchor) {
   });
 }
 
+
+/* ── Right-clicking a file tab ────────────────────────────────
+   Rename used to be the only thing right-click did, and it was invisible --
+   the tab's title attribute was the only place it was written down. A menu
+   says what is on offer, and it is where the lock can be taken off.
+
+   THE LOCK IS A SIGNPOST, NOT A CELL. Handout files are locked so that the
+   tab bar tells you where the work is, but it is your library: if you want to
+   change the driver, or you are the one writing the exercise, the way to do
+   it should be one click away rather than a trip to Admin.
+   -------------------------------------------------------------- */
+function _pfmClose() {
+  const el = document.getElementById('file-menu');
+  if (el) el.remove();
+  document.removeEventListener('mousedown', _pfmOutside, true);
+  document.removeEventListener('keydown', _pfmEsc, true);
+}
+
+function _pfmOutside(e) {
+  const el = document.getElementById('file-menu');
+  if (el && !el.contains(e.target)) _pfmClose();
+}
+
+function _pfmEsc(e) {
+  if (e.key === 'Escape') { e.stopPropagation(); _pfmClose(); }
+}
+
+function practiceFileMenu(fi, anchor, e) {
+  if (e) e.preventDefault();
+  if (!state.userFiles || fi >= state.userFiles.length) return;
+  // Right-clicking again puts it away rather than opening a second one.
+  if (document.getElementById('file-menu')) { _pfmClose(); return; }
+
+  const f = state.userFiles[fi];
+  const label = escapeHTML(f.name + f.ext);
+  const items = [];
+
+  if (f.locked) {
+    items.push(['unlock', 'unlock', 'Unlock this file',
+                'It was given to you — editing it changes the exercise.']);
+    items.push(['reset', 'rotate-ccw', 'Restore the given version', '']);
+  } else {
+    items.push(['rename', 'pencil', 'Rename…', '']);
+    items.push(['lock', 'lock', 'Lock this file', 'Read it, but do not edit it.']);
+    if (fi === 0) items.push(['reset', 'rotate-ccw', 'Reset to starter code', '']);
+    else items.push(['delete', 'trash-2', 'Delete this file', '']);
+  }
+
+  const el = document.createElement('div');
+  el.id = 'file-menu';
+  el.className = 'file-menu';
+  el.innerHTML = '<div class="file-menu-title">' + label + '</div>'
+    + items.map(([act, icon, text, hint]) =>
+        '<button type="button" class="file-menu-item' + (act === 'delete' ? ' is-danger' : '') + '" data-act="' + act + '">'
+        + '<i data-lucide="' + icon + '"></i>'
+        + '<span><strong>' + text + '</strong>'
+        + (hint ? '<em>' + hint + '</em>' : '') + '</span></button>').join('');
+
+  document.body.appendChild(el);
+
+  // Placed under the tab, nudged back on screen if it would fall off the edge.
+  const r = (anchor || document.body).getBoundingClientRect();
+  el.style.top = (r.bottom + 4) + 'px';
+  el.style.left = Math.max(6, Math.min(r.left, window.innerWidth - el.offsetWidth - 6)) + 'px';
+
+  el.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('.file-menu-item');
+    if (!btn) return;
+    const act = btn.getAttribute('data-act');
+    _pfmClose();
+    if (act === 'rename') practiceRenameFile(fi, anchor);
+    else if (act === 'delete') practiceDeleteFile(fi);
+    else if (act === 'reset') practiceRestoreFile(fi);
+    else if (act === 'lock' || act === 'unlock') practiceToggleFileLock(fi);
+  });
+
+  document.addEventListener('mousedown', _pfmOutside, true);
+  document.addEventListener('keydown', _pfmEsc, true);
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: el });
+}
+
+/** Turn the lock on or off for one file, from the attempt. */
+function practiceToggleFileLock(fi) {
+  if (!state.userFiles || fi >= state.userFiles.length) return;
+  const f = state.userFiles[fi];
+  // Save what is on screen BEFORE the lock changes, or an edit to the file
+  // being locked is lost, and the file being unlocked picks up the other's text.
+  savePracticeFileCode();
+  f.locked = !f.locked;
+  loadPracticeFile(state.activeFileIndex, { restored: true });
+  renderPracticeFileTabs();
+  if (typeof _practiceAutoSave === 'function') _practiceAutoSave();
+  if (typeof toast === 'function') {
+    toast(f.name + f.ext + (f.locked ? ' is locked — read only.' : ' can be edited now.'),
+          { type: 'info', duration: 2600 });
+  }
+}
+
+/** Put a file back to the version it was given as. */
+function practiceRestoreFile(fi) {
+  if (!state.userFiles || fi >= state.userFiles.length) return;
+  const f = state.userFiles[fi];
+  const name = f.name + f.ext;
+  const go = () => {
+    f.userCode = f.starterCode || '';
+    loadPracticeFile(state.activeFileIndex, { restored: true });
+    renderPracticeFileTabs();
+    if (typeof _practiceAutoSave === 'function') _practiceAutoSave();
+  };
+  if (typeof showConfirm === 'function') {
+    showConfirm('Restore file', 'Put "' + name + '" back to the version you were given?', go);
+  } else { go(); }
+}
+
 function practiceRenameFile(fi, anchor) {
   if (!state.userFiles || fi >= state.userFiles.length) return;
+  /* Renaming a given file breaks the #include that reaches it. */
+  if (state.userFiles[fi].locked) return;
   savePracticeFileCode();
   openFileDialog({
     mode: 'rename',
@@ -830,6 +979,10 @@ function practiceRenameFile(fi, anchor) {
 function practiceDeleteFile(fi) {
   if (!state.userFiles || fi <= 0 || fi >= state.userFiles.length) return;
   const f = state.userFiles[fi];
+  if (f.locked) {
+    if (typeof toast === 'function') toast(f.name + f.ext + ' was given to you — it cannot be deleted.', { type: 'info' });
+    return;
+  }
   const label = f.name + f.ext;
   const go = () => {
     savePracticeFileCode();          // keep edits to whatever is on screen now
