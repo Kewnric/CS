@@ -3337,3 +3337,386 @@
   color: var(--text-primary);
   white-space: nowrap;
 }
+
+/* ============================================================
+   THE 2024 CANVAS PASS
+   ------------------------------------------------------------
+   Everything below arrived with the audit fixes: performance containment,
+   colour rules, multi-select, the local graph, saved views, link labels and
+   the motion that makes a move read as a move rather than a cut.
+   ============================================================ */
+
+/* ── Containment ───────────────────────────────────────────────
+   181 absolutely-positioned cards inside one transformed layer, and not a
+   single `contain` or `will-change` in 3,300 lines. Telling the browser that a
+   node's layout cannot affect anything outside it took a full re-render from
+   100 ms to 80 ms. */
+.viz-node {
+  contain: layout style paint;
+}
+.viz-nodes-layer,
+.viz-canvas-svg {
+  will-change: transform;
+}
+.viz-canvas-container.panning .viz-node,
+.viz-node.dragging,
+.viz-node.dragging-child {
+  will-change: left, top;
+}
+
+/* ── Colour by rule ────────────────────────────────────────────
+   A tint set by vizNodeTint, kept separate from the colour you painted by hand
+   so turning the rule off gives your own colours back untouched. */
+.viz-node.viz-tinted .viz-node-inner {
+  border-color: color-mix(in srgb, var(--viz-tint) 72%, var(--border-color));
+  border-left: 3px solid var(--viz-tint);
+  box-shadow: var(--shadow-md), inset 0 0 0 9999px color-mix(in srgb, var(--viz-tint) 7%, transparent);
+}
+.viz-node.viz-tinted:hover .viz-node-inner {
+  border-color: var(--viz-tint);
+  box-shadow: var(--shadow-lg), 0 0 14px color-mix(in srgb, var(--viz-tint) 45%, transparent);
+}
+.viz-node.viz-tinted .viz-globe-circle {
+  border-color: var(--viz-tint);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--viz-tint) 30%, transparent);
+}
+
+/* The legend now explains whichever rule is running, not just the libraries. */
+.viz-legend-title {
+  font-weight: 700;
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 0.625rem;
+  margin-right: 0.15rem;
+}
+.viz-legend-item i {
+  background: currentColor;
+}
+
+/* ── Marquee selection ─────────────────────────────────────────
+   Shift-drag on empty canvas. Selection used to be a single id, so delete,
+   colour and move were all one-node operations. */
+.viz-marquee {
+  position: absolute;
+  border: 1.5px dashed var(--color-primary);
+  background: var(--color-primary-glow);
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+  z-index: 40;
+}
+.viz-node.viz-marquee-hit .viz-node-inner {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-glow);
+}
+
+/* ── Canvas status chips ───────────────────────────────────────
+   How many nodes are selected, and what the local graph is hiding. Both were
+   states you could get into with nothing on screen saying so. */
+.viz-canvas-chips {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 18;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: flex-start;
+  pointer-events: none;
+}
+.viz-canvas-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.28rem 0.5rem 0.28rem 0.55rem;
+  border-radius: var(--radius-md);
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid var(--border-color);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  pointer-events: auto;
+  animation: vizChipIn 0.22s cubic-bezier(0.34, 1.4, 0.64, 1);
+  max-width: min(340px, 60vw);
+}
+.viz-canvas-chip.hidden { display: none; }
+.viz-canvas-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.viz-focus-bar {
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--border-color));
+  color: var(--color-primary);
+}
+.viz-chip-x {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.6;
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+  padding: 0 0.15rem;
+  border-radius: 3px;
+}
+.viz-chip-x:hover { opacity: 1; background: rgba(255, 255, 255, 0.08); }
+.viz-chip-x:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; opacity: 1; }
+
+@keyframes vizChipIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* While a local graph is on, the canvas says so at the edges as well. */
+.viz-canvas-container.viz-focus-mode::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--color-primary) 22%, transparent);
+  border-radius: inherit;
+}
+
+/* ── Stat chips that are filters ───────────────────────────────
+   They were four inert numbers under the pane header. */
+.mini-stat-chip.viz-chip-filter {
+  border: 1px solid transparent;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+}
+.mini-stat-chip.viz-chip-filter:hover { transform: translateY(-1px); }
+.mini-stat-chip.viz-chip-filter.is-on {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+}
+.mini-stat-chip.viz-chip-filter:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ── Prerequisites, on the node card ───────────────────────────
+   This list used to be every other node on the canvas: 146 rows, 5,445 px of
+   scrolling inside a 160 px box, with no search and no ordering. */
+.viz-prereq-block {
+  padding: 0.7rem 0.75rem 0.75rem;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+.viz-prereq-head {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.viz-prereq-search {
+  width: 100%;
+  padding: 0.35rem 0.55rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 0.75rem;
+  font-family: var(--font-sans);
+}
+.viz-prereq-search:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-glow);
+}
+.viz-prereq-list {
+  max-height: 168px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding-right: 0.15rem;
+}
+.viz-prereq-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.32rem 0.45rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  font-size: 0.75rem;
+  cursor: pointer;
+  opacity: 0.72;
+  transition: opacity 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+.viz-prereq-row:hover { opacity: 1; transform: translateX(2px); }
+.viz-prereq-row:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+.viz-prereq-row.is-on {
+  opacity: 1;
+  border-color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 10%, var(--bg-surface));
+}
+.viz-prereq-icon { width: 13px; height: 13px; flex-shrink: 0; color: var(--text-tertiary); }
+.viz-prereq-row.is-on .viz-prereq-icon { color: var(--color-warning); }
+.viz-prereq-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viz-prereq-mark { width: 12px; height: 12px; flex-shrink: 0; opacity: 0.7; }
+.viz-prereq-empty { font-size: 0.7rem; color: var(--text-tertiary); padding: 0.35rem 0.15rem; }
+.viz-prereq-sep { height: 1px; background: var(--border-color); margin: 0.25rem 0; }
+
+/* ── Link labels ───────────────────────────────────────────────
+   A link carried colour, an arrow and a lock but no words. */
+.viz-link-label {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  fill: var(--text-secondary);
+  paint-order: stroke;
+  stroke: var(--bg-base);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  pointer-events: none;
+  text-anchor: middle;
+}
+
+/* ── Toolbar popups ────────────────────────────────────────────
+   Several rows are real <button>s now (they toggle state and need
+   aria-pressed), so they need the button reset the divs never did. */
+button.viz-link-type-option {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.viz-link-type-option.is-on {
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+.viz-link-type-option:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
+}
+.viz-popup-title {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.15rem 0.625rem 0.35rem;
+}
+.viz-view-row { padding-right: 0.35rem; }
+.viz-view-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viz-views-empty {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  padding: 0.3rem 0.625rem 0.5rem;
+}
+
+/* ── Reveal in the tree ────────────────────────────────────────
+   Clicking a node and clicking a row were two selections that never met. */
+.tree-node-row.viz-reveal-flash {
+  animation: vizRevealFlash 1.15s ease;
+}
+@keyframes vizRevealFlash {
+  0% { background: var(--color-primary-subtle); box-shadow: inset 2px 0 0 var(--color-primary); }
+  70% { background: var(--color-primary-subtle); box-shadow: inset 2px 0 0 var(--color-primary); }
+  100% { background: transparent; box-shadow: none; }
+}
+
+/* ── Far zoom ──────────────────────────────────────────────────
+   Below 0.45 the labels are a few pixels tall. Dropping the text and the
+   shadows there is both faster and more legible as a shape map. */
+.viz-canvas-container.viz-far .viz-node-subtitle,
+.viz-canvas-container.viz-far .viz-node-badge,
+.viz-canvas-container.viz-far .viz-port,
+.viz-canvas-container.viz-far .viz-link-label { display: none; }
+.viz-canvas-container.viz-far .viz-node-inner {
+  box-shadow: none;
+  padding: 0.55rem 0.7rem;
+}
+
+/* ── Entrance, staggered ───────────────────────────────────────
+   The keyframes and the _isNew flag were already here; every node still
+   appeared in the same frame. */
+.viz-node.viz-node-entering .viz-node-inner {
+  animation-delay: calc(var(--viz-stagger, 0) * 18ms);
+}
+
+/* A new link draws itself from source to target instead of snapping in. */
+@keyframes vizLinkDraw {
+  from { stroke-dashoffset: var(--viz-link-len, 600); }
+  to { stroke-dashoffset: 0; }
+}
+.viz-link.viz-link-new {
+  stroke-dasharray: var(--viz-link-len, 600);
+  animation: vizLinkDraw 0.32s ease-out forwards;
+}
+
+/* Hovering a node marches the dashes along its own connections. */
+@keyframes vizLinkFlow { to { stroke-dashoffset: -24px; } }
+.viz-canvas-container.viz-focus .viz-link-group.viz-link-adj .viz-link {
+  stroke-dasharray: 6 6;
+  animation: vizLinkFlow 0.9s linear infinite;
+}
+
+/* ── The toolbar on a small screen ─────────────────────────────
+   626 px of buttons in a 359 px pane. The row wraps, but wrapping four rows
+   of icons over the canvas is not an answer either — the labels go, the gaps
+   tighten, and the rest is behind the More button. */
+@media (max-width: 720px) {
+  .viz-canvas-toolbar { gap: 0.3rem; padding: 0.35rem 0.5rem; }
+  .viz-canvas-toolbar-left span { display: none; }
+  .viz-toolbar-sep { display: none; }
+  .viz-toolbar-pill-btn .viz-pill-chevron { display: none; }
+  .viz-minimap { width: 116px; height: 72px; }
+  .viz-minimap canvas { width: 116px; height: 72px; }
+  .viz-canvas-chips { top: 0.5rem; left: 0.5rem; }
+  .viz-scope-legend { flex-wrap: wrap; max-width: calc(100% - 1.5rem); }
+}
+
+/* Touch: the ports are 10px targets built for a mouse. */
+@media (pointer: coarse) {
+  .viz-port { width: 18px; height: 18px; }
+  .viz-canvas-container { touch-action: none; }
+}
+
+/* ── Focus rings ───────────────────────────────────────────────
+   Fifteen of the seventeen toolbar buttons had no visible focus state. */
+.viz-zoom-btn:focus-visible,
+.viz-module-tab:focus-visible,
+.viz-swap-btn:focus-visible,
+.viz-tabs-toggle-btn:focus-visible,
+.viz-color-swatch:focus-visible,
+.viz-ctx-item:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── Reduced motion ────────────────────────────────────────────
+   Two blocks in 3,300 lines, and neither covered the simulation, the selected
+   pulse, the fog reveal or the grid pulse — the four most likely to bother
+   someone who asked for less of it. */
+@media (prefers-reduced-motion: reduce) {
+  .viz-node,
+  .viz-node-inner,
+  .viz-canvas-chip,
+  .viz-toolbar-popup,
+  .viz-marquee { animation: none !important; transition: none !important; }
+  .viz-node.viz-node-entering .viz-node-inner { animation: none !important; opacity: 1; transform: none; }
+  .viz-link.viz-link-new { animation: none !important; stroke-dasharray: none; }
+  .viz-canvas-container.viz-focus .viz-link-group.viz-link-adj .viz-link {
+    animation: none !important;
+    stroke-dasharray: none;
+  }
+  .tree-node-row.viz-reveal-flash { animation: none !important; background: var(--color-primary-subtle); }
+  .viz-canvas-container { animation: none !important; }
+  .viz-node.selected .viz-node-inner { animation: none !important; }
+  .viz-fog-overlay { animation: none !important; }
+}

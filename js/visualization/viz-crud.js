@@ -15,15 +15,44 @@ function vizAddCanvasNode(label, type, dataId, scope, x, y) {
   return node;
 }
 
-function vizDeleteNode(nodeId) {
-  vizPushUndo();
+/**
+ * Delete a canvas node — and, if it stands for one, the library record too.
+ *
+ * That second half is why this now asks first. Deleting from here is the same
+ * act as deleting the program in its own library, and it used to happen on a
+ * bare Delete or Backspace with no dialog of any kind. The canvas Undo button
+ * cannot bring it back either (see vizUndo), so the confirmation IS the safety
+ * net for anything with a dataId. A node you only drew stays instant.
+ */
+function vizDeleteNode(nodeId, opts) {
   const node = viz.nodes.find(n => n.id === nodeId);
   if (!node) return;
 
   if (node.dataId === 'root' || node.type === 'root') {
+    // The undo snapshot used to be banked BEFORE this guard, so a refused
+    // delete still cost you one press of Ctrl+Z.
     showMessage('Cannot Delete Root', 'The Root category node cannot be removed from the canvas.');
     return;
   }
+
+  const owned = !!node.dataId;
+  const go = () => _vizDeleteNodeNow(node);
+  if (owned && !(opts && opts.skipConfirm) && typeof showConfirm === 'function') {
+    // Say it the way the app says it everywhere else: a person deletes a
+    // program, not a "challenge".
+    const kind = { folder: 'category', challenge: 'program', snippet: 'snippet', notebook: 'notebook' }[node.type] || 'node';
+    showConfirm('Delete this ' + kind + '?',
+      'This removes "' + (node.label || 'Untitled') + '" from your library, not just from the canvas.'
+      + (node.type === 'folder' ? ' Everything inside it goes too.' : ''),
+      go);
+    return;
+  }
+  go();
+}
+
+function _vizDeleteNodeNow(node) {
+  const nodeId = node.id;
+  vizPushUndo();
 
   if (node.dataId) {
     // Through the shared soft-delete helpers, so deleting a node here is the
@@ -51,6 +80,9 @@ function vizDeleteNode(nodeId) {
     }
     saveData();
   }
+
+  viz.selectedNodeIds.delete(nodeId);
+  if (viz.focusNodeId === nodeId) viz.focusNodeId = null;
 
   if (node.type === 'comment') {
     viz.nodes = viz.nodes.filter(n => n.id !== nodeId);
@@ -81,6 +113,40 @@ function vizDeleteNode(nodeId) {
   vizRenderCanvas();
   vizRenderContentPane();
   vizSave();
+}
+
+/** Delete key: everything selected, asked about once rather than per node. */
+function vizDeleteSelection() {
+  const ids = viz.selectedNodeIds.size
+    ? [...viz.selectedNodeIds]
+    : (viz.selectedNodeId ? [viz.selectedNodeId] : []);
+  if (!ids.length) return;
+  const nodes = ids.map(id => viz.nodes.find(n => n.id === id)).filter(Boolean).filter(n => n.type !== 'root' && n.dataId !== 'root');
+  if (!nodes.length) return;
+
+  if (nodes.length === 1) { vizDeleteNode(nodes[0].id); return; }
+
+  const owned = nodes.filter(n => n.dataId).length;
+  const run = () => {
+    vizPushUndo();
+    nodes.forEach(n => _vizDeleteNodeNow(n));
+    viz.selectedNodeIds.clear();
+    vizUpdateSelectionChip();
+  };
+  if (owned && typeof showConfirm === 'function') {
+    showConfirm('Delete ' + nodes.length + ' items?',
+      owned + ' of them are real library records and will be removed from your library, not just the canvas.',
+      run);
+  } else run();
+}
+
+/** Everything currently drawn on the canvas. */
+function vizSelectAll() {
+  const g = vizVisibleGraph();
+  viz.selectedNodeIds = new Set(g.nodes.map(n => n.id));
+  if (!viz.selectedNodeId && g.nodes.length) viz.selectedNodeId = g.nodes[0].id;
+  vizRenderCanvas();
+  vizUpdateSelectionChip();
 }
 
 function vizEditNodeColor(nodeId, color) {
@@ -168,7 +234,7 @@ function vizAddLink(fromId, toId, isCustom = false) {
   const toNode = viz.nodes.find(n => n.id === toId);
 
   if (fromNode?.type === 'comment' || toNode?.type === 'comment') {
-    const commentLink = { id: 'vl_' + generateId(), from: fromId, to: toId, locked: false, isCustom: true };
+    const commentLink = { id: 'vl_' + generateId(), from: fromId, to: toId, locked: false, isCustom: true, _isNew: true };
     viz.links.push(commentLink);
     vizRenderCanvas();
     vizSave();
@@ -243,7 +309,7 @@ function vizAddLink(fromId, toId, isCustom = false) {
     else if (['challenge', 'snippet', 'notebook'].includes(childNode.type)) moveItemToFolder(childNode.dataId, childNode.type, parentFolderId);
   }
 
-  const newLink = { id: 'vl_' + generateId(), from: finalFromId, to: finalToId, locked: false, isCustom: isCustom, arrowType: viz.defaultLinkArrowType || 'arrow' };
+  const newLink = { id: 'vl_' + generateId(), from: finalFromId, to: finalToId, locked: false, isCustom: isCustom, arrowType: viz.defaultLinkArrowType || 'arrow', _isNew: true };
   viz.links.push(newLink);
 
   vizRenderCanvas();
@@ -346,72 +412,91 @@ const VIZ_BAND_X = { challenge: 60, snippet: 60 + VIZ_BAND_W, notebook: 60 + VIZ
 function vizAutoPopulate(only) {
   const scopes = only || (viz.activeModule === 'general' || viz.activeModule === 'brain'
     ? [] : [viz.activeModule]);
+  if (!scopes.length) return;
   const scopeLabels = { challenge: 'Programs', snippet: 'Snippets', notebook: 'Notebooks' };
   let dirty = false;
 
+  /* One index built up front. This used to be a linear viz.nodes.find() per
+     folder and per item — O(n^2) over the whole library, and the library only
+     grows. */
+  const byData = new Map();
+  viz.nodes.forEach(n => { if (n.dataId) byData.set(n.dataId + '|' + n.scope, n); });
+  const foldersByParent = new Map();
+  (state.nodes || []).forEach(n => {
+    if (n.type !== 'folder') return;
+    const k = n.scope + '|' + (n.parentId || '');
+    if (!foldersByParent.has(k)) foldersByParent.set(k, []);
+    foldersByParent.get(k).push(n);
+  });
+
   scopes.forEach(scope => {
+    const had = viz.nodes.some(n => n.scope === scope);
     const baseX = VIZ_BAND_X[scope] || 60;
     let maxY = 60;
-    viz.nodes.filter(n => n.scope === scope).forEach(n => { if (n.y > maxY) maxY = n.y; });
+    viz.nodes.forEach(n => { if (n.scope === scope && n.y > maxY) maxY = n.y; });
     let nextY = maxY > 60 ? maxY + 100 : 60;
 
-    let scopeNode = viz.nodes.find(n => n.dataId === 'root' && n.scope === scope);
+    const items = (typeof getItemsForScope === 'function' ? getItemsForScope(scope) : []) || [];
+    const itemsByParent = new Map();
+    items.forEach(it => {
+      const k = it.parentId || '';
+      if (!itemsByParent.has(k)) itemsByParent.set(k, []);
+      itemsByParent.get(k).push(it);
+    });
+    const kids = (parentId) => foldersByParent.get(scope + '|' + (parentId || '')) || [];
+
+    let scopeNode = byData.get('root|' + scope);
     if (scopeNode) {
       scopeNode.type = 'root';
       scopeNode.label = scopeLabels[scope] || scope;
     } else {
-      const rootFolders = state.nodes.filter(n => n.type === 'folder' && n.scope === scope && !n.parentId);
-      const rootItems = (typeof getItemsForScope === 'function' ? getItemsForScope(scope) : []).filter(it => !it.parentId);
-      if (rootFolders.length === 0 && rootItems.length === 0) return;
-
+      if (kids(null).length === 0 && (itemsByParent.get('') || []).length === 0) return;
       scopeNode = { id: 'vn_' + generateId(), label: scopeLabels[scope] || scope, type: 'root', dataId: 'root', scope, x: baseX, y: nextY, color: null };
       viz.nodes.push(scopeNode);
+      byData.set('root|' + scope, scopeNode);
       nextY += 120;
       dirty = true;
     }
 
+    const addItem = (it, parentVizId, x) => {
+      if (byData.has(it.id + '|' + scope)) return;
+      const n = { id: 'vn_' + generateId(), label: it.title || it.name || 'Untitled', type: scope, dataId: it.id, scope, x, y: nextY, color: null };
+      viz.nodes.push(n);
+      byData.set(it.id + '|' + scope, n);
+      viz.links.push({ id: 'vl_' + generateId(), from: parentVizId, to: n.id, locked: false });
+      nextY += 70;
+      dirty = true;
+    };
+
     function syncFolderBranch(folder, parentVizId, depth) {
-      let vizNode = viz.nodes.find(n => n.dataId === folder.id);
+      let vizNode = byData.get(folder.id + '|' + scope);
       if (!vizNode) {
-        const x = baseX + depth * 260;
-        vizNode = { id: 'vn_' + generateId(), label: folder.name, type: 'folder', dataId: folder.id, scope, x, y: nextY, color: null, icon: folder.icon };
+        vizNode = { id: 'vn_' + generateId(), label: folder.name, type: 'folder', dataId: folder.id, scope, x: baseX + depth * 260, y: nextY, color: null, icon: folder.icon };
         viz.nodes.push(vizNode);
+        byData.set(folder.id + '|' + scope, vizNode);
         viz.links.push({ id: 'vl_' + generateId(), from: parentVizId, to: vizNode.id, locked: false });
         nextY += 80;
         dirty = true;
       }
-
-      const items = (typeof getItemsForScope === 'function' ? getItemsForScope(scope) : []).filter(it => it.parentId === folder.id);
-      items.forEach(it => {
-        if (!viz.nodes.find(n => n.dataId === it.id)) {
-          const itemVizId = 'vn_' + generateId();
-          viz.nodes.push({ id: itemVizId, label: it.title || it.name || 'Untitled', type: scope, dataId: it.id, scope, x: vizNode.x + 240, y: nextY, color: null });
-          viz.links.push({ id: 'vl_' + generateId(), from: vizNode.id, to: itemVizId, locked: false });
-          nextY += 70;
-          dirty = true;
-        }
-      });
-
-      const childFolders = state.nodes.filter(n => n.type === 'folder' && n.scope === scope && n.parentId === folder.id);
-      childFolders.forEach(cf => syncFolderBranch(cf, vizNode.id, depth + 1));
+      (itemsByParent.get(folder.id) || []).forEach(it => addItem(it, vizNode.id, vizNode.x + 240));
+      kids(folder.id).forEach(cf => syncFolderBranch(cf, vizNode.id, depth + 1));
     }
 
-    const rootFolders = state.nodes.filter(n => n.type === 'folder' && n.scope === scope && !n.parentId);
-    rootFolders.forEach(f => syncFolderBranch(f, scopeNode.id, 1));
+    kids(null).forEach(f => syncFolderBranch(f, scopeNode.id, 1));
+    (itemsByParent.get('') || []).forEach(it => addItem(it, scopeNode.id, baseX + 240));
 
-    const rootItems = (typeof getItemsForScope === 'function' ? getItemsForScope(scope) : []).filter(it => !it.parentId);
-    rootItems.forEach(it => {
-      if (!viz.nodes.find(n => n.dataId === it.id)) {
-        const itemVizId = 'vn_' + generateId();
-        viz.nodes.push({ id: itemVizId, label: it.title || it.name || 'Untitled', type: scope, dataId: it.id, scope, x: baseX + 240, y: nextY, color: null });
-        viz.links.push({ id: 'vl_' + generateId(), from: scopeNode.id, to: itemVizId, locked: false });
-        nextY += 70;
-        dirty = true;
-      }
-    });
+    /* Filling an empty canvas places nodes down a single column, which for the
+       starter pack is a 960 x 13,060 ribbon — a shape no zoom level can read.
+       A first fill therefore asks for one arrangement pass; a later top-up of
+       three new programs does not, because that would move everything you had
+       already placed by hand. */
+    if (!had && viz.nodes.filter(n => n.scope === scope).length > 12) viz._needsLayout = true;
   });
 
-  if (dirty) vizSave();
+  if (dirty) {
+    if (typeof _vizLinkSig !== 'undefined') _vizLinkSig = '';
+    vizSave();
+  }
 }
 
 function vizGetAllDescendants(nodeId, nodesList, linksList) {

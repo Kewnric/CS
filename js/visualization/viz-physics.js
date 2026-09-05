@@ -64,9 +64,10 @@ const VF_DT        = 0.016;   // reference step; real dt is clamped around this
 /** Snapshot of the active module's simulation context (cheap, per frame). */
 function _vfCtx() {
   if (typeof viz !== 'undefined' && viz.activeModule === 'brain') {
+    const bg = vizVisibleGraph();
     return {
-      nodes: brain.nodes,
-      links: brain.links,
+      nodes: bg.nodes,
+      links: bg.links,
       defW: 250, defH: 80,
       dragging: () => brain.draggingNode,
       updateLinks: () => { if (typeof brainUpdateSVGLinks === 'function') brainUpdateSVGLinks(); },
@@ -76,12 +77,14 @@ function _vfCtx() {
       render: () => { if (typeof brainRenderCanvas === 'function') brainRenderCanvas(); },
     };
   }
-  const scopes = (typeof vizGetVisibleScopes === 'function') ? vizGetVisibleScopes() : [];
-  const nodes = viz.nodes.filter(n => scopes.includes(n.scope));
-  const ids = new Set(nodes.map(n => n.id));
+  /* Only what is actually on screen. This used to filter by scope alone, so
+     with the depth set to "Folders only" the simulation ran springs and
+     collision against 147 invisible cards and shoved the 34 visible folders
+     apart to make room for them. */
+  const g = vizVisibleGraph();
   return {
-    nodes,
-    links: viz.links.filter(l => ids.has(l.from) && ids.has(l.to)),
+    nodes: g.nodes,
+    links: g.links,
     defW: 180, defH: 50,
     dragging: () => viz.draggingNode,
     updateLinks: () => { if (typeof vizUpdateSVGLinks === 'function') vizUpdateSVGLinks(); },
@@ -110,14 +113,22 @@ function vizToggleForceLayout() {
     ctx.nodes.forEach(n => vizForce._preForcePositions.set(n.id, { x: n.x, y: n.y }));
     // Pre-untangle: run the simulation synchronously (no DOM writes) so the
     // graph springs into a clean layout instantly instead of crawling there.
+    /* The untangle used to run all 260 iterations in one synchronous loop —
+       174 ms of frozen UI on the press. It runs in slices now, so the button
+       responds immediately and the graph visibly springs apart. */
     const sizes = _vfSizes(ctx);
-    for (let i = 0; i < VF_BURST_ITER; i++) {
-      const maxV = _vfStep(ctx, sizes, null, VF_DT);
-      if (i > 60 && maxV < VF_SETTLE_V) break;
-    }
-    vizForce._vel.clear();
-    ctx.render(); // one full re-render with the untangled positions
-    vizForceWake();
+    let i = 0;
+    const slice = () => {
+      if (!vizForce.enabled) return;
+      const until = Math.min(i + 40, VF_BURST_ITER);
+      let maxV = 0;
+      for (; i < until; i++) maxV = _vfStep(ctx, sizes, null, VF_DT);
+      if (i < VF_BURST_ITER && !(i > 60 && maxV < VF_SETTLE_V)) { requestAnimationFrame(slice); return; }
+      vizForce._vel.clear();
+      ctx.render();
+      vizForceWake();
+    };
+    requestAnimationFrame(slice);
     vizForce._last = 0;
     if (!vizForce._raf) vizForce._raf = requestAnimationFrame(_vfTick);
   } else {
@@ -305,10 +316,16 @@ function _vfStep(ctx, sizes, draggingId, dt) {
   });
 
   // 3. Gravity toward the centre (keeps islands from drifting away)
+  /* Repulsion is pairwise and therefore grows with n^2 while gravity was a
+     fixed constant, so the more nodes there were the further the graph blew
+     out: 181 nodes settled into a 22,000 x 1,000 strip that no zoom could
+     read. Scaling the pull with sqrt(n) keeps the shape roughly square at any
+     size, which is the whole point of running a simulation. */
+  const pull = VF_GRAVITY * cfg.center * 28 * Math.max(1, Math.sqrt(nodes.length) / 3);
   nodes.forEach(n => {
     const g = geo.get(n.id);
-    g.fx += (cx - g.cx) * VF_GRAVITY * cfg.center * 28;
-    g.fy += (cy - g.cy) * VF_GRAVITY * cfg.center * 28;
+    g.fx += (cx - g.cx) * pull;
+    g.fy += (cy - g.cy) * pull;
   });
 
   // 4. Integrate (skip the node being dragged — the cursor pins it)

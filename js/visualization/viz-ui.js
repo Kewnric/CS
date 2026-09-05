@@ -63,11 +63,12 @@ function vizRestoreUiState() {
 }
 
 function vizSwitchModule(mod) {
+  if (!VIZ_MODULES[mod]) return;
   viz._undoStack = [];
   brain._undoStack = [];
   const btn = document.getElementById('viz-undo-btn');
   if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
-  
+
   const leavingBrain = viz.activeModule === 'brain' && mod !== 'brain';
   if (leavingBrain) {
     brainSaveCurrentVersion();
@@ -78,7 +79,6 @@ function vizSwitchModule(mod) {
       const hint = document.getElementById('viz-linking-hint');
       if (hint) hint.classList.add('hidden');
     }
-    // Reset container classes that brain may have set
     const container = document.getElementById('viz-canvas-container');
     if (container) container.classList.remove('linking-mode', 'color-paint-mode');
   }
@@ -87,6 +87,12 @@ function vizSwitchModule(mod) {
   viz.activeModule = mod;
   viz.selectedFolderId = viz.folderStatePerModule[mod] || null;
   viz.selectedNodeId = null;
+  // A selection and a local-graph focus belong to the canvas you made them on.
+  viz.selectedNodeIds.clear();
+  viz.focusNodeId = null;
+  viz.marquee = null;
+  if (typeof _vizResetRenderCache === 'function') _vizResetRenderCache();
+  if (typeof vizUpdateSelectionChip === 'function') vizUpdateSelectionChip();
 
   // Turn off viz-side link mode if active (only relevant for non-brain modules)
   if (viz.linkModeEnabled) vizToggleLinkMode();
@@ -101,7 +107,10 @@ function vizSwitchModule(mod) {
   }
 
   document.querySelectorAll('.viz-module-tab').forEach(t => {
-    t.classList.toggle('active', t.dataset.module === mod);
+    const on = t.dataset.module === mod;
+    t.classList.toggle('active', on);
+    t.setAttribute('aria-selected', String(on));
+    t.tabIndex = on ? 0 : -1;
   });
 
   // Always reset link button visual to off when switching
@@ -123,18 +132,195 @@ function vizSwitchModule(mod) {
   if (mod === 'brain') {
     initBrain();
   } else {
-    // Reset toolbar label when leaving brain module
     const labelEl = document.getElementById('viz-canvas-toolbar-label');
-    const labelMap = { challenge: 'Programs Canvas', snippet: 'Snippets Canvas', notebook: 'Notebooks Canvas', general: 'General Canvas' };
-    if (labelEl) labelEl.textContent = labelMap[mod] || 'Mindmap Canvas';
+    if (labelEl) labelEl.textContent = vizModuleMeta(mod).label + ' Canvas';
     // Fill this library's own canvas on first visit. General is the union view,
     // so it shows whatever the others have placed and never drags all three
     // libraries on by itself — that was 80 nodes at 32% zoom.
     if (mod !== 'general') vizAutoPopulate([mod]);
     vizSyncDepthBtn();
+    const fresh = viz._needsLayout;
+    viz._needsLayout = false;
+    if (typeof vizSyncTintBtn === 'function') vizSyncTintBtn();
+    if (typeof vizSyncFocusBtn === 'function') vizSyncFocusBtn();
     vizRenderContentPane();
     vizRenderCanvas();
-    setTimeout(() => vizCenterCanvas(), 50);
+    if (fresh) setTimeout(() => vizAutoLayout('silent'), 30);
+    else setTimeout(() => vizCenterCanvas(true), 50);
+  }
+}
+
+/* ── Local graph ───────────────────────────────────────────────
+   181 nodes is not a map, it is a wall. Showing only what is within N links of
+   one node is how Obsidian makes a large graph legible, and Brain already had
+   a subtree version of the idea (_focusedParentId) that the library canvases
+   could not reach. */
+
+function vizToggleFocusMenu() {
+  const el = document.getElementById('viz-focus-popup');
+  if (el) el.classList.toggle('hidden');
+}
+
+function vizSetFocusHops(n) {
+  viz.focusHops = Number(n) || 0;
+  if (!viz.focusHops) viz.focusNodeId = null;
+  else if (!viz.focusNodeId) viz.focusNodeId = viz.selectedNodeId || null;
+  const popup = document.getElementById('viz-focus-popup');
+  if (popup) popup.classList.add('hidden');
+  vizSave();
+  vizSyncFocusBtn();
+  vizRenderCanvas();
+  if (viz.focusNodeId) setTimeout(() => vizCenterCanvas(), 30);
+}
+
+/** G, or the node menu: focus on what is selected. */
+function vizToggleFocusHere() {
+  if (viz.focusNodeId) { vizClearFocus(); return; }
+  const id = viz.selectedNodeId;
+  if (!id) { if (typeof toast === 'function') toast('Select a node first.', { type: 'info' }); return; }
+  viz.focusNodeId = id;
+  if (!viz.focusHops) viz.focusHops = 2;
+  vizSave();
+  vizSyncFocusBtn();
+  vizRenderCanvas();
+  setTimeout(() => vizCenterCanvas(), 30);
+}
+
+function vizClearFocus() {
+  viz.focusNodeId = null;
+  vizSyncFocusBtn();
+  vizRenderCanvas();
+  setTimeout(() => vizCenterCanvas(), 30);
+}
+
+function vizSyncFocusBtn() {
+  const btn = document.getElementById('viz-focus-btn');
+  const on = !!(viz.focusNodeId && viz.focusHops > 0);
+  if (btn) {
+    btn.classList.toggle('is-active', on);
+    const label = on
+      ? 'Showing ' + viz.focusHops + ' step' + (viz.focusHops !== 1 ? 's' : '') + ' around one node'
+      : 'Local graph (G)';
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+  }
+  document.querySelectorAll('#viz-focus-popup .viz-link-type-option').forEach(o => {
+    o.classList.toggle('active', Number(o.dataset.hops) === (viz.focusHops || 0));
+  });
+  const bar = document.getElementById('viz-focus-bar');
+  if (bar) {
+    bar.classList.toggle('hidden', !on);
+    if (on) {
+      const node = viz.nodes.find(n => n.id === viz.focusNodeId);
+      bar.innerHTML = '<i data-lucide="crosshair" style="width:12px;height:12px;"></i>'
+        + '<span>' + escapeHTML(node ? node.label : 'Focused') + ' · ' + viz.focusHops
+        + ' step' + (viz.focusHops !== 1 ? 's' : '') + '</span>'
+        + '<button type="button" class="viz-chip-x" onclick="vizClearFocus()" aria-label="Show the whole graph">&times;</button>';
+      if (typeof lucide !== 'undefined') lucide.createIcons({ el: bar });
+    }
+  }
+}
+
+/* ── Saved views ───────────────────────────────────────────────
+   Brain has versions; the library canvases had exactly one state each, so any
+   arrangement you made for one purpose destroyed the last one. A view is a
+   bookmark of the camera and the filters, not a copy of the graph. */
+
+function vizToggleViewsMenu() {
+  const el = document.getElementById('viz-views-popup');
+  if (!el) return;
+  el.classList.toggle('hidden');
+  if (!el.classList.contains('hidden')) vizRenderViewsMenu();
+}
+
+function vizRenderViewsMenu() {
+  const el = document.getElementById('viz-views-popup');
+  if (!el) return;
+  const mine = (viz.savedViews || []).filter(v => v.module === viz.activeModule);
+  el.innerHTML = mine.map(v =>
+    '<div class="viz-link-type-option viz-view-row" onclick="vizApplyView(\'' + v.id + '\')">'
+    + '<i data-lucide="bookmark" style="width:14px;height:14px;"></i>'
+    + '<span class="viz-view-name">' + escapeHTML(v.name) + '</span>'
+    + '<button type="button" class="viz-chip-x" onclick="event.stopPropagation();vizDeleteView(\'' + v.id + '\')" aria-label="Delete this view">&times;</button>'
+    + '</div>').join('')
+    + (mine.length ? '<div class="viz-ctx-divider"></div>' : '<div class="viz-views-empty">No saved views yet.</div>')
+    + '<div class="viz-link-type-option" onclick="vizSaveView()"><i data-lucide="plus" style="width:14px;height:14px;"></i> Save this view</div>';
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: el });
+}
+
+function vizSaveView() {
+  const popup = document.getElementById('viz-views-popup');
+  if (popup) popup.classList.add('hidden');
+  showInputDialog('Save this view', 'The camera, the depth filter and the colour rule — not a copy of the graph.',
+    'View name', '', (name) => {
+      const clean = (name || '').trim();
+      if (!clean) return;
+      viz.savedViews = viz.savedViews || [];
+      viz.savedViews.push({
+        id: 'vv_' + generateId(), name: clean, module: viz.activeModule,
+        pan: { x: viz.pan.x, y: viz.pan.y }, zoom: viz.zoom,
+        depth: viz.canvasDepth, tint: viz.tintRule,
+        focusNodeId: viz.focusNodeId, focusHops: viz.focusHops
+      });
+      vizSaveNow();
+      vizRenderViewsMenu();
+      if (typeof toast === 'function') toast('Saved "' + clean + '".', { type: 'success' });
+    });
+}
+
+function vizApplyView(id) {
+  const v = (viz.savedViews || []).find(x => x.id === id);
+  if (!v) return;
+  const popup = document.getElementById('viz-views-popup');
+  if (popup) popup.classList.add('hidden');
+  if (VIZ_DEPTHS.indexOf(v.depth) !== -1) viz.canvasDepth = v.depth;
+  if (VIZ_TINT_RULES[v.tint]) viz.tintRule = v.tint;
+  viz.focusNodeId = v.focusNodeId && viz.nodes.some(n => n.id === v.focusNodeId) ? v.focusNodeId : null;
+  viz.focusHops = v.focusHops || 0;
+  vizSyncDepthBtn();
+  vizSyncTintBtn();
+  vizSyncFocusBtn();
+  vizRenderCanvas();
+  vizTweenView(v.pan, v.zoom);
+  vizSave();
+}
+
+function vizDeleteView(id) {
+  viz.savedViews = (viz.savedViews || []).filter(v => v.id !== id);
+  vizSaveNow();
+  vizRenderViewsMenu();
+}
+
+/**
+ * Scroll the sidebar to the row a canvas node stands for, and flash it.
+ * Clicking a node and clicking a row were two selections that never met.
+ */
+function vizRevealInTree(dataId) {
+  if (!dataId || dataId === 'root') return;
+  let cur = (state.nodes || []).find(n => n.id === dataId);
+  if (!cur) {
+    const item = ['challenge', 'snippet', 'notebook']
+      .map(sc => ((typeof getItemsForScope === 'function' ? getItemsForScope(sc) : []) || []).find(x => x.id === dataId))
+      .find(Boolean);
+    if (item && !item.parentId) viz.expandedFolderIds.add('__root__');
+    cur = item && item.parentId ? (state.nodes || []).find(n => n.id === item.parentId) : null;
+  }
+  let guard = 0;
+  while (cur && guard++ < 60) {
+    viz.expandedFolderIds.add(cur.id);
+    cur = cur.parentId ? (state.nodes || []).find(n => n.id === cur.parentId) : null;
+  }
+  if (viz.activeModule === 'general' && typeof VIZ_GEN_SCOPES !== 'undefined') {
+    VIZ_GEN_SCOPES.forEach(s => viz.expandedFolderIds.add(s.id));
+  }
+  vizRenderContentPane();
+  const body = document.getElementById('viz-content-body');
+  const holder = body && body.querySelector('.tree-node[data-node-id="' + dataId + '"]');
+  const row = holder && holder.querySelector('.tree-node-row');
+  if (row) {
+    row.scrollIntoView({ block: 'center', behavior: vizPrefersReducedMotion() ? 'auto' : 'smooth' });
+    row.classList.add('viz-reveal-flash');
+    setTimeout(() => row.classList.remove('viz-reveal-flash'), 1200);
   }
 }
 
@@ -157,9 +343,13 @@ function vizRenderContentPane() {
   const query = (viz.paneQuery || '').trim().toLowerCase();
   // The pane's search box sat above a list it had no effect on — it only
   // highlighted canvas nodes.
-  const rowMatches = (o) => !query || String(o.title || o.name || '').toLowerCase().includes(query);
+  const rowMatches = (o) => vizPaneFilterAllows(o)
+    && (!query || String(o.title || o.name || '').toLowerCase().includes(query));
+  // A folder survives if anything under it does — true for the search box and
+  // for the header chip filters alike.
+  const narrowed = !!query || !!viz.paneFilter;
   const folderMatches = (fid, sc) => {
-    if (!query) return true;
+    if (!narrowed) return true;
     const kids = treeChildren(fid, sc);
     return kids.some(k => k.kind === 'folder' ? folderMatches(k.node.id, sc) : rowMatches(k.node));
   };
@@ -181,7 +371,7 @@ function vizRenderContentPane() {
         (typeof getItemsForScope === 'function' ? getItemsForScope(scope) : []).some(it => it.parentId === f.id);
       const isActive = viz.selectedFolderId === f.id;
       const chevronClass = hasChildren ? (isExpanded || query ? 'expanded' : '') : 'invisible';
-      if (query && !folderMatches(f.id, scope)) return;
+      if (narrowed && !folderMatches(f.id, scope)) return;
 
       html += `<div class="tree-node" data-level="${depth}" data-node-id="${f.id}">
         <div class="tree-node-row ${isActive ? 'active' : ''}" data-node-id="${f.id}"
@@ -285,7 +475,10 @@ function vizRenderContentPane() {
     ? html + treeRootDropHTML('viz')
     : (query
       ? `<div class="viz-content-empty"><i data-lucide="search-x"></i><p>Nothing matches “${escapeHTML(viz.paneQuery || '')}”.</p></div>`
-      : `<div class="viz-content-empty"><i data-lucide="inbox"></i><p>No items yet. Right-click the canvas to add nodes.</p></div>`);
+      : viz.paneFilter
+        ? `<div class="viz-content-empty"><i data-lucide="filter-x"></i><p>Nothing is ${viz.paneFilter === 'placed' ? 'on the canvas' : 'starred'} yet.</p>
+             <button type="button" class="btn btn-ghost btn-sm" onclick="vizTogglePaneFilter(null)">Show everything</button></div>`
+        : `<div class="viz-content-empty"><i data-lucide="inbox"></i><p>No items yet. Right-click the canvas to add nodes.</p></div>`);
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: body });
 }
 
@@ -471,7 +664,9 @@ function _vizGenFolderRow(o) {
 function vizRenderGeneralTree(body) {
   vizGenInvalidate();
   const query = (viz.paneQuery || '').trim().toLowerCase();
-  const matches = (it) => !query || String(it.title || it.name || '').toLowerCase().includes(query);
+  const matches = (it) => vizPaneFilterAllows(it)
+    && (!query || String(it.title || it.name || '').toLowerCase().includes(query));
+  const narrowed = !!query || !!viz.paneFilter;
   const iconOf = (scope, it) => it.icon || { challenge: 'file-code', snippet: 'code', notebook: 'book-open' }[scope] || 'file';
 
   const itemRow = (it, scope, level) => {
@@ -494,7 +689,7 @@ function vizRenderGeneralTree(body) {
   };
 
   const folderMatches = (fid, scope) => {
-    if (!query) return true;
+    if (!narrowed) return true;
     if (vizGenItems(scope).some(it => (it.parentId || null) === fid && matches(it))) return true;
     return (state.nodes || []).some(n => n.type === 'folder' && n.scope === scope && n.parentId === fid && folderMatches(n.id, scope));
   };
@@ -504,7 +699,7 @@ function vizRenderGeneralTree(body) {
     treeChildren(parentId, 'general', 'vizgen').forEach(entry => {
       const n = entry.node;
       if (entry.kind === 'folder') {
-        if (query && !folderMatches(n.id, scope)) return;
+        if (narrowed && !folderMatches(n.id, scope)) return;
         const count = typeof countItemsRecursive === 'function' ? countItemsRecursive(n.id, scope) : 0;
         const kids = count > 0 || (state.nodes || []).some(f => f.type === 'folder' && f.scope === scope && f.parentId === n.id);
         html += _vizGenFolderRow({
@@ -757,12 +952,23 @@ function vizNodeClick(e, nodeId) {
   const isFogged = nodeEl && nodeEl.classList.contains('viz-fog-of-war');
 
   if (viz.colorModeEnabled && !isFogged) {
-    vizEditNodeColor(nodeId, viz.colorPaintColor || null);
+    // Painting with several nodes selected paints all of them.
+    if (viz.selectedNodeIds.size > 1 && viz.selectedNodeIds.has(nodeId)) {
+      vizPushUndo();
+      viz.selectedNodeIds.forEach(id => {
+        const n = viz.nodes.find(x => x.id === id);
+        if (n) n.color = viz.colorPaintColor || null;
+      });
+      vizRenderCanvas();
+      vizSave();
+    } else {
+      vizEditNodeColor(nodeId, viz.colorPaintColor || null);
+    }
     return;
   }
 
   if (viz.linkingFrom) {
-    // Port drag completes via its own mouseup listener — ignore clicks from it
+    // Port drag completes via its own pointerup listener — ignore clicks from it
     if (viz.portDrag) return;
     if (viz.linkingFrom !== nodeId) {
       // Detect if clicked on a specific port circle
@@ -773,22 +979,9 @@ function vizNodeClick(e, nodeId) {
         if (viz._linkFromSide) link.fromSide = viz._linkFromSide;
         if (portEl && portEl.dataset.side) {
           link.toSide = portEl.dataset.side;
-        } else {
-          // Use cursor position relative to target node (3-tier logic)
-          const nodeEl = e.target.closest('.viz-node');
-          if (nodeEl) {
-            const rect = nodeEl.getBoundingClientRect();
-            const lx = e.clientX - rect.left, ly = e.clientY - rect.top;
-            const w = rect.width, h = rect.height;
-            const ef = 0.25;
-            const inCenterX = lx > w * ef && lx < w * (1 - ef);
-            const inCenterY = ly > h * ef && ly < h * (1 - ef);
-            if (!(inCenterX && inCenterY)) {
-              const dTop = ly, dBottom = h - ly, dLeft = lx, dRight = w - lx;
-              const minDist = Math.min(dTop, dBottom, dLeft, dRight);
-              link.toSide = minDist === dTop ? 'top' : minDist === dBottom ? 'bottom' : minDist === dLeft ? 'left' : 'right';
-            }
-          }
+        } else if (nodeEl) {
+          // The same rule the live preview draws, so what you saw is what you get.
+          link.toSide = vizSnapSide(nodeEl, e.clientX, e.clientY, viz.linkingFrom, nodeId);
         }
       }
     }
@@ -806,7 +999,21 @@ function vizNodeClick(e, nodeId) {
     return;
   }
 
+  /* Shift or Ctrl extends the selection. Everything that acts on "the
+     selection" — delete, colour, drag — reads viz.selectedNodeIds, and until
+     now that set could only ever hold one thing. */
+  if (e.shiftKey || e.ctrlKey || e.metaKey) {
+    if (viz.selectedNodeIds.has(nodeId)) viz.selectedNodeIds.delete(nodeId);
+    else viz.selectedNodeIds.add(nodeId);
+    viz.selectedNodeId = viz.selectedNodeIds.size ? nodeId : null;
+    vizRenderCanvas();
+    vizUpdateSelectionChip();
+    return;
+  }
+
+  viz.selectedNodeIds.clear();
   viz.selectedNodeId = nodeId;
+  vizUpdateSelectionChip();
 
   const node = viz.nodes.find(n => n.id === nodeId);
   if (node && node.type === 'folder' && node.dataId) {
@@ -814,14 +1021,16 @@ function vizNodeClick(e, nodeId) {
     if (node.dataId && node.dataId !== 'root') viz.expandedFolderIds.add(node.dataId);
     vizRenderContentPane();
     vizHideNodePopup();
-  } else if (node && ['challenge', 'snippet', 'notebook'].includes(node.type)) {
+  } else {
     // Selection only. The detail card used to appear on a single click, so it
     // opened while you were panning, box-selecting or just aiming at a node —
     // it now needs a deliberate double-click (see vizNodeDblClick).
     vizHideNodePopup();
-  } else {
-    vizHideNodePopup();
   }
+
+  // The pane and the canvas were two selections that never met: clicking a
+  // node left the tree exactly where it was, however far away the row is.
+  if (node && node.dataId && node.dataId !== 'root') vizRevealInTree(node.dataId);
 
   vizRenderCanvas();
 }
@@ -952,10 +1161,17 @@ function vizNodeCtx(e, nodeId) {
     editCommentBtn.style.display = node.type === 'comment' ? 'flex' : 'none';
   }
 
-  const resizeBtn = document.getElementById('viz-ctx-resize-btn');
-  if (resizeBtn) {
-    resizeBtn.style.display = node.type === 'root' ? 'none' : 'flex';
+  // Say which of the two deletes this is. Removing a node that stands for a
+  // library record removes the record; a comment or a stray node is just a
+  // drawing, and calling both "Delete Node" is what made the first one a trap.
+  const delLabel = document.getElementById('viz-ctx-delete-label');
+  if (delLabel) {
+    delLabel.textContent = node.dataId
+      ? (node.type === 'folder' ? 'Delete from library…' : 'Delete from library…')
+      : 'Remove from canvas';
   }
+  const revealBtn = document.getElementById('viz-ctx-reveal-btn');
+  if (revealBtn) revealBtn.style.display = (node.dataId && node.dataId !== 'root') ? 'flex' : 'none';
 
   const collapseBtn = document.getElementById('viz-ctx-collapse-btn');
   const expandBtn = document.getElementById('viz-ctx-expand-btn');
@@ -1075,6 +1291,8 @@ function vizLinkCtx(e, linkId) {
   const link = viz.links.find(l => l.id === linkId);
   const lockBtn = menu.querySelector('[data-action="toggle-lock"]');
   if (lockBtn && link) lockBtn.innerHTML = `<i data-lucide="${link.locked ? 'unlock' : 'lock'}"></i> ${link.locked ? 'Unlock' : 'Lock'}`;
+  const labelAction = document.getElementById('viz-link-label-action');
+  if (labelAction && link) labelAction.textContent = link.label ? 'Edit the label' : 'Add a label';
   menu.querySelectorAll('.viz-color-swatch').forEach(sw => {
     sw.classList.toggle('active', sw.dataset.color === (link?.color || ''));
   });
@@ -1132,8 +1350,19 @@ function vizCtxSetLinkArrow(type) {
   vizHideAllMenus();
 }
 
+/**
+ * Highlight the canvas nodes matching a query.
+ *
+ * This used to call vizRenderCanvas(), which tore down and rebuilt every node
+ * in the graph — 54 ms — to change two CSS classes. It toggles the classes.
+ */
 function vizSearchNodes(query) {
-  if (viz.activeModule === 'brain') { brainSearchNodes(query); const cb = document.getElementById('viz-search-clear'); if (cb) cb.classList.toggle('hidden', !query); return; }
+  if (viz.activeModule === 'brain') {
+    brainSearchNodes(query);
+    const cb = document.getElementById('viz-search-clear');
+    if (cb) cb.classList.toggle('hidden', !query);
+    return;
+  }
   viz.searchQuery = (query || '').toLowerCase().trim();
   const clearBtn = document.getElementById('viz-search-clear');
   if (clearBtn) clearBtn.classList.toggle('hidden', !viz.searchQuery);
@@ -1141,17 +1370,27 @@ function vizSearchNodes(query) {
   const scopes = vizGetVisibleScopes();
   viz.highlightedNodeIds = new Set();
   if (viz.searchQuery) {
-    viz.nodes.filter(n => scopes.includes(n.scope)).forEach(n => {
+    viz.nodes.forEach(n => {
+      if (!scopes.includes(n.scope)) return;
       if ((n.label || '').toLowerCase().includes(viz.searchQuery)) viz.highlightedNodeIds.add(n.id);
     });
   }
-  vizRenderContentPane();
-  vizRenderCanvas();
+  if (typeof _vizNodeEls !== 'undefined') {
+    _vizNodeEls.forEach((el, id) => {
+      const node = viz.nodes.find(n => n.id === id);
+      const hit = viz.highlightedNodeIds.has(id);
+      el.classList.toggle('viz-search-match', !!(viz.searchQuery && hit));
+      el.classList.toggle('viz-search-dim', !!(viz.searchQuery && !hit && node && node.type !== 'root'));
+    });
+  }
+  const empty = document.getElementById('viz-canvas-empty');
+  if (empty) vizPaintEmptyState(empty, vizVisibleGraph());
 }
 
 function vizClearSearch() {
   const inp = document.getElementById('viz-search-input');
   if (inp) inp.value = '';
+  clearTimeout(_vizSearchTimer);
   // In Brain the box filters the VERSION LIST (vizPaneSearch → brainSearchSidebar).
   // Clearing it only reset the canvas highlight, so the box went empty while the
   // list stayed filtered by a word that was no longer written anywhere.
@@ -1159,6 +1398,29 @@ function vizClearSearch() {
   viz.paneQuery = '';
   vizRenderContentPane();
   vizSearchNodes('');
+}
+
+/**
+ * The pane's search box: it filters the sidebar list AND highlights the canvas.
+ *
+ * It used to do both by calling vizRenderContentPane twice (once here, once
+ * inside vizSearchNodes) and then a full canvas rebuild — 70 ms for a single
+ * keystroke, with no debounce, so a six-letter query was six of those.
+ */
+let _vizSearchTimer = null;
+
+function vizPaneSearch(q) {
+  clearTimeout(_vizSearchTimer);
+  const value = q || '';
+  _vizSearchTimer = setTimeout(() => {
+    if (viz.activeModule === 'brain') {
+      if (typeof brainSearchSidebar === 'function') brainSearchSidebar(value);
+      return;
+    }
+    viz.paneQuery = value;
+    vizRenderContentPane();
+    vizSearchNodes(value);
+  }, 150);
 }
 
 /** Double-click a program/snippet/notebook node to open its detail card. */
@@ -1190,29 +1452,32 @@ function vizShowNodePopup(node, x, y) {
 
   const actionsEl = document.getElementById('viz-popup-actions');
   if (actionsEl) {
+    const act = (fn, icon, title, color) =>
+      `<button class="btn btn-ghost btn-sm" onclick="${fn}" title="${title}" aria-label="${title}" style="padding:0.25rem;"><i data-lucide="${icon}" style="width:16px;height:16px;color:${color};"></i></button>`;
     let btns = '';
     if (node.type === 'challenge') {
-      btns = `<button class="btn btn-ghost btn-sm" onclick="vizPopupPlay()" title="Practice" style="padding:0.25rem;"><i data-lucide="play" style="width:16px;height:16px;color:var(--color-success);"></i></button>
-        <button class="btn btn-ghost btn-sm" onclick="vizPopupEdit()" title="Edit" style="padding:0.25rem;"><i data-lucide="edit-2" style="width:16px;height:16px;color:var(--color-primary);"></i></button>`;
+      btns = act('vizPopupPlay()', 'play', 'Practice', 'var(--color-success)')
+        + act('vizPopupEdit()', 'edit-2', 'Edit', 'var(--color-primary)');
     } else if (node.type === 'snippet') {
-      btns = `<button class="btn btn-ghost btn-sm" onclick="vizPopupPlay()" title="View in Library" style="padding:0.25rem;"><i data-lucide="eye" style="width:16px;height:16px;color:var(--color-success);"></i></button>`;
+      btns = act('vizPopupPlay()', 'eye', 'View in Library', 'var(--color-success)');
     } else if (node.type === 'notebook') {
-      btns = `<button class="btn btn-ghost btn-sm" onclick="vizPopupPlay()" title="Open Notebook" style="padding:0.25rem;"><i data-lucide="play" style="width:16px;height:16px;color:var(--color-success);"></i></button>
-        <button class="btn btn-ghost btn-sm" onclick="vizPopupEdit()" title="Edit Notebook" style="padding:0.25rem;"><i data-lucide="edit-2" style="width:16px;height:16px;color:var(--color-primary);"></i></button>`;
+      btns = act('vizPopupPlay()', 'play', 'Open Notebook', 'var(--color-success)')
+        + act('vizPopupEdit()', 'edit-2', 'Edit Notebook', 'var(--color-primary)');
     }
+    // Two things the map could do and never offered from the card it opens.
+    btns += act('vizPopupFocus()', 'crosshair', 'Show only what is near this', 'var(--text-secondary)')
+      + act('vizPopupReveal()', 'list-tree', 'Find in the list', 'var(--text-secondary)');
     actionsEl.innerHTML = btns;
   }
 
   const statsEl = document.getElementById('viz-popup-stats');
   if (statsEl) {
     if (node.type === 'challenge' && node.dataId) {
-      const attempts = (state.history || []).filter(h => h.challengeId === node.dataId && !h.isArchived);
-      const perfect = attempts.filter(h => h.score === 100);
-      const bestScore = attempts.length ? Math.max(...attempts.map(h => h.score || 0)) : null;
+      const h = vizHistoryIndex().get(node.dataId) || { n: 0, perfect: 0, best: null, last: 0 };
       statsEl.innerHTML = `
-        <div class="viz-popup-stat"><span class="viz-popup-stat-val">${attempts.length}</span><span class="viz-popup-stat-label">Attempts</span></div>
-        <div class="viz-popup-stat"><span class="viz-popup-stat-val" style="color:var(--color-success)">${perfect.length}</span><span class="viz-popup-stat-label">Perfect</span></div>
-        <div class="viz-popup-stat"><span class="viz-popup-stat-val" style="color:var(--color-warning)">${bestScore !== null ? bestScore + '%' : '—'}</span><span class="viz-popup-stat-label">Best</span></div>
+        <div class="viz-popup-stat"><span class="viz-popup-stat-val">${h.n}</span><span class="viz-popup-stat-label">Attempts</span></div>
+        <div class="viz-popup-stat"><span class="viz-popup-stat-val" style="color:var(--color-success)">${h.perfect}</span><span class="viz-popup-stat-label">Perfect</span></div>
+        <div class="viz-popup-stat"><span class="viz-popup-stat-val" style="color:var(--color-warning)">${h.n ? h.best + '%' : '—'}</span><span class="viz-popup-stat-label">Best</span></div>
       `;
       statsEl.style.display = 'flex';
     } else {
@@ -1220,18 +1485,7 @@ function vizShowNodePopup(node, x, y) {
     }
   }
 
-  const locksList = document.getElementById('viz-popup-locks-list');
-  if (locksList) {
-    const allPrograms = viz.nodes.filter(n => ['challenge', 'snippet', 'notebook'].includes(n.type) && n.id !== node.id);
-    locksList.innerHTML = allPrograms.map(p => {
-      const isLocked = viz.links.some(l => l.locked && ((l.from === p.id && l.to === node.id) || (l.to === p.id && l.from === node.id)));
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:0.375rem 0.5rem;background:var(--bg-surface);border-radius:var(--radius-sm);border:1px solid ${isLocked ? 'var(--color-warning)' : 'var(--border-color)'};opacity:${isLocked ? '1' : '0.6'};cursor:pointer;transition:all 0.2s ease;" onclick="vizPopupToggleLock('${p.id}')">
-        <span style="font-size:0.75rem;">${escapeHTML(p.label)}</span>
-        <i data-lucide="${isLocked ? 'lock' : 'unlock'}" style="width:12px;height:12px;color:${isLocked ? 'var(--color-warning)' : 'var(--text-tertiary)'}"></i>
-      </div>`;
-    }).join('');
-    if (allPrograms.length === 0) locksList.innerHTML = '<div style="font-size:0.7rem;color:var(--text-tertiary);padding:0.5rem;">No other nodes available</div>';
-  }
+  vizPaintPrereqs(node);
 
   lucide.createIcons({ root: popup });
 
@@ -1254,6 +1508,78 @@ function vizShowNodePopup(node, x, y) {
 
   popup.style.left = popupLeft + 'px';
   popup.style.top = popupTop + 'px';
+}
+
+/**
+ * The prerequisites section.
+ *
+ * It used to render one row for EVERY other node on the canvas — 146 of them
+ * on the starter pack, 5,445 px of scrolling inside a 160 px box, with no
+ * search and no ordering, and it offered snippets as prerequisites for
+ * notebooks. What belongs here is the prerequisites that are actually set,
+ * plus a way to add one.
+ */
+function vizPaintPrereqs(node, filter) {
+  const list = document.getElementById('viz-popup-locks-list');
+  if (!list) return;
+  const q = (filter === undefined ? (document.getElementById('viz-prereq-search') || {}).value : filter) || '';
+  const query = q.trim().toLowerCase();
+
+  const setIds = new Set();
+  viz.links.forEach(l => {
+    if (!l.locked) return;
+    if (l.to === node.id) setIds.add(l.from);
+    else if (l.from === node.id) setIds.add(l.to);
+  });
+
+  const row = (n, on) => `
+    <div class="viz-prereq-row${on ? ' is-on' : ''}" onclick="vizPopupToggleLock('${n.id}')" role="button" tabindex="0"
+         title="${on ? 'Remove this prerequisite' : 'Require this first'}">
+      <i data-lucide="${VIZ_NODE_ICONS[n.type] || 'file'}" class="viz-prereq-icon"></i>
+      <span class="viz-prereq-name">${escapeHTML(n.label)}</span>
+      <i data-lucide="${on ? 'check' : 'plus'}" class="viz-prereq-mark"></i>
+    </div>`;
+
+  const set = viz.nodes.filter(n => setIds.has(n.id));
+  // Candidates are programs in the SAME library — a snippet was never a
+  // sensible prerequisite for a notebook, and a folder is not one at all.
+  const candidates = query
+    ? viz.nodes.filter(n => n.id !== node.id && !setIds.has(n.id)
+      && n.scope === node.scope && ['challenge', 'snippet', 'notebook'].includes(n.type)
+      && (n.label || '').toLowerCase().includes(query)).slice(0, 12)
+    : [];
+
+  list.innerHTML =
+    (set.length ? set.map(n => row(n, true)).join('') : '<div class="viz-prereq-empty">Nothing required yet.</div>')
+    + (candidates.length ? '<div class="viz-prereq-sep"></div>' + candidates.map(n => row(n, false)).join('') : '')
+    + (query && !candidates.length ? '<div class="viz-prereq-empty">No match in this library.</div>' : '');
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: list });
+
+  const search = document.getElementById('viz-prereq-search');
+  if (search) search.value = q;
+}
+
+function vizPrereqSearch(v) {
+  if (viz.popupTargetNode) vizPaintPrereqs(viz.popupTargetNode, v);
+}
+
+function vizPopupFocus() {
+  if (!viz.popupTargetNode) return;
+  viz.selectedNodeId = viz.popupTargetNode.id;
+  vizHideNodePopup();
+  viz.focusNodeId = viz.selectedNodeId;
+  if (!viz.focusHops) viz.focusHops = 2;
+  vizSave();
+  vizSyncFocusBtn();
+  vizRenderCanvas();
+  setTimeout(() => vizCenterCanvas(), 30);
+}
+
+function vizPopupReveal() {
+  if (!viz.popupTargetNode) return;
+  const id = viz.popupTargetNode.dataId;
+  vizHideNodePopup();
+  vizRevealInTree(id);
 }
 
 function vizHideNodePopup() {
@@ -1378,13 +1704,7 @@ function vizPopupToggleLock(otherNodeId) {
 
 function vizToggleFlowyDrag() {
   viz.flowyDragEnabled = !viz.flowyDragEnabled;
-  const btn = document.getElementById('viz-flow-toggle-btn');
-  if (btn) {
-    btn.classList.toggle('is-active', viz.flowyDragEnabled);
-    btn.classList.add('viz-state-flow');
-    btn.style.color = '';
-    btn.style.borderColor = '';
-  }
+  vizSyncMoreMenu();
   vizSave();
 }
 
@@ -1417,8 +1737,10 @@ function vizToggleColorMode() {
   }
   const popup = document.getElementById('viz-color-mode-popup');
   if (popup) popup.classList.toggle('hidden', !viz.colorModeEnabled);
+  if (btn) btn.setAttribute('aria-pressed', String(!!viz.colorModeEnabled));
   const container = document.getElementById('viz-canvas-container');
   if (container) container.classList.toggle('color-paint-mode', viz.colorModeEnabled);
+  vizSave();
 }
 
 function vizSetPaintColor(color) {
@@ -1501,11 +1823,7 @@ function vizCtxChangeIcon() {
 
 function vizToggleGlobeMode() {
   viz.globeModeEnabled = !viz.globeModeEnabled;
-  const btn = document.getElementById('viz-globe-toggle-btn');
-  if (btn) {
-    btn.classList.toggle('is-active', viz.globeModeEnabled);
-    btn.classList.add('viz-state-globe');
-  }
+  vizSyncMoreMenu();
   const container = document.getElementById('viz-canvas-container');
   if (container) container.classList.toggle('globe-mode', viz.globeModeEnabled);
   if (viz.activeModule === 'brain') brainRenderCanvas();
@@ -1526,14 +1844,6 @@ function vizAutoPopulateForce() {
    The identity line, subtitle and stat chips, filled per module. The pane used
    to show only an uppercase word and a breadcrumb, so it read as a different
    kind of surface from the library panes it is a copy of. */
-
-const VIZ_HEADER_META = {
-  challenge: { label: 'Programs', icon: 'file-code', noun: 'program' },
-  snippet: { label: 'Snippets', icon: 'code', noun: 'snippet' },
-  notebook: { label: 'Notebooks', icon: 'book-open', noun: 'notebook' },
-  general: { label: 'General', icon: 'layers', noun: 'item' },
-  brain: { label: 'Brain', icon: 'brain-circuit', noun: 'version' }
-};
 
 /** Show or hide the leaf rows, the same toggle the libraries have. */
 function vizToggleTreeItems() {
@@ -1586,24 +1896,28 @@ function vizPaintHeader(o) {
   }
 }
 
-/** Header for one of the library-backed modules. */
+/**
+ * Header for one of the library-backed modules.
+ *
+ * The chips used to be four inert numbers. They are filters now — the same
+ * affordance the Browse filter row has, and the one everybody tries on a
+ * number that sits next to a label.
+ */
 function vizUpdateHeaderStats() {
   const mod = viz.activeModule;
-  const meta = VIZ_HEADER_META[mod] || VIZ_HEADER_META.general;
-  const scopes = (mod === 'general') ? ['challenge', 'snippet', 'notebook'] : [mod];
+  const meta = vizModuleMeta(mod);
+  const scopes = meta.scopes.length ? meta.scopes : [mod];
   let items = 0, folders = 0, favs = 0;
+  const ids = new Set();
   scopes.forEach(sc => {
     const list = (typeof getItemsForScope === 'function' ? getItemsForScope(sc) : []) || [];
     items += list.length;
     favs += list.filter(x => x && x.favorite).length;
     folders += (state.nodes || []).filter(n => n.type === 'folder' && n.scope === sc).length;
+    list.forEach(x => ids.add(x.id));
   });
   // Only THIS module's items that are on the canvas, counted once each — the
   // node list spans every module, so a raw count ran past the total.
-  const ids = new Set();
-  scopes.forEach(sc => {
-    ((typeof getItemsForScope === 'function' ? getItemsForScope(sc) : []) || []).forEach(x => ids.add(x.id));
-  });
   const placedIds = new Set();
   (viz.nodes || []).forEach(n => { if (n.dataId && ids.has(n.dataId)) placedIds.add(n.dataId); });
   const placed = placedIds.size;
@@ -1629,35 +1943,44 @@ function vizUpdateHeaderStats() {
       </div>`;
   }
 
+  const f = viz.paneFilter;
   vizPaintHeader({
     label: meta.label,
-    icon: meta.icon,
+    icon: meta.headerIcon,
     subtitle: mod === 'general'
       ? `${items} items in 3 libraries · ${folders} folders`
       : `${items} ${meta.noun}${items !== 1 ? 's' : ''} across ${folders} folder${folders !== 1 ? 's' : ''}`,
     chips:
-      _vizChip('total', meta.icon, items, 'Total', '', `Total ${meta.noun}s`) +
-      _vizChip('placed', 'git-branch', placed, 'On canvas', 'completed', 'Items already placed on this canvas') +
-      _vizChip('fav', 'star', favs, 'Starred', '', 'Favourites in this module') +
+      _vizFilterChip('total', meta.headerIcon, items, 'Total', null, f, `Show every ${meta.noun}`) +
+      _vizFilterChip('placed', 'git-branch', placed, 'On canvas', 'placed', f, 'Only the items already placed on this canvas') +
+      _vizFilterChip('fav', 'star', favs, 'Starred', 'starred', f, 'Only your favourites') +
       lastChip
   });
 }
 
-/**
- * The pane's search box. In Brain it filters the version list; everywhere else
- * it highlights canvas nodes as before. It used to sit above a list it had no
- * effect on.
- */
-function vizPaneSearch(q) {
-  if (viz.activeModule === 'brain') {
-    if (typeof brainSearchSidebar === 'function') brainSearchSidebar(q);
-    return;
-  }
-  // It filters the list AND highlights the canvas. It used to do only the
-  // second, so typing into it left the 54 rows below completely untouched.
-  viz.paneQuery = q || '';
+/** A stat chip that is also a filter toggle. */
+function _vizFilterChip(stat, icon, value, label, filter, active, title) {
+  const on = filter !== null && active === filter;
+  const cls = 'mini-stat-chip viz-chip-filter' + (on ? ' is-on' : '') + (stat === 'placed' ? ' completed' : '');
+  return `<button type="button" class="${cls}" data-stat="${stat}" title="${escapeHTML(title || label)}"
+      aria-pressed="${on}" onclick="vizTogglePaneFilter(${filter === null ? 'null' : "'" + filter + "'"})">
+    <i data-lucide="${icon}" style="width:12px;height:12px;"></i>
+    <span class="mini-stat-value">${value}</span>
+    <span class="mini-stat-label">${label}</span>
+  </button>`;
+}
+
+function vizTogglePaneFilter(filter) {
+  viz.paneFilter = (viz.paneFilter === filter) ? null : filter;
   vizRenderContentPane();
-  vizSearchNodes(q);
+}
+
+/** Does a sidebar row survive the active chip filter? */
+function vizPaneFilterAllows(item) {
+  if (!viz.paneFilter) return true;
+  if (viz.paneFilter === 'starred') return !!item.favorite;
+  if (viz.paneFilter === 'placed') return viz.nodes.some(n => n.dataId === item.id);
+  return true;
 }
 
 /** Brain's arrange menu. */
@@ -1668,21 +1991,30 @@ function brainToggleLayoutMenu() {
 
 /** Brain's toolbar options only apply to Brain. */
 function vizSyncModuleTools() {
-  const tools = document.getElementById('brain-only-tools');
-  const chip = document.getElementById('brain-saved-chip');
   const isBrain = viz.activeModule === 'brain';
-  const depth = document.getElementById('viz-depth-btn');
-  if (depth && depth.parentElement) depth.parentElement.classList.toggle('hidden', isBrain);
-  const legend = document.getElementById('viz-scope-legend');
-  if (legend) legend.classList.toggle('hidden', viz.activeModule !== 'general');
-  if (tools) tools.classList.toggle('hidden', !isBrain);
-  if (chip) chip.classList.toggle('hidden', !isBrain);
+  const show = (id, on) => { const el = document.getElementById(id); if (el) el.classList.toggle('hidden', !on); };
+  const showWrap = (id, on) => {
+    const el = document.getElementById(id);
+    if (el && el.parentElement) el.parentElement.classList.toggle('hidden', !on);
+  };
+
+  show('brain-only-tools', isBrain);
+  show('brain-saved-chip', isBrain);
+  show('brain-new-btn', isBrain);
+  // The library canvases own these four; Brain has its own arrangement menu
+  // and no library scope to filter by.
+  showWrap('viz-depth-btn', !isBrain);
+  showWrap('viz-tint-btn', !isBrain);
+  showWrap('viz-focus-btn', !isBrain);
+  showWrap('viz-views-btn', !isBrain);
+
   const popup = document.getElementById('brain-layout-popup');
   if (popup && !isBrain) popup.classList.add('hidden');
-  // Creating a version moved into the right-click menu; this keeps one visible
-  // way in, so the feature is not discoverable only by guessing.
-  const newBtn = document.getElementById('brain-new-btn');
-  if (newBtn) newBtn.classList.toggle('hidden', !isBrain);
+  if (typeof vizPaintLegend === 'function') vizPaintLegend();
+  if (typeof vizUpdateSelectionChip === 'function') vizUpdateSelectionChip();
+  if (typeof vizSyncFocusBtn === 'function') vizSyncFocusBtn();
+  if (typeof vizApplyMinimapVisibility === 'function') vizApplyMinimapVisibility();
+  if (typeof vizSyncMoreMenu === 'function') vizSyncMoreMenu();
 }
 
 /* ── The shortcuts, on request ────────────────────────────────
@@ -1694,20 +2026,26 @@ function vizSyncModuleTools() {
 const VIZ_SHORTCUTS = {
   Keyboard: [
     [['F'], 'Fit the whole graph on screen'],
+    [['G'], 'Show only what is near the selected node'],
     [['L'], 'Link mode — click two nodes to connect them'],
     [['P'], 'Force layout on or off'],
+    [['/'], 'Jump to the search box'],
     [['+'], 'Zoom in'],
     [['−'], 'Zoom out'],
-    [['Del'], 'Delete the selected node'],
-    [['Esc'], 'Cancel a link, close any menu'],
+    [['Ctrl', 'A'], 'Select every node on the canvas'],
+    [['Del'], 'Delete what is selected — asks first if it is a library record'],
+    [['Esc'], 'Clear the focus, then the selection, then any open menu'],
     [['Ctrl', 'Z'], 'Undo']
   ],
   Mouse: [
     [['Drag'], 'Pan the canvas'],
+    [['Shift', 'Drag'], 'Draw a selection box'],
+    [['Shift', 'Click'], 'Add a node to the selection'],
     [['Scroll'], 'Zoom towards the pointer'],
+    [['Pinch'], 'Zoom, on a touch screen'],
     [['Double-click'], 'Add a node where you clicked'],
-    [['Right-click'], 'Node and canvas menus'],
-    [['Click map'], 'Jump to that part of the graph']
+    [['Right-click'], 'Node, link and canvas menus'],
+    [['Drag map'], 'Scrub the view around the graph']
   ]
 };
 
@@ -1767,3 +2105,88 @@ window.vizCloseShortcuts = function () {
   document.removeEventListener('keydown', _vizShortcutsKey, true);
   if (ov) { ov.classList.add('hidden'); ov.innerHTML = ''; ov.onclick = null; }
 };
+
+/* ── The "More" menu, and the toggles that live in it ─────────
+   Fog, globe, drag-along and the minimap are settings you change once and
+   forget. They were four of the seventeen buttons competing for attention in
+   a single flat toolbar row. */
+
+function vizToggleMoreMenu() {
+  const el = document.getElementById('viz-more-popup');
+  if (!el) return;
+  el.classList.toggle('hidden');
+  if (!el.classList.contains('hidden')) vizSyncMoreMenu();
+}
+
+function vizSyncMoreMenu() {
+  const set = (id, on) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.toggle('is-on', !!on);
+    el.setAttribute('aria-pressed', String(!!on));
+  };
+  set('viz-fog-toggle-btn', viz.fogEnabled);
+  set('viz-globe-toggle-btn', viz.globeModeEnabled);
+  set('viz-flow-toggle-btn', viz.flowyDragEnabled);
+  set('viz-minimap-btn', vizMinimapVisible());
+}
+
+/* The minimap could only be hidden from inside Brain, which is exactly where
+   it gets in the way least. On a 375px screen it covers 16% of the canvas. */
+const VIZ_MINIMAP_KEY = 'vizMinimapOn';
+
+function vizMinimapVisible() {
+  return localStorage.getItem(VIZ_MINIMAP_KEY) !== 'false';
+}
+
+function vizToggleMinimap() {
+  const on = !vizMinimapVisible();
+  try { localStorage.setItem(VIZ_MINIMAP_KEY, String(on)); } catch (e) { /* quota */ }
+  vizApplyMinimapVisibility();
+  vizSyncMoreMenu();
+}
+
+function vizApplyMinimapVisibility() {
+  const el = document.getElementById('viz-minimap');
+  if (el) el.classList.toggle('hidden', !vizMinimapVisible());
+}
+
+/* ── Node menu extras ─────────────────────────────────────── */
+
+function vizCtxFocusHere() {
+  const id = viz.contextNodeId;
+  vizHideAllMenus();
+  if (!id) return;
+  viz.selectedNodeId = id;
+  viz.focusNodeId = id;
+  if (!viz.focusHops) viz.focusHops = 2;
+  vizSave();
+  vizSyncFocusBtn();
+  vizRenderCanvas();
+  setTimeout(() => vizCenterCanvas(), 30);
+}
+
+function vizCtxReveal() {
+  const id = viz.contextNodeId;
+  vizHideAllMenus();
+  const node = viz.nodes.find(n => n.id === id);
+  if (node) vizRevealInTree(node.dataId);
+}
+
+/* ── Link labels ──────────────────────────────────────────── */
+
+function vizCtxLabelLink() {
+  const id = viz.contextLinkId;
+  vizHideAllMenus();
+  if (!id) return;
+  const link = viz.links.find(l => l.id === id);
+  if (!link) return;
+  showInputDialog('Label this link',
+    'A word or two for what the connection means — "explains", "needs first", "harder version of".',
+    'Label', link.label || '', (value) => {
+      link.label = (value || '').trim();
+      if (typeof _vizLinkSig !== 'undefined') _vizLinkSig = '';
+      vizRenderCanvas();
+      vizSave();
+    });
+}

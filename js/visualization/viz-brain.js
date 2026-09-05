@@ -1837,10 +1837,11 @@ function brainApplyOpts() {
     container.classList.toggle('brain-hide-links', !o.links);
     container.classList.toggle('brain-locked', brainIsLocked());
   }
-  const mini = document.getElementById('viz-minimap');
-  if (mini) mini.classList.toggle('hidden', !o.minimap);
+  // The minimap switch is shared with the library canvases now (it lives in
+  // the toolbar's More menu), so Brain no longer owns it.
+  if (typeof vizApplyMinimapVisibility === 'function') vizApplyMinimapVisibility();
   [['brain-snap-btn', o.snap], ['brain-links-btn', o.links],
-   ['brain-minimap-btn', o.minimap], ['brain-lock-btn', brainIsLocked()]
+   ['brain-lock-btn', brainIsLocked()]
   ].forEach(([id, on]) => {
     const b = document.getElementById(id);
     if (b) b.classList.toggle('active', !!on);

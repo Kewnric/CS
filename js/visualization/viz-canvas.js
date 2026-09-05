@@ -103,12 +103,13 @@ function vizPortDragStart(e, nodeId, side) {
       : vizSnapSide(targetEl, mv.clientX, mv.clientY, nodeId, targetEl.dataset.nodeId);
     vizPaintLinkTarget(targetEl, side);
   }
-  document.addEventListener('mousemove', onPortDragMove, true);
+  document.addEventListener('pointermove', onPortDragMove, true);
 
   // Complete the port drag on mouseup — find if cursor is over a node
   function onPortDragUp(upEvent) {
-    document.removeEventListener('mouseup', onPortDragUp, true);
-    document.removeEventListener('mousemove', onPortDragMove, true);
+    document.removeEventListener('pointerup', onPortDragUp, true);
+    document.removeEventListener('pointercancel', onPortDragUp, true);
+    document.removeEventListener('pointermove', onPortDragMove, true);
     vizClearLinkTarget();
     if (!viz.portDrag) return;
 
@@ -145,7 +146,8 @@ function vizPortDragStart(e, nodeId, side) {
     viz.portDrag = null;
     vizCancelLinking();
   }
-  document.addEventListener('mouseup', onPortDragUp, true);
+  document.addEventListener('pointerup', onPortDragUp, true);
+  document.addEventListener('pointercancel', onPortDragUp, true);
 }
 
 /**
@@ -205,452 +207,488 @@ function vizGetVisibleScopes() {
   return [viz.activeModule];
 }
 
-function vizCenterCanvas() {
-  const container = document.getElementById('viz-canvas-container');
-  if (!container || viz.nodes.length === 0) return;
+/* ── Rendering ─────────────────────────────────────────────────
+   This used to be `nodesLayer.innerHTML = ''` followed by rebuilding 181
+   elements, 724 ports and 1,647 event listeners — on every zoom press, every
+   node click, every colour change. It is a reconcile now: an element is built
+   once and afterwards only the parts that actually changed are touched.
 
-  const scopes = vizGetVisibleScopes();
-  const visibleNodes = viz.nodes.filter(n => scopes.includes(n.scope) && vizDepthAllows(n));
+   A node's element is rebuilt only when its SIGNATURE changes (label, icon,
+   colour, fog, completion, collapse count, comment text). Position and state
+   classes are cheap attribute writes and happen every time. */
 
-  if (visibleNodes.length === 0) {
-    viz.pan = { x: 0, y: 0 };
-    viz.zoom = 1;
+const _vizNodeEls = new Map();      // nodeId -> element, for reconcile
+let _vizLinkSig = '';               // when this changes the SVG groups rebuild
+let _vizDefsBuilt = false;
+
+/* Forgetting the element map is not enough on its own: the elements are still
+   in the layer, and a reconcile that has forgotten them cannot remove them.
+   Switching from Programs to Snippets left all 183 program cards on screen
+   underneath an empty-state message. */
+function _vizResetRenderCache() {
+  _vizNodeEls.clear();
+  _vizLinkSig = '';
+  _vizDefsBuilt = false;
+  vizGeomRelease();
+  const layer = document.getElementById('viz-nodes-layer');
+  if (layer) layer.innerHTML = '';
+  const svg = document.getElementById('viz-canvas-svg');
+  if (svg) svg.innerHTML = '';
+}
+
+/** Is this node greyed out because its prerequisites are unmet? */
+function _vizIsFogged(node, links) {
+  if (!viz.fogEnabled || node.type === 'root' || node.type === 'comment') return false;
+  const reqOf = (id) => (state.categoryRequirements ? state.categoryRequirements[id] : null);
+  const unmet = (req) => {
+    if (!req) return false;
+    if (req.requiredChallengeIds && req.requiredChallengeIds.length > 0) {
+      return req.requiredChallengeIds.some(cId => !state.history.some(h => h.challengeId === cId && h.score === 100 && !h.isArchived));
+    }
+    if (req.reqNodeId) {
+      const completed = typeof getCompletedCount === 'function' ? getCompletedCount(req.reqNodeId) : 0;
+      return completed < (req.count || 1);
+    }
+    return false;
+  };
+  for (const ll of links) {
+    if (ll.to !== node.id || !ll.locked) continue;
+    const parentViz = viz.nodes.find(n => n.id === ll.from);
+    if (parentViz && parentViz.dataId && unmet(reqOf(node.dataId || parentViz.dataId))) return true;
+  }
+  if (node.dataId && node.type === 'folder' && unmet(reqOf(node.dataId))) return true;
+  return false;
+}
+
+const VIZ_NODE_ICONS = { root: 'server', folder: 'folder', challenge: 'code', snippet: 'file-text', notebook: 'book', comment: 'message-circle' };
+
+/** Everything the node's markup depends on, gathered once. */
+function _vizNodeInfo(node, links) {
+  const fog = _vizIsFogged(node, links);
+  const globe = viz.globeModeEnabled && node.type !== 'comment' && node.type !== 'root';
+  let done = false, count = 0;
+  if (!fog && node.type === 'challenge' && node.dataId) {
+    const h = vizHistoryIndex().get(node.dataId);
+    if (h && h.perfect > 0) { done = true; count = h.perfect; }
+  }
+  return {
+    fog: fog, globe: globe, done: done, count: count,
+    tint: vizNodeTint(node),
+    icon: node.icon || VIZ_NODE_ICONS[node.type] || VIZ_NODE_ICONS[node.scope] || 'file'
+  };
+}
+
+function _vizNodeSig(node, o) {
+  return [node.label, node.type, o.icon, node.color || '', o.tint || '', o.fog ? 1 : 0, o.globe ? 1 : 0,
+    o.done ? 1 : 0, o.count, node.collapsed ? (node._collapsedChildren || []).length : -1,
+    node.type === 'comment' ? (node.commentContent || '') : '',
+    node.userSized ? node.w + 'x' + node.h : ''].join('~|~');
+}
+
+/** The inner markup of one node. Rebuilt only when the signature changes. */
+function _vizFillNode(el, node, o) {
+  const label = o.fog ? '???' : escapeHTML(node.label);
+  const hidden = node.collapsed ? (node._collapsedChildren || []).length : 0;
+  const collapseBadge = node.collapsed
+    ? `<span class="viz-collapse-badge" title="${hidden} hidden children">+${hidden}</span>` : '';
+
+  if (node.type === 'comment') {
+    const w = (node.userSized && node.w) ? `width:${node.w}px;` : 'width:250px;';
+    const h = (node.userSized && node.h) ? `height:${node.h}px;` : 'height:fit-content;';
+    el.innerHTML = `<div class="viz-node-inner" style="${w} ${h}">
+      <div class="viz-comment-body">
+        <div class="viz-comment-content">${escapeHTML(node.commentContent || 'Double click or right click to edit comment...')}</div>
+      </div>
+    </div>`;
+    _vizWatchCommentSize(el, node);
     return;
   }
 
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  visibleNodes.forEach(n => {
-    const nw = n.w || 200;
-    const nh = n.h || 80;
-    if (n.x < minX) minX = n.x;
-    if (n.x + nw > maxX) maxX = n.x + nw;
-    if (n.y < minY) minY = n.y;
-    if (n.y + nh > maxY) maxY = n.y + nh;
+  let subtitle = '';
+  if (node.type !== 'root') {
+    const scopeLabels = { challenge: 'Program', snippet: 'Snippet', notebook: 'Notebook' };
+    const typeLabel = node.type === 'folder' ? 'Category' : (scopeLabels[node.scope] || node.scope || '');
+    subtitle = `<div class="viz-node-subtitle">${o.fog ? 'Locked' : escapeHTML(typeLabel)}${o.done && o.count > 0 ? ' · x' + o.count : ''}</div>`;
+  }
+  const doneBadge = o.done
+    ? `<span class="viz-node-badge viz-node-badge-done" title="Completed"><i data-lucide="check" style="width:10px;height:10px;"></i></span>` : '';
+  const glyph = o.fog ? 'lock' : o.icon;
+
+  if (o.globe) {
+    el.innerHTML = `
+      <div class="viz-globe-circle" title="${label}">
+        <i data-lucide="${glyph}"></i>
+        ${o.done ? '<span class="viz-globe-badge"><i data-lucide="check" style="width:8px;height:8px;"></i></span>' : ''}
+      </div>
+      <div class="viz-globe-expand">
+        <div class="viz-node-header"><i data-lucide="${glyph}"></i><span class="viz-node-title">${label}</span>${doneBadge}</div>
+        ${subtitle}
+      </div>
+      ${collapseBadge}
+      ${o.fog ? '<div class="viz-fog-overlay"><i data-lucide="eye-off"></i></div>' : ''}`;
+  } else {
+    el.innerHTML = `<div class="viz-node-inner">
+      <div class="viz-node-header"><i data-lucide="${glyph}"></i><span class="viz-node-title">${label}</span>${doneBadge}</div>
+      ${subtitle}
+    </div>
+    ${collapseBadge}
+    ${o.fog ? '<div class="viz-fog-overlay"><i data-lucide="eye-off"></i><span class="viz-fog-label">???</span></div>' : ''}`;
+  }
+
+  // Ports go on after the content, since innerHTML has just cleared them.
+  _vizAddPorts(el, node.id);
+}
+
+function _vizAddPorts(el, nodeId) {
+  ['top', 'right', 'bottom', 'left'].forEach(side => {
+    const port = document.createElement('div');
+    port.className = 'viz-port';
+    port.dataset.side = side;
+    port.dataset.nodeId = nodeId;
+    port.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      e.stopPropagation(); e.preventDefault();
+      vizPortDragStart(e, nodeId, side);
+    });
+    el.appendChild(port);
   });
+}
 
-  const padding = 150;
-  const contentWidth = (maxX - minX) + (padding * 2);
-  const contentHeight = (maxY - minY) + (padding * 2);
+/** Honour a size the user actually dragged, and only that. */
+function _vizWatchCommentSize(el, node) {
+  setTimeout(() => {
+    const inner = el.querySelector('.viz-node-inner');
+    if (!inner) return;
+    if (node._resizeObserver) node._resizeObserver.disconnect();
+    // ResizeObserver fires once for the current size the moment it starts
+    // observing. Treating that as a resize baked the first layout's height into
+    // the note, which then clipped its own text as soon as it grew.
+    let initial = true;
+    const observer = new ResizeObserver(() => {
+      if (initial) { initial = false; return; }
+      if (inner.offsetWidth > 0) { node.w = inner.offsetWidth; node.h = inner.offsetHeight; node.userSized = true; }
+    });
+    observer.observe(inner);
+    node._resizeObserver = observer;
+  }, 0);
+}
 
-  const containerWidth = container.offsetWidth;
-  const containerHeight = container.offsetHeight;
+/** Listeners are attached once per element, never per render. */
+function _vizBindNode(el, nodeId) {
+  el.addEventListener('pointerdown', (e) => vizNodeMouseDown(e, nodeId));
+  el.addEventListener('click', (e) => vizNodeClick(e, nodeId));
+  el.addEventListener('contextmenu', (e) => vizNodeCtx(e, nodeId));
+  el.addEventListener('mouseenter', () => { if (typeof vizHoverFocus === 'function') vizHoverFocus(nodeId); });
+  el.addEventListener('mouseleave', () => {
+    if (typeof vizHoverClear === 'function') vizHoverClear();
+    delete el.dataset.nearSide;
+  });
+  el.addEventListener('mousemove', (e) => {
+    if (el.dataset.type === 'comment') return;
+    const r = el.getBoundingClientRect();
+    const lx = e.clientX - r.left, ly = e.clientY - r.top;
+    const dTop = ly, dBottom = r.height - ly, dLeft = lx, dRight = r.width - lx;
+    const min = Math.min(dTop, dBottom, dLeft, dRight);
+    el.dataset.nearSide = min === dTop ? 'top' : min === dBottom ? 'bottom' : min === dLeft ? 'left' : 'right';
+  });
+  el.addEventListener('dblclick', (e) => {
+    const node = viz.nodes.find(n => n.id === nodeId);
+    if (node && node.type === 'comment') { e.stopPropagation(); vizHideAllMenus(); vizOpenCommentEditor(node); }
+    else vizNodeDblClick(e, nodeId);
+  });
+}
 
-  let scaleX = containerWidth / contentWidth;
-  let scaleY = containerHeight / contentHeight;
-  let newZoom = Math.min(scaleX, scaleY, 1.2);
-  newZoom = Math.max(newZoom, 0.2);
-
-  viz.zoom = newZoom;
-
-  const centerX = minX + (maxX - minX) / 2;
-  const centerY = minY + (maxY - minY) / 2;
-
-  viz.pan.x = (containerWidth / 2) - (centerX * viz.zoom);
-  viz.pan.y = (containerHeight / 2) - (centerY * viz.zoom);
-
-  vizRenderCanvas();
-  vizSave();
+/* Below VIZ_CULL_ZOOM the cards are a few pixels tall and unreadable, so on a
+   very large graph there is no reason to build DOM for the ones off screen.
+   Left off entirely under 400 nodes: at that size the whole render is cheap
+   and culling would only add a way to be wrong. */
+function _vizCullSet(g) {
+  if (g.nodes.length <= 400 || viz.zoom >= VIZ_CULL_ZOOM) return null;
+  const c = document.getElementById('viz-canvas-container');
+  if (!c) return null;
+  const mx = c.offsetWidth * 0.75, my = c.offsetHeight * 0.75;
+  const x0 = (-viz.pan.x - mx) / viz.zoom, y0 = (-viz.pan.y - my) / viz.zoom;
+  const x1 = (-viz.pan.x + c.offsetWidth + mx) / viz.zoom;
+  const y1 = (-viz.pan.y + c.offsetHeight + my) / viz.zoom;
+  const keep = new Set();
+  g.nodes.forEach(n => {
+    const w = n.w || 200, h = n.h || 80;
+    if (n.x < x1 && n.x + w > x0 && n.y < y1 && n.y + h > y0) keep.add(n.id);
+  });
+  return keep;
 }
 
 function vizRenderCanvas() {
   if (viz.activeModule === 'brain') { brainRenderCanvas(); return; }
+  // Anything in the layer that the reconcile is not tracking belongs to another
+  // module (or to Brain, which writes the same layer directly).
+  const stray = document.getElementById('viz-nodes-layer');
+  if (stray && stray.children.length && !_vizNodeEls.size) stray.innerHTML = '';
   const container = document.getElementById('viz-canvas-container');
   const svg = document.getElementById('viz-canvas-svg');
   const nodesLayer = document.getElementById('viz-nodes-layer');
   const emptyState = document.getElementById('viz-canvas-empty');
-  if (!container || !nodesLayer) return;
+  if (!container || !nodesLayer || !svg) return;
 
   vizPruneGhostNodes();
+  vizHistoryIndex(true);
 
-  const scopes = vizGetVisibleScopes();
-  const hiddenByCollapse = new Set();
-  viz.collapsedNodeIds.forEach(cid => {
-    const cNode = viz.nodes.find(n => n.id === cid);
-    if (cNode && scopes.includes(cNode.scope)) {
-      vizGetAllDescendants(cid, viz.nodes, viz.links).forEach(d => hiddenByCollapse.add(d));
-    }
-  });
-  const visibleNodes = viz.nodes.filter(n => scopes.includes(n.scope) && !hiddenByCollapse.has(n.id) && vizDepthAllows(n));
-  const visibleNodeIds = new Set(visibleNodes.map(n => n.id));
-  const visibleLinks = viz.links.filter(l => visibleNodeIds.has(l.from) && visibleNodeIds.has(l.to));
+  const g = vizVisibleGraph();
+  const cull = _vizCullSet(g);
+  const drawn = cull ? g.nodes.filter(n => cull.has(n.id)) : g.nodes;
 
-  if (emptyState) emptyState.classList.toggle('hidden', visibleNodes.length > 0);
+  vizPaintEmptyState(emptyState, g);
 
   nodesLayer.style.transform = `translate(${viz.pan.x}px, ${viz.pan.y}px) scale(${viz.zoom})`;
   svg.style.transform = `translate(${viz.pan.x}px, ${viz.pan.y}px) scale(${viz.zoom})`;
+  container.classList.toggle('viz-far', viz.zoom < VIZ_CULL_ZOOM);
+  container.classList.toggle('viz-focus-mode', !!(viz.focusNodeId && viz.focusHops > 0));
 
-  nodesLayer.innerHTML = '';
-  const renderedNodeMap = new Map();
-  visibleNodes.forEach(node => {
-    const isLinked = visibleLinks.some(l => l.from === node.id || l.to === node.id);
-    const linkedClass = (!isLinked && node.type !== 'root' && node.type !== 'comment') ? 'not-linked' : '';
+  const linkedIds = new Set();
+  g.links.forEach(l => { linkedIds.add(l.from); linkedIds.add(l.to); });
 
-    let isFogged = false;
-    if (viz.fogEnabled && node.type !== 'root' && node.type !== 'comment') {
-      const incomingLockedLinks = visibleLinks.filter(l => l.to === node.id && l.locked);
-      if (incomingLockedLinks.length > 0) {
-        for (const ll of incomingLockedLinks) {
-          const parentViz = viz.nodes.find(n => n.id === ll.from);
-          if (parentViz && parentViz.dataId) {
-            const targetDataId = node.dataId || parentViz.dataId;
-            const req = state.categoryRequirements ? state.categoryRequirements[targetDataId] : null;
-            if (req) {
-              if (req.requiredChallengeIds && req.requiredChallengeIds.length > 0) {
-                isFogged = req.requiredChallengeIds.some(cId => !state.history.some(h => h.challengeId === cId && h.score === 100 && !h.isArchived));
-              } else if (req.reqNodeId) {
-                const completed = typeof getCompletedCount === 'function' ? getCompletedCount(req.reqNodeId) : 0;
-                isFogged = completed < (req.count || 1);
-              }
-            }
-          }
-        }
+  const seen = new Set();
+  let rebuilt = 0;
+  let entering = 0;
+
+  drawn.forEach(node => {
+    const info = _vizNodeInfo(node, g.links);
+    const sig = _vizNodeSig(node, info);
+    let el = _vizNodeEls.get(node.id);
+    if (el && !el.isConnected) { _vizNodeEls.delete(node.id); el = null; }
+
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'viz-node';
+      el.dataset.nodeId = node.id;
+      el.dataset.type = node.type || 'item';
+      _vizBindNode(el, node.id);
+      el.__sig = sig;
+      _vizFillNode(el, node, info);
+      nodesLayer.appendChild(el);
+      _vizNodeEls.set(node.id, el);
+      rebuilt++;
+      if (node._isNew) {
+        // Staggered by draw order rather than all in the same frame, the way
+        // the subfolder grid in Browse already arrives.
+        el.style.setProperty('--viz-stagger', String(Math.min(entering++, 26)));
+        el.classList.add('viz-node-entering');
+        delete node._isNew;
+        setTimeout(() => { el.classList.remove('viz-node-entering'); el.style.removeProperty('--viz-stagger'); }, 900);
       }
-      if (!isFogged && node.dataId && node.type === 'folder') {
-        const folderReq = state.categoryRequirements ? state.categoryRequirements[node.dataId] : null;
-        if (folderReq) {
-          if (folderReq.requiredChallengeIds && folderReq.requiredChallengeIds.length > 0) {
-            isFogged = folderReq.requiredChallengeIds.some(cId => !state.history.some(h => h.challengeId === cId && h.score === 100 && !h.isArchived));
-          } else if (folderReq.reqNodeId) {
-            const completed = typeof getCompletedCount === 'function' ? getCompletedCount(folderReq.reqNodeId) : 0;
-            isFogged = completed < (folderReq.count || 1);
-          }
-        }
-      }
+    } else if (el.__sig !== sig) {
+      el.__sig = sig;
+      el.dataset.type = node.type || 'item';
+      _vizFillNode(el, node, info);
+      rebuilt++;
     }
 
-    const fogClass = isFogged ? 'viz-fog-of-war' : '';
-
-    const isGlobe = viz.globeModeEnabled && node.type !== 'comment' && node.type !== 'root';
-
-    const el = document.createElement('div');
-    el.className = `viz-node ${node.id === viz.selectedNodeId ? 'selected' : ''} ${linkedClass} ${fogClass}${isGlobe ? ' viz-globe-node' : ''}`;
-    el.dataset.type = node.type || 'item';
-    // On the General canvas a program, a snippet and a notebook were identical
-    // rectangles — the only way to tell them apart was to read a 6px label.
-    if (node.scope) el.dataset.scope = node.scope;
-    if (node.color) el.dataset.color = node.color;
-    if (node.isDraft) el.dataset.draft = "true";
-    if (node.type === 'comment') el.dataset.format = node.commentFormat || 'auto';
+    // Cheap per-render writes: position, state classes, data attributes.
     el.style.left = node.x + 'px';
     el.style.top = node.y + 'px';
-    el.dataset.nodeId = node.id;
+    if (node.scope) el.dataset.scope = node.scope; else delete el.dataset.scope;
+    if (node.color) el.dataset.color = node.color; else delete el.dataset.color;
+    if (info.tint) el.style.setProperty('--viz-tint', info.tint); else el.style.removeProperty('--viz-tint');
+    el.classList.toggle('viz-tinted', !!info.tint);
+    if (node.isDraft) el.dataset.draft = 'true'; else delete el.dataset.draft;
+    if (node.type === 'comment') el.dataset.format = node.commentFormat || 'auto';
 
-    const iconMap = { root: 'server', folder: 'folder', challenge: 'code', snippet: 'file-text', notebook: 'book', comment: 'message-circle' };
-    const icon = node.icon || iconMap[node.type] || iconMap[node.scope] || 'file';
-
-    const displayLabel = isFogged ? '???' : escapeHTML(node.label);
-
-    let isCompleted = false;
-    let completionCount = 0;
-    if (!isFogged && node.type === 'challenge' && node.dataId) {
-      const attempts = (state.history || []).filter(h => h.challengeId === node.dataId && !h.isArchived);
-      const perfect = attempts.filter(h => h.score === 100);
-      isCompleted = perfect.length > 0;
-      completionCount = perfect.length;
-    }
-
-    const isHighlighted = viz.searchQuery && viz.highlightedNodeIds.has(node.id);
-    const isDimmed = viz.searchQuery && !viz.highlightedNodeIds.has(node.id) && node.type !== 'root';
-    if (isHighlighted) el.classList.add('viz-search-match');
-    if (isDimmed) el.classList.add('viz-search-dim');
-
-    let subtitle = '';
-    if (node.type !== 'comment' && node.type !== 'root') {
-      const scopeLabels = { challenge: 'Program', snippet: 'Snippet', notebook: 'Notebook' };
-      let typeLabel = node.type === 'folder' ? 'Category' : (scopeLabels[node.scope] || node.scope || '');
-      const scopeText = isFogged ? 'Locked' : escapeHTML(typeLabel);
-      const countText = isCompleted && completionCount > 0 ? ` · ×${completionCount}` : '';
-      subtitle = `<div class="viz-node-subtitle">${scopeText}${countText}</div>`;
-    }
-
-    let collapseBadgeHTML = '';
-    if (node.collapsed) {
-      const collapsedCount = (node._collapsedChildren || []).length;
-      collapseBadgeHTML = `<span class="viz-collapse-badge" title="${collapsedCount} hidden children">+${collapsedCount}</span>`;
-    }
-
-    if (node.type === 'comment') {
-      // Only a size you actually dragged is honoured — see the observer below.
-      const styleW = (node.userSized && node.w) ? `width: ${node.w}px;` : 'width: 250px;';
-      const styleH = (node.userSized && node.h) ? `height: ${node.h}px;` : 'height: fit-content;';
-      el.innerHTML = `<div class="viz-node-inner" style="${styleW} ${styleH}">
-        <div class="viz-comment-body">
-          <div class="viz-comment-content">${escapeHTML(node.commentContent || 'Double click or right click to edit comment...')}</div>
-        </div>
-      </div>`;
-
-      setTimeout(() => {
-        const inner = el.querySelector('.viz-node-inner');
-        if (!inner) return;
-        // Disconnect the previous observer — re-renders used to leak one per render
-        if (node._resizeObserver) node._resizeObserver.disconnect();
-        // ResizeObserver fires once for the current size as soon as it starts
-        // observing. Treating that as a resize baked the first layout's height
-        // into the note, which then clipped its own text as soon as it grew.
-        let initial = true;
-        const observer = new ResizeObserver(() => {
-          if (initial) { initial = false; return; }
-          if (inner.offsetWidth > 0) {
-            node.w = inner.offsetWidth;
-            node.h = inner.offsetHeight;
-            node.userSized = true;
-          }
-        });
-        observer.observe(inner);
-        node._resizeObserver = observer;
-      }, 0);
-    } else if (isGlobe) {
-      // Globe mode: collapsed circle with icon, expands to full card on hover
-      const badgeHTML = isCompleted
-        ? `<span class="viz-globe-badge"><i data-lucide="check" style="width:8px;height:8px;"></i></span>`
-        : '';
-      el.innerHTML = `
-        <div class="viz-globe-circle" title="${displayLabel}">
-          <i data-lucide="${isFogged ? 'lock' : icon}"></i>
-          ${badgeHTML}
-        </div>
-        <div class="viz-globe-expand">
-          <div class="viz-node-header">
-            <i data-lucide="${isFogged ? 'lock' : icon}"></i>
-            <span class="viz-node-title">${displayLabel}</span>
-            ${isCompleted ? `<span class="viz-node-badge viz-node-badge-done"><i data-lucide="check" style="width:10px;height:10px;"></i></span>` : ''}
-          </div>
-          ${subtitle}
-        </div>
-        ${collapseBadgeHTML}
-        ${isFogged ? '<div class="viz-fog-overlay"><i data-lucide="eye-off"></i></div>' : ''}
-      `;
-    } else {
-      const badgeHTML = isCompleted
-        ? `<span class="viz-node-badge viz-node-badge-done" title="Completed!"><i data-lucide="check" style="width:10px;height:10px;"></i></span>`
-        : '';
-      el.innerHTML = `<div class="viz-node-inner">
-        <div class="viz-node-header">
-          <i data-lucide="${isFogged ? 'lock' : icon}"></i>
-          <span class="viz-node-title">${displayLabel}</span>
-          ${badgeHTML}
-        </div>
-        ${subtitle}
-      </div>
-      ${collapseBadgeHTML}
-      ${isFogged ? '<div class="viz-fog-overlay"><i data-lucide="eye-off"></i><span class="viz-fog-label">???</span></div>' : ''}`;
-    }
-
-    el.addEventListener('mousedown', (e) => vizNodeMouseDown(e, node.id));
-    el.addEventListener('click', (e) => vizNodeClick(e, node.id));
-    el.addEventListener('contextmenu', (e) => vizNodeCtx(e, node.id));
-    // Obsidian-style hover focus: highlight this node + neighbors, fade the rest
-    el.addEventListener('mouseenter', () => { if (typeof vizHoverFocus === 'function') vizHoverFocus(node.id); });
-    el.addEventListener('mouseleave', () => { if (typeof vizHoverClear === 'function') vizHoverClear(); });
-    el.addEventListener('mousemove', (e) => {
-      if (node.type === 'comment') return;
-      const r = el.getBoundingClientRect();
-      const lx = e.clientX - r.left, ly = e.clientY - r.top;
-      const w = r.width, h = r.height;
-      // Distance to each edge
-      const dTop = ly, dBottom = h - ly, dLeft = lx, dRight = w - lx;
-      const min = Math.min(dTop, dBottom, dLeft, dRight);
-      const side = min === dTop ? 'top' : min === dBottom ? 'bottom' : min === dLeft ? 'left' : 'right';
-      el.dataset.nearSide = side;
-    });
-    el.addEventListener('mouseleave', () => { delete el.dataset.nearSide; });
-
-    if (node.type === 'comment') {
-      el.addEventListener('dblclick', (e) => {
-        e.stopPropagation();
-        vizHideAllMenus();
-        vizOpenCommentEditor(node);
-      });
-    } else {
-      el.addEventListener('dblclick', (e) => vizNodeDblClick(e, node.id));
-    }
-
-    // Add connection ports (not on comment nodes — they're free-form)
-    if (node.type !== 'comment') {
-      ['top','right','bottom','left'].forEach(side => {
-        const port = document.createElement('div');
-        port.className = 'viz-port';
-        port.dataset.side = side;
-        port.dataset.nodeId = node.id;
-        port.addEventListener('mousedown', (e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          vizPortDragStart(e, node.id, side);
-        });
-        el.appendChild(port);
-      });
-    }
-
-    // Entrance animation only for newly added nodes (flag set by addCanvasNode)
-    if (node._isNew) {
-      el.classList.add('viz-node-entering');
-      delete node._isNew;
-      setTimeout(() => el.classList.remove('viz-node-entering'), 400);
-    }
-
-    nodesLayer.appendChild(el);
-    renderedNodeMap.set(node.id, el);
+    const cl = el.classList;
+    cl.toggle('selected', node.id === viz.selectedNodeId || viz.selectedNodeIds.has(node.id));
+    cl.toggle('viz-globe-node', info.globe);
+    cl.toggle('viz-fog-of-war', info.fog);
+    cl.toggle('not-linked', !linkedIds.has(node.id) && node.type !== 'root' && node.type !== 'comment');
+    cl.toggle('viz-search-match', !!(viz.searchQuery && viz.highlightedNodeIds.has(node.id)));
+    cl.toggle('viz-search-dim', !!(viz.searchQuery && !viz.highlightedNodeIds.has(node.id) && node.type !== 'root'));
+    seen.add(node.id);
   });
 
-  let svgContent = '';
-  visibleLinks.forEach(link => {
-    const fromNode = visibleNodes.find(n => n.id === link.from);
-    const toNode = visibleNodes.find(n => n.id === link.to);
-    if (!fromNode || !toNode) return;
-
-    const fromEl = renderedNodeMap.get(link.from);
-    const toEl = renderedNodeMap.get(link.to);
-
-    const fromW = fromEl ? fromEl.offsetWidth : (fromNode.type === 'root' ? 160 : 180);
-    const fromH = fromEl ? fromEl.offsetHeight : (fromNode.type === 'root' ? 60 : 50);
-    const toW = toEl ? toEl.offsetWidth : (toNode.type === 'root' ? 160 : 180);
-    const toH = toEl ? toEl.offsetHeight : (toNode.type === 'root' ? 60 : 50);
-
-    const cpPath = vizBezierPath(
-      fromNode.x, fromNode.y, fromW, fromH,
-      toNode.x, toNode.y, toW, toH,
-      link.fromSide, link.toSide
-    );
-    const linkColorHex = link.color ? vizColorMap(link.color) : null;
-    const linkColorStyle = linkColorHex ? `stroke:${linkColorHex};` : '';
-    const isLocked = link.locked;
-    const isCustom = link.isCustom;
-    const cls = isLocked ? 'viz-link locked' : isCustom ? 'viz-link custom-link' : 'viz-link';
-    // Use a dynamic colored marker when the link has a custom color
-    let baseArrowId;
-    if (link.color) {
-      baseArrowId = `viz-arrowhead-col-${link.color}`;
-    } else if (isLocked) {
-      baseArrowId = 'viz-arrowhead-locked';
-    } else if (isCustom) {
-      baseArrowId = 'viz-arrowhead-custom';
-    } else {
-      baseArrowId = 'viz-arrowhead';
-    }
-    const arrowType = link.arrowType || viz.defaultLinkArrowType || 'arrow';
-    const markerEnd = arrowType !== 'none' ? `marker-end="url(#${baseArrowId})"` : '';
-    const markerStart = arrowType === 'double-arrow' ? `marker-start="url(#${baseArrowId}-back)"` : '';
-    svgContent += `<g class="viz-link-group" data-link-id="${link.id}" oncontextmenu="vizLinkCtx(event,'${link.id}')">
-      <path class="viz-link-hitbox" d="${cpPath}"/>
-      <path class="${cls}" d="${cpPath}" style="${linkColorStyle}" ${markerEnd} ${markerStart}/>
-    </g>`;
+  // Anything no longer visible loses its element, and its listeners with it.
+  _vizNodeEls.forEach((el, id) => {
+    if (seen.has(id)) return;
+    el.remove();
+    _vizNodeEls.delete(id);
   });
 
-  if (viz.linkingFrom && visibleNodeIds.has(viz.linkingFrom)) {
-    const fromNode = visibleNodes.find(n => n.id === viz.linkingFrom);
-    const fromEl = renderedNodeMap.get(viz.linkingFrom);
-    if (fromNode) {
-      const fw = fromEl ? fromEl.offsetWidth : (fromNode.type === 'root' ? 160 : 180);
-      const fh = fromEl ? fromEl.offsetHeight : (fromNode.type === 'root' ? 60 : 50);
-      const side = viz.portDrag ? viz.portDrag.fromSide : (viz._linkFromSide || 'right');
-      const port = vizPortCenter(fromNode.x, fromNode.y, fw, fh, side);
-      svgContent += `<path id="viz-temp-link" class="viz-link custom-link" d="M ${port.x} ${port.y} L ${port.x} ${port.y}" style="pointer-events:none;"/>`;
-    }
-  }
+  _vizRenderLinks(svg, nodesLayer, g, drawn);
 
-  svg.innerHTML = svgContent;
-  // Rebuild defs every render to include dynamic per-color arrowheads
-  const colorArrowDefs = Object.entries({ red:'#ef4444', orange:'#f97316', yellow:'#eab308', green:'#22c55e', blue:'#3b82f6', purple:'#a855f7', pink:'#ec4899', cyan:'#06b6d4' })
-    .map(([name, hex]) => `
-      <marker id="viz-arrowhead-col-${name}" markerWidth="8" markerHeight="6" refX="6" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="${hex}" opacity="0.9"/></marker>
-      <marker id="viz-arrowhead-col-${name}-back" markerWidth="8" markerHeight="6" refX="2" refY="3" orient="auto"><polygon points="8 0, 0 3, 8 6" fill="${hex}" opacity="0.9"/></marker>
-    `).join('');
-  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-  defs.innerHTML = `
-    <marker id="viz-arrowhead" markerWidth="8" markerHeight="6" refX="6" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--text-tertiary)" opacity="0.6"/></marker>
-    <marker id="viz-arrowhead-back" markerWidth="8" markerHeight="6" refX="2" refY="3" orient="auto"><polygon points="8 0, 0 3, 8 6" fill="var(--text-tertiary)" opacity="0.6"/></marker>
-    <marker id="viz-arrowhead-locked" markerWidth="8" markerHeight="6" refX="6" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f59e0b" opacity="0.8"/></marker>
-    <marker id="viz-arrowhead-locked-back" markerWidth="8" markerHeight="6" refX="2" refY="3" orient="auto"><polygon points="8 0, 0 3, 8 6" fill="#f59e0b" opacity="0.8"/></marker>
-    <marker id="viz-arrowhead-custom" markerWidth="8" markerHeight="6" refX="6" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#f59e0b" opacity="0.6"/></marker>
-    <marker id="viz-arrowhead-custom-back" markerWidth="8" markerHeight="6" refX="2" refY="3" orient="auto"><polygon points="8 0, 0 3, 8 6" fill="#f59e0b" opacity="0.6"/></marker>
-    ${colorArrowDefs}
-  `;
-  svg.insertBefore(defs, svg.firstChild);
-
-  visibleLinks.filter(l => l.locked).forEach(link => {
-    const fromNode = visibleNodes.find(n => n.id === link.from);
-    const toNode = visibleNodes.find(n => n.id === link.to);
-    if (!fromNode || !toNode) return;
-    const fromEl = renderedNodeMap.get(link.from);
-    const toEl = renderedNodeMap.get(link.to);
-    const fromOffsetW = (fromEl ? fromEl.offsetWidth : 180) / 2;
-    const toOffsetW   = (toEl   ? toEl.offsetWidth   : 180) / 2;
-    const fromOffsetH = (fromEl ? fromEl.offsetHeight : 50)  / 2;
-    const toOffsetH   = (toEl   ? toEl.offsetHeight   : 50)  / 2;
-    const mx = (fromNode.x + fromOffsetW + toNode.x + toOffsetW) / 2 - 11;
-    const my = (fromNode.y + fromOffsetH + toNode.y + toOffsetH) / 2 - 11;
-    const lockEl = document.createElement('div');
-    lockEl.className = 'viz-link-lock';
-    lockEl.style.left = mx + 'px';
-    lockEl.style.top = my + 'px';
-    lockEl.innerHTML = '<i data-lucide="lock"></i>';
-    lockEl.dataset.lockLinkId = link.id;
-    nodesLayer.appendChild(lockEl);
-  });
-
-  lucide.createIcons({ root: container });
+  // Only icons inside nodes that were actually rebuilt this pass.
+  if (rebuilt > 0 && typeof lucide !== 'undefined') lucide.createIcons({ root: nodesLayer });
   vizUpdateZoomDisplay();
   vizUpdateMinimap();
-  // Re-render replaces node elements — refresh the physics element cache
+  vizPaintLegend();
   if (typeof vizForce !== 'undefined' && vizForce.enabled) vizForceWake();
 }
 
-function vizUpdateSVGLinks() {
-  const svg = document.getElementById('viz-canvas-svg');
-  const nodesLayer = document.getElementById('viz-nodes-layer');
-  if (!svg || !nodesLayer) return;
+/* One message used to cover three completely different situations: nothing
+   placed, everything hidden by the depth filter, and nothing matching a
+   search. Two of those need to say what happened and offer the way back. */
+function vizPaintEmptyState(el, g) {
+  if (!el) return;
+  if (g.nodes.length > 0) { el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  const h3 = el.querySelector('h3'), p = el.querySelector('p'), btn = el.querySelector('button');
   const scopes = vizGetVisibleScopes();
-  const visibleNodes = viz.nodes.filter(n => scopes.includes(n.scope));
-  const visibleNodeIds = new Set(visibleNodes.map(n => n.id));
-  viz.links.filter(l => visibleNodeIds.has(l.from) && visibleNodeIds.has(l.to)).forEach(link => {
-    const fromNode = visibleNodes.find(n => n.id === link.from);
-    const toNode = visibleNodes.find(n => n.id === link.to);
-    if (!fromNode || !toNode) return;
-    const fromEl = nodesLayer.querySelector(`[data-node-id="${link.from}"]`);
-    const toEl = nodesLayer.querySelector(`[data-node-id="${link.to}"]`);
-    const fw = fromEl ? fromEl.offsetWidth : (fromNode.type === 'root' ? 160 : 180);
-    const fh = fromEl ? fromEl.offsetHeight : (fromNode.type === 'root' ? 60 : 50);
-    const tw = toEl ? toEl.offsetWidth : (toNode.type === 'root' ? 160 : 180);
-    const th = toEl ? toEl.offsetHeight : (toNode.type === 'root' ? 60 : 50);
-    const cpPath = vizBezierPath(fromNode.x, fromNode.y, fw, fh, toNode.x, toNode.y, tw, th, link.fromSide, link.toSide);
-    const group = svg.querySelector(`g[data-link-id="${link.id}"]`);
-    if (group) group.querySelectorAll('path').forEach(p => p.setAttribute('d', cpPath));
-  });
-
-  viz.links.filter(l => l.locked && visibleNodeIds.has(l.from) && visibleNodeIds.has(l.to)).forEach(link => {
-    const fromNode = visibleNodes.find(n => n.id === link.from);
-    const toNode = visibleNodes.find(n => n.id === link.to);
-    if (!fromNode || !toNode) return;
-    const fromEl = nodesLayer.querySelector(`[data-node-id="${link.from}"]`);
-    const toEl = nodesLayer.querySelector(`[data-node-id="${link.to}"]`);
-    const fw = fromEl ? fromEl.offsetWidth : 180;
-    const fh = fromEl ? fromEl.offsetHeight : 50;
-    const tw = toEl ? toEl.offsetWidth : 180;
-    const th = toEl ? toEl.offsetHeight : 50;
-    const mx = (fromNode.x + fw / 2 + toNode.x + tw / 2) / 2 - 11;
-    const my = (fromNode.y + fh / 2 + toNode.y + th / 2) / 2 - 11;
-    const lockEl = nodesLayer.querySelector(`[data-lock-link-id="${link.id}"]`);
-    if (lockEl) { lockEl.style.left = mx + 'px'; lockEl.style.top = my + 'px'; }
-  });
+  const anyInScope = viz.nodes.some(n => scopes.includes(n.scope));
+  let title, body, label, action;
+  if (viz.focusNodeId && viz.focusHops > 0) {
+    title = 'Nothing within range';
+    body = 'The focused node has no neighbours this close. Widen the range or clear the focus.';
+    label = 'Clear focus'; action = 'vizClearFocus()';
+  } else if (viz.searchQuery && anyInScope) {
+    title = 'No match on the canvas';
+    body = 'Nothing placed here matches "' + (viz.searchQuery || '') + '".';
+    label = 'Clear search'; action = 'vizClearSearch()';
+  } else if (anyInScope) {
+    title = 'Everything is filtered out';
+    body = 'The canvas is set to show ' + (VIZ_DEPTH_META[viz.canvasDepth] || VIZ_DEPTH_META.all).label.toLowerCase() + ', and none are placed.';
+    label = 'Show everything'; action = "vizSetDepth('all')";
+  } else {
+    title = 'Your Mindmap Canvas';
+    body = 'Drag items from the left, right-click to create nodes, or double-click to add a node.';
+    label = 'Auto-populate'; action = 'vizAutoPopulateForce()';
+  }
+  if (h3) h3.textContent = title;
+  if (p) p.textContent = body;
+  if (btn && btn.dataset.emptyAction !== action) {
+    btn.dataset.emptyAction = action;
+    btn.setAttribute('onclick', action);
+    btn.innerHTML = '<i data-lucide="zap" style="width:14px;height:14px;"></i> ' + escapeHTML(label);
+    if (typeof lucide !== 'undefined') lucide.createIcons({ el: btn });
+  }
 }
 
+/**
+ * The SVG layer. The <g> elements are rebuilt only when the link SET changes;
+ * a move just repaints the `d` attributes through vizPaintLinks.
+ */
+function _vizRenderLinks(svg, nodesLayer, g, drawn) {
+  if (!_vizDefsBuilt) { _vizBuildDefs(svg); _vizDefsBuilt = true; }
+
+  const drawnIds = new Set(drawn.map(n => n.id));
+  const links = g.links.filter(l => drawnIds.has(l.from) && drawnIds.has(l.to));
+  const sig = links.map(l => [l.id, l.color || '', l.locked ? 1 : 0, l.isCustom ? 1 : 0,
+    l.arrowType || viz.defaultLinkArrowType || 'arrow', l.label || ''].join(':')).join('|')
+    + '#' + (viz.linkingFrom || '');
+
+  if (sig !== _vizLinkSig) {
+    _vizLinkSig = sig;
+    let out = '';
+    links.forEach(link => {
+      const hex = link.color ? vizColorMap(link.color) : null;
+      const cls = link.locked ? 'viz-link locked' : link.isCustom ? 'viz-link custom-link' : 'viz-link';
+      const baseArrowId = link.color ? 'viz-arrowhead-col-' + link.color
+        : link.locked ? 'viz-arrowhead-locked'
+          : link.isCustom ? 'viz-arrowhead-custom' : 'viz-arrowhead';
+      const arrowType = link.arrowType || viz.defaultLinkArrowType || 'arrow';
+      const markerEnd = arrowType !== 'none' ? `marker-end="url(#${baseArrowId})"` : '';
+      const markerStart = arrowType === 'double-arrow' ? `marker-start="url(#${baseArrowId}-back)"` : '';
+      // A label rides the path itself, so it curves and moves with the link.
+      const label = link.label
+        ? `<text class="viz-link-label" dy="-6"><textPath href="#vlp-${link.id}" startOffset="50%">${escapeHTML(link.label)}</textPath></text>`
+        : '';
+      const fresh = link._isNew ? ' viz-link-new' : '';
+      delete link._isNew;
+      out += `<g class="viz-link-group" data-link-id="${link.id}" oncontextmenu="vizLinkCtx(event,'${link.id}')">
+        <path class="viz-link-hitbox" d=""/>
+        <path id="vlp-${link.id}" class="${cls}${fresh}" d="" style="${hex ? 'stroke:' + hex + ';' : ''}" ${markerEnd} ${markerStart}/>
+        ${label}
+      </g>`;
+    });
+    if (viz.linkingFrom && g.nodeById.has(viz.linkingFrom)) {
+      out += '<path id="viz-temp-link" class="viz-link custom-link" d="" style="pointer-events:none;"/>';
+    }
+    const defs = svg.querySelector('defs');
+    svg.innerHTML = out;
+    if (defs) svg.insertBefore(defs, svg.firstChild);
+
+    // Lock badges live in the node layer so they scale with it.
+    nodesLayer.querySelectorAll('.viz-link-lock').forEach(el => el.remove());
+    links.filter(l => l.locked).forEach(link => {
+      const lockEl = document.createElement('div');
+      lockEl.className = 'viz-link-lock';
+      lockEl.innerHTML = '<i data-lucide="lock"></i>';
+      lockEl.dataset.lockLinkId = link.id;
+      nodesLayer.appendChild(lockEl);
+      if (typeof lucide !== 'undefined') lucide.createIcons({ el: lockEl });
+    });
+    vizGeomRelease();   // the cached <g> handles are stale
+  }
+
+  const temp = document.getElementById('viz-temp-link');
+  if (temp && viz.linkingFrom) {
+    const from = g.nodeById.get(viz.linkingFrom);
+    if (from) {
+      const el = _vizNodeEls.get(viz.linkingFrom);
+      const fw = el ? el.offsetWidth : (from.type === 'root' ? 160 : 180);
+      const fh = el ? el.offsetHeight : (from.type === 'root' ? 60 : 50);
+      const side = viz.portDrag ? viz.portDrag.fromSide : (viz._linkFromSide || 'right');
+      const p = vizPortCenter(from.x, from.y, fw, fh, side);
+      temp.setAttribute('d', `M ${p.x} ${p.y} L ${p.x} ${p.y}`);
+    }
+  }
+
+  vizPaintLinks({ nodes: drawn, links: links, nodeById: new Map(drawn.map(n => [n.id, n])) });
+}
+
+/* Eighteen arrowhead markers that never change were being rebuilt from a
+   template string on every single render. */
+function _vizBuildDefs(svg) {
+  const colors = { red: '#ef4444', orange: '#f97316', yellow: '#eab308', green: '#22c55e', blue: '#3b82f6', purple: '#a855f7', pink: '#ec4899', cyan: '#06b6d4' };
+  const fwd = (id, fill, op) => `<marker id="${id}" markerWidth="8" markerHeight="6" refX="6" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="${fill}" opacity="${op}"/></marker>`;
+  const back = (id, fill, op) => `<marker id="${id}-back" markerWidth="8" markerHeight="6" refX="2" refY="3" orient="auto"><polygon points="8 0, 0 3, 8 6" fill="${fill}" opacity="${op}"/></marker>`;
+  let html = fwd('viz-arrowhead', 'var(--text-tertiary)', 0.6) + back('viz-arrowhead', 'var(--text-tertiary)', 0.6)
+    + fwd('viz-arrowhead-locked', '#f59e0b', 0.8) + back('viz-arrowhead-locked', '#f59e0b', 0.8)
+    + fwd('viz-arrowhead-custom', '#f59e0b', 0.6) + back('viz-arrowhead-custom', '#f59e0b', 0.6);
+  Object.keys(colors).forEach(name => {
+    html += fwd('viz-arrowhead-col-' + name, colors[name], 0.9) + back('viz-arrowhead-col-' + name, colors[name], 0.9);
+  });
+  const old = svg.querySelector('defs');
+  if (old) old.remove();
+  const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+  defs.innerHTML = html;
+  svg.insertBefore(defs, svg.firstChild);
+}
+
+/**
+ * Repaint the link paths after a move.
+ *
+ * This used to be a second copy of the geometry, and it interleaved writes
+ * with reads: setAttribute on a path, then offsetWidth on the next node, 182
+ * times. Each read forced a synchronous layout — 184 ms per drag frame, five
+ * frames a second. vizPaintLinks does the same work read-first for 5.7 ms.
+ */
+function vizUpdateSVGLinks() {
+  vizPaintLinks(vizGeom.held && vizGeom.graph ? vizGeom.graph : null);
+}
+
+/* ── Dragging a node ──────────────────────────────────────────
+   Pointer events rather than mouse events, so the canvas works with a finger
+   and a stylus as well as a mouse. There was not one touch listener in the
+   whole module before this: on a phone the canvas rendered and then did
+   nothing at all. */
+
 function vizNodeMouseDown(e, nodeId) {
-  if (e.button !== 0) return;
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
   e.stopPropagation();
   if (viz.linkModeEnabled || viz.linkingFrom || viz.colorModeEnabled) return;
   const node = viz.nodes.find(n => n.id === nodeId);
   if (!node) return;
 
+  // The bottom-right corner of a comment is its resize grip, not a drag handle.
   if (node.type === 'comment') {
     const inner = e.target.closest('.viz-node-inner');
     if (inner) {
       const rect = inner.getBoundingClientRect();
       const localX = (e.clientX - rect.left) / viz.zoom;
       const localY = (e.clientY - rect.top) / viz.zoom;
-      if (localX > inner.offsetWidth - 25 && localY > inner.offsetHeight - 25) {
-        return;
-      }
+      if (localX > inner.offsetWidth - 25 && localY > inner.offsetHeight - 25) return;
     }
+  }
+
+  // Dragging any node of a multi-selection moves the whole selection.
+  if (!viz.selectedNodeIds.has(nodeId) && !(e.shiftKey || e.ctrlKey || e.metaKey)) {
+    viz.selectedNodeIds.clear();
   }
 
   const container = document.getElementById('viz-canvas-container');
@@ -664,8 +702,19 @@ function vizNodeMouseDown(e, nodeId) {
   viz._dragStartPos = { x: e.clientX, y: e.clientY };
   viz.dragOffset.x = (e.clientX - rect.left - viz.pan.x) / viz.zoom - node.x;
   viz.dragOffset.y = (e.clientY - rect.top - viz.pan.y) / viz.zoom - node.y;
-  document.addEventListener('mousemove', vizNodeDrag);
-  document.addEventListener('mouseup', vizNodeDragEnd);
+
+  // Node sizes cannot change mid-drag, so measure once here instead of
+  // re-measuring every node on every frame.
+  const g = vizVisibleGraph();
+  vizGeomHold(g);
+  vizGeom.graph = g;
+
+  if (e.pointerId !== undefined && e.currentTarget && e.currentTarget.setPointerCapture) {
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* already gone */ }
+  }
+  document.addEventListener('pointermove', vizNodeDrag);
+  document.addEventListener('pointerup', vizNodeDragEnd);
+  document.addEventListener('pointercancel', vizNodeDragEnd);
 }
 
 function vizNodeDrag(e) {
@@ -688,34 +737,52 @@ function vizNodeDrag(e) {
   const dx = node.x - prevX;
   const dy = node.y - prevY;
 
-  const nodeEl = document.querySelector(`.viz-node[data-node-id="${node.id}"]`);
+  const nodeEl = _vizNodeEls.get(node.id);
   if (nodeEl) {
     nodeEl.style.left = node.x + 'px';
     nodeEl.style.top = node.y + 'px';
     nodeEl.classList.add('dragging');
   }
 
-  if (viz.flowyDragEnabled && (dx !== 0 || dy !== 0)) vizDragDescendants(node.id, dx, dy, new Set([node.id]));
-  vizUpdateSVGLinks();
-  vizUpdateMinimap();
+  // Everything else in the selection travels with it.
+  if (viz.selectedNodeIds.size > 1 && viz.selectedNodeIds.has(node.id) && (dx || dy)) {
+    viz.selectedNodeIds.forEach(id => {
+      if (id === node.id) return;
+      const other = viz.nodes.find(n => n.id === id);
+      if (!other) return;
+      other.x += dx; other.y += dy;
+      const el = _vizNodeEls.get(id);
+      if (el) { el.style.left = other.x + 'px'; el.style.top = other.y + 'px'; el.classList.add('dragging-child'); }
+    });
+  } else if (viz.flowyDragEnabled && (dx !== 0 || dy !== 0)) {
+    vizDragDescendants(node.id, dx, dy, new Set([node.id]));
+  }
+
+  // One repaint per animation frame, however many pointermoves arrive.
+  vizSchedulePaint(() => { vizUpdateSVGLinks(); vizUpdateMinimap(); });
 }
 
 function vizNodeDragEnd() {
+  vizCancelScheduledPaint();
   if (viz.draggingNode) {
-    const nodeEl = document.querySelector(`.viz-node[data-node-id="${viz.draggingNode}"]`);
+    const nodeEl = _vizNodeEls.get(viz.draggingNode);
     if (nodeEl) nodeEl.classList.remove('dragging');
   }
   document.querySelectorAll('.viz-node.dragging-child').forEach(el => el.classList.remove('dragging-child'));
   viz.draggingNode = null;
   viz._undoArmed = false;
-  document.removeEventListener('mousemove', vizNodeDrag);
-  document.removeEventListener('mouseup', vizNodeDragEnd);
-  if (viz._hasDragged) {
-    vizRenderCanvas();
-    vizSave();
-    vizUpdateMinimap();
-  }
+  document.removeEventListener('pointermove', vizNodeDrag);
+  document.removeEventListener('pointerup', vizNodeDragEnd);
+  document.removeEventListener('pointercancel', vizNodeDragEnd);
+  const dragged = viz._hasDragged;
   viz._hasDragged = false;
+  vizGeom.graph = null;
+  vizGeomRelease();
+  if (dragged) {
+    vizUpdateSVGLinks();
+    vizUpdateMinimap();
+    vizSave();
+  }
 }
 
 function vizDragDescendants(nodeId, dx, dy, visited) {
@@ -726,7 +793,7 @@ function vizDragDescendants(nodeId, dx, dy, visited) {
     if (!child) return;
     child.x += dx;
     child.y += dy;
-    const childEl = document.querySelector(`.viz-node[data-node-id="${l.to}"]`);
+    const childEl = _vizNodeEls.get(l.to);
     if (childEl) {
       childEl.style.left = child.x + 'px';
       childEl.style.top = child.y + 'px';
@@ -830,23 +897,86 @@ function vizCanvasDragOver(e) {
   e.dataTransfer.dropEffect = 'copy';
 }
 
+/* ── Panning, pinching and marquee selection ──────────────────
+   All pointer events. A plain drag on empty canvas pans; holding Shift (or
+   Ctrl/Cmd) drags a selection box instead. Two fingers pinch to zoom. */
+
+const _vizPointers = new Map();     // pointerId -> {x, y}
+let _vizPinch = null;
+
 function vizCanvasMouseDown(e) {
   if (viz.activeModule === 'brain') { brainCanvasMouseDown(e); return; }
-  if (e.target.closest('.viz-node') || e.button !== 0) return;
-  // Clicking empty canvas while in linking mode cancels the link
-  if (viz.linkingFrom) {
-    vizCancelLinking();
+  if (e.target.closest('.viz-node') || e.target.closest('.viz-minimap')) return;
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+  _vizPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (_vizPointers.size === 2) { _vizStartPinch(); return; }
+  if (_vizPointers.size > 2) return;
+
+  // Clicking empty canvas while linking cancels the link.
+  if (viz.linkingFrom) { vizCancelLinking(); return; }
+
+  const container = document.getElementById('viz-canvas-container');
+  if (e.shiftKey || e.ctrlKey || e.metaKey) {
+    const rect = container.getBoundingClientRect();
+    viz.marquee = {
+      x0: (e.clientX - rect.left - viz.pan.x) / viz.zoom,
+      y0: (e.clientY - rect.top - viz.pan.y) / viz.zoom,
+      x1: 0, y1: 0, add: e.shiftKey
+    };
+    viz.marquee.x1 = viz.marquee.x0;
+    viz.marquee.y1 = viz.marquee.y0;
+    if (!e.shiftKey) { viz.selectedNodeIds.clear(); viz.selectedNodeId = null; }
+    _vizPaintMarquee();
     return;
   }
+
+  vizStopTween();
   viz.isPanning = true;
   viz.panStart = { x: e.clientX, y: e.clientY };
-  viz.panStartOffset = { ...viz.pan };
-  const container = document.getElementById('viz-canvas-container');
+  viz.panStartOffset = { x: viz.pan.x, y: viz.pan.y };
   if (container) container.classList.add('panning');
+}
+
+function _vizStartPinch() {
+  const pts = [..._vizPointers.values()];
+  const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+  _vizPinch = { dist: dist || 1, zoom: viz.zoom, cx: (pts[0].x + pts[1].x) / 2, cy: (pts[0].y + pts[1].y) / 2 };
+  viz.isPanning = false;
+  const c = document.getElementById('viz-canvas-container');
+  if (c) c.classList.remove('panning');
 }
 
 function vizCanvasMouseMove(e) {
   if (viz.activeModule === 'brain') { brainCanvasMouseMove(e); return; }
+
+  if (_vizPointers.has(e.pointerId)) _vizPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  if (_vizPinch && _vizPointers.size >= 2) {
+    const pts = [..._vizPointers.values()];
+    const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+    const container = document.getElementById('viz-canvas-container');
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const mx = _vizPinch.cx - rect.left, my = _vizPinch.cy - rect.top;
+    const tx = (mx - viz.pan.x) / viz.zoom, ty = (my - viz.pan.y) / viz.zoom;
+    viz.zoom = vizClampZoom(_vizPinch.zoom * (dist / _vizPinch.dist));
+    viz.pan.x = mx - tx * viz.zoom;
+    viz.pan.y = my - ty * viz.zoom;
+    vizApplyTransform();
+    vizUpdateZoomDisplay();
+    return;
+  }
+
+  if (viz.marquee) {
+    const container = document.getElementById('viz-canvas-container');
+    const rect = container.getBoundingClientRect();
+    viz.marquee.x1 = (e.clientX - rect.left - viz.pan.x) / viz.zoom;
+    viz.marquee.y1 = (e.clientY - rect.top - viz.pan.y) / viz.zoom;
+    vizSchedulePaint(_vizPaintMarquee);
+    return;
+  }
+
   if (viz.linkingFrom) {
     const tempLink = document.getElementById('viz-temp-link');
     const container = document.getElementById('viz-canvas-container');
@@ -859,7 +989,6 @@ function vizCanvasMouseMove(e) {
       if (mMatch) {
         const fx = parseFloat(mMatch[1]), fy = parseFloat(mMatch[2]);
         const fromSide = viz.portDrag ? viz.portDrag.fromSide : null;
-        // Determine auto exit side from source port
         const cp = vizTempLinkCP(fx, fy, mouseX, mouseY, fromSide);
         tempLink.setAttribute('d', `M ${fx} ${fy} C ${cp.c1x} ${cp.c1y}, ${cp.c2x} ${cp.c2y}, ${mouseX} ${mouseY}`);
       }
@@ -869,45 +998,111 @@ function vizCanvasMouseMove(e) {
 
   viz.pan.x = viz.panStartOffset.x + (e.clientX - viz.panStart.x);
   viz.pan.y = viz.panStartOffset.y + (e.clientY - viz.panStart.y);
+  vizSchedulePaint(() => { vizApplyTransform(); });
+}
 
-  const nodesLayer = document.getElementById('viz-nodes-layer');
-  const svg = document.getElementById('viz-canvas-svg');
-  if (nodesLayer) nodesLayer.style.transform = `translate(${viz.pan.x}px, ${viz.pan.y}px) scale(${viz.zoom})`;
-  if (svg) svg.style.transform = `translate(${viz.pan.x}px, ${viz.pan.y}px) scale(${viz.zoom})`;
-  vizUpdateMinimap();
+/** The selection box, drawn in canvas coordinates so it tracks the graph. */
+function _vizPaintMarquee() {
+  const layer = document.getElementById('viz-nodes-layer');
+  if (!layer) return;
+  let box = document.getElementById('viz-marquee');
+  if (!viz.marquee) { if (box) box.remove(); return; }
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'viz-marquee';
+    box.className = 'viz-marquee';
+    layer.appendChild(box);
+  }
+  const m = viz.marquee;
+  const x = Math.min(m.x0, m.x1), y = Math.min(m.y0, m.y1);
+  const w = Math.abs(m.x1 - m.x0), h = Math.abs(m.y1 - m.y0);
+  box.style.left = x + 'px'; box.style.top = y + 'px';
+  box.style.width = w + 'px'; box.style.height = h + 'px';
+
+  // Live feedback: highlight what would be caught if you let go now.
+  const g = vizVisibleGraph();
+  g.nodes.forEach(n => {
+    const nw = n.w || 200, nh = n.h || 60;
+    const hit = n.x < x + w && n.x + nw > x && n.y < y + h && n.y + nh > y;
+    const el = _vizNodeEls.get(n.id);
+    if (el) el.classList.toggle('viz-marquee-hit', hit);
+  });
+}
+
+function vizCanvasMouseUp(e) {
+  if (viz.activeModule === 'brain') { brainCanvasMouseUp(); return; }
+  if (e && e.pointerId !== undefined) _vizPointers.delete(e.pointerId);
+  if (_vizPointers.size < 2 && _vizPinch) { _vizPinch = null; vizSave(); }
+
+  if (viz.marquee) {
+    const m = viz.marquee;
+    const x = Math.min(m.x0, m.x1), y = Math.min(m.y0, m.y1);
+    const w = Math.abs(m.x1 - m.x0), h = Math.abs(m.y1 - m.y0);
+    viz.marquee = null;
+    _vizPaintMarquee();
+    document.querySelectorAll('.viz-node.viz-marquee-hit').forEach(el => el.classList.remove('viz-marquee-hit'));
+    if (w > 4 || h > 4) {
+      const g = vizVisibleGraph();
+      g.nodes.forEach(n => {
+        const nw = n.w || 200, nh = n.h || 60;
+        if (n.x < x + w && n.x + nw > x && n.y < y + h && n.y + nh > y) viz.selectedNodeIds.add(n.id);
+      });
+      if (viz.selectedNodeIds.size && !viz.selectedNodeId) viz.selectedNodeId = [...viz.selectedNodeIds][0];
+      vizRenderCanvas();
+      vizUpdateSelectionChip();
+    }
+    return;
+  }
+
+  if (viz.isPanning) {
+    vizCancelScheduledPaint();
+    viz.isPanning = false;
+    const container = document.getElementById('viz-canvas-container');
+    if (container) container.classList.remove('panning');
+    vizApplyTransform();
+    // Culling is keyed to the viewport, so a pan at low zoom needs a re-render
+    // to bring newly-visible nodes in. Only matters on very large graphs.
+    if (viz.zoom < VIZ_CULL_ZOOM && viz.nodes.length > 400) vizRenderCanvas();
+    vizSave();
+  }
+}
+
+/** How many nodes are selected, said out loud. */
+function vizUpdateSelectionChip() {
+  const el = document.getElementById('viz-selection-chip');
+  if (!el) return;
+  const n = viz.selectedNodeIds.size;
+  el.classList.toggle('hidden', n < 2);
+  if (n >= 2) el.innerHTML = `<i data-lucide="box-select" style="width:11px;height:11px;"></i> ${n} selected`
+    + ` <button type="button" class="viz-chip-x" onclick="vizClearSelection()" aria-label="Clear selection">&times;</button>`;
+  if (n >= 2 && typeof lucide !== 'undefined') lucide.createIcons({ el: el });
+}
+
+function vizClearSelection() {
+  viz.selectedNodeIds.clear();
+  vizRenderCanvas();
+  vizUpdateSelectionChip();
 }
 
 function vizTempLinkCP(fx, fy, tx, ty, fromSide) {
   const dist = Math.sqrt((tx - fx) ** 2 + (ty - fy) ** 2);
   const bend = Math.min(Math.max(dist * 0.45, 40), 200);
   let c1x = fx, c1y = fy;
-  if (fromSide === 'right')  { c1x = fx + bend; c1y = fy; }
-  else if (fromSide === 'left')   { c1x = fx - bend; c1y = fy; }
-  else if (fromSide === 'top')    { c1x = fx; c1y = fy - bend; }
+  if (fromSide === 'right') { c1x = fx + bend; c1y = fy; }
+  else if (fromSide === 'left') { c1x = fx - bend; c1y = fy; }
+  else if (fromSide === 'top') { c1x = fx; c1y = fy - bend; }
   else if (fromSide === 'bottom') { c1x = fx; c1y = fy + bend; }
   else {
-    // Auto: exit in direction of target
     const dx = tx - fx, dy = ty - fy;
     if (Math.abs(dx) >= Math.abs(dy)) { c1x = fx + (dx > 0 ? bend : -bend); c1y = fy; }
-    else                               { c1x = fx; c1y = fy + (dy > 0 ? bend : -bend); }
+    else { c1x = fx; c1y = fy + (dy > 0 ? bend : -bend); }
   }
-  // Control point 2: approach target from its direction
   const dx2 = fx - tx, dy2 = fy - ty;
   const b2 = bend * 0.8;
   let c2x = tx, c2y = ty;
   if (Math.abs(dx2) >= Math.abs(dy2)) { c2x = tx + (dx2 > 0 ? b2 : -b2); c2y = ty; }
-  else                                  { c2x = tx; c2y = ty + (dy2 > 0 ? b2 : -b2); }
+  else { c2x = tx; c2y = ty + (dy2 > 0 ? b2 : -b2); }
   return { c1x, c1y, c2x, c2y };
-}
-
-function vizCanvasMouseUp(e) {
-  if (viz.activeModule === 'brain') { brainCanvasMouseUp(); return; }
-  if (viz.isPanning) {
-    viz.isPanning = false;
-    const container = document.getElementById('viz-canvas-container');
-    if (container) container.classList.remove('panning');
-    vizSave();
-  }
 }
 
 let _vizWheelSaveTimer = null;
@@ -917,6 +1112,7 @@ function vizCanvasWheel(e) {
   e.preventDefault();
   const container = document.getElementById('viz-canvas-container');
   if (!container) return;
+  vizStopTween();
 
   const rect = container.getBoundingClientRect();
   const mouseX = e.clientX - rect.left;
@@ -927,7 +1123,7 @@ function vizCanvasWheel(e) {
 
   // Multiplicative zoom — uniform feel at every zoom level (like Obsidian)
   const factor = e.deltaY > 0 ? 0.92 : 1.087;
-  const newZoom = Math.min(3, Math.max(0.2, viz.zoom * factor));
+  const newZoom = vizClampZoom(viz.zoom * factor);
 
   viz.pan.x = mouseX - targetX * newZoom;
   viz.pan.y = mouseY - targetY * newZoom;
@@ -935,133 +1131,195 @@ function vizCanvasWheel(e) {
 
   // Transform-only update: a full vizRenderCanvas() + localStorage write per
   // wheel tick rebuilt the entire node DOM and made zooming feel janky.
-  const nodesLayer = document.getElementById('viz-nodes-layer');
-  const svg = document.getElementById('viz-canvas-svg');
-  const tf = `translate(${viz.pan.x}px, ${viz.pan.y}px) scale(${viz.zoom})`;
-  if (nodesLayer) nodesLayer.style.transform = tf;
-  if (svg) svg.style.transform = tf;
+  vizApplyTransform();
   vizUpdateZoomDisplay();
-  vizUpdateMinimap();
   clearTimeout(_vizWheelSaveTimer);
-  _vizWheelSaveTimer = setTimeout(() => vizSave(), 400);
+  _vizWheelSaveTimer = setTimeout(() => {
+    vizSave();
+    if (viz.nodes.length > 400) vizRenderCanvas();
+  }, 400);
 }
 
-function vizZoomIn() { viz.zoom = Math.min(3, viz.zoom + 0.15); vizRenderCanvas(); vizSave(); }
-function vizZoomOut() { viz.zoom = Math.max(0.2, viz.zoom - 0.15); vizRenderCanvas(); vizSave(); }
-function vizZoomReset() { viz.zoom = 1; viz.pan = { x: 0, y: 0 }; vizCenterCanvas(); }
+function vizZoomIn() { vizZoomBy(1.2); }
+function vizZoomOut() { vizZoomBy(1 / 1.2); }
+
+/** Zoom about the centre of the canvas, eased. */
+function vizZoomBy(factor) {
+  const c = document.getElementById('viz-canvas-container');
+  const cam = viz.activeModule === 'brain' ? brain : viz;
+  if (!c) { cam.zoom = vizClampZoom(cam.zoom * factor); vizApplyTransform(); return; }
+  const mx = c.offsetWidth / 2, my = c.offsetHeight / 2;
+  const tx = (mx - cam.pan.x) / cam.zoom, ty = (my - cam.pan.y) / cam.zoom;
+  const z = vizClampZoom(cam.zoom * factor);
+  vizTweenView({ x: mx - tx * z, y: my - ty * z }, z, () => {
+    if (viz.activeModule === 'brain') brainSaveCurrentVersion(); else vizSave();
+  });
+}
+
+function vizZoomReset() { vizCenterCanvas(); }
+
 function vizUpdateZoomDisplay() {
   const el = document.getElementById('viz-zoom-level');
-  if (el) el.textContent = Math.round(viz.zoom * 100) + '%';
+  const z = viz.activeModule === 'brain' ? brain.zoom : viz.zoom;
+  if (el) el.textContent = Math.round(z * 100) + '%';
 }
 
-function vizAutoLayout() {
-  const scopes = vizGetVisibleScopes();
-  const visibleNodes = viz.nodes.filter(n => scopes.includes(n.scope));
-  if (visibleNodes.length === 0) return;
+/**
+ * Fit the visible graph on screen.
+ *
+ * The zoom floor used to be 0.2, and no layout this module produces fits at
+ * 0.2 — auto-populate builds a 1:13 ribbon. Pressing F left most of the graph
+ * off screen with no way to zoom out further. VIZ_ZOOM_MIN is 0.04 now, and
+ * the layouts below aim for a shape that does not need it.
+ */
+function vizCenterCanvas(instant) {
+  const container = document.getElementById('viz-canvas-container');
+  if (!container) return;
+  const g = vizVisibleGraph();
+  if (!g.nodes.length) { viz.pan = { x: 0, y: 0 }; viz.zoom = 1; vizApplyTransform(); return; }
+
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  g.nodes.forEach(n => {
+    const nw = n.w || 200, nh = n.h || 80;
+    if (n.x < minX) minX = n.x;
+    if (n.x + nw > maxX) maxX = n.x + nw;
+    if (n.y < minY) minY = n.y;
+    if (n.y + nh > maxY) maxY = n.y + nh;
+  });
+
+  const padding = 90;
+  const contentWidth = (maxX - minX) + padding * 2;
+  const contentHeight = (maxY - minY) + padding * 2;
+  const zoom = vizClampZoom(Math.min(container.offsetWidth / contentWidth, container.offsetHeight / contentHeight, 1.2));
+
+  const centerX = minX + (maxX - minX) / 2;
+  const centerY = minY + (maxY - minY) / 2;
+  const pan = { x: container.offsetWidth / 2 - centerX * zoom, y: container.offsetHeight / 2 - centerY * zoom };
+
+  if (instant) { viz.pan = pan; viz.zoom = zoom; vizApplyTransform(); vizUpdateZoomDisplay(); }
+  else vizTweenView(pan, zoom);
+  vizSave();
+}
+
+/* ── Auto-layout ───────────────────────────────────────────────
+   The old one put every subtree in a single row and capped leaf grids at three
+   columns, which turned 181 nodes into a 30,324 x 1,202 strip — a 25:1 shape
+   no zoom level can read, and the reason "Fit" could never fit.
+
+   The fix is one idea applied at every level rather than only at the top: a
+   parent's children are SHELF-PACKED into rows whose target width comes from
+   the area they cover, so a node with thirty children gets a block roughly as
+   wide as it is tall instead of a thirty-wide ribbon. */
+
+const VIZ_LAY = { NW: 210, NH: 66, GX: 46, GY: 90, ROWGAP: 26, ASPECT: 1.7 };
+
+/** Pack blocks into rows no wider than targetW. Returns rows + total size. */
+function _vizShelf(blocks, targetW, gapX, gapY) {
+  const rows = [];
+  let row = [], rowW = 0, rowH = 0;
+  blocks.forEach(b => {
+    const add = row.length ? gapX + b.w : b.w;
+    if (row.length && rowW + add > targetW) {
+      rows.push({ items: row, w: rowW, h: rowH });
+      row = []; rowW = 0; rowH = 0;
+    }
+    row.push(b);
+    rowW += row.length > 1 ? gapX + b.w : b.w;
+    rowH = Math.max(rowH, b.h);
+  });
+  if (row.length) rows.push({ items: row, w: rowW, h: rowH });
+  const w = Math.max(...rows.map(r => r.w), 0);
+  const h = rows.reduce((a, r) => a + r.h, 0) + Math.max(0, rows.length - 1) * gapY;
+  return { rows, w, h };
+}
+
+function vizAutoLayout(kind) {
+  const g = vizVisibleGraph();
+  if (!g.nodes.length) return;
   vizPushUndo();
 
-  const visibleIds = new Set(visibleNodes.map(n => n.id));
-  const visibleLinks = viz.links.filter(l => visibleIds.has(l.from) && visibleIds.has(l.to) && !l.isCustom);
-  const children = {};
+  const children = new Map();
   const hasParent = new Set();
-  visibleLinks.forEach(l => {
-    if (!children[l.from]) children[l.from] = [];
-    children[l.from].push(l.to);
+  g.links.filter(l => !l.isCustom).forEach(l => {
+    if (!children.has(l.from)) children.set(l.from, []);
+    children.get(l.from).push(l.to);
     hasParent.add(l.to);
   });
 
-  let roots = visibleNodes.filter(n => !hasParent.has(n.id));
-  if (roots.length === 0) roots = [visibleNodes[0]];
+  let roots = g.nodes.filter(n => !hasParent.has(n.id));
+  if (!roots.length) roots = [g.nodes[0]];
 
-  const subtreeWidth = {};
-  function calcWidth(nodeId, visited) {
-    if (visited.has(nodeId)) return 0;
-    visited.add(nodeId);
-    let w = 0;
-    const kids = children[nodeId] || [];
+  const done = new Set();
+  const pos = new Map();
 
-    const isLeaf = (id) => (!children[id] || children[id].length === 0);
-    const allLeaves = kids.length >= 3 && kids.every(isLeaf);
+  /** Measure one subtree into a block: the node, then its packed children. */
+  function measure(id) {
+    if (done.has(id)) return null;
+    done.add(id);
+    const kids = (children.get(id) || []).map(measure).filter(Boolean);
+    if (!kids.length) return { id, w: VIZ_LAY.NW, h: VIZ_LAY.NH, rows: null };
 
-    if (allLeaves) {
-      const cols = Math.min(3, Math.ceil(Math.sqrt(kids.length)));
-      w = cols * 1.0 + (cols - 1) * 0.2;
-      kids.forEach(kid => { visited.add(kid); subtreeWidth[kid] = 1.0; });
-    } else {
-      kids.forEach((kid, i) => {
-        w += calcWidth(kid, new Set(visited));
-        if (i < kids.length - 1) w += 0.4;
-      });
-    }
-
-    subtreeWidth[nodeId] = Math.max(1.0, w);
-    return subtreeWidth[nodeId];
+    // Target width from the area the children cover, biased to the shape of a
+    // screen. sqrt(area * 1.7) is a block about 1.7 times wider than tall.
+    const area = kids.reduce((a, b) => a + (b.w + VIZ_LAY.GX) * (b.h + VIZ_LAY.ROWGAP), 0);
+    const targetW = Math.max(...kids.map(b => b.w), Math.sqrt(area * VIZ_LAY.ASPECT));
+    const packed = _vizShelf(kids, targetW, VIZ_LAY.GX, VIZ_LAY.ROWGAP);
+    return {
+      id,
+      w: Math.max(VIZ_LAY.NW, packed.w),
+      h: VIZ_LAY.NH + VIZ_LAY.GY + packed.h,
+      rows: packed.rows
+    };
   }
 
-  roots.forEach(r => calcWidth(r.id, new Set()));
-
-  const posMap = {};
-  function assignPos(nodeId, startY, startX, visited) {
-    if (visited.has(nodeId)) return;
-    visited.add(nodeId);
-
-    const myWidth = subtreeWidth[nodeId] || 1.0;
-    posMap[nodeId] = { x: startX + myWidth / 2, y: startY };
-
-    const kids = children[nodeId] || [];
-    const isLeaf = (id) => (!children[id] || children[id].length === 0);
-    const allLeaves = kids.length >= 3 && kids.every(isLeaf);
-
-    if (allLeaves) {
-      const cols = Math.min(3, Math.ceil(Math.sqrt(kids.length)));
-      let row = 0;
-      let col = 0;
-      kids.forEach(kid => {
-        visited.add(kid);
-        const cx = startX + col * 1.2 + 0.5;
-        const cy = startY + 1 + row * 0.7;
-        posMap[kid] = { x: cx, y: cy };
-
-        col++;
-        if (col >= cols) {
-          col = 0;
-          row++;
-        }
-      });
-    } else {
-      let currentX = startX;
-      kids.forEach((kid, i) => {
-        const kidWidth = subtreeWidth[kid] || 1.0;
-        assignPos(kid, startY + 1, currentX, new Set(visited));
-        currentX += kidWidth;
-        if (i < kids.length - 1) currentX += 0.4;
-      });
-    }
+  /** Place a measured block with its top-left corner at (x, y). */
+  function place(box, x, y) {
+    pos.set(box.id, { x: Math.round(x + box.w / 2 - VIZ_LAY.NW / 2), y: Math.round(y) });
+    if (!box.rows) return;
+    let cy = y + VIZ_LAY.NH + VIZ_LAY.GY;
+    box.rows.forEach(row => {
+      // Centre each row under the parent, so the tree reads as a tree.
+      let cx = x + (box.w - row.w) / 2;
+      row.items.forEach(b => { place(b, cx, cy); cx += b.w + VIZ_LAY.GX; });
+      cy += row.h + VIZ_LAY.ROWGAP;
+    });
   }
 
-  let rootX = 0;
-  roots.forEach((r, i) => {
-    const w = subtreeWidth[r.id] || 1.0;
-    assignPos(r.id, 0, rootX, new Set());
-    rootX += w;
-    if (i < roots.length - 1) rootX += 1.0;
+  const rootBoxes = roots.map(r => measure(r.id)).filter(Boolean);
+  // Islands — anything not reachable from a root — become blocks of their own
+  // rather than a row tacked on the end.
+  g.nodes.forEach(n => { const b = measure(n.id); if (b) rootBoxes.push(b); });
+
+  const area = rootBoxes.reduce((a, b) => a + (b.w + VIZ_LAY.GX) * (b.h + VIZ_LAY.GY), 0);
+  const c = document.getElementById('viz-canvas-container');
+  const aspect = c && c.offsetHeight ? Math.max(1, c.offsetWidth / c.offsetHeight) : VIZ_LAY.ASPECT;
+  const targetW = Math.max(...rootBoxes.map(b => b.w), Math.sqrt(area * aspect));
+  const top = _vizShelf(rootBoxes, targetW, VIZ_LAY.GX * 2, VIZ_LAY.GY);
+
+  let cy = 0;
+  top.rows.forEach(row => {
+    let cx = 0;
+    row.items.forEach(b => { place(b, cx, cy); cx += b.w + VIZ_LAY.GX * 2; });
+    cy += row.h + VIZ_LAY.GY;
   });
 
-  const COL_W = 340, ROW_H = 220;
-  const ORIGIN_X = 100, ORIGIN_Y = 100;
-
-  visibleNodes.forEach(n => {
-    const pos = posMap[n.id];
-    if (pos) {
-      n.x = ORIGIN_X + pos.x * COL_W - 170;
-      n.y = ORIGIN_Y + pos.y * ROW_H;
-    }
+  g.nodes.forEach(n => {
+    const p = pos.get(n.id);
+    if (p) { n.x = p.x; n.y = p.y; }
   });
 
+  _vizLinkSig = '';
   vizRenderCanvas();
   vizSave();
-  setTimeout(() => vizCenterCanvas(), 50);
+  setTimeout(() => vizCenterCanvas(), 30);
+  if (typeof toast === 'function' && kind !== 'silent') toast('Nodes arranged.', { type: 'success' });
 }
+
+/* ── Minimap ───────────────────────────────────────────────────
+   It drew every node in scope, ignoring the depth filter and collapsed
+   subtrees, so with "Folders only" it showed a picture of 181 nodes next to a
+   canvas showing 34. And the viewport rectangle could only be clicked, never
+   dragged, which is the gesture everyone tries first. */
 
 function vizUpdateMinimap() {
   const canvas = document.getElementById('viz-minimap-canvas');
@@ -1073,12 +1331,9 @@ function vizUpdateMinimap() {
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0, 0, W, H);
 
-  const scopes = vizGetVisibleScopes();
-  const nodes = viz.nodes.filter(n => scopes.includes(n.scope));
-  if (nodes.length === 0) {
-    if (viewportEl) { viewportEl.style.display = 'none'; }
-    return;
-  }
+  const g = vizVisibleGraph();
+  const nodes = g.nodes;
+  if (!nodes.length) { if (viewportEl) viewportEl.style.display = 'none'; return; }
   if (viewportEl) viewportEl.style.display = '';
 
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -1093,82 +1348,89 @@ function vizUpdateMinimap() {
   const ox = (W - worldW * scale) / 2 - (minX - pad) * scale;
   const oy = (H - worldH * scale) / 2 - (minY - pad) * scale;
 
-  // Store scale/offset for click-to-navigate
   canvas._mmScale = scale;
   canvas._mmOx = ox;
   canvas._mmOy = oy;
 
-  const ids = new Set(nodes.map(n => n.id));
   ctx.strokeStyle = 'rgba(148,163,184,0.18)';
   ctx.lineWidth = 0.75;
-  viz.links.filter(l => ids.has(l.from) && ids.has(l.to)).forEach(l => {
-    const fn = nodes.find(n => n.id === l.from);
-    const tn = nodes.find(n => n.id === l.to);
+  ctx.beginPath();
+  g.links.forEach(l => {
+    const fn = g.nodeById.get(l.from), tn = g.nodeById.get(l.to);
     if (!fn || !tn) return;
-    ctx.beginPath();
     ctx.moveTo(fn.x * scale + ox, fn.y * scale + oy);
     ctx.lineTo(tn.x * scale + ox, tn.y * scale + oy);
-    ctx.stroke();
   });
+  ctx.stroke();
 
+  const typeColors = { root: '#6366f1', folder: '#06b6d4', challenge: '#22c55e', snippet: '#f59e0b', notebook: '#a855f7', comment: '#f97316' };
   nodes.forEach(n => {
     const nx = n.x * scale + ox, ny = n.y * scale + oy;
     const nw = Math.max((n.w || 150) * scale, 4), nh = Math.max((n.h || 48) * scale, 3);
-    const colorMap = { root: '#6366f1', folder: '#06b6d4', challenge: '#22c55e', snippet: '#f59e0b', notebook: '#a855f7', comment: '#f97316' };
-    const isSelected = n.id === viz.selectedNodeId;
-    ctx.fillStyle = isSelected ? '#6366f1' : (colorMap[n.type] || '#64748b');
+    const isSelected = n.id === viz.selectedNodeId || viz.selectedNodeIds.has(n.id);
+    // The minimap follows the same colour rule the canvas is using, so the two
+    // pictures agree with each other.
+    ctx.fillStyle = isSelected ? '#6366f1' : (vizNodeTint(n) || (n.color ? vizColorMap(n.color) : null) || typeColors[n.type] || '#64748b');
     ctx.globalAlpha = isSelected ? 1 : 0.65;
     ctx.beginPath();
-    if (ctx.roundRect) {
-      ctx.roundRect(nx, ny, Math.max(nw, 6), Math.max(nh, 4), 2);
-    } else {
-      ctx.rect(nx, ny, Math.max(nw, 6), Math.max(nh, 4));
-    }
+    if (ctx.roundRect) ctx.roundRect(nx, ny, Math.max(nw, 6), Math.max(nh, 4), 2);
+    else ctx.rect(nx, ny, Math.max(nw, 6), Math.max(nh, 4));
     ctx.fill();
     ctx.globalAlpha = 1;
   });
 
-  const contW = container.offsetWidth, contH = container.offsetHeight;
   const vx = (-viz.pan.x / viz.zoom) * scale + ox;
   const vy = (-viz.pan.y / viz.zoom) * scale + oy;
-  const vw = (contW / viz.zoom) * scale;
-  const vh = (contH / viz.zoom) * scale;
+  const vw = (container.offsetWidth / viz.zoom) * scale;
+  const vh = (container.offsetHeight / viz.zoom) * scale;
   if (viewportEl) {
-    // Clamp position so the rect stays inside the minimap bounds
     const clampedX = Math.max(0, Math.min(vx, W));
     const clampedY = Math.max(0, Math.min(vy, H));
-    const clampedW = Math.min(vw, W - clampedX);
-    const clampedH = Math.min(vh, H - clampedY);
     viewportEl.style.left = clampedX + 'px';
     viewportEl.style.top = clampedY + 'px';
-    viewportEl.style.width = Math.max(clampedW, 4) + 'px';
-    viewportEl.style.height = Math.max(clampedH, 4) + 'px';
+    viewportEl.style.width = Math.max(Math.min(vw, W - clampedX), 4) + 'px';
+    viewportEl.style.height = Math.max(Math.min(vh, H - clampedY), 4) + 'px';
   }
+}
+
+/** Move the view so the given minimap point is centred. */
+function _vizMinimapGoto(clientX, clientY, tween) {
+  const canvas = document.getElementById('viz-minimap-canvas');
+  const container = document.getElementById('viz-canvas-container');
+  if (!canvas || !container || canvas._mmScale === undefined) return;
+  const rect = canvas.getBoundingClientRect();
+  const worldX = ((clientX - rect.left) - canvas._mmOx) / canvas._mmScale;
+  const worldY = ((clientY - rect.top) - canvas._mmOy) / canvas._mmScale;
+  const pan = { x: container.offsetWidth / 2 - worldX * viz.zoom, y: container.offsetHeight / 2 - worldY * viz.zoom };
+  if (tween) vizTweenView(pan, viz.zoom);
+  else { viz.pan = pan; vizApplyTransform(); }
 }
 
 function vizMinimapClick(e) {
   if (viz.activeModule === 'brain') return;
-  const canvas = document.getElementById('viz-minimap-canvas');
-  const container = document.getElementById('viz-canvas-container');
-  if (!canvas || !container || canvas._mmScale === undefined) return;
-
-  const rect = canvas.getBoundingClientRect();
-  const mx = e.clientX - rect.left;
-  const my = e.clientY - rect.top;
-
-  // Convert minimap pixel -> world coords -> pan so clicked point centers the viewport
-  const worldX = (mx - canvas._mmOx) / canvas._mmScale;
-  const worldY = (my - canvas._mmOy) / canvas._mmScale;
-
-  viz.pan.x = container.offsetWidth / 2 - worldX * viz.zoom;
-  viz.pan.y = container.offsetHeight / 2 - worldY * viz.zoom;
-
-  const nodesLayer = document.getElementById('viz-nodes-layer');
-  const svg = document.getElementById('viz-canvas-svg');
-  if (nodesLayer) nodesLayer.style.transform = `translate(${viz.pan.x}px, ${viz.pan.y}px) scale(${viz.zoom})`;
-  if (svg) svg.style.transform = `translate(${viz.pan.x}px, ${viz.pan.y}px) scale(${viz.zoom})`;
-  vizUpdateMinimap();
+  _vizMinimapGoto(e.clientX, e.clientY, true);
   vizSave();
+}
+
+/** Drag the viewport rectangle around the map. */
+function vizMinimapDragStart(e) {
+  if (viz.activeModule === 'brain') return;
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  e.preventDefault();
+  e.stopPropagation();
+  vizStopTween();
+  const move = (ev) => vizSchedulePaint(() => _vizMinimapGoto(ev.clientX, ev.clientY, false));
+  const up = () => {
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', up);
+    document.removeEventListener('pointercancel', up);
+    vizCancelScheduledPaint();
+    vizSave();
+  };
+  document.addEventListener('pointermove', move);
+  document.addEventListener('pointerup', up);
+  document.addEventListener('pointercancel', up);
+  _vizMinimapGoto(e.clientX, e.clientY, false);
 }
 
 function vizCanvasDblClick(e) {
@@ -1181,4 +1443,103 @@ function vizCanvasDblClick(e) {
   const y = (e.clientY - rect.top - viz.pan.y) / viz.zoom;
   viz.contextPos = { x, y };
   vizCtxAddNode();
+}
+
+/* ── Export ────────────────────────────────────────────────────
+   A map you spent an evening arranging could not leave the browser. Brain
+   versions could at least be shared; the library canvases could not. */
+
+function _vizExportSVG() {
+  const g = vizVisibleGraph();
+  if (!g.nodes.length) { if (typeof toast === 'function') toast('Nothing on the canvas to export.', { type: 'info' }); return null; }
+
+  const sizes = new Map();
+  g.nodes.forEach(n => {
+    const el = _vizNodeEls.get(n.id);
+    sizes.set(n.id, { w: (el && el.offsetWidth) || n.w || 180, h: (el && el.offsetHeight) || n.h || 50 });
+  });
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  g.nodes.forEach(n => {
+    const s = sizes.get(n.id);
+    minX = Math.min(minX, n.x); minY = Math.min(minY, n.y);
+    maxX = Math.max(maxX, n.x + s.w); maxY = Math.max(maxY, n.y + s.h);
+  });
+  const pad = 48;
+  const W = Math.ceil(maxX - minX + pad * 2), H = Math.ceil(maxY - minY + pad * 2);
+  const ox = pad - minX, oy = pad - minY;
+
+  const typeColors = { root: '#6366f1', folder: '#06b6d4', challenge: '#22c55e', snippet: '#f59e0b', notebook: '#a855f7', comment: '#f97316' };
+  let body = '';
+  g.links.forEach(l => {
+    const f = g.nodeById.get(l.from), t = g.nodeById.get(l.to);
+    const fs = sizes.get(l.from), ts = sizes.get(l.to);
+    if (!f || !t) return;
+    const d = vizBezierPath(f.x + ox, f.y + oy, fs.w, fs.h, t.x + ox, t.y + oy, ts.w, ts.h, l.fromSide, l.toSide);
+    const stroke = l.color ? vizColorMap(l.color) : (l.locked ? '#f59e0b' : '#94a3b8');
+    body += `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="1.6" opacity="0.75"/>`;
+    if (l.label) {
+      const mx = (f.x + ox + fs.w / 2 + t.x + ox + ts.w / 2) / 2;
+      const my = (f.y + oy + fs.h / 2 + t.y + oy + ts.h / 2) / 2;
+      body += `<text x="${mx}" y="${my - 5}" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#64748b">${escapeHTML(l.label)}</text>`;
+    }
+  });
+  g.nodes.forEach(n => {
+    const s = sizes.get(n.id);
+    const fill = vizNodeTint(n) || (n.color ? vizColorMap(n.color) : null) || typeColors[n.type] || '#64748b';
+    const x = n.x + ox, y = n.y + oy;
+    const text = n.type === 'comment' ? (n.commentContent || '') : (n.label || '');
+    const clipped = text.length > 34 ? text.slice(0, 33) + '…' : text;
+    body += `<rect x="${x}" y="${y}" width="${s.w}" height="${s.h}" rx="10" fill="#0f172a" stroke="${fill}" stroke-width="2"/>`
+      + `<rect x="${x}" y="${y}" width="4" height="${s.h}" rx="2" fill="${fill}"/>`
+      + `<text x="${x + 16}" y="${y + s.h / 2 + 4}" font-family="system-ui,sans-serif" font-size="13" font-weight="600" fill="#e2e8f0">${escapeHTML(clipped)}</text>`;
+  });
+
+  return { svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`
+    + `<rect width="${W}" height="${H}" fill="#0b1220"/>${body}</svg>`, W, H };
+}
+
+function _vizDownload(href, filename) {
+  const a = document.createElement('a');
+  a.href = href;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+function vizExportSVG() {
+  const out = _vizExportSVG();
+  if (!out) return;
+  const url = URL.createObjectURL(new Blob([out.svg], { type: 'image/svg+xml' }));
+  _vizDownload(url, vizExportName() + '.svg');
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  if (typeof toast === 'function') toast('Canvas exported as SVG.', { type: 'success' });
+}
+
+function vizExportPNG() {
+  const out = _vizExportSVG();
+  if (!out) return;
+  const scale = Math.min(2, Math.max(1, 2200 / Math.max(out.W, out.H)));
+  const img = new Image();
+  img.onload = () => {
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(out.W * scale);
+    cv.height = Math.round(out.H * scale);
+    const ctx = cv.getContext('2d');
+    ctx.drawImage(img, 0, 0, cv.width, cv.height);
+    cv.toBlob((blob) => {
+      if (!blob) { if (typeof toast === 'function') toast('Could not render the PNG.', { type: 'error' }); return; }
+      const url = URL.createObjectURL(blob);
+      _vizDownload(url, vizExportName() + '.png');
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      if (typeof toast === 'function') toast('Canvas exported as PNG.', { type: 'success' });
+    }, 'image/png');
+  };
+  img.onerror = () => { if (typeof toast === 'function') toast('Could not render the PNG.', { type: 'error' }); };
+  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(out.svg);
+}
+
+function vizExportName() {
+  const label = (vizModuleMeta(viz.activeModule).label || 'canvas').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  return 'studysession-' + label + '-' + new Date().toISOString().slice(0, 10);
 }
