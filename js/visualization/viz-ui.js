@@ -219,110 +219,178 @@ function _vizPaintStrip() {
    181 nodes is not a map, it is a wall. Showing only what is within N links of
    one node is how Obsidian makes a large graph legible, and Brain already had
    a subtree version of the idea (_focusedParentId) that the library canvases
-   could not reach. */
+   could not reach.
 
-function vizToggleFocusMenu() {
-  const el = document.getElementById('viz-focus-popup');
-  if (el) el.classList.toggle('hidden');
-}
+   The first version of this menu did nothing at all unless a node happened to
+   be selected first: picking "2 steps" set a hop count against no node, and
+   the canvas carried on showing all 181. The range and the target are one
+   feature, so the menu now ARMS the mode and the next node you click becomes
+   the target — and while the mode is on, the focus simply follows whatever you
+   select, rather than pinning to the node you happened to start from. */
+
+function vizToggleFocusMenu() { vizTogglePopup('viz-focus-popup'); }
 
 function vizSetFocusHops(n) {
-  viz.focusHops = Number(n) || 0;
-  if (!viz.focusHops) viz.focusNodeId = null;
-  else if (!viz.focusNodeId) viz.focusNodeId = viz.selectedNodeId || null;
+  const hops = Number(n) || 0;
+  viz.focusHops = hops;
   const popup = document.getElementById('viz-focus-popup');
   if (popup) popup.classList.add('hidden');
+
+  if (!hops) {
+    viz.focusNodeId = null;
+    viz.focusArmed = false;
+  } else if (!viz.focusNodeId) {
+    // Fall back to the selection, then to the node nearest the middle of the
+    // view — something has to be the centre of a local graph, and refusing to
+    // pick one is what made this menu look broken.
+    viz.focusNodeId = viz.selectedNodeId || _vizNodeNearestCentre();
+    viz.focusArmed = !viz.focusNodeId;
+    if (viz.focusArmed && typeof toast === 'function') {
+      toast('Click a node to centre the local graph on it.', { type: 'info', duration: 3000 });
+    }
+  }
   vizSave();
   vizSyncFocusBtn();
   vizRenderCanvas();
   if (viz.focusNodeId) setTimeout(() => vizCenterCanvas(), 30);
 }
 
+/** The visible node closest to the middle of the viewport. */
+function _vizNodeNearestCentre() {
+  const c = document.getElementById('viz-canvas-container');
+  const g = vizVisibleGraph();
+  if (!c || !g.nodes.length) return null;
+  const cx = (c.offsetWidth / 2 - viz.pan.x) / viz.zoom;
+  const cy = (c.offsetHeight / 2 - viz.pan.y) / viz.zoom;
+  let best = null, bestD = Infinity;
+  g.nodes.forEach(n => {
+    if (n.type === 'comment' || n.type === 'frame') return;
+    const d = Math.hypot(n.x + (n.w || 180) / 2 - cx, n.y + (n.h || 50) / 2 - cy);
+    if (d < bestD) { bestD = d; best = n; }
+  });
+  return best ? best.id : null;
+}
+
 /** G, or the node menu: focus on what is selected. */
 function vizToggleFocusHere() {
-  if (viz.focusNodeId) { vizClearFocus(); return; }
-  const id = viz.selectedNodeId;
-  if (!id) { if (typeof toast === 'function') toast('Select a node first.', { type: 'info' }); return; }
-  viz.focusNodeId = id;
+  if (viz.focusNodeId || viz.focusArmed) { vizClearFocus(); return; }
   if (!viz.focusHops) viz.focusHops = 2;
+  vizSetFocusHops(viz.focusHops);
+}
+
+function vizClearFocus() {
+  viz.focusNodeId = null;
+  viz.focusArmed = false;
   vizSave();
   vizSyncFocusBtn();
   vizRenderCanvas();
   setTimeout(() => vizCenterCanvas(), 30);
 }
 
-function vizClearFocus() {
-  viz.focusNodeId = null;
+/** Step the range up or down from the bar, without reopening the menu. */
+function vizNudgeFocus(delta) {
+  const next = Math.max(1, Math.min(5, (viz.focusHops || 2) + delta));
+  if (next === viz.focusHops) return;
+  viz.focusHops = next;
+  vizSave();
   vizSyncFocusBtn();
   vizRenderCanvas();
   setTimeout(() => vizCenterCanvas(), 30);
 }
 
 function vizSyncFocusBtn() {
-  const btn = document.getElementById('viz-focus-btn');
   const on = !!(viz.focusNodeId && viz.focusHops > 0);
+  const armed = !!viz.focusArmed && viz.focusHops > 0;
+  const btn = document.getElementById('viz-focus-btn');
   if (btn) {
-    btn.classList.toggle('is-active', on);
+    btn.classList.toggle('is-active', on || armed);
     const label = on
       ? 'Showing ' + viz.focusHops + ' step' + (viz.focusHops !== 1 ? 's' : '') + ' around one node'
-      : 'Local graph (G)';
+      : armed ? 'Click a node to centre the local graph' : 'Local graph (G)';
     btn.title = label;
     btn.setAttribute('aria-label', label);
   }
   document.querySelectorAll('#viz-focus-popup .viz-link-type-option').forEach(o => {
     o.classList.toggle('active', Number(o.dataset.hops) === (viz.focusHops || 0));
   });
+
   const bar = document.getElementById('viz-focus-bar');
-  if (bar) {
-    bar.classList.toggle('hidden', !on);
-    if (on) {
-      const node = viz.nodes.find(n => n.id === viz.focusNodeId);
-      bar.innerHTML = '<i data-lucide="crosshair" style="width:12px;height:12px;"></i>'
-        + '<span>' + escapeHTML(node ? node.label : 'Focused') + ' · ' + viz.focusHops
-        + ' step' + (viz.focusHops !== 1 ? 's' : '') + '</span>'
-        + '<button type="button" class="viz-chip-x" onclick="vizClearFocus()" aria-label="Show the whole graph">&times;</button>';
-      if (typeof lucide !== 'undefined') lucide.createIcons({ el: bar });
-    }
+  if (!bar) return;
+  bar.classList.toggle('hidden', !(on || armed));
+  if (armed) {
+    bar.innerHTML = '<i data-lucide="crosshair" style="width:12px;height:12px;"></i>'
+      + '<span>Click a node to focus on it</span>'
+      + '<button type="button" class="viz-chip-x" onclick="vizClearFocus()" aria-label="Cancel">&times;</button>';
+  } else if (on) {
+    const node = viz.nodes.find(n => n.id === viz.focusNodeId);
+    const shown = vizVisibleGraph().nodes.length;
+    bar.innerHTML = '<i data-lucide="crosshair" style="width:12px;height:12px;"></i>'
+      + '<span>' + escapeHTML(node ? node.label : 'Focused') + '</span>'
+      + '<button type="button" class="viz-step-btn" onclick="vizNudgeFocus(-1)" aria-label="Fewer steps"'
+      + (viz.focusHops <= 1 ? ' disabled' : '') + '>&minus;</button>'
+      + '<b class="viz-step-n">' + viz.focusHops + '</b>'
+      + '<button type="button" class="viz-step-btn" onclick="vizNudgeFocus(1)" aria-label="More steps"'
+      + (viz.focusHops >= 5 ? ' disabled' : '') + '>+</button>'
+      + '<span class="viz-focus-count">' + shown + ' of ' + viz.nodes.filter(n => vizGetVisibleScopes().includes(n.scope)).length + '</span>'
+      + '<button type="button" class="viz-chip-x" onclick="vizClearFocus()" aria-label="Show the whole graph">&times;</button>';
   }
+  if ((on || armed) && typeof lucide !== 'undefined') lucide.createIcons({ el: bar });
 }
 
 /* ── Saved views ───────────────────────────────────────────────
    Brain has versions; the library canvases had exactly one state each, so any
    arrangement you made for one purpose destroyed the last one. A view is a
-   bookmark of the camera and the filters, not a copy of the graph. */
+   bookmark of the camera and the filters, not a copy of the graph.
 
-function vizToggleViewsMenu() {
-  const el = document.getElementById('viz-views-popup');
-  if (!el) return;
-  el.classList.toggle('hidden');
-  if (!el.classList.contains('hidden')) vizRenderViewsMenu();
+   It records WHICH LIBRARIES were selected, and applying it selects them
+   again. Keying the list by that combination instead — which is what the first
+   version did — meant a view saved on Programs vanished from the menu the
+   moment you also ticked Notebooks, which looks exactly like losing it. */
+
+function vizToggleViewsMenu() { vizTogglePopup('viz-views-popup', vizRenderViewsMenu); }
+
+function vizViewSurface() { return viz.activeModule === 'brain' ? 'brain' : 'library'; }
+
+/** Views for the surface you are on, oldest first. */
+function vizViewsHere() {
+  const here = vizViewSurface();
+  return (viz.savedViews || []).filter(v => (v.surface || (v.module === 'brain' ? 'brain' : 'library')) === here);
 }
 
 function vizRenderViewsMenu() {
   const el = document.getElementById('viz-views-popup');
   if (!el) return;
-  const mine = (viz.savedViews || []).filter(v => v.module === vizViewKey());
-  el.innerHTML = mine.map(v =>
-    '<div class="viz-link-type-option viz-view-row" onclick="vizApplyView(\'' + v.id + '\')">'
-    + '<i data-lucide="bookmark" style="width:14px;height:14px;"></i>'
-    + '<span class="viz-view-name">' + escapeHTML(v.name) + '</span>'
-    + '<button type="button" class="viz-chip-x" onclick="event.stopPropagation();vizDeleteView(\'' + v.id + '\')" aria-label="Delete this view">&times;</button>'
-    + '</div>').join('')
-    + (mine.length ? '<div class="viz-ctx-divider"></div>' : '<div class="viz-views-empty">No saved views yet.</div>')
-    + '<div class="viz-link-type-option" onclick="vizSaveView()"><i data-lucide="plus" style="width:14px;height:14px;"></i> Save this view</div>';
+  const mine = vizViewsHere();
+  el.innerHTML = '<div class="viz-popup-title">Saved views</div>'
+    + mine.map(v => {
+      const libs = (v.scopes || []).map(s => vizModuleMeta(s).label).join(' + ');
+      return '<div class="viz-link-type-option viz-view-row" onclick="vizApplyView(\'' + v.id + '\')" role="menuitem" tabindex="0">'
+        + '<i data-lucide="bookmark" style="width:14px;height:14px;"></i>'
+        + '<span class="viz-view-name">' + escapeHTML(v.name)
+        + (libs ? '<em class="viz-view-sub">' + escapeHTML(libs) + '</em>' : '') + '</span>'
+        + '<button type="button" class="viz-chip-x" onclick="event.stopPropagation();vizDeleteView(\'' + v.id + '\')" aria-label="Delete the view named ' + escapeHTML(v.name) + '">&times;</button>'
+        + '</div>';
+    }).join('')
+    + (mine.length ? '' : '<div class="viz-views-empty">Nothing saved yet. A view remembers where you were looking, which libraries were on, and how the nodes were coloured.</div>')
+    + '<div class="viz-ctx-divider"></div>'
+    + '<div class="viz-link-type-option" onclick="vizSaveView()" role="menuitem" tabindex="0"><i data-lucide="plus" style="width:14px;height:14px;"></i> Save this view</div>';
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: el });
 }
 
 function vizSaveView() {
   const popup = document.getElementById('viz-views-popup');
   if (popup) popup.classList.add('hidden');
-  showInputDialog('Save this view', 'The camera, the depth filter and the colour rule — not a copy of the graph.',
-    'View name', '', (name) => {
+  const suggestion = vizSurfaceLabel() + (viz.canvasDepth !== 'all' ? ' · ' + VIZ_DEPTH_META[viz.canvasDepth].label : '');
+  showInputDialog('Save this view',
+    'Where you are looking, which libraries are on, the depth filter and the colour rule — not a copy of the graph.',
+    'View name', suggestion, (name) => {
       const clean = (name || '').trim();
       if (!clean) return;
       viz.savedViews = viz.savedViews || [];
       viz.savedViews.push({
-        id: 'vv_' + generateId(), name: clean, module: vizViewKey(),
+        id: 'vv_' + generateId(), name: clean,
+        surface: vizViewSurface(),
+        scopes: vizGetVisibleScopes().slice(),
         pan: { x: viz.pan.x, y: viz.pan.y }, zoom: viz.zoom,
         depth: viz.canvasDepth, tint: viz.tintRule,
         focusNodeId: viz.focusNodeId, focusHops: viz.focusHops
@@ -338,22 +406,45 @@ function vizApplyView(id) {
   if (!v) return;
   const popup = document.getElementById('viz-views-popup');
   if (popup) popup.classList.add('hidden');
+
+  // A view that was taken with two libraries up brings them back with it.
+  const want = (v.scopes || []).filter(s => VIZ_LIBRARY_SCOPES.includes(s));
+  const changed = want.length && want.join('+') !== vizGetVisibleScopes().join('+');
+  if (changed) {
+    viz.scopes = want;
+    viz.activeModule = 'library';
+    if (typeof _vizResetRenderCache === 'function') _vizResetRenderCache();
+    _vizPaintStrip();
+    vizGetVisibleScopes().forEach(sc => vizAutoPopulate([sc]));
+    viz._needsLayout = false;
+    vizRenderContentPane();
+  }
+
   if (VIZ_DEPTHS.indexOf(v.depth) !== -1) viz.canvasDepth = v.depth;
   if (VIZ_TINT_RULES[v.tint]) viz.tintRule = v.tint;
   viz.focusNodeId = v.focusNodeId && viz.nodes.some(n => n.id === v.focusNodeId) ? v.focusNodeId : null;
   viz.focusHops = v.focusHops || 0;
+  viz.focusArmed = false;
   vizSyncDepthBtn();
   vizSyncTintBtn();
   vizSyncFocusBtn();
   vizRenderCanvas();
   vizTweenView(v.pan, v.zoom);
   vizSave();
+  if (typeof toast === 'function') toast('Showing "' + v.name + '".', { type: 'info', duration: 2000 });
 }
 
 function vizDeleteView(id) {
-  viz.savedViews = (viz.savedViews || []).filter(v => v.id !== id);
+  const v = (viz.savedViews || []).find(x => x.id === id);
+  viz.savedViews = (viz.savedViews || []).filter(x => x.id !== id);
   vizSaveNow();
   vizRenderViewsMenu();
+  if (v && typeof toast === 'function') {
+    toast('Deleted "' + v.name + '".', {
+      type: 'info', duration: 6000,
+      action: { label: 'Undo', onClick: () => { viz.savedViews.push(v); vizSaveNow(); vizRenderViewsMenu(); } }
+    });
+  }
 }
 
 /**
@@ -613,9 +704,7 @@ function vizRenderContentPane() {
 
   const scopes = vizGetVisibleScopes();
   const multi = scopes.length > 1;
-  if (breadcrumbEl) {
-    breadcrumbEl.innerHTML = `<span class="viz-breadcrumb-item" style="cursor:default;color:var(--text-primary)">${multi ? 'All selected libraries' : 'Root'}</span>`;
-  }
+  vizPaintBreadcrumb(scopes, multi);
 
   const query = (viz.paneQuery || '').trim().toLowerCase();
   const narrowed = !!query || !!viz.paneFilter;
@@ -702,6 +791,53 @@ function vizRenderContentPane() {
     ? html + treeRootDropHTML('viz')
     : _vizPaneEmptyHTML(query);
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: body });
+}
+
+/**
+ * The path to whichever folder is selected.
+ *
+ * This row used to be the single word "Root", permanently, with nothing in it
+ * to click — a label that never changed and never told you anything. It is the
+ * real ancestry now, each step selects that folder, and the row is not drawn
+ * at all when there is no path to show.
+ */
+function vizPaintBreadcrumb(scopes, multi) {
+  const el = document.getElementById('viz-content-breadcrumb');
+  if (!el) return;
+  const fid = viz.selectedFolderId;
+  const folder = fid && fid !== '__root__' ? (state.nodes || []).find(n => n.id === fid) : null;
+
+  if (!folder) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+
+  const chain = [];
+  let cur = folder, guard = 0;
+  while (cur && guard++ < 60) {
+    chain.unshift(cur);
+    cur = cur.parentId ? (state.nodes || []).find(n => n.id === cur.parentId) : null;
+  }
+
+  const rootLabel = multi ? vizModuleMeta(folder.scope).label : vizSurfaceLabel();
+  const sep = '<span class="viz-crumb-sep" aria-hidden="true">/</span>';
+  let html = `<button type="button" class="viz-breadcrumb-item" onclick="vizBreadcrumbTo(null)" title="${escapeHTML(rootLabel)}">${escapeHTML(rootLabel)}</button>`;
+  chain.forEach((n, i) => {
+    const last = i === chain.length - 1;
+    html += sep + `<button type="button" class="viz-breadcrumb-item"${last ? ' aria-current="true"' : ''}
+      onclick="vizBreadcrumbTo('${n.id}')" title="${escapeHTML(n.name)}">${escapeHTML(n.name)}</button>`;
+  });
+  el.classList.remove('hidden');
+  el.setAttribute('aria-label', 'Folder path');
+  el.innerHTML = html;
+}
+
+/** Select an ancestor from the breadcrumb, or clear back to the top. */
+function vizBreadcrumbTo(folderId) {
+  viz.selectedFolderId = folderId;
+  if (folderId) viz.expandedFolderIds.add(folderId);
+  vizRenderContentPane();
+  if (folderId) {
+    const node = viz.nodes.find(n => n.dataId === folderId);
+    if (node) { viz.selectedNodeId = node.id; vizRenderCanvas(); vizRevealInTree(folderId); }
+  }
 }
 
 /**
@@ -1000,6 +1136,21 @@ function vizNodeClick(e, nodeId) {
   vizUpdateSelectionChip();
 
   const node = viz.nodes.find(n => n.id === nodeId);
+
+  /* While the local graph is on, it follows what you select. Pinning it to the
+     node you happened to start from meant the only way to look at somewhere
+     else was to turn the whole thing off and on again. */
+  if (viz.focusHops > 0 && node && node.type !== 'comment' && node.type !== 'frame'
+      && viz.focusNodeId !== nodeId) {
+    viz.focusNodeId = nodeId;
+    viz.focusArmed = false;
+    vizSave();
+    vizSyncFocusBtn();
+    vizRenderCanvas();
+    setTimeout(() => vizCenterCanvas(), 30);
+    if (node.dataId && node.dataId !== 'root') vizRevealInTree(node.dataId);
+    return;
+  }
   if (node && node.type === 'folder' && node.dataId) {
     viz.selectedFolderId = node.dataId === 'root' ? null : node.dataId;
     if (node.dataId && node.dataId !== 'root') viz.expandedFolderIds.add(node.dataId);
@@ -1701,6 +1852,7 @@ function vizToggleFlowyDrag() {
 
 function vizToggleColorMode() {
   viz.colorModeEnabled = !viz.colorModeEnabled;
+  if (viz.colorModeEnabled) vizClosePopups('viz-color-mode-popup');
 
   // Turn off link mode for the currently active module
   if (viz.colorModeEnabled) {
@@ -1754,15 +1906,10 @@ function vizSetPaintColor(color) {
 }
 
 function vizToggleLinkTypeDropdown() {
-  const popup = document.getElementById('viz-link-type-popup');
-  if (!popup) return;
-  const isHidden = popup.classList.contains('hidden');
   vizHideAllMenus();
-  document.getElementById('viz-color-mode-popup')?.classList.add('hidden');
-  if (isHidden) {
-    popup.classList.remove('hidden');
-    lucide.createIcons({ root: popup });
-  }
+  vizTogglePopup('viz-link-type-popup', () => {
+    if (typeof lucide !== 'undefined') lucide.createIcons({ root: document.getElementById('viz-link-type-popup') });
+  });
 }
 
 /**
@@ -1963,7 +2110,11 @@ function vizUpdateHeaderStats() {
 function _vizFilterChip(stat, icon, value, label, filter, active, title) {
   const on = filter !== null && active === filter;
   const cls = 'mini-stat-chip viz-chip-filter' + (on ? ' is-on' : '') + (stat === 'placed' ? ' completed' : '');
-  return `<button type="button" class="${cls}" data-stat="${stat}" title="${escapeHTML(title || label)}"
+  // The label is dropped in a narrow pane, so the number has to be able to
+  // explain itself: both go in the tooltip and the accessible name.
+  const full = value + ' ' + label + (title ? ' — ' + title : '');
+  return `<button type="button" class="${cls}" data-stat="${stat}" title="${escapeHTML(full)}"
+      aria-label="${escapeHTML(full)}"
       aria-pressed="${on}" onclick="vizTogglePaneFilter(${filter === null ? 'null' : "'" + filter + "'"})">
     <i data-lucide="${icon}" style="width:12px;height:12px;"></i>
     <span class="mini-stat-value">${value}</span>
@@ -1985,10 +2136,7 @@ function vizPaneFilterAllows(item) {
 }
 
 /** Brain's arrange menu. */
-function brainToggleLayoutMenu() {
-  const el = document.getElementById('brain-layout-popup');
-  if (el) el.classList.toggle('hidden');
-}
+function brainToggleLayoutMenu() { vizTogglePopup('brain-layout-popup'); }
 
 /** Brain's toolbar options only apply to Brain. */
 function vizSyncModuleTools() {
@@ -2112,12 +2260,7 @@ window.vizCloseShortcuts = function () {
    forget. They were four of the seventeen buttons competing for attention in
    a single flat toolbar row. */
 
-function vizToggleMoreMenu() {
-  const el = document.getElementById('viz-more-popup');
-  if (!el) return;
-  el.classList.toggle('hidden');
-  if (!el.classList.contains('hidden')) vizSyncMoreMenu();
-}
+function vizToggleMoreMenu() { vizTogglePopup('viz-more-popup', vizSyncMoreMenu); }
 
 function vizSyncMoreMenu() {
   const set = (id, on) => {
@@ -2126,6 +2269,11 @@ function vizSyncMoreMenu() {
     el.classList.toggle('is-on', !!on);
     el.setAttribute('aria-pressed', String(!!on));
   };
+  const isBrain = viz.activeModule === 'brain';
+  // Fog of war reads the library's prerequisite rules; Brain has none, so the
+  // row did nothing at all there.
+  const fog = document.getElementById('viz-fog-toggle-btn');
+  if (fog) fog.classList.toggle('hidden', isBrain);
   set('viz-fog-toggle-btn', viz.fogEnabled);
   set('viz-globe-toggle-btn', viz.globeModeEnabled);
   set('viz-flow-toggle-btn', viz.flowyDragEnabled);

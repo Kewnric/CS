@@ -53,6 +53,10 @@ const viz = {
   /* Local graph: show only the neighbourhood of one node. 0 hops = off. */
   focusNodeId: null,
   focusHops: 0,
+  /* The range is chosen before the target: armed means "the next node you
+     click is the centre". Picking a range with nothing selected used to set a
+     number against no node and change nothing on screen. */
+  focusArmed: false,
   /* More than one node can be selected now; selectedNodeId stays as the
      "primary" for the things that only make sense for one (rename, popup). */
   selectedNodeIds: new Set(),
@@ -86,10 +90,7 @@ function vizSetDepth(mode) {
   setTimeout(() => vizCenterCanvas(), 30);
 }
 
-function vizToggleDepthMenu() {
-  const el = document.getElementById('viz-depth-popup');
-  if (el) el.classList.toggle('hidden');
-}
+function vizToggleDepthMenu() { vizTogglePopup('viz-depth-popup'); }
 
 function vizSyncDepthBtn() {
   const btn = document.getElementById('viz-depth-btn');

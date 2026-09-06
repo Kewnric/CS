@@ -301,10 +301,7 @@ function vizSetTintRule(rule) {
   vizRenderCanvas();
 }
 
-function vizToggleTintMenu() {
-  const el = document.getElementById('viz-tint-popup');
-  if (el) el.classList.toggle('hidden');
-}
+function vizToggleTintMenu() { vizTogglePopup('viz-tint-popup'); }
 
 function vizSyncTintBtn() {
   const rule = viz.tintRule || 'none';
@@ -370,7 +367,11 @@ function vizTweenView(pan, zoom, done) {
   const to = { x: pan.x, y: pan.y, z: vizClampZoom(zoom) };
   const near = Math.abs(from.x - to.x) < 1 && Math.abs(from.y - to.y) < 1 && Math.abs(from.z - to.z) < 0.005;
 
-  if (near || vizPrefersReducedMotion()) {
+  /* requestAnimationFrame does not fire while the document is hidden, so a
+     tween started in a background tab never finishes and the camera is simply
+     left where it was — Fit, the minimap and applying a saved view all quietly
+     did nothing. When there is nothing to animate to, just arrive. */
+  if (near || vizPrefersReducedMotion() || document.hidden) {
     cam.pan.x = to.x; cam.pan.y = to.y; cam.zoom = to.z;
     vizApplyTransform();
     if (done) done();
@@ -379,6 +380,18 @@ function vizTweenView(pan, zoom, done) {
 
   const dur = 280;
   const t0 = performance.now();
+  /* And if the tab is hidden PART WAY through, the loop stops being called;
+     this lands the camera on the target rather than stranding it mid-flight. */
+  const onHide = () => {
+    if (!document.hidden) return;
+    vizStopTween();
+    cam.pan.x = to.x; cam.pan.y = to.y; cam.zoom = to.z;
+    vizApplyTransform();
+    vizUpdateZoomDisplay();
+    document.removeEventListener('visibilitychange', onHide);
+    if (done) done();
+  };
+  document.addEventListener('visibilitychange', onHide);
   const ease = (t) => 1 - Math.pow(1 - t, 3);   // easeOutCubic
   const step = (now) => {
     const p = Math.min(1, (now - t0) / dur);
@@ -389,7 +402,11 @@ function vizTweenView(pan, zoom, done) {
     vizApplyTransform();
     vizUpdateZoomDisplay();
     if (p < 1) { _vizTweenRaf = requestAnimationFrame(step); }
-    else { _vizTweenRaf = null; if (done) done(); }
+    else {
+      _vizTweenRaf = null;
+      document.removeEventListener('visibilitychange', onHide);
+      if (done) done();
+    }
   };
   _vizTweenRaf = requestAnimationFrame(step);
 }
@@ -407,6 +424,46 @@ function vizApplyTransform() {
   if (c) c.classList.toggle('viz-far', cam.zoom < VIZ_CULL_ZOOM);
   if (isBrain) { if (typeof brainUpdateMinimap === 'function') brainUpdateMinimap(); }
   else if (typeof vizUpdateMinimap === 'function') vizUpdateMinimap();
+}
+
+/* ============================================================
+   ONE POPUP AT A TIME
+   ------------------------------------------------------------
+   Every dropdown toggled only itself, and the document click handler closed
+   the others only when the click landed OUTSIDE `.viz-toolbar-dropdown`. So
+   opening a second dropdown left the first hanging open, and four could be on
+   screen at once, overlapping each other and the canvas.
+   ============================================================ */
+
+const VIZ_POPUPS = [
+  'viz-depth-popup', 'viz-tint-popup', 'viz-focus-popup', 'viz-views-popup',
+  'viz-more-popup', 'viz-link-type-popup', 'viz-color-mode-popup', 'brain-layout-popup'
+];
+
+/** Close every toolbar popup, optionally sparing one. */
+function vizClosePopups(except) {
+  VIZ_POPUPS.forEach(id => {
+    if (id === except) return;
+    // Colour mode's popup IS the mode's control surface: closing it while the
+    // mode is on would hide the swatch you are painting with.
+    if (id === 'viz-color-mode-popup' && viz.colorModeEnabled && except !== null) return;
+    const el = document.getElementById(id);
+    if (el) el.classList.add('hidden');
+  });
+}
+
+/**
+ * Open this popup and close the rest, or close it if it was already open.
+ * @returns {boolean} true if it ended up open
+ */
+function vizTogglePopup(id, onOpen) {
+  const el = document.getElementById(id);
+  if (!el) return false;
+  const willOpen = el.classList.contains('hidden');
+  vizClosePopups(willOpen ? id : undefined);
+  el.classList.toggle('hidden', !willOpen);
+  if (willOpen && typeof onOpen === 'function') onOpen();
+  return willOpen;
 }
 
 /* ============================================================

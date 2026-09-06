@@ -329,7 +329,9 @@ function brainRenderSidebar() {
   } else if (titleEl) {
     titleEl.textContent = 'Brain';
   }
-  if (breadcrumbEl) breadcrumbEl.innerHTML = '<span class="viz-breadcrumb-item" style="cursor:default;color:var(--text-primary)">Versions</span>';
+  // The path to the open version's folder, or nothing at all. It used to be the
+  // fixed word "Versions", which said nothing and could not be clicked.
+  if (breadcrumbEl) brainPaintBreadcrumb(breadcrumbEl, active);
 
   // The search box filters the version list, not just canvas nodes — it sat
   // above a list it had no effect on.
@@ -455,6 +457,40 @@ function brainRenderSidebar() {
   body.setAttribute('oncontextmenu', "treePaneContextMenu(event, 'brain')");
   body.innerHTML = html;
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: body });
+}
+
+/** Open a brain folder and scroll its row into view. */
+function brainRevealFolder(id) {
+  const f = brain.folders.find(x => x.id === id);
+  if (!f) return;
+  if (f.collapsed) { f.collapsed = false; brainSave(); }
+  if (!brainSetFolderOpen(id, true)) brainRenderSidebar();
+  const row = document.querySelector('#viz-content-body .tree-node[data-node-id="' + id + '"] .tree-node-row');
+  if (row) {
+    row.scrollIntoView({ block: 'nearest', behavior: vizPrefersReducedMotion() ? 'auto' : 'smooth' });
+    row.classList.add('viz-reveal-flash');
+    setTimeout(() => row.classList.remove('viz-reveal-flash'), 1200);
+  }
+}
+
+/** Where the open version lives, as a clickable path. */
+function brainPaintBreadcrumb(el, active) {
+  if (!active || !active.folderId) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+  const chain = [];
+  let cur = brain.folders.find(f => f.id === active.folderId), guard = 0;
+  while (cur && guard++ < 60) {
+    chain.unshift(cur);
+    cur = cur.parentId ? brain.folders.find(f => f.id === cur.parentId) : null;
+  }
+  if (!chain.length) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+  const sep = '<span class="viz-crumb-sep" aria-hidden="true">/</span>';
+  el.classList.remove('hidden');
+  el.setAttribute('aria-label', 'Folder path');
+  el.innerHTML = '<button type="button" class="viz-breadcrumb-item" onclick="brainCollapseAll(false)" title="All versions">Brain</button>'
+    + chain.map((f, i) => sep + '<button type="button" class="viz-breadcrumb-item"'
+      + (i === chain.length - 1 ? ' aria-current="true"' : '')
+      + ' onclick="brainRevealFolder(&quot;' + f.id + '&quot;)" title="' + escapeHTML(f.name) + '">'
+      + escapeHTML(f.name) + '</button>').join('');
 }
 
 /** Versions in a folder and every folder under it — the library's badge rule. */

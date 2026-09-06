@@ -3483,9 +3483,15 @@
 
 /* ── Stat chips that are filters ───────────────────────────────
    They were four inert numbers under the pane header. */
+/* `font: inherit` here reset the FONT SIZE too, and this selector outranks the
+   .mini-stat-chip rule that sets it — so turning these chips from divs into
+   buttons silently blew them up from 11px to 16px, wrapped "On canvas" onto a
+   second line, and made the pane header 259px tall. Only the family needs
+   bringing over from the button UA sheet. */
 .mini-stat-chip.viz-chip-filter {
   border: 1px solid transparent;
-  font: inherit;
+  font-family: inherit;
+  line-height: inherit;
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
 }
@@ -3669,11 +3675,10 @@ button.viz-link-type-option {
    626 px of buttons in a 359 px pane. The row wraps, but wrapping four rows
    of icons over the canvas is not an answer either — the labels go, the gaps
    tighten, and the rest is behind the More button. */
+/* The toolbar's own compaction moved to a container query (see below) — a
+   media query here measured the window, not the pane. These four are genuinely
+   about the device. */
 @media (max-width: 720px) {
-  .viz-canvas-toolbar { gap: 0.3rem; padding: 0.35rem 0.5rem; }
-  .viz-canvas-toolbar-left span { display: none; }
-  .viz-toolbar-sep { display: none; }
-  .viz-toolbar-pill-btn .viz-pill-chevron { display: none; }
   .viz-minimap { width: 116px; height: 72px; }
   .viz-minimap canvas { width: 116px; height: 72px; }
   .viz-canvas-chips { top: 0.5rem; left: 0.5rem; }
@@ -3818,4 +3823,207 @@ button.viz-link-type-option {
   .viz-node.viz-collapsing,
   .viz-node.viz-expanding { animation: none !important; }
   .viz-collapse-badge { transition: none !important; }
+}
+
+/* ── The pane header ───────────────────────────────────────────
+   Four chips on one nowrap row ran 155px past the edge of a 226px pane, and
+   the subtitle wrapped to three lines beside a 44px icon. The header was 259px
+   of a 840px pane — a third of the list, spent on four numbers. */
+/* A container query rather than a viewport one: the pane is resizable, so what
+   matters is how wide THIS row is, not how wide the window is. Below the width
+   where four chips fit, the labels go and the numbers stay — the row keeps its
+   single line instead of doubling the header's height. */
+/* One row, always. Wrapping doubled the header's height the moment the pane
+   got narrow, which is exactly when there is least room to spare; scrolling
+   keeps the height fixed and still reaches every chip. The labels go first,
+   via a container query rather than a viewport one — the pane is resizable, so
+   what matters is how wide THIS row is, not how wide the window is. */
+.viz-content-header .browse-mini-stats {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-top: 0.4rem;
+  padding-bottom: 2px;
+  container-type: inline-size;
+  scrollbar-width: none;
+}
+.viz-content-header .browse-mini-stats::-webkit-scrollbar { display: none; }
+@container (max-width: 430px) {
+  .viz-content-header .mini-stat-chip .mini-stat-label { display: none; }
+  .viz-content-header .mini-stat-chip { padding-inline: 0.5rem; }
+  .viz-content-header .mini-progress-chip .mini-bar { display: none; }
+}
+.viz-content-header .mini-stat-chip {
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.viz-content-header .mini-stat-chip .mini-stat-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The progress chip carries a bar, so it is the one that should give way. */
+.viz-content-header .mini-progress-chip {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.viz-content-header .mini-progress-chip .mini-bar { min-width: 24px; }
+
+/* One line, with the whole sentence on hover. It sits beside a fixed-width
+   icon tile in a pane that can be dragged down to 220px. */
+.viz-content-header .section-header-subtitle {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.viz-content-header .section-header-text { min-width: 0; }
+
+/* ── Breadcrumb ────────────────────────────────────────────────
+   It said "Root" and nothing else, forever: a stray word under the title with
+   no path in it and nothing to click. It is the real path now, and it is not
+   drawn at all when there is nowhere to go. */
+.viz-content-breadcrumb {
+  gap: 0.15rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 0;
+  min-height: 0;
+}
+.viz-content-breadcrumb.hidden { display: none; }
+.viz-content-breadcrumb .viz-breadcrumb-item {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 0.6875rem;
+  color: var(--text-tertiary);
+  padding: 0.1rem 0.28rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  max-width: 14ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.viz-content-breadcrumb .viz-breadcrumb-item:hover {
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+.viz-content-breadcrumb .viz-breadcrumb-item:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+.viz-content-breadcrumb .viz-breadcrumb-item[aria-current="true"] {
+  color: var(--text-primary);
+  font-weight: 600;
+  cursor: default;
+}
+.viz-content-breadcrumb .viz-breadcrumb-item[aria-current="true"]:hover { background: transparent; }
+.viz-content-breadcrumb .viz-crumb-sep {
+  color: var(--text-tertiary);
+  opacity: 0.5;
+  font-size: 0.625rem;
+  flex-shrink: 0;
+}
+
+/* ── The focus bar's stepper ───────────────────────────────────
+   The range was only reachable by reopening the dropdown, which closed the
+   thing you were looking at to change how much of it you could see. */
+.viz-step-btn {
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: inherit;
+  width: 17px;
+  height: 17px;
+  line-height: 1;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+}
+.viz-step-btn:hover:not(:disabled) { background: var(--color-primary-subtle); border-color: var(--color-primary); }
+.viz-step-btn:disabled { opacity: 0.35; cursor: default; }
+.viz-step-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+.viz-step-n { font-variant-numeric: tabular-nums; min-width: 0.9em; text-align: center; }
+.viz-focus-count {
+  color: var(--text-tertiary);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  padding-left: 0.15rem;
+}
+
+/* ── Saved-view rows ───────────────────────────────────────────
+   The delete cross was glued to the name with no gap, so the row read as
+   "Overview×". */
+.viz-view-row { padding-right: 0.3rem; gap: 0.45rem; }
+.viz-view-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+  overflow: hidden;
+}
+.viz-view-name > em {
+  font-style: normal;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.viz-views-empty {
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: var(--text-tertiary);
+  padding: 0.3rem 0.625rem 0.5rem;
+  max-width: 24ch;
+}
+#viz-views-popup { min-width: 220px; }
+
+/* ── The toolbar, sized to the PANE ────────────────────────────
+   The compaction rules were a viewport media query, so on a 1400px window
+   with the divider dragged left they never fired: a 593px pane still tried to
+   lay out 760px of controls and wrapped into three rows stacked over the
+   canvas. What matters is how wide this toolbar is, not the window. */
+.viz-canvas-toolbar-wrap { container-type: inline-size; container-name: viztoolbar; }
+
+@container viztoolbar (max-width: 780px) {
+  .viz-canvas-toolbar { gap: 0.3rem; padding: 0.35rem 0.6rem; }
+  /* The whole identity block goes, not just its words: a lone four-way arrow
+     with no label beside it reads as a stray plus sign. */
+  .viz-canvas-toolbar-left { display: none; }
+  .viz-toolbar-sep { display: none; }
+  .viz-toolbar-pill-btn .viz-pill-chevron { display: none; }
+}
+
+@container viztoolbar (max-width: 640px) {
+  /* The stepper goes; the readout stays a button that fits the graph, which is
+     the one zoom control you cannot get from the scroll wheel. */
+  .viz-zoom-controls .viz-zoom-btn[title^="Zoom"] { display: none; }
+  .brain-saved-chip .brain-saved-text { display: none; }
+  .brain-saved-chip { min-width: 0; padding-inline: 0.35rem; }
+}
+
+@container viztoolbar (max-width: 460px) {
+  .viz-zoom-level { display: none; }
+  /* Last tier before wrapping: the pills give up their breathing room rather
+     than the row giving up its single line. */
+  .viz-canvas-toolbar .viz-zoom-btn { min-width: 28px; padding-inline: 0.3rem; }
+  .viz-canvas-toolbar { gap: 0.22rem; padding-inline: 0.4rem; }
+}
+
+/* ── Brain's canvas ────────────────────────────────────────────
+   A note is a slab of text; its box should never be smaller than the words in
+   it, and the words should never spill past the border. */
+.viz-node[data-type="comment"] .viz-comment-content {
+  overflow-wrap: anywhere;
+  hyphens: auto;
 }
