@@ -296,6 +296,12 @@
    translucent, with a lit top edge and a shadow under it, so it sits ABOVE the
    bar instead of in it. The plate now uses the same material, which is what
    makes the two ends of the topbar look like one design. */
+/* `display` here outranks the [hidden] attribute, which is only `display:none`
+   in the UA sheet — so _bossSyncNick setting `chip.hidden = true` did nothing
+   and the plate sat beside the boss bar it is meant to stand in for, pushing
+   the bar 53px off centre. The LV pill inside it already carried this guard;
+   the plate needed its own. */
+.boss-nick[hidden] { display: none; }
 .boss-nick {
   flex: 0 1 auto;
   min-width: 0;
