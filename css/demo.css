@@ -1,0 +1,433 @@
+/* ============================================================
+   DEMO.CSS — the walkthrough that runs before your turn
+   ------------------------------------------------------------
+   Three regions, and the layout is the argument: the CODE on the left with one
+   line lit, what that line DOES on the right, and underneath it the two things
+   you would otherwise have to imagine — what the variables hold now, and what
+   has appeared on screen so far.
+   ============================================================ */
+
+.demo-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 12000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(0.5rem, 3vw, 2rem);
+  background: rgba(4, 8, 16, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: demoFade 0.18s ease-out;
+}
+@keyframes demoFade { from { opacity: 0; } to { opacity: 1; } }
+
+/* The page behind must not scroll under the dialog. */
+body.demo-open { overflow: hidden; }
+
+.demo-window {
+  width: min(1080px, 100%);
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-base);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  animation: demoRise 0.24s cubic-bezier(0.22, 1.1, 0.4, 1);
+}
+@keyframes demoRise {
+  from { opacity: 0; transform: translateY(14px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ── Head ─────────────────────────────────────────────────── */
+.demo-head {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.9rem 1.1rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  flex-shrink: 0;
+}
+.demo-head-icon {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 34%, transparent);
+}
+.demo-head-icon svg { width: 19px; height: 19px; }
+.demo-head-text { flex: 1; min-width: 0; }
+.demo-head-text h2 {
+  margin: 0;
+  font-size: 1.02rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+.demo-head-text p {
+  margin: 0.1rem 0 0;
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.demo-head-actions { display: flex; align-items: center; gap: 0.45rem; flex-shrink: 0; }
+.demo-icon-btn {
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.demo-icon-btn:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+.demo-icon-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.demo-icon-btn svg { width: 16px; height: 16px; }
+.demo-ghost {
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-tertiary);
+  font: inherit;
+  font-size: 0.72rem;
+  padding: 0.3rem 0.55rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.demo-ghost:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
+
+/* ── Body: code | explanation ─────────────────────────────── */
+.demo-body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+}
+.demo-code-pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid var(--border-color);
+  background: var(--bg-code, #0d1117);
+}
+.demo-pane-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.42rem 0.75rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+.demo-pane-label svg { width: 12px; height: 12px; }
+
+.demo-code {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0.6rem 0;
+  overflow: auto;
+  font-family: var(--font-mono, ui-monospace, Consolas, monospace);
+  font-size: 0.815rem;
+  line-height: 1.72;
+  tab-size: 4;
+}
+.demo-line { display: flex; padding: 0 0.75rem; transition: background 0.18s ease; }
+.demo-ln {
+  flex-shrink: 0;
+  width: 2.2em;
+  text-align: right;
+  padding-right: 0.9em;
+  color: var(--text-tertiary);
+  opacity: 0.5;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+.demo-lt { white-space: pre; min-width: 0; }
+
+/* The one line this step is about. Everything else stays legible rather than
+   being dimmed to nothing — you need the surrounding code to make sense of it. */
+.demo-line.is-on {
+  background: color-mix(in srgb, var(--color-primary) 17%, transparent);
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+.demo-line.is-on .demo-ln { opacity: 1; color: var(--color-primary); font-weight: 700; }
+
+/* ── Side: what it does, what it holds, what it printed ───── */
+.demo-side {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg-base);
+}
+.demo-say {
+  padding: 1rem 1.1rem;
+  font-size: 0.9rem;
+  line-height: 1.62;
+  color: var(--text-secondary);
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+.demo-say p { margin: 0; }
+.demo-say code {
+  font-family: var(--font-mono, ui-monospace, Consolas, monospace);
+  font-size: 0.86em;
+  background: var(--bg-surface-hover);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  padding: 0.05em 0.3em;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+.demo-say strong { color: var(--text-primary); font-weight: 700; }
+.demo-say em { color: var(--text-primary); font-style: italic; }
+.demo-fade { animation: demoSay 0.22s ease-out; }
+@keyframes demoSay { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+.demo-recap h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  color: var(--color-success);
+}
+.demo-recap h3 svg { width: 15px; height: 15px; }
+.demo-recap p { color: var(--text-secondary); }
+
+/* The variable watch. A row per name; the one that just moved is marked. */
+.demo-watch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0 1.1rem 0.75rem;
+  flex-shrink: 0;
+}
+.demo-watch.hidden { display: none; }
+.demo-var {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.22rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  font-family: var(--font-mono, ui-monospace, Consolas, monospace);
+  font-size: 0.735rem;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.demo-var-name { color: var(--text-tertiary); }
+.demo-var-val { color: var(--text-primary); font-weight: 600; }
+.demo-var.is-changed {
+  border-color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 12%, var(--bg-surface));
+  animation: demoPop 0.32s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+.demo-var.is-changed .demo-var-val { color: var(--color-warning); }
+@keyframes demoPop { from { transform: scale(0.92); } to { transform: none; } }
+
+/* What has appeared on screen so far. */
+.demo-term {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-code, #0d1117);
+  display: flex;
+  flex-direction: column;
+  max-height: 40%;
+}
+.demo-term-body {
+  margin: 0;
+  padding: 0.6rem 0.9rem 0.8rem;
+  overflow: auto;
+  font-family: var(--font-mono, ui-monospace, Consolas, monospace);
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 3.2em;
+}
+.demo-term-idle { color: var(--text-tertiary); font-style: italic; opacity: 0.7; }
+/* What a person typed, so it reads apart from what the program wrote. */
+.demo-typed {
+  color: var(--color-success);
+  font-weight: 700;
+  border-bottom: 1px dotted color-mix(in srgb, var(--color-success) 60%, transparent);
+}
+
+/* ── Foot: progress and navigation ────────────────────────── */
+.demo-foot {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.65rem 1.1rem;
+  border-top: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  flex-shrink: 0;
+}
+.demo-dots { display: flex; flex-wrap: wrap; gap: 0.28rem; flex: 1; min-width: 0; }
+.demo-dot {
+  width: 9px; height: 9px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
+}
+.demo-dot:hover { transform: scale(1.25); border-color: var(--color-primary); }
+.demo-dot.is-done { background: color-mix(in srgb, var(--color-primary) 45%, transparent); border-color: transparent; }
+.demo-dot.is-on { background: var(--color-primary); border-color: var(--color-primary); transform: scale(1.3); }
+.demo-dot-end { border-radius: 2px; }
+.demo-dot:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+.demo-nav { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+.demo-count {
+  font-family: var(--font-mono, ui-monospace, Consolas, monospace);
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  min-width: 4.2em;
+  text-align: center;
+}
+.demo-nav .btn svg { width: 14px; height: 14px; }
+
+/* ── The library of walkthroughs ──────────────────────────── */
+.demo-window-lib { width: min(900px, 100%); }
+.demo-lib-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 1rem 1.1rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.3rem;
+}
+.demo-lib-group > h3 {
+  margin: 0 0 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.demo-lib-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 0.5rem;
+}
+.demo-card {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.65rem 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition: border-color 0.16s ease, transform 0.16s ease, background 0.16s ease;
+}
+.demo-card:hover { border-color: var(--color-primary); transform: translateY(-1px); background: var(--bg-surface-hover); }
+.demo-card:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.demo-card-icon {
+  width: 30px; height: 30px;
+  flex-shrink: 0;
+  display: grid; place-items: center;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+}
+.demo-card-icon svg { width: 15px; height: 15px; }
+.demo-card-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.demo-card-text strong { font-size: 0.845rem; color: var(--text-primary); font-weight: 700; }
+.demo-card-text em {
+  font-style: normal;
+  font-size: 0.71rem;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.demo-card-meta { display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0; }
+.demo-card-tick { width: 14px; height: 14px; color: var(--color-success); }
+.demo-card-steps {
+  font-family: var(--font-mono, ui-monospace, Consolas, monospace);
+  font-size: 0.66rem;
+  color: var(--text-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 3px;
+  padding: 0.05rem 0.3rem;
+}
+/* Seen ones stay reachable but stop competing with the ones you have not met. */
+.demo-card.is-seen { opacity: 0.72; }
+.demo-card.is-seen:hover { opacity: 1; }
+
+.demo-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.demo-switch input { accent-color: var(--color-primary); cursor: pointer; }
+
+.demo-foot-lib { justify-content: space-between; }
+.demo-foot-hint { font-size: 0.72rem; color: var(--text-tertiary); text-align: right; }
+
+/* ── The button on the practice screen ────────────────────── */
+.practice-demo-btn.has-demo { color: var(--color-primary); }
+.practice-demo-btn.is-new { position: relative; }
+/* A walkthrough you have not seen says so, once, without a word of copy. */
+.practice-demo-btn.is-new::after {
+  content: '';
+  position: absolute;
+  top: 2px; right: 2px;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--color-warning);
+  box-shadow: 0 0 0 2px var(--bg-surface);
+  animation: demoPing 2.4s ease-in-out infinite;
+}
+@keyframes demoPing {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.35); opacity: 0.65; }
+}
+
+/* ── Narrow screens ───────────────────────────────────────── */
+@media (max-width: 820px) {
+  .demo-body { grid-template-columns: 1fr; grid-template-rows: minmax(140px, 1fr) minmax(0, 1.1fr); }
+  .demo-code-pane { border-right: 0; border-bottom: 1px solid var(--border-color); }
+  .demo-term { max-height: 34%; }
+  .demo-head-text p { display: none; }
+  .demo-foot { flex-wrap: wrap; gap: 0.6rem; }
+  .demo-dots { order: 2; width: 100%; justify-content: center; }
+  .demo-nav { order: 1; width: 100%; justify-content: space-between; }
+  .demo-foot-hint { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-overlay, .demo-window, .demo-fade, .demo-var.is-changed,
+  .practice-demo-btn.is-new::after { animation: none !important; }
+  .demo-line, .demo-dot, .demo-card { transition: none !important; }
+}

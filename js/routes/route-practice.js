@@ -101,6 +101,13 @@ function practiceTemplate() {
           <div>
             <div class="practice-desc-head">
               <h2>Description</h2>
+              <!-- The walkthrough for whatever idea this program is about. It
+                   opens by itself the first time; this is how you get it back,
+                   and how you reach the rest of them. -->
+              <button class="practice-desc-edit practice-demo-btn" id="practice-demo-btn" onclick="demoShowForCurrent()"
+                      title="Walkthroughs" aria-label="Walkthroughs">
+                <i data-lucide="presentation"></i>
+              </button>
               <button class="practice-desc-edit" id="practice-desc-speak" onclick="practiceSpeakDescription()"
                       title="Read this description aloud" aria-label="Read this description aloud">
                 <i data-lucide="volume-2"></i>

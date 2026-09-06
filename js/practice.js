@@ -161,6 +161,12 @@ function initPractice() {
   if (bossToggleBtn) bossToggleBtn.style.color = bossBarEnabled ? 'var(--color-warning)' : 'var(--text-tertiary)';
   syncCheatsheetBtn(challenge);
 
+  /* Show the idea before the attempt. Only for an idea you have not met, only
+     once, and only on a fresh attempt — coming back to a draft means you have
+     already been here. */
+  if (typeof demoSyncButton === 'function') demoSyncButton();
+  if (!autoSaved && typeof demoMaybeAutoOpen === 'function') demoMaybeAutoOpen(challenge, variant);
+
   // Line numbers visibility
   if (typeof initLineNumbersState === 'function') initLineNumbersState();
 

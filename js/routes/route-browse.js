@@ -25,6 +25,11 @@ function browseTemplate() {
                 <i data-lucide="${localStorage.getItem('browseHideItems') === 'true' ? 'eye-off' : 'eye'}" id="browse-toggle-items-icon"></i>
               </button>
               ${typeof codingStarterButtonTemplate === 'function' ? codingStarterButtonTemplate() : ''}
+              <!-- Every walkthrough, browsable outside an attempt. -->
+              <button class="tutorial-trigger-btn" onclick="demoOpenLibrary()"
+                      title="Walkthroughs — see an idea demonstrated" aria-label="Walkthroughs">
+                <i data-lucide="presentation"></i>
+              </button>
               <button class="tutorial-trigger-btn" onclick="GuidedTutorial.start()" title="Show Page Tour">
                 <i data-lucide="graduation-cap"></i>
               </button>
