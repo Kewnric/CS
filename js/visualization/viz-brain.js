@@ -456,6 +456,11 @@ function brainRenderSidebar() {
   body.classList.toggle('hide-tree-items', localStorage.getItem('vizHideItems') === 'true');
   body.setAttribute('oncontextmenu', "treePaneContextMenu(event, 'brain')");
   body.innerHTML = html;
+  /* This writes the container directly rather than through treeCommit, so the
+     shared markup cache has to be told — otherwise the library pane's next
+     render matches a cached string, skips its write, and Brain's list stays on
+     screen under the library's own header. */
+  if (typeof treeSyncMarkup === 'function') treeSyncMarkup(body, html);
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: body });
 }
 

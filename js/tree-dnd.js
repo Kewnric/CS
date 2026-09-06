@@ -40,6 +40,28 @@ const TREE_HOSTS = {};
  */
 function registerTreeHost(ns, cfg) { TREE_HOSTS[ns] = cfg; }
 
+/**
+ * Redraw whichever tree is on screen.
+ *
+ * The row helpers — set a colour, an icon, a level, toggle a favourite — all
+ * ended with `invalidateBrowseCache(); renderBrowse();`, which is the Coding
+ * library and nothing else. Offering the same menu on another tree therefore
+ * changed the data and left the row it was opened on looking untouched.
+ */
+function treeRefreshHosts() {
+  Object.keys(TREE_HOSTS).forEach(ns => {
+    const h = TREE_HOSTS[ns];
+    if (!h || typeof h.rerender !== 'function') return;
+    const el = h.container ? document.querySelector(h.container) : null;
+    if (h.container && !el) return;
+    /* Two hosts can share one container — the Visualize pane is the library
+       tree and Brain's version list, one at a time. Redrawing both put Brain's
+       empty state over a library of 149 programs. */
+    if (el && el.dataset.treeNs && el.dataset.treeNs !== ns) return;
+    try { h.rerender(); } catch (e) { console.warn('[Tree] rerender failed for ' + ns, e); }
+  });
+}
+
 const TDND = {
   ns: null, ids: [], kind: null,
   row: null, zone: null,

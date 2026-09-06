@@ -4027,3 +4027,19 @@ button.viz-link-type-option {
   overflow-wrap: anywhere;
   hyphens: auto;
 }
+
+/* ── Row badges give way before the label does ─────────────────
+   With the library's badges brought across, a 200px pane spent its width on
+   "L3" and "loops" and truncated the program's name to a single letter. The
+   name is the row; the badges are annotations on it, so they go first — and by
+   container width, because this pane is resizable. */
+.viz-content-body { container-type: inline-size; container-name: vizpane; }
+.viz-content-body .tree-node-label { min-width: 4ch; }
+
+@container vizpane (max-width: 300px) {
+  .viz-content-body .tree-badge-tag { display: none; }
+}
+@container vizpane (max-width: 240px) {
+  .viz-content-body .tree-badge-level { display: none; }
+  .viz-content-body .tier-badge { font-size: 0.55rem; padding-inline: 0.22rem; }
+}

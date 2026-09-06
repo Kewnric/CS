@@ -1992,7 +1992,7 @@ function browseToggleShow(what) {
   try { o = JSON.parse(localStorage.getItem(BROWSE_SHOW_KEY)) || {}; } catch (e) { o = {}; }
   o[what] = !o[what];
   try { localStorage.setItem(BROWSE_SHOW_KEY, JSON.stringify(o)); } catch (e) { /* quota */ }
-  invalidateBrowseCache(); renderBrowse();
+  invalidateBrowseCache(); treeRefreshHosts();
 }
 
 const TREE_COLORS = [
@@ -2011,6 +2011,10 @@ function treeColorOf(id) { const c = TREE_COLORS.find(x => x.id === id); return 
 function browseFindItem(id) {
   return (state.challenges || []).find(c => c.id === id) ||
          (state.codingSets || []).find(x => x.id === id) ||
+         // The same row menu is offered on the Visualize pane, where a row can
+         // be a snippet or a notebook rather than a program.
+         (state.snippets || []).find(x => x.id === id) ||
+         (state.notebooks || []).find(x => x.id === id) ||
          (state.nodes || []).find(n => n.id === id) || null;
 }
 
@@ -2041,7 +2045,7 @@ window.browseApplyColor = function (id, color) {
   saveData();
   const dlg = document.getElementById('tree-color-dlg');
   if (dlg) dlg.remove();
-  invalidateBrowseCache(); renderBrowse();
+  invalidateBrowseCache(); treeRefreshHosts();
 };
 
 function browseToggleFavorite(id) {
@@ -2049,7 +2053,7 @@ function browseToggleFavorite(id) {
   if (!it) return;
   it.favorite = !it.favorite;
   saveData();
-  invalidateBrowseCache(); renderBrowse();
+  invalidateBrowseCache(); treeRefreshHosts();
   if (typeof toast === 'function') toast(it.favorite ? 'Added to favourites.' : 'Removed from favourites.', { type: 'info' });
 }
 
@@ -2060,7 +2064,7 @@ function browseSetLevel(id) {
     it.level != null ? String(it.level) : '', function (v) {
       const n = parseInt(v, 10);
       if (isNaN(n)) delete it.level; else it.level = n;
-      saveData(); invalidateBrowseCache(); renderBrowse();
+      saveData(); invalidateBrowseCache(); treeRefreshHosts();
     });
 }
 
@@ -2070,7 +2074,7 @@ function browseSetIcon(id) {
   const apply = function (v) {
     const name = (v || '').trim();
     if (name) it.icon = name; else delete it.icon;
-    saveData(); invalidateBrowseCache(); renderBrowse();
+    saveData(); invalidateBrowseCache(); treeRefreshHosts();
   };
   if (typeof showIconPicker === 'function') {
     showIconPicker('Change icon', 'Search and pick one, or clear it.', it.icon || '', apply);

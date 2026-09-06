@@ -523,6 +523,11 @@ function _vizIdx() {
     if (n.type === 'folder' && live.includes(n.scope)) { idx.folder.set(n.id, n); idx.scopeOf.set(n.id, n.scope); }
   });
   live.forEach(sc => vizScopeItems(sc).forEach(it => { idx.item.set(it.id, it); idx.scopeOf.set(it.id, sc); }));
+  // Practice sets are rows in the Programs tree too, so the engine has to be
+  // able to find one by id when a menu is opened on it.
+  if (live.includes('challenge')) {
+    (state.codingSets || []).forEach(st => { idx.item.set(st.id, st); idx.scopeOf.set(st.id, 'challenge'); });
+  }
   _vizIndex = idx;
   return idx;
 }
@@ -615,6 +620,8 @@ registerTreeHost('viz', {
   isExpanded: (id) => viz.expandedFolderIds.has(id),
   expand: (id) => { if (!viz.expandedFolderIds.has(id)) vizContentToggleFolder(id); },
   toggle: (id) => vizContentToggleFolder(id),
+  // Moving between folders asks first; reordering inside one does not.
+  confirmMove: true,
   acceptsDrop: (targetId) => (vizMultiScope()
     ? targetId === '__root__'
     : libRootAcceptsDrop('viz', targetId)),
@@ -635,9 +642,79 @@ registerTreeHost('viz', {
     }
     return true;
   },
-  pseudoActions: (id) => (VIZ_SCOPE_BY_ID[id]
-    ? [{ sep: true }, { icon: 'git-branch', label: 'Add this library to the canvas', fn: () => vizAddScopeToCanvas(VIZ_SCOPE_BY_ID[id].scope) }]
-    : []),
+
+  /* ── The row menu ────────────────────────────────────────────
+     This pane offered three actions — add to canvas, link to, star — while the
+     Coding library's rows carried rename, new subfolder, delete, icon, colour,
+     tier, prerequisites, level, practice and compare. They are the same rows
+     in the same engine, so they get the same menu; the canvas actions are
+     added to it rather than replacing it. */
+  onRename: (id, kind) => {
+    if (kind === 'folder') {
+      const f = (state.nodes || []).find(n => n.id === id);
+      if (!f) return;
+      showInputDialog('Rename folder', null, 'Name', f.name || '', (v) => {
+        const t = (v || '').trim();
+        if (!t) return;
+        f.name = t;
+        // The canvas node stands for the same folder, so it is renamed too.
+        const cn = viz.nodes.find(n => n.dataId === id);
+        if (cn) { cn.label = t; vizRenderCanvas(); vizSave(); }
+        saveData();
+        vizRenderContentPane();
+      });
+      return;
+    }
+    const it = vizIdxNode(id)
+      || (state.codingSets || []).find(x => x.id === id)
+      || (typeof browseFindItem === 'function' ? browseFindItem(id) : null);
+    if (!it) return;
+    showInputDialog('Rename', null, 'Title', it.title || it.name || '', (v) => {
+      const t = (v || '').trim();
+      if (!t) return;
+      if ('title' in it || !('name' in it)) it.title = t; else it.name = t;
+      const cn = viz.nodes.find(n => n.dataId === id);
+      if (cn) { cn.label = t; vizRenderCanvas(); vizSave(); }
+      saveData();
+      vizRenderContentPane();
+    });
+  },
+  onNewSubfolder: (id) => {
+    const scope = vizScopeOf(id) || vizPrimaryScope();
+    const under = VIZ_SCOPE_BY_ID[id] ? null : id;
+    showInputDialog('New folder', null, 'Folder name', '', (v) => {
+      const t = (v || '').trim();
+      if (!t) return;
+      if (typeof createNode === 'function') createNode(t, 'folder', under, scope);
+      if (under) viz.expandedFolderIds.add(under);
+      vizRenderContentPane();
+    });
+  },
+  onDelete: (id, kind) => {
+    const scope = vizScopeOf(id);
+    const after = () => { vizPruneGhostNodes(); vizRenderCanvas(); vizRenderContentPane(); };
+    if (kind === 'folder') {
+      if (typeof softDeleteFolder === 'function') softDeleteFolder(id, after);
+      else if (typeof deleteNode === 'function') { deleteNode(id); after(); }
+      return;
+    }
+    if ((state.codingSets || []).some(x => x.id === id)) {
+      const set = state.codingSets.find(x => x.id === id);
+      const at = state.codingSets.indexOf(set);
+      state.codingSets = state.codingSets.filter(x => x.id !== id);
+      saveData(); after();
+      if (typeof pushUndo === 'function') {
+        pushUndo('Deleted set "' + (set.title || 'Untitled') + '"', () => {
+          state.codingSets.splice(Math.min(at, state.codingSets.length), 0, set);
+          saveData(); after();
+        });
+      }
+      return;
+    }
+    if (scope === 'snippet' && typeof softDeleteSnippet === 'function') softDeleteSnippet(id, after);
+    else if (scope === 'notebook' && typeof softDeleteNotebook === 'function') softDeleteNotebook(id, after);
+    else if (typeof softDeleteChallenge === 'function') softDeleteChallenge(id, after);
+  },
   extraActions: (id, kind) => {
     const onCanvas = viz.nodes.some(n => n.dataId === id);
     const acts = [{
@@ -645,21 +722,68 @@ registerTreeHost('viz', {
       label: onCanvas ? 'Find on canvas' : 'Add to canvas',
       fn: () => vizRevealOnCanvas(id)
     }];
-    if (kind !== 'folder') {
-      const it = _vizIdx().item.get(id);
-      // Joining a notebook to the program it explains: the one thing that
-      // needs more than one library selected, and there was no way to start it
-      // from this pane at all.
-      acts.push({ icon: 'link', label: 'Link to…', fn: () => vizStartLinkFromRow(id) });
-      acts.push({
-        icon: it && it.favorite ? 'star-off' : 'star',
-        label: it && it.favorite ? 'Remove star' : 'Star',
-        fn: () => vizToggleStar(id)
-      });
+
+    if (kind === 'folder') {
+      acts.push({ sep: true });
+      acts.push({ icon: 'image', label: 'Change icon…', fn: () => browseSetIcon(id) });
+      acts.push({ icon: 'palette', label: 'Highlight colour…', fn: () => browseSetColor(id) });
+      // Tier and prerequisites are Programs-only ideas; they are what the
+      // canvas's fog of war reads, so they belong on this pane most of all.
+      if (vizScopeOf(id) === 'challenge') {
+        acts.push({ icon: 'award', label: 'Set tier…', fn: () => { ctxTargetNodeId = id; ctxOpenTierPicker(); } });
+        acts.push({ icon: 'lock', label: 'Set prerequisites…', fn: () => { ctxTargetNodeId = id; ctxOpenLockPicker(); } });
+      }
+      return acts;
     }
+
+    const it = _vizIdx().item.get(id);
+    const scope = vizScopeOf(id);
+
+    /* A practice set is a row in this tree but not a program: practising it,
+       comparing it with a solution or giving it a level are all meaningless. */
+    const isSet = (state.codingSets || []).some(x => x.id === id);
+    if (isSet) {
+      acts.push({ icon: 'play', label: 'Open this set', fn: () => {
+        // Through the same launcher the library uses, so the timer prompt and
+        // the autosave rules are the ones you already know.
+        if (typeof startCodingSet === 'function') { startCodingSet(id); return; }
+        clearSessionParam('psetAutosave');
+        setSessionParam('activeCodingSet', id);
+        setSessionParam('codingSetTimeLimit', 0);
+        spaNavigate('practice-set');
+      } });
+      acts.push({ sep: true });
+      acts.push({ icon: 'image', label: 'Change icon…', fn: () => browseSetIcon(id) });
+      return acts;
+    }
+
+    // Joining a notebook to the program it explains: the one thing that needs
+    // more than one library selected, and there was no way to start it here.
+    acts.push({ icon: 'link', label: 'Link to…', fn: () => vizStartLinkFromRow(id) });
+    acts.push({ sep: true });
+    if (scope === 'challenge') {
+      acts.push({ icon: 'play', label: 'Practice', fn: () => { if (typeof promptTimer === 'function') promptTimer(id); } });
+      acts.push({ icon: 'git-compare', label: 'Compare with solution', fn: () => { if (typeof anOpenReview === 'function') anOpenReview(id); } });
+    }
+    acts.push({
+      icon: it && it.favorite ? 'star-off' : 'star',
+      label: it && it.favorite ? 'Remove from favourites' : 'Add to favourites',
+      fn: () => vizToggleStar(id)
+    });
+    acts.push({ icon: 'palette', label: 'Highlight colour…', fn: () => browseSetColor(id) });
+    acts.push({ icon: 'image', label: 'Change icon…', fn: () => browseSetIcon(id) });
+    acts.push({ icon: 'hash', label: 'Set level…', fn: () => browseSetLevel(id) });
     return acts;
   },
+  pseudoActions: (id) => (VIZ_SCOPE_BY_ID[id]
+    ? [{ sep: true }, { icon: 'git-branch', label: 'Add this library to the canvas', fn: () => vizAddScopeToCanvas(VIZ_SCOPE_BY_ID[id].scope) }]
+    : []),
   paneActions: () => ([
+    { icon: 'folder-plus', label: 'New root folder', fn: () => vizNewRootFolder() },
+    { sep: true },
+    { icon: browseShow('level') ? 'check-square' : 'square', label: 'Show level badge', fn: () => browseToggleShow('level') },
+    { icon: browseShow('tags') ? 'check-square' : 'square', label: 'Show topic badge', fn: () => browseToggleShow('tags') },
+    { sep: true },
     { icon: 'chevrons-up-down', label: 'Expand all', fn: () => vizExpandAll(true) },
     { icon: 'chevrons-down-up', label: 'Collapse all', fn: () => vizExpandAll(false) },
     { sep: true },
@@ -667,130 +791,25 @@ registerTreeHost('viz', {
   ])
 });
 
-/** One row for a library heading, a real folder, or the pseudo-folder. */
-function _vizFolderRow(o) {
-  return `
-    <div class="tree-node${o.head ? ' viz-gen-head' : ''}" data-level="${o.level}" data-node-id="${o.id}">
-      <div class="tree-node-row${o.active ? ' active' : ''}"
-           ${treeRowAttrs({
-    ns: 'viz', id: o.id, kind: 'folder', level: o.level, expanded: o.open, selected: !!o.active,
-    draggable: !o.head && o.id !== '__root__',
-    dragStart: o.head || o.id === '__root__' ? undefined : `vizTreeDragStart(event,'${o.id}','folder')`
-  })}
-           style="padding-left: calc(0.75rem + 0rem)"
-           oncontextmenu="${o.head || o.id === '__root__' ? `treeContextMenu(event, '${o.id}', 'viz')` : `vizContentCtx(event,'${o.id}','folder')`}"
-           onclick="${o.head || o.id === '__root__' ? `vizContentToggleFolder('${o.id}')` : `vizContentClickFolder('${o.id}')`}">
-        <i data-lucide="chevron-right" class="tree-node-chevron ${o.kids ? (o.open ? 'expanded' : '') : 'invisible'}"
-           onclick="event.stopPropagation();vizContentToggleFolder('${o.id}')"></i>
-        <i data-lucide="${o.icon}" class="tree-node-icon ${o.head ? 'viz-gen-head-icon' : 'folder-icon-color'}"${o.head ? '' : ' style="width:14px;height:14px;"'}></i>
-        <span class="tree-node-label"${o.hint ? ` title="${escapeHTML(o.hint)}"` : ''}>${escapeHTML(o.label)}</span>
-        <span class="tree-node-badge">${o.count}</span>
-      </div>
-      <div class="tree-children ${o.open ? '' : 'collapsed'}" role="group">
-        <div class="tree-children-inner">${o.children}</div>
-      </div>
-    </div>`;
+/** A new top-level folder in whichever library is primary. */
+function vizNewRootFolder() {
+  const scope = vizPrimaryScope();
+  showInputDialog('New root folder', 'It goes at the top level of ' + vizModuleMeta(scope).label + '.',
+    'Folder name', '', (v) => {
+      const t = (v || '').trim();
+      if (!t) return;
+      if (typeof createNode === 'function') createNode(t, 'folder', null, scope);
+      vizRenderContentPane();
+    });
 }
 
-function vizRenderContentPane() {
-  vizSyncModuleTools();
-  if (viz.activeModule === 'brain') { brainRenderSidebar(); return; }
-  const body = document.getElementById('viz-content-body');
-  const breadcrumbEl = document.getElementById('viz-content-breadcrumb');
-  if (!body) return;
-
-  vizIndexInvalidate();
-  vizUpdateHeaderStats();
-
-  const scopes = vizGetVisibleScopes();
-  const multi = scopes.length > 1;
-  vizPaintBreadcrumb(scopes, multi);
-
-  const query = (viz.paneQuery || '').trim().toLowerCase();
-  const narrowed = !!query || !!viz.paneFilter;
-  const matches = (o) => vizPaneFilterAllows(o)
-    && (!query || String(o.title || o.name || '').toLowerCase().includes(query));
-
-  const iconOf = (scope, it) => it.icon || { challenge: 'file-code', snippet: 'code', notebook: 'book-open' }[scope] || 'file';
-
-  const itemRow = (it, scope, level) => {
-    const isActive = viz.selectedNodeId && (viz.nodes.find(n => n.id === viz.selectedNodeId) || {}).dataId === it.id;
-    const onCanvas = viz.nodes.some(n => n.dataId === it.id);
-    return `
-      <div class="tree-node tree-item-node" data-level="${level}" data-node-id="${it.id}" data-scope="${scope}">
-        <div class="tree-node-row ${isActive ? 'active' : ''}"
-             ${treeRowAttrs({ ns: 'viz', id: it.id, kind: 'item', level, selected: isActive, dragStart: `vizTreeDragStart(event,'${it.id}','item')` })}
-             style="padding-left: calc(0.75rem + ${TREE_ITEM_INSET}rem)"
-             oncontextmenu="vizContentCtx(event,'${it.id}','item')"
-             onclick="vizContentClickItem('${it.id}','${scope}')">
-          <i class="tree-node-chevron invisible"></i>
-          <i data-lucide="${iconOf(scope, it)}" class="tree-node-icon viz-gen-item-icon" style="width:14px;height:14px;"></i>
-          <span class="tree-node-label" style="font-weight:400; font-size:0.875rem;">${escapeHTML(it.title || it.name || 'Untitled')}</span>
-          ${it.favorite ? '<i data-lucide="star" class="viz-gen-star"></i>' : ''}
-          ${onCanvas ? '<span class="viz-gen-dot" title="On the canvas"></span>' : ''}
-        </div>
-      </div>`;
-  };
-
-  const folderMatches = (fid, scope) => {
-    if (!narrowed) return true;
-    if (vizScopeItems(scope).some(it => (it.parentId || null) === fid && matches(it))) return true;
-    return (state.nodes || []).some(n => n.type === 'folder' && n.scope === scope && n.parentId === fid && folderMatches(n.id, scope));
-  };
-
-  function renderUnder(parentId, scope, level) {
-    let html = '';
-    treeChildren(parentId, scope, 'viz').forEach(entry => {
-      const n = entry.node;
-      if (entry.kind === 'folder') {
-        if (narrowed && !folderMatches(n.id, scope)) return;
-        const count = typeof countItemsRecursive === 'function' ? countItemsRecursive(n.id, scope) : 0;
-        const kids = count > 0 || (state.nodes || []).some(f => f.type === 'folder' && f.scope === scope && f.parentId === n.id);
-        html += _vizFolderRow({
-          id: n.id, level, label: n.name, icon: n.icon || 'folder', count, kids,
-          active: viz.selectedFolderId === n.id,
-          open: viz.expandedFolderIds.has(n.id) || narrowed,
-          children: renderUnder(n.id, scope, level + 1)
-        });
-        return;
-      }
-      if (!matches(n)) return;
-      html += itemRow(n, scope, level + 1);
-    });
-    return html;
-  }
-
-  let html = '';
-  if (multi) {
-    VIZ_SCOPES.filter(s => scopes.includes(s.scope)).forEach(head => {
-      const all = vizScopeItems(head.scope);
-      const shown = narrowed ? all.filter(matches).length : all.length;
-      if (narrowed && !shown) return;
-      html += _vizFolderRow({
-        id: head.id, level: 0, label: head.label, icon: head.icon, head: true,
-        count: shown, kids: all.length > 0 || (state.nodes || []).some(n => n.type === 'folder' && n.scope === head.scope),
-        hint: `Everything in your ${head.label} library`,
-        // Collapsed on a first visit: all three expanded is 2700px of list in a
-        // 600px pane. The set is remembered from then on (see vizSave).
-        open: viz.expandedFolderIds.has(head.id) || narrowed,
-        children: renderUnder(head.id, head.scope, 1)
-      });
-    });
-  } else {
-    html += renderUnder(null, scopes[0], 0);
-  }
-
-  html += _vizRootPseudoFolder(scopes, multi, matches, narrowed, itemRow);
-
-  body.dataset.treeNs = 'viz';
-  body.setAttribute('role', 'tree');
-  body.setAttribute('aria-label', multi ? 'Selected libraries' : vizModuleMeta(scopes[0]).label);
-  body.classList.toggle('hide-tree-items', localStorage.getItem('vizHideItems') === 'true');
-  body.setAttribute('oncontextmenu', "treePaneContextMenu(event, 'viz')");
-  body.innerHTML = html
-    ? html + treeRootDropHTML('viz')
-    : _vizPaneEmptyHTML(query);
-  if (typeof lucide !== 'undefined') lucide.createIcons({ root: body });
+/** A practice set row: select it, and offer it to the canvas. */
+function vizContentClickSet(setId) {
+  const canvasNode = viz.nodes.find(n => n.dataId === setId);
+  viz.selectedNodeId = canvasNode ? canvasNode.id : null;
+  viz.selectedFolderId = null;
+  vizRenderContentPane();
+  vizRenderCanvas();
 }
 
 /**
@@ -840,6 +859,208 @@ function vizBreadcrumbTo(folderId) {
   }
 }
 
+/** One row for a library heading, a real folder, or the pseudo-folder. */
+function _vizFolderRow(o) {
+  return `
+    <div class="tree-node${o.head ? ' viz-gen-head' : ''}${o.accent ? ' has-accent' : ''}" data-level="${o.level}" data-node-id="${o.id}"${o.accent ? ` style="--row-accent:${o.accent}"` : ''}>
+      <div class="tree-node-row${o.active ? ' active' : ''}"
+           ${treeRowAttrs({
+    ns: 'viz', id: o.id, kind: 'folder', level: o.level, expanded: o.open, selected: !!o.active,
+    draggable: !o.head && o.id !== '__root__',
+    dragStart: o.head || o.id === '__root__' ? undefined : `vizTreeDragStart(event,'${o.id}','folder')`
+  })}
+           style="padding-left: calc(0.75rem + 0rem)"
+           oncontextmenu="treeContextMenu(event, '${o.id}', 'viz')"
+           onclick="${o.head || o.id === '__root__' ? `vizContentToggleFolder('${o.id}')` : `vizContentClickFolder('${o.id}')`}">
+        <i data-lucide="chevron-right" class="tree-node-chevron ${o.kids ? (o.open ? 'expanded' : '') : 'invisible'}"
+           onclick="event.stopPropagation();vizContentToggleFolder('${o.id}')"></i>
+        <i data-lucide="${o.icon}" class="tree-node-icon ${o.head ? 'viz-gen-head-icon' : 'folder-icon-color'}"${o.head ? '' : ' style="width:14px;height:14px;"'}></i>
+        <span class="tree-node-label"${o.hint ? ` title="${escapeHTML(o.hint)}"` : ''}>${escapeHTML(o.label)}</span>
+        ${o.lock || ''}${o.tier || ''}
+        <span class="tree-node-badge">${o.count}</span>
+      </div>
+      <div class="tree-children ${o.open ? '' : 'collapsed'}" role="group">
+        <div class="tree-children-inner">${o.children}</div>
+      </div>
+    </div>`;
+}
+
+/** The padlock a folder shows while its prerequisites are unmet. */
+function _vizFolderLock(folderId) {
+  const req = state.categoryRequirements ? state.categoryRequirements[folderId] : null;
+  if (!req) return '';
+  let locked = false;
+  if (req.requiredChallengeIds && req.requiredChallengeIds.length > 0) {
+    locked = req.requiredChallengeIds.some(cId => !state.history.some(h => h.challengeId === cId && h.score === 100 && !h.isArchived));
+  } else if (req.reqNodeId) {
+    locked = (typeof getCompletedCount === 'function' ? getCompletedCount(req.reqNodeId) : 0) < (req.count || 1);
+  }
+  return locked ? '<i data-lucide="lock" class="tree-node-lock"></i>' : '';
+}
+
+function vizRenderContentPane() {
+  vizSyncModuleTools();
+  if (viz.activeModule === 'brain') { brainRenderSidebar(); return; }
+  const body = document.getElementById('viz-content-body');
+  if (!body) return;
+
+  vizIndexInvalidate();
+  vizUpdateHeaderStats();
+
+  const scopes = vizGetVisibleScopes();
+  const multi = scopes.length > 1;
+  vizPaintBreadcrumb(scopes, multi);
+
+  const query = (viz.paneQuery || '').trim().toLowerCase();
+  const narrowed = !!query || !!viz.paneFilter;
+  /* The same predicate the Coding library uses: title AND tags fuzzy-match,
+     while descriptions, version names and filenames are substring-matched, so
+     the box reaches past the title. This pane used to compare the title only. */
+  const matches = (o, scope) => vizPaneFilterAllows(o)
+    && (!query || (typeof libMatches === 'function'
+      ? libMatches(o, query, scope) : String(o.title || o.name || '').toLowerCase().includes(query)));
+
+  const iconOf = (scope, it) => it.icon || { challenge: 'file-code', snippet: 'code', notebook: 'book-open' }[scope] || 'file';
+
+  const itemRow = (it, scope, level) => {
+    const isActive = viz.selectedNodeId && (viz.nodes.find(n => n.id === viz.selectedNodeId) || {}).dataId === it.id;
+    const onCanvas = viz.nodes.some(n => n.dataId === it.id);
+    // The badges, the star and the highlight colour the library rows carry.
+    const accent = it.color && typeof treeColorOf === 'function' ? treeColorOf(it.color) : '';
+    const showLevel = typeof browseShow === 'function' && browseShow('level');
+    const showTags = typeof browseShow === 'function' && browseShow('tags');
+    return `
+      <div class="tree-node tree-item-node${accent ? ' has-accent' : ''}" data-level="${level}" data-node-id="${it.id}" data-scope="${scope}"${accent ? ` style="--row-accent:${accent}"` : ''}>
+        <div class="tree-node-row ${isActive ? 'active' : ''}"
+             ${treeRowAttrs({ ns: 'viz', id: it.id, kind: 'item', level, selected: isActive, dragStart: `vizTreeDragStart(event,'${it.id}','item')` })}
+             style="padding-left: calc(0.75rem + ${TREE_ITEM_INSET}rem)"
+             oncontextmenu="treeContextMenu(event, '${it.id}', 'viz')"
+             onclick="vizContentClickItem('${it.id}','${scope}')">
+          <i class="tree-node-chevron invisible"></i>
+          <i data-lucide="${iconOf(scope, it)}" class="tree-node-icon viz-gen-item-icon" style="width:14px;height:14px;"></i>
+          <span class="tree-node-label">${escapeHTML(it.title || it.name || 'Untitled')}</span>
+          ${showLevel && it.level != null ? `<span class="tree-badge-level">L${it.level}</span>` : ''}
+          ${showTags && (it.tags || []).length ? `<span class="tree-badge-tag">${escapeHTML(it.tags[0])}</span>` : ''}
+          ${it.favorite ? '<i data-lucide="star" class="tree-node-star"></i>' : ''}
+          ${onCanvas ? '<span class="viz-gen-dot" title="On the canvas"></span>' : ''}
+        </div>
+      </div>`;
+  };
+
+  /* Practice sets live in the Programs tree too, and this pane simply did not
+     draw them — a whole row type the library shows and this one hid. */
+  const setRow = (set, level) => {
+    const n = (set.problems || []).length;
+    const onCanvas = viz.nodes.some(x => x.dataId === set.id);
+    return `
+      <div class="tree-node tree-item-node tree-set-node" data-level="${level}" data-node-id="${set.id}" data-scope="challenge">
+        <div class="tree-node-row"
+             ${treeRowAttrs({ ns: 'viz', id: set.id, kind: 'set', level })}
+             style="padding-left: calc(0.75rem + ${TREE_ITEM_INSET}rem)"
+             oncontextmenu="treeContextMenu(event, '${set.id}', 'viz')"
+             onclick="vizContentClickSet('${set.id}')">
+          <i class="tree-node-chevron invisible"></i>
+          <i data-lucide="${escapeHTML(set.icon || 'layout-grid')}" class="tree-node-icon" style="color:var(--color-accent);"></i>
+          <span class="tree-node-label">${escapeHTML(set.title)}</span>
+          <span class="tree-node-badge" title="${n} problem${n !== 1 ? 's' : ''}">${n}</span>
+          ${onCanvas ? '<span class="viz-gen-dot" title="On the canvas"></span>' : ''}
+        </div>
+      </div>`;
+  };
+
+  const setsIn = (fid) => (typeof getSetsInFolder === 'function' && scopes.includes('challenge'))
+    ? (getSetsInFolder(fid) || []) : [];
+
+  const folderMatches = (fid, scope) => {
+    if (!narrowed) return true;
+    if (vizScopeItems(scope).some(it => (it.parentId || null) === fid && matches(it, scope))) return true;
+    if (setsIn(fid).some(s => !query || fuzzyMatch(s.title, query))) return true;
+    return (state.nodes || []).some(n => n.type === 'folder' && n.scope === scope && n.parentId === fid && folderMatches(n.id, scope));
+  };
+
+  function renderUnder(parentId, scope, level) {
+    let html = '';
+    treeChildren(parentId, scope, 'viz').forEach(entry => {
+      const n = entry.node;
+      if (entry.kind === 'folder') {
+        if (narrowed && !folderMatches(n.id, scope)) return;
+        const count = typeof countItemsRecursive === 'function' ? countItemsRecursive(n.id, scope) : 0;
+        const kids = count > 0 || setsIn(n.id).length > 0
+          || (state.nodes || []).some(f => f.type === 'folder' && f.scope === scope && f.parentId === n.id);
+        html += _vizFolderRow({
+          id: n.id, level, label: n.name, icon: n.icon || 'folder', count, kids,
+          active: viz.selectedFolderId === n.id,
+          lock: _vizFolderLock(n.id),
+          tier: typeof getTierBadgeHTML === 'function' ? getTierBadgeHTML(n.tier) : '',
+          accent: n.color && typeof treeColorOf === 'function' ? treeColorOf(n.color) : '',
+          open: viz.expandedFolderIds.has(n.id) || narrowed,
+          children: renderUnder(n.id, scope, level + 1)
+        });
+        return;
+      }
+      if (!matches(n, scope)) return;
+      html += itemRow(n, scope, level + 1);
+    });
+    // Sets sit alongside the items of the folder they belong to.
+    setsIn(parentId).forEach(set => {
+      if (query && !fuzzyMatch(set.title, query)) return;
+      if (viz.paneFilter === 'starred' && !set.favorite) return;
+      if (viz.paneFilter === 'placed' && !viz.nodes.some(x => x.dataId === set.id)) return;
+      html += setRow(set, level + 1);
+    });
+    return html;
+  }
+
+  let html = '';
+  if (multi) {
+    VIZ_SCOPES.filter(s => scopes.includes(s.scope)).forEach(head => {
+      const all = vizScopeItems(head.scope);
+      const shown = narrowed ? all.filter(it => matches(it, head.scope)).length : all.length;
+      if (narrowed && !shown) return;
+      html += _vizFolderRow({
+        id: head.id, level: 0, label: head.label, icon: head.icon, head: true,
+        count: shown, kids: all.length > 0 || (state.nodes || []).some(n => n.type === 'folder' && n.scope === head.scope),
+        hint: `Everything in your ${head.label} library`,
+        // Collapsed on a first visit: all three expanded is 2700px of list in a
+        // 600px pane. The set is remembered from then on (see vizSave).
+        open: viz.expandedFolderIds.has(head.id) || narrowed,
+        children: renderUnder(head.id, head.scope, 1)
+      });
+    });
+  } else {
+    html += renderUnder(null, scopes[0], 0);
+  }
+
+  html += _vizRootPseudoFolder(scopes, multi, matches, narrowed, itemRow);
+
+  // If Brain last wrote this container, the cached markup describes ITS list,
+  // not ours: force the write rather than trusting a stale match.
+  const wasOther = body.dataset.treeNs && body.dataset.treeNs !== 'viz';
+  if (wasOther && typeof treeSyncMarkup === 'function') treeSyncMarkup(body, '');
+  body.dataset.treeNs = 'viz';
+  body.setAttribute('role', 'tree');
+  body.setAttribute('aria-label', multi ? 'Selected libraries' : vizModuleMeta(scopes[0]).label);
+  body.classList.toggle('hide-tree-items', localStorage.getItem('vizHideItems') === 'true');
+  body.setAttribute('oncontextmenu', "treePaneContextMenu(event, 'viz')");
+
+  /* treeCommit rather than a bare innerHTML write: it skips the write entirely
+     when nothing structural changed — selecting a row is a class, not a
+     rebuild — and staggers the rows in when it does. Every other library tree
+     goes through it; this one did not, so it re-created the whole list on each
+     render and never animated. */
+  const finalHtml = html ? html + treeRootDropHTML('viz') : _vizPaneEmptyHTML(query);
+  const rebuilt = typeof treeCommit === 'function'
+    ? treeCommit(body, finalHtml, viz.selectedFolderId || _vizSelectedDataId())
+    : (body.innerHTML = finalHtml, true);
+  if (rebuilt && typeof lucide !== 'undefined') lucide.createIcons({ root: body });
+}
+
+/** Which data row the canvas selection stands for, for the tree's highlight. */
+function _vizSelectedDataId() {
+  const n = viz.nodes.find(x => x.id === viz.selectedNodeId);
+  return n ? n.dataId : null;
+}
+
 /**
  * The bottom row. With one library it is the Uncategorized / Favourites row
  * every library tree has; with several it is Starred across all of them,
@@ -848,7 +1069,7 @@ function vizBreadcrumbTo(folderId) {
 function _vizRootPseudoFolder(scopes, multi, matches, narrowed, itemRow) {
   if (multi) {
     const starred = [];
-    scopes.forEach(sc => vizScopeItems(sc).forEach(it => { if (it.favorite && matches(it)) starred.push({ it, scope: sc }); }));
+    scopes.forEach(sc => vizScopeItems(sc).forEach(it => { if (it.favorite && matches(it, sc)) starred.push({ it, scope: sc }); }));
     if (!starred.length && narrowed) return '';
     return _vizFolderRow({
       id: '__root__', level: 0, label: 'Starred', icon: 'star', count: starred.length,
@@ -860,7 +1081,8 @@ function _vizRootPseudoFolder(scopes, multi, matches, narrowed, itemRow) {
   }
   const scope = scopes[0];
   const all = vizScopeItems(scope);
-  const rootList = ((typeof libRootItems === 'function') ? libRootItems('viz', all) : all.filter(i => !i.parentId)).filter(matches);
+  const rootList = ((typeof libRootItems === 'function') ? libRootItems('viz', all) : all.filter(i => !i.parentId))
+    .filter(it => matches(it, scope));
   if (!rootList.length) return '';
   const meta = (typeof libRootMeta === 'function') ? libRootMeta('viz') : { label: 'Uncategorized', icon: 'inbox', hint: '' };
   return _vizFolderRow({
@@ -1026,10 +1248,15 @@ function vizContentClickItem(itemId, scope) {
   vizRenderCanvas();
 }
 
+/**
+ * Put a row on the canvas, wired to its parent.
+ *
+ * This used to BE the row's right-click handler, which is why this pane never
+ * showed a menu: right-clicking silently added a node and nothing else. It is
+ * one entry in the shared menu now (see the host's extraActions).
+ */
 function vizContentCtx(e, id, type) {
-  e.preventDefault();
-  // General used to return here, so right-clicking a row did nothing at all
-  // when more than one library was on screen.
+  if (e && e.preventDefault) e.preventDefault();
   const scope = vizScopeOf(id) || vizPrimaryScope();
   if (viz.nodes.find(n => n.dataId === id)) return;
 
