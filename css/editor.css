@@ -232,6 +232,12 @@
 
 /* --- Practice Top Bar --- */
 .practice-topbar {
+  /* The boss bar's two height numbers, hoisted out of .sao-boss so the title
+     plate can be built to the same ones. They have to agree: the plate stands
+     in for the bar, and if it is shorter the topbar changes height every time
+     the bar is switched — measured at 12px of jump before this. */
+  --sao-h: 26px;              /* the plate/track height itself */
+  --sao-pad-y: 12px;          /* air above and below it, for the readout */
   background: #161b22;
   border-bottom: 1px solid #21262d;
   padding: 0.75rem 1rem;
@@ -267,6 +273,9 @@
   align-items: center;
   justify-content: center;
   gap: 0.6rem;
+  /* Whichever of the two is in here, the track is the same height, so toggling
+     the bar no longer resizes the topbar under the editor. */
+  min-height: calc(var(--sao-h) + var(--sao-pad-y) * 2);
 }
 
 /* WITH THE BAR OFF, THE PLATE STANDS WHERE THE BAR STOOD. It keeps the same
@@ -309,7 +318,10 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.34rem 0.7rem 0.34rem 0.6rem;
+  /* Exactly the bar's plate height. Fixed rather than derived from the text, so
+     a one-line title and a wrapped one both leave the topbar the same size. */
+  height: var(--sao-h);
+  padding: 0 0.7rem 0 0.6rem;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.07);
@@ -2005,7 +2017,8 @@ mark.diff-hit.current {
    ============================================================ */
 .sao-boss {
   --sao-hue: 82;              /* SAO yellow-green at full HP → 0 (red) at empty */
-  --sao-h: 26px;              /* plate height */
+  /* --sao-h and --sao-pad-y come from .practice-topbar, so the title plate that
+     stands in for this bar is built to the same height. */
   --sao-chamfer: 14px;        /* plate right-end diagonal run */
   --sao-tr-chamfer: 8px;      /* track right-end diagonal run */
   --sao-step: 5px;            /* how far the bar thins after the step */
@@ -2022,7 +2035,7 @@ mark.diff-hit.current {
   flex: 1 1 260px;
   min-width: 0;
   max-width: 620px;
-  padding: 12px 0 12px;
+  padding: var(--sao-pad-y) 0;
   user-select: none;
 }
 
