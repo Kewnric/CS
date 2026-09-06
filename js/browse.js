@@ -133,8 +133,25 @@ function browseSelectProgram(programId) {
   renderBrowse();
 }
 
+/**
+ * Where the library was standing when you left it.
+ *
+ * renderBrowse restores both of these, but only two of the five ways out of
+ * here were recording them — so opening a program from the detail view and
+ * coming back put you at the top of a list you had scrolled a long way down.
+ * Every path that leaves for an attempt calls this now, and so does the
+ * results screen's Back, which returns here rather than to the attempt.
+ */
+function browseRememberScroll() {
+  const pane1 = document.querySelector('.messenger-pane-1 .pane-1-content');
+  if (pane1) setSessionParam('studySidebarScroll', pane1.scrollTop);
+  const pane2 = document.querySelector('.messenger-pane-2');
+  if (pane2) setSessionParam('browseScroll', pane2.scrollTop);
+}
+
 /** Start practice on a specific variant directly from the program detail view. */
 function browseStartVariant(challengeId, variantId) {
+  browseRememberScroll();
   setSessionParam('practiceChallenge', challengeId);
   setSessionParam('practiceVariant', variantId);
   setSessionParam('timeLimit', 0);
@@ -624,6 +641,7 @@ function browseResume(challengeId) {
   const saved = getSessionParam('autoSavedFiles');
   const c = state.challenges.find(x => x.id === challengeId);
   if (!c || !saved || saved.challengeId !== challengeId) { browseStartFresh(challengeId); return; }
+  browseRememberScroll();
   const variant = c.variants.find(v => v.id === saved.variantId) || c.variants[0];
   setSessionParam('practiceChallenge', c.id);
   setSessionParam('practiceVariant', variant.id);
@@ -1638,10 +1656,13 @@ function renderBrowseContent() {
     paintedInRegions = true;
   }
 
-  // Restore scroll
+  // Restore scroll — both panes, so coming back from an attempt puts the list
+  // AND the folder tree back where they were rather than only the list.
   setTimeout(() => {
     const pane2 = document.querySelector('.messenger-pane-2');
     if (pane2) pane2.scrollTop = getSessionParam('browseScroll') || 0;
+    const pane1 = document.querySelector('.messenger-pane-1 .pane-1-content');
+    if (pane1) pane1.scrollTop = getSessionParam('studySidebarScroll') || 0;
   }, 50);
 
   // The region painter has already done the icons for whatever it rewrote.

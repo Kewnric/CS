@@ -269,27 +269,84 @@
   gap: 0.6rem;
 }
 
+/* WITH THE BAR OFF, THE CENTRE HOLDS ONE SMALL LABEL — and a flex:1 track for
+   it is what put the title on a line of its own. The topbar wraps (it has to:
+   the boss bar wants the full width on a narrow window), and a centre column
+   demanding a third of the row could not fit beside the buttons, so it took the
+   next row and left the name floating in the middle of an empty strip.
+
+   Sized to its content instead, it stays up on the first row and sits directly
+   after Back, which is where a document's title belongs and what makes it read
+   as part of the toolbar rather than as something dropped under it. */
+.practice-topbar-center:not(.boss-on) {
+  flex: 0 1 auto;
+  margin-right: auto;
+  justify-content: flex-start;
+}
+
 /* The program name, standing where the boss bar stands when the bar is off.
    Sized to the text rather than the strip: this is a label, and a label
    stretched across a third of the topbar reads as a broken bar. It truncates
    instead of wrapping, because the topbar is one row high. */
+/* A nameplate, matched to the timer at the other end of the strip.
+
+   It used to be a flat dark rectangle on a flat dark topbar — the same fill and
+   the same border as the icon buttons beside it, so it read as a button that
+   had lost its icon rather than as a label. The timer had already solved this:
+   translucent, with a lit top edge and a shadow under it, so it sits ABOVE the
+   bar instead of in it. The plate now uses the same material, which is what
+   makes the two ends of the topbar look like one design. */
 .boss-nick {
   flex: 0 1 auto;
   min-width: 0;
-  max-width: min(340px, 100%);
+  max-width: min(420px, 100%);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.34rem 0.7rem 0.34rem 0.6rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(14px) saturate(150%);
+  -webkit-backdrop-filter: blur(14px) saturate(150%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.24),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.22),
+    0 2px 12px rgba(0, 0, 0, 0.3);
+  color: var(--text-primary, #e6e6ef);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1.25;
+}
+/* The icon carries the accent so the plate has one lit thing on it, the way the
+   timer's clock face does. */
+.boss-nick-icon {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  color: var(--color-primary, #818cf8);
+  opacity: 0.9;
+}
+/* The name is the part allowed to run out of room. */
+.boss-nick-text {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding: 0.4rem 0.85rem;
-  border-radius: 9px;
-  border: 1px solid var(--border-color, #2f2f3a);
-  background: var(--bg-elevated, #1c1c24);
-  color: var(--text-primary, #e6e6ef);
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  line-height: 1.2;
 }
+.boss-nick-lv {
+  flex-shrink: 0;
+  padding: 0.08rem 0.4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-primary, #6366f1) 22%, transparent);
+  color: var(--color-primary, #a5b4fc);
+  font-size: 0.63rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  font-variant-numeric: tabular-nums;
+}
+.boss-nick-lv[hidden] { display: none; }
 
 .practice-title-badge {
   flex: 0 1 auto;
@@ -3073,8 +3130,19 @@ mark.diff-hit.current {
   transition: background 0.15s, color 0.15s;
 }
 .pp-row-toggle:hover { background: #21262d; color: #e6edf3; }
-.pp-row-toggle svg { transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
-.pp-row-toggle:hover svg { transform: scale(1.2); }
+/* One chevron, rotated — not two icons swapped. It points DOWN when the row is
+   closed (there is more below, press to bring it down) and turns UP once it is
+   open (press to put it away), which is the direction every other disclosure in
+   the app uses and the opposite of what this one used to do.
+   Composed through variables so the hover scale and the open rotation do not
+   overwrite each other; transform still transitions, so ppToggleTestDetail
+   flipping aria-expanded before the re-render animates the turn. */
+.pp-row-toggle svg {
+  transform: rotate(var(--pp-rot, 0deg)) scale(var(--pp-sc, 1));
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.pp-row-toggle[aria-expanded="true"] svg { --pp-rot: 180deg; }
+.pp-row-toggle:hover svg { --pp-sc: 1.2; }
 
 /* The output panel rolls down out of the row and back up into it. <details>-style
    height animation isn't available here (the element is created and destroyed by

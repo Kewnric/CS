@@ -151,6 +151,9 @@ const _ambRand = (lo, hi) => lo + Math.random() * (hi - lo);
  */
 function _ambFill(host) {
   if (!host) return;
+  // Before the early return: a pane filled by an older build has shards but no
+  // scene, and bailing out above would leave it without one for the session.
+  _ambScene(host);
   if (host.querySelector(':scope > .amb-shards')) return;
 
   const layer = document.createElement('div');
@@ -260,6 +263,43 @@ function _ambFill(host) {
 
   // First child, so it sits behind everything the pane already holds.
   host.insertBefore(layer, host.firstChild);
+  _ambScene(host);
+}
+
+/* ── The place the weather happens in ──────────────────────────
+   The panes had a tiled field, one glow and some flecks: weather with nothing
+   for it to blow through. What was missing was a PLACE — growth at the edges
+   of the frame, and light with a direction, so the pane reads as looking into
+   somewhere rather than at a texture.
+
+   Four layers, all of them empty elements the stylesheet fills per theme:
+
+     .amb-cast    light with a direction — shafts, or a low warm wash
+     .amb-far     the distant treeline, small and pale, barely moving
+     .amb-canopy  growth hanging in from the top corners
+     .amb-under   growth standing up from the bottom edge
+
+   The parallax is the point of having three of them: far sways least and
+   slowest, canopy most. Same rule as everything else here — inset:0 and NEVER
+   transformed, because both panes scroll and a transformed layer grows their
+   scrollbars. Every one of these sways by background-position, which moves a
+   painted image without the box following it.
+
+   Idempotent, like _ambFill: a pane that still has its scene is left alone. */
+function _ambScene(host) {
+  if (!host || host.querySelector(':scope > .amb-scene')) return;
+  const scene = document.createElement('div');
+  scene.className = 'amb-scene';
+  scene.setAttribute('aria-hidden', 'true');
+  ['amb-cast', 'amb-far', 'amb-canopy', 'amb-under'].forEach(cls => {
+    const el = document.createElement('div');
+    el.className = cls;
+    /* A per-pane phase, so the sidebar and the results panel are never in
+       step. Two panes breathing together reads as one image cut in half. */
+    el.style.setProperty('--sway-d', (-Math.random() * 40).toFixed(1) + 's');
+    scene.appendChild(el);
+  });
+  host.insertBefore(scene, host.firstChild);
 }
 
 /** Put the shards back wherever they are missing, or take them all away. */
@@ -268,7 +308,7 @@ function ambMount() {
   document.body.classList.toggle('amb-off', !on);
   _ambApplyThemeClass();
   if (!on) {
-    document.querySelectorAll('.amb-shards').forEach(el => el.remove());
+    document.querySelectorAll('.amb-shards, .amb-scene').forEach(el => el.remove());
     document.querySelectorAll('.amb-host').forEach(el => el.classList.remove('amb-host'));
     return;
   }

@@ -1818,7 +1818,11 @@ function bossBarTemplate() {
     <!-- Stands in for the bar when the bar is switched off. Emitted here, not
          in the routes, so all three attempt screens keep the same topbar
          without three copies of it. -->
-    <span class="boss-nick" id="boss-nick" hidden></span>`;
+    <span class="boss-nick" id="boss-nick" hidden>
+      <i data-lucide="file-code-2" class="boss-nick-icon" aria-hidden="true"></i>
+      <span class="boss-nick-text" id="boss-nick-text"></span>
+      <span class="boss-nick-lv" id="boss-nick-lv" hidden></span>
+    </span>`;
 }
 
 /** Show/hide the crystal + nameplate together (they're siblings in the topbar). */
@@ -1882,9 +1886,23 @@ function _bossSyncNick() {
   const chip = document.getElementById('boss-nick');
   if (!chip) return;
   const show = !!_bossName && !bossIsVisible();
-  chip.textContent = _bossName;
+  // Into the span, not the chip: the chip also holds the icon and the level,
+  // and writing textContent on it would delete both.
+  const text = document.getElementById('boss-nick-text');
+  if (text) text.textContent = _bossName;
+  /* The level travels with the name. It is the one fact the hidden plate was
+     also carrying, and a nameplate with nothing but a name on it is what made
+     this read as a stray button rather than as part of the strip. */
+  const lv = document.getElementById('boss-nick-lv');
+  if (lv) {
+    const n = state.activeChallenge && typeof getProgramLevel === 'function'
+      ? getProgramLevel(state.activeChallenge) : null;
+    lv.textContent = n ? 'LV. ' + n : '';
+    lv.hidden = !n;
+  }
   chip.title = _bossName;
   chip.hidden = !show;
+  if (show && typeof lucide !== 'undefined') lucide.createIcons({ root: chip });
 }
 
 /** Click the LV. cell to set the level without going to Admin. */

@@ -144,9 +144,9 @@ function demoMaybeAutoOpen(challenge, variant) {
    ============================================================ */
 
 /* ── Reading the walkthrough aloud ─────────────────────────────
-   Off until asked for: speech that starts on its own is startling, and this
-   opens by itself on a first attempt. Once turned on it is remembered, and
-   every step from then on is read as it appears.
+   Never on its own: this window opens by itself on a first attempt, and a
+   window that starts talking the moment it appears is startling. It reads when
+   the button is pressed, and only the step being looked at.
 
    The narration marks its code with <code>, and speech.js speaks those spans
    through speechSayCode — so `*p` is "star P" and `printf("%d\n", n)` is
@@ -163,16 +163,32 @@ function demoSetVoice(on) {
   try { localStorage.setItem(DEMO_VOICE_KEY, on ? 'on' : 'off'); } catch (e) { /* private mode */ }
 }
 
+/* PRESS IT AND IT READS THIS STEP. It goes quiet at the end of the step, and
+   the button goes out with it.
+
+   It began as a mode: armed once, then every step read itself as it appeared.
+   That broke both ways. Once a step had been read to the end the button still
+   looked lit, so pressing it turned the mode off and nothing was heard — two
+   presses to hear a step again. And showing the SPEAKING state instead just
+   moved the lie: the walkthrough carried on talking through Next while the
+   button sat there showing muted.
+
+   One rule now, and the button never disagrees with it: lit means talking,
+   dark means silent, and pressing always starts the step you are looking at. */
 function demoToggleVoice() {
   if (typeof speechSupported === 'function' && !speechSupported()) {
     if (typeof toast === 'function') toast('This browser has no speech engine.', { type: 'warning' });
     return;
   }
-  const on = !demoVoiceOn();
-  demoSetVoice(on);
+  if (demoState.speaking) {
+    demoSetVoice(false);
+    if (typeof speechStop === 'function') speechStop();
+    demoState.speaking = false;
+  } else {
+    demoSetVoice(true);
+    demoSpeakStep();
+  }
   demoSyncVoiceBtn();
-  if (on) demoSpeakStep();
-  else if (typeof speechStop === 'function') speechStop();
 }
 
 /** Voice, speed and pitch — the app's existing panel, opened over the walkthrough. */
@@ -184,13 +200,16 @@ function demoVoiceSettings() {
 function demoSyncVoiceBtn() {
   const btn = document.getElementById('demo-voice-btn');
   if (!btn) return;
-  const on = demoVoiceOn();
-  btn.classList.toggle('is-on', on);
-  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-  btn.title = on ? 'Stop reading the walkthrough aloud' : 'Read the walkthrough aloud';
-  btn.innerHTML = `<i data-lucide="${on ? 'volume-2' : 'volume-x'}"></i>`;
+  const live = !!demoState.speaking;
+  btn.classList.toggle('is-on', live);
+  btn.setAttribute('aria-pressed', live ? 'true' : 'false');
+  btn.title = live
+    ? 'Stop reading (and stop reading the steps after this one)'
+    : 'Read this step aloud';
+  btn.innerHTML = `<i data-lucide="${live ? 'volume-2' : 'volume-x'}"></i>`;
+  // The settings stay reachable while the mode is armed, not only mid-sentence.
   const gear = document.getElementById('demo-voice-cog');
-  if (gear) gear.hidden = !on;
+  if (gear) gear.hidden = false;
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: btn });
 }
 
@@ -204,11 +223,18 @@ function demoSpeakStep() {
      worth hearing, and reading a paragraph rather than the whole panel keeps
      the read-along markup off the controls. */
   const target = sayEl.querySelector('.demo-recap p') || sayEl.querySelector('p') || sayEl;
-  if (typeof speakElementAlong === 'function') speakElementAlong(target);
-  else if (typeof speak === 'function') speak(target.innerHTML);
+  /* Disarmed at the end of the step, not just marked idle. That is what stops
+     Next from talking over a button that says muted — with the flag cleared
+     there is nothing left that could speak without being pressed. */
+  const done = () => { demoState.speaking = false; demoSetVoice(false); demoSyncVoiceBtn(); };
+  let started = false;
+  if (typeof speakElementAlong === 'function') started = speakElementAlong(target, { onend: done });
+  else if (typeof speak === 'function') started = speak(target.innerHTML, { onend: done });
+  demoState.speaking = !!started;
+  demoSyncVoiceBtn();
 }
 
-const demoState = { id: null, step: 0, keyHandler: null, fromLibrary: false };
+const demoState = { id: null, step: 0, keyHandler: null, fromLibrary: false, speaking: false };
 
 function demoOpen(id, opts) {
   const lesson = demoById(id);
@@ -342,6 +368,7 @@ function demoRenderStep() {
      puts the original HTML back when it stops — stopping after the next step
      had been written would have restored the PREVIOUS step's text over it. */
   if (typeof speechStop === 'function') speechStop();
+  demoState.speaking = false;
   const steps = lesson.steps || [];
   const last = demoState.step >= steps.length;
   const step = last ? null : steps[demoState.step];
@@ -404,7 +431,6 @@ function demoRenderStep() {
   if (ov && typeof lucide !== 'undefined') lucide.createIcons({ root: ov });
 
   demoSyncVoiceBtn();
-  demoSpeakStep();
 }
 
 function demoGo(n) {
@@ -426,6 +452,7 @@ function demoPrev() { demoGo(demoState.step - 1); }
 function demoClose(silent) {
   const ov = document.getElementById('demo-overlay');
   if (typeof speechStop === 'function') speechStop();
+  demoState.speaking = false;
   if (typeof closeSpeechPanel === 'function' && document.getElementById('speech-panel')) closeSpeechPanel();
   if (demoState.keyHandler) {
     document.removeEventListener('keydown', demoState.keyHandler, true);
@@ -648,9 +675,9 @@ function demoRenderMemory(step, prev) {
       <div class="demo-frame${f.label ? '' : ' is-bare'}">
         ${f.label ? `<span class="demo-frame-label">${escapeHTML(f.label)}</span>` : ''}
         <div class="demo-frame-boxes">
-          ${f.boxes.map(b => `
+          ${f.boxes.map((b, bi) => `
             <div class="demo-box${b.isNew ? ' is-new' : ''}${b.changed ? ' is-changed' : ''}${ptrs[b.name] ? ' is-ptr' : ''}"
-                 id="${_demoBoxId(b.key)}" data-var="${escapeHTML(b.name)}">
+                 id="${_demoBoxId(b.key)}" data-var="${escapeHTML(b.name)}" style="--i:${bi}">
               <span class="demo-box-name">${escapeHTML(b.name)}</span>
               <span class="demo-box-val">${escapeHTML(b.value)}</span>
             </div>`).join('')}

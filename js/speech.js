@@ -74,6 +74,23 @@ if (speechSupported()) {
   window.speechSynthesis.addEventListener('voiceschanged', _speechCollectVoices);
 }
 
+/* The voice this app wants when nobody has chosen one.
+
+   "System default" is whatever the OS happens to hand over, which on Windows is
+   usually a flat, elderly desktop voice. Rosa is the natural-sounding Filipino
+   English voice — the right accent for this app's reader and a far better one
+   to be met by — so it is preferred by NAME when it is installed, ahead of the
+   platform default. Matched loosely because vendors decorate the name
+   ("Microsoft Rosa Online (Natural) - English (Philippines)"), and the whole
+   chain is skipped the moment the user picks something in the panel. */
+const SPEECH_PREFERRED_VOICES = [
+  (v) => /rosa/i.test(v.name) && /Natural/i.test(v.name),
+  (v) => /rosa/i.test(v.name),
+  (v) => /Natural/i.test(v.name) && /en[-_]PH/i.test(v.lang),
+  (v) => /en[-_]PH/i.test(v.lang),
+  (v) => /Natural/i.test(v.name) && /^en/i.test(v.lang)
+];
+
 function _speechPickVoice(prefs) {
   if (!_speechVoices.length) return null;
   if (prefs.voiceURI) {
@@ -81,9 +98,19 @@ function _speechPickVoice(prefs) {
     if (hit) return hit;
   }
   // Nothing chosen, or the chosen voice is gone (another machine, or a browser
-  // that ships a different set): fall back to the platform default rather than
+  // that ships a different set).
+  for (const wants of SPEECH_PREFERRED_VOICES) {
+    const hit = _speechVoices.find(wants);
+    if (hit) return hit;
+  }
+  // Nothing on the wanted list is installed: the platform default, rather than
   // going silent.
   return _speechVoices.find(v => v.default) || _speechVoices[0];
+}
+
+/** The voice that will actually be used right now, chosen or inferred. */
+function speechActiveVoice() {
+  return _speechPickVoice(speechPrefs());
 }
 
 /**
@@ -527,7 +554,9 @@ function _speechPaintPanel(voices) {
     <label class="speech-row">
       <span class="speech-row-label">Voice</span>
       <select id="speech-voice" class="form-select" onchange="speechSetPref({ voiceURI: this.value })">
-        <option value=""${p.voiceURI ? '' : ' selected'}>System default</option>
+        <option value=""${p.voiceURI ? '' : ' selected'}>Automatic${
+          (() => { const a = _speechPickVoice({ voiceURI: '' }); return a ? ' — ' + escapeHTML(a.name) : ''; })()
+        }</option>
         ${options}
       </select>
     </label>

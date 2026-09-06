@@ -299,12 +299,46 @@ body.demo-open { overflow: hidden; }
   white-space: nowrap;
 }
 
-/* A box that has just appeared. */
-.demo-box.is-new { animation: demoBoxIn 0.34s cubic-bezier(0.3, 1.35, 0.5, 1); }
-@keyframes demoBoxIn {
-  from { opacity: 0; transform: translateY(7px) scale(0.9); }
-  to { opacity: 1; transform: none; }
+/* A box that has just appeared.
+
+   A variable coming into existence is an EVENT — it is the thing the step is
+   about — and at 0.34s from 0.9 scale it was over before you had looked at it.
+   Now it arrives: it drops in from above, overshoots, and a ring of the accent
+   opens out of its edge and fades, so the eye is taken to the box that is new
+   rather than having to find it.
+
+   Staggered by position, so two variables appearing together arrive one after
+   the other. Simultaneous reads as a repaint; in sequence reads as two things
+   happening. */
+.demo-box.is-new {
+  animation: demoBoxIn 0.52s cubic-bezier(0.22, 1.4, 0.4, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 110ms);
 }
+@keyframes demoBoxIn {
+  0%   { opacity: 0; transform: translateY(-14px) scale(0.72); }
+  55%  { opacity: 1; }
+  100% { opacity: 1; transform: none; }
+}
+/* The ring. Drawn on a pseudo-element so nothing about the box's own layout,
+   border or background has to move to make it. */
+.demo-box.is-new::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  border: 2px solid var(--color-primary);
+  pointer-events: none;
+  animation: demoBoxRing 0.72s ease-out backwards;
+  animation-delay: calc(var(--i, 0) * 110ms);
+}
+@keyframes demoBoxRing {
+  0%   { opacity: 0; transform: scale(0.72); }
+  35%  { opacity: 0.85; }
+  100% { opacity: 0; transform: scale(1.5); }
+}
+/* The ring is positioned against the box, so the box has to be a containing
+   block for it — without this it would size itself to the frame instead. */
+.demo-box { position: relative; }
 
 /* A box whose value has just changed — the single most important thing on the
    panel, so it gets the accent and a beat of movement. */
@@ -314,12 +348,20 @@ body.demo-open { overflow: hidden; }
 }
 .demo-box.is-changed .demo-box-val {
   color: var(--color-warning);
-  animation: demoValIn 0.4s cubic-bezier(0.3, 1.5, 0.5, 1);
+  animation: demoValIn 0.46s cubic-bezier(0.3, 1.5, 0.5, 1);
 }
 @keyframes demoValIn {
-  0% { opacity: 0; transform: translateY(-8px) scale(1.25); }
+  0% { opacity: 0; transform: translateY(-10px) scale(1.35); }
   60% { opacity: 1; }
   100% { transform: none; }
+}
+/* The box flinches with the number. Without it only the digits moved, which at
+   this size is a flicker rather than a change. */
+.demo-box.is-changed { animation: demoBoxHit 0.46s cubic-bezier(0.3, 1.5, 0.5, 1); }
+@keyframes demoBoxHit {
+  0%   { transform: scale(1); }
+  35%  { transform: scale(1.09); }
+  100% { transform: scale(1); }
 }
 
 /* A pointer box: it holds a location, so it is drawn as one. */
@@ -619,8 +661,9 @@ body.demo-open { overflow: hidden; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .demo-box, .demo-box.is-changed .demo-box-val, .demo-box.is-gone,
-  .demo-arrow, .demo-flow-chip, .demo-out-new, .demo-line.is-on {
+  .demo-box, .demo-box.is-new::after, .demo-box.is-changed .demo-box-val,
+  .demo-box.is-gone, .demo-arrow, .demo-flow-chip, .demo-out-new,
+  .demo-line.is-on {
     animation: none !important;
     transition: none !important;
     opacity: 1;

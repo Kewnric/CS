@@ -1518,6 +1518,21 @@ details[open]>.snippet-folder-summary>.folder-icon {
     margin: 0 !important;
   }
 
+  /* Unless the bar is switched off, when the centre is one small nameplate and
+     a full-width row is 900px of nothing with a label adrift in it. Sized to
+     its content it goes back up beside Back on the first row. The rule above
+     still owns the case it was written for — the bar, which does want the row. */
+  .practice-topbar-center:not(.boss-on) {
+    /* Back to source order — the base rule's `order: 3` is what sends the BAR
+       to the bottom, and inheriting it put the nameplate after the buttons on
+       the right instead of after Back on the left. */
+    order: 0;
+    flex: 0 1 auto;
+    width: auto;
+    margin-right: auto !important;
+    justify-content: flex-start;
+  }
+
   /* Own row = room again, so the boss nameplate gets its full readout back. */
   .sao-hp { display: inline-block; }
   .sao-boss {

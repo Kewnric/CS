@@ -276,7 +276,7 @@ function _ppTestsHtml() {
             <span class="pp-row-label">${escapeHTML(t.name || ('Test case ' + (ti + 1)))}${t.hidden ? ' <em class="pp-hidden">(hidden)</em>' : ''}</span>
             <button class="pp-row-toggle" onclick="ppToggleTestDetail(${ti})" aria-expanded="${open}"
                     title="${open ? 'Hide' : 'Show'} this test's output">
-              <i data-lucide="chevron-${open ? 'down' : 'up'}" style="width:13px;height:13px;"></i>
+              <i data-lucide="chevron-down" style="width:13px;height:13px;"></i>
             </button>
             <button class="pp-run-btn" onclick="ppRunTest(${ti})" title="Run this test"><i data-lucide="play" style="width:12px;height:12px;"></i></button>
           </div>

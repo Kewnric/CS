@@ -82,8 +82,12 @@ function initSolution() {
     backBtn.onclick = () => { clearSessionParam('solutionSetAttempt'); spaNavigate(backType); };
     backBtn.innerHTML = '<i data-lucide="chevron-left" style="width:18px;height:18px;"></i> Back to History';
   } else {
-    backBtn.onclick = () => spaNavigate('practice');
-    backBtn.innerHTML = '<i data-lucide="chevron-left" style="width:18px;height:18px;"></i> Back to Practice';
+    /* The library, not the attempt. This screen is what you see AFTER finishing,
+       so "back" is out of the attempt and into the shelf you took it from — and
+       it lands where you left it, on the folder and at the scroll position the
+       program was opened from (see browseRememberScroll). */
+    backBtn.onclick = () => spaNavigate('browse');
+    backBtn.innerHTML = '<i data-lucide="chevron-left" style="width:18px;height:18px;"></i> Back to Library';
   }
 
   _solLoadPrefs();
