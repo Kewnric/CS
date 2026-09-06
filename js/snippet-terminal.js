@@ -200,6 +200,7 @@ function _snipTermStartClock(session) {
 
 function _snipTermStopClock(session) {
   if (session && session.clock) { clearInterval(session.clock); session.clock = null; }
+  if (session && session.stallNote) { clearTimeout(session.stallNote); session.stallNote = null; }
   const el = document.getElementById('snip-term-elapsed');
   if (el) el.textContent = '';
 }
@@ -253,6 +254,16 @@ async function _snipTermRunStep() {
   if (engineEl) engineEl.textContent = 'GCC';
   session.engine = 'GCC';
   _snipTermStartClock(session);
+
+  // See _termRunStep: past the stall window the compiler is not merely slow,
+  // and a spinner identical to a normal compile is what made it inexplicable.
+  session.stallNote = setTimeout(() => {
+    if (_snipTerm !== session || !session.running || session.engine !== 'GCC') return;
+    const line = session.lines[spinIdx];
+    if (!line) return;
+    line.text = '⏳ The compiler is slow to answer — retrying it, with the offline interpreter standing by...';
+    _snipTermRender();
+  }, GODBOLT_STALL_MS);
 
   // See the note in practice.js: a probe build reports each stdin read, so the
   // first read that comes up empty is exactly where the program blocks. The

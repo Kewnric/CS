@@ -3059,6 +3059,7 @@ function _termStartClock(session) {
 
 function _termStopClock(session) {
   if (session && session.clock) { clearInterval(session.clock); session.clock = null; }
+  if (session && session.stallNote) { clearTimeout(session.stallNote); session.stallNote = null; }
   if (typeof psfxWorkStop === 'function') psfxWorkStop();
   const el = document.getElementById('term-elapsed');
   if (el) el.textContent = '';
@@ -3119,6 +3120,17 @@ async function _termRunStep() {
   if (engineEl) engineEl.textContent = 'GCC';
   session.engine = 'GCC';
   _termStartClock(session);
+
+  /* A healthy compile takes about a second and a half. Past the stall window
+     something is wrong, and a spinner that looks exactly like a normal compile
+     is the reason waiting for it felt inexplicable rather than merely slow. */
+  session.stallNote = setTimeout(() => {
+    if (_term !== session || !session.running || session.engine !== 'GCC') return;
+    const line = session.lines[spinIdx];
+    if (!line) return;
+    line.text = '⏳ The compiler is slow to answer — retrying it, with the offline interpreter standing by...';
+    _termRender();
+  }, GODBOLT_STALL_MS);
 
   // Interactive stepping: a probe build reports each stdin read (see
   // termInstrumentC), so the FIRST read that comes up empty is exactly where a
@@ -3964,49 +3976,142 @@ function preprocessMultiFile(code) {
   return result;
 }
 
-/** Raw Godbolt compile+run on an already-merged translation unit (no preprocessing).
- *  Aborts after 25s so a hung request can't leave the UI spinning forever. */
-async function _godboltCompileRun(processedCode, stdin, externalAborter, userArgs) {
-  // Reuse the caller's controller when given one, so a Stop button can cancel
-  // the request. The 25 s guard still applies either way.
-  const aborter = externalAborter || new AbortController();
-  const timeoutId = setTimeout(() => aborter.abort(), 25000);
-  let response;
-  try {
-    response = await fetch('https://godbolt.org/api/compiler/cg132/compile', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      signal: aborter.signal,
-      body: JSON.stringify({
-        source: processedCode,
-        options: {
-          userArguments: userArgs || (typeof termCompilerArgs === 'function' ? termCompilerArgs() : '-Wall -lm'),
-          executeParameters: { args: [], stdin: stdin || '' },
-          compilerOptions: { executorRequest: true },
-          filters: { execute: true }
-        },
-        lang: 'c'
-      })
-    });
-  } catch (e) {
-    throw (e && e.name === 'AbortError') ? new Error('TIMEOUT') : e;
-  } finally {
-    clearTimeout(timeoutId);
+/* ── Talking to the compiler ───────────────────────────────────
+   Measured against the real service: eight consecutive compiles of a
+   hello-world took 0.77s, 1.40s, 1.40s, 1.41s, 1.79s, 1.40s, 1.44s and 2.00s.
+   That is what a healthy request costs. Every so often one simply never
+   answers, and the old code waited out its whole 25 s guard before falling
+   back to the interpreter — so the SAME program that normally runs in a second
+   and a half occasionally took twenty-five, with nothing on screen to say why.
+   A guard set to eighteen times the normal response time is not a guard; it is
+   the thing you actually experience.
+
+   Two changes. A request that has gone quiet for STALL_MS is not abandoned —
+   it is RACED: a second one goes out and whichever answers first wins. A stall
+   therefore costs about STALL_MS plus a normal response rather than the full
+   ceiling, while a program that genuinely takes a long time to run still has
+   the first attempt running with the full ceiling, which abandoning it would
+   have thrown away.
+
+   And when nothing answers at all, that is remembered for a minute. Otherwise
+   every following Run pays the ceiling again to rediscover the same thing —
+   worst on Check Code, which compiles once per test case. */
+const GODBOLT_STALL_MS = 5000;      // hedge a request that has gone quiet
+const GODBOLT_DEADLINE_MS = 25000;  // absolute ceiling for one attempt
+const GODBOLT_OFFLINE_MS = 60000;   // how long "unreachable" is believed
+
+/** When set, the compiler is presumed down until this timestamp. */
+let _godboltDownUntil = 0;
+
+/** True while the compiler is being skipped without asking. @returns {boolean} */
+function godboltIsDown() {
+  return Date.now() < _godboltDownUntil;
+}
+
+/** Forget a previous failure, so the next run tries the network again. */
+function godboltClearDown() {
+  _godboltDownUntil = 0;
+}
+
+/** One attempt. Rejects with TIMEOUT on its own deadline or on Stop. */
+function _godboltAttempt(body, externalSignal, deadline) {
+  const ac = new AbortController();
+  const timer = setTimeout(() => ac.abort(), deadline);
+  // The Stop button owns a controller of its own; forward it so Stop cancels
+  // every attempt in flight, not just whichever one happens to be first.
+  const relay = () => ac.abort();
+  if (externalSignal) {
+    if (externalSignal.aborted) ac.abort();
+    else externalSignal.addEventListener('abort', relay, { once: true });
   }
 
-  if (!response.ok) throw new Error('HTTP_' + response.status);
+  return fetch('https://godbolt.org/api/compiler/cg132/compile', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    signal: ac.signal,
+    body: body
+  }).then(async (response) => {
+    if (!response.ok) throw new Error('HTTP_' + response.status);
+    const r = await response.json();
+    const joinText = (arr) => (arr || []).map(o => o.text || '').join('\n');
+    return {
+      didExecute: r.didExecute !== false,
+      exitCode: r.code != null ? r.code : (r.didExecute === false ? -1 : 0),
+      stdout: joinText(r.stdout),
+      stderr: joinText(r.stderr),
+      buildStderr: joinText(r.buildResult ? r.buildResult.stderr : null),
+      execTime: r.execTime
+    };
+  }).catch((e) => {
+    throw (e && e.name === 'AbortError') ? new Error('TIMEOUT') : e;
+  }).finally(() => {
+    clearTimeout(timer);
+    if (externalSignal) externalSignal.removeEventListener('abort', relay);
+    ac.abort();     // release the loser of a race
+  });
+}
 
-  const r = await response.json();
-  const joinText = (arr) => (arr || []).map(o => o.text || '').join('\n');
+/** Raw Godbolt compile+run on an already-merged translation unit (no preprocessing).
+ *  Hedges a stalled request, and gives up for a minute once nothing answers. */
+async function _godboltCompileRun(processedCode, stdin, externalAborter, userArgs) {
+  // Already known to be unreachable: fail instantly rather than making the user
+  // sit through the same twenty-five seconds on every run.
+  if (godboltIsDown()) throw new Error('OFFLINE');
 
-  return {
-    didExecute: r.didExecute !== false,
-    exitCode: r.code != null ? r.code : (r.didExecute === false ? -1 : 0),
-    stdout: joinText(r.stdout),
-    stderr: joinText(r.stderr),
-    buildStderr: joinText(r.buildResult ? r.buildResult.stderr : null),
-    execTime: r.execTime
-  };
+  const body = JSON.stringify({
+    source: processedCode,
+    options: {
+      userArguments: userArgs || (typeof termCompilerArgs === 'function' ? termCompilerArgs() : '-Wall -lm'),
+      executeParameters: { args: [], stdin: stdin || '' },
+      compilerOptions: { executorRequest: true },
+      filters: { execute: true }
+    },
+    lang: 'c'
+  });
+  const signal = externalAborter ? externalAborter.signal : null;
+  // Pressing Stop rejects every attempt, and that must not be read as the
+  // service being down — it is the user, and the next Run should try again.
+  const stopped = () => !!(signal && signal.aborted);
+
+  const first = _godboltAttempt(body, signal, GODBOLT_DEADLINE_MS);
+  // Settle-marker form: a rejection here is recorded, not thrown, so the stall
+  // window can be raced against it without an unhandled rejection.
+  const marked = first.then(v => ({ value: v }), e => ({ error: e }));
+
+  const early = await Promise.race([
+    marked,
+    new Promise(r => setTimeout(() => r(null), GODBOLT_STALL_MS))
+  ]);
+  if (early) {
+    // It answered inside the window, one way or the other.
+    if (!early.error) { godboltClearDown(); return early.value; }
+    if (early.error.message === 'TIMEOUT' && !stopped()) _godboltDownUntil = Date.now() + GODBOLT_OFFLINE_MS;
+    throw early.error;
+  }
+
+  /* It has gone quiet. Send a second one and take whichever answers first,
+     leaving the original running in case it is slow rather than lost.
+
+     The hedge gets what is LEFT of the ceiling, not a fresh one of its own —
+     measured: with a full one it ended at 5 s + 25 s and a total outage cost
+     30 s, which is worse than doing nothing. Both attempts now expire at the
+     same moment, so an outage still costs exactly the ceiling. */
+  const second = _godboltAttempt(body, signal, GODBOLT_DEADLINE_MS - GODBOLT_STALL_MS);
+  try {
+    // Promise.any takes the first SUCCESS, so one attempt failing does not
+    // discard the other while it is still going to work.
+    const res = await Promise.any([first, second]);
+    godboltClearDown();
+    return res;
+  } catch (agg) {
+    const errs = (agg && agg.errors) || [];
+    // Nothing answered at all. An HTTP error means the service is there and
+    // said no, which is no reason to stop asking.
+    if (errs.some(e => e && e.message === 'TIMEOUT') && !stopped()) {
+      _godboltDownUntil = Date.now() + GODBOLT_OFFLINE_MS;
+    }
+    throw errs[0] || new Error('TIMEOUT');
+  }
 }
 
 async function executeWithGodbolt(code, stdin) {
