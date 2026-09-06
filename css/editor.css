@@ -332,17 +332,21 @@
     inset 0 -1px 0 rgba(0, 0, 0, 0.22),
     0 2px 12px rgba(0, 0, 0, 0.3);
   color: var(--text-primary, #e6e6ef);
-  font-size: 0.8rem;
+  /* Bigger than the bar's own 0.7rem name cell. That one is squeezed in beside
+     the HP track; this plate is the only thing in the strip, so the title can
+     take the room. Sized to leave clear air inside the fixed 26px — see the
+     measurement in the commit. */
+  font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: 0.01em;
-  line-height: 1.25;
+  line-height: 1.2;
 }
 /* The icon carries the accent so the plate has one lit thing on it, the way the
    timer's clock face does. */
 .boss-nick-icon {
   flex-shrink: 0;
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
   color: var(--color-primary, #818cf8);
   opacity: 0.9;
 }
@@ -359,7 +363,7 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--color-primary, #6366f1) 22%, transparent);
   color: var(--color-primary, #a5b4fc);
-  font-size: 0.63rem;
+  font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.05em;
   font-variant-numeric: tabular-nums;
