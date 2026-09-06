@@ -104,7 +104,10 @@ function vizSyncDepthBtn() {
 
 /** Does the canvas draw this node under the current depth setting? */
 function vizDepthAllows(node) {
-  if (viz.canvasDepth === 'folders') return node.type === 'folder' || node.type === 'root' || node.type === 'comment';
+  // Comments and frames are things you drew, not library structure, so they
+  // survive every setting — hiding your own annotations was never the point.
+  if (node.type === 'comment' || node.type === 'frame') return true;
+  if (viz.canvasDepth === 'folders') return node.type === 'folder' || node.type === 'root';
   if (viz.canvasDepth === 'items') return node.type !== 'folder' && node.type !== 'root';
   return true;
 }

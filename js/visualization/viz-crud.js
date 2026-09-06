@@ -529,8 +529,21 @@ function vizCollapseChildren(nodeId) {
   });
   node.collapsed = true;
   viz.collapsedNodeIds.add(nodeId);
-  vizRenderCanvas();
-  vizSave();
+  // The children used to vanish between frames. Scaling them into the parent
+  // first is the same sentence the tree rows tell when a folder closes.
+  _vizAnimateCollapse(descIds, () => { vizRenderCanvas(); vizSave(); });
+}
+
+/** Play the children out, then render without them. */
+function _vizAnimateCollapse(ids, done) {
+  if (typeof vizPrefersReducedMotion === 'function' && vizPrefersReducedMotion()) { done(); return; }
+  let any = false;
+  ids.forEach(id => {
+    const el = _vizNodeEls.get(id);
+    if (el) { el.classList.add('viz-collapsing'); any = true; }
+  });
+  if (!any) { done(); return; }
+  setTimeout(done, 190);
 }
 
 function vizExpandChildren(nodeId) {
@@ -576,6 +589,15 @@ function vizExpandChildren(nodeId) {
   delete node._collapsedChildren;
   viz.collapsedNodeIds.delete(nodeId);
   vizRenderCanvas();
+  // They arrive scaling out of the parent, the reverse of the way they went in.
+  if (!(typeof vizPrefersReducedMotion === 'function' && vizPrefersReducedMotion())) {
+    descIds.forEach(id => {
+      const el = _vizNodeEls.get(id);
+      if (!el) return;
+      el.classList.add('viz-expanding');
+      setTimeout(() => el.classList.remove('viz-expanding'), 300);
+    });
+  }
   vizSave();
 }
 
@@ -599,4 +621,75 @@ function vizPruneGhostNodes() {
     viz.links = viz.links.filter(l => nodeIds.has(l.from) && nodeIds.has(l.to));
     vizSave();
   }
+}
+
+/* ── Group frames ──────────────────────────────────────────────
+   A titled rectangle behind a cluster that moves with it. The comment node was
+   nearly this already — it just sat in front and captured nothing, so there
+   was no way to say "these eight belong together" and then treat them as one.
+
+   A frame is canvas-only: it has no dataId, so deleting one deletes a drawing
+   and nothing else. */
+
+const VIZ_FRAME_PAD = 42;
+
+function vizCtxAddFrame() {
+  vizHideAllMenus();
+  const g = vizVisibleGraph();
+  const inside = (viz.selectedNodeIds.size > 1)
+    ? g.nodes.filter(n => viz.selectedNodeIds.has(n.id))
+    : [];
+
+  let box;
+  if (inside.length) {
+    const sizes = inside.map(n => ({ x: n.x, y: n.y, w: _vizWidthOf(n), h: _vizHeightOf(n) }));
+    box = {
+      x: Math.min(...sizes.map(s => s.x)) - VIZ_FRAME_PAD,
+      y: Math.min(...sizes.map(s => s.y)) - VIZ_FRAME_PAD - 6,
+      w: Math.max(...sizes.map(s => s.x + s.w)) - Math.min(...sizes.map(s => s.x)) + VIZ_FRAME_PAD * 2,
+      h: Math.max(...sizes.map(s => s.y + s.h)) - Math.min(...sizes.map(s => s.y)) + VIZ_FRAME_PAD * 2 + 6
+    };
+  } else {
+    const x = viz.contextPos ? viz.contextPos.x : 0;
+    const y = viz.contextPos ? viz.contextPos.y : 0;
+    box = { x, y, w: 520, h: 340 };
+  }
+
+  showInputDialog('Group these', inside.length
+    ? `A frame around the ${inside.length} nodes you have selected. Dragging it moves all of them.`
+    : 'An empty frame. Anything you drop inside it travels with it.',
+    'Group name', '', (name) => {
+      vizPushUndo();
+      const node = vizAddCanvasNode((name || '').trim() || 'Group', 'frame', null, vizPrimaryScope(), box.x, box.y);
+      // vizAddCanvasNode jitters the position so two new nodes never land on
+      // top of each other; a frame is placed deliberately, so put it back.
+      node.x = box.x; node.y = box.y;
+      node.w = box.w; node.h = box.h;
+      node.userSized = true;
+      viz.selectedNodeIds.clear();
+      viz.selectedNodeId = node.id;
+      vizRenderCanvas();
+      vizUpdateSelectionChip();
+      vizSave();
+    });
+}
+
+function _vizWidthOf(n) {
+  const el = _vizNodeEls.get(n.id);
+  return (el && el.offsetWidth) || n.w || 180;
+}
+function _vizHeightOf(n) {
+  const el = _vizNodeEls.get(n.id);
+  return (el && el.offsetHeight) || n.h || 50;
+}
+
+/** Everything a frame currently encloses, worked out when the drag starts. */
+function vizFrameContents(frame) {
+  const g = vizVisibleGraph();
+  const x2 = frame.x + (frame.w || 520), y2 = frame.y + (frame.h || 340);
+  return g.nodes.filter(n => {
+    if (n.id === frame.id || n.type === 'frame') return false;
+    const w = _vizWidthOf(n), h = _vizHeightOf(n);
+    return n.x >= frame.x && n.y >= frame.y && n.x + w <= x2 && n.y + h <= y2;
+  });
 }

@@ -1067,6 +1067,13 @@ function vizCanvasCtx(e) {
   const addFolderBtn = menu.querySelector('[onclick="vizCtxAddFolder()"]');
   if (addFolderBtn) addFolderBtn.innerHTML = `<i data-lucide="folder-plus"></i> <span>Add Category</span>`;
 
+  // Say what the frame would actually enclose, rather than making you find out.
+  const frameLabel = document.getElementById('viz-ctx-frame-label');
+  if (frameLabel) {
+    frameLabel.textContent = viz.selectedNodeIds.size > 1
+      ? `Group the ${viz.selectedNodeIds.size} selected` : 'Add Group Frame';
+  }
+
   lucide.createIcons({ root: menu });
 
   const container = document.getElementById('viz-canvas-container');
@@ -1758,6 +1765,14 @@ function vizToggleLinkTypeDropdown() {
   }
 }
 
+/**
+ * Which arrowhead a NEW link gets.
+ *
+ * This used to rewrite the button's innerHTML to an icon plus the word "Link",
+ * so choosing anything other than the default turned an icon-only pill into a
+ * labelled one — permanently wider, shifting every tool beside it. It swaps
+ * the glyph and leaves the shape alone.
+ */
 function vizSetLinkArrowType(type) {
   viz.defaultLinkArrowType = type;
   document.querySelectorAll('#viz-link-type-popup .viz-link-type-option').forEach(opt => {
@@ -1765,23 +1780,23 @@ function vizSetLinkArrowType(type) {
   });
   const popup = document.getElementById('viz-link-type-popup');
   if (popup) popup.classList.add('hidden');
-  // Update label on the Link button to show current type
   const linkBtn = document.getElementById('viz-link-toggle-btn');
   if (linkBtn) {
-    const iconMap = { 'arrow': 'arrow-right', 'double-arrow': 'arrow-left-right', 'none': 'minus' };
-    const iconName = iconMap[type] || 'link';
-    const chevron = linkBtn.querySelector('.viz-pill-chevron');
-    linkBtn.innerHTML = `<i data-lucide="${iconName}" style="width:12px;height:12px;"></i> Link `;
-    if (chevron) linkBtn.appendChild(chevron);
-    else {
-      const newChevron = document.createElement('span');
-      newChevron.className = 'viz-pill-chevron';
-      newChevron.setAttribute('onclick', 'event.stopPropagation();vizToggleLinkTypeDropdown()');
-      newChevron.innerHTML = '<i data-lucide="chevron-down" style="width:10px;height:10px;"></i>';
-      linkBtn.appendChild(newChevron);
+    const iconName = { 'arrow': 'link', 'double-arrow': 'arrow-left-right', 'none': 'minus' }[type] || 'link';
+    const glyph = linkBtn.querySelector('i, svg');
+    if (glyph) {
+      const fresh = document.createElement('i');
+      fresh.setAttribute('data-lucide', iconName);
+      fresh.style.width = '12px';
+      fresh.style.height = '12px';
+      glyph.replaceWith(fresh);
+      if (typeof lucide !== 'undefined') lucide.createIcons({ el: linkBtn });
     }
-    if (typeof lucide !== 'undefined') lucide.createIcons({ el: linkBtn });
+    const label = 'Link mode (L) — new links: ' + ({ 'arrow': 'arrow', 'double-arrow': 'double arrow', 'none': 'no arrow' }[type] || 'arrow');
+    linkBtn.title = label;
+    linkBtn.setAttribute('aria-label', label);
   }
+  vizSave();
 }
 
 function vizCtxChangeIcon() {

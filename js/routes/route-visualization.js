@@ -346,6 +346,7 @@ function vizTemplate() {
       <button class="viz-ctx-item" onclick="vizCtxAddFolder()"><i data-lucide="folder-plus"></i> <span>Add Category</span></button>
       <div class="viz-ctx-divider"></div>
       <button class="viz-ctx-item" onclick="vizCtxAddComment()"><i data-lucide="message-circle"></i> Add Comment</button>
+      <button class="viz-ctx-item" onclick="vizCtxAddFrame()"><i data-lucide="group"></i> <span id="viz-ctx-frame-label">Add Group Frame</span></button>
       <div class="viz-ctx-divider"></div>
       <button class="viz-ctx-item" onclick="vizSelectAll()"><i data-lucide="box-select"></i> Select all</button>
       <button class="viz-ctx-item" onclick="vizAutoLayout()"><i data-lucide="layout"></i> Auto Layout</button>

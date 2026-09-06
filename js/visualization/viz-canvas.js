@@ -292,6 +292,14 @@ function _vizFillNode(el, node, o) {
   const collapseBadge = node.collapsed
     ? `<span class="viz-collapse-badge" title="${hidden} hidden children">+${hidden}</span>` : '';
 
+  if (node.type === 'frame') {
+    // A frame is a container: its box IS the node, and the title hangs off the
+    // top edge so it never covers what is inside.
+    el.innerHTML = `<div class="viz-node-inner" style="width:${node.w || 520}px;height:${node.h || 340}px;"></div>
+      <span class="viz-frame-title">${escapeHTML(node.label || 'Group')}</span>`;
+    return;
+  }
+
   if (node.type === 'comment') {
     const w = (node.userSized && node.w) ? `width:${node.w}px;` : 'width:250px;';
     const h = (node.userSized && node.h) ? `height:${node.h}px;` : 'height:fit-content;';
@@ -708,6 +716,7 @@ function vizNodeMouseDown(e, nodeId) {
   const g = vizVisibleGraph();
   vizGeomHold(g);
   vizGeom.graph = g;
+  viz._frameCargo = node.type === 'frame' ? vizFrameContents(node) : null;
 
   if (e.pointerId !== undefined && e.currentTarget && e.currentTarget.setPointerCapture) {
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) { /* already gone */ }
@@ -744,8 +753,17 @@ function vizNodeDrag(e) {
     nodeEl.classList.add('dragging');
   }
 
-  // Everything else in the selection travels with it.
-  if (viz.selectedNodeIds.size > 1 && viz.selectedNodeIds.has(node.id) && (dx || dy)) {
+  // A frame carries whatever it enclosed WHEN THE DRAG STARTED. Working it out
+  // on the first move instead asked after the frame had already jumped — at
+  // 0.08 zoom one 25px mouse step is 300 world px, and everything had fallen
+  // outside the box by the time the question was put.
+  if (node.type === 'frame' && (dx || dy) && viz._frameCargo) {
+    viz._frameCargo.forEach(child => {
+      child.x += dx; child.y += dy;
+      const el = _vizNodeEls.get(child.id);
+      if (el) { el.style.left = child.x + 'px'; el.style.top = child.y + 'px'; el.classList.add('dragging-child'); }
+    });
+  } else if (viz.selectedNodeIds.size > 1 && viz.selectedNodeIds.has(node.id) && (dx || dy)) {
     viz.selectedNodeIds.forEach(id => {
       if (id === node.id) return;
       const other = viz.nodes.find(n => n.id === id);
@@ -776,6 +794,7 @@ function vizNodeDragEnd() {
   document.removeEventListener('pointercancel', vizNodeDragEnd);
   const dragged = viz._hasDragged;
   viz._hasDragged = false;
+  viz._frameCargo = null;
   vizGeom.graph = null;
   vizGeomRelease();
   if (dragged) {

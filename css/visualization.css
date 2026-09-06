@@ -3720,3 +3720,102 @@ button.viz-link-type-option {
   .viz-node.selected .viz-node-inner { animation: none !important; }
   .viz-fog-overlay { animation: none !important; }
 }
+
+/* ── The library strip ─────────────────────────────────────────
+   Three toggles and a surface switch, not five tabs. The chips read as
+   independently selectable, and Brain is set apart by a divider because it is
+   a different kind of thing, not a fourth library. */
+.viz-strip-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 0.25rem 0.15rem;
+  background: var(--border-color);
+  flex-shrink: 0;
+}
+.viz-scope-count {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  padding: 0 0.35rem;
+  white-space: nowrap;
+  align-self: center;
+}
+.viz-scope-count.hidden { display: none; }
+.viz-module-tab[data-scope].active::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  margin-right: 0.1rem;
+  flex-shrink: 0;
+}
+.viz-module-tab.viz-tab-brain.active {
+  /* Brain is a surface, not a library — a different accent says so without a
+     second explanatory label. */
+  color: #a855f7;
+  border-color: color-mix(in srgb, #a855f7 55%, transparent);
+  background: color-mix(in srgb, #a855f7 14%, transparent);
+}
+
+/* ── Collapse and expand ───────────────────────────────────────
+   The +N badge said children had gone somewhere; they simply vanished. They
+   scale into the parent now, and back out of it, which is the same sentence
+   the tree rows tell when a folder closes. */
+@keyframes vizCollapseIn {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.5); }
+}
+@keyframes vizExpandOut {
+  from { opacity: 0; transform: scale(0.55); }
+  to { opacity: 1; transform: scale(1); }
+}
+.viz-node.viz-collapsing { animation: vizCollapseIn 0.2s ease-in forwards; pointer-events: none; }
+.viz-node.viz-expanding { animation: vizExpandOut 0.26s cubic-bezier(0.34, 1.4, 0.64, 1); }
+.viz-collapse-badge { transition: transform 0.18s cubic-bezier(0.34, 1.5, 0.64, 1); }
+.viz-node:hover .viz-collapse-badge { transform: scale(1.12); }
+
+/* ── Group frames ──────────────────────────────────────────────
+   A titled rectangle behind a cluster that moves with it. The comment node was
+   nearly this already — it just sat in front and captured nothing. */
+.viz-node[data-type="frame"] { z-index: 1; }
+.viz-node[data-type="frame"] .viz-node-inner {
+  background: color-mix(in srgb, var(--viz-tint, var(--color-primary)) 7%, transparent);
+  border: 2px dashed color-mix(in srgb, var(--viz-tint, var(--color-primary)) 45%, var(--border-color));
+  border-radius: var(--radius-lg);
+  box-shadow: none;
+  padding: 0;
+  min-width: 0;
+  max-width: none;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+.viz-node[data-type="frame"] .viz-frame-title {
+  position: absolute;
+  top: -0.95rem;
+  left: 0.6rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--viz-tint, var(--color-primary)) 80%, var(--text-secondary));
+  background: var(--bg-base);
+  padding: 0 0.35rem;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.viz-node[data-type="frame"]:hover .viz-node-inner {
+  border-style: solid;
+  transform: none;
+}
+.viz-node[data-type="frame"].selected .viz-node-inner {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-glow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viz-node.viz-collapsing,
+  .viz-node.viz-expanding { animation: none !important; }
+  .viz-collapse-badge { transition: none !important; }
+}
