@@ -211,36 +211,152 @@ body.demo-open { overflow: hidden; }
 .demo-recap h3 svg { width: 15px; height: 15px; }
 .demo-recap p { color: var(--text-secondary); }
 
-/* The variable watch. A row per name; the one that just moved is marked. */
-.demo-watch {
+/* ── The memory diagram ────────────────────────────────────────
+   Boxes rather than chips, because the ideas that need demonstrating are about
+   the RELATIONSHIPS between boxes: a pointer holds where another one is, a
+   copy is a second box with the same number in it, and a local goes away. Each
+   of those is a thing you can draw and cannot say in a row of text. */
+.demo-mem {
+  position: relative;
+  padding: 0.4rem 1.1rem 0.85rem;
+  flex-shrink: 0;
+  min-height: 0;
+}
+.demo-mem.hidden { display: none; }
+
+.demo-mem-arrows {
+  position: absolute;
+  left: 1.1rem;
+  top: 0.4rem;
+  pointer-events: none;
+  overflow: visible;
+  color: var(--color-primary);
+  z-index: 2;
+}
+.demo-arrow {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0;
+  animation: demoArrowIn 0.34s ease-out 0.08s forwards;
+}
+@keyframes demoArrowIn { to { opacity: 0.9; } }
+.demo-arrow-null {
+  fill: var(--text-tertiary);
+  font-family: var(--font-mono, ui-monospace, Consolas, monospace);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+
+/* Frames stack left to right; a caller and a callee are two groups, which is
+   the point being made whenever both are on screen at once. */
+.demo-mem-frames {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
-  padding: 0 1.1rem 0.75rem;
-  flex-shrink: 0;
+  gap: 0.4rem 0.9rem;
+  align-items: flex-end;
+  padding-top: 1.9rem;   /* room for the arrows to arc over the boxes */
+  position: relative;
+  z-index: 1;
 }
-.demo-watch.hidden { display: none; }
-.demo-var {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.4rem;
-  padding: 0.22rem 0.5rem;
+.demo-frame { display: flex; flex-direction: column; gap: 0.22rem; min-width: 0; }
+.demo-frame-label {
+  font-family: var(--font-mono, ui-monospace, Consolas, monospace);
+  font-size: 0.62rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  padding-left: 0.1rem;
+}
+.demo-frame.is-bare .demo-frame-label { display: none; }
+.demo-frame-boxes { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.demo-frame:not(.is-bare) .demo-frame-boxes {
+  padding: 0.28rem;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+}
+
+.demo-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.05rem;
+  min-width: 3.6rem;
+  padding: 0.3rem 0.5rem;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   background: var(--bg-surface);
   font-family: var(--font-mono, ui-monospace, Consolas, monospace);
-  font-size: 0.735rem;
-  transition: border-color 0.2s ease, background 0.2s ease;
+  transition: border-color 0.22s ease, background 0.22s ease, transform 0.22s ease;
 }
-.demo-var-name { color: var(--text-tertiary); }
-.demo-var-val { color: var(--text-primary); font-weight: 600; }
-.demo-var.is-changed {
+.demo-box-name { font-size: 0.64rem; color: var(--text-tertiary); line-height: 1.2; }
+.demo-box-val {
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+/* A box that has just appeared. */
+.demo-box.is-new { animation: demoBoxIn 0.34s cubic-bezier(0.3, 1.35, 0.5, 1); }
+@keyframes demoBoxIn {
+  from { opacity: 0; transform: translateY(7px) scale(0.9); }
+  to { opacity: 1; transform: none; }
+}
+
+/* A box whose value has just changed — the single most important thing on the
+   panel, so it gets the accent and a beat of movement. */
+.demo-box.is-changed {
   border-color: var(--color-warning);
-  background: color-mix(in srgb, var(--color-warning) 12%, var(--bg-surface));
-  animation: demoPop 0.32s cubic-bezier(0.3, 1.4, 0.5, 1);
+  background: color-mix(in srgb, var(--color-warning) 14%, var(--bg-surface));
 }
-.demo-var.is-changed .demo-var-val { color: var(--color-warning); }
-@keyframes demoPop { from { transform: scale(0.92); } to { transform: none; } }
+.demo-box.is-changed .demo-box-val {
+  color: var(--color-warning);
+  animation: demoValIn 0.4s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+@keyframes demoValIn {
+  0% { opacity: 0; transform: translateY(-8px) scale(1.25); }
+  60% { opacity: 1; }
+  100% { transform: none; }
+}
+
+/* A pointer box: it holds a location, so it is drawn as one. */
+.demo-box.is-ptr {
+  border-color: color-mix(in srgb, var(--color-primary) 55%, var(--border-color));
+  background: color-mix(in srgb, var(--color-primary) 9%, var(--bg-surface));
+}
+.demo-box.is-ptr .demo-box-val { color: var(--color-primary); }
+
+/* And one that has gone out of scope, fading where it stood. */
+.demo-frame.is-gone { opacity: 0.55; }
+.demo-box.is-gone {
+  border-style: dashed;
+  animation: demoBoxOut 0.9s ease-in forwards;
+}
+@keyframes demoBoxOut {
+  0% { opacity: 1; }
+  55% { opacity: 0.7; transform: none; }
+  100% { opacity: 0; transform: translateY(6px) scale(0.92); }
+}
+
+/* The value that travels when something is copied. */
+.demo-flow-chip {
+  position: absolute;
+  z-index: 3;
+  transform: translate(-50%, -50%);
+  padding: 0.15rem 0.4rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-warning);
+  color: #1a1206;
+  font-family: var(--font-mono, ui-monospace, Consolas, monospace);
+  font-size: 0.74rem;
+  font-weight: 700;
+  pointer-events: none;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  transition: transform 0.62s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.62s ease-in;
+}
 
 /* What has appeared on screen so far. */
 .demo-term {
@@ -482,4 +598,32 @@ body.demo-open { overflow: hidden; }
 
 @media (prefers-reduced-motion: reduce) {
   .demo-next-card { transition: none !important; }
+}
+
+/* Newly printed output, marked for a moment so you can see which line of the
+   program produced it. */
+.demo-out-new {
+  background: color-mix(in srgb, var(--color-success) 22%, transparent);
+  border-radius: 2px;
+  animation: demoOutIn 0.9s ease-out;
+}
+@keyframes demoOutIn {
+  0% { background: color-mix(in srgb, var(--color-success) 45%, transparent); }
+  100% { background: color-mix(in srgb, var(--color-success) 0%, transparent); }
+}
+
+/* The line being executed gets a moment of movement as it becomes the one. */
+.demo-line.is-on { animation: demoLineIn 0.3s ease-out; }
+@keyframes demoLineIn {
+  from { background: color-mix(in srgb, var(--color-primary) 40%, transparent); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-box, .demo-box.is-changed .demo-box-val, .demo-box.is-gone,
+  .demo-arrow, .demo-flow-chip, .demo-out-new, .demo-line.is-on {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1;
+  }
+  .demo-arrow { opacity: 0.9; }
 }

@@ -202,7 +202,7 @@ function demoShellHTML(lesson, auto) {
         </div>
         <div class="demo-side">
           <div class="demo-say" id="demo-say"></div>
-          <div class="demo-watch" id="demo-watch"></div>
+          <div class="demo-mem" id="demo-mem"></div>
           <div class="demo-term">
             <div class="demo-pane-label"><i data-lucide="terminal"></i> Output</div>
             <pre class="demo-term-body" id="demo-term"></pre>
@@ -297,36 +297,9 @@ function demoRenderStep() {
     sayEl.classList.add('demo-fade');
   }
 
-  // The variable watch: only drawn when the lesson tracks any.
-  const watchEl = document.getElementById('demo-watch');
-  if (watchEl) {
-    const vars = step && step.vars;
-    if (!vars || !Object.keys(vars).length) { watchEl.classList.add('hidden'); watchEl.innerHTML = ''; }
-    else {
-      watchEl.classList.remove('hidden');
-      const prev = demoState.step > 0 ? (steps[demoState.step - 1] || {}).vars || {} : {};
-      watchEl.innerHTML = Object.keys(vars).map(k => {
-        const changed = String(prev[k]) !== String(vars[k]);
-        return `<div class="demo-var${changed ? ' is-changed' : ''}">
-          <span class="demo-var-name">${escapeHTML(k)}</span>
-          <span class="demo-var-val">${escapeHTML(String(vars[k]))}</span>
-        </div>`;
-      }).join('');
-    }
-  }
-
-  // Output so far. A step without `out` keeps whatever the last one printed,
-  // because nothing was printed — an empty string would wipe the screen.
-  const termEl = document.getElementById('demo-term');
-  if (termEl) {
-    let out = '';
-    for (let i = 0; i <= Math.min(demoState.step, steps.length - 1); i++) {
-      if (steps[i] && steps[i].out !== undefined) out = steps[i].out;
-    }
-    termEl.innerHTML = out
-      ? escapeHTML(out).replace(/‸([^‸]*)‸/g, '<span class="demo-typed">$1</span>')
-      : '<span class="demo-term-idle">nothing yet</span>';
-  }
+  // The memory diagram: boxes, arrows between them, and the values that move.
+  demoRenderMemory(step, demoState.step > 0 ? steps[demoState.step - 1] : null);
+  demoRenderTerminal(steps, demoState.step);
 
   const dots = document.getElementById('demo-dots');
   if (dots) {
@@ -515,4 +488,223 @@ function demoSyncButton() {
     : 'Walkthroughs';
   btn.title = label;
   btn.setAttribute('aria-label', label);
+}
+
+/* ============================================================
+   THE MEMORY DIAGRAM
+   ------------------------------------------------------------
+   The watch used to be a row of name/value chips. That is enough for "i is 3"
+   and nowhere near enough for the ideas that actually need demonstrating: a
+   pointer is a box holding the location of ANOTHER box, and a row of text
+   cannot show the second half of that sentence.
+
+   So the boxes are drawn, and the relationships between them are drawn too —
+   an arrow from a pointer to what it points at, and a value that visibly
+   travels when it is copied. A step says:
+
+     vars  { 'main · score': '5' }   the boxes, optionally grouped by frame
+     ptrs  { p: 'score' }            draw an arrow from p's box to score's
+     flow  { from: 'score', to: 'n' } animate a value moving between them
+
+   `vars` is the old shape and still works everywhere it was already used; a
+   name containing " · " is split into a frame label and a variable name, which
+   upgrades the lessons that already wrote 'main · score' for free.
+   ============================================================ */
+
+/** Split 'main · score' into its frame and its name. */
+function _demoSplitVar(key) {
+  const i = key.indexOf(' · ');
+  return i === -1 ? { frame: '', name: key } : { frame: key.slice(0, i), name: key.slice(i + 3) };
+}
+
+/** A stable DOM-safe id for a box, so arrows can find it. */
+function _demoBoxId(key) {
+  return 'demo-box-' + key.replace(/[^A-Za-z0-9]/g, '_');
+}
+
+/**
+ * Draw the boxes for this step, and animate the difference from the last one.
+ * @param {object} step
+ * @param {object} prev the step before it, for the diff
+ */
+function demoRenderMemory(step, prev) {
+  const host = document.getElementById('demo-mem');
+  if (!host) return;
+  const vars = (step && step.vars) || {};
+  const keys = Object.keys(vars);
+
+  if (!keys.length) {
+    host.classList.add('hidden');
+    host.innerHTML = '';
+    return;
+  }
+  host.classList.remove('hidden');
+
+  const prevVars = (prev && prev.vars) || {};
+  const ptrs = (step && step.ptrs) || {};
+  // A pointer's target may be written 'score' or 'main · score'; match either.
+  const findKey = (name) => keys.find(k => k === name || _demoSplitVar(k).name === name);
+
+  const frames = [];
+  keys.forEach(k => {
+    const { frame, name } = _demoSplitVar(k);
+    let f = frames.find(x => x.label === frame);
+    if (!f) { f = { label: frame, boxes: [] }; frames.push(f); }
+    const isNew = !(k in prevVars);
+    const changed = !isNew && String(prevVars[k]) !== String(vars[k]);
+    f.boxes.push({ key: k, name, value: String(vars[k]), isNew, changed });
+  });
+
+  host.innerHTML =
+    '<svg class="demo-mem-arrows" id="demo-mem-svg" aria-hidden="true"></svg>'
+    + '<div class="demo-mem-frames">'
+    + frames.map(f => `
+      <div class="demo-frame${f.label ? '' : ' is-bare'}">
+        ${f.label ? `<span class="demo-frame-label">${escapeHTML(f.label)}</span>` : ''}
+        <div class="demo-frame-boxes">
+          ${f.boxes.map(b => `
+            <div class="demo-box${b.isNew ? ' is-new' : ''}${b.changed ? ' is-changed' : ''}${ptrs[b.name] ? ' is-ptr' : ''}"
+                 id="${_demoBoxId(b.key)}" data-var="${escapeHTML(b.name)}">
+              <span class="demo-box-name">${escapeHTML(b.name)}</span>
+              <span class="demo-box-val">${escapeHTML(b.value)}</span>
+            </div>`).join('')}
+        </div>
+      </div>`).join('')
+    + '</div>';
+
+  // Anything that has just gone out of scope leaves a ghost for a moment,
+  // because a variable silently disappearing is the one thing pass-by-value
+  // most needs you to notice.
+  const gone = Object.keys(prevVars).filter(k => !(k in vars));
+  if (gone.length) _demoGhostOut(host, gone, prevVars);
+
+  /* Arrows are measured, not guessed, so the boxes have to be laid out first —
+     but NOT through requestAnimationFrame: it does not fire while the document
+     is hidden, and the diagram would then have boxes and no arrows between
+     them, which is the half that does not teach anything. Reading
+     getBoundingClientRect forces the layout we need, right here. */
+  _demoDrawArrows(host, ptrs, findKey);
+  if (step && step.flow) setTimeout(() => _demoFlow(host, step.flow, findKey), 20);
+}
+
+/** An SVG arrow from each pointer's box to the box it points at. */
+function _demoDrawArrows(host, ptrs, findKey) {
+  const svg = document.getElementById('demo-mem-svg');
+  if (!svg) return;
+  const names = Object.keys(ptrs);
+  const hostBox = host.getBoundingClientRect();
+  svg.setAttribute('viewBox', `0 0 ${Math.max(1, hostBox.width)} ${Math.max(1, hostBox.height)}`);
+  svg.style.width = hostBox.width + 'px';
+  svg.style.height = hostBox.height + 'px';
+
+  if (!names.length) { svg.innerHTML = ''; return; }
+
+  let defs = `<defs><marker id="demo-arrowhead" markerWidth="7" markerHeight="6" refX="6" refY="3" orient="auto">
+      <polygon points="0 0, 7 3, 0 6" fill="currentColor"/></marker></defs>`;
+  let paths = '';
+  names.forEach((from, i) => {
+    const fromEl = document.getElementById(_demoBoxId(findKey(from) || from));
+    const toName = ptrs[from];
+    const toEl = toName === null || toName === undefined
+      ? null : document.getElementById(_demoBoxId(findKey(toName) || toName));
+    if (!fromEl) return;
+
+    const a = fromEl.getBoundingClientRect();
+    const ax = a.left - hostBox.left + a.width / 2;
+    const ay = a.top - hostBox.top;
+
+    if (!toEl) {
+      // A pointer that points at nothing. NULL is a fact worth drawing rather
+      // than leaving as an absence.
+      paths += `<text x="${ax}" y="${Math.max(10, ay - 6)}" class="demo-arrow-null" text-anchor="middle">NULL</text>`;
+      return;
+    }
+    const b = toEl.getBoundingClientRect();
+    const bx = b.left - hostBox.left + b.width / 2;
+    const by = b.top - hostBox.top;
+
+    // Arc over the top of the boxes: the diagram reads left to right, so a
+    // line straight through the middle of it would cross whatever sits between.
+    const lift = 16 + Math.min(26, Math.abs(bx - ax) * 0.14) + i * 5;
+    const midY = Math.min(ay, by) - lift;
+    const d = `M ${ax} ${ay - 2} C ${ax} ${midY}, ${bx} ${midY}, ${bx} ${by - 2}`;
+    paths += `<path class="demo-arrow" d="${d}" marker-end="url(#demo-arrowhead)"/>`;
+  });
+  svg.innerHTML = defs + paths;
+}
+
+/**
+ * A value visibly travelling from one box to another.
+ *
+ * This is the whole of pass-by-value in one gesture: you SEE the 5 leave score
+ * and arrive in n, and that the thing that arrived is a second 5.
+ */
+function _demoFlow(host, flow, findKey) {
+  if (typeof vizPrefersReducedMotion === 'function' && vizPrefersReducedMotion()) return;
+  const fromEl = document.getElementById(_demoBoxId(findKey(flow.from) || flow.from));
+  const toEl = document.getElementById(_demoBoxId(findKey(flow.to) || flow.to));
+  if (!fromEl || !toEl) return;
+
+  const hostBox = host.getBoundingClientRect();
+  const a = fromEl.getBoundingClientRect();
+  const b = toEl.getBoundingClientRect();
+
+  const chip = document.createElement('span');
+  chip.className = 'demo-flow-chip';
+  chip.textContent = flow.label !== undefined ? flow.label
+    : (fromEl.querySelector('.demo-box-val') || {}).textContent || '';
+  chip.style.left = (a.left - hostBox.left + a.width / 2) + 'px';
+  chip.style.top = (a.top - hostBox.top + a.height / 2) + 'px';
+  host.appendChild(chip);
+
+  const dx = (b.left - a.left) + (b.width - a.width) / 2;
+  const dy = (b.top - a.top) + (b.height - a.height) / 2;
+  // One frame at the start position, then the move — a timeout rather than a
+  // rAF for the same reason the arrows are drawn directly.
+  setTimeout(() => {
+    chip.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    chip.style.opacity = '0.15';
+  }, 30);
+  setTimeout(() => chip.remove(), 760);
+}
+
+/** A box that has just gone out of scope, fading where it stood. */
+function _demoGhostOut(host, gone, prevVars) {
+  const frames = host.querySelector('.demo-mem-frames');
+  if (!frames) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'demo-frame is-gone';
+  wrap.innerHTML = '<span class="demo-frame-label">gone</span><div class="demo-frame-boxes">'
+    + gone.map(k => {
+      const { name } = _demoSplitVar(k);
+      return `<div class="demo-box is-gone">
+        <span class="demo-box-name">${escapeHTML(name)}</span>
+        <span class="demo-box-val">${escapeHTML(String(prevVars[k]))}</span>
+      </div>`;
+    }).join('') + '</div>';
+  frames.appendChild(wrap);
+  setTimeout(() => wrap.remove(), 900);
+}
+
+/* ── The terminal ──────────────────────────────────────────────
+   New output is marked as it arrives rather than the whole block swapping, so
+   you can see WHICH line this step produced. */
+function demoRenderTerminal(steps, index) {
+  const termEl = document.getElementById('demo-term');
+  if (!termEl) return;
+  let out = '', before = '';
+  for (let i = 0; i <= Math.min(index, steps.length - 1); i++) {
+    if (steps[i] && steps[i].out !== undefined) { before = out; out = steps[i].out; }
+  }
+  if (!out) { termEl.innerHTML = '<span class="demo-term-idle">nothing yet</span>'; return; }
+
+  const paint = (s) => escapeHTML(s).replace(/‸([^‸]*)‸/g, '<span class="demo-typed">$1</span>');
+  // Only the tail is new, and only when this step actually added to it.
+  const added = (before && out.startsWith(before)) ? out.slice(before.length) : '';
+  termEl.innerHTML = added
+    ? paint(out.slice(0, out.length - added.length)) + '<span class="demo-out-new">' + paint(added) + '</span>'
+    : paint(out);
+  const fresh = termEl.querySelector('.demo-out-new');
+  if (fresh) setTimeout(() => fresh.classList.remove('demo-out-new'), 900);
+  termEl.scrollTop = termEl.scrollHeight;
 }

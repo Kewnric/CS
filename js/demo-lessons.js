@@ -75,7 +75,12 @@ int main(void) {
     tagline: '%d, %f and the second argument that fills them in',
     icon: 'hash',
     file: 'apples.c',
-    match: { requires: ['printf'], folders: ['starter-folder-core-var', 'starter-folder-core-op'] },
+    // The printing tier, and specifically the programs there that print a
+    // VALUE rather than a fixed line. It used to claim the variables and
+    // operators tiers as well, which left the two lessons actually about
+    // those tiers unable to outrank it on their own folders.
+    match: { requires: ['printf'], folders: ['starter-folder-core-out'],
+             code: /printf\s*\([^)]*%[-0-9.]*[a-zA-Z][^)]*,/ },
     code:
 `#include <stdio.h>
 
@@ -96,6 +101,7 @@ int main(void) {
       { line: 9, say: 'Two placeholders, two arguments, in that order. The second one is an expression rather than a variable — printf gets the answer, 4.5, not the sum.', vars: { apples: '3', price: '1.5' }, out: 'I have 3 apples.\nEach costs 1.50.\n3 apples cost 4.50.\n' },
       { line: 9, say: 'The order is the whole contract: the first %d takes the first argument, the %.2f takes the second. Give it fewer arguments than placeholders and it prints whatever happens to be lying in memory.', vars: { apples: '3', price: '1.5' }, out: 'I have 3 apples.\nEach costs 1.50.\n3 apples cost 4.50.\n' }
     ],
+    next: ['types'],
     recap: 'A <code>%</code> in the string is a hole; the arguments after the string fill the holes, left to right, one each.'
   },
 
@@ -252,6 +258,7 @@ int main(void) {
         out: 'Enter a score: ‸90‸\nGrade B\n'
       }
     ],
+    next: ['switch'],
     recap: 'A chain runs at most one branch, top to bottom. Put the tightest condition first, or a looser one above it will catch everything.'
   },
 
@@ -347,6 +354,7 @@ int main(void) {
         out: '0\nLift off\n'
       }
     ],
+    next: ['do-while', 'break-continue'],
     recap: 'A while checks first and might never run; a do-while checks last and always runs once. Either way, moving the condition along is on you.'
   },
 
@@ -460,7 +468,7 @@ int main(void) {
     steps: [
       { line: 9, say: 'main makes a box called <code>score</code> with 5 in it. Hold on to that: 5.', vars: { 'main · score': '5' } },
       { line: 11, say: 'The call. And here is the thing the whole lesson is about — C does not hand the function your box. It <strong>copies what is in it</strong>.', vars: { 'main · score': '5' } },
-      { line: 3, say: 'A second, separate box is made, called <code>n</code>, and the value 5 is copied into it. Two boxes now. They hold the same number and have nothing else to do with each other.', vars: { 'main · score': '5', 'addTen · n': '5' } },
+      { line: 3, say: 'A second, separate box is made, called <code>n</code>, and the value 5 is copied into it. Watch the 5 travel: two boxes now, holding the same number and with nothing else to do with each other.', vars: { 'main · score': '5', 'addTen · n': '5' }, flow: { from: 'score', to: 'n', label: '5' } },
       { line: 4, say: '<code>n = n + 10</code>. This changes <strong>n</strong>. Watch score: it does not move, because nobody touched it.', vars: { 'main · score': '5', 'addTen · n': '15' } },
       { line: 5, say: 'Print from inside, and n really is 15. The function did exactly what it was asked.', vars: { 'main · score': '5', 'addTen · n': '15' }, out: 'inside:  n is 15\n' },
       { line: 6, say: 'addTen ends — and <code>n</code> ceases to exist. It was a local copy, and its lifetime was the call.', vars: { 'main · score': '5' }, out: 'inside:  n is 15\n' },
@@ -497,13 +505,13 @@ int main(void) {
     return 0;
 }`,
     steps: [
-      { line: 4, say: 'An ordinary variable. It holds 5, and it lives somewhere in memory — say address 1000. You never normally care where.', vars: { score: '5   (at 1000)' } },
-      { line: 5, say: 'Two new pieces of notation, and they are opposites. <code>&amp;score</code> means "the ADDRESS of score" — 1000, not 5.', vars: { score: '5   (at 1000)' } },
-      { line: 5, say: '<code>int *p</code> declares p as "a thing that holds the address of an int". So p now holds 1000. p is a box too; what is inside it is a location.', vars: { score: '5   (at 1000)', p: '1000' } },
-      { line: 7, say: 'Printing score prints 5, the way it always did. Nothing about score has changed.', vars: { score: '5   (at 1000)', p: '1000' }, out: 'score is 5\n' },
-      { line: 8, say: '<code>*p</code> is the other direction: "go to the address in p and use what is there". That is 1000, and 1000 holds 5. This is called <strong>dereferencing</strong>.', vars: { score: '5   (at 1000)', p: '1000' }, out: 'score is 5\np points at 5\n' },
-      { line: 10, say: 'And it works as a destination too. <code>*p = 99</code> means "go to 1000 and put 99 there". It never mentions score.', vars: { score: '99   (at 1000)', p: '1000' }, out: 'score is 5\np points at 5\n' },
-      { line: 11, say: 'But score IS 1000, so score is 99 now. That is the whole point of a pointer: a second way to reach one box.', vars: { score: '99   (at 1000)', p: '1000' }, out: 'score is 5\np points at 5\nscore is now 99\n' }
+      { line: 4, say: 'An ordinary variable. It holds 5, and it lives somewhere in memory — say address 1000. You never normally care where.', vars: { score: '5' } },
+      { line: 5, say: 'Two new pieces of notation, and they are opposites. <code>&amp;score</code> means "the ADDRESS of score" — 1000, not 5.', vars: { score: '5' } },
+      { line: 5, say: '<code>int *p</code> declares p as "a thing that holds the address of an int". So p holds 1000 — and the arrow IS what that means: p is a box too, and what is inside it is a location.', vars: { score: '5', p: '1000' }, ptrs: { p: 'score' } },
+      { line: 7, say: 'Printing score prints 5, the way it always did. Nothing about score has changed.', vars: { score: '5', p: '1000' }, ptrs: { p: 'score' }, out: 'score is 5\n' },
+      { line: 8, say: '<code>*p</code> is the other direction: follow the arrow and use what is at the end of it. This is called <strong>dereferencing</strong>.', vars: { score: '5', p: '1000' }, ptrs: { p: 'score' }, out: 'score is 5\np points at 5\n' },
+      { line: 10, say: 'And it works as a destination too. <code>*p = 99</code> means "follow the arrow and put 99 there". It never mentions score by name.', vars: { score: '99', p: '1000' }, ptrs: { p: 'score' }, out: 'score is 5\np points at 5\n' },
+      { line: 11, say: 'But the arrow ends at score, so score is 99 now. That is the whole point of a pointer: a second way to reach one box.', vars: { score: '99', p: '1000' }, ptrs: { p: 'score' }, out: 'score is 5\np points at 5\nscore is now 99\n' }
     ],
     next: ['pass-by-reference', 'pointer-array'],
     recap: '<code>&amp;x</code> gets the address of x. <code>*p</code> uses whatever is at the address in p — to read it, or to write to it.'
@@ -533,13 +541,13 @@ int main(void) {
     return 0;
 }`,
     steps: [
-      { line: 8, say: 'Same start as the pass-by-value walkthrough: score holds 5, at some address — say 1000.', vars: { 'main · score': '5   (at 1000)' } },
-      { line: 10, say: 'And here is the one difference that changes everything: <code>&amp;score</code>. We are not handing over the value 5 — we are handing over the ADDRESS 1000.', vars: { 'main · score': '5   (at 1000)' } },
-      { line: 3, say: 'So the parameter has to be able to hold an address: <code>int *n</code>. A copy is still made — but it is a copy of the address, and a copy of an address still points at the original box.', vars: { 'main · score': '5   (at 1000)', 'addTen · n': '1000' } },
-      { line: 4, say: '<code>*n</code> reads through the address: go to 1000, find 5. Add ten to get 15.', vars: { 'main · score': '5   (at 1000)', 'addTen · n': '1000' } },
-      { line: 4, say: 'And <code>*n =</code> writes through it: go to 1000, put 15 there. That box belongs to main.', vars: { 'main · score': '15   (at 1000)', 'addTen · n': '1000' } },
-      { line: 5, say: 'addTen ends and <code>n</code> disappears, exactly like last time. But what it did while it was alive was permanent, because it reached outside itself.', vars: { 'main · score': '15   (at 1000)' } },
-      { line: 11, say: 'score is 15. The function changed its caller\'s variable — that is <strong>pass by reference</strong>.', vars: { 'main · score': '15   (at 1000)' }, out: 'score is 15\n' },
+      { line: 8, say: 'Same start as the pass-by-value walkthrough: score holds 5, at some address — say 1000.', vars: { 'main · score': '5' } },
+      { line: 10, say: 'And here is the one difference that changes everything: <code>&amp;score</code>. We are not handing over the value 5 — we are handing over the ADDRESS 1000.', vars: { 'main · score': '5' } },
+      { line: 3, say: 'So the parameter has to be able to hold an address: <code>int *n</code>. A copy is still made — but it is a copy of the ADDRESS, and a copy of an address still points at the original box.', vars: { 'main · score': '5', 'addTen · n': '1000' }, ptrs: { n: 'score' }, flow: { from: 'score', to: 'n', label: '&score' } },
+      { line: 4, say: '<code>*n</code> reads through the address: follow the arrow, find 5. Add ten to get 15.', vars: { 'main · score': '5', 'addTen · n': '1000' }, ptrs: { n: 'score' } },
+      { line: 4, say: 'And <code>*n =</code> writes through it: follow the arrow, put 15 there. That box belongs to main — watch it change from inside the function.', vars: { 'main · score': '15', 'addTen · n': '1000' }, ptrs: { n: 'score' } },
+      { line: 5, say: 'addTen ends and <code>n</code> disappears, exactly like last time. But what it did while it was alive was permanent, because it reached outside itself.', vars: { 'main · score': '15' } },
+      { line: 11, say: 'score is 15. The function changed its caller\'s variable — that is <strong>pass by reference</strong>.', vars: { 'main · score': '15' }, out: 'score is 15\n' },
       {
         lines: [3, 7],
         code:
@@ -989,7 +997,7 @@ int main(void) {
       { line: 20, say: 'But it is a <strong>copy</strong>, not a link. Changing team[0] does not touch p.', vars: { 'p.hp': '35', 'team[0].hp': '40' } },
       { line: 21, say: '35 and 40. Same rule as pass-by-value, and for the same reason: assigning a struct duplicates its contents.', vars: { 'p.hp': '35', 'team[0].hp': '40' }, out: 'Pikachu (Lv 12) HP 35\n35 and 40\n' }
     ],
-    next: ['struct-pointer'],
+    next: ['typedef', 'struct-pointer'],
     recap: 'A <code>struct</code> is a shape; a variable of that type is one instance. Reach members with <code>.</code>, and remember that assigning a struct copies every member.'
   },
 
@@ -1215,17 +1223,17 @@ int main(void) {
     return 0;
 }`,
     steps: [
-      { lines: [4, 7], say: 'A node holds a value and <strong>the address of the next node</strong>. The struct contains a pointer to its own type, which is legal precisely because a pointer\'s size is known even when the struct is not finished.', vars: {} },
-      { line: 10, say: '<code>head</code> is the way in — the address of the first node. NULL means the list is empty, and NULL is also what marks the end.', vars: { head: 'NULL' } },
-      { line: 15, say: 'One node, asked for by hand. An array reserves all its room at once; a list asks for one node at a time, which is why it can grow to any length.', vars: { i: '3', n: '→ new node' } },
-      { lines: [16, 17], say: 'Fill it in, and point it at whatever the head was. On the first pass that is NULL — so this node\'s <code>next</code> is NULL, which makes it the last one.', vars: { i: '3', 'n->value': '3', 'n->next': 'NULL' } },
-      { line: 18, say: 'And now this node IS the head. Inserting at the front is two assignments and no shifting at all — the thing an array cannot do cheaply.', vars: { head: '→ [3|NULL]' } },
-      { lines: [15, 18], say: 'Second pass, i is 2. The new node points at the old head, and takes its place.', vars: { head: '→ [2] → [3|NULL]' } },
-      { lines: [15, 18], say: 'Third pass, i is 1. The loop counted DOWN because each insert goes on the front — building 3, 2, 1 leaves the list in the order 1, 2, 3.', vars: { head: '→ [1] → [2] → [3|NULL]' } },
-      { line: 21, say: 'Walking it. Start at head, and the step is <code>n = n-&gt;next</code> — you cannot jump to the fifth node, you have to walk past four.', vars: { n: '→ [1]' } },
-      { line: 22, say: 'First value.', vars: { n: '→ [1]', 'n->value': '1' }, out: '1 ' },
-      { line: 21, say: 'Follow the link.', vars: { n: '→ [2]' }, out: '1 2 ' },
-      { line: 21, say: 'And again — until <code>n</code> is NULL, which is the condition that stops the walk. That is the whole reason the last node\'s next is NULL rather than anything else.', vars: { n: 'NULL' }, out: '1 2 3 \n' },
+      { lines: [4, 7], say: 'A node holds a value and <strong>the address of the next node</strong>. The struct contains a pointer to its own type, which is legal precisely because a pointer’s size is known even when the struct is not finished.', vars: {} },
+      { line: 10, say: '<code>head</code> is the way in — the address of the first node. NULL means the list is empty, and NULL is also what marks the end.', vars: { head: 'NULL' }, ptrs: { head: null } },
+      { line: 15, say: 'One node, asked for by hand. An array reserves all its room at once; a list asks for one node at a time, which is why it can grow to any length.', vars: { head: 'NULL', 'node A': '?' }, ptrs: { head: null } },
+      { lines: [16, 17], say: 'Fill it in, and point it at whatever the head was. On the first pass that is NULL — so this node’s <code>next</code> is NULL, which makes it the last one.', vars: { head: 'NULL', 'node A': '3' }, ptrs: { head: null, 'node A': null } },
+      { line: 18, say: 'And now this node IS the head. Inserting at the front is two assignments and no shifting at all — the thing an array cannot do cheaply.', vars: { head: '→', 'node A': '3' }, ptrs: { head: 'node A', 'node A': null } },
+      { lines: [15, 18], say: 'Second pass, i is 2. The new node points at the old head, and takes its place.', vars: { head: '→', 'node B': '2', 'node A': '3' }, ptrs: { head: 'node B', 'node B': 'node A', 'node A': null } },
+      { lines: [15, 18], say: 'Third pass, i is 1. The loop counted DOWN because each insert goes on the front — building 3, 2, 1 leaves the list in the order 1, 2, 3.', vars: { head: '→', 'node C': '1', 'node B': '2', 'node A': '3' }, ptrs: { head: 'node C', 'node C': 'node B', 'node B': 'node A', 'node A': null } },
+      { line: 21, say: 'Walking it. Start at head, and the step is <code>n = n-&gt;next</code> — you cannot jump to the fifth node, you have to walk past four.', vars: { head: '→', n: '→', 'node C': '1', 'node B': '2', 'node A': '3' }, ptrs: { head: 'node C', n: 'node C', 'node C': 'node B', 'node B': 'node A', 'node A': null } },
+      { line: 22, say: 'First value.', vars: { n: '→', 'node C': '1', 'node B': '2', 'node A': '3' }, ptrs: { n: 'node C', 'node C': 'node B', 'node B': 'node A', 'node A': null }, out: '1 ' },
+      { line: 21, say: 'Follow the link.', vars: { n: '→', 'node C': '1', 'node B': '2', 'node A': '3' }, ptrs: { n: 'node B', 'node C': 'node B', 'node B': 'node A', 'node A': null }, out: '1 2 ' },
+      { line: 21, say: 'And again — until <code>n</code> is NULL, which is the condition that stops the walk. That is the whole reason the last node’s next is NULL rather than anything else.', vars: { n: 'NULL', 'node C': '1', 'node B': '2', 'node A': '3' }, ptrs: { n: null, 'node C': 'node B', 'node B': 'node A', 'node A': null }, out: '1 2 3 \n' },
       { line: 15, say: 'One duty left, and this program shirks it: every one of those nodes came from malloc and none was freed. Freeing a list means walking it while holding onto <code>next</code> BEFORE you free the node — reading a freed node to find out where to go next is the classic way to lose the rest of the list.', vars: {}, out: '1 2 3 \n' }
     ],
     next: ['struct-pointer'],
@@ -1281,6 +1289,346 @@ int main(void) {
       { line: 19, say: 'One thing to know for later: <code>fscanf</code> returns how many items it managed to read, which is how a loop knows the file has run out — <code>while (fscanf(f, "%d", &amp;x) == 1)</code> is the usual shape. At the end it returns <code>EOF</code>.', vars: {}, out: 'read 70 and 82\n' }
     ],
     recap: 'fopen with a mode, check for NULL, fprintf/fscanf exactly like printf/scanf with the file first, then fclose. "w" empties the file; closing is what actually writes it.'
+  }
+
+,
+
+  /* ══ Types and operators ═════════════════════════════════ */
+
+  {
+    id: 'types',
+    order: 22,
+    group: 'Getting words out and values in',
+    title: 'Types, sizeof and casting',
+    tagline: 'What fits in the box, and what falls off the edge',
+    icon: 'ruler',
+    file: 'types.c',
+    match: { folders: ['starter-folder-core-var'] },
+    code:
+`#include <stdio.h>
+
+int main(void) {
+    int whole = 7;
+    double exact = 7.0;
+    char letter = 'A';
+    const int MAX = 100;
+
+    printf("%d bytes, %d bytes, %d byte\\n",
+           (int) sizeof(int), (int) sizeof(double), (int) sizeof(char));
+
+    printf("%d\\n", whole / 2);
+    printf("%.2f\\n", exact / 2);
+    printf("%.2f\\n", (double) whole / 2);
+
+    printf("%c is %d\\n", letter, letter);
+    printf("%d\\n", MAX);
+    return 0;
+}`,
+    steps: [
+      { line: 4, say: 'A type is a promise about what a box can hold and how wide it is. <code>int</code> is a whole number — no fractional part, ever.', vars: { whole: '7' } },
+      { line: 5, say: '<code>double</code> holds a number with a decimal point. Same value written two ways, two completely different boxes.', vars: { whole: '7', exact: '7.0' } },
+      { line: 6, say: '<code>char</code> is one character, in single quotes. Double quotes would be a string, which is a different thing entirely.', vars: { whole: '7', exact: '7.0', letter: "'A'" } },
+      { line: 7, say: '<code>const</code> is a promise not to change it. The compiler holds you to it — assigning to MAX later is an error, not a warning.', vars: { whole: '7', exact: '7.0', letter: "'A'", MAX: '100 (const)' } },
+      { lines: [9, 10], say: '<code>sizeof</code> reports how many bytes a type takes. It is measured by the compiler, not worked out at runtime.', vars: {}, out: '4 bytes, 8 bytes, 1 byte\n' },
+      { line: 12, say: 'And here is the one that catches everyone. <code>7 / 2</code> where both sides are int is <strong>integer division</strong>: the answer is 3, and the remainder is thrown away. Not rounded — dropped.', vars: { whole: '7' }, out: '4 bytes, 8 bytes, 1 byte\n3\n' },
+      { line: 13, say: 'With a double on the left the division is done in doubles, and you get 3.50.', vars: { exact: '7.0' }, out: '4 bytes, 8 bytes, 1 byte\n3\n3.50\n' },
+      { line: 14, say: 'A <strong>cast</strong> forces the issue: <code>(double) whole</code> says "treat this int as a double, here, for this expression". One side being a double is enough to make the whole division a double one.', vars: { whole: '7' }, out: '4 bytes, 8 bytes, 1 byte\n3\n3.50\n3.50\n' },
+      { line: 14, say: 'The cast has to be on an operand, not on the answer. <code>(double)(whole / 2)</code> would divide as ints first — giving 3 — and then convert the 3, which is exactly the bug it was meant to avoid.', vars: {}, out: '4 bytes, 8 bytes, 1 byte\n3\n3.50\n3.50\n' },
+      { line: 16, say: 'And a char really is a number: it stores the character\'s code, 65 for A. Same box, two placeholders — <code>%c</code> shows the character, <code>%d</code> shows the number. That is why <code>letter + 1</code> is B.', vars: { letter: "'A' = 65" }, out: '4 bytes, 8 bytes, 1 byte\n3\n3.50\n3.50\nA is 65\n' }
+    ],
+    next: ['operators'],
+    recap: 'int drops the fraction; double keeps it. Cast an OPERAND, not the answer. A char is a small integer holding a character code.'
+  },
+
+  {
+    id: 'operators',
+    order: 24,
+    group: 'Getting words out and values in',
+    title: 'Operators',
+    tagline: '%, precedence, and ++ before or after',
+    icon: 'calculator',
+    file: 'ops.c',
+    match: { folders: ['starter-folder-core-op'] },
+    code:
+`#include <stdio.h>
+
+int main(void) {
+    int n = 254;
+    int a = 2, b;
+
+    printf("%d %d\\n", n / 10, n % 10);
+    printf("%d\\n", 2 + 3 * 4);
+    printf("%d\\n", (2 + 3) * 4);
+
+    a += 5;
+    printf("%d\\n", a);
+
+    b = a++;
+    printf("a=%d b=%d\\n", a, b);
+
+    b = ++a;
+    printf("a=%d b=%d\\n", a, b);
+    return 0;
+}`,
+    steps: [
+      { line: 7, say: 'The two halves of a division. <code>/</code> gives the whole part — 254 / 10 is 25 — and <code>%</code> gives what is left over, 4.', vars: { n: '254' }, out: '25 4\n' },
+      { line: 7, say: 'Which makes <code>% 10</code> "the last digit" and <code>/ 10</code> "everything but the last digit". Those two together are how you take a number apart one digit at a time.', vars: { n: '254' }, out: '25 4\n' },
+      { line: 8, say: 'Precedence: <code>*</code> binds tighter than <code>+</code>, so this is 2 + 12, not 5 × 4. The same rule as ordinary arithmetic.', vars: {}, out: '25 4\n14\n' },
+      { line: 9, say: 'Brackets override it. When you are not certain, brackets cost nothing and remove the doubt for whoever reads it next.', vars: {}, out: '25 4\n14\n20\n' },
+      { line: 11, say: '<code>a += 5</code> is shorthand for <code>a = a + 5</code>. The same exists for <code>-=</code>, <code>*=</code>, <code>/=</code> and <code>%=</code>.', vars: { a: '7' }, out: '25 4\n14\n20\n' },
+      { line: 12, say: 'Seven.', vars: { a: '7' }, out: '25 4\n14\n20\n7\n' },
+      { line: 14, say: 'Now the pair that trips people. <code>a++</code> is <strong>post</strong>-increment: it hands back the OLD value and then adds one.', vars: { a: '8', b: '7' } },
+      { line: 15, say: 'So a is 8 and b got 7 — the value a had before the ++ happened.', vars: { a: '8', b: '7' }, out: '25 4\n14\n20\n7\na=8 b=7\n' },
+      { line: 17, say: '<code>++a</code> is <strong>pre</strong>-increment: add one first, then hand back the new value.', vars: { a: '9', b: '9' } },
+      { line: 18, say: 'Both 9. As a statement on its own — <code>i++;</code> in a for loop — the two are identical; the difference only shows when you use the result.', vars: { a: '9', b: '9' }, out: '25 4\n14\n20\n7\na=8 b=7\na=9 b=9\n' }
+    ],
+    recap: '<code>/</code> is the whole part, <code>%</code> the remainder. <code>a++</code> hands back the old value, <code>++a</code> the new one.'
+  },
+
+  /* ══ Choices ═════════════════════════════════════════════ */
+
+  {
+    id: 'switch',
+    order: 55,
+    group: 'Choosing what to do',
+    title: 'switch',
+    tagline: 'One value, many cases — and the break that must be there',
+    icon: 'list-checks',
+    file: 'menu.c',
+    match: { folders: ['starter-folder-2'], code: /\bswitch\s*\(/ },
+    code:
+`#include <stdio.h>
+
+int main(void) {
+    int choice;
+
+    printf("Pick 1-3: ");
+    scanf("%d", &choice);
+
+    switch (choice) {
+        case 1:
+            printf("Add\\n");
+            break;
+        case 2:
+            printf("Remove\\n");
+            break;
+        case 3:
+            printf("Quit\\n");
+            break;
+        default:
+            printf("No such option\\n");
+    }
+    return 0;
+}`,
+    steps: [
+      { lines: [6, 7], say: 'You type <strong>2</strong>.', vars: { choice: '2' }, out: 'Pick 1-3: ‸2‸\n' },
+      { line: 9, say: '<code>switch</code> takes one value and jumps straight to the matching label. It is not a chain of tests — it is a jump, which is why it only works on whole numbers and characters, never on a range or a string.', vars: { choice: '2' }, out: 'Pick 1-3: ‸2‸\n' },
+      { line: 13, say: 'choice is 2, so execution lands here. The cases above were not tested and not run — they were skipped over.', vars: { choice: '2' }, out: 'Pick 1-3: ‸2‸\n' },
+      { line: 14, say: 'Run the body.', vars: { choice: '2' }, out: 'Pick 1-3: ‸2‸\nRemove\n' },
+      { line: 15, say: '<code>break</code> leaves the switch. This is the line everyone forgets, and forgetting it is not a syntax error — it compiles perfectly.', vars: { choice: '2' }, out: 'Pick 1-3: ‸2‸\nRemove\n' },
+      { line: 19, say: '<code>default</code> is the else: it runs when no case matched. It is optional, and a switch without one silently does nothing for an unexpected value.', vars: { choice: '2' }, out: 'Pick 1-3: ‸2‸\nRemove\n' },
+      {
+        line: 14,
+        code:
+`#include <stdio.h>
+
+int main(void) {
+    int choice;
+
+    printf("Pick 1-3: ");
+    scanf("%d", &choice);
+
+    switch (choice) {
+        case 1:
+            printf("Add\\n");
+        case 2:
+            printf("Remove\\n");
+        case 3:
+            printf("Quit\\n");
+        default:
+            printf("No such option\\n");
+    }
+    return 0;
+}`,
+        say: 'Here is the same switch with the breaks removed. A case is a LABEL, not a block — once execution lands on one it carries straight on through every case below it. Type 1 and you get all four lines. This is called <strong>fall-through</strong>.',
+        vars: { choice: '1' },
+        out: 'Pick 1-3: ‸1‸\nAdd\nRemove\nQuit\nNo such option\n'
+      },
+      {
+        lines: [10, 12],
+        code:
+`#include <stdio.h>
+
+int main(void) {
+    char grade;
+
+    printf("Grade: ");
+    scanf(" %c", &grade);
+
+    switch (grade) {
+        case 'A':
+        case 'B':
+            printf("Pass\\n");
+            break;
+        default:
+            printf("Fail\\n");
+    }
+    return 0;
+}`,
+        say: 'And fall-through is occasionally what you want. Stacking labels with nothing between them is how you say "A or B, same answer" — the only tidy way a switch can express an <em>or</em>.',
+        vars: { grade: "'B'" },
+        out: 'Grade: ‸B‸\nPass\n'
+      }
+    ],
+    next: ['break-continue'],
+    recap: 'A switch jumps to a matching label and runs on from there. Every case needs its <code>break</code> unless you meant it to fall through.'
+  },
+
+  /* ══ Loops ═══════════════════════════════════════════════ */
+
+  {
+    id: 'do-while',
+    order: 72,
+    group: 'Doing it again',
+    title: 'do-while',
+    tagline: 'When the body has to run at least once',
+    icon: 'rotate-cw',
+    file: 'menu.c',
+    match: { folders: ['starter-folder-lp-rep'], code: /\bdo\s*\{/ },
+    code:
+`#include <stdio.h>
+
+int main(void) {
+    int n;
+
+    do {
+        printf("Enter a positive number: ");
+        scanf("%d", &n);
+    } while (n <= 0);
+
+    printf("Thank you: %d\\n", n);
+    return 0;
+}`,
+    steps: [
+      { line: 4, say: '<code>n</code> holds nothing yet — and that is exactly the problem this loop shape solves. A <code>while</code> would have to test it before anything had put a value in it.', vars: { n: '(nothing yet)' } },
+      { line: 6, say: '<code>do</code> means "run this now". No question is asked first; the body simply happens.', vars: { n: '(nothing yet)' } },
+      { lines: [7, 8], say: 'Prompt and read. You type <strong>-4</strong>.', vars: { n: '-4' }, out: 'Enter a positive number: ‸-4‸\n' },
+      { line: 9, say: 'NOW the question, at the bottom. Is n still no good? -4 is ≤ 0, so yes — go round again.', vars: { n: '-4' }, out: 'Enter a positive number: ‸-4‸\n' },
+      { lines: [7, 8], say: 'Second time. You type <strong>0</strong>, which is also not positive.', vars: { n: '0' }, out: 'Enter a positive number: ‸-4‸\nEnter a positive number: ‸0‸\n' },
+      { line: 9, say: 'Still ≤ 0. Again.', vars: { n: '0' }, out: 'Enter a positive number: ‸-4‸\nEnter a positive number: ‸0‸\n' },
+      { lines: [7, 8], say: 'You type <strong>12</strong>.', vars: { n: '12' }, out: 'Enter a positive number: ‸-4‸\nEnter a positive number: ‸0‸\nEnter a positive number: ‸12‸\n' },
+      { line: 9, say: '<code>12 &lt;= 0</code> is false, so the loop ends. Note the <strong>semicolon</strong> after the closing bracket — a do-while is one statement and needs one, unlike every other loop.', vars: { n: '12' }, out: 'Enter a positive number: ‸-4‸\nEnter a positive number: ‸0‸\nEnter a positive number: ‸12‸\n' },
+      { line: 11, say: 'Out, with a value known to be good.', vars: { n: '12' }, out: 'Enter a positive number: ‸-4‸\nEnter a positive number: ‸0‸\nEnter a positive number: ‸12‸\nThank you: 12\n' },
+      { line: 6, say: 'That is the whole choice: <strong>while</strong> when the body might not need to run at all, <strong>do-while</strong> when it must run once before you can possibly know. Input validation and menus are the two places you meet it.', vars: {}, out: 'Enter a positive number: ‸-4‸\nEnter a positive number: ‸0‸\nEnter a positive number: ‸12‸\nThank you: 12\n' }
+    ],
+    recap: 'The body runs, THEN the question is asked — so it always runs at least once. Remember the semicolon after <code>while (…)</code>.'
+  },
+
+  {
+    id: 'break-continue',
+    order: 75,
+    group: 'Doing it again',
+    title: 'break and continue',
+    tagline: 'Leaving early, and skipping just this one',
+    icon: 'skip-forward',
+    file: 'skip.c',
+    match: { folders: ['starter-folder-lp-rep'], code: /\b(break|continue)\s*;/ },
+    code:
+`#include <stdio.h>
+
+int main(void) {
+    int i;
+
+    for (i = 1; i <= 6; i++) {
+        if (i % 3 == 0) {
+            continue;
+        }
+        printf("%d ", i);
+    }
+    printf("\\n");
+
+    for (i = 1; i <= 6; i++) {
+        if (i == 4) {
+            break;
+        }
+        printf("%d ", i);
+    }
+    printf("\\n");
+    return 0;
+}`,
+    steps: [
+      { lines: [6, 7], say: 'First loop. The test is "is i a multiple of 3?" — using the remainder operator from the operators walkthrough.', vars: { i: '1' } },
+      { line: 10, say: '1 is not, so it prints.', vars: { i: '1' }, out: '1 ' },
+      { line: 10, say: '2 likewise.', vars: { i: '2' }, out: '1 2 ' },
+      { line: 8, say: 'i is 3, so <code>continue</code> runs — and it jumps STRAIGHT to the next pass. The printf below is skipped, but the loop itself carries on.', vars: { i: '3' }, out: '1 2 ' },
+      { line: 6, say: 'Important detail: continue does not skip the <code>i++</code>. In a <code>for</code> the step is part of the loop machinery, so it still happens.', vars: { i: '4' }, out: '1 2 ' },
+      { line: 10, say: '4 and 5 print, 6 is skipped, and the loop finishes normally.', vars: { i: '6' }, out: '1 2 4 5 \n' },
+      { line: 14, say: 'Second loop, same range.', vars: { i: '1' }, out: '1 2 4 5 \n' },
+      { line: 18, say: '1, 2 and 3 print.', vars: { i: '3' }, out: '1 2 4 5 \n1 2 3 ' },
+      { line: 16, say: 'i is 4 and <code>break</code> runs. This does not skip a pass — it <strong>ends the loop entirely</strong>. Execution continues after the closing brace.', vars: { i: '4' }, out: '1 2 4 5 \n1 2 3 ' },
+      { line: 20, say: 'So 5 and 6 never happen. That is the difference in one word: continue means "not this one", break means "no more".', vars: { i: '4' }, out: '1 2 4 5 \n1 2 3 \n' },
+      { line: 16, say: 'One trap worth knowing now: in NESTED loops, break leaves only the loop it is in — the inner one. There is no "break out of both" in C; you need a flag, or a function you can return from.', vars: {}, out: '1 2 4 5 \n1 2 3 \n' }
+    ],
+    recap: '<code>continue</code> skips the rest of this pass; <code>break</code> ends the loop. In nested loops, break only leaves the inner one.'
+  },
+
+  /* ══ Structs ═════════════════════════════════════════════ */
+
+  {
+    id: 'typedef',
+    order: 172,
+    group: 'Structs',
+    title: 'typedef',
+    tagline: 'A shorter name for a type you will write a hundred times',
+    icon: 'tag',
+    file: 'typedef.c',
+    // No folder of its own on purpose. Every struct program in the pack uses
+    // typedef, so claiming that folder outranked the struct walkthrough and
+    // left the more basic idea unreachable. This one is offered as the
+    // follow-up from `struct`, which is the order it should be met in.
+    match: { code: /typedef/ },
+    code:
+`#include <stdio.h>
+
+struct PokemonTag {
+    int level;
+    int hp;
+};
+
+typedef struct PokemonTag Pokemon;
+
+typedef struct {
+    int x;
+    int y;
+} Point;
+
+void show(Pokemon p) {
+    printf("Lv %d HP %d\\n", p.level, p.hp);
+}
+
+int main(void) {
+    struct PokemonTag a = {5, 20};
+    Pokemon b = {12, 35};
+    Point origin = {0, 0};
+
+    show(a);
+    show(b);
+    printf("(%d, %d)\\n", origin.x, origin.y);
+    return 0;
+}`,
+    steps: [
+      { lines: [3, 6], say: 'An ordinary struct. Its full type name is <code>struct PokemonTag</code> — both words, every time you declare one, pass one, or return one.', vars: {} },
+      { line: 8, say: '<code>typedef</code> gives an existing type a second name. Read it as a declaration with the word typedef on the front: this says "<code>Pokemon</code> is now another way of writing <code>struct PokemonTag</code>".', vars: {} },
+      { line: 8, say: 'It creates nothing and costs nothing at runtime. There is no new type here — just a shorter name for one that already existed.', vars: {} },
+      { lines: [10, 13], say: 'And the form you will see most: the tag is left out entirely and the name comes after the closing brace. <code>Point</code> is the only name this struct has.', vars: {} },
+      { line: 15, say: 'Which makes parameters and return types readable. <code>Pokemon p</code> rather than <code>struct PokemonTag p</code> — on a function taking three of them, that is the difference between a line and a paragraph.', vars: {} },
+      { line: 20, say: 'The old spelling still works. <code>a</code> is declared the long way.', vars: { 'a': 'Lv 5, 20 hp' } },
+      { line: 21, say: 'And <code>b</code> the short way. These are the SAME TYPE — not two similar ones — so anything that takes one takes the other.', vars: { 'a': 'Lv 5, 20 hp', 'b': 'Lv 12, 35 hp' } },
+      { line: 22, say: '<code>Point</code> has no long form to fall back on, because no tag was ever written.', vars: { 'origin': '(0, 0)' } },
+      { lines: [24, 25], say: 'Both go to the same function, and it cannot tell which spelling declared them.', vars: {}, out: 'Lv 5 HP 20\nLv 12 HP 35\n' },
+      { line: 26, say: 'One place the tag is still needed: a struct that refers to ITSELF. <code>typedef struct Node { int v; Node *next; } Node;</code> does not compile — the name does not exist yet inside the braces. You write <code>struct Node *next;</code> there, which is why linked-list code carries both.', vars: {}, out: 'Lv 5 HP 20\nLv 12 HP 35\n(0, 0)\n' }
+    ],
+    recap: '<code>typedef</code> is an alias, not a new type. It is what lets you write <code>Pokemon</code> instead of <code>struct PokemonTag</code> everywhere.'
   }
 
 
