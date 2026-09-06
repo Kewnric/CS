@@ -2385,12 +2385,59 @@ function _bossBarNoTarget() {
   _bossResetCombo();
 }
 
+/* ── Whether the break happens at all ──────────────────────────
+   It takes the whole screen, shakes the layout and lasts 2.6 seconds, and it
+   fires every time the bar reaches zero — which, while you are working towards
+   the answer, is every time you get there and then edit one more character.
+   Some people want it every time and some want it never, and the screen shake
+   is the part that bothers people independently of the rest, so it is its own
+   switch rather than being folded into "off".
+
+   Both default ON: this is the reward the boss bar exists for. */
+const BOSS_BREAK_KEY = 'ssp.bossBreak';
+const BOSS_SHAKE_KEY = 'ssp.bossShake';
+
+/** Does the screen break when the boss dies? @returns {boolean} */
+function bossBreakOn() {
+  try { return localStorage.getItem(BOSS_BREAK_KEY) !== '0'; } catch (e) { return true; }
+}
+
+/** Does the layout shake with it? @returns {boolean} */
+function bossShakeOn() {
+  try { return localStorage.getItem(BOSS_SHAKE_KEY) !== '0'; } catch (e) { return true; }
+}
+
+function setBossBreak(on) {
+  try { localStorage.setItem(BOSS_BREAK_KEY, on ? '1' : '0'); } catch (e) { /* private mode */ }
+  // Nothing to undo when switching it off mid-burst except a burst in progress.
+  if (!on) _bossBreakClear();
+  if (typeof feelSync === 'function') feelSync();
+}
+
+function setBossShake(on) {
+  try { localStorage.setItem(BOSS_SHAKE_KEY, on ? '1' : '0'); } catch (e) { /* private mode */ }
+  if (!on) {
+    const layout = document.querySelector('.practice-layout');
+    if (layout) layout.classList.remove('boss-shake');
+  }
+  if (typeof feelSync === 'function') feelSync();
+}
+
+/** Take down anything the effect left on screen. */
+function _bossBreakClear() {
+  const ov = document.getElementById('boss-shatter-overlay');
+  if (ov) ov.remove();
+  const layout = document.querySelector('.practice-layout');
+  if (layout) layout.classList.remove('boss-shake');
+}
+
 /**
  * Full-page "boss defeated" shatter: the screen flashes, then dozens of glassy
  * cyan polygon shards burst outward and rain down — Sword Art Online style.
  * Pure DOM/CSS, removes itself when finished. Honors prefers-reduced-motion.
  */
 function _bossDefeatShatter() {
+  if (!bossBreakOn()) return;
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   let overlay = document.getElementById('boss-shatter-overlay');
   if (overlay) overlay.remove();
@@ -2454,8 +2501,9 @@ function _bossDefeatShatter() {
   overlay.insertAdjacentHTML('beforeend', shardsHtml);
   document.body.appendChild(overlay);
 
-  // Screen shake on the practice layout for impact
-  const layout = document.querySelector('.practice-layout');
+  // Screen shake on the practice layout for impact — its own switch, because
+  // moving the whole page is what people object to when they object.
+  const layout = bossShakeOn() ? document.querySelector('.practice-layout') : null;
   if (layout) {
     layout.classList.remove('boss-shake');
     void layout.offsetWidth;

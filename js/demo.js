@@ -143,6 +143,71 @@ function demoMaybeAutoOpen(challenge, variant) {
    THE PLAYER
    ============================================================ */
 
+/* ── Reading the walkthrough aloud ─────────────────────────────
+   Off until asked for: speech that starts on its own is startling, and this
+   opens by itself on a first attempt. Once turned on it is remembered, and
+   every step from then on is read as it appears.
+
+   The narration marks its code with <code>, and speech.js speaks those spans
+   through speechSayCode — so `*p` is "star P" and `printf("%d\n", n)` is
+   "print F, percent D backslash N, N" rather than the engine's own reading,
+   which drops every operator and leaves a sentence that sounds complete and
+   says nothing. */
+const DEMO_VOICE_KEY = 'demoVoice';
+
+function demoVoiceOn() {
+  try { return localStorage.getItem(DEMO_VOICE_KEY) === 'on'; } catch (e) { return false; }
+}
+
+function demoSetVoice(on) {
+  try { localStorage.setItem(DEMO_VOICE_KEY, on ? 'on' : 'off'); } catch (e) { /* private mode */ }
+}
+
+function demoToggleVoice() {
+  if (typeof speechSupported === 'function' && !speechSupported()) {
+    if (typeof toast === 'function') toast('This browser has no speech engine.', { type: 'warning' });
+    return;
+  }
+  const on = !demoVoiceOn();
+  demoSetVoice(on);
+  demoSyncVoiceBtn();
+  if (on) demoSpeakStep();
+  else if (typeof speechStop === 'function') speechStop();
+}
+
+/** Voice, speed and pitch — the app's existing panel, opened over the walkthrough. */
+function demoVoiceSettings() {
+  if (typeof speechStop === 'function') speechStop();
+  if (typeof openSpeechPanel === 'function') openSpeechPanel();
+}
+
+function demoSyncVoiceBtn() {
+  const btn = document.getElementById('demo-voice-btn');
+  if (!btn) return;
+  const on = demoVoiceOn();
+  btn.classList.toggle('is-on', on);
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  btn.title = on ? 'Stop reading the walkthrough aloud' : 'Read the walkthrough aloud';
+  btn.innerHTML = `<i data-lucide="${on ? 'volume-2' : 'volume-x'}"></i>`;
+  const gear = document.getElementById('demo-voice-cog');
+  if (gear) gear.hidden = !on;
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: btn });
+}
+
+/** Read this step's narration, lighting each word as the voice reaches it. */
+function demoSpeakStep() {
+  if (!demoVoiceOn()) return;
+  if (typeof speechSupported !== 'function' || !speechSupported()) return;
+  const sayEl = document.getElementById('demo-say');
+  if (!sayEl) return;
+  /* The recap panel carries buttons for what to read next; only the prose is
+     worth hearing, and reading a paragraph rather than the whole panel keeps
+     the read-along markup off the controls. */
+  const target = sayEl.querySelector('.demo-recap p') || sayEl.querySelector('p') || sayEl;
+  if (typeof speakElementAlong === 'function') speakElementAlong(target);
+  else if (typeof speak === 'function') speak(target.innerHTML);
+}
+
 const demoState = { id: null, step: 0, keyHandler: null, fromLibrary: false };
 
 function demoOpen(id, opts) {
@@ -164,6 +229,10 @@ function demoOpen(id, opts) {
   document.body.classList.add('demo-open');
 
   demoState.keyHandler = (e) => {
+    /* The voice panel sits on top of this one and its sliders are driven by the
+       arrow keys — the same keys that step the walkthrough. While it is open it
+       owns the keyboard, Escape included. */
+    if (document.getElementById('speech-panel')) return;
     if (e.key === 'Escape') { e.stopPropagation(); demoClose(); }
     else if (e.key === 'ArrowRight' || e.key === 'Enter') { e.preventDefault(); demoNext(); }
     else if (e.key === 'ArrowLeft') { e.preventDefault(); demoPrev(); }
@@ -189,6 +258,14 @@ function demoShellHTML(lesson, auto) {
         <div class="demo-head-actions">
           ${auto ? `<button type="button" class="demo-ghost" onclick="demoSetAuto(false);demoClose();"
                 title="Stop walkthroughs opening on their own">Don't show these</button>` : ''}
+          <button type="button" class="demo-icon-btn demo-voice-btn" id="demo-voice-btn"
+                  onclick="demoToggleVoice()" aria-pressed="false" aria-label="Read the walkthrough aloud">
+            <i data-lucide="volume-x"></i>
+          </button>
+          <button type="button" class="demo-icon-btn" id="demo-voice-cog" hidden
+                  onclick="demoVoiceSettings()" aria-label="Voice, speed and pitch">
+            <i data-lucide="sliders-horizontal"></i>
+          </button>
           <button type="button" class="demo-icon-btn" onclick="demoClose()" aria-label="Close the walkthrough">
             <i data-lucide="x"></i>
           </button>
@@ -261,6 +338,10 @@ function _demoHotLines(step) {
 function demoRenderStep() {
   const lesson = demoById(demoState.id);
   if (!lesson) return;
+  /* BEFORE anything is rewritten. The read-along marks up the narration and
+     puts the original HTML back when it stops — stopping after the next step
+     had been written would have restored the PREVIOUS step's text over it. */
+  if (typeof speechStop === 'function') speechStop();
   const steps = lesson.steps || [];
   const last = demoState.step >= steps.length;
   const step = last ? null : steps[demoState.step];
@@ -321,6 +402,9 @@ function demoRenderStep() {
   }
   const ov = document.getElementById('demo-overlay');
   if (ov && typeof lucide !== 'undefined') lucide.createIcons({ root: ov });
+
+  demoSyncVoiceBtn();
+  demoSpeakStep();
 }
 
 function demoGo(n) {
@@ -341,6 +425,8 @@ function demoPrev() { demoGo(demoState.step - 1); }
 
 function demoClose(silent) {
   const ov = document.getElementById('demo-overlay');
+  if (typeof speechStop === 'function') speechStop();
+  if (typeof closeSpeechPanel === 'function' && document.getElementById('speech-panel')) closeSpeechPanel();
   if (demoState.keyHandler) {
     document.removeEventListener('keydown', demoState.keyHandler, true);
     demoState.keyHandler = null;

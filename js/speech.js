@@ -187,7 +187,14 @@ function _speechPlainText(input) {
        from someone else through a share link, so "just to read the text out"
        would have been enough to run their code. parseFromString builds an
        inert document: no handlers, no requests, same text back. */
-    s = new DOMParser().parseFromString(s, 'text/html').body.textContent || '';
+    const doc = new DOMParser().parseFromString(s, 'text/html');
+    /* Code is spoken as code, not as prose. Which text that is does not have to
+       be guessed — the markup already says so. */
+    doc.body.querySelectorAll('code, kbd, samp, pre').forEach((el) => {
+      const said = speechSayCode(el.textContent);
+      el.parentNode.replaceChild(doc.createTextNode(' ' + said + ' '), el);
+    });
+    s = doc.body.textContent || '';
   }
   s = s
     .replace(/`{1,3}/g, ' ')       // code fences and inline ticks
@@ -198,6 +205,256 @@ function _speechPlainText(input) {
      into a lone full stop -- which the engine reads aloud as "dot". Nothing to
      say means nothing to say. */
   return /^[\s.]*$/.test(s) ? '' : s;
+}
+
+
+/* ── Reading code out loud ──────────────────────────────────────────────────
+   A speech engine reads prose. Handed code it does two things wrong, and both
+   are fatal to a walkthrough whose whole subject is the code.
+
+   IT DROPS THE PUNCTUATION. Punctuation is prosody to a TTS engine — a comma is
+   a pause, a full stop is a longer one, and everything else is silence. So
+   `if (x == 5)` is spoken "if x 5", `*p` is "p", `&score` is "score", and
+   `a[i]` is "a i". The operators ARE the lesson; losing them leaves sentences
+   that sound complete and say nothing.
+
+   AND IT MISREADS THE NAMES. `printf` is a word to the engine and it will try
+   to pronounce it as one. `char`, `argv`, `strlen`, `%d`, `\n` — none of these
+   survive being treated as English.
+
+   So a code fragment is tokenised and spoken deliberately: `*` is "star" where
+   it makes a pointer and "times" where it multiplies, `&` is "ampersand",
+   `->` is "arrow", `%d` is "percent D", `\n` is "backslash N". Brackets and
+   quotes are dropped, because that is what a person reading code aloud does —
+   `printf("%d\n", n)` is read "print F, percent D backslash N, N".
+
+   The narration marks its code with <code>, so which text needs this is not a
+   guess: it is already in the markup. */
+
+/** Names an English voice cannot be trusted with. */
+const SPEECH_CODE_SAY = {
+  printf: 'print F', scanf: 'scan F', sprintf: 'S print F', snprintf: 'S N print F',
+  fprintf: 'F print F', fscanf: 'F scan F', fgets: 'F gets', fputs: 'F puts',
+  fopen: 'F open', fclose: 'F close', fread: 'F read', fwrite: 'F write',
+  feof: 'F E O F', fseek: 'F seek', ftell: 'F tell', getchar: 'get char',
+  putchar: 'put char', puts: 'puts', gets: 'gets', getline: 'get line',
+  strlen: 'string length', strcpy: 'string copy', strncpy: 'string N copy',
+  strcmp: 'string compare', strncmp: 'string N compare', strcat: 'string cat',
+  strncat: 'string N cat', strchr: 'string char', strstr: 'string string',
+  strtok: 'string toke', memset: 'mem set', memcpy: 'mem copy',
+  malloc: 'malloc', calloc: 'C alloc', realloc: 'ree alloc', free: 'free',
+  sizeof: 'size of', typedef: 'type def',
+  atoi: 'A to I', atof: 'A to F', abs: 'abs', srand: 'S rand', qsort: 'Q sort',
+  isalpha: 'is alpha', isdigit: 'is digit', isspace: 'is space',
+  toupper: 'to upper', tolower: 'to lower',
+  stdin: 'standard in', stdout: 'standard out', stderr: 'standard error',
+  argc: 'arg C', argv: 'arg V',
+  NULL: 'null', EOF: 'E O F', FILE: 'file',
+  int: 'int', char: 'char', float: 'float', double: 'double', void: 'void',
+  unsigned: 'unsigned', signed: 'signed', short: 'short', long: 'long'
+};
+
+/** Headers, which are read as names rather than spelled out. */
+const SPEECH_CODE_HEADERS = {
+  stdio: 'standard I O dot H', stdlib: 'standard lib dot H',
+  string: 'string dot H', math: 'math dot H', ctype: 'C type dot H',
+  stdbool: 'standard bool dot H', time: 'time dot H', limits: 'limits dot H'
+};
+
+/** Words that make the `*` after them a pointer rather than a multiplication. */
+const SPEECH_CODE_TYPES = ['int', 'char', 'float', 'double', 'void', 'long', 'short',
+  'unsigned', 'signed', 'struct', 'union', 'enum', 'const', 'static', 'FILE', 'size_t'];
+
+const SPEECH_ESCAPE_SAY = {
+  n: 'backslash N', t: 'backslash T', r: 'backslash R', 0: 'backslash zero',
+  '\\': 'backslash backslash', '"': 'quote', "'": 'quote'
+};
+
+const SPEECH_ENTITIES = {
+  '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&apos;': "'", '&nbsp;': ' '
+};
+
+/** Fragments usually arrive already decoded; this is for callers passing raw HTML. */
+function _speechDecodeEntities(s) {
+  return String(s).replace(/&(?:amp|lt|gt|quot|apos|nbsp|#39);/g, m => SPEECH_ENTITIES[m] || m);
+}
+
+/** "%5.2f" → "percent 5 point 2 F". */
+function _speechSaySpec(spec) {
+  const rest = spec.slice(1);
+  if (rest === '%') return 'percent percent';
+  /* The letters are spelled out BEFORE the dot becomes the word "point" —
+     the other order spells "point" itself, and %5.2f came out "percent
+     P O I N T 2 F". */
+  return ('percent ' + rest
+    .replace(/[A-Za-z]+/g, m => ' ' + m.toUpperCase().split('').join(' ') + ' ')
+    .replace(/\./g, ' point '))
+    .replace(/\s+/g, ' ').trim();
+}
+
+/** The inside of a string or char literal: escapes and conversions spoken, text kept. */
+function _speechSayLiteral(body) {
+  let out = '', plain = '';
+  const flush = () => { if (plain.trim()) out += ' ' + plain.trim(); plain = ''; };
+  for (let i = 0; i < body.length; i++) {
+    const c = body[i];
+    if (c === '\\') {
+      flush();
+      const nx = body[i + 1] || '';
+      out += ' ' + (SPEECH_ESCAPE_SAY[nx] || ('backslash ' + nx.toUpperCase()));
+      i++;
+      continue;
+    }
+    if (c === '%') {
+      // m[0], not m[1]: _speechSaySpec expects the leading % and slices it off,
+      // so handing it the group alone ate the conversion letter — "%d" inside a
+      // string came out as "percent".
+      const m = /^%(?:%|[-+ #0]*\*?\d*(?:\.\d+)?(?:hh|h|ll|l|L|z|j|t)?[diouxXeEfFgGaAcspn])/.exec(body.slice(i));
+      if (m) { flush(); out += ' ' + _speechSaySpec(m[0]); i += m[0].length - 1; continue; }
+    }
+    plain += c;
+  }
+  flush();
+  return out.replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * A code fragment, spoken the way a person reads code aloud.
+ * @param {string} code  e.g. `printf("%d\n", n)`
+ * @returns {string} e.g. "print F , percent D backslash N , N"
+ */
+function speechSayCode(code) {
+  const s = _speechDecodeEntities(String(code == null ? '' : code))
+    // A construct whose name contains a hyphen, which is otherwise a minus.
+    .replace(/\bdo-while\b/g, 'do while');
+  if (!s.trim()) return '';
+
+  const out = [];
+  const push = (w) => { if (w) out.push(w); };
+  let i = 0;
+  let value = false;   // the previous token was something a value can come from
+  let typed = false;   // ...and it was a type name, which makes a following * a pointer
+
+  while (i < s.length) {
+    const c = s[i];
+    if (/\s/.test(c)) { i++; continue; }
+
+    // ── literals ──
+    if (c === '"' || c === "'") {
+      let j = i + 1, body = '';
+      while (j < s.length && s[j] !== c) {
+        if (s[j] === '\\') { body += s[j] + (s[j + 1] || ''); j += 2; }
+        else { body += s[j]; j++; }
+      }
+      i = j + 1;
+      push(_speechSayLiteral(body));
+      value = true; typed = false;
+      continue;
+    }
+
+    // ── a bare escape, which is how the narration writes \n on its own ──
+    if (c === '\\') {
+      const nx = s[i + 1] || '';
+      push(SPEECH_ESCAPE_SAY[nx] || 'backslash');
+      i += SPEECH_ESCAPE_SAY[nx] ? 2 : 1;
+      value = true; typed = false;
+      continue;
+    }
+
+    // ── #include, and the <header.h> after it ──
+    if (c === '#') {
+      const m = /^#\s*([A-Za-z]+)/.exec(s.slice(i));
+      if (m) { push(m[1]); i += m[0].length; value = false; typed = false; continue; }
+      push('hash'); i++; continue;
+    }
+    if (c === '<') {
+      const h = /^<\s*([A-Za-z_]\w*)\.h\s*>/.exec(s.slice(i));
+      if (h) {
+        push(SPEECH_CODE_HEADERS[h[1]] || (h[1] + ' dot H'));
+        i += h[0].length; value = true; typed = false; continue;
+      }
+      if (s[i + 1] === '=') { push('less than or equal to'); i += 2; value = false; continue; }
+      if (s[i + 1] === '<') { push('shifted left by'); i += 2; value = false; continue; }
+      push('less than'); i++; value = false; continue;
+    }
+
+    // ── numbers ──
+    if (/[0-9]/.test(c)) {
+      const m = /^\d+(?:\.\d+)?/.exec(s.slice(i));
+      push(m[0]); i += m[0].length; value = true; typed = false;
+      continue;
+    }
+
+    // ── names ──
+    if (/[A-Za-z_]/.test(c)) {
+      const m = /^[A-Za-z_]\w*/.exec(s.slice(i));
+      const word = m[0];
+      i += word.length;
+      // stdio.h and friends, when they arrive without the angle brackets.
+      if (SPEECH_CODE_HEADERS[word] && s.slice(i, i + 2) === '.h') {
+        push(SPEECH_CODE_HEADERS[word]); i += 2; value = true; typed = false; continue;
+      }
+      if (SPEECH_CODE_SAY[word]) push(SPEECH_CODE_SAY[word]);
+      // A lone letter is a variable name, and read as prose "a" becomes the
+      // article and "i" the pronoun. Spelled as a capital it stays a letter.
+      else if (word.length === 1) push(word.toUpperCase());
+      else push(word.replace(/_/g, ' '));
+      value = true;
+      typed = SPEECH_CODE_TYPES.indexOf(word) !== -1;
+      continue;
+    }
+
+    // ── operators, longest first ──
+    const two = s.slice(i, i + 2);
+    const TWO = {
+      '->': 'arrow', '==': 'double equals', '!=': 'not equals', '>=': 'greater than or equal to',
+      '++': 'plus plus', '--': 'minus minus', '+=': 'plus equals', '-=': 'minus equals',
+      '*=': 'times equals', '/=': 'divide equals', '%=': 'modulo equals',
+      '&&': 'and', '||': 'or', '>>': 'shifted right by'
+    };
+    if (TWO[two]) { push(TWO[two]); i += 2; value = (two === '++' || two === '--'); typed = false; continue; }
+
+    if (c === '*') {
+      /* The one genuinely ambiguous character in C. Spaces on both sides and a
+         value in front means multiplication — `n * sizeof(int)`. Anything else
+         is a pointer: `int *n`, `*p`, `FILE *`. */
+      const spaced = /\s/.test(s[i - 1] || '') && /\s/.test(s[i + 1] || '');
+      push(spaced && value && !typed ? 'times' : 'star');
+      i++; value = false; typed = false; continue;
+    }
+    if (c === '&') {
+      push(value && /\s/.test(s[i - 1] || '') && /\s/.test(s[i + 1] || '') ? 'bitwise and' : 'ampersand');
+      i++; value = false; typed = false; continue;
+    }
+    if (c === '%') {
+      if (s[i + 1] === '%') { push('percent percent'); i += 2; value = true; continue; }
+      const m = /^%[-+ #0]*\*?\d*(?:\.\d+)?(?:hh|h|ll|l|L|z|j|t)?[diouxXeEfFgGaAcspn]/.exec(s.slice(i));
+      if (m) { push(_speechSaySpec(m[0])); i += m[0].length; value = true; typed = false; continue; }
+      /* `%` on its own is the percent SIGN the printf lesson is about; `% 10`
+         with an operand after it is the modulo OPERATOR. Both are written as a
+         bare fragment in the narration, and the space is what separates them. */
+      push(value || /^%\s+\S/.test(s.slice(i)) ? 'modulo' : 'percent sign');
+      i++; value = false; continue;
+    }
+
+    const ONE = {
+      '=': 'equals', '+': 'plus', '-': 'minus', '/': 'divided by', '!': 'not',
+      '>': 'greater than', '.': 'dot', ';': ';', ',': ',', ':': 'colon',
+      '?': 'question mark', '{': 'open brace', '}': 'close brace',
+      '[': 'index', '|': 'bitwise or', '^': 'caret', '~': 'tilde'
+    };
+    // `int a[]` — empty brackets say "this is an array", not "index nothing".
+    if (c === '[' && s[i + 1] === ']') { push('array'); i += 2; value = true; continue; }
+    // Brackets are dropped, the way they are when a person reads code aloud.
+    if (c === '(' || c === ')' || c === ']') { i++; value = (c !== '('); typed = false; continue; }
+    if (ONE[c] !== undefined) { push(ONE[c]); i++; value = false; typed = false; continue; }
+    i++;   // anything else has no sound worth making
+  }
+
+  return out.join(' ')
+    .replace(/\s+([,;])/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /* ── The voice panel ────────────────────────────────────────────────────────
@@ -222,7 +479,7 @@ function openSpeechPanel() {
       <h2 class="modal-title" style="display:flex;align-items:center;gap:0.5rem;">
         <i data-lucide="mic-vocal"></i> Read Aloud
       </h2>
-      <p class="modal-desc">Used by the coding attempt's description and the language library.</p>
+      <p class="modal-desc">Used by the walkthroughs, the coding attempt's description and the language library.</p>
       <div id="speech-panel-body" class="speech-body">
         <div class="speech-loading">Looking for voices…</div>
       </div>
@@ -377,6 +634,12 @@ function _rpMarkUp(host) {
   const bulk = texts.reduce((n, t) => n + (t.nodeValue || '').length, 0);
   const perLetter = bulk <= 2600;
 
+  /* A <code> span is one unit, not a row of words: it is spoken through
+     speechSayCode — so what is said ("star P") and what is written ("*p") are
+     different lengths and different counts, and only the span as a whole can
+     be lit. Its own text nodes are skipped once it has been taken. */
+  const codeTaken = new Set();
+
   texts.forEach((node) => {
     const raw = node.nodeValue;
     if (!raw || !raw.trim()) return;
@@ -386,6 +649,19 @@ function _rpMarkUp(host) {
     const block = node.parentElement && node.parentElement.closest('p,li,div,h1,h2,h3,h4,h5,h6,pre,td');
     if (lastBlock && block !== lastBlock && !/[.!?]\s*$/.test(spoken)) spoken += '. ';
     lastBlock = block;
+
+    const codeEl = node.parentElement && node.parentElement.closest('code, kbd, samp');
+    if (codeEl && host.contains(codeEl)) {
+      if (codeTaken.has(codeEl)) return;
+      codeTaken.add(codeEl);
+      const said = speechSayCode(codeEl.textContent);
+      if (!said) return;
+      if (spoken && !/\s$/.test(spoken)) spoken += ' ';
+      codeEl.classList.add('rp-w', 'rp-w-plain');
+      words.push({ el: codeEl, at: spoken.length, len: said.length });
+      spoken += said + ' ';
+      return;
+    }
 
     if (_rpSkip(node)) { spoken += raw.replace(/\s+/g, ' '); return; }
 

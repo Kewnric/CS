@@ -1,8 +1,8 @@
 /* ============================================================
    FEEL-PANEL.JS — one button for how the attempt screen feels
    ------------------------------------------------------------
-   Typing sound, letter animation and background motion each had their own
-   36px button in the topbar, and each kept its options behind that button.
+   Typing sound, letter animation and background motion each had their own 36px
+   button in the topbar, and each kept its options behind that button.
    Measured, the right-hand cluster wanted 671px for nine controls and 718px
    for ten once a cheat sheet existed — six of them identical icons with no
    grouping, in a strip that also has to hold the boss bar, a timer and two
@@ -11,10 +11,10 @@
    They are one decision: what this screen is like to sit in front of. So they
    are one button and one panel.
 
-   ONE SECTION AT A TIME, PAGED. Stacked, the three ran to 643px of content and
-   had to scroll below roughly an 830px viewport — the third sat under the fold,
-   and a panel that hides its scrollbar hides that there is a third at all.
-   Paged, each is short enough to read whole, the header says which of three you
+   ONE SECTION AT A TIME, PAGED. Stacked, they ran to 643px of content and had
+   to scroll below roughly an 830px viewport — the last sat under the fold, and
+   a panel that hides its scrollbar hides that there is a last one at all.
+   Paged, each is short enough to read whole, the header says which section you
    are on, and nothing is out of sight.
 
    IT ALSO SETTLES THE TOGGLE-VERSUS-PANEL CONFLICT. The old buttons toggled
@@ -31,7 +31,8 @@ function _feelIsOn() {
               (typeof sfxVolume !== 'function' || sfxVolume() > 0);
   const letters = typeof edfxEnabled === 'function' && edfxEnabled();
   const amb = typeof ambEnabled === 'function' && ambEnabled();
-  return { sfx, letters, amb, any: sfx || letters || amb };
+  const brk = typeof bossBreakOn !== 'function' || bossBreakOn();
+  return { sfx, letters, amb, brk, any: sfx || letters || amb || brk };
 }
 
 /** One row. Every option in this panel is one of these, Off included. */
@@ -45,7 +46,7 @@ function _feelOpt(o) {
        + '</button>';
 }
 
-/* ── The three pages ──────────────────────────────────────── */
+/* ── The pages ────────────────────────────────────────────── */
 
 /** Typing sound: volume, voice, and Off. */
 function _feelSfxRows() {
@@ -109,8 +110,24 @@ function _feelAmbRows() {
                  onclick: 'if (ambEnabled()) toggleAmbient();' });
 }
 
+/** The boss break: the shake as its own switch, and Off. */
+function _feelBreakRows() {
+  if (typeof bossBreakOn !== 'function') return '';
+  const on = bossBreakOn();
+  const shake = typeof bossShakeOn === 'function' ? bossShakeOn() : true;
+  return _feelOpt({ name: 'Full break', hint: 'glass shatters across the screen',
+                    on: on && shake, onclick: 'setBossBreak(true); setBossShake(true);',
+                    title: 'Break the screen and shake the layout when the boss reaches 0' })
+       + _feelOpt({ name: 'No shake', hint: 'the glass breaks, the page holds still',
+                    on: on && !shake, onclick: 'setBossBreak(true); setBossShake(false);',
+                    title: 'Keep the shatter but stop the screen shake' })
+       + _feelOpt({ name: 'Off', hint: 'the bar just empties', on: !on,
+                    title: 'No effect at all when the boss reaches 0',
+                    onclick: 'setBossBreak(false);' });
+}
+
 /* Order is the order you meet them: the sound you hear as you type, then what
-   the text does, then what is behind it. */
+   the text does, then what is behind it, then what happens when you win. */
 const FEEL_PAGES = [
   { id: 'sound',   title: 'Typing sound',     rows: _feelSfxRows,
     icon: () => (typeof sfxEnabled === 'function' && sfxEnabled()) ? 'volume-2' : 'volume-x' },
@@ -122,7 +139,9 @@ const FEEL_PAGES = [
       const cur = typeof ambTheme === 'function' ? ambTheme() : '';
       const t = (typeof AMB_THEMES !== 'undefined') && AMB_THEMES.find(x => x.id === cur);
       return (t && t.icon) || 'sparkles';
-    } }
+    } },
+  { id: 'break',   title: 'Boss break',       rows: _feelBreakRows,
+    icon: () => (typeof bossBreakOn === 'function' && bossBreakOn()) ? 'zap' : 'zap-off' }
 ];
 
 /* Kept across opens on purpose. Coming back to the page you were last on is
@@ -130,8 +149,8 @@ const FEEL_PAGES = [
    lost being returned to one of them. */
 let _feelPage = 0;
 
-/** Step between pages. Wraps: at three, a dead end at either edge is just a
-    control that sometimes does nothing. */
+/** Step between pages. Wraps: a dead end at either edge is just a control
+    that sometimes does nothing. */
 function feelPageGo(delta) {
   const n = FEEL_PAGES.length;
   _feelPage = ((_feelPage + delta) % n + n) % n;
@@ -205,10 +224,10 @@ function feelPanelBodyHTML() {
 /**
  * Repaint the panel in place.
  *
- * Every option here is generated, so rather than three modules each reaching
- * for their own button and their own rows, one rebuild covers all of them.
- * The three original _sync*Btn() functions still run and now find no button;
- * they all guard with `if (!btn) return`, so they are harmless no-ops.
+ * Every option here is generated, so rather than each module reaching for its
+ * own button and its own rows, one rebuild covers all of them. The original
+ * _sync*Btn() functions still run and now find no button; they all guard with
+ * `if (!btn) return`, so they are harmless no-ops.
  */
 function feelSync() {
   const pop = document.getElementById('feel-pop');
@@ -224,7 +243,8 @@ function feelSync() {
     const s = _feelIsOn();
     const label = 'Feel — typing sound ' + (s.sfx ? 'on' : 'off')
                 + ', letters ' + (s.letters ? 'on' : 'off')
-                + ', background ' + (s.amb ? 'on' : 'off');
+                + ', background ' + (s.amb ? 'on' : 'off')
+                + ', boss break ' + (s.brk ? 'on' : 'off');
     btn.title = label;
     btn.setAttribute('aria-label', label);
     btn.style.color = s.any ? 'var(--color-primary)' : '';

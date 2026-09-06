@@ -627,3 +627,32 @@ body.demo-open { overflow: hidden; }
   }
   .demo-arrow { opacity: 0.9; }
 }
+
+/* ── Reading the walkthrough aloud ─────────────────────────────
+   The toggle reads as a state, not a press: on, it takes the accent colour and
+   a matching tint, so a glance at the header answers "is it going to talk?" */
+.demo-voice-btn.is-on {
+  color: var(--color-primary);
+  border-color: color-mix(in srgb, var(--color-primary) 55%, transparent);
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+.demo-voice-btn.is-on:hover {
+  background: color-mix(in srgb, var(--color-primary) 20%, transparent);
+  color: var(--color-primary);
+}
+
+/* A code chip is read as one unit -- "star P", not "star" then "P" -- so it
+   lights as one chip rather than letter by letter. Its own border and fill
+   already set it apart from the prose, so the reading state moves those rather
+   than only the text colour, which a chip's background would half-swallow. */
+.demo-say code.rp-w.is-now {
+  color: var(--color-primary);
+  border-color: color-mix(in srgb, var(--color-primary) 60%, transparent);
+  background: color-mix(in srgb, var(--color-primary) 16%, transparent);
+}
+.demo-say code.rp-w.is-said { color: var(--text-tertiary); }
+
+/* The voice panel is opened FROM the walkthrough, so it has to sit over it --
+   .demo-overlay is 12000 and .modal-overlay is 1000, which would otherwise put
+   the settings behind the thing that asked for them. */
+body.demo-open #speech-panel { z-index: 12500; }
