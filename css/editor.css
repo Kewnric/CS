@@ -232,12 +232,6 @@
 
 /* --- Practice Top Bar --- */
 .practice-topbar {
-  /* The boss bar's two height numbers, hoisted out of .sao-boss so the title
-     plate can be built to the same ones. They have to agree: the plate stands
-     in for the bar, and if it is shorter the topbar changes height every time
-     the bar is switched — measured at 12px of jump before this. */
-  --sao-h: 26px;              /* the plate/track height itself */
-  --sao-pad-y: 12px;          /* air above and below it, for the readout */
   background: #161b22;
   border-bottom: 1px solid #21262d;
   padding: 0.75rem 1rem;
@@ -273,9 +267,6 @@
   align-items: center;
   justify-content: center;
   gap: 0.6rem;
-  /* Whichever of the two is in here, the track is the same height, so toggling
-     the bar no longer resizes the topbar under the editor. */
-  min-height: calc(var(--sao-h) + var(--sao-pad-y) * 2);
 }
 
 /* WITH THE BAR OFF, THE PLATE STANDS WHERE THE BAR STOOD. It keeps the same
@@ -318,10 +309,7 @@
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  /* Exactly the bar's plate height. Fixed rather than derived from the text, so
-     a one-line title and a wrapped one both leave the topbar the same size. */
-  height: var(--sao-h);
-  padding: 0 0.7rem 0 0.6rem;
+  padding: 0.34rem 0.7rem 0.34rem 0.6rem;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: rgba(255, 255, 255, 0.07);
@@ -332,21 +320,17 @@
     inset 0 -1px 0 rgba(0, 0, 0, 0.22),
     0 2px 12px rgba(0, 0, 0, 0.3);
   color: var(--text-primary, #e6e6ef);
-  /* Bigger than the bar's own 0.7rem name cell. That one is squeezed in beside
-     the HP track; this plate is the only thing in the strip, so the title can
-     take the room. Sized to leave clear air inside the fixed 26px — see the
-     measurement in the commit. */
-  font-size: 0.95rem;
+  font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 0.01em;
-  line-height: 1.2;
+  line-height: 1.25;
 }
 /* The icon carries the accent so the plate has one lit thing on it, the way the
    timer's clock face does. */
 .boss-nick-icon {
   flex-shrink: 0;
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   color: var(--color-primary, #818cf8);
   opacity: 0.9;
 }
@@ -363,7 +347,7 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--color-primary, #6366f1) 22%, transparent);
   color: var(--color-primary, #a5b4fc);
-  font-size: 0.68rem;
+  font-size: 0.63rem;
   font-weight: 700;
   letter-spacing: 0.05em;
   font-variant-numeric: tabular-nums;
@@ -2021,8 +2005,7 @@ mark.diff-hit.current {
    ============================================================ */
 .sao-boss {
   --sao-hue: 82;              /* SAO yellow-green at full HP → 0 (red) at empty */
-  /* --sao-h and --sao-pad-y come from .practice-topbar, so the title plate that
-     stands in for this bar is built to the same height. */
+  --sao-h: 26px;              /* plate height */
   --sao-chamfer: 14px;        /* plate right-end diagonal run */
   --sao-tr-chamfer: 8px;      /* track right-end diagonal run */
   --sao-step: 5px;            /* how far the bar thins after the step */
@@ -2039,7 +2022,7 @@ mark.diff-hit.current {
   flex: 1 1 260px;
   min-width: 0;
   max-width: 620px;
-  padding: var(--sao-pad-y) 0;
+  padding: 12px 0 12px;
   user-select: none;
 }
 
