@@ -269,20 +269,20 @@
   gap: 0.6rem;
 }
 
-/* WITH THE BAR OFF, THE CENTRE HOLDS ONE SMALL LABEL — and a flex:1 track for
-   it is what put the title on a line of its own. The topbar wraps (it has to:
-   the boss bar wants the full width on a narrow window), and a centre column
-   demanding a third of the row could not fit beside the buttons, so it took the
-   next row and left the name floating in the middle of an empty strip.
+/* WITH THE BAR OFF, THE PLATE STANDS WHERE THE BAR STOOD. It keeps the same
+   flex:1 track and the same centring as the bar, so switching the bar off
+   leaves the title on the spot the bar was centred on instead of moving it
+   somewhere else — the two states line up, which is the whole point of the
+   plate being the bar's stand-in.
 
-   Sized to its content instead, it stays up on the first row and sits directly
-   after Back, which is where a document's title belongs and what makes it read
-   as part of the toolbar rather than as something dropped under it. */
-.practice-topbar-center:not(.boss-on) {
-  flex: 0 1 auto;
-  margin-right: auto;
-  justify-content: flex-start;
-}
+   It is deliberately NOT centred on the topbar. The right-hand cluster (timer,
+   Retry, Check Code and four icon buttons) is 605px against Back's 57, so the
+   middle of the topbar is 274px right of the middle of this track; putting the
+   plate there would line it up with nothing, and at 1040px it lands on top of
+   the buttons.
+
+   Below 1024px the topbar wraps and the bar takes its own row, so the plate
+   goes back beside Back instead — see the same selector in layout.css. */
 
 /* The program name, standing where the boss bar stands when the bar is off.
    Sized to the text rather than the strip: this is a label, and a label
