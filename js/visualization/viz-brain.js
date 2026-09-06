@@ -760,29 +760,38 @@ function brainUndo() {
   brainRenderCanvas(); brainSaveCurrentVersion();
 }
 
-function brainZoomIn() { brain.zoom = Math.min(3, brain.zoom + 0.15); brainRenderCanvas(); brainSaveCurrentVersion(); }
-function brainZoomOut() { brain.zoom = Math.max(0.2, brain.zoom - 0.15); brainRenderCanvas(); brainSaveCurrentVersion(); }
-function brainZoomReset() { brain.zoom = 1; brain.pan = { x: 0, y: 0 }; brainCenterCanvas(); }
+/* ── Brain's camera, through the shared one ───────────────────
+   These were a second copy of the viz camera with a different zoom floor
+   (0.2 vs 0.04) and no easing, so Fit here could not fit a large map either
+   and every jump was a cut. They call the shared helpers now. */
+function brainZoomIn() { vizZoomBy(1.2); }
+function brainZoomOut() { vizZoomBy(1 / 1.2); }
+function brainZoomReset() { brainCenterCanvas(); }
+
 function brainUpdateZoomDisplay() {
   const el = document.getElementById('viz-zoom-level');
   if (el) el.textContent = Math.round(brain.zoom * 100) + '%';
 }
 
-function brainCenterCanvas() {
+function brainCenterCanvas(instant) {
   const container = document.getElementById('viz-canvas-container');
-  if (!container || brain.nodes.length === 0) { brainRenderCanvas(); return; }
+  const g = vizVisibleGraph();
+  if (!container || !g.nodes.length) { brainRenderCanvas(); return; }
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  brain.nodes.forEach(n => {
+  g.nodes.forEach(n => {
     const w = n.w || 250, h = n.h || 80;
     minX = Math.min(minX, n.x); maxX = Math.max(maxX, n.x + w);
     minY = Math.min(minY, n.y); maxY = Math.max(maxY, n.y + h);
   });
-  const pad = 100, cw = container.offsetWidth, ch = container.offsetHeight;
-  const scaleX = cw / (maxX - minX + pad * 2), scaleY = ch / (maxY - minY + pad * 2);
-  brain.zoom = Math.min(Math.max(Math.min(scaleX, scaleY, 1.2), 0.2), 3);
-  brain.pan.x = cw / 2 - ((minX + (maxX - minX) / 2) * brain.zoom);
-  brain.pan.y = ch / 2 - ((minY + (maxY - minY) / 2) * brain.zoom);
-  brainRenderCanvas(); brainSaveCurrentVersion();
+  const pad = 90, cw = container.offsetWidth, ch = container.offsetHeight;
+  const zoom = vizClampZoom(Math.min(cw / (maxX - minX + pad * 2), ch / (maxY - minY + pad * 2), 1.2));
+  const pan = {
+    x: cw / 2 - ((minX + (maxX - minX) / 2) * zoom),
+    y: ch / 2 - ((minY + (maxY - minY) / 2) * zoom)
+  };
+  if (instant) { brain.pan = pan; brain.zoom = zoom; vizApplyTransform(); brainUpdateZoomDisplay(); }
+  else vizTweenView(pan, zoom);
+  brainSaveCurrentVersion();
 }
 
 function brainUpdateMinimap() {
@@ -792,19 +801,25 @@ function brainUpdateMinimap() {
   if (!canvas || !container) return;
   const ctx = canvas.getContext('2d'), W = canvas.width, H = canvas.height;
   ctx.clearRect(0, 0, W, H);
-  if (brain.nodes.length === 0) return;
+  // Collapsed subtrees are not on screen, so they are not on the map either.
+  const g = vizVisibleGraph();
+  if (!g.nodes.length) { if (viewportEl) viewportEl.style.display = 'none'; return; }
+  if (viewportEl) viewportEl.style.display = '';
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  brain.nodes.forEach(n => { minX = Math.min(minX, n.x); maxX = Math.max(maxX, n.x + (n.w || 250)); minY = Math.min(minY, n.y); maxY = Math.max(maxY, n.y + (n.h || 80)); });
+  g.nodes.forEach(n => { minX = Math.min(minX, n.x); maxX = Math.max(maxX, n.x + (n.w || 250)); minY = Math.min(minY, n.y); maxY = Math.max(maxY, n.y + (n.h || 80)); });
   const pad = 40, wW = Math.max(maxX - minX + pad * 2, 1), wH = Math.max(maxY - minY + pad * 2, 1);
   const scale = Math.min(W / wW, H / wH), ox = (W - wW * scale) / 2 - (minX - pad) * scale, oy = (H - wH * scale) / 2 - (minY - pad) * scale;
+  canvas._mmScale = scale; canvas._mmOx = ox; canvas._mmOy = oy;
   ctx.strokeStyle = 'rgba(148,163,184,0.25)'; ctx.lineWidth = 1;
-  brain.links.forEach(l => {
-    const fn = brain.nodes.find(n => n.id === l.from), tn = brain.nodes.find(n => n.id === l.to);
+  ctx.beginPath();
+  g.links.forEach(l => {
+    const fn = g.nodeById.get(l.from), tn = g.nodeById.get(l.to);
     if (!fn || !tn) return;
-    ctx.beginPath(); ctx.moveTo(fn.x * scale + ox, fn.y * scale + oy); ctx.lineTo(tn.x * scale + ox, tn.y * scale + oy); ctx.stroke();
+    ctx.moveTo(fn.x * scale + ox, fn.y * scale + oy); ctx.lineTo(tn.x * scale + ox, tn.y * scale + oy);
   });
-  brain.nodes.forEach(n => {
-    ctx.fillStyle = n.id === brain.selectedNodeId ? '#6366f1' : 'rgba(245,158,11,0.7)';
+  ctx.stroke();
+  g.nodes.forEach(n => {
+    ctx.fillStyle = n.id === brain.selectedNodeId ? '#6366f1' : (n.color ? vizColorMap(n.color) : 'rgba(245,158,11,0.7)');
     ctx.globalAlpha = n.id === brain.selectedNodeId ? 1 : 0.7;
     ctx.beginPath(); ctx.roundRect(n.x * scale + ox, n.y * scale + oy, Math.max((n.w || 150) * scale, 4), Math.max((n.h || 48) * scale, 3), 2); ctx.fill();
     ctx.globalAlpha = 1;
@@ -812,7 +827,12 @@ function brainUpdateMinimap() {
   const cW = container.offsetWidth, cH = container.offsetHeight;
   const vx = (-brain.pan.x / brain.zoom) * scale + ox, vy = (-brain.pan.y / brain.zoom) * scale + oy;
   const vw = (cW / brain.zoom) * scale, vh = (cH / brain.zoom) * scale;
-  if (viewportEl) { viewportEl.style.left = Math.max(0, vx) + 'px'; viewportEl.style.top = Math.max(0, vy) + 'px'; viewportEl.style.width = Math.min(vw, W) + 'px'; viewportEl.style.height = Math.min(vh, H) + 'px'; }
+  if (viewportEl) {
+    const cx = Math.max(0, Math.min(vx, W)), cy = Math.max(0, Math.min(vy, H));
+    viewportEl.style.left = cx + 'px'; viewportEl.style.top = cy + 'px';
+    viewportEl.style.width = Math.max(Math.min(vw, W - cx), 4) + 'px';
+    viewportEl.style.height = Math.max(Math.min(vh, H - cy), 4) + 'px';
+  }
 }
 
 function brainRenderCanvas() {
@@ -936,7 +956,7 @@ function brainRenderCanvas() {
       _brainObservers.set(node.id, obs);
     }, 0);
     if (!isGhost) {
-      el.addEventListener('mousedown', (e) => brainNodeMouseDown(e, node.id));
+      el.addEventListener('pointerdown', (e) => brainNodeMouseDown(e, node.id));
       el.addEventListener('click', (e) => brainNodeClick(e, node.id));
       el.addEventListener('contextmenu', (e) => brainNodeCtx(e, node.id));
       el.addEventListener('mouseenter', () => { if (typeof vizHoverFocus === 'function') vizHoverFocus(node.id); });
@@ -947,7 +967,8 @@ function brainRenderCanvas() {
         port.className = 'viz-port';
         port.dataset.side = side;
         port.dataset.nodeId = node.id;
-        port.addEventListener('mousedown', (e) => {
+        port.addEventListener('pointerdown', (e) => {
+          if (e.pointerType === 'mouse' && e.button !== 0) return;
           e.stopPropagation(); e.preventDefault();
           brainPortDragStart(e, node.id, side);
         });
@@ -1088,8 +1109,13 @@ function brainNodeClick(e, nodeId) {
   brainRenderCanvas();
 }
 
+/* ── Dragging and panning, on pointer events ──────────────────
+   Brain had its own copy of all of this, bound to mouse events only and with
+   the same read/write thrash in the link repaint. It shares the engine now:
+   one geometry snapshot per drag, one repaint per frame, and a finger works. */
+
 function brainNodeMouseDown(e, nodeId) {
-  if (e.button !== 0) return;
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
   e.stopPropagation();
   if (typeof viz !== 'undefined' && viz.colorModeEnabled) return;
   const node = brain.nodes.find(n => n.id === nodeId);
@@ -1108,8 +1134,11 @@ function brainNodeMouseDown(e, nodeId) {
   brain.draggingNode = nodeId; brain._hasDragged = false; brain._dragStartPos = { x: e.clientX, y: e.clientY };
   brain.dragOffset.x = (e.clientX - rect.left - brain.pan.x) / brain.zoom - node.x;
   brain.dragOffset.y = (e.clientY - rect.top - brain.pan.y) / brain.zoom - node.y;
-  document.addEventListener('mousemove', brainNodeDrag);
-  document.addEventListener('mouseup', brainNodeDragEnd);
+  vizGeom.graph = vizVisibleGraph();
+  vizGeomHold(vizGeom.graph);
+  document.addEventListener('pointermove', brainNodeDrag);
+  document.addEventListener('pointerup', brainNodeDragEnd);
+  document.addEventListener('pointercancel', brainNodeDragEnd);
 }
 
 function brainNodeDrag(e) {
@@ -1139,7 +1168,7 @@ function brainNodeDrag(e) {
   node.y = newY;
   const el = document.querySelector(`.viz-node[data-node-id="${node.id}"]`);
   if (el) { el.style.left = node.x + 'px'; el.style.top = node.y + 'px'; el.classList.add('dragging'); }
-  brainUpdateSVGLinks();
+  vizSchedulePaint(() => { brainUpdateSVGLinks(); brainUpdateMinimap(); });
 }
 
 function brainFlowDragConnected(nodeId, dx, dy, visited) {
@@ -1159,27 +1188,13 @@ function brainFlowDragConnected(nodeId, dx, dy, visited) {
   });
 }
 
+/** The shared painter: one read pass, one write pass. */
 function brainUpdateSVGLinks() {
-  const svg = document.getElementById('viz-canvas-svg');
-  const nodesLayer = document.getElementById('viz-nodes-layer');
-  if (!svg || !nodesLayer) return;
-  brain.links.forEach(link => {
-    const fn = brain.nodes.find(n => n.id === link.from);
-    const tn = brain.nodes.find(n => n.id === link.to);
-    if (!fn || !tn) return;
-    const fEl = nodesLayer.querySelector(`[data-node-id="${link.from}"]`);
-    const tEl = nodesLayer.querySelector(`[data-node-id="${link.to}"]`);
-    const fw = fEl ? fEl.offsetWidth : 250, fh = fEl ? fEl.offsetHeight : 80;
-    const tw = tEl ? tEl.offsetWidth : 250, th = tEl ? tEl.offsetHeight : 80;
-    const d = typeof vizBezierPath === 'function'
-      ? vizBezierPath(fn.x, fn.y, fw, fh, tn.x, tn.y, tw, th, link.fromSide, link.toSide)
-      : `M ${fn.x + fw/2} ${fn.y + fh/2} L ${tn.x + tw/2} ${tn.y + th/2}`;
-    const group = svg.querySelector(`g[data-link-id="${link.id}"]`);
-    if (group) group.querySelectorAll('path').forEach(p => p.setAttribute('d', d));
-  });
+  vizPaintLinks(vizGeom.held && vizGeom.graph ? vizGeom.graph : null);
 }
 
 function brainNodeDragEnd() {
+  vizCancelScheduledPaint();
   // Keep the id: the snap block below read brain.draggingNode AFTER it had been
   // set to null, so the condition was never true and Snap to grid did nothing
   // at all — the toolbar toggle was decorative.
@@ -1187,8 +1202,10 @@ function brainNodeDragEnd() {
   if (droppedId) { const el = document.querySelector(`.viz-node[data-node-id="${droppedId}"]`); if (el) el.classList.remove('dragging'); }
   brain.draggingNode = null;
   brain._prevDragPos = null;
-  document.removeEventListener('mousemove', brainNodeDrag);
-  document.removeEventListener('mouseup', brainNodeDragEnd);
+  document.removeEventListener('pointermove', brainNodeDrag);
+  document.removeEventListener('pointerup', brainNodeDragEnd);
+  document.removeEventListener('pointercancel', brainNodeDragEnd);
+  vizGeomRelease();
   if (brain._hasDragged) {
     // Land on the grid the canvas draws, when snapping is on.
     if (brainOpts().snap && droppedId) {
@@ -1201,8 +1218,24 @@ function brainNodeDragEnd() {
   brain._undoArmed = false;
 }
 
+const _brainPointers = new Map();
+let _brainPinch = null;
+
 function brainCanvasMouseDown(e) {
-  if (e.target.closest('.viz-node') || e.button !== 0) return;
+  if (e.target.closest('.viz-node') || e.target.closest('.viz-minimap')) return;
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  _brainPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (_brainPointers.size === 2) {
+    const pts = [..._brainPointers.values()];
+    _brainPinch = {
+      dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1,
+      zoom: brain.zoom, cx: (pts[0].x + pts[1].x) / 2, cy: (pts[0].y + pts[1].y) / 2
+    };
+    brain.isPanning = false;
+    return;
+  }
+  if (_brainPointers.size > 2) return;
+  vizStopTween();
   brain.isPanning = true;
   brain.panStart = { x: e.clientX, y: e.clientY };
   brain.panStartOffset = { ...brain.pan };
@@ -1211,6 +1244,24 @@ function brainCanvasMouseDown(e) {
 }
 
 function brainCanvasMouseMove(e) {
+  if (_brainPointers.has(e.pointerId)) _brainPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+  if (_brainPinch && _brainPointers.size >= 2) {
+    const pts = [..._brainPointers.values()];
+    const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+    const container = document.getElementById('viz-canvas-container');
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const mx = _brainPinch.cx - rect.left, my = _brainPinch.cy - rect.top;
+    const tx = (mx - brain.pan.x) / brain.zoom, ty = (my - brain.pan.y) / brain.zoom;
+    brain.zoom = vizClampZoom(_brainPinch.zoom * (dist / _brainPinch.dist));
+    brain.pan.x = mx - tx * brain.zoom;
+    brain.pan.y = my - ty * brain.zoom;
+    vizApplyTransform();
+    brainUpdateZoomDisplay();
+    return;
+  }
+
   if (brain.linkingFrom) {
     const tempLink = document.getElementById('viz-temp-link');
     const container = document.getElementById('viz-canvas-container');
@@ -1222,45 +1273,37 @@ function brainCanvasMouseMove(e) {
       const m = d.match(/M (\S+) (\S+)/);
       if (m) {
         const fx = parseFloat(m[1]), fy = parseFloat(m[2]);
-        const fromSide = brain._portDragSide || null;
-        if (typeof vizTempLinkCP === 'function') {
-          const cp = vizTempLinkCP(fx, fy, mx, my, fromSide);
-          tempLink.setAttribute('d', `M ${fx} ${fy} C ${cp.c1x} ${cp.c1y}, ${cp.c2x} ${cp.c2y}, ${mx} ${my}`);
-        } else {
-          const bend = Math.min(Math.max(Math.abs(my - fy) * 0.5, 40), 180);
-          tempLink.setAttribute('d', `M ${fx} ${fy} C ${fx} ${fy + bend}, ${mx} ${my - bend}, ${mx} ${my}`);
-        }
+        const cp = vizTempLinkCP(fx, fy, mx, my, brain._portDragSide || null);
+        tempLink.setAttribute('d', `M ${fx} ${fy} C ${cp.c1x} ${cp.c1y}, ${cp.c2x} ${cp.c2y}, ${mx} ${my}`);
       }
     }
   }
   if (!brain.isPanning) return;
   brain.pan.x = brain.panStartOffset.x + (e.clientX - brain.panStart.x);
   brain.pan.y = brain.panStartOffset.y + (e.clientY - brain.panStart.y);
-  const nodesLayer = document.getElementById('viz-nodes-layer');
-  const svg = document.getElementById('viz-canvas-svg');
-  if (nodesLayer) nodesLayer.style.transform = `translate(${brain.pan.x}px, ${brain.pan.y}px) scale(${brain.zoom})`;
-  if (svg) svg.style.transform = `translate(${brain.pan.x}px, ${brain.pan.y}px) scale(${brain.zoom})`;
-  brainUpdateMinimap();
+  vizSchedulePaint(() => vizApplyTransform());
 }
 
 /**
- * Document-level: this runs for EVERY mouseup on the page while Brain is open,
- * not just ones on the canvas.
+ * Document-level: this runs for EVERY pointerup on the page while Brain is
+ * open, not just ones on the canvas.
  *
  * It used to call brainSaveCurrentVersion() unconditionally, which repainted
  * the "Saved just now" chip in the canvas toolbar. That chip sits in the same
  * flex row as the Brain toolbar buttons, so rewriting it between mouseup and
  * click reflowed the row and the browser never dispatched the click at all —
- * which is why those buttons needed a second press to do anything. It also
- * meant a full deep-clone and localStorage write on every click anywhere.
+ * which is why those buttons needed a second press to do anything.
  */
-function brainCanvasMouseUp() {
+function brainCanvasMouseUp(e) {
+  if (e && e.pointerId !== undefined) _brainPointers.delete(e.pointerId);
+  if (_brainPointers.size < 2 && _brainPinch) { _brainPinch = null; brainSaveCurrentVersion(); }
   if (!brain.isPanning) return;
+  vizCancelScheduledPaint();
   brain.isPanning = false;
   const container = document.getElementById('viz-canvas-container');
   if (container) container.classList.remove('panning');
   const moved = brain.pan.x !== brain.panStartOffset.x || brain.pan.y !== brain.panStartOffset.y;
-  if (moved) brainSaveCurrentVersion();
+  if (moved) { vizApplyTransform(); brainSaveCurrentVersion(); }
 }
 
 let _brainWheelSaveTimer = null;
@@ -1269,21 +1312,17 @@ function brainCanvasWheel(e) {
   e.preventDefault();
   const container = document.getElementById('viz-canvas-container');
   if (!container) return;
+  vizStopTween();
   const rect = container.getBoundingClientRect();
   const mx = e.clientX - rect.left, my = e.clientY - rect.top;
   const tx = (mx - brain.pan.x) / brain.zoom, ty = (my - brain.pan.y) / brain.zoom;
   const factor = e.deltaY > 0 ? 0.92 : 1.087;
-  const newZoom = Math.min(3, Math.max(0.2, brain.zoom * factor));
+  const newZoom = vizClampZoom(brain.zoom * factor);
   brain.pan.x = mx - tx * newZoom; brain.pan.y = my - ty * newZoom;
   brain.zoom = newZoom;
   // Transform-only (full re-render per wheel tick was rebuilding all nodes)
-  const nodesLayer = document.getElementById('viz-nodes-layer');
-  const svg = document.getElementById('viz-canvas-svg');
-  const tf = `translate(${brain.pan.x}px, ${brain.pan.y}px) scale(${brain.zoom})`;
-  if (nodesLayer) nodesLayer.style.transform = tf;
-  if (svg) svg.style.transform = tf;
+  vizApplyTransform();
   brainUpdateZoomDisplay();
-  brainUpdateMinimap();
   clearTimeout(_brainWheelSaveTimer);
   _brainWheelSaveTimer = setTimeout(() => brainSaveCurrentVersion(), 400);
 }
@@ -1490,7 +1529,8 @@ function brainPortDragStart(e, nodeId, side) {
   brainRenderCanvas();
 
   function onUp(upEvent) {
-    document.removeEventListener('mouseup', onUp, true);
+    document.removeEventListener('pointerup', onUp, true);
+    document.removeEventListener('pointercancel', onUp, true);
     if (!brain.linkingFrom) return;
     const els = document.elementsFromPoint(upEvent.clientX, upEvent.clientY);
     const targetEl = els.find(el => el.dataset && el.dataset.nodeId && el.dataset.nodeId !== nodeId);
@@ -1563,7 +1603,8 @@ function brainPortDragStart(e, nodeId, side) {
     brain._portDragging = false;
     brainCancelLinking();
   }
-  document.addEventListener('mouseup', onUp, true);
+  document.addEventListener('pointerup', onUp, true);
+  document.addEventListener('pointercancel', onUp, true);
 }
 
 function brainHideAllMenus() {

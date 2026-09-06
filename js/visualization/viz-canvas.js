@@ -1030,7 +1030,7 @@ function _vizPaintMarquee() {
 }
 
 function vizCanvasMouseUp(e) {
-  if (viz.activeModule === 'brain') { brainCanvasMouseUp(); return; }
+  if (viz.activeModule === 'brain') { brainCanvasMouseUp(e); return; }
   if (e && e.pointerId !== undefined) _vizPointers.delete(e.pointerId);
   if (_vizPointers.size < 2 && _vizPinch) { _vizPinch = null; vizSave(); }
 
@@ -1398,23 +1398,26 @@ function _vizMinimapGoto(clientX, clientY, tween) {
   const canvas = document.getElementById('viz-minimap-canvas');
   const container = document.getElementById('viz-canvas-container');
   if (!canvas || !container || canvas._mmScale === undefined) return;
+  const cam = viz.activeModule === 'brain' ? brain : viz;
   const rect = canvas.getBoundingClientRect();
   const worldX = ((clientX - rect.left) - canvas._mmOx) / canvas._mmScale;
   const worldY = ((clientY - rect.top) - canvas._mmOy) / canvas._mmScale;
-  const pan = { x: container.offsetWidth / 2 - worldX * viz.zoom, y: container.offsetHeight / 2 - worldY * viz.zoom };
-  if (tween) vizTweenView(pan, viz.zoom);
-  else { viz.pan = pan; vizApplyTransform(); }
+  const pan = { x: container.offsetWidth / 2 - worldX * cam.zoom, y: container.offsetHeight / 2 - worldY * cam.zoom };
+  if (tween) vizTweenView(pan, cam.zoom);
+  else { cam.pan = pan; vizApplyTransform(); }
+}
+
+function _vizMinimapSave() {
+  if (viz.activeModule === 'brain') brainSaveCurrentVersion(); else vizSave();
 }
 
 function vizMinimapClick(e) {
-  if (viz.activeModule === 'brain') return;
   _vizMinimapGoto(e.clientX, e.clientY, true);
-  vizSave();
+  _vizMinimapSave();
 }
 
-/** Drag the viewport rectangle around the map. */
+/** Drag the viewport rectangle around the map — the gesture everyone tries. */
 function vizMinimapDragStart(e) {
-  if (viz.activeModule === 'brain') return;
   if (e.pointerType === 'mouse' && e.button !== 0) return;
   e.preventDefault();
   e.stopPropagation();
@@ -1425,7 +1428,7 @@ function vizMinimapDragStart(e) {
     document.removeEventListener('pointerup', up);
     document.removeEventListener('pointercancel', up);
     vizCancelScheduledPaint();
-    vizSave();
+    _vizMinimapSave();
   };
   document.addEventListener('pointermove', move);
   document.addEventListener('pointerup', up);
