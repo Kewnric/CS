@@ -201,10 +201,10 @@ function vizPortCenter(nx, ny, nw, nh, side) {
   return                        { x: nx + nw,      y: ny + nh / 2 };
 }
 
+/** Which libraries the canvas is showing. One, two or all three. */
 function vizGetVisibleScopes() {
   if (viz.activeModule === 'brain') return [];
-  if (viz.activeModule === 'general') return ['challenge', 'snippet', 'notebook'];
-  return [viz.activeModule];
+  return viz.scopes && viz.scopes.length ? viz.scopes : ['challenge'];
 }
 
 /* ── Rendering ─────────────────────────────────────────────────
@@ -807,17 +807,6 @@ function vizSidebarDragStart(e, id, type) {
   e.dataTransfer.setData('application/json', JSON.stringify({ id, type }));
 }
 
-/**
- * A sidebar row is draggable two ways at once: onto the canvas to place a node
- * (the application/json payload above), and within the tree to reorganise it
- * (tree-dnd.js). Both payloads ride along, and whichever surface receives the
- * drop reads the one it understands.
- */
-function vizTreeDragStart(e, id, type) {
-  vizSidebarDragStart(e, id, type);
-  if (typeof treeDragStart === 'function') treeDragStart(e, id, 'viz');
-}
-
 function vizCanvasDrop(e) {
   e.preventDefault();
   const dataString = e.dataTransfer.getData('application/json');
@@ -826,13 +815,11 @@ function vizCanvasDrop(e) {
   vizPushUndo();
   try {
     const data = JSON.parse(dataString);
-    let scope = viz.activeModule;
-    if (scope === 'general') {
-      if (state.challenges.find(c => c.id === data.id)) scope = 'challenge';
-      else if ((state.snippets || []).find(s => s.id === data.id)) scope = 'snippet';
-      else if ((state.notebooks || []).find(n => n.id === data.id)) scope = 'notebook';
-      else scope = 'challenge';
-    }
+    // A dropped row knows its own library, whether one is selected or three.
+    let scope = vizPrimaryScope();
+    if (state.challenges.find(c => c.id === data.id)) scope = 'challenge';
+    else if ((state.snippets || []).find(s => s.id === data.id)) scope = 'snippet';
+    else if ((state.notebooks || []).find(n => n.id === data.id)) scope = 'notebook';
 
     const container = document.getElementById('viz-canvas-container');
     const rect = container.getBoundingClientRect();
@@ -1543,6 +1530,6 @@ function vizExportPNG() {
 }
 
 function vizExportName() {
-  const label = (vizModuleMeta(viz.activeModule).label || 'canvas').toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  const label = vizSurfaceLabel().toLowerCase().replace(/[^a-z0-9]+/g, '-');
   return 'studysession-' + label + '-' + new Date().toISOString().slice(0, 10);
 }

@@ -1,24 +1,34 @@
 /* Route: visualization */
 
-/* The five tabs used to be five hand-written buttons, and adding a sixth meant
-   editing this template, vizSwitchModule, a header map, a label map,
-   vizGetVisibleScopes, vizSyncModuleTools and vizDepthAllows. They come from
-   VIZ_MODULES now, and they are a real tablist: the strip had no role, no
-   aria-selected and no roving tab stop, so to a screen reader it was five
-   unrelated buttons. */
-function vizModuleTabsHTML() {
-  return VIZ_MODULE_ORDER.map((id, i) => {
-    const m = VIZ_MODULES[id];
+/* ── The strip ─────────────────────────────────────────────────
+   Five buttons used to mix two unrelated questions: which LIBRARY you were
+   looking at (Programs / Snippets / Notebooks), the union of all three
+   ("General"), and a completely different surface that shares only the chrome
+   (Brain). It is two controls now — a multi-select of libraries, and a switch
+   to Brain — which is why General no longer needs to exist as a thing.
+
+   They are toggle buttons rather than a tablist, because more than one can be
+   on at once; a plain click selects just that library, shift-click adds. */
+function vizScopeChipsHTML() {
+  return VIZ_LIBRARY_SCOPES.map((sc, i) => {
+    const m = VIZ_SCOPE_META[sc];
     const on = i === 0;
-    return `<button class="viz-module-tab${on ? ' active' : ''}" data-module="${id}" role="tab"
-        id="viz-tab-${id}" aria-selected="${on}" aria-controls="viz-content-body" tabindex="${on ? 0 : -1}"
-        onclick="vizSwitchModule('${id}')" onkeydown="vizModuleTabKey(event)">
+    return `<button class="viz-module-tab${on ? ' active' : ''}" data-scope="${sc}"
+        id="viz-scope-${sc}" aria-pressed="${on}"
+        title="Show ${m.label} — shift-click to add a library"
+        onclick="vizScopeClick(event, '${sc}')" onkeydown="vizStripKey(event)">
         <i data-lucide="${m.icon}"></i> ${m.label}</button>`;
-  }).join('');
+  }).join('')
+    + '<span class="viz-scope-count hidden" id="viz-scope-count" aria-live="polite"></span>'
+    + '<span class="viz-strip-sep" aria-hidden="true"></span>'
+    + `<button class="viz-module-tab viz-tab-brain" data-surface="brain" aria-pressed="false"
+        title="Brain — your own versioned maps, not a library"
+        onclick="vizSetSurface('brain')" onkeydown="vizStripKey(event)">
+        <i data-lucide="brain-circuit"></i> Brain</button>`;
 }
 
-/** Left/Right move between tabs, the way a tablist is expected to behave. */
-function vizModuleTabKey(e) {
+/** Left/Right move along the strip, the way a group of buttons should. */
+function vizStripKey(e) {
   const keys = { ArrowLeft: -1, ArrowRight: 1, Home: 'first', End: 'last' };
   if (!(e.key in keys)) return;
   e.preventDefault();
@@ -28,7 +38,7 @@ function vizModuleTabKey(e) {
   const next = step === 'first' ? tabs[0]
     : step === 'last' ? tabs[tabs.length - 1]
       : tabs[(i + step + tabs.length) % tabs.length];
-  if (next) { next.focus(); next.click(); }
+  if (next) next.focus();
 }
 
 /** One colour swatch row, used by every context menu that offers colours. */
@@ -52,8 +62,8 @@ function vizTemplate() {
             <button class="viz-tabs-toggle-btn" id="viz-tabs-toggle-btn" onclick="vizToggleModuleTabs()" title="Toggle module tabs" aria-label="Toggle module tabs">
               <i data-lucide="layout-grid"></i>
             </button>
-            <div class="viz-module-tabs" id="viz-module-tabs" role="tablist" aria-label="Visualization module">
-              ${vizModuleTabsHTML()}
+            <div class="viz-module-tabs" id="viz-module-tabs" role="group" aria-label="Libraries to show">
+              ${vizScopeChipsHTML()}
             </div>
           </div>
         </div>

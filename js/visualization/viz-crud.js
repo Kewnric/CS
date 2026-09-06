@@ -7,7 +7,7 @@ function vizAddCanvasNode(label, type, dataId, scope, x, y) {
   const container = document.getElementById('viz-canvas-container');
   const cx = x !== undefined ? x : (container ? container.offsetWidth / 2 : 400) / viz.zoom - viz.pan.x / viz.zoom;
   const cy = y !== undefined ? y : (container ? container.offsetHeight / 2 : 300) / viz.zoom - viz.pan.y / viz.zoom;
-  const node = { id, label, type: type || 'item', dataId: dataId || null, scope: scope || viz.activeModule, x: cx + (Math.random() - 0.5) * 80, y: cy + (Math.random() - 0.5) * 60, color: null, _isNew: true };
+  const node = { id, label, type: type || 'item', dataId: dataId || null, scope: scope || vizPrimaryScope(), x: cx + (Math.random() - 0.5) * 80, y: cy + (Math.random() - 0.5) * 60, color: null, _isNew: true };
   viz.nodes.push(node);
   viz.selectedNodeId = id;
   vizRenderCanvas();
@@ -410,8 +410,7 @@ const VIZ_BAND_X = { challenge: 60, snippet: 60 + VIZ_BAND_W, notebook: 60 + VIZ
  *   just because you opened the page.
  */
 function vizAutoPopulate(only) {
-  const scopes = only || (viz.activeModule === 'general' || viz.activeModule === 'brain'
-    ? [] : [viz.activeModule]);
+  const scopes = only || (viz.activeModule === 'brain' ? [] : vizGetVisibleScopes());
   if (!scopes.length) return;
   const scopeLabels = { challenge: 'Programs', snippet: 'Snippets', notebook: 'Notebooks' };
   let dirty = false;

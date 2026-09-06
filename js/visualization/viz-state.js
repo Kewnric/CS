@@ -3,7 +3,11 @@
    ============================================================ */
 
 const viz = {
-  activeModule: 'challenge',
+  /* Two surfaces, not five modules: the library map, and Brain. Which
+     LIBRARIES the map shows is a separate question, answered by `scopes` —
+     "General" was only ever all three at once. */
+  activeModule: 'library',
+  scopes: ['challenge'],
   selectedNodeId: null,
   selectedFolderId: null,
   folderStatePerModule: {},
@@ -217,6 +221,7 @@ function _vizSnapshot() {
     // a 600px pane) — after that it is whatever you left it as.
     expandedFolderIds: [...viz.expandedFolderIds],
     canvasDepth: viz.canvasDepth,
+    scopes: viz.scopes,
     // These three were read back at init but never written, so the paint
     // colour silently reset to blue on every reload and the toolbar sync for
     // colour mode was dead code.
@@ -278,6 +283,10 @@ function vizLoad() {
       if (d.defaultLinkArrowType) viz.defaultLinkArrowType = d.defaultLinkArrowType;
       viz.expandedFolderIds = new Set(d.expandedFolderIds || []);
       if (VIZ_DEPTHS.indexOf(d.canvasDepth) !== -1) viz.canvasDepth = d.canvasDepth;
+      if (Array.isArray(d.scopes)) {
+        const clean = d.scopes.filter(sc => VIZ_LIBRARY_SCOPES.includes(sc));
+        if (clean.length) viz.scopes = clean;
+      }
       viz.collapsedNodeIds = new Set(d.collapsedNodeIds || []);
       viz.collapsedNodeIds.forEach(id => {
         const node = viz.nodes.find(n => n.id === id);

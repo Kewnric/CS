@@ -19,11 +19,11 @@ function initVisualization() {
   // Ensure any previous bindings are cleaned up before re-binding.
   destroyVisualization();
 
-  // Always start on the Programs (challenge) module so the sidebar, toolbar
-  // label, and active-tab highlight are consistent on every route mount.
-  // Brain canvas state is preserved in `brain.*`; resetting activeModule here
-  // does not lose any brain data.
-  viz.activeModule = 'challenge';
+  // Always open on the library map rather than Brain, so the pane, the
+  // toolbar label and the strip agree on every route mount. Which libraries
+  // are selected is restored from storage by vizLoad below.
+  // Brain's canvas state is preserved in `brain.*`; this loses none of it.
+  viz.activeModule = 'library';
   viz.selectedNodeIds = new Set();
   viz.focusNodeId = null;
   viz.marquee = null;

@@ -410,21 +410,41 @@ function vizApplyTransform() {
 }
 
 /* ============================================================
-   THE MODULE REGISTRY
+   THE TWO SURFACES, AND THE LIBRARY FILTER
    ------------------------------------------------------------
-   The tab strip used to be five hand-written buttons, and adding a sixth
-   meant editing the template, vizSwitchModule, VIZ_HEADER_META, a labelMap,
-   vizGetVisibleScopes, vizSyncModuleTools and vizDepthAllows. A module is
-   really just a label, an icon and a set of library scopes.
+   The tab strip used to be five buttons that mixed two unrelated questions.
+   Programs, Snippets and Notebooks are one implementation with a different
+   `scope` string; "General" was those three at once and carried a second,
+   duplicate tree host to prove it; and Brain shares no data model with any of
+   them — versions, not library items — only the chrome.
+
+   So: which LIBRARIES the map shows is a multi-select (viz.scopes), and which
+   SURFACE you are on is a separate two-way switch (viz.activeModule). General
+   stops being a special case and becomes any combination you like, including
+   ones the five tabs could not express — Programs and Notebooks without
+   Snippets, which is exactly the cross-library link case it existed for.
    ============================================================ */
 
-const VIZ_MODULES = {
-  challenge: { label: 'Programs',  icon: 'code',          scopes: ['challenge'], noun: 'program',  headerIcon: 'file-code' },
-  snippet:   { label: 'Snippets',  icon: 'file-text',     scopes: ['snippet'],   noun: 'snippet',  headerIcon: 'code' },
-  notebook:  { label: 'Notebooks', icon: 'book',          scopes: ['notebook'],  noun: 'notebook', headerIcon: 'book-open' },
-  general:   { label: 'General',   icon: 'layers',        scopes: ['challenge', 'snippet', 'notebook'], noun: 'item', headerIcon: 'layers' },
-  brain:     { label: 'Brain',     icon: 'brain-circuit', scopes: [],            noun: 'version',  headerIcon: 'brain-circuit' }
-};
-const VIZ_MODULE_ORDER = ['challenge', 'snippet', 'notebook', 'general', 'brain'];
+const VIZ_LIBRARY_SCOPES = ['challenge', 'snippet', 'notebook'];
 
-function vizModuleMeta(id) { return VIZ_MODULES[id] || VIZ_MODULES.challenge; }
+const VIZ_SCOPE_META = {
+  challenge: { label: 'Programs', icon: 'code', headerIcon: 'file-code', noun: 'program' },
+  snippet: { label: 'Snippets', icon: 'file-text', headerIcon: 'code', noun: 'snippet' },
+  notebook: { label: 'Notebooks', icon: 'book', headerIcon: 'book-open', noun: 'notebook' }
+};
+
+function vizModuleMeta(scope) { return VIZ_SCOPE_META[scope] || VIZ_SCOPE_META.challenge; }
+
+/** What to call whatever is on screen: one library, several, or Brain. */
+function vizSurfaceLabel() {
+  if (viz.activeModule === 'brain') return 'Brain';
+  const s = vizGetVisibleScopes();
+  if (s.length === 1) return vizModuleMeta(s[0]).label;
+  if (s.length === VIZ_LIBRARY_SCOPES.length) return 'All libraries';
+  return s.map(x => vizModuleMeta(x).label).join(' + ');
+}
+
+/** Saved views belong to a combination of libraries, not to a "module". */
+function vizViewKey() {
+  return viz.activeModule === 'brain' ? 'brain' : vizGetVisibleScopes().slice().sort().join('+');
+}
