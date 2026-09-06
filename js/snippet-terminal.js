@@ -328,6 +328,7 @@ async function _snipTermRunStep() {
 
   if (!resA.didExecute) {
     session.lines.push({ type: 'error', text: 'Compilation Error:\n' + (termCleanDiagnostics(resA.buildStderr || resA.stderr) || 'Unknown error') });
+    termPushLint(session);
     session.completed = true;
     session.running = false;
     session.exitCode = -1;
@@ -409,6 +410,7 @@ async function _snipTermRunStep() {
     if (errText) session.lines.push({ type: 'error', text: errText });
   const warnText = termCleanDiagnostics(resA.buildStderr);
   if (warnText) session.lines.push({ type: 'warning', text: '⚠️ ' + warnText });
+  termPushLint(session);
 
   session.completed = true;
   session.running = false;
@@ -450,8 +452,9 @@ function _snipTermRunJSCPP(code, stdin) {
   return new Promise((resolve, reject) => {
     ensureJSCPP(() => {
       let output = '';
+      let processed = '';
       try {
-        const processed = preprocessCForJSCPP(code);
+        processed = preprocessCForJSCPP(code);
         const exitCode = JSCPP.run(processed, stdin || '', {
           stdio: { write: (s) => { output += s; } },
           unsigned_overflow: 'warn'
@@ -459,10 +462,20 @@ function _snipTermRunJSCPP(code, stdin) {
         resolve({ didExecute: true, exitCode: exitCode, stdout: output, stderr: '', buildStderr: '', execTime: null });
       } catch (err) {
         const msg = err.message || String(err);
+        // An interactive program comes through here on every keystroke, so the
+        // cheap check goes first and the translation only runs on real failures.
         if (msg.includes('EOF') || msg.includes('Memory overflow')) {
           resolve({ didExecute: true, exitCode: 1, stdout: output, stderr: '', buildStderr: '', execTime: null });
-        } else if (msg.includes('parse') || msg.includes('Syntax') || msg.includes('unexpected')) {
-          resolve({ didExecute: false, exitCode: -1, stdout: '', stderr: msg, buildStderr: msg, execTime: null });
+          return;
+        }
+        // See _termRunJSCPP: the raw text points at a preprocessed line and
+        // buries the one token that matters in a forty-token list.
+        const said = termExplainJSCPP(msg, code, processed, code);
+        if (termIsBuildFailure(msg)) {
+          const text = said || msg;
+          resolve({ didExecute: false, exitCode: -1, stdout: '', stderr: text, buildStderr: text, execTime: null });
+        } else if (said) {
+          resolve({ didExecute: false, exitCode: -1, stdout: output, stderr: said, buildStderr: said, execTime: null });
         } else {
           reject(err);
         }

@@ -3211,6 +3211,7 @@ async function _termRunStep() {
   if (!resA.didExecute) {
     _termCue(session, 'punch');
     session.lines.push({ type: 'error', text: 'Compilation Error:\n' + (termCleanDiagnostics(resA.buildStderr || resA.stderr, session.code) || 'Unknown error') });
+    termPushLint(session);
     session.completed = true;
     session.running = false;
     session.exitCode = -1;
@@ -3315,6 +3316,7 @@ async function _termRunStep() {
     if (errText) session.lines.push({ type: 'error', text: errText });
   const warnText = termCleanDiagnostics(resA.buildStderr, session.code);
   if (warnText) session.lines.push({ type: 'warning', text: '⚠️ ' + warnText });
+  termPushLint(session);
 
   session.completed = true;
   session.running = false;
@@ -3413,9 +3415,12 @@ function _termRunJSCPP(code, stdin) {
   return new Promise((resolve, reject) => {
     ensureJSCPP(() => {
       let output = '';
+      /* Both of these are needed by the failure path, to put a reported line
+         number back on the line the user is actually looking at. */
+      let merged = '', processed = '';
       try {
-        const merged = preprocessMultiFile(code);
-        const processed = preprocessCForJSCPP(merged);
+        merged = preprocessMultiFile(code);
+        processed = preprocessCForJSCPP(merged);
         const exitCode = JSCPP.run(processed, stdin || '', {
           stdio: { write: (s) => { output += s; } },
           unsigned_overflow: 'warn'
@@ -3426,9 +3431,18 @@ function _termRunJSCPP(code, stdin) {
         if (msg.includes('EOF') || msg.includes('Memory overflow')) {
           // Program needs more input — partial output already captured
           resolve({ didExecute: true, exitCode: 1, stdout: output, stderr: '', buildStderr: '', execTime: null });
-        } else if (msg.includes('parse') || msg.includes('Syntax') || msg.includes('unexpected')) {
-          resolve({ didExecute: false, exitCode: -1, stdout: '', stderr: msg, buildStderr: msg, execTime: null });
+        } else if (termIsBuildFailure(msg)) {
+          /* The raw text is a forty-token dump pointing at a preprocessed line.
+             Show what it MEANS instead; the original is kept only when nothing
+             could be made of it, because "ERROR: Parsing Failure:" on its own
+             tells the reader nothing the translation has not already said. */
+          const text = termExplainJSCPP(msg, merged, processed, code) || msg;
+          resolve({ didExecute: false, exitCode: -1, stdout: '', stderr: text, buildStderr: text, execTime: null });
         } else {
+          // Not a parse failure, but the interpreter's own limits read just as
+          // badly: "variable fopen does not exist" is not the user's mistake.
+          const said = termExplainJSCPP(msg, merged, processed, code);
+          if (said) { resolve({ didExecute: false, exitCode: -1, stdout: output, stderr: said, buildStderr: said, execTime: null }); return; }
           reject(err);
         }
       }
@@ -3629,6 +3643,36 @@ function preprocessCForJSCPP(code) {
 
   // ── 9. Handle void main() → int main() ──
   p = p.replace(/\bvoid\s+main\s*\(/g, 'int main(');
+
+  /* ── 10. (void) parameter lists ──────────────────────────────
+     THE most important line in this function. The interpreter cannot parse a
+     parameter list of `(void)` at all — it reports "missing declarator for
+     argument" and refuses the whole program. Which means that while Godbolt is
+     unreachable, `int main(void)` fails: the exact form this app's own course
+     teaches, and the opening line of nearly every program in the library.
+
+     Only a PARAMETER LIST is rewritten — an identifier immediately before the
+     bracket. A cast, `(void) printf(...)`, has no identifier there and is left
+     alone, and `(void *)` never matches because of the star. */
+  p = p.replace(/([A-Za-z_]\w*)\s*\(\s*void\s*\)/g, '$1()');
+
+  /* ── 11. Field widths in a scanf format ──────────────────────
+     The interpreter turns a scanf format into a regular expression, and a
+     width breaks that: `scanf("%255s", word)` dies with an internal JS error
+     ("object null is not iterable"), and so does `%3d`. A width on scanf is
+     precisely what safe C teaches — every string-reading program in this app's
+     own library uses `%255s` to keep the input inside the buffer — so without
+     this line the fallback cannot run any of them.
+
+     Dropping the width is safe here: the interpreter has no real buffer to
+     overrun, and it ignored the bound anyway. printf widths are deliberately
+     NOT touched — there a width is padding, it works, and removing it would
+     change the program's output. */
+  p = p.replace(
+    /\b(scanf|sscanf|fscanf)\s*\(\s*((?:[A-Za-z_]\w*\s*,\s*)?)"((?:[^"\\]|\\.)*)"/g,
+    (m, fn, lead, fmt) =>
+      fn + '(' + lead + '"' + fmt.replace(/%(\d+)(?=(?:hh|h|ll|l|L)?[diouxXeEfFgGacs])/g, '%') + '"'
+  );
 
   return p;
 }
@@ -3990,16 +4034,19 @@ function _gradeRunJSCPP(processedSource, stdin) {
   return new Promise((resolve, reject) => {
     ensureJSCPP(() => {
       let output = '';
+      let processed = '';
       try {
-        const processed = preprocessCForJSCPP(processedSource);
+        processed = preprocessCForJSCPP(processedSource);
         const exitCode = JSCPP.run(processed, stdin || '', { stdio: { write: (s) => { output += s; } }, unsigned_overflow: 'warn' });
         resolve({ didExecute: true, exitCode: exitCode, stdout: output, stderr: '', buildStderr: '' });
       } catch (err) {
         const msg = err.message || String(err);
         if (msg.includes('EOF') || msg.includes('Memory overflow')) {
           resolve({ didExecute: true, exitCode: 1, stdout: output, stderr: 'Program asked for more input than the test provided.', buildStderr: '' });
-        } else if (msg.includes('parse') || msg.includes('Syntax') || msg.includes('unexpected')) {
-          resolve({ didExecute: false, exitCode: -1, stdout: '', stderr: msg, buildStderr: msg });
+        } else if (termIsBuildFailure(msg)) {
+          // A failed submission is the worst place to print a token dump.
+          const text = termExplainJSCPP(msg, processedSource, processed, processedSource) || msg;
+          resolve({ didExecute: false, exitCode: -1, stdout: '', stderr: text, buildStderr: text });
         } else {
           reject(err);
         }

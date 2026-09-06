@@ -452,3 +452,313 @@ function termExitNote(exitCode) {
   }
   return { line: '\nProcess exited with code ' + exitCode, status: '⚠️ Exit code ' + exitCode, ok: false };
 }
+
+/* ── Reading the fallback interpreter's complaints ─────────────
+   When Godbolt is unreachable the local interpreter takes over, and what it
+   says about a program that will not parse is this, in full:
+
+     ERROR: Parsing Failure:
+     line 5 (column 3): ("Battery 87%\n")\n  return 0;\n}
+     ------------------------------------------------^
+     Expected "!=", "%", "%=", "&", "&&", "&=", "(", "*", "*=", "+", "++",
+     "+=", ",", "-", "--", "-=", "->", ".", "/", "/*", "//", "/=", ";", "<",
+     … forty tokens … but "r" found.
+
+   Three things are wrong with that. The line number is the PREPROCESSED line,
+   not the one in the editor. The excerpt is the whole rest of the file printed
+   on one row with its newlines escaped, so the caret under it points nowhere.
+   And the one token that matters — ";" — is the twenty-third item of a list
+   nobody is going to read.
+
+   Everything below turns that into the line the user actually typed, a caret
+   under the spot, and a sentence naming what is missing. */
+
+/** A thrown interpreter message that means "this never compiled". */
+function termIsBuildFailure(msg) {
+  return /pars|syntax|unexpected|missing declarator|but .{0,40}found/i.test(String(msg || ''));
+}
+
+/**
+ * Where a brace went wrong: the line of a `{` that is never closed, or of a
+ * `}` that closes nothing. Strings, chars and comments are skipped, so a brace
+ * inside printf("}") does not count.
+ * @returns {{line:number, extra:boolean}|null}
+ */
+function termBraceFault(src) {
+  const s = String(src || '');
+  const open = [];
+  let line = 1, i = 0;
+  let inStr = false, inChar = false, inLine = false, inBlock = false;
+
+  while (i < s.length) {
+    const c = s[i], next = s[i + 1];
+    if (c === '\n') { line++; i++; if (inLine) inLine = false; continue; }
+    if (inLine) { i++; continue; }
+    if (inBlock) { if (c === '*' && next === '/') { i += 2; inBlock = false; } else i++; continue; }
+    if ((inStr || inChar) && c === '\\') { i += 2; continue; }
+    if (inStr) { if (c === '"') inStr = false; i++; continue; }
+    if (inChar) { if (c === "'") inChar = false; i++; continue; }
+    if (c === '/' && next === '/') { inLine = true; i += 2; continue; }
+    if (c === '/' && next === '*') { inBlock = true; i += 2; continue; }
+    if (c === '"') { inStr = true; i++; continue; }
+    if (c === "'") { inChar = true; i++; continue; }
+    if (c === '{') open.push(line);
+    else if (c === '}') { if (!open.length) return { line: line, extra: true }; open.pop(); }
+    i++;
+  }
+  return open.length ? { line: open[open.length - 1], extra: false } : null;
+}
+
+/**
+ * The offending line, quoted from the user's own file with a caret under it.
+ * @param {string[]} lines the source, already split
+ * @param {number} lineNo 1-based; 0 means "we could not place it"
+ * @param {number} column 1-based, or 0 to omit the caret
+ */
+function termQuoteLine(lines, lineNo, column) {
+  if (!lineNo || lineNo < 1 || lineNo > lines.length) return '';
+  // Tabs are one character to the parser and several columns on screen, so the
+  // caret can only line up if both sides agree. Expanding them makes it agree.
+  const text = String(lines[lineNo - 1]).replace(/\t/g, '    ');
+  const shift = String(lines[lineNo - 1]).slice(0, Math.max(0, column - 1)).split('\t').length - 1;
+  const gutter = String(lineNo).padStart(4, ' ') + ' | ';
+  let out = '\n' + gutter + text;
+  if (column > 0) {
+    out += '\n' + ' '.repeat(gutter.length - 2) + '| '
+        + ' '.repeat(Math.max(0, column - 1 + shift * 3)) + '^';
+  }
+  return out;
+}
+
+/* Interpreter limits that are worth naming rather than leaking as a raw throw.
+   Each of these is something real GCC compiles happily, so the honest thing to
+   say is that the fallback cannot do it — not that the program is wrong. */
+const TERM_JSCPP_LIMITS = [
+  [/(?:variable|type) (?:FILE|fopen|fclose|fprintf|fread|fwrite|rewind|fseek|ftell|feof) (?:does not exist|is not defined)/i,
+   'File input/output is not available in the offline interpreter.\nFILE and fopen need a real filesystem, and there is none in the browser.\nThis program will run properly once the compiler is reachable again.'],
+  [/type struct/i,
+   'The offline interpreter does not support struct.\nNothing is wrong with your program — the fallback simply cannot do\nstructs. It will compile and run once the compiler is reachable again.'],
+  [/variable (?:malloc|calloc|realloc|free) does not exist/i,
+   'This use of malloc could not be converted for the offline interpreter.\nIt has no heap. Simple cases are rewritten as fixed-size arrays\nautomatically; this one was too complex to rewrite.'],
+  [/Invalid regular expression/i,
+   'That scanf format is more than the offline interpreter can handle.\nIt builds a pattern out of the format string, and %* (skip this field)\nis not something it can express. The real compiler has no trouble with it.'],
+  [/object null is not iterable/i,
+   'The offline interpreter could not read input in that format.\nA scan set — %[^\\n] and the like — is the usual cause; it does not\nsupport them. The real compiler does.'],
+  [/variable (\w+) does not exist/i,
+   'The offline interpreter does not provide "$1".\nIt is a partial implementation of C, and this is one of the gaps.\nThe real compiler has it — try again when it is reachable.'],
+  [/Memory overflow/i,
+   'The program ran out of memory in the interpreter.\nAn unbounded loop or a very large array is the usual cause.']
+];
+
+/**
+ * Translate an interpreter failure into something a student can act on.
+ *
+ * @param {string} raw       what the interpreter threw
+ * @param {string} merged    the source it was handed (all files linked together)
+ * @param {string} processed the source after preprocessCForJSCPP
+ * @param {string} userSource the file the editor is showing, for the quote
+ * @returns {string} plain text, or '' when nothing better than the raw message
+ */
+function termExplainJSCPP(raw, merged, processed, userSource) {
+  const msg = String(raw || '').replace(/^ERROR:\s*/i, '');
+  if (!msg.trim()) return '';
+
+  for (const [re, text] of TERM_JSCPP_LIMITS) {
+    const hit = re.exec(msg);
+    if (hit) return text.replace('$1', hit[1] || '');
+  }
+
+  const user = String(userSource == null ? (merged || '') : userSource);
+  const uLines = user.split('\n');
+  const mLines = String(merged || user).split('\n');
+  const pLines = String(processed || merged || user).split('\n');
+
+  /* How far down the preprocessor pushed everything. It only ever adds or
+     removes lines in the header region at the top — `using namespace std;`
+     after the last include, a header block when there are none, an unsupported
+     include dropped — and every other rewrite it does is in place, one line for
+     one line. So the drift below the headers is a single constant, and that is
+     the whole of the correction. */
+  const drift = pLines.length - mLines.length;
+
+  /** processed line (1-based) → the same line in the editor, or 0. */
+  const toUser = (pLine) => {
+    const idx = pLine - 1 - drift;
+    if (idx < 0 || idx >= mLines.length) return 0;
+    if (user === String(merged || user)) return idx + 1;
+    // Several files were linked into one unit, so the line may not be in the
+    // file on screen. Claim it only when its text appears there exactly once.
+    if (mLines[idx] === uLines[idx]) return idx + 1;
+    const want = mLines[idx].trim();
+    if (!want) return 0;
+    const hits = [];
+    uLines.forEach((l, i) => { if (l.trim() === want) hits.push(i + 1); });
+    return hits.length === 1 ? hits[0] : 0;
+  };
+
+  // "line 5 (column 3):" — a parse failure.
+  const pos = msg.match(/line\s+(\d+)\s*\(column\s+(\d+)\)/i);
+  if (pos) {
+    const pLine = parseInt(pos[1], 10);
+    const column = parseInt(pos[2], 10);
+    const expected = (msg.match(/Expected([\s\S]*?)\bbut\b/i) || ['', ''])[1];
+    const found = (msg.match(/\bbut\s+([\s\S]*?)\s*found/i) || ['', ''])[1];
+    const at = toUser(pLine);
+    // The column was measured against the preprocessed line. It only transfers
+    // if that line came through the preprocessor untouched.
+    const same = at > 0 && pLines[pLine - 1] === uLines[at - 1];
+
+    // Ran off the end of the file: a block was never closed.
+    if (/end of input/i.test(found)) {
+      const fault = termBraceFault(user);
+      if (fault && !fault.extra) {
+        return 'The { opened on line ' + fault.line + ' is never closed.\n'
+          + 'Every { needs a matching }.'
+          + termQuoteLine(uLines, fault.line, 0);
+      }
+      return 'The file ends in the middle of something.\nA closing } or ) is missing.';
+    }
+
+    // An unbalanced bracket on the marked line.
+    if (expected.indexOf('")"') !== -1) {
+      return 'A closing ) is missing on line ' + (at || pLine) + '.\n'
+        + 'Count the brackets along the line: every ( needs its ).'
+        + termQuoteLine(uLines, at, same ? column : 0);
+    }
+
+    // The classic. The parser only complains once it reaches the NEXT
+    // statement, so the semicolon belongs at the end of the line before.
+    if (expected.indexOf('";"') !== -1) {
+      let target = at - 1;
+      while (target >= 1 && !uLines[target - 1].trim()) target--;
+      if (target >= 1) {
+        const text = uLines[target - 1];
+        const col = text.replace(/\s+$/, '').length + 1;
+        return 'Missing semicolon at the end of line ' + target + '.\n'
+          + "C ends every statement with a ';'. The compiler doesn't notice until it\n"
+          + 'reaches the next one, which is why line ' + at + ' is where it stopped.'
+          + termQuoteLine(uLines, target, col);
+      }
+    }
+
+    const extra = termBraceFault(user);
+    if (extra && extra.extra) {
+      return 'There is a } on line ' + extra.line + ' that closes nothing.'
+        + termQuoteLine(uLines, extra.line, 0);
+    }
+    return 'Line ' + (at || pLine) + " doesn't parse.\n"
+      + 'Something is wrong with the punctuation here or just above — a missing\n'
+      + '; or ) or " is almost always the cause.'
+      + termQuoteLine(uLines, at, same ? column : 0);
+  }
+
+  // "3:10 missing declarator for argument" — the short form.
+  const short = msg.match(/^\s*(\d+):(\d+)\s+([\s\S]+)$/);
+  if (short) {
+    const at = toUser(parseInt(short[1], 10));
+    return short[3].trim().replace(/\s+/g, ' ')
+      + (at ? '\n' + termQuoteLine(uLines, at, 0).replace(/^\n/, '') : '');
+  }
+  return '';
+}
+
+/* ── The warnings the interpreter never gives ──────────────────
+   Godbolt compiles with -Wall, so on a normal run real GCC has already said
+   everything below. The fallback interpreter has no warnings at all: it runs
+   the program and prints whatever comes out, which is how printf("87%\n")
+   comes out looking right while being undefined behaviour.
+
+   These three are the ones that produce plausible output while being wrong,
+   which is exactly the kind that goes unnoticed. */
+
+/**
+ * @param {string} src the user's file
+ * @returns {Array<{line:number, text:string}>}
+ */
+function termLintC(src) {
+  const lines = String(src || '').split('\n');
+  const notes = [];
+
+  /* scanf("%d", p) is correct when p is already a pointer or an array, so the
+     names declared that way are collected first and never warned about. */
+  const indirect = new Set();
+  const all = String(src || '');
+  let m;
+  const ptrDecl = /\b(?:char|int|short|long|float|double|unsigned|signed|void|size_t|FILE|[A-Z]\w*)\s*\*+\s*([A-Za-z_]\w*)/g;
+  while ((m = ptrDecl.exec(all))) indirect.add(m[1]);
+  const arrDecl = /\b([A-Za-z_]\w*)\s*\[\s*\w*\s*\]\s*(?:=|;|,|\))/g;
+  while ((m = arrDecl.exec(all))) indirect.add(m[1]);
+
+  /* A conversion is % then optional flags, width, precision and length, then
+     the letter — or a scan set, %[^\n] and friends, whose closing ] may be the
+     very first character inside the brackets. */
+  const conv = /^[-+ #0]*\*?\d*(?:\.\d+)?(?:hh|h|ll|l|L|z|j|t)?(?:[diouxXeEfFgGaAcspn%]|\[\^?\]?[^\]]*\])/;
+
+  lines.forEach((raw, i) => {
+    const line = raw.replace(/\/\/.*$/, '');
+    const at = i + 1;
+
+    // A lone % in a format string. printf("87%\n") is undefined behaviour —
+    // GCC calls it "spurious trailing %". A literal percent is written %%.
+    const fmt = line.match(/\b(?:printf|fprintf|sprintf|snprintf|scanf|sscanf)\s*\([^"]*"((?:[^"\\]|\\.)*)"/);
+    if (fmt) {
+      const s = fmt[1];
+      for (let k = 0; k < s.length; k++) {
+        if (s[k] !== '%') continue;
+        const rest = s.slice(k + 1);
+        const hit = conv.exec(rest);
+        if (hit) { k += hit[0].length; continue; }
+        notes.push({
+          line: at,
+          text: 'line ' + at + ': that % is not a conversion.\n'
+            + 'To print a percent sign, write it twice: %%. A single % makes printf\n'
+            + 'look for an argument that was never passed.'
+        });
+        break;
+      }
+    }
+
+    // if (x = 5) stores 5 and then tests it, so the branch is always taken.
+    const assign = /\b(if|while)\s*\(\s*([A-Za-z_]\w*)\s*=(?!=)/.exec(line);
+    if (assign) {
+      notes.push({
+        line: at,
+        text: 'line ' + at + ': "' + assign[2] + ' =" assigns, it does not compare.\n'
+          + 'This stores the value in ' + assign[2] + ' and then tests it, so the '
+          + assign[1] + ' is\nalmost certainly always true. To compare, write ==.'
+      });
+    }
+
+    // scanf needs the address of what it writes into.
+    const sc = /\bscanf\s*\(\s*"([^"]*)"\s*,\s*([^;]*)\)\s*;/.exec(line);
+    if (sc && /%[-0-9.*]*(?:hh|h|ll|l|L)?[diouxXeEfFgGac]/.test(sc[1])) {
+      sc[2].split(',').map(a => a.trim()).forEach(a => {
+        if (/^[A-Za-z_]\w*$/.test(a) && !indirect.has(a)) {
+          notes.push({
+            line: at,
+            text: 'line ' + at + ': scanf is missing an & before ' + a + '.\n'
+              + 'scanf writes THROUGH an address, so it needs &' + a + '. Given the value\n'
+              + 'instead, it treats that number as a location and writes there.'
+          });
+        }
+      });
+    }
+  });
+  return notes;
+}
+
+/**
+ * Say what -Wall would have said, on the runs where nobody said it.
+ *
+ * Godbolt compiles with -Wall, so a normal run has already been told about a
+ * stray %, an `if (x = 5)` or a scanf missing its &. The fallback interpreter
+ * has no warnings whatsoever — it runs the program and prints whatever comes
+ * out, which is how `printf("87%\n")` comes out looking perfectly fine while
+ * being undefined behaviour. So the check only runs when it is the one running.
+ */
+function termPushLint(session) {
+  if (!session || session.engine !== 'JSCPP' || session.linted) return;
+  session.linted = true;
+  const notes = (typeof termLintC === 'function') ? termLintC(session.code) : [];
+  notes.forEach(n => session.lines.push({ type: 'warning', text: '⚠️ ' + n.text }));
+}
