@@ -321,7 +321,7 @@ h3 {
 
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
 }
 
@@ -639,10 +639,28 @@ h3 {
   transition: background-color 0.5s ease, color 0.5s ease, border-color 0.5s ease, fill 0.5s ease, stroke 0.5s ease, box-shadow 0.5s ease !important;
 }
 
-/* Staggered children animation */
+/* Staggered children animation.
+
+   `backwards`, NOT `forwards` — and no resting opacity:0 to go with it.
+
+   A forwards fill keeps the animation in effect for good, and an animation that
+   touches `transform` makes the element transformed for as long as it is in
+   effect. The last keyframe being translateY(0) — or even `none`, which an
+   in-effect animation still resolves to the identity matrix — does not save
+   you: the element stays transformed, which means it stays a stacking context
+   AND the containing block for anything absolutely positioned inside it.
+
+   That was quietly trapping every menu under a staggered row. The library's
+   View menu is z-index 30 over cards at auto and still painted UNDER them,
+   because its z-index was resolved inside its parent's context and that context
+   was painted in DOM order, before the grid.
+
+   Backwards fill holds the FROM state during the delay — which is all the
+   opacity:0 was ever for — and then hands the element back to its own styles
+   the moment the animation ends. No lingering transform, no context, nothing
+   trapped, and it looks exactly the same. */
 .stagger-children>* {
-  opacity: 0;
-  animation: fadeInUp 0.4s ease-out forwards;
+  animation: fadeInUp 0.4s ease-out backwards;
 }
 
 .stagger-children>*:nth-child(1) {
@@ -764,11 +782,18 @@ h3 {
   transition-duration: 0s !important;
 }
 
-/* Forces animations to retain their final computed values */
+/* Forces animations to retain their final computed values.
+
+   .stagger-children>* is deliberately NOT in this list any more. It needed a
+   forwards fill only because it rested at opacity:0; it now rests visible and
+   fills backwards instead (see the rule above), and forcing forwards here undid
+   that — leaving every staggered child permanently transformed, a stacking
+   context, and a trap for any menu inside it. An !important on a shared list is
+   exactly the kind of rule that keeps winning an argument nobody remembers
+   having, so the fix is to take the selector out rather than fight it. */
 .animate-fade-in,
 .fade-in-up,
 .pulse-highlight,
-.stagger-children>*,
 .heatmap-cell,
 .home-activity-item {
   animation-fill-mode: forwards !important;

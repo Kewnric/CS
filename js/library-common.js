@@ -48,6 +48,20 @@ function getLibPref(key, fallback) {
   return v === undefined ? fallback : v;
 }
 
+/* ── Subfolder tiles ───────────────────────────────────────────
+   One session key shared by the coding library, snippets and notebooks, read
+   in six places — so the convention lives here rather than being spelled out
+   at each of them.
+
+   SHOWN BY DEFAULT. It used to be `get() !== 'false'` meaning hide, so a folder
+   with children opened looking empty until you found the toggle: the tiles are
+   how you get to the rest of the tier, and hiding the way down by default made
+   a nested library look like a shallow one. Only an explicit 'true' hides them
+   now, which is what the existing writers already store. */
+function libSubfoldersHidden() {
+  return getSessionParam('hideSubfolders') === 'true';
+}
+
 function setLibPref(key, value) {
   const p = _libPrefs();
   if (value === null || value === undefined) delete p[key];

@@ -624,7 +624,7 @@ function _renderSnippetFilterBar(total, shown, pool) {
     onClear: 'clearSnippetFilters()',
     sort: sortSel,
     view: `<label class="lib-view-row">
-      <input type="checkbox" ${getSessionParam('hideSubfolders') === 'false' ? 'checked' : ''}
+      <input type="checkbox" ${libSubfoldersHidden() ? '' : 'checked'}
              onchange="setSessionParam('hideSubfolders', this.checked ? 'false' : 'true'); renderSnippetDetail();" />
       <span><strong>Subfolders</strong><em>Show subfolder tiles above the cards</em></span>
     </label>`,
@@ -751,7 +751,7 @@ function renderSnippetFolderOverview(container) {
         </p>
       </div>`;
   } else {
-    const hideSubfolders = getSessionParam('hideSubfolders') !== 'false';
+    const hideSubfolders = libSubfoldersHidden();
     const filterBarHtml = _preFilterSnippets.length > 0 ? _renderSnippetFilterBar(_preFilterSnippets.length, snippets.length, _preFilterSnippets) : '';
 
     // ---- Pagination ----

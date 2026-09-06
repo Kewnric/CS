@@ -781,7 +781,7 @@ function _renderNotebookFilterBar(total, shown, pool) {
     onClear: 'clearNotebookFilters()',
     sort: sortSel,
     view: `<label class="lib-view-row">
-      <input type="checkbox" ${getSessionParam('hideSubfolders') === 'false' ? 'checked' : ''}
+      <input type="checkbox" ${libSubfoldersHidden() ? '' : 'checked'}
              onchange="setSessionParam('hideSubfolders', this.checked ? 'false' : 'true'); notesRenderDetail();" />
       <span><strong>Subfolders</strong><em>Show subfolder tiles above the cards</em></span>
     </label>`,
@@ -1005,7 +1005,7 @@ function renderNotebookFolderOverview(container) {
         </p>
       </div>`;
   } else {
-    const hideSubfolders = getSessionParam('hideSubfolders') !== 'false';
+    const hideSubfolders = libSubfoldersHidden();
     const filterBarHtml = _preFilterNotebooks.length > 0 ? _renderNotebookFilterBar(_preFilterNotebooks.length, notebooks.length, _preFilterNotebooks) : '';
 
     let gridHtml = '';

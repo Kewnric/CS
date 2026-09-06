@@ -17,8 +17,19 @@
    padding as any other row now; the smaller icon and lighter label are what
    carry the hierarchy, not a cramped row. */
 
-/* --- Collapsible filter shell --- */
-.lib-filter-shell { margin-bottom: 1rem; }
+/* --- Collapsible filter shell ---
+   The shell is raised above the grid on purpose. The menus it opens hang below
+   its own row and over the cards, and a menu that resolves its z-index inside
+   some ancestor's stacking context is at the mercy of whatever creates one up
+   the tree — which is exactly how the View menu ended up under the folder tiles
+   (a staggered entrance was leaving a transform on the row; see fadeInUp).
+   Lifting the shell itself means the menus are above the content no matter what
+   happens inside it. */
+.lib-filter-shell {
+  margin-bottom: 1rem;
+  position: relative;
+  z-index: 20;
+}
 .lib-filter-head {
   display: flex;
   align-items: center;

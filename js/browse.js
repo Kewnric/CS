@@ -863,7 +863,7 @@ function _renderBrowseFilterBar(total, shown, pool) {
       </span>
     </div>
     <label class="lib-view-row">
-      <input type="checkbox" ${getSessionParam('hideSubfolders') === 'false' ? 'checked' : ''}
+      <input type="checkbox" ${libSubfoldersHidden() ? '' : 'checked'}
              onchange="setSessionParam('hideSubfolders', this.checked ? 'false' : 'true'); renderBrowseContent();" />
       <span><strong>Subfolders</strong><em>Show subfolder tiles above the cards</em></span>
     </label>`;
@@ -1567,7 +1567,7 @@ function renderBrowseContent() {
         </p>
       </div>`;
   } else {
-    const hideSubfolders = getSessionParam('hideSubfolders') !== 'false';
+    const hideSubfolders = libSubfoldersHidden();
 
     // In search mode the heading is "Search Results", so it must NOT carry the
     // previously-selected folder's description, progress bar or click-to-edit
