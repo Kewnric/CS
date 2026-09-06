@@ -431,3 +431,55 @@ body.demo-open { overflow: hidden; }
   .practice-demo-btn.is-new::after { animation: none !important; }
   .demo-line, .demo-dot, .demo-card { transition: none !important; }
 }
+
+/* ── What builds on this ───────────────────────────────────────
+   Offered on the last panel, because that is the moment the next idea makes
+   sense. Two lessons had no program that could reach them, and a walkthrough
+   only the shelf knows about is one nobody finds when it would help. */
+.demo-next-up {
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.demo-next-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.demo-next-card {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  transition: border-color 0.16s ease, transform 0.16s ease;
+}
+.demo-next-card:hover { border-color: var(--color-primary); transform: translateX(2px); }
+.demo-next-card:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.demo-next-card > i:first-child { width: 15px; height: 15px; flex-shrink: 0; color: var(--color-primary); }
+.demo-next-card span { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.demo-next-card strong { font-size: 0.82rem; color: var(--text-primary); }
+.demo-next-card em {
+  font-style: normal;
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.demo-next-go { width: 13px; height: 13px; flex-shrink: 0; color: var(--text-tertiary); }
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-next-card { transition: none !important; }
+}

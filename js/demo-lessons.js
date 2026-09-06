@@ -128,6 +128,7 @@ int main(void) {
       { line: 7, say: 'Now the <code>&amp;</code>. printf is given a <em>value</em> to print; scanf has to be given somewhere to <em>put</em> one. <code>&amp;n</code> means "the address of n" — the box itself, not a copy of what is in it. Leave the &amp; off and scanf writes to whatever number happened to be in <code>n</code>, treated as an address.', vars: { n: '5' }, out: 'Enter a number: ‸5‸\n' },
       { line: 9, say: 'And now <code>n</code> really holds 5, so printing it prints 5.', vars: { n: '5' }, out: 'Enter a number: ‸5‸\nYou typed 5.\n' }
     ],
+    next: ['string'],
     recap: 'Prompt, then <code>scanf("%d", &amp;n)</code>. The <code>&amp;</code> is not decoration — it is what lets scanf reach your variable.'
   },
 
@@ -424,6 +425,7 @@ int main(void) {
       { line: 10, say: 'Print it.', vars: { '(main) result': '16' }, out: '16\n' },
       { line: 11, say: 'And you can use a call anywhere a value fits — no variable needed. This runs square again with a different argument and prints the answer straight out.', vars: { '(main) result': '16' }, out: '16\n81\n' }
     ],
+    next: ['pass-by-value'],
     recap: 'A function is a named block with an entrance (parameters) and an exit (return). The call becomes the returned value, right where you wrote it.'
   },
 
@@ -465,6 +467,7 @@ int main(void) {
       { line: 12, say: 'Back in main. <code>score</code> is still 5. Nothing went wrong; the function was never given anything that could change it.', vars: { 'main · score': '5' }, out: 'inside:  n is 15\noutside: score is 5\n' },
       { line: 11, say: 'This is <strong>pass by value</strong>, and it is the default for every plain variable in C. A function receives copies, so it cannot reach back and alter its caller\'s variables — which is usually exactly what you want.', vars: { 'main · score': '5' }, out: 'inside:  n is 15\noutside: score is 5\n' }
     ],
+    next: ['pointer', 'pass-by-reference'],
     recap: 'The function got a copy, changed the copy, and the copy went away. If you need the caller\'s variable to change, you have to give the function its address — that is the next walkthrough.'
   },
 
@@ -502,6 +505,7 @@ int main(void) {
       { line: 10, say: 'And it works as a destination too. <code>*p = 99</code> means "go to 1000 and put 99 there". It never mentions score.', vars: { score: '99   (at 1000)', p: '1000' }, out: 'score is 5\np points at 5\n' },
       { line: 11, say: 'But score IS 1000, so score is 99 now. That is the whole point of a pointer: a second way to reach one box.', vars: { score: '99   (at 1000)', p: '1000' }, out: 'score is 5\np points at 5\nscore is now 99\n' }
     ],
+    next: ['pass-by-reference', 'pointer-array'],
     recap: '<code>&amp;x</code> gets the address of x. <code>*p</code> uses whatever is at the address in p — to read it, or to write to it.'
   },
 
@@ -600,6 +604,7 @@ int main(void) {
       { line: 11, say: '…and on to the end.', vars: { i: '4', 'marks[i]': '64' }, out: 'first is 70\nlast is 64\n70 82 55 91 64 ' },
       { line: 13, say: 'i reaches 5, the condition fails, the loop stops — having touched every box exactly once.', vars: { i: '5' }, out: 'first is 70\nlast is 64\n70 82 55 91 64 \n' }
     ],
+    next: ['array-function', 'array-ops'],
     recap: 'Indexes run 0 to size-1. Loop with <code>i &lt; size</code>, and remember that C never checks whether you went off the end.'
   },
 
@@ -649,6 +654,7 @@ int main(void) {
       { line: 14, say: '<code>a[i] = a[i] + 1</code>. There is no copy to protect main\'s array, so this changes main\'s boxes directly.', vars: { 'main · marks': '11 21 31' }, out: 'total 60\n' },
       { line: 23, say: 'Back in main, and the array really has changed: 63, not 60. An <code>int</code> passed to a function is safe from it; an array is not, and nothing in the call looks any different.', vars: { 'main · marks': '11 21 31' }, out: 'total 60\ntotal 63\n' }
     ],
+    next: ['pointer-array'],
     recap: 'An array argument becomes a pointer. The function can change your data, it cannot measure it, and you must pass the length yourself.'
   },
 
@@ -691,5 +697,591 @@ int main(void) {
     ],
     recap: 'Base case first, then a call that moves toward it. The calls stack up on the way down and are finished off in reverse on the way back.'
   }
+,
+
+  /* ══ Arrays, continued ═══════════════════════════════════ */
+
+  {
+    id: 'array-ops',
+    order: 145,
+    group: 'Arrays',
+    title: 'Insert and delete',
+    tagline: 'Making room, and closing the gap',
+    icon: 'list-plus',
+    file: 'ops.c',
+    match: { folders: ['starter-folder-ar-ops', 'starter-folder-4'] },
+    code:
+`#include <stdio.h>
+
+int main(void) {
+    int a[6] = {10, 20, 30, 40, 0};
+    int n = 4;
+    int i;
+
+    for (i = n; i > 1; i--) {
+        a[i] = a[i - 1];
+    }
+    a[1] = 99;
+    n++;
+
+    for (i = 0; i < n; i++) {
+        printf("%d ", a[i]);
+    }
+    printf("\\n");
+    return 0;
+}`,
+    steps: [
+      { lines: [4, 5], say: 'Six boxes, but only four are in use. That is the whole trick of an array list: the array is a fixed size, and <code>n</code> says how much of it counts. The spare room is what lets anything be inserted.', vars: { 'a': '10 20 30 40 _ _', n: '4' } },
+      { line: 8, say: 'To insert at position 1, everything from there on has to move one place right. The loop runs BACKWARDS — start at the end and walk down.', vars: { 'a': '10 20 30 40 _ _', n: '4', i: '4' } },
+      { line: 9, say: 'i is 4: copy a[3] into a[4]. The 40 now exists in two places, which is fine — the left-hand copy is about to be overwritten.', vars: { 'a': '10 20 30 40 40', n: '4', i: '4' } },
+      { line: 9, say: 'i is 3: a[2] into a[3]. The 30 moves right.', vars: { 'a': '10 20 30 30 40', n: '4', i: '3' } },
+      { line: 9, say: 'i is 2: a[1] into a[2]. And now position 1 is free — its old value is safely one place along.', vars: { 'a': '10 20 20 30 40', n: '4', i: '2' } },
+      { line: 8, say: 'Going backwards is the point. Forwards, the first copy would overwrite the value the second copy needed, and one number would be smeared across the whole array.', vars: { 'a': '10 20 20 30 40', n: '4', i: '1' } },
+      { line: 11, say: 'Now drop the new value into the hole.', vars: { 'a': '10 99 20 30 40', n: '4', i: '1' } },
+      { line: 12, say: 'And say the list is one longer. Forgetting this line is the classic bug: the value is there, and nothing will ever look at it.', vars: { 'a': '10 99 20 30 40', n: '5', i: '1' } },
+      { lines: [14, 16], say: 'Printing uses <code>n</code>, not 6. The two spare boxes hold whatever they held before and are none of the list\'s business.', vars: { n: '5' }, out: '10 99 20 30 40 \n' },
+      {
+        line: 8,
+        code:
+`#include <stdio.h>
+
+int main(void) {
+    int a[6] = {10, 99, 20, 30, 40};
+    int n = 5;
+    int i;
+
+    for (i = 1; i < n - 1; i++) {
+        a[i] = a[i + 1];
+    }
+    n--;
+
+    for (i = 0; i < n; i++) {
+        printf("%d ", a[i]);
+    }
+    printf("\\n");
+    return 0;
+}`,
+        say: 'Deleting is the same idea reversed: shift everything after the hole one place LEFT, and this time the loop runs forwards for exactly the same reason. Then <code>n--</code>. Nothing is erased — the last slot still holds its old copy — the list just stops counting it.',
+        vars: { 'a': '10 20 30 40 40', n: '4' },
+        out: '10 20 30 40 \n'
+      }
+    ],
+    recap: 'Insert: shift right, backwards, then write, then <code>n++</code>. Delete: shift left, forwards, then <code>n--</code>. The array never changes size; <code>n</code> does.'
+  },
+
+  {
+    id: 'grid',
+    order: 148,
+    group: 'Arrays',
+    title: 'Two dimensions',
+    tagline: 'Rows and columns, and which loop is which',
+    icon: 'table-2',
+    file: 'grid.c',
+    match: { folders: ['starter-folder-ar-grid', 'starter-folder-11'] },
+    code:
+`#include <stdio.h>
+
+int main(void) {
+    int g[2][3] = { {1, 2, 3},
+                    {4, 5, 6} };
+    int r, c, sum;
+
+    for (r = 0; r < 2; r++) {
+        sum = 0;
+        for (c = 0; c < 3; c++) {
+            printf("%d ", g[r][c]);
+            sum = sum + g[r][c];
+        }
+        printf("| row total %d\\n", sum);
+    }
+    return 0;
+}`,
+    steps: [
+      { lines: [4, 5], say: '<code>g[2][3]</code> reads outside-in: <strong>2 rows, each of 3</strong>. The braces are written the same way — one inner pair per row.', vars: { 'g[0]': '1 2 3', 'g[1]': '4 5 6' } },
+      { line: 7, say: 'Outer loop over rows. <code>r</code> picks which row; it will be 0 then 1.', vars: { r: '0' } },
+      { line: 8, say: '<code>sum</code> is reset HERE, inside the row loop. Put it above line 7 and you would get a running total across the whole grid instead of one per row.', vars: { r: '0', sum: '0' } },
+      { line: 9, say: 'Inner loop over the columns of THIS row.', vars: { r: '0', c: '0', sum: '0' } },
+      { lines: [10, 11], say: '<code>g[r][c]</code> is row r, column c — row first, always, in the same order as the declaration.', vars: { r: '0', c: '0', sum: '1' }, out: '1 ' },
+      { lines: [10, 11], say: 'c walks along the row.', vars: { r: '0', c: '2', sum: '6' }, out: '1 2 3 ' },
+      { line: 13, say: 'End of the row: print its total and break the line. Outside the inner loop, inside the outer one — the same placement as the star triangle.', vars: { r: '0', sum: '6' }, out: '1 2 3 | row total 6\n' },
+      { line: 7, say: 'Next row. <code>c</code> restarts at 0 and <code>sum</code> is cleared again.', vars: { r: '1', c: '0', sum: '0' }, out: '1 2 3 | row total 6\n' },
+      { lines: [10, 11], say: 'Row 1 is 4, 5, 6.', vars: { r: '1', c: '2', sum: '15' }, out: '1 2 3 | row total 6\n4 5 6 ' },
+      { line: 13, say: 'And its total.', vars: { r: '1', sum: '15' }, out: '1 2 3 | row total 6\n4 5 6 | row total 15\n' },
+      { line: 9, say: 'Column totals are the same two loops with the order swapped: put <code>c</code> outside and <code>r</code> inside, and you walk down a column instead of along a row. The grid does not change — only which index moves fastest.', vars: {}, out: '1 2 3 | row total 6\n4 5 6 | row total 15\n' }
+    ],
+    recap: '<code>g[row][col]</code>, declared rows-first. Outer loop rows, inner loop columns — and swap them to work down columns instead.'
+  },
+
+  {
+    id: 'pointer-array',
+    order: 149,
+    group: 'Pointers',
+    title: 'Pointers and arrays',
+    tagline: 'Why a[i] and *(a + i) are the same thing',
+    icon: 'move-horizontal',
+    file: 'ptrarr.c',
+    match: { folders: ['starter-folder-ptr-arr', 'starter-folder-5'] },
+    code:
+`#include <stdio.h>
+
+int main(void) {
+    int a[4] = {10, 20, 30, 40};
+    int *p = a;
+    int i;
+
+    printf("%d %d\\n", a[0], *p);
+    printf("%d %d\\n", a[2], *(p + 2));
+
+    for (i = 0; i < 4; i++) {
+        printf("%d ", *(a + i));
+    }
+    printf("\\n");
+    return 0;
+}`,
+    steps: [
+      { line: 4, say: 'Four ints, side by side. Say the first sits at address 1000 — then, because each int is 4 bytes, the next is at 1004, then 1008, then 1012.', vars: { a: '10 20 30 40' } },
+      { line: 5, say: 'No <code>&amp;</code> here, and that is not a mistake. <strong>An array\'s name IS the address of its first element.</strong> <code>p = a</code> and <code>p = &amp;a[0]</code> mean the same thing.', vars: { a: '10 20 30 40', p: '1000' } },
+      { line: 8, say: 'So <code>*p</code> — what is at 1000 — is 10, which is exactly <code>a[0]</code>.', vars: { p: '1000' }, out: '10 10\n' },
+      { line: 9, say: '<code>p + 2</code> does NOT mean 1002. Pointer arithmetic counts in ELEMENTS: two ints along is 8 bytes, so it is 1008. The compiler knows the size because the pointer has a type.', vars: { p: '1000', 'p + 2': '1008' }, out: '10 10\n30 30\n' },
+      { line: 9, say: 'Which makes <code>*(p + 2)</code> and <code>a[2]</code> the same value by the same route. They are not similar — <code>a[i]</code> is <em>defined</em> as <code>*(a + i)</code>.', vars: { p: '1000' }, out: '10 10\n30 30\n' },
+      { lines: [11, 12], say: 'So this loop is an ordinary array walk, written the other way round. Both forms compile to the same thing; brackets are just easier to read.', vars: { i: '0' }, out: '10 10\n30 30\n10 ' },
+      { line: 12, say: 'i walks along.', vars: { i: '3' }, out: '10 10\n30 30\n10 20 30 40 ' },
+      { line: 5, say: 'One difference that matters: <code>p</code> is a variable and can be moved — <code>p++</code> is legal. <code>a</code> is the array\'s name and cannot; <code>a++</code> will not compile.', vars: { a: '10 20 30 40', p: '1000' }, out: '10 10\n30 30\n10 20 30 40 \n' }
+    ],
+    recap: '<code>a</code> is the address of <code>a[0]</code>, and <code>a[i]</code> means <code>*(a + i)</code>. Adding 1 to a pointer moves it one ELEMENT, not one byte.'
+  },
+
+  /* ══ Strings ═════════════════════════════════════════════ */
+
+  {
+    id: 'string',
+    order: 160,
+    group: 'Strings',
+    title: 'Strings',
+    tagline: 'A char array, and the invisible character on the end',
+    icon: 'text-cursor-input',
+    file: 'word.c',
+    match: { folders: ['starter-folder-9'] },
+    code:
+`#include <stdio.h>
+
+int main(void) {
+    char word[20];
+    int i;
+
+    printf("Enter a word: ");
+    scanf("%s", word);
+
+    printf("You typed %s\\n", word);
+
+    for (i = 0; word[i] != '\\0'; i++) {
+        printf("%c-", word[i]);
+    }
+    printf("\\n%d letters\\n", i);
+    return 0;
+}`,
+    steps: [
+      { line: 4, say: 'There is no string type in C. A string is an <strong>array of char</strong> — 20 boxes, each holding one character. The 20 is the room available, not the length of anything.', vars: { word: '(20 empty boxes)' } },
+      { lines: [7, 8], say: 'You type <strong>cat</strong>. Note there is no <code>&amp;</code> on <code>word</code>: it is an array, so its name is already the address scanf needs.', vars: { word: "c a t \\0" }, out: 'Enter a word: ‸cat‸\n' },
+      { line: 8, say: 'And scanf put FOUR characters in, not three. After the t it wrote <code>\'\\0\'</code> — a byte of value zero, the <strong>null terminator</strong>. That is the only thing marking where the word ends.', vars: { 'word[0..3]': "'c' 'a' 't' '\\0'" }, out: 'Enter a word: ‸cat‸\n' },
+      { line: 10, say: '<code>%s</code> starts at the address it is given and prints characters until it meets the \\0. Lose that byte and it keeps going into whatever is next in memory.', vars: { 'word[0..3]': "'c' 'a' 't' '\\0'" }, out: 'Enter a word: ‸cat‸\nYou typed cat\n' },
+      { line: 12, say: 'Which is also how you walk one yourself. The loop has no length to count to — it stops when it <em>finds</em> the terminator.', vars: { i: '0', 'word[i]': "'c'" }, out: 'Enter a word: ‸cat‸\nYou typed cat\n' },
+      { line: 13, say: '<code>%c</code> is one character; <code>%s</code> is a whole string. Different placeholders for different things.', vars: { i: '0', 'word[i]': "'c'" }, out: 'Enter a word: ‸cat‸\nYou typed cat\nc-' },
+      { line: 13, say: 'On along the word.', vars: { i: '2', 'word[i]': "'t'" }, out: 'Enter a word: ‸cat‸\nYou typed cat\nc-a-t-' },
+      { line: 12, say: 'i is 3, and <code>word[3]</code> IS the \\0, so the condition fails and the loop stops. It never printed the terminator — it stopped at it.', vars: { i: '3', 'word[i]': "'\\0'" }, out: 'Enter a word: ‸cat‸\nYou typed cat\nc-a-t-' },
+      { line: 15, say: 'And <code>i</code> has counted the letters for free: 3. That is exactly what <code>strlen</code> does — it walks to the \\0 and reports how far it got.', vars: { i: '3' }, out: 'Enter a word: ‸cat‸\nYou typed cat\nc-a-t-\n3 letters\n' },
+      { line: 4, say: 'Last thing, and it is the one that bites: <code>scanf("%s")</code> will happily write past box 20 if you type more than that. It does not know how big the array is. It stops at whitespace, too — type "hot dog" and you get "hot".', vars: {}, out: 'Enter a word: ‸cat‸\nYou typed cat\nc-a-t-\n3 letters\n' }
+    ],
+    next: ['string-funcs'],
+    recap: 'A string is a char array ending in <code>\'\\0\'</code>. Loop until you meet the terminator; the array\'s size and the string\'s length are two different numbers.'
+  },
+
+  {
+    id: 'string-funcs',
+    order: 165,
+    group: 'Strings',
+    title: 'strlen, strcpy, strcmp',
+    tagline: 'Why = and == do not work on strings',
+    icon: 'wand-2',
+    file: 'strfn.c',
+    match: { folders: ['starter-folder-9'], code: /\b(strlen|strcpy|strcmp|strcat)\s*\(/ },
+    code:
+`#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    char a[20] = "cat";
+    char b[20];
+
+    printf("%d\\n", (int) strlen(a));
+
+    strcpy(b, a);
+    printf("%s\\n", b);
+
+    strcat(b, "fish");
+    printf("%s\\n", b);
+
+    if (strcmp(a, "cat") == 0) {
+        printf("a is cat\\n");
+    }
+    return 0;
+}`,
+    steps: [
+      { line: 2, say: 'These four live in <code>&lt;string.h&gt;</code>, not stdio. Forget this include and the compiler guesses at them, which usually still links and then behaves oddly.' },
+      { line: 5, say: 'A char array can be initialised from a literal. This puts c, a, t and the \\0 into the first four boxes; the other sixteen are spare room.', vars: { a: '"cat"  (+ 16 spare)' } },
+      { line: 8, say: '<code>strlen</code> walks to the \\0 and returns how far it went: 3. Not 20, and not 4 — the terminator is not part of the length.', vars: { a: '"cat"' }, out: '3\n' },
+      { line: 10, say: 'Now the important one. You cannot write <code>b = a</code>: that would try to assign one array to another, and C will not. Copying a string means copying it character by character, which is what <code>strcpy</code> does.', vars: { a: '"cat"', b: '"cat"' } },
+      { line: 10, say: 'And strcpy copies the \\0 too — otherwise the copy would have no end. It also has no idea how big <code>b</code> is, so a source longer than the destination overruns it.', vars: { a: '"cat"', b: '"cat"' }, out: '3\n' },
+      { line: 11, say: 'b really is its own string now. Changing it later will not touch a.', vars: { a: '"cat"', b: '"cat"' }, out: '3\ncat\n' },
+      { line: 13, say: '<code>strcat</code> APPENDS: it finds b\'s \\0, and writes from there. So the destination has to have room for both — b is 20 boxes and "catfish" needs 8, which is fine.', vars: { b: '"catfish"' }, out: '3\ncat\n' },
+      { line: 14, say: 'Seven characters plus a new terminator.', vars: { b: '"catfish"' }, out: '3\ncat\ncatfish\n' },
+      { line: 16, say: 'And the other thing you cannot do: <code>a == "cat"</code> compares two ADDRESSES, and they are different addresses, so it is false even though the text matches.', vars: { a: '"cat"' }, out: '3\ncat\ncatfish\n' },
+      { line: 16, say: '<code>strcmp</code> compares the characters. It returns <strong>0 when they are equal</strong> — which reads backwards until you know why: it returns negative, zero or positive to say which sorts first, so zero means "no difference".', vars: {}, out: '3\ncat\ncatfish\n' },
+      { line: 17, say: 'So the test for "are these the same string" is <code>strcmp(a, b) == 0</code>. Writing <code>if (strcmp(a, b))</code> means "if they are DIFFERENT", which is the opposite of what it looks like.', vars: {}, out: '3\ncat\ncatfish\ta is cat\n' }
+    ],
+    recap: 'Copy with strcpy, join with strcat, compare with <code>strcmp(a, b) == 0</code>. <code>=</code> and <code>==</code> on strings do not do what they look like.'
+  },
+
+  /* ══ Structs ═════════════════════════════════════════════ */
+
+  {
+    id: 'struct',
+    order: 170,
+    group: 'Structs',
+    title: 'Structs',
+    tagline: 'One name for several values that belong together',
+    icon: 'package-2',
+    file: 'poke.c',
+    match: { folders: ['starter-folder-7'] },
+    code:
+`#include <stdio.h>
+
+struct Pokemon {
+    char name[20];
+    int level;
+    int hp;
+};
+
+int main(void) {
+    struct Pokemon p;
+    struct Pokemon team[3];
+
+    strcpy(p.name, "Pikachu");
+    p.level = 12;
+    p.hp = 35;
+
+    printf("%s (Lv %d) HP %d\\n", p.name, p.level, p.hp);
+
+    team[0] = p;
+    team[0].hp = 40;
+    printf("%d and %d\\n", p.hp, team[0].hp);
+    return 0;
+}`,
+    steps: [
+      { lines: [3, 7], say: 'This does not make anything. It describes a <strong>shape</strong>: any Pokemon has a name, a level and some hp. Nothing exists yet and no memory has been used.' },
+      { line: 7, say: 'Note the semicolon after the closing brace. A struct definition needs one; leaving it off produces an error pointing at the next line, which is why it is so confusing.' },
+      { line: 10, say: 'THIS makes one. <code>p</code> is a single variable that happens to contain three things — one box big enough for all of them, side by side.', vars: { 'p.name': '(empty)', 'p.level': '?', 'p.hp': '?' } },
+      { line: 11, say: 'And an array of them works exactly like an array of ints: three Pokemon in a row.', vars: { team: '3 Pokemon, all empty' } },
+      { line: 13, say: 'The dot reaches a member. <code>p.name</code> is a char array, so it is copied with strcpy like any other string — you cannot assign to it.', vars: { 'p.name': '"Pikachu"' } },
+      { lines: [14, 15], say: 'The int members are plain assignments.', vars: { 'p.name': '"Pikachu"', 'p.level': '12', 'p.hp': '35' } },
+      { line: 17, say: 'Each member is printed with the placeholder for its own type — <code>%s</code> for the name, <code>%d</code> for the numbers. You cannot print a whole struct in one go.', vars: { 'p.level': '12', 'p.hp': '35' }, out: 'Pikachu (Lv 12) HP 35\n' },
+      { line: 19, say: 'And here is the one that surprises people: a struct CAN be assigned whole. This copies all three members in one line — including the name array, which is the one thing <code>=</code> normally refuses.', vars: { 'p.hp': '35', 'team[0].hp': '35' } },
+      { line: 20, say: 'But it is a <strong>copy</strong>, not a link. Changing team[0] does not touch p.', vars: { 'p.hp': '35', 'team[0].hp': '40' } },
+      { line: 21, say: '35 and 40. Same rule as pass-by-value, and for the same reason: assigning a struct duplicates its contents.', vars: { 'p.hp': '35', 'team[0].hp': '40' }, out: 'Pikachu (Lv 12) HP 35\n35 and 40\n' }
+    ],
+    next: ['struct-pointer'],
+    recap: 'A <code>struct</code> is a shape; a variable of that type is one instance. Reach members with <code>.</code>, and remember that assigning a struct copies every member.'
+  },
+
+  {
+    id: 'struct-pointer',
+    order: 175,
+    group: 'Structs',
+    title: 'Structs and functions',
+    tagline: 'The arrow, and how to let a function change one',
+    icon: 'arrow-right-circle',
+    file: 'structfn.c',
+    match: { folders: ['starter-folder-7'], code: /->/ },
+    code:
+`#include <stdio.h>
+
+struct Pokemon {
+    int level;
+    int hp;
+};
+
+void levelUpCopy(struct Pokemon p) {
+    p.level = p.level + 1;
+}
+
+void levelUp(struct Pokemon *p) {
+    p->level = p->level + 1;
+    p->hp = p->hp + 5;
+}
+
+int main(void) {
+    struct Pokemon pika = {12, 35};
+
+    levelUpCopy(pika);
+    printf("after copy: %d\\n", pika.level);
+
+    levelUp(&pika);
+    printf("after ref:  %d hp %d\\n", pika.level, pika.hp);
+    return 0;
+}`,
+    steps: [
+      { line: 18, say: 'One Pokemon: level 12, 35 hp. The braces fill the members in declaration order.', vars: { 'pika.level': '12', 'pika.hp': '35' } },
+      { line: 20, say: 'Call the by-value version. A struct passed like this is COPIED — every member of it, however big the struct is.', vars: { 'pika.level': '12' } },
+      { line: 9, say: 'So this raises the copy\'s level, exactly as it says.', vars: { 'pika.level': '12', 'copy p.level': '13' } },
+      { line: 21, say: 'And back in main, pika is untouched. Same lesson as pass-by-value, just with more members involved.', vars: { 'pika.level': '12' }, out: 'after copy: 12\n' },
+      { line: 23, say: 'Now the address version. <code>&amp;pika</code> — the same <code>&amp;</code> as always.', vars: { 'pika.level': '12', 'pika.hp': '35' }, out: 'after copy: 12\n' },
+      { line: 12, say: 'The parameter is <code>struct Pokemon *p</code>: a pointer to one. Nothing is copied but the address itself.', vars: { 'p': '→ pika' }, out: 'after copy: 12\n' },
+      { line: 13, say: 'And here is the arrow. <code>p-&gt;level</code> means "follow the pointer, then take the level member". It is shorthand for <code>(*p).level</code>, which is what you would otherwise have to write — the brackets are needed because <code>.</code> binds tighter than <code>*</code>.', vars: { 'pika.level': '13' }, out: 'after copy: 12\n' },
+      { line: 14, say: 'Writing through the arrow changes main\'s Pokemon.', vars: { 'pika.level': '13', 'pika.hp': '40' }, out: 'after copy: 12\n' },
+      { line: 24, say: '13 and 40. Both changes stuck.', vars: { 'pika.level': '13', 'pika.hp': '40' }, out: 'after copy: 12\nafter ref:  13 hp 40\n' },
+      { line: 12, say: 'And this is why real code passes structs by pointer even when it does not need to change them: a big struct copied on every call is slow, and an address is always one small value. You will see <code>const struct Pokemon *p</code> for exactly that — pass the address, promise not to write.', vars: {}, out: 'after copy: 12\nafter ref:  13 hp 40\n' }
+    ],
+    recap: 'Dot on a struct, arrow on a pointer to one. Pass <code>&amp;thing</code> and take <code>struct T *p</code> when the function must change it — or when copying it would be wasteful.'
+  },
+
+  /* ══ Memory you ask for ══════════════════════════════════ */
+
+  {
+    id: 'malloc',
+    order: 180,
+    group: 'Memory you ask for',
+    title: 'malloc and free',
+    tagline: 'An array whose size you do not know until you run',
+    icon: 'database',
+    file: 'alloc.c',
+    match: { folders: ['starter-folder-6'] },
+    code:
+`#include <stdio.h>
+#include <stdlib.h>
+
+int main(void) {
+    int n, i;
+    int *a;
+
+    printf("How many? ");
+    scanf("%d", &n);
+
+    a = malloc(n * sizeof(int));
+    if (a == NULL) {
+        return 1;
+    }
+
+    for (i = 0; i < n; i++) {
+        a[i] = i * 10;
+    }
+    for (i = 0; i < n; i++) {
+        printf("%d ", a[i]);
+    }
+    printf("\\n");
+
+    free(a);
+    return 0;
+}`,
+    steps: [
+      { line: 6, say: 'The problem this solves: <code>int a[n]</code> with n read at runtime is not something you can rely on. The size of an ordinary array has to be known when the program is compiled.', vars: {} },
+      { lines: [8, 9], say: 'You type <strong>4</strong>. Only now does the program know how much room it needs.', vars: { n: '4' }, out: 'How many? ‸4‸\n' },
+      { line: 11, say: '<code>malloc</code> asks for a number of BYTES, not a number of ints. <code>n * sizeof(int)</code> is the idiom: four ints at four bytes each is 16 bytes.', vars: { n: '4' }, out: 'How many? ‸4‸\n' },
+      { line: 11, say: 'Use <code>sizeof(int)</code> rather than 4. It is not always 4, and writing the number by hand is a bug that only appears on a different machine.', vars: { n: '4' }, out: 'How many? ‸4‸\n' },
+      { line: 11, say: 'What comes back is an ADDRESS — the start of 16 bytes nobody else is using. <code>a</code> is a pointer, and from here on it behaves exactly like an array name.', vars: { n: '4', a: '→ 16 bytes' }, out: 'How many? ‸4‸\n' },
+      { line: 12, say: 'And it can fail. When there is no room, malloc returns <code>NULL</code> — and using a NULL pointer crashes. Checking is not optional politeness; it is the difference between an error and a crash.', vars: { a: '→ 16 bytes' }, out: 'How many? ‸4‸\n' },
+      { lines: [16, 17], say: 'Now it is just an array. <code>a[i]</code> works because, as the pointer walkthrough showed, that is <code>*(a + i)</code> either way.', vars: { 'a[0..3]': '0 10 20 30' }, out: 'How many? ‸4‸\n' },
+      { lines: [19, 21], say: 'Read it back the same way.', vars: { 'a[0..3]': '0 10 20 30' }, out: 'How many? ‸4‸\n0 10 20 30 \n' },
+      { line: 24, say: '<code>free</code> hands the 16 bytes back. Memory from malloc is <strong>yours until you say otherwise</strong> — it is not cleaned up when the function ends, the way a local array is.', vars: { a: '(freed)' }, out: 'How many? ‸4‸\n0 10 20 30 \n' },
+      { line: 24, say: 'Every malloc needs exactly one free. None, and the memory leaks; twice, and the program corrupts its own allocator. And after free, <code>a</code> still holds the old address — using it now is a "use after free", which often appears to work and then does not.', vars: {}, out: 'How many? ‸4‸\n0 10 20 30 \n' }
+    ],
+    next: ['malloc-return', 'linked-list'],
+    recap: '<code>malloc(n * sizeof(T))</code>, check for NULL, use it as an array, <code>free</code> it once. It lives until you free it, not until the function ends.'
+  },
+
+  {
+    id: 'malloc-return',
+    order: 185,
+    group: 'Memory you ask for',
+    title: 'Returning an array',
+    tagline: 'Count first, then allocate — and never return a local',
+    icon: 'package-open',
+    file: 'build.c',
+    match: { folders: ['starter-folder-6'], code: /\*\s*\w+\s*\([^)]*\)\s*\{[\s\S]*malloc/ },
+    code:
+`#include <stdio.h>
+#include <stdlib.h>
+
+int *multiples(int of, int limit, int *count) {
+    int i, n = 0;
+    int *out;
+
+    for (i = of; i <= limit; i = i + of) {
+        n++;
+    }
+
+    out = malloc(n * sizeof(int));
+    if (out == NULL) { *count = 0; return NULL; }
+
+    n = 0;
+    for (i = of; i <= limit; i = i + of) {
+        out[n] = i;
+        n++;
+    }
+
+    *count = n;
+    return out;
+}
+
+int main(void) {
+    int howMany, i;
+    int *a = multiples(3, 10, &howMany);
+
+    for (i = 0; i < howMany; i++) {
+        printf("%d ", a[i]);
+    }
+    printf("\\n");
+    free(a);
+    return 0;
+}`,
+    steps: [
+      { line: 27, say: 'main wants the multiples of 3 up to 10. It cannot know in advance that there are three of them — so the function has to both build the array AND report its length.', vars: {} },
+      { line: 4, say: 'Which is why there are two ways out. The RETURN carries the array; <code>int *count</code> is an out-parameter carrying the length, by address, exactly like pass-by-reference.', vars: { of: '3', limit: '10' } },
+      { lines: [8, 10], say: 'First pass: count, do not store. 3, 6, 9 — three of them. Nothing has been allocated yet.', vars: { n: '3' } },
+      { line: 12, say: 'Now the size is known, so ask for exactly that much. This is the <strong>count-then-allocate</strong> pattern, and the alternative is guessing a maximum and wasting it.', vars: { n: '3', out: '→ 12 bytes' } },
+      { line: 13, say: 'Check the allocation, and on failure report zero AND return NULL — a caller that gets a length without an array will read from nowhere.', vars: { out: '→ 12 bytes' } },
+      { lines: [15, 19], say: 'Second pass over the same numbers, storing them this time. The loop is identical; only the body differs.', vars: { 'out[0..2]': '3 6 9', n: '3' } },
+      { line: 21, say: 'Write the length back through the pointer main gave us.', vars: { 'main howMany': '3' } },
+      { line: 22, say: 'And return the address. This is safe because the memory came from malloc — it belongs to nobody in particular and outlives this call.', vars: { 'main howMany': '3' } },
+      {
+        lines: [4, 8],
+        code:
+`#include <stdio.h>
+
+int *broken(void) {
+    int local[3] = {1, 2, 3};
+    return local;
+}
+
+int main(void) {
+    int *a = broken();
+    printf("%d\\n", a[0]);
+    return 0;
+}`,
+        say: 'And here is what you must NOT do. <code>local</code> lives on the stack; it stops existing the moment broken returns, so the address handed back points at memory that has been given up. It often prints 1 the first time and rubbish the second, which is the worst possible behaviour — it looks like it works.',
+        vars: { a: '→ memory that is gone' },
+        out: '1\n'
+      },
+      { line: 33, say: 'Back in the working version: main uses the array, then frees it. Whoever receives malloc\'d memory inherits the duty to free it — that has to be said in the function\'s documentation, because nothing in the type says so.', vars: {}, out: '3 6 9 \n' }
+    ],
+    recap: 'Count, allocate exactly, fill, return the pointer and the length separately. Never return the address of a local — return malloc\'d memory, and say who frees it.'
+  },
+
+  /* ══ Lists ═══════════════════════════════════════════════ */
+
+  {
+    id: 'linked-list',
+    order: 190,
+    group: 'Memory you ask for',
+    title: 'Linked lists',
+    tagline: 'Nodes that know where the next one is',
+    icon: 'workflow',
+    file: 'list.c',
+    match: { folders: ['starter-folder-8', 'starter-folder-ws'] },
+    code:
+`#include <stdio.h>
+#include <stdlib.h>
+
+struct Node {
+    int value;
+    struct Node *next;
+};
+
+int main(void) {
+    struct Node *head = NULL;
+    struct Node *n;
+    int i;
+
+    for (i = 3; i >= 1; i--) {
+        n = malloc(sizeof(struct Node));
+        n->value = i;
+        n->next = head;
+        head = n;
+    }
+
+    for (n = head; n != NULL; n = n->next) {
+        printf("%d ", n->value);
+    }
+    printf("\\n");
+    return 0;
+}`,
+    steps: [
+      { lines: [4, 7], say: 'A node holds a value and <strong>the address of the next node</strong>. The struct contains a pointer to its own type, which is legal precisely because a pointer\'s size is known even when the struct is not finished.', vars: {} },
+      { line: 10, say: '<code>head</code> is the way in — the address of the first node. NULL means the list is empty, and NULL is also what marks the end.', vars: { head: 'NULL' } },
+      { line: 15, say: 'One node, asked for by hand. An array reserves all its room at once; a list asks for one node at a time, which is why it can grow to any length.', vars: { i: '3', n: '→ new node' } },
+      { lines: [16, 17], say: 'Fill it in, and point it at whatever the head was. On the first pass that is NULL — so this node\'s <code>next</code> is NULL, which makes it the last one.', vars: { i: '3', 'n->value': '3', 'n->next': 'NULL' } },
+      { line: 18, say: 'And now this node IS the head. Inserting at the front is two assignments and no shifting at all — the thing an array cannot do cheaply.', vars: { head: '→ [3|NULL]' } },
+      { lines: [15, 18], say: 'Second pass, i is 2. The new node points at the old head, and takes its place.', vars: { head: '→ [2] → [3|NULL]' } },
+      { lines: [15, 18], say: 'Third pass, i is 1. The loop counted DOWN because each insert goes on the front — building 3, 2, 1 leaves the list in the order 1, 2, 3.', vars: { head: '→ [1] → [2] → [3|NULL]' } },
+      { line: 21, say: 'Walking it. Start at head, and the step is <code>n = n-&gt;next</code> — you cannot jump to the fifth node, you have to walk past four.', vars: { n: '→ [1]' } },
+      { line: 22, say: 'First value.', vars: { n: '→ [1]', 'n->value': '1' }, out: '1 ' },
+      { line: 21, say: 'Follow the link.', vars: { n: '→ [2]' }, out: '1 2 ' },
+      { line: 21, say: 'And again — until <code>n</code> is NULL, which is the condition that stops the walk. That is the whole reason the last node\'s next is NULL rather than anything else.', vars: { n: 'NULL' }, out: '1 2 3 \n' },
+      { line: 15, say: 'One duty left, and this program shirks it: every one of those nodes came from malloc and none was freed. Freeing a list means walking it while holding onto <code>next</code> BEFORE you free the node — reading a freed node to find out where to go next is the classic way to lose the rest of the list.', vars: {}, out: '1 2 3 \n' }
+    ],
+    next: ['struct-pointer'],
+    recap: 'A node holds a value and the next address; NULL ends the list. Insert at the front by pointing the new node at the head and becoming the head. Walk with <code>n = n-&gt;next</code>.'
+  },
+
+  /* ══ Files ═══════════════════════════════════════════════ */
+
+  {
+    id: 'file-io',
+    order: 200,
+    group: 'Files',
+    title: 'Reading and writing a file',
+    tagline: 'fopen, fprintf, fclose — and checking it opened',
+    icon: 'file-text',
+    file: 'notes.c',
+    match: { folders: ['starter-folder-12'] },
+    code:
+`#include <stdio.h>
+
+int main(void) {
+    FILE *f;
+    int a, b;
+
+    f = fopen("scores.txt", "w");
+    if (f == NULL) {
+        printf("could not open\\n");
+        return 1;
+    }
+    fprintf(f, "%d %d\\n", 70, 82);
+    fclose(f);
+
+    f = fopen("scores.txt", "r");
+    if (f == NULL) {
+        return 1;
+    }
+    fscanf(f, "%d %d", &a, &b);
+    fclose(f);
+
+    printf("read %d and %d\\n", a, b);
+    return 0;
+}`,
+    steps: [
+      { line: 4, say: '<code>FILE *</code> is a handle: not the file, and not its contents — a thing the library gives you that stands for an open file.', vars: { f: '(none)' } },
+      { line: 7, say: '<code>fopen</code> takes a name and a MODE. <code>"w"</code> is write, and it is destructive: it empties an existing file before you write a byte. <code>"a"</code> appends instead.', vars: { f: '→ scores.txt (w)' } },
+      { line: 8, say: 'And it can fail — no permission, no such folder, disk full. It returns NULL when it does, and every use of the handle after that is a crash. This check is the same duty as checking malloc.', vars: { f: '→ scores.txt (w)' } },
+      { line: 12, say: '<code>fprintf</code> is <code>printf</code> with one extra argument on the front: which file. Everything after it is identical — same placeholders, same rules.', vars: { f: '→ scores.txt (w)' }, out: '' },
+      { line: 13, say: '<code>fclose</code> matters more than it looks. Output is buffered, so the numbers may still be sitting in memory rather than on the disk — closing is what guarantees they arrive. A program that ends without closing can leave an empty file.', vars: { f: '(closed)' } },
+      { line: 15, say: 'Open it again, this time with <code>"r"</code> for read. A file opened "w" cannot be read from — the mode is a promise about what you will do.', vars: { f: '→ scores.txt (r)' } },
+      { line: 19, say: '<code>fscanf</code> is <code>scanf</code> with the file on the front, and it keeps the <code>&amp;</code>: it still needs somewhere to put what it reads.', vars: { a: '70', b: '82' } },
+      { line: 20, say: 'Close it again. Two opens, two closes.', vars: { a: '70', b: '82', f: '(closed)' } },
+      { line: 22, say: 'And the values really did come back off the disk.', vars: { a: '70', b: '82' }, out: 'read 70 and 82\n' },
+      { line: 19, say: 'One thing to know for later: <code>fscanf</code> returns how many items it managed to read, which is how a loop knows the file has run out — <code>while (fscanf(f, "%d", &amp;x) == 1)</code> is the usual shape. At the end it returns <code>EOF</code>.', vars: {}, out: 'read 70 and 82\n' }
+    ],
+    recap: 'fopen with a mode, check for NULL, fprintf/fscanf exactly like printf/scanf with the file first, then fclose. "w" empties the file; closing is what actually writes it.'
+  }
+
 
 ];

@@ -274,10 +274,22 @@ function demoRenderStep() {
 
   const sayEl = document.getElementById('demo-say');
   if (sayEl) {
+    /* The last panel is the takeaway, plus whatever builds on this idea. Two
+       lessons had no program that could reach them — a walkthrough only the
+       shelf knows about is one nobody finds at the moment it would help. */
+    const follows = (lesson.next || []).map(demoById).filter(Boolean);
     sayEl.innerHTML = last
       ? `<div class="demo-recap">
            <h3><i data-lucide="flag"></i> Your turn</h3>
            <p>${lesson.recap || ''}</p>
+           ${follows.length ? `<div class="demo-next-up">
+             <span class="demo-next-label">Builds on this</span>
+             ${follows.map(f => `<button type="button" class="demo-next-card" onclick="demoOpen('${f.id}', {fromLibrary:${demoState.fromLibrary}})">
+               <i data-lucide="${f.icon || 'sparkles'}"></i>
+               <span><strong>${escapeHTML(f.title)}</strong><em>${escapeHTML(f.tagline || '')}</em></span>
+               <i data-lucide="arrow-right" class="demo-next-go"></i>
+             </button>`).join('')}
+           </div>` : ''}
          </div>`
       : `<p>${step.say || ''}</p>`;
     sayEl.classList.remove('demo-fade');
