@@ -699,3 +699,109 @@ body.demo-open { overflow: hidden; }
    .demo-overlay is 12000 and .modal-overlay is 1000, which would otherwise put
    the settings behind the thing that asked for them. */
 body.demo-open #speech-panel { z-index: 12500; }
+
+/* ── The voice button's own options ────────────────────────────
+   On the body, not inside the walkthrough: the window sits at z-index 12000
+   and clips at its own rounded corner, so a menu hanging off a header button
+   has to be a sibling of it and stacked above.
+
+   Anchored to the button rather than to the pointer. It belongs to that one
+   control — there is never a second one — and a menu that lands wherever the
+   cursor happened to be reads as a page-wide context menu, which this is not. */
+.demo-voice-menu {
+  position: fixed;
+  z-index: 12600;
+  width: 300px;
+  max-width: calc(100vw - 16px);
+  padding: 0.3rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+  animation: demoMenuIn 0.14s ease-out;
+}
+@keyframes demoMenuIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+.demo-voice-menu-title {
+  padding: 0.4rem 0.55rem 0.3rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.demo-voice-menu-sep {
+  height: 1px;
+  margin: 0.25rem 0.35rem;
+  background: var(--border-color);
+}
+.demo-voice-opt {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.demo-voice-opt:hover { background: var(--bg-surface-hover); }
+.demo-voice-opt:focus-visible { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+.demo-voice-opt strong {
+  display: block;
+  font-size: 0.79rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.demo-voice-opt em {
+  display: block;
+  font-style: normal;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  color: var(--text-tertiary);
+  margin-top: 1px;
+}
+/* The tick box is always drawn, so the rows line up whether or not anything is
+   checked — a mark that appears and shifts the text is harder to scan than one
+   that fills. */
+.demo-voice-tick {
+  flex-shrink: 0;
+  width: 17px;
+  height: 17px;
+  margin-top: 1px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-color);
+  border-radius: 5px;
+  color: transparent;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+.demo-voice-tick svg { width: 11px; height: 11px; }
+.demo-voice-opt.is-on .demo-voice-tick {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+/* The settings row is an action, not a checkbox: no box to fill. */
+.demo-voice-opt.is-plain .demo-voice-tick {
+  border-color: transparent;
+  color: var(--text-tertiary);
+}
+
+/* Reading every step is a standing choice, so the button says so even when it
+   is not currently talking — a dotted underline rather than the lit state,
+   which stays reserved for "it is speaking right now". */
+.demo-voice-btn.is-auto:not(.is-on) {
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--border-color));
+  color: var(--color-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-voice-menu { animation: none; }
+}
