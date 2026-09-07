@@ -122,12 +122,25 @@ function _drillMakeFix(lesson) {
      almost every line, so it won 24 of 32 questions and the deck was one joke
      told repeatedly. Choosing among the kinds that apply, and only then where
      to put it, spreads the deck across the fault taxonomy. */
+  /* A line that appears twice cannot carry the fault. Breaking one copy leaves
+     the other standing as the correct answer, in the same file, on screen --
+     measured: 14 questions could be answered by copying the line above without
+     reading either. Lessons repeat lines often (two identical counting loops,
+     the same printf in both branches), so this is not a rare shape. */
+  const seen = new Map();
+  lines.forEach(l => {
+    const k = _drillNormLine(l);
+    seen.set(k, (seen.get(k) || 0) + 1);
+  });
+  const unique = (line) => seen.get(_drillNormLine(line)) === 1;
+
   const kinds = DRILL_MUTATIONS.map(m => {
     const spots = [];
     lines.forEach((line, i) => {
       if (!m.hit(line)) return;
       const broken = m.break(line);
       if (broken === line) return;        // the pattern matched but changed nothing
+      if (!unique(line)) return;          // its own answer is elsewhere on screen
       spots.push({ m, i, broken });
     });
     return spots;

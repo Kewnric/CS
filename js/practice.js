@@ -2473,6 +2473,17 @@ function bossCorrectnessWin() {
 
   const go = () => {
     crit.remove();
+    /* GONE MEANS GONE. The break is a full-screen overlay parked on
+       document.body, and it lands up to two seconds after the check that
+       earned it -- the requirement rows and the test rows each stagger the
+       lead, then the crit holds for another 620ms on top. That is long enough
+       to have moved on, and inside a practice set moving on is the normal
+       thing to do. Measured: leaving the problem inside that window still
+       painted 96 shards and a BREAK banner, fixed and full-screen at z-index
+       99998, over the NEXT problem -- because the overlay outlives the bar it
+       belongs to. The crit needs no such guard; it is a child of the wrapper
+       and leaves with it. Only the body-level overlay can strand. */
+    if (!wrap.isConnected) return;
     wrap.classList.remove('is-crit');
     if (crystal) crystal.classList.remove('is-crit');
     wrap.classList.add('boss-slain');
