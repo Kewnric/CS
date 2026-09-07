@@ -391,6 +391,11 @@ function _practiceAutoSave() {
   });
   _practiceSaveExecs();
   _bossMarkSaved();
+  /* The draft goes straight to localStorage rather than through saveData, so
+     nothing ever told the cloud it had changed -- the sync only fired when
+     something ELSE happened to save. That is why an attempt written and left
+     on one machine was not on the other. */
+  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 }
 
 /* ── Check-Code restore points, kept across leaving the page ───────────── */
@@ -443,6 +448,20 @@ function _practiceTrimHistoryCode() {
     if (had) e.codeTrimmed = true;            // so the readers can say why
   }
   return freed;
+}
+
+/**
+ * The save button, which exists only on a phone.
+ *
+ * Ctrl+S is not a gesture a touchscreen has, so on mobile there was no way to
+ * force a save at all -- you waited for the 30-second autosave and hoped. This
+ * is the same call the shortcut makes, with the same toast, so there is one
+ * save path rather than two that can drift.
+ */
+function practiceSaveTapped() {
+  if (practiceSaveNow() && typeof toast === 'function') {
+    toast('Saved.', { type: 'success', duration: 1400 });
+  }
 }
 
 function practiceSaveNow() {

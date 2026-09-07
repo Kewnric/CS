@@ -65,6 +65,12 @@ function practiceTemplate() {
           ${typeof examBadgeHTML === 'function' ? examBadgeHTML() : ''}
         </div>
         <div class="practice-topbar-right">
+          <!-- Ctrl+S is not a gesture a phone has. The same call the shortcut
+               makes, on a button that only exists where the shortcut cannot. -->
+          <button class="btn btn-ghost practice-icon-btn practice-save-btn" onclick="practiceSaveTapped()"
+                  title="Save your work" id="practice-save-btn" aria-label="Save your work">
+            <i data-lucide="save" style="width:16px;height:16px;" aria-hidden="true"></i>
+          </button>
           <button class="btn btn-ghost practice-icon-btn" onclick="toggleBossHealthBar()" title="Boss health bar" id="boss-bar-toggle-btn" aria-label="Boss health bar" aria-pressed="true">
             <i data-lucide="swords" style="width:16px;height:16px;" aria-hidden="true"></i>
           </button>

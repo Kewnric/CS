@@ -186,6 +186,8 @@ function loadData() {
       state.langScenarios = parsed.langScenarios || [];
       state.langHistory = parsed.langHistory || [];
       state.wings = (parsed.wings && typeof parsed.wings === 'object') ? parsed.wings : {};
+      state.codingStash = parsed.codingStash || null;
+      state.mistakes = Array.isArray(parsed.mistakes) ? parsed.mistakes : [];
       state.expandedNodes = parsed.expandedNodes || [];
 
       // Tree migration: if nodes don't exist yet, migrate from flat categories
@@ -294,6 +296,8 @@ function seedDefaultData() {
   state.history = seed.history;
   state.activeAttempts = seed.activeAttempts;
   state.review = seed.review || {};
+  state.codingStash = null;
+  state.mistakes = [];
   saveData();
 }
 
@@ -361,7 +365,14 @@ function _flushSaveData() {
     langSets: state.langSets || [],
     langScenarios: state.langScenarios || [],
     langHistory: state.langHistory || [],
-    wings: state.wings || {}
+    wings: state.wings || {},
+    /* THE PARKED LIBRARY. The starter-pack switch moves whatever is live into
+       codingStash and puts the other set on screen. It was never written down,
+       so switching packs and reloading lost the parked side entirely -- which
+       for someone whose own programs were parked is the whole library. */
+    codingStash: state.codingStash || null,
+    // The classified error log; see mistakes.js. Also never persisted.
+    mistakes: state.mistakes || []
   };
   /* Never write over data we could not read. Everything above is default state
      when the load failed, so this would be the write that turns a recoverable

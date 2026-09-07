@@ -873,3 +873,44 @@ a,
     animation: none;
   }
 }
+
+/* ── The blue box on tap ───────────────────────────────────────
+   Mobile browsers paint their own highlight over whatever you touch, sized to
+   the nearest clickable ancestor — so tapping a button inside a card lit the
+   whole card. It is not a hover or an active style, which is why nothing in
+   this stylesheet appeared to control it, and it fought every state the app
+   draws for itself.
+
+   Cleared everywhere. The app already shows what you pressed: buttons have
+   :active, cards have their own selected state, and links have focus rings. */
+* { -webkit-tap-highlight-color: transparent; }
+
+/* And the long-press menu on controls. TEXT stays selectable on purpose —
+   descriptions, code, output and samples are all things you copy — so this
+   only covers things you press. */
+button,
+a,
+[role="button"],
+[onclick],
+.card,
+.sidebar-link,
+.feel-opt,
+.pp-tab,
+.drill-mode,
+.browse-filter-chip,
+.lib-chip {
+  -webkit-touch-callout: none;
+}
+
+/* A control's LABEL is not something you meant to select when you double-tap
+   it. The content areas are deliberately left out. */
+button,
+.sidebar-link,
+.pp-tab,
+.drill-mode,
+.browse-filter-chip,
+.lib-chip,
+.feel-opt {
+  -webkit-user-select: none;
+  user-select: none;
+}

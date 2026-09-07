@@ -807,12 +807,14 @@ function _applyBrowseFilterSort(list) {
   /* Direction is applied before favourites float, so starring something keeps
      it on top whichever way the list is running.
 
-     NOT for folder order. Descending is meaningful for Best score or Recent;
-     on a curriculum it silently runs the course backwards -- one click put
-     "Draw a box" first and "One line of text" tenth, with nothing on screen
-     saying so. The sequence has one direction and it is the one it was
-     written in. */
-  if (sort !== 'default') out = libApplySortDir('browse', out);
+     THIS APPLIES TO FOLDER ORDER TOO, and briefly did not. Reversing a taught
+     sequence looked like something no one could want, so it was excluded --
+     which turned Ascending and Descending into two buttons that did nothing on
+     the sort they are most obviously about. The original complaint was that a
+     reversed list was INVISIBLE, not that reversing was wrong, and the sequence
+     number on every card fixes that: 10 first now reads as reversed at a
+     glance. Control is better than a guess about what someone meant. */
+  out = libApplySortDir('browse', out);
 
   // Favourites always float to the top of whatever order was chosen.
   out.sort((a, b) => (libIsFavorite(b) ? 1 : 0) - (libIsFavorite(a) ? 1 : 0));

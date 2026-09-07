@@ -664,6 +664,10 @@ async function _loadV2Domains(uid) {
     state.langScenarios = d.langScenarios || [];
     state.wings = (d.wings && typeof d.wings === 'object') ? d.wings : {};
     _restoreCheatSheets(d.cheatsheets);
+    state.codingStash = d.codingStash || state.codingStash || null;
+    state.mistakes = Array.isArray(d.mistakes) ? d.mistakes : (state.mistakes || []);
+    _restoreDraft('ssp.practiceDraft', d.practiceDraft);
+    _restoreDraft('ssp.sqlAttemptDraft', d.sqlDraft);
   }
 
   // History (separated for size management)
@@ -754,6 +758,10 @@ function _restoreV1Data(data) {
   state.langHistory = parsed.langHistory || [];
   state.wings = (parsed.wings && typeof parsed.wings === 'object') ? parsed.wings : {};
   _restoreCheatSheets(parsed.cheatsheets);
+  state.codingStash = parsed.codingStash || state.codingStash || null;
+  state.mistakes = Array.isArray(parsed.mistakes) ? parsed.mistakes : (state.mistakes || []);
+  _restoreDraft('ssp.practiceDraft', parsed.practiceDraft);
+  _restoreDraft('ssp.sqlAttemptDraft', parsed.sqlDraft);
 
   if (Array.isArray(parsed.nodes)) {
     state.nodes = parsed.nodes;
@@ -1094,7 +1102,18 @@ async function saveToFirestore(uid) {
       // The cheat sheets live in their own localStorage key rather than in
       // `state`. csSave() has always asked for a cloud save; nothing carried
       // them until now.
-      cheatsheets: (typeof cs !== 'undefined' && cs.sheets) ? cs.sheets : _cheatSheetsFromStorage()
+      cheatsheets: (typeof cs !== 'undefined' && cs.sheets) ? cs.sheets : _cheatSheetsFromStorage(),
+      // Parked library and the classified error log -- neither was written
+      // anywhere before, so both died with the tab. See state.js.
+      codingStash: state.codingStash || null,
+      mistakes: state.mistakes || [],
+      /* THE ATTEMPT YOU HAVE NOT FINISHED. It lives in localStorage and went
+         nowhere, so Resume was a single-device promise: the code you wrote on
+         one machine simply was not on the other. It carries its own savedAt,
+         which is what lets the newer of two drafts win on load rather than
+         whichever device happened to sync last. */
+      practiceDraft: _draftForCloud('ssp.practiceDraft'),
+      sqlDraft: _draftForCloud('ssp.sqlAttemptDraft')
     }) || {};
 
     // History domain (separated — grows unbounded)
@@ -1253,6 +1272,39 @@ async function saveToFirestore(uid) {
 /** Called by saveData()/vizSave()/brainSave()/saveQuestData().
  *  Marks dirty and schedules a debounced auto-save to cloud.
  *  "Save now" button still works for immediate flush. */
+/* ── Unfinished attempts ───────────────────────────────────────
+   Read straight out of localStorage rather than from `state`, because that is
+   where the editor keeps them: the draft is written on a timer while you type,
+   long before anything is graded. */
+function _draftForCloud(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    return (d && typeof d === 'object') ? d : null;
+  } catch (e) { return null; }
+}
+
+/**
+ * Keep whichever draft is newer.
+ *
+ * Two devices can each hold an unfinished attempt, and the one that synced
+ * last is not necessarily the one written last -- a laptop that has been shut
+ * since Tuesday would otherwise overwrite this morning's work when it wakes up
+ * and pushes. savedAt decides it instead.
+ */
+function _restoreDraft(key, incoming) {
+  if (!incoming || typeof incoming !== 'object') return;
+  try {
+    const mineRaw = localStorage.getItem(key);
+    if (mineRaw) {
+      const mine = JSON.parse(mineRaw);
+      if (mine && (mine.savedAt || 0) >= (incoming.savedAt || 0)) return;
+    }
+    localStorage.setItem(key, JSON.stringify(incoming));
+  } catch (e) { /* private mode, or a draft too big to store */ }
+}
+
 function scheduleCloudSave() {
   if (_suppressCloudSave) return;
   markCloudDirty();
