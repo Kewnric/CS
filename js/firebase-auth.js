@@ -647,6 +647,7 @@ async function _loadV2Domains(uid) {
     state.codingStash = st.codingStash || state.codingStash || null;
     _restoreDraft('ssp.practiceDraft', st.practiceDraft);
     _restoreDraft('ssp.sqlAttemptDraft', st.sqlDraft);
+    _restoreDraft('npAttemptInProgress', st.npDraft);
   }
 
   // App (core data — excludes history)
@@ -768,6 +769,7 @@ function _restoreV1Data(data) {
   state.mistakes = Array.isArray(parsed.mistakes) ? parsed.mistakes : (state.mistakes || []);
   _restoreDraft('ssp.practiceDraft', parsed.practiceDraft);
   _restoreDraft('ssp.sqlAttemptDraft', parsed.sqlDraft);
+  _restoreDraft('npAttemptInProgress', parsed.npDraft);
 
   if (Array.isArray(parsed.nodes)) {
     state.nodes = parsed.nodes;
@@ -1130,7 +1132,14 @@ async function saveToFirestore(uid) {
     const stashPayload = _sanitizeForFirestore({
       codingStash: state.codingStash || null,
       practiceDraft: _draftForCloud('ssp.practiceDraft'),
-      sqlDraft: _draftForCloud('ssp.sqlAttemptDraft')
+      sqlDraft: _draftForCloud('ssp.sqlAttemptDraft'),
+      /* The notebook attempt too. Home lists all three under Resume, from
+         the same keys that resume them, but only two of them travelled --
+         so a half-finished reviewer was offered on the machine you left it
+         on and nowhere else. It carries savedAt like the others, so the
+         newer of two devices' drafts wins the same way. Measured at 8.9KB
+         for a 120-question attempt, against a 1MB document cap. */
+      npDraft: _draftForCloud('npAttemptInProgress')
     }) || {};
 
     // History domain (separated — grows unbounded)
