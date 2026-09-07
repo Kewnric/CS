@@ -1609,6 +1609,13 @@ function retryPractice() {
   _starterAnimAborted = true;
   if (_starterAnimator) _starterAnimator.abort();
   if (typeof closeResultModal === 'function') closeResultModal();
+  /* A retry is a new attempt, so the run budget starts again. Without this the
+     count carried over: a budget of 2 with one run spent opened the retry at
+     1/2, and the second retry showed over budget for work not yet done. The
+     recall and budget SETTINGS stay — they belong to the sitting, not the
+     attempt — only the tally resets. */
+  if (typeof examResetRuns === 'function') examResetRuns();
+  if (typeof mistakeResetAttempt === 'function') mistakeResetAttempt();
 
   const variant = state.activeVariant;
   if (!variant) return;

@@ -631,14 +631,23 @@ async function _loadV2Domains(uid) {
   const userRef = fbDb.collection('users').doc(uid);
   const domRef = (name) => userRef.collection('domains').doc(name);
 
-  const [appDoc, histDoc, vizDoc, brainDoc, questsDoc, settingsDoc] = await Promise.all([
+  const [appDoc, histDoc, vizDoc, brainDoc, questsDoc, settingsDoc, stashDoc] = await Promise.all([
     domRef('app').get(),
     domRef('history').get(),
     domRef('viz').get(),
     domRef('brain').get(),
     domRef('quests').get(),
-    domRef('settings').get()
+    domRef('settings').get(),
+    domRef('stash').get()
   ]);
+
+  // The parked library and the unfinished attempts; see the write side.
+  if (stashDoc.exists) {
+    const st = stashDoc.data();
+    state.codingStash = st.codingStash || state.codingStash || null;
+    _restoreDraft('ssp.practiceDraft', st.practiceDraft);
+    _restoreDraft('ssp.sqlAttemptDraft', st.sqlDraft);
+  }
 
   // App (core data — excludes history)
   if (appDoc.exists) {
@@ -664,10 +673,7 @@ async function _loadV2Domains(uid) {
     state.langScenarios = d.langScenarios || [];
     state.wings = (d.wings && typeof d.wings === 'object') ? d.wings : {};
     _restoreCheatSheets(d.cheatsheets);
-    state.codingStash = d.codingStash || state.codingStash || null;
     state.mistakes = Array.isArray(d.mistakes) ? d.mistakes : (state.mistakes || []);
-    _restoreDraft('ssp.practiceDraft', d.practiceDraft);
-    _restoreDraft('ssp.sqlAttemptDraft', d.sqlDraft);
   }
 
   // History (separated for size management)
@@ -1105,13 +1111,24 @@ async function saveToFirestore(uid) {
       cheatsheets: (typeof cs !== 'undefined' && cs.sheets) ? cs.sheets : _cheatSheetsFromStorage(),
       // Parked library and the classified error log -- neither was written
       // anywhere before, so both died with the tab. See state.js.
-      codingStash: state.codingStash || null,
       mistakes: state.mistakes || [],
       /* THE ATTEMPT YOU HAVE NOT FINISHED. It lives in localStorage and went
          nowhere, so Resume was a single-device promise: the code you wrote on
          one machine simply was not on the other. It carries its own savedAt,
          which is what lets the newer of two drafts win on load rather than
          whichever device happened to sync last. */
+    }) || {};
+
+    /* THE PARKED LIBRARY AND THE UNFINISHED ATTEMPTS GET THEIR OWN DOCUMENT.
+       A Firestore document is capped at 1MB and the write is rejected whole if
+       it goes over -- silently, as far as the app is concerned. The app doc is
+       414KB with the pack installed, and codingStash is a SECOND library of
+       much the same size, so putting it alongside would have taken a user with
+       both packs to the edge of a cap that fails the entire sync rather than
+       the one field. Drafts carry whole files and ride along here for the same
+       reason. */
+    const stashPayload = _sanitizeForFirestore({
+      codingStash: state.codingStash || null,
       practiceDraft: _draftForCloud('ssp.practiceDraft'),
       sqlDraft: _draftForCloud('ssp.sqlAttemptDraft')
     }) || {};
@@ -1191,6 +1208,7 @@ async function saveToFirestore(uid) {
     // Add all domain docs to the atomic batch
     batch.set(domRef('app'), appPayload);
     batch.set(domRef('history'), historyPayload);
+    batch.set(domRef('stash'), stashPayload);
     batch.set(domRef('viz'), vizPayload);
     batch.set(domRef('brain'), brainPayload);
     batch.set(domRef('quests'), questsPayload);
