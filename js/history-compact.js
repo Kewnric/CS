@@ -231,3 +231,109 @@ function historyCompact(list) {
   }
   return out;
 }
+
+/* ── What it is costing, and how to get some back ──────────────
+   Deletion existed, but only one program at a time: you opened that program's
+   history, ticked boxes and deleted. Recovering room meant visiting up to 159
+   programs by hand, which made the "trim your history" advice technically true
+   and practically useless. This is the same operation across everything, and it
+   goes through softDeleteHistory so it lands in the undo stack like every other
+   delete rather than being a special irreversible button. */
+
+/** Bytes the practice history occupies, as Firestore counts them. */
+function historyBytes(list) {
+  try {
+    const json = JSON.stringify(list || state.history || []);
+    return (typeof TextEncoder !== 'undefined')
+      ? new TextEncoder().encode(json).length : json.length;
+  } catch (e) { return 0; }
+}
+
+/* Practice history shares its document with the notebook, snippet and language
+   histories, so its own budget is a share of the cap rather than all of it.
+   The compaction windows are tuned to settle just under this. */
+const HISTORY_BUDGET = 640000;
+
+/** Entries older than `days`, oldest first. */
+function historyOlderThan(days) {
+  const cut = Date.now() - days * 86400000;
+  return (state.history || []).filter(h => _histWhen(h) && _histWhen(h) < cut);
+}
+
+/** Everything except the highest-scoring attempt at each program. */
+function historyNonBest() {
+  const best = new Map();
+  (state.history || []).forEach(h => {
+    const cur = best.get(h.challengeId);
+    if (!cur || (h.score || 0) > (cur.score || 0)) best.set(h.challengeId, h);
+  });
+  const keep = new Set(best.values());
+  return (state.history || []).filter(h => !keep.has(h));
+}
+
+function _histPlural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+
+/**
+ * Delete a set of entries by the rule that chose them.
+ * @param {string} rule 'days:<n>' or 'nonbest'
+ */
+function historyTrim(rule) {
+  const m = /^days:(\d+)$/.exec(rule || '');
+  const doomed = m ? historyOlderThan(parseInt(m[1], 10)) : historyNonBest();
+  if (!doomed.length) {
+    if (typeof toast === 'function') toast('Nothing matches that — no attempts were deleted.', { type: 'info' });
+    return;
+  }
+  const ids = doomed.map(h => h.id).filter(Boolean);
+  if (!ids.length) return;
+  const freed = Math.round(historyBytes(doomed) / 1024);
+  const what = m
+    ? _histPlural(ids.length, 'attempt') + ' older than ' + m[1] + ' days'
+    : _histPlural(ids.length, 'attempt') + ' that are not your best at their program';
+  const ask = typeof showConfirm === 'function' ? showConfirm : null;
+  const run = () => {
+    softDeleteHistory(ids, () => {
+      if (typeof renderAnalyticsCharts === 'function') renderAnalyticsCharts();
+      else if (typeof handleRoute === 'function') handleRoute();
+      if (typeof toast === 'function') {
+        toast('Deleted ' + _histPlural(ids.length, 'attempt') + ', freeing about ' + freed
+              + 'KB. Undo is in the usual place.', { type: 'success', duration: 5000 });
+      }
+    });
+  };
+  if (ask) ask('Delete ' + _histPlural(ids.length, 'attempt'), 'This removes ' + what
+      + ', freeing about ' + freed + 'KB. Scores go with them. You can undo it.', run);
+  else run();
+}
+
+/** The Storage card on the analytics screen. */
+function historyStoragePanelHTML() {
+  const list = state.history || [];
+  const used = historyBytes(list);
+  const pct = Math.min(100, Math.round((used / HISTORY_BUDGET) * 100));
+  const withCode = list.filter(historyHasCode).length;
+  const tone = pct >= 90 ? 'is-hot' : pct >= 70 ? 'is-warm' : '';
+
+  const opts = [
+    { rule: 'days:365', label: 'Older than a year', n: historyOlderThan(365).length },
+    { rule: 'days:180', label: 'Older than 6 months', n: historyOlderThan(180).length },
+    { rule: 'days:90', label: 'Older than 90 days', n: historyOlderThan(90).length },
+    { rule: 'nonbest', label: 'All but your best at each program', n: historyNonBest().length }
+  ];
+
+  return '<div class="hs-wrap">'
+    + '<div class="hs-meter ' + tone + '"><span style="width:' + pct + '%"></span></div>'
+    + '<p class="hs-line"><b>' + Math.round(used / 1024) + ' KB</b> of about '
+      + Math.round(HISTORY_BUDGET / 1024) + ' KB &mdash; ' + pct + '% of what practice history '
+      + 'can use before the sync refuses the write.</p>'
+    + '<p class="hs-sub">' + _histPlural(list.length, 'attempt') + ' kept, ' + withCode
+      + ' of them still carrying the code you wrote. Older attempts keep their scores for ever; '
+      + 'only the source is let go, and the reference is read back from the program itself.</p>'
+    + '<div class="hs-acts">'
+    + opts.map(o => '<button class="hs-btn" ' + (o.n ? '' : 'disabled ')
+        + 'onclick="historyTrim(\'' + o.rule + '\')">'
+        + o.label + '<span class="hs-n">' + o.n + '</span></button>').join('')
+    + '</div>'
+    + '<p class="hs-note">Deleting here goes through the same undo as everywhere else.</p>'
+    + '</div>';
+}

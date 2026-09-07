@@ -328,3 +328,55 @@
 }
 .cn-go:hover { color: var(--color-primary); border-color: var(--color-primary); }
 .cn-go svg { width: 12px; height: 12px; }
+
+/* ── Storage card ──────────────────────────────────────────────
+   A meter rather than a number on its own: "412 KB" means nothing without the
+   ceiling it is heading for, and the whole point of the card is to say how much
+   room is left before a sync starts refusing writes. */
+.hs-wrap { display: flex; flex-direction: column; gap: 10px; }
+
+.hs-meter {
+  height: 8px; border-radius: 999px; overflow: hidden;
+  background: var(--bg-tertiary, rgba(127, 127, 127, 0.18));
+}
+.hs-meter > span {
+  display: block; height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--color-success, #2e9e6b), var(--color-info, #3b82c4));
+  transition: width .4s ease;
+}
+.hs-meter.is-warm > span {
+  background: linear-gradient(90deg, var(--color-info, #3b82c4), var(--color-warning, #d08b2c));
+}
+.hs-meter.is-hot > span {
+  background: linear-gradient(90deg, var(--color-warning, #d08b2c), var(--color-danger, #d0503c));
+}
+
+.hs-line { margin: 0; color: var(--text-primary); font-size: .92rem; line-height: 1.5; }
+.hs-line b { font-variant-numeric: tabular-nums; }
+.hs-sub, .hs-note { margin: 0; color: var(--text-secondary); font-size: .82rem; line-height: 1.5; }
+.hs-note { color: var(--text-tertiary); font-size: .78rem; }
+
+.hs-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+
+.hs-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 7px 10px 7px 12px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--border-color, rgba(127, 127, 127, .3));
+  background: var(--bg-secondary, transparent); color: var(--text-primary);
+  font: inherit; font-size: .82rem; line-height: 1;
+  transition: border-color .15s ease, background .15s ease;
+}
+.hs-btn:hover:not(:disabled) {
+  border-color: var(--color-danger, #d0503c);
+  background: var(--bg-tertiary, rgba(127, 127, 127, .1));
+}
+.hs-btn:focus-visible { outline: 2px solid var(--color-info, #3b82c4); outline-offset: 2px; }
+
+/* Nothing matches, so the button says so instead of pretending to be live. */
+.hs-btn:disabled { opacity: .45; cursor: default; }
+
+.hs-n {
+  min-width: 20px; padding: 2px 6px; border-radius: 999px;
+  background: var(--bg-tertiary, rgba(127, 127, 127, .18));
+  font-variant-numeric: tabular-nums; font-size: .76rem; text-align: center;
+}

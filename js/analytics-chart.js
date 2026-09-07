@@ -294,6 +294,11 @@ function renderAnalyticsOverview(container) {
           <span class="ac-card-hint">ranked by attempts it cost, not by how often it fired</span></div>
         ${typeof mistakesPanelHTML === 'function' ? mistakesPanelHTML(6) : ''}
       </div>
+      <div class="ac-card" data-reveal>
+        <div class="ac-card-title">Storage
+          <span class="ac-card-hint">what the record costs, and how to get some back</span></div>
+        ${typeof historyStoragePanelHTML === 'function' ? historyStoragePanelHTML() : ''}
+      </div>
       <div class="ac-grid2">
         <div class="ac-card" data-reveal>
           <div class="ac-card-title">Weakest programs <span class="ac-card-hint">click to compare against the solution</span></div>
