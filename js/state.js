@@ -186,6 +186,7 @@ function loadData() {
       state.langScenarios = parsed.langScenarios || [];
       state.langHistory = parsed.langHistory || [];
       state.wings = (parsed.wings && typeof parsed.wings === 'object') ? parsed.wings : {};
+      state.codingPackLayout = parsed.codingPackLayout || 0;
       state.codingStash = parsed.codingStash || null;
       state.mistakes = Array.isArray(parsed.mistakes) ? parsed.mistakes : [];
       state.expandedNodes = parsed.expandedNodes || [];
@@ -296,6 +297,7 @@ function seedDefaultData() {
   state.history = seed.history;
   state.activeAttempts = seed.activeAttempts;
   state.review = seed.review || {};
+  state.codingPackLayout = 0;
   state.codingStash = null;
   state.mistakes = [];
   saveData();
@@ -377,6 +379,16 @@ function _flushSaveData() {
        codingStash and puts the other set on screen. It was never written down,
        so switching packs and reloading lost the parked side entirely -- which
        for someone whose own programs were parked is the whole library. */
+    /* THE LAYOUT MIGRATION'S OWN STAMP. _csMigrateLayout compares this against
+       CS_LAYOUT_VERSION and skips everything when they match -- its comment says
+       'once migrated it is an integer comparison'. It never was, because the
+       stamp was set on state and never written down, so it came back undefined
+       on every load and the comparison could not match. Measured over 10 visits
+       to the coding library: 10 full rebuilds of the 159-program pack and 10
+       calls to saveData, against 0 and 0 once the stamp survives. The rebuild is
+       only ~1.7ms; the spurious save is the cost, since it marks the cloud dirty
+       and schedules a write of the whole app document for no change at all. */
+    codingPackLayout: state.codingPackLayout || 0,
     codingStash: state.codingStash || null,
     // The classified error log; see mistakes.js. Also never persisted.
     mistakes: state.mistakes || []

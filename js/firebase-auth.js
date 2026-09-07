@@ -671,6 +671,9 @@ async function _loadV2Domains(uid) {
     // account in the same tab used to inherit whatever the first account had
     // in memory here, and then write it up to the second account's cloud.
     state.codingSets = d.codingSets || [];
+    // The layout migration's stamp; see state.js. Small metadata, so it
+    // rides in the app document rather than the parked-library one.
+    state.codingPackLayout = d.codingPackLayout || 0;
     state.review = d.review || {};
     state.deadlines = d.deadlines || {};
     state.events = d.events || [];
@@ -770,6 +773,7 @@ function _restoreV1Data(data) {
   state.langHistory = parsed.langHistory || [];
   state.wings = (parsed.wings && typeof parsed.wings === 'object') ? parsed.wings : {};
   _restoreCheatSheets(parsed.cheatsheets);
+  state.codingPackLayout = parsed.codingPackLayout || state.codingPackLayout || 0;
   state.codingStash = parsed.codingStash || state.codingStash || null;
   state.mistakes = Array.isArray(parsed.mistakes) ? parsed.mistakes : (state.mistakes || []);
   _restoreDraft('ssp.practiceDraft', parsed.practiceDraft);
@@ -938,6 +942,7 @@ function _cacheAllToLocalStorage() {
       notebookCategories: getNodeNamesForScope('notebook'),
       nodes: state.nodes,
       expandedNodes: state.expandedNodes,
+      codingPackLayout: state.codingPackLayout || 0,
       categoryRequirements: state.categoryRequirements,
       snippetProgress: state.snippetProgress,
       badges: state.badges,
@@ -1094,6 +1099,7 @@ async function saveToFirestore(uid) {
     const appPayload = _sanitizeForFirestore({
       nodes: state.nodes,
       expandedNodes: state.expandedNodes,
+      codingPackLayout: state.codingPackLayout || 0,
       categoryRequirements: state.categoryRequirements,
       snippetProgress: state.snippetProgress,
       badges: state.badges,
