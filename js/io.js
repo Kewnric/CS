@@ -30,7 +30,14 @@ function handleDataExport() {
     langSets: state.langSets || [],
     langScenarios: state.langScenarios || [],
     langHistory: state.langHistory || [],
-    wings: state.wings || {}
+    wings: state.wings || {},
+    /* THE PARKED LIBRARY AND THE MISTAKE LOG. Both are saved and both are
+       synced, and neither was in a backup. codingStash is whatever the
+       starter-pack switch put aside -- for someone whose own programs are
+       parked, that is their entire library, and an export taken before a
+       reset or a move to a new device silently did not contain it. */
+    codingStash: state.codingStash || null,
+    mistakes: Array.isArray(state.mistakes) ? state.mistakes : []
   };
   // The cheat sheets live in their own localStorage key rather than in
   // `state`, which is exactly why they were missing from every backup taken
@@ -138,6 +145,14 @@ function handleDataImport(e) {
         state.langScenarios = parsed.langScenarios || [];
         state.langHistory = parsed.langHistory || [];
         state.wings = (parsed.wings && typeof parsed.wings === 'object') ? parsed.wings : {};
+        /* Kept rather than cleared when the backup predates the field. An
+           import replaces your data, but a file written before the parked
+           library was ever recorded says nothing about it -- reading that
+           silence as "delete it" would throw away a whole library the backup
+           never claimed to replace. Same rule the cloud load uses. */
+        state.codingStash = parsed.codingStash || state.codingStash || null;
+        state.mistakes = Array.isArray(parsed.mistakes) ? parsed.mistakes
+          : (Array.isArray(state.mistakes) ? state.mistakes : []);
 
         if (parsed.nodes && parsed.nodes.length > 0) {
           state.nodes = parsed.nodes;
@@ -230,6 +245,9 @@ function handleDataReset() {
         langScenarios: [],
         langHistory: [],
         wings: {},
+        // Named rather than left out, so a reset states what it clears.
+        codingStash: null,
+        mistakes: [],
         activeChallenge: null,
         activeVariant: null,
         userCode: '',
