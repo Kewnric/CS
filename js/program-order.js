@@ -7,12 +7,14 @@
 
    Two things went wrong because of that.
 
-   IT COULD BE REVERSED WITHOUT ANYONE NOTICING. "Folder order" ran through the
+   IT COULD BE REVERSED WITHOUT ANYONE NOTICING. "Folder order" runs through the
    library's ascending/descending control like every other sort, so one click
-   turned the curriculum backwards: "Draw a box" first and "One line of text"
-   last, with nothing on screen to say so. Direction is meaningful for Best
-   score or Recent; for a taught sequence it only inverts it. So the direction
-   control no longer applies to folder order.
+   turns the curriculum backwards: "Draw a box" first and "One line of text"
+   last. The control still does that, deliberately — excluding folder order
+   from it just made two buttons that did nothing on the sort they are most
+   obviously about. The problem was never that reversing is wrong, it was that
+   a reversed list was INVISIBLE, and the number on every card is what fixes
+   that: 10 first now reads as reversed at a glance.
 
    AND IT COULD NOT BE EDITED. Changing the sequence meant editing the pack
    source, so an author could not reorder their own library at all.
@@ -78,18 +80,43 @@ function programRenumber(parentId, orderedIds) {
 
 /**
  * Move one program up or down among its siblings.
- * Numbers the whole folder first when it has never been numbered, so a single
- * nudge cannot leave one program numbered and the rest not.
+ *
+ * `visibleIds`, when given, is the list actually on screen — and it matters,
+ * because a filter hides siblings while leaving them in the order. Swapping
+ * with the stored neighbour then changes the data and NOTHING on screen:
+ * measured with every other program hidden, moving one earlier swapped it with
+ * a hidden card and the visible list came back byte-identical, so the arrow
+ * looked broken. Moving relative to the visible neighbour instead means what
+ * you see is what you reordered.
+ *
+ * Numbers the whole folder as it goes, so one nudge cannot leave a single
+ * program numbered and the rest not.
  */
-function programMove(id, delta) {
+function programMove(id, delta, visibleIds) {
   const c = (state.challenges || []).find(x => x.id === id);
   if (!c) return false;
-  const sibs = programsInFolder(c.parentId);
-  const i = sibs.findIndex(x => x.id === id);
-  const j = i + delta;
-  if (i === -1 || j < 0 || j >= sibs.length) return false;
-  const ids = sibs.map(x => x.id);
-  ids.splice(j, 0, ids.splice(i, 1)[0]);
+  const ids = programsInFolder(c.parentId).map(x => x.id);
+  const from = ids.indexOf(id);
+  if (from === -1) return false;
+
+  /* Which program should it end up beside? The next one you can SEE.
+
+     The visible SET is taken from the caller; the visible ORDER is derived from
+     the stored order rather than trusted, because a list captured from the DOM
+     goes stale the moment a move lands. Trusting it made the arrows
+     non-reversible against a stale list -- up then down finished a place lower
+     than it started. Filtering the current order down to that set cannot. */
+  const visSet = new Set(visibleIds || []);
+  const lane = visSet.size ? ids.filter(x => visSet.has(x)) : ids;
+  const at = lane.indexOf(id);
+  if (at === -1) return false;
+  const neighbour = lane[at + delta];
+  if (neighbour === undefined) return false;      // already at the visible end
+
+  ids.splice(from, 1);
+  const nAt = ids.indexOf(neighbour);
+  // Earlier means "take its place"; later means "go just past it".
+  ids.splice(delta < 0 ? nAt : nAt + 1, 0, id);
   programRenumber(c.parentId, ids);
   return true;
 }
@@ -119,8 +146,14 @@ function programMoveBtnsHTML(c) {
     + '</span>';
 }
 
+/** The ids currently rendered, in the order they are rendered. */
+function _programShownIds() {
+  return [...document.querySelectorAll('#browse-card-grid [id^="card-"]')]
+    .map(el => el.id.slice(5));
+}
+
 function programMoveAndPaint(id, delta) {
-  if (!programMove(id, delta)) return;
+  if (!programMove(id, delta, _programShownIds())) return;
   if (typeof invalidateBrowseCache === 'function') invalidateBrowseCache();
   if (typeof renderBrowseContent === 'function') renderBrowseContent();
   else if (typeof renderBrowse === 'function') renderBrowse();
@@ -153,7 +186,20 @@ function programToggleReorder() {
 
 /** Number the folder exactly as it is displayed right now. */
 function programRenumberShown(parentId) {
-  const n = programRenumber(parentId);
+  /* Refused while anything is hidden. Numbering "as displayed" when a filter is
+     on would have to decide where the programs you cannot see go, and every
+     answer to that is a surprise -- most of them destructive. */
+  const shown = _programShownIds().filter(x => (state.challenges || []).some(c => c.id === x));
+  const whole = programsInFolder(parentId).length;
+  if (shown.length && shown.length < whole) {
+    if (typeof toast === 'function') {
+      toast('Clear the filters first — ' + (whole - shown.length) + ' of ' + whole
+            + ' programs are hidden, and numbering would have to guess where they go.',
+            { type: 'warning', duration: 4500 });
+    }
+    return;
+  }
+  const n = programRenumber(parentId, shown.length ? shown : null);
   if (typeof invalidateBrowseCache === 'function') invalidateBrowseCache();
   if (typeof renderBrowse === 'function') renderBrowse();
   if (typeof toast === 'function') toast('Numbered ' + n + ' program' + (n !== 1 ? 's' : '') + ' 1–' + n + '.', { type: 'success' });
