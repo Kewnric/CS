@@ -32,11 +32,25 @@ const CONCEPT_MISTAKES = {
   array: ['array-bounds'],
   loop: ['timeout'],
   for: ['timeout'],
-  while: ['timeout'],
-  dowhile: ['timeout'],
+  while: ['timeout', 'assign-in-condition'],
+  dowhile: ['timeout', 'assign-in-condition'],
   nestedloop: ['timeout'],
   function: ['missing-return'],
-  recursion: ['missing-return']
+  recursion: ['missing-return'],
+  /* Conditionals had no mistake wired to them at all, so their strength came
+     from attempt scores alone and nothing could ever pull one down -- while
+     assign-in-condition, the "= where == was meant" rule, mapped to no concept
+     in this table and therefore counted towards nothing. The rule and the
+     concepts both already existed; only the link was missing.
+
+     while and dowhile take it too: `while (x = 1)` is the same fault, and it
+     is the shape the drill generator already looks for (if|while).
+
+     switch is deliberately left out. No rule in the taxonomy describes a
+     switch-specific fault, and inventing a link to one that does not fit
+     would make the row move for reasons the reader cannot act on. */
+  if: ['assign-in-condition'],
+  ifelse: ['assign-in-condition']
 };
 
 /** Half-life of evidence, in days. */
@@ -76,7 +90,20 @@ function conceptPrograms() {
 
 /** Evidence decays: 1.0 today, 0.5 after CONCEPT_HALF_LIFE days. */
 function _conceptWeight(ts) {
-  const days = Math.max(0, (Date.now() - ts) / 86400000);
+  /* A timestamp that is not a number is not evidence, and must not be poison.
+     One mistake-log entry with no `at` -- an import, an edited store, a record
+     from a build that did not stamp them -- made the sum NaN, and NaN fails
+     every >= in _conceptBand, so find() matched nothing and the fallback
+     returned the LAST band: measured, a concept sitting at a clean 100 was
+     reported Weak, with a NaN percentage on the row.
+
+     Unknown age reads as infinitely old, so it weighs nothing and changes no
+     total. Note the deliberate difference from a zero timestamp, which stays
+     as it was: 0.5^(days since the epoch / 21) is subnormal rather than zero,
+     so a history entry with no time still carries its score in the ratio
+     instead of dropping the concept to untried. */
+  const n = Number(ts);
+  const days = isFinite(n) ? Math.max(0, (Date.now() - n) / 86400000) : Infinity;
   return Math.pow(0.5, days / CONCEPT_HALF_LIFE);
 }
 
