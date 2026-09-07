@@ -285,6 +285,11 @@ function renderAnalyticsOverview(container) {
         ${typeof anHeatmapHTML === 'function' ? anHeatmapHTML() : ''}
       </div>
       <div class="ac-card" data-reveal>
+        <div class="ac-card-title">Concept mastery
+          <span class="ac-card-hint">per idea, not per program &mdash; recent work counts for more</span></div>
+        ${typeof conceptPanelHTML === 'function' ? conceptPanelHTML() : ''}
+      </div>
+      <div class="ac-card" data-reveal>
         <div class="ac-card-title">What keeps going wrong
           <span class="ac-card-hint">ranked by attempts it cost, not by how often it fired</span></div>
         ${typeof mistakesPanelHTML === 'function' ? mistakesPanelHTML(6) : ''}

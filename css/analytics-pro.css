@@ -224,3 +224,107 @@
   font-size: 0.8rem;
   color: var(--text-tertiary);
 }
+
+/* ── Concept mastery ───────────────────────────────────────────
+   A meter per idea, weakest first. The bar is the reading and the number is
+   the confirmation, so the list can be scanned down the left edge without
+   reading a single figure — which is the point of ordering it by strength. */
+.cn-lead {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.7rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-hover);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+.cn-lead strong { color: var(--text-primary); }
+.cn-drill {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-primary) 15%, transparent);
+  color: var(--color-primary);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cn-drill:hover { background: color-mix(in srgb, var(--color-primary) 26%, transparent); }
+.cn-drill svg { width: 13px; height: 13px; }
+
+.cn-list { display: flex; flex-direction: column; gap: 0.3rem; }
+.cn-row {
+  display: grid;
+  grid-template-columns: 4px 1fr auto auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.5rem;
+  border-radius: var(--radius-sm);
+}
+.cn-row:hover { background: var(--bg-surface-hover); }
+
+/* The band is carried by colour on a rail, not by a badge — fifteen badges in
+   a column is a wall of chips, and the rail reads at a glance. */
+.cn-meter {
+  position: relative;
+  align-self: stretch;
+  min-height: 26px;
+  border-radius: 999px;
+  background: var(--border-color);
+  overflow: hidden;
+}
+.cn-fill {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: var(--cn-w, 0%);
+  background: var(--cn-tone, var(--text-tertiary));
+  transition: height 0.4s var(--ease-standard, ease);
+}
+.cn-row.is-weak    { --cn-tone: var(--color-danger, #ef4444); }
+.cn-row.is-shaky   { --cn-tone: var(--color-warning, #f59e0b); }
+.cn-row.is-solid   { --cn-tone: var(--color-primary, #6366f1); }
+.cn-row.is-strong  { --cn-tone: var(--color-success, #22c55e); }
+.cn-row.is-untried { --cn-tone: transparent; }
+
+.cn-name { min-width: 0; }
+.cn-label {
+  display: block;
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+.cn-sub {
+  display: block;
+  font-size: 0.68rem;
+  color: var(--text-tertiary);
+  margin-top: 1px;
+}
+.cn-pct {
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: var(--cn-tone, var(--text-tertiary));
+  font-variant-numeric: tabular-nums;
+}
+.cn-row.is-untried .cn-pct { color: var(--text-tertiary); }
+.cn-go {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+.cn-go:hover { color: var(--color-primary); border-color: var(--color-primary); }
+.cn-go svg { width: 12px; height: 12px; }
