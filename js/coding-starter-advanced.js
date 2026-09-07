@@ -323,7 +323,27 @@ function codingStarterAdvanced() {
          expected: 'Enter how many: Enter the numbers: Enter an index: Value: 9' },
        { name: 'past the end', stdin: '3\n7 8 9\n5\n',
          expected: 'Enter how many: Enter the numbers: Enter an index: Out of range' }],
-      ['loop', 'if'])
+      ['loop', 'if']),
+
+    _csProgram('file-append', 12, "Add to the end, don't erase",
+      "<code>\"w\"</code> empties a file the moment you open it. <code>\"a\"</code> keeps what is there and writes after it.<br><br>Read <code>n</code> numbers. Write the FIRST with <code>\"w\"</code>, then open with <code>\"a\"</code> for each one after it, one line each. Then read <code>log.txt</code> back with <code>fgets</code> and print it.<br><br>Prompts: <code>Enter how many: </code>, then <code>Enter the numbers: </code>.<br><br>Open with <code>\"w\"</code> inside the loop instead and you finish with one number in the file \u2014 the last one, having erased the rest. That is worth doing once to see.",
+      [{ title: 'Sample 1', content: "Input:\n4\n7 8 9 10\nOutput:\nEnter how many: Enter the numbers: 7\n8\n9\n10" }],
+      [
+       { name: "four lines, none lost", stdin: "4\n7 8 9 10\n",
+         expected: "Enter how many: Enter the numbers: 7\n8\n9\n10" },
+       { name: "just the one", stdin: "1\n42\n",
+         expected: "Enter how many: Enter the numbers: 42" }],
+      ['loop', 'printf']),
+
+    _csProgram('file-menu', 12, "The inventory that remembers",
+      "The inventory that survives being closed: the same menu shape as the student records, with the array saved to a file and read back.<br><br><code>1</code> asks <code>Enter name and quantity: </code> and answers <code>Now holding N</code>. <code>2</code> prints <code>NAME xQTY</code> per item, or <code>Nothing in stock</code>. <code>3</code> writes every item to <code>stock.txt</code> and answers <code>Saved N</code>. <code>4</code> reads them back and answers <code>Loaded N</code>. <code>0</code> prints <code>Bye</code>.<br><br>Two things worth having for life. Check <code>fopen</code> against <code>NULL</code> before using the handle \u2014 say <code>No saved file</code> rather than crashing. And read with <code>while (fscanf(f, \"%31s %d\", ...) == 2)</code>: the COUNT it returns is how you know a record came through, and it is what stops you at the end of the file.",
+      [{ title: 'Sample 1', content: "Input:\n1\nRope 3\n1\nTorch 5\n3\n4\n2\n0\nOutput:\n=== Inventory ===\n1. Add an item\n2. List\n3. Save to file\n4. Load from file\n0. Exit\nChoice: Enter name and quantity: Now holding 1\n=== Inventory ===\n1. Add an item\n2. List\n3. Save to file\n4. Load from file\n0. Exit\nChoice: Enter name and quantity: Now holding 2\n=== Inventory ===\n1. Add an item\n2. List\n3. Save to file\n4. Load from file\n0. Exit\nChoice: Saved 2\n=== Inventory ===\n1. Add an item\n2. List\n3. Save to file\n4. Load from file\n0. Exit\nChoice: Loaded 2\n=== Inventory ===\n1. Add an item\n2. List\n3. Save to file\n4. Load from file\n0. Exit\nChoice: Rope x3\nTorch x5\n=== Inventory ===\n1. Add an item\n2. List\n3. Save to file\n4. Load from file\n0. Exit\nChoice: Bye" }],
+      [
+       { name: "save then load back", stdin: "1\nRope 3\n1\nTorch 5\n3\n4\n2\n0\n",
+         expected: "=== Inventory ===\n1. Add an item\n2. List\n3. Save to file\n4. Load from file\n0. Exit\nChoice: Enter name and quantity: Now holding 1\n=== Inventory ===\n1. Add an item\n2. List\n3. Save to file\n4. Load from file\n0. Exit\nChoice: Enter name and quantity: Now holding 2\n=== Inventory ===\n1. Add an item\n2. List\n3. Save to file\n4. Load from file\n0. Exit\nChoice: Saved 2\n=== Inventory ===\n1. Add an item\n2. List\n3. Save to file\n4. Load from file\n0. Exit\nChoice: Loaded 2\n=== Inventory ===\n1. Add an item\n2. List\n3. Save to file\n4. Load from file\n0. Exit\nChoice: Rope x3\nTorch x5\n=== Inventory ===\n1. Add an item\n2. List\n3. Save to file\n4. Load from file\n0. Exit\nChoice: Bye" },
+       { name: "one item round trip", stdin: "1\nRope 9\n3\n4\n0\n",
+         expected: "=== Inventory ===\n1. Add an item\n2. List\n3. Save to file\n4. Load from file\n0. Exit\nChoice: Enter name and quantity: Now holding 1\n=== Inventory ===\n1. Add an item\n2. List\n3. Save to file\n4. Load from file\n0. Exit\nChoice: Saved 1\n=== Inventory ===\n1. Add an item\n2. List\n3. Save to file\n4. Load from file\n0. Exit\nChoice: Loaded 1\n=== Inventory ===\n1. Add an item\n2. List\n3. Save to file\n4. Load from file\n0. Exit\nChoice: Bye" }],
+      ['array', 'switch', 'dowhile'])
   ];
 
   return { nodes, challenges };

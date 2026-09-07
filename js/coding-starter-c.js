@@ -219,7 +219,49 @@ function codingStarterFundamentals() {
        { name: 'using what you do not have',
          stdin: 'USE potion 1\nEND\n', expected: 'Not enough potion' },
        { name: 'order is the order they were added',
-         stdin: 'ADD c 1\nADD a 1\nADD b 1\nLIST\nEND\n', expected: 'c x1\na x1\nb x1' }])
+         stdin: 'ADD c 1\nADD a 1\nADD b 1\nLIST\nEND\n', expected: 'c x1\na x1\nb x1' }]),
+
+    _csProgram('struct-func', 7, "Give a struct to a function",
+      "A struct handed to a function is COPIED, all of it \u2014 the same rule as an int, applied to something bigger.<br><br>Write two functions. <code>levelUpCopy(Pokemon p)</code> takes one by value and adds 1 to its level; <code>levelUpReal(Pokemon *p)</code> takes a pointer and does the same with <code>p-&gt;level</code>. Call each once and print the level after both.<br><br>Prompt: <code>Enter name and level: </code>. Then <code>After the copy: NAME LEVEL</code> and <code>After the pointer: NAME LEVEL</code>.<br><br>The first one changes nothing, and that is the lesson. Watch which number moves.",
+      [{ title: 'Sample 1', content: "Input:\nPika 5\nOutput:\nEnter name and level: After the copy: Pika 5\nAfter the pointer: Pika 6" }],
+      [
+       { name: "a copy changes nothing", stdin: "Pika 5\n",
+         expected: "Enter name and level: After the copy: Pika 5\nAfter the pointer: Pika 6" },
+       { name: "the pointer does", stdin: "Bulba 12\n",
+         expected: "Enter name and level: After the copy: Bulba 12\nAfter the pointer: Bulba 13" }],
+      ['function', 'pointer']),
+
+    _csProgram('struct-nested', 7, "A struct inside a struct",
+      "A struct can hold another struct. Build <code>Date</code> (day, month, year) and give <code>Person</code> a <code>Date born</code>, then reach through both names to get at a field: <code>p.born.day</code>.<br><br>Prompts: <code>Enter a name: </code>, then <code>Enter day month year: </code>.<br>Answer: <code>NAME was born on DD/MM/YYYY</code>, with the day and month padded to two digits \u2014 <code>%02d</code> does that.",
+      [{ title: 'Sample 1', content: "Input:\nAna\n4 7 2005\nOutput:\nEnter a name: Enter day month year: Ana was born on 04/07/2005" }],
+      [
+       { name: "padded to two digits", stdin: "Ana\n4 7 2005\n",
+         expected: "Enter a name: Enter day month year: Ana was born on 04/07/2005" },
+       { name: "already two digits", stdin: "Ben\n15 11 1999\n",
+         expected: "Enter a name: Enter day month year: Ben was born on 15/11/1999" }],
+      ['scanf', 'printf']),
+
+    _csProgram('struct-sort', 7, "Order the team",
+      "Read <code>n</code>, then <code>n</code> pairs of name and level, and print them from the highest level down.<br><br>Prompts: <code>Enter how many: </code>, then <code>Enter a name and level for each: </code>.<br><br>Sort with a bubble sort and swap the WHOLE struct \u2014 <code>tmp = team[j];</code> copies every field at once, the same copying rule you met passing one to a function. Swapping the names and the levels separately is how a team ends up with the wrong levels.<br><br>Two on the same level keep the order they were typed in: only swap when the next one is strictly higher.",
+      [{ title: 'Sample 1', content: "Input:\n3\nAna 5 Ben 9 Cy 2\nOutput:\nEnter how many: Enter a name and level for each: Ben 9\nAna 5\nCy 2" }],
+      [
+       { name: "highest first", stdin: "3\nAna 5 Ben 9 Cy 2\n",
+         expected: "Enter how many: Enter a name and level for each: Ben 9\nAna 5\nCy 2" },
+       { name: "a tie keeps input order", stdin: "2\nOne 1 Two 1\n",
+         expected: "Enter how many: Enter a name and level for each: One 1\nTwo 1" },
+       { name: "one on its own", stdin: "1\nSolo 7\n",
+         expected: "Enter how many: Enter a name and level for each: Solo 7" }],
+      ['array', 'nestedloop']),
+
+    _csProgram('struct-menu', 7, "Student records",
+      "A whole little program rather than an exercise: an array of structs behind a menu that keeps running until you choose 0.<br><br>Print the menu, read a choice, do it, print the menu again \u2014 a <code>do-while</code> around a <code>switch</code>.<br><br><code>1</code> asks <code>Enter id name year: </code> and answers <code>Added NAME</code>. <code>2</code> prints every record as <code>ID NAME year Y</code>, or <code>No students yet</code> when there are none. <code>3</code> asks <code>Enter an id: </code> and answers <code>Found NAME year Y</code> or <code>Not found</code>. <code>0</code> leaves, printing <code>Bye</code>. Anything else is <code>No such choice</code>.<br><br>The menu text is part of your output, so it is compared too \u2014 copy it exactly from the sample.",
+      [{ title: 'Sample 1', content: "Input:\n1\n101 Ana 2\n1\n102 Ben 1\n2\n3\n102\n3\n999\n0\nOutput:\n=== Student Records ===\n1. Add a student\n2. List all\n3. Find by ID\n0. Exit\nChoice: Enter id name year: Added Ana\n=== Student Records ===\n1. Add a student\n2. List all\n3. Find by ID\n0. Exit\nChoice: Enter id name year: Added Ben\n=== Student Records ===\n1. Add a student\n2. List all\n3. Find by ID\n0. Exit\nChoice: 101 Ana year 2\n102 Ben year 1\n=== Student Records ===\n1. Add a student\n2. List all\n3. Find by ID\n0. Exit\nChoice: Enter an id: Found Ben year 1\n=== Student Records ===\n1. Add a student\n2. List all\n3. Find by ID\n0. Exit\nChoice: Enter an id: Not found\n=== Student Records ===\n1. Add a student\n2. List all\n3. Find by ID\n0. Exit\nChoice: Bye" }],
+      [
+       { name: "add, list, find, miss", stdin: "1\n101 Ana 2\n1\n102 Ben 1\n2\n3\n102\n3\n999\n0\n",
+         expected: "=== Student Records ===\n1. Add a student\n2. List all\n3. Find by ID\n0. Exit\nChoice: Enter id name year: Added Ana\n=== Student Records ===\n1. Add a student\n2. List all\n3. Find by ID\n0. Exit\nChoice: Enter id name year: Added Ben\n=== Student Records ===\n1. Add a student\n2. List all\n3. Find by ID\n0. Exit\nChoice: 101 Ana year 2\n102 Ben year 1\n=== Student Records ===\n1. Add a student\n2. List all\n3. Find by ID\n0. Exit\nChoice: Enter an id: Found Ben year 1\n=== Student Records ===\n1. Add a student\n2. List all\n3. Find by ID\n0. Exit\nChoice: Enter an id: Not found\n=== Student Records ===\n1. Add a student\n2. List all\n3. Find by ID\n0. Exit\nChoice: Bye" },
+       { name: "empty list and a bad choice", stdin: "2\n7\n0\n",
+         expected: "=== Student Records ===\n1. Add a student\n2. List all\n3. Find by ID\n0. Exit\nChoice: No students yet\n=== Student Records ===\n1. Add a student\n2. List all\n3. Find by ID\n0. Exit\nChoice: No such choice\n=== Student Records ===\n1. Add a student\n2. List all\n3. Find by ID\n0. Exit\nChoice: Bye" }],
+      ['array', 'switch', 'dowhile'])
   ];
 
   return { nodes: nodes, challenges: challenges };
