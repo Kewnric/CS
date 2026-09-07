@@ -31,7 +31,17 @@ const MISTAKE_RULES = [
     why: 'scanf writes THROUGH an address. Given the value instead, it treats whatever number is in the variable as a location and writes there.',
     fix: 'Pass &name, not name — except for arrays, which are already addresses.',
     concept: 'scanf',
-    test: /expects argument of type '[^']*\*'[^\n]*but argument \d+ has type|scanf is missing an &|missing an & before/i
+    /* THE CONVERSION HAS TO BE ONE THAT TAKES A VALUE. "expects argument of
+       type 'something *'" was enough on its own, and it is not: %s expects
+       char * and %p expects void * in printf too, so printf("%s", n) was
+       being reported as a missing & -- telling the reader to pass &name for a
+       bug where that is not the fix. Measured: 3 of 16 real GCC wordings
+       landed on the wrong rule, every one of them a printf.
+       Requiring a numeric or char conversion separates them, because those
+       expect a pointer ONLY under scanf. The cost is that scanf("%s", &arr)
+       now reads as a format mismatch rather than an & problem; its advice is
+       generic there instead of wrong, which is the better way round. */
+    test: /format '%[^']*[diuoxXfFeEgGaAc]' expects argument of type '[^']*\*'[^\n]*but argument \d+ has type|scanf is missing an &|missing an & before/i
   },
   {
     code: 'format-percent',

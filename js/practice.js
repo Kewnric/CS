@@ -1620,15 +1620,30 @@ function retryPractice() {
   const variant = state.activeVariant;
   if (!variant) return;
 
+  /* Retry re-arms the attempt, so it honours the same constraint the attempt
+     was started under: a recall retry is blank too.
+
+     THE FILES, not just the buffer. This blanked state.userCode and reset
+     every file to its starter, which looks right -- the editor opens empty --
+     and is not: the starter recall exists to hide was sitting in the file
+     record, so switching tabs and back put it on screen. Measured on a
+     two-file program, main came back holding its whole starter after a recall
+     retry while the editor still read blank.
+
+     Locked files keep their starter either way. They are given to you, and a
+     recall attempt is about recalling what you write, not what you were
+     handed -- which is the same rule the attempt opens under. */
+  const recall = typeof examRecallOn === 'function' && examRecallOn();
+
   // Reset all files to starter code
   if (state.userFiles) {
-    state.userFiles = variant.files ? variant.files.map(f => ({ ...f, userCode: f.starterCode || '' })) :
-                      [{ id: generateId(), name: 'main', ext: '.c', starterCode: variant.starterCode || '', code: variant.code || '', userCode: variant.starterCode || '' }];
+    state.userFiles = variant.files
+      ? variant.files.map(f => ({ ...f,
+          userCode: (recall && !f.locked) ? '' : (f.starterCode || '') }))
+      : [{ id: generateId(), name: 'main', ext: '.c', starterCode: variant.starterCode || '', code: variant.code || '', userCode: recall ? '' : (variant.starterCode || '') }];
     state.activeFileIndex = 0;
   }
-  /* Retry re-arms the attempt, so it honours the same constraint the attempt
-     was started under: a recall retry is blank too. */
-  state.userCode = (typeof examRecallOn === 'function' && examRecallOn())
+  state.userCode = recall
     ? ''
     : (variant.files ? (variant.files[0]?.starterCode || '') : (variant.starterCode || ''));
 
