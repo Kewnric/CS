@@ -543,9 +543,11 @@ function _buildChallengeCardCompact(c) {
   return `
     <div class="card card-compact${libIsSelected('browse', c.id) ? ' lib-selected' : ''}" id="card-${c.id}"
          onclick="${selecting ? `libToggleSelect('browse','${c.id}')` : `browseSelectProgram('${c.id}')`}" style="cursor:pointer;">
+      ${typeof programSeqBadgeHTML === 'function' ? programSeqBadgeHTML(c) : ''}
       ${libSelectBoxHTML('browse', c.id)}
       <div class="card-compact-head">
         <h3 class="card-compact-title">${escapeHTML(c.title)}</h3>
+        ${typeof programReorderOn === 'function' && programReorderOn() ? programMoveBtnsHTML(c) : ''}
         ${getLevelBadgeHTML(c)}${typeof getDifficultyBadgeHTML === 'function' ? getDifficultyBadgeHTML(c) : ''}
       </div>
       <div class="card-compact-meta">
@@ -582,11 +584,13 @@ function _buildChallengeCard(c, query) {
     <div class="card card-enhanced has-cover${libIsSelected('browse', c.id) ? ' lib-selected' : ''}" id="card-${c.id}"
          onclick="${selecting ? `libToggleSelect('browse','${c.id}')` : `browseSelectProgram('${c.id}')`}" style="cursor: pointer;">
       ${coverHtml}
+      ${typeof programSeqBadgeHTML === 'function' ? programSeqBadgeHTML(c) : ''}
       ${libSelectBoxHTML('browse', c.id)}
       ${isPerfect ? '<div class="card-completed-badge"><i data-lucide="check" style="width:10px;height:10px;"></i></div>' : ''}
       ${libFavButtonHTML('browse', c)}
       <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:0.5rem;">
         <h3 style="font-weight:700; font-size:1.1rem; color:var(--text-primary); flex:1;">${escapeHTML(c.title)} ${getLevelBadgeHTML(c)} ${typeof getDifficultyBadgeHTML === 'function' ? getDifficultyBadgeHTML(c) : ''}</h3>
+        ${typeof programReorderOn === 'function' && programReorderOn() ? programMoveBtnsHTML(c) : ''}
         <span class="version-pill">${vCount} version${vCount !== 1 ? 's' : ''}</span>
       </div>
       ${/* Two rows, not one heap: what happened to you here, then what this
@@ -794,11 +798,21 @@ function _applyBrowseFilterSort(list) {
   }
   // Unlevelled programs sort last so the levelled run reads as a ladder.
   else if (sort === 'level') out.sort((a, b) => (getProgramLevel(a) ?? Infinity) - (getProgramLevel(b) ?? Infinity));
-  // 'default' preserves the folder/search order.
+  /* 'default' is the TAUGHT sequence, so it is sorted by the explicit order
+     rather than left to array position. Programs that have never been numbered
+     keep their authored position, so this changes nothing until something is
+     actually numbered. */
+  else if (typeof programSortByOrder === 'function') out = programSortByOrder(out);
 
-  // Direction is applied before favourites float, so starring something keeps
-  // it on top whichever way the list is running.
-  out = libApplySortDir('browse', out);
+  /* Direction is applied before favourites float, so starring something keeps
+     it on top whichever way the list is running.
+
+     NOT for folder order. Descending is meaningful for Best score or Recent;
+     on a curriculum it silently runs the course backwards -- one click put
+     "Draw a box" first and "One line of text" tenth, with nothing on screen
+     saying so. The sequence has one direction and it is the one it was
+     written in. */
+  if (sort !== 'default') out = libApplySortDir('browse', out);
 
   // Favourites always float to the top of whatever order was chosen.
   out.sort((a, b) => (libIsFavorite(b) ? 1 : 0) - (libIsFavorite(a) ? 1 : 0));
@@ -866,6 +880,17 @@ function _renderBrowseFilterBar(total, shown, pool) {
         ${libChipHTML(kind === 'sets', "setBrowseKind('sets')", 'Sets')}
       </span>
     </div>
+    ${/* Reordering lives in this menu rather than on every card: the cards are
+          for choosing what to do next far more often than for rearranging. */ ''}
+    <label class="lib-view-row">
+      <input type="checkbox" ${typeof programReorderOn === 'function' && programReorderOn() ? 'checked' : ''}
+             onchange="programToggleReorder()" />
+      <span><strong>Reorder programs</strong><em>Arrows on each card, to move it earlier or later in its folder</em></span>
+    </label>
+    ${browseActiveNodeId ? `<div class="lib-view-row lib-view-seg">
+      <span class="lib-view-row-main"><strong>Number them</strong><em>Stamp 1&ndash;n onto this folder, in the order shown</em></span>
+      <button class="lib-chip" onclick="programRenumberShown('${browseActiveNodeId}')">Renumber</button>
+    </div>` : ''}
     <label class="lib-view-row">
       <input type="checkbox" ${libSubfoldersHidden() ? '' : 'checked'}
              onchange="setSessionParam('hideSubfolders', this.checked ? 'false' : 'true'); renderBrowseContent();" />

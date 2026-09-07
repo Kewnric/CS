@@ -168,6 +168,17 @@ function _csFingerprint(ch) {
 }
 
 function _csStamp(pack) {
+  /* THE TEACHING SEQUENCE, WRITTEN DOWN. It was always here -- the programs
+     are authored in order inside each folder -- but only as array position,
+     which nothing on screen could show and nothing protected. Stamping it makes
+     it a fact about the program: it survives sorting, it can be displayed on
+     the card, and it can be edited. See program-order.js. */
+  const seen = Object.create(null);
+  (pack.challenges || []).forEach(c => {
+    const k = c.parentId || '';
+    c.order = (seen[k] = (seen[k] || 0) + 1);
+  });
+  // AFTER the order, so a re-numbering shows up as a genuine pack change.
   (pack.challenges || []).forEach(c => { c.packFp = _csFingerprint(c); });
   return pack;
 }

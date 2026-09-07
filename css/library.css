@@ -2022,3 +2022,73 @@ body.tree-dragging [data-tree-ns]::-webkit-scrollbar { width: 0; height: 0; }
   .admin-cards-animate .admin-nav-bar,
   .admin-cards-animate .admin-nav-title { animation: none !important; }
 }
+
+/* ── The sequence number ───────────────────────────────────────
+   A course is an order, and the order was invisible: it lived in an array, so
+   nothing said which program came first and one click of the descending
+   control could run the whole curriculum backwards with no sign of it.
+
+   Small, ahead of the title, on every card. Its job is to make the sequence
+   readable at a glance — which is also what makes a wrong one obvious. */
+.prog-seq {
+  position: absolute;
+  top: 0.625rem;
+  left: 0.625rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.55rem;
+  height: 1.55rem;
+  padding: 0 0.35rem;
+  border-radius: 8px;
+  /* It sits on the cover art, which is a different colour on every card, so it
+     carries its own ground and a hairline rather than trusting the contrast. */
+  background: rgba(13, 17, 23, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(8px) saturate(140%);
+  -webkit-backdrop-filter: blur(8px) saturate(140%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  color: #fff;
+  font-size: 0.74rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+/* A position it happens to occupy, rather than one it was given. Same shape so
+   the column still lines up, quieter so the difference is visible. */
+.prog-seq.is-implied {
+  color: rgba(255, 255, 255, 0.62);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+/* The compact card has no cover behind it, so the badge takes the page's own
+   surface instead of a scrim over artwork. */
+.card-compact .prog-seq {
+  background: var(--color-primary-subtle, rgba(99, 102, 241, 0.16));
+  border-color: transparent;
+  color: var(--color-primary);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+.card-compact .prog-seq.is-implied { color: var(--text-tertiary); }
+/* Clear of the number. */
+.card-compact .card-compact-head { padding-left: 1.9rem; }
+
+/* Only while reordering. Two buttons on every card is a lot of furniture for
+   the rarer job, so they arrive with the mode and leave with it. */
+.prog-move { display: inline-flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+.prog-move-btn {
+  width: 20px;
+  height: 15px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.prog-move-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.prog-move-btn svg { width: 11px; height: 11px; }
