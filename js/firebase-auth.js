@@ -39,6 +39,11 @@ const FIRESTORE_SCHEMA_VERSION = 2;
 /* "Remember me" upgrades this to LOCAL, which survives a browser restart. The
    default stays SESSION so an unticked box behaves exactly as before. */
 const REMEMBER_KEY = 'ssp.rememberMode';
+
+/* Firestore's hard cap is 1,048,576 bytes per document. This sits below it so
+   the field names and per-document overhead Firestore also charges for have
+   somewhere to go, and so the warning arrives before the write is refused. */
+const DOC_BYTE_CEILING = 1040000;
 function authRemembered() {
   try { return localStorage.getItem(REMEMBER_KEY); } catch (e) { return null; }
 }
@@ -1200,14 +1205,39 @@ async function saveToFirestore(uid) {
       tutorialsDone
     }) || {};
 
-    // Per-domain size check (Firestore doc limit: 1 MB each)
-    const domains = { app: appPayload, history: historyPayload, viz: vizPayload, brain: brainPayload, quests: questsPayload, settings: settingsPayload };
+    /* Per-domain size check (Firestore doc limit: 1 MB each).
+
+       STASH IS CHECKED TOO, and used not to be -- which is backwards, because
+       it is the document this whole split exists for. It carries the parked
+       library, a second full copy of the pack, plus three unfinished attempts.
+       Every other domain was measured and it alone went out unmeasured.
+
+       That mattered more than a missed warning: the write is one atomic batch,
+       so an oversized stash does not fail by itself, it fails EVERY domain with
+       it -- app, history, settings, all of it -- and reports a raw Firestore
+       error instead of the sentence that says what to do about it. */
+    const domains = { app: appPayload, history: historyPayload, stash: stashPayload, viz: vizPayload, brain: brainPayload, quests: questsPayload, settings: settingsPayload };
     for (const [name, payload] of Object.entries(domains)) {
+      /* UTF-8 BYTES, which is what Firestore counts. String length counts
+         UTF-16 units, and every em dash and arrow in this app's own copy is
+         one unit but three bytes -- measured at 0.08% more bytes than units
+         on a real stash, which is 840 bytes at the threshold against a margin
+         of only 576. A document sitting right on the line could therefore
+         pass here and still be refused. The limit is also not purely payload:
+         Firestore charges for field names and its own per-document overhead,
+         so the ceiling leaves room for that instead of aiming at the cap. */
       let size = 0;
-      try { size = JSON.stringify(payload).length; } catch (e) {}
-      if (size > 1048000) {
+      try {
+        const json = JSON.stringify(payload);
+        size = (typeof TextEncoder !== 'undefined')
+          ? new TextEncoder().encode(json).length
+          : json.length;
+      } catch (e) {}
+      if (size > DOC_BYTE_CEILING) {
         const hint = name === 'history' ? 'Trim practice history (Analytics → delete old attempts).'
-          : name === 'app' ? 'Reduce challenges/snippets/notebooks.' : 'Reduce ' + name + ' data.';
+          : name === 'app' ? 'Reduce challenges/snippets/notebooks.'
+          : name === 'stash' ? 'The parked library is too big. Switch the coding library over to it so it is not being carried as a spare, or clear it.'
+          : 'Reduce ' + name + ' data.';
         const err = new Error('Domain "' + name + '" too large (' + Math.round(size / 1024) + ' KB). ' + hint);
         err.code = 'doc-too-large';
         throw err;
