@@ -26,7 +26,23 @@
    ============================================================ */
 
 /** A handout-shaped program: several given files and one to fill in. */
-function _cswProgram(id, title, description, folder) {
+/* A worked sample, taken from the first test rather than written by hand.
+ * These programs are driver-based, so a sample IS a test run: the stdin the
+ * driver reads and exactly what it prints back. Deriving it means the sample
+ * cannot drift from the program -- verify-pack replays every sample against
+ * the reference, and one written by hand is one more thing to keep in step. */
+function _csSampleFromTest(tests) {
+  const t = (tests || [])[0];
+  if (!t || t.expected === undefined) return [];
+  const stdin = String(t.stdin || '').replace(/\s+$/, '');
+  return [{
+    title: 'Sample 1',
+    content: (stdin ? 'Input:\n' + stdin + '\n' : '')
+           + 'Output:\n' + String(t.expected).replace(/\s+$/, '')
+  }];
+}
+
+function _cswProgram(id, title, description, folder, reqs) {
   const files = (typeof CSW_FILES !== 'undefined' && CSW_FILES[id]) || [];
   const tests = (typeof CSW_TESTS !== 'undefined' && CSW_TESTS[id]) || [];
   /* The file with a stub is the one being marked, and it goes first so the
@@ -61,9 +77,13 @@ function _cswProgram(id, title, description, folder) {
         starterCode: f.starterCode, code: f.code,
         locked: f.starterCode === f.code
       })),
-      samples: [],
+      samples: _csSampleFromTest(tests),
       tests: tests,
-      minRequirements: []
+      /* Kept deliberately short. A requirement the student's own correct
+         solution happens not to use marks right work wrong, so only the
+         ones the task cannot be done without are listed -- verify-pack
+         checks each of these against the reference. */
+      minRequirements: (reqs || []).map(t => ({ type: t }))
     }]
   };
 }
@@ -98,7 +118,7 @@ function codingStarterWorkshops() {
       + 'Call the provided utilities freely — <code>findParticipant</code> and <code>appendItem</code> '
       + 'especially. <code>MAX</code> is 5 and every name is unique.<br><br>'
       + '<em>The driver reads a test number 1-5 on stdin and runs that scenario.</em>',
-      'ws'),
+      'ws', ['function', 'array']),
 
     _cswProgram('ws-lobby', 'Workshop · Gaming server cleanup',
       'A game lobby keeps its active players in a LINKED LIST. Players whose ping is too high lag the '
@@ -115,7 +135,7 @@ function codingStarterWorkshops() {
       + 'the previous node so you can relink around a deletion.<br><br>'
       + 'Input is the ping threshold, then a count, then that many lines of '
       + '<code>ID username ping</code>.',
-      'ws'),
+      'ws', ['function', 'printf', 'scanf']),
 
     _cswProgram('ws-flights', 'Workshop · Flight connections on a budget',
       'A flight network is a single linked list of <code>FlightNode</code>, each holding a source hub, a '
@@ -134,7 +154,7 @@ function codingStarterWorkshops() {
       + '<code>totalHubs</code> is only for validation, and the driver frees the array you return.<br><br>'
       + 'This is the count-then-allocate pattern: you cannot size the array until you know how many '
       + 'matches there are, so you walk the list twice rather than guessing or growing.',
-      'ws')
+      'ws', ['function', 'pointer'])
   ];
 
   return { challenges: challenges, nodes: nodes };

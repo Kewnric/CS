@@ -295,7 +295,7 @@ function _cslRunTest() {
 }
 
 /** A two-file program: the driver, and the header it includes. */
-function _cslProgram(id, title, description, driverKey, headerName, headerKey, tests) {
+function _cslProgram(id, title, description, driverKey, headerName, headerKey, tests, reqs) {
   return {
     id: 'starter-' + id,
     title: title,
@@ -315,9 +315,13 @@ function _cslProgram(id, title, description, driverKey, headerName, headerKey, t
         { id: 'starter-' + id + '-f2', name: headerName, ext: '.h',
           starterCode: CSL_TEMPLATES[headerKey], code: CSL_SOLUTIONS[headerKey] }
       ],
-      samples: [],
+      samples: (typeof _csSampleFromTest === 'function') ? _csSampleFromTest(tests) : [],
       tests: tests || [],
-      minRequirements: []
+      /* Kept deliberately short. A requirement the student's own correct
+         solution happens not to use marks right work wrong, so only the
+         ones the task cannot be done without are listed -- verify-pack
+         checks each of these against the reference. */
+      minRequirements: (reqs || []).map(t => ({ type: t }))
     }]
   };
 }
@@ -339,7 +343,7 @@ function codingStarterLists() {
         + '<code>Element with ID STUD1013 is not found</code> and leave the list alone.<br><br>'
         + 'This is an array-backed list, so deleting from the middle means shifting everything after it '
         + 'down one and dropping the count. There is no gap left behind.',
-        'driver-c', 'ArrayList', 'arraylist-h', _cslRunTest()),
+        'driver-c', 'ArrayList', 'arraylist-h', _cslRunTest(), ['loop', 'printf']),
 
       _cslProgram('list-linked', 'The same list, linked',
         'The same exercise with the same driver, but the list is now a chain of nodes — so the same '
@@ -352,7 +356,7 @@ function codingStarterLists() {
         + '<code>List *trav</code> — the address of each link rather than the node itself — because then '
         + 'inserting or removing at the front needs no special case.<br><br>'
         + 'Every node comes from <code>malloc</code>, so check it, and <code>free</code> what you unlink.',
-        'driver-ll-c', 'LinkedList', 'linkedlist-h', _cslRunTest()),
+        'driver-ll-c', 'LinkedList', 'linkedlist-h', _cslRunTest(), ['loop', 'printf']),
 
       _cslProgram('list-array-2', 'The array list, three more operations',
         'Version 2 of the handout: the same array list with three further functions.<br><br>'
@@ -367,7 +371,7 @@ function codingStarterLists() {
         + 'dummy of <code>"XXXX"</code> strings, <code>0</code> and <code>\'\\0\'</code> when there is '
         + 'none.<br><br>'
         + 'Then drive all three from <code>main.c</code>.',
-        'driver2-c', 'ArrayList', 'arraylist2-h', [])
+        'driver2-c', 'ArrayList', 'arraylist2-h', [], ['loop', 'printf'])
     ]
   };
 }
