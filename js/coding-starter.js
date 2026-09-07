@@ -176,9 +176,19 @@ function _csStamp(pack) {
   const seen = Object.create(null);
   (pack.challenges || []).forEach(c => {
     const k = c.parentId || '';
-    c.order = (seen[k] = (seen[k] || 0) + 1);
+    /* Both: `order` is the live number, `packOrder` is what the pack asked
+       for. Keeping the second is what lets a refresh tell "you moved this"
+       from "you have never touched it" -- see the merge below. */
+    c.order = c.packOrder = (seen[k] = (seen[k] || 0) + 1);
   });
-  // AFTER the order, so a re-numbering shows up as a genuine pack change.
+  /* The fingerprint covers what a program IS -- title, text, files, tests --
+     and deliberately not what order it comes in. Reordering is not editing, so
+     moving a program must not mark it as yours-and-frozen and cut it off from
+     future pack fixes. (The comment here used to claim the opposite, that a
+     renumber showed up as a pack change; it never did, because _csFingerprint
+     does not read `order`. Verified: changing order leaves the hash equal.)
+     Keeping a moved program refreshable is exactly why the merge compares
+     order against packOrder instead of leaning on this hash. */
   (pack.challenges || []).forEach(c => { c.packFp = _csFingerprint(c); });
   return pack;
 }
@@ -265,9 +275,25 @@ function updateCodingStarterPack() {
   const freshParent = {};
   fresh.challenges.forEach(f => { freshParent[f.id] = f.parentId; });
 
+  /* Folders you have put in your own order. A program added into one of those
+     goes on the end instead of taking the number the pack gives it, which
+     would land on a number you had already chosen and print two cards with the
+     same one. */
+  const userOrdered = new Set();
+  const folderMax = Object.create(null);
+  (target.challenges || []).forEach(c => {
+    const k = c.parentId || '';
+    if (c.packOrder != null && c.order !== c.packOrder) userOrdered.add(k);
+    if (typeof c.order === 'number') folderMax[k] = Math.max(folderMax[k] || 0, c.order);
+  });
+
   fresh.challenges.forEach(f => {
     const have = byId[f.id];
-    if (!have) { target.challenges.push(f); added++; return; }
+    if (!have) {
+      const k = f.parentId || '';
+      if (userOrdered.has(k)) f.order = (folderMax[k] = (folderMax[k] || 0) + 1);
+      target.challenges.push(f); added++; return;
+    }
     /* No stamp means it predates this mechanism. Those were installed before
        anything could edit them through the pack UI, so treat them as
        untouched rather than freezing them out of every future update. */
@@ -281,6 +307,18 @@ function updateCodingStarterPack() {
       kept++;
       return;
     }
+    /* THE PACK OWNS THE DEFAULT ORDER; YOU OWN IT ONCE YOU HAVE MOVED IT.
+       packFp does not cover `order`, deliberately -- reordering a program is
+       not an edit to the program -- but that meant a refresh replaced the
+       record wholesale and put the authoring sequence back. Measured: moving a
+       program to the front of its folder survived until the next pack update
+       and then silently reverted, undoing the one thing the reordering feature
+       exists to allow.
+
+       packOrder makes "you moved this" a comparison rather than a guess. A
+       program installed before that field existed carries no such record, so
+       it follows the pack exactly as it always did. */
+    if (have.packOrder != null && have.order !== have.packOrder) f.order = have.order;
     target.challenges[posById[f.id]] = f;
     refreshed++;
   });
