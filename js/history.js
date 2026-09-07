@@ -49,8 +49,16 @@ window.flushActiveAnalyticsState = function() {
   historyDetailPage = 1;
 
   if (typeof state !== 'undefined' && state && Array.isArray(state.expandedNodes)) {
+    /* Save only when something actually went. The filter drops analytics-scoped
+       keys, which exist only if you expanded a folder on the analytics screen --
+       so on every other navigation it removes nothing and the save was writing
+       to say so. The router calls this on EVERY route change: measured, eight
+       navigations round the app produced seven saves with no user change behind
+       any of them, each one marking the cloud dirty and scheduling a write of
+       the whole app document. */
+    const before = state.expandedNodes.length;
     state.expandedNodes = state.expandedNodes.filter(key => !key.includes('_analytics_'));
-    if (typeof saveData === 'function') {
+    if (state.expandedNodes.length !== before && typeof saveData === 'function') {
       saveData();
     }
   }
