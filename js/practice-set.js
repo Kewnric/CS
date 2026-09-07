@@ -19,6 +19,10 @@ function psetInit() {
   const set = (state.codingSets || []).find(s => s.id === setId);
   if (!set || !(set.problems || []).length) { _psetGoLibrary(setId); return; }
 
+  // Nothing carried in from whatever was open before this set.
+  if (typeof mistakeResetAttempt === 'function') mistakeResetAttempt();
+  if (typeof examResetRuns === 'function') examResetRuns();
+
   // Neutralize single-practice state so shared helpers (run terminal,
   // preprocessMultiFile, boss bar) operate on the raw editor content only.
   state.activeChallenge = null;
@@ -950,6 +954,16 @@ async function _psetDoSubmit() {
       }
     }
   }
+
+  /* THE MISTAKES MADE DURING THE SET, banked here.
+     Nothing on this screen flushed the buffer, so a set's compile errors sat in
+     it until the NEXT single-program attempt was graded and were then written
+     down against that program -- errors from a set attributed to something
+     unrelated, and its count inflated. Flushed once for the whole set, against
+     the set rather than any one problem: the runs happen while switching
+     between them, so which problem an error belonged to is not knowable after
+     the fact, and guessing would be the same lie in a smaller size. */
+  if (typeof mistakeFlush === 'function') mistakeFlush('set:' + _pset.set.id);
 
   saveData();
   clearSessionParam('psetAutosave');

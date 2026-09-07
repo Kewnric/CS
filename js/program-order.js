@@ -29,9 +29,35 @@ function programOrder(c) {
   return typeof n === 'number' && isFinite(n) ? n : null;
 }
 
+/**
+ * One spelling of "the root folder".
+ *
+ * Root arrives here under five different names, which is how the numbering
+ * came apart. A program at root carries `parentId: null` when the app made it
+ * and `undefined` when it was imported -- browse already normalises that pair
+ * (browse.js:1551) and this did not, so the two halves became separate folders
+ * and each got its own "1". Two cards, same number.
+ *
+ * The folder side is worse. Browse names the root `'__root__'`, and the
+ * Renumber button interpolates that name into an onclick, so when the id is
+ * null it arrives as the STRING 'null'. Neither matches any program's
+ * parentId, so root looked empty: measured with a filter hiding 2 of 3
+ * programs, "clear the filters first" never fired -- it compared 1 shown
+ * against 0 total, renumbered the one visible program to 1, and left the other
+ * two unnumbered. Numbered programs sort ahead of unnumbered ones, so that
+ * silently promoted a filtered card to the top of the library for good.
+ *
+ * All five mean the same folder, so they all have to reduce to one value.
+ */
+function _programFolderId(v) {
+  return (v === '__root__' || v === 'null') ? null : (v || null);
+}
+
 /** Everything in a folder, in the order it should be taught. */
 function programsInFolder(parentId, pool) {
-  const list = (pool || state.challenges || []).filter(c => c.parentId === parentId);
+  const want = _programFolderId(parentId);
+  const list = (pool || state.challenges || [])
+    .filter(c => _programFolderId(c.parentId) === want);
   return programSortByOrder(list);
 }
 
