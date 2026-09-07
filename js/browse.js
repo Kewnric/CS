@@ -155,6 +155,8 @@ function browseStartVariant(challengeId, variantId) {
   setSessionParam('practiceChallenge', challengeId);
   setSessionParam('practiceVariant', variantId);
   setSessionParam('timeLimit', 0);
+  // Straight in, with no Session Setup: no recall, no run budget.
+  if (typeof examClear === 'function') examClear();
   spaNavigate('practice');
 }
 
@@ -645,6 +647,8 @@ function browseResume(challengeId) {
   const variant = c.variants.find(v => v.id === saved.variantId) || c.variants[0];
   setSessionParam('practiceChallenge', c.id);
   setSessionParam('practiceVariant', variant.id);
+  // Straight in, with no Session Setup: no recall, no run budget.
+  if (typeof examClear === 'function') examClear();
   spaNavigate('practice');
 }
 

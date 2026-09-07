@@ -368,6 +368,19 @@
         <div style="flex:1;"><label class="form-label" for="timer-s" style="text-align:center;">Secs</label><input
             type="number" id="timer-s" min="0" value="0" class="form-input" style="text-align:center;" /></div>
       </div>
+      <div class="setup-constraints">
+        <label class="setup-row">
+          <input type="checkbox" id="setup-recall" />
+          <span><strong>Recall</strong><em>Start from an empty file, with the boss bar off. The spec and the
+            tests stay &mdash; only the two things that leak the answer go.</em></span>
+        </label>
+        <label class="setup-row">
+          <span class="setup-row-main"><strong>Run budget</strong><em>Counts your runs so you notice them.
+            It never blocks Run or Check Code.</em></span>
+          <input type="number" id="setup-runs" min="0" max="99" value="0" class="form-input setup-num"
+                 aria-label="Run budget, 0 for none" />
+        </label>
+      </div>
       <div class="modal-actions">
         <button onclick="closeTimerModal()" class="btn btn-secondary">Cancel</button>
         <button onclick="confirmStartPractice()" class="btn btn-primary"><i data-lucide="play"
@@ -483,6 +496,7 @@
   <script defer src="js/mistakes.js"></script>
   <script defer src="js/concepts.js"></script>
   <script defer src="js/drills.js"></script>
+  <script defer src="js/exam-mode.js"></script>
   <!-- Shared library primitives. Must load before browse/study/notes: they call
        registerLibAdapter() at top level. -->
   <script defer src="js/library-common.js"></script>

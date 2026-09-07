@@ -104,7 +104,12 @@ function initPractice() {
           : { id: sv.id || generateId(), name: sv.name, ext: sv.ext,
               starterCode: '', code: '', userCode: sv.userCode || '' };
       })
-    : variant.files.map(f => ({ ...f, userCode: f.starterCode || '' }));
+    /* RECALL STARTS FROM NOTHING. Only on a fresh attempt: this branch is the
+        no-autosave one, so coming back to a recall attempt still restores what
+        was written rather than clearing it. */
+    : variant.files.map(f => ({ ...f,
+        userCode: (typeof examRecallOn === 'function' && examRecallOn() && !f.locked)
+          ? '' : (f.starterCode || '') }));
   /* Back to the file you were actually in. Clamped against the list that was
      just rebuilt rather than the one that was saved, because a file may have
      been deleted since and an index past the end would load nothing at all. */
@@ -156,7 +161,12 @@ function initPractice() {
   bossSetLevel(typeof getProgramLevel === 'function' ? getProgramLevel(challenge) : challenge.level);
   _bossResetCombo();
   _bossSeedLowest(challenge);
-  const bossBarEnabled = sessionStorage.getItem('bossBarEnabled') !== 'false';
+  /* The bar measures how close your text is to the reference, so in a recall
+     attempt watching it rise IS being told you are on the right track. It is
+     forced off rather than merely defaulted off, and the toggle is left alone
+     so it comes straight back on the next ordinary attempt. */
+  const bossBarEnabled = sessionStorage.getItem('bossBarEnabled') !== 'false'
+    && !(typeof examRecallOn === 'function' && examRecallOn());
   bossSetVisible(bossBarEnabled);
   const bossToggleBtn = document.getElementById('boss-bar-toggle-btn');
   if (bossToggleBtn) bossToggleBtn.style.color = bossBarEnabled ? 'var(--color-warning)' : 'var(--text-tertiary)';
@@ -760,7 +770,12 @@ function loadPracticeFile(fi, opts) {
   if (_starterAnimator) _starterAnimator.abort();
 
   const code = file.userCode || '';
-  if (!code && file.starterCode && typeof SyntaxTextAnimator !== 'undefined') {
+  /* A recall attempt has a deliberately empty file, and "empty with a starter
+     available" is exactly the condition this branch treats as "first load, put
+     the starter in". Without the guard it hands the starter straight back and
+     recall does nothing at all. */
+  const recall = typeof examRecallOn === 'function' && examRecallOn();
+  if (!code && !recall && file.starterCode && typeof SyntaxTextAnimator !== 'undefined') {
     // Only animate on first load (no user code yet)
     state.userFiles[fi].userCode = file.starterCode;
     textarea.value = '';
@@ -1472,6 +1487,8 @@ async function submitCode() {
     scoreBasis: scoreBasis,
     testsPassed: testResults ? testResults.filter(r => r.passed).length : null,
     testsTotal: testResults ? testResults.length : null,
+    // How the attempt was taken: recall, and runs against any budget.
+    ...(typeof examRecord === 'function' ? examRecord() : {}),
     /* WHAT went wrong, not just how much. Classified during the attempt from
        every compile error, warning and crash; see mistakes.js. */
     mistakes: (function () {
@@ -1583,7 +1600,11 @@ function retryPractice() {
                       [{ id: generateId(), name: 'main', ext: '.c', starterCode: variant.starterCode || '', code: variant.code || '', userCode: variant.starterCode || '' }];
     state.activeFileIndex = 0;
   }
-  state.userCode = variant.files ? (variant.files[0]?.starterCode || '') : (variant.starterCode || '');
+  /* Retry re-arms the attempt, so it honours the same constraint the attempt
+     was started under: a recall retry is blank too. */
+  state.userCode = (typeof examRecallOn === 'function' && examRecallOn())
+    ? ''
+    : (variant.files ? (variant.files[0]?.starterCode || '') : (variant.starterCode || ''));
 
   const textarea = document.getElementById('editor-textarea');
   const preCode = document.getElementById('editor-code');
@@ -2874,6 +2895,9 @@ function _termClose(byUser) {
 function runCodeWithPiston(seedStdin) {
   const textarea = document.getElementById('editor-textarea');
   if (!textarea) return;
+  /* Counted, never gated -- the budget is there to be noticed, not obeyed.
+     See exam-mode.js for why this does not stop you. */
+  if (typeof examNoteRun === 'function') examNoteRun();
   /* No anvil here. The strike marks Check Code, which is the graded
      event; Run Code is a scratch run you may do a dozen times in a row
      while poking at output, and a cue on every one of those turns a

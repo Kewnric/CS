@@ -1266,12 +1266,16 @@ function confirmStartPractice() {
   const m = parseInt(document.getElementById('timer-m').value) || 0;
   const s = parseInt(document.getElementById('timer-s').value) || 0;
   const vId = document.getElementById('timer-variant-select').value;
+  const recall = !!(document.getElementById('setup-recall') || {}).checked;
+  const runBudget = parseInt((document.getElementById('setup-runs') || {}).value, 10) || 0;
 
   closeTimerModal();
 
   setSessionParam('practiceChallenge', pendingChallengeId);
   setSessionParam('practiceVariant', vId);
   setSessionParam('timeLimit', (h * 3600) + (m * 60) + s);
+  // Read above, before the modal was taken down; see exam-mode.js.
+  if (typeof examSetup === 'function') examSetup(recall, runBudget);
 
   spaNavigate('practice');
 }

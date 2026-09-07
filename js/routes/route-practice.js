@@ -62,6 +62,7 @@ function practiceTemplate() {
         <div class="practice-topbar-center">
           ${bossCrystalTemplate()}
           ${bossBarTemplate()}
+          ${typeof examBadgeHTML === 'function' ? examBadgeHTML() : ''}
         </div>
         <div class="practice-topbar-right">
           <button class="btn btn-ghost practice-icon-btn" onclick="toggleBossHealthBar()" title="Boss health bar" id="boss-bar-toggle-btn" aria-label="Boss health bar" aria-pressed="true">

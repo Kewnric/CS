@@ -103,6 +103,7 @@ function renderPracticePanel() {
     </div>
     <div class="pp-tab-body" id="pp-tab-body"></div>
     <div class="pp-footer">
+      ${typeof examRunsHTML === 'function' ? examRunsHTML() : ''}
       <button class="btn btn-run-code pp-runcode-btn${_ppCtx.runDisabled ? ' is-unavailable' : ''}"
               id="pp-runcode-btn"
               onclick="${_ppCtx.runDisabled ? 'ppRunUnavailable()' : 'runCodeWithPiston()'}"
