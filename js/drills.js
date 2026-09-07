@@ -64,7 +64,7 @@ const DRILL_MUTATIONS = [
   },
   {
     code: 'assign-in-condition',
-    weight: 5,
+    weight: 7,
     ask: 'A comparison is not comparing.',
     hit: (l) => /\b(if|while)\s*\([^)]*==/.test(l),
     break: (l) => l.replace('==', '=')
@@ -85,14 +85,14 @@ const DRILL_MUTATIONS = [
   },
   {
     code: 'format-mismatch',
-    weight: 2,
+    weight: 1,
     ask: 'A conversion does not match what is being printed.',
     hit: (l) => /printf\s*\([^)]*%d/.test(l),
     break: (l) => l.replace('%d', '%s')
   },
   {
     code: 'off-by-direction',
-    weight: 5,
+    weight: 10,
     ask: 'A counter is moving the wrong way.',
     hit: (l) => /\+\+/.test(l) && !/for\s*\(/.test(l),
     break: (l) => l.replace('++', '--')
@@ -151,7 +151,16 @@ function _drillMakeFix(lesson) {
      every line ends in a semicolon, so picking evenly among the kinds a lesson
      happens to support still gave it 49% of the deck — most lessons support
      only it and one other. The subtle faults carry more weight both to even
-     the mix out and because they are the ones worth practising. */
+     the mix out and because they are the ones worth practising.
+
+     RE-TUNED ONCE THE CORPUS COULD TAKE IT. A weight only redistributes among
+     the kinds a lesson actually supports, so while off-by-direction fitted 2
+     lessons of 32 no weighting could lift it — measured, even at 12 it reached
+     4.5%, and every tuning simply moved mass between the two shallow faults.
+     Six lessons carrying the scarce faults changed that, and these weights were
+     then chosen by measuring the deck rather than by argument: the spread
+     between the most and least common fault went 13.9x, to 6.2x on the new
+     lessons alone, to 4.3x here, with nothing below 7.7%. */
   const totalW = kinds.reduce((t, sp) => t + (sp[0].m.weight || 1), 0);
   let roll = Math.random() * totalW;
   let spots = kinds[kinds.length - 1];

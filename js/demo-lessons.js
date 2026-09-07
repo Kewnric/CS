@@ -1629,6 +1629,250 @@ int main(void) {
       { line: 26, say: 'One place the tag is still needed: a struct that refers to ITSELF. <code>typedef struct Node { int v; Node *next; } Node;</code> does not compile — the name does not exist yet inside the braces. You write <code>struct Node *next;</code> there, which is why linked-list code carries both.', vars: {}, out: 'Lv 5 HP 20\nLv 12 HP 35\n(0, 0)\n' }
     ],
     recap: '<code>typedef</code> is an alias, not a new type. It is what lets you write <code>Pokemon</code> instead of <code>struct PokemonTag</code> everywhere.'
+  },
+
+  /* ══ Faults worth practising ═════════════════════════════
+     These six exist as much for the DRILL DECK as for reading. Measured, the
+     deck leaned on the two faults that fit anywhere -- a missing semicolon fits
+     every line and a wrong conversion nearly every printf -- while the subtle
+     ones had almost nowhere to live: off-by-direction fitted 2 of 32 lessons
+     and a lost & only 7. Weighting could not fix that, because a weight only
+     redistributes among the kinds a lesson actually supports.
+
+     So each of these carries at least one of the scarce faults on a line of its
+     own: a bare ++ outside a for, a loop bound, an == inside a condition, or a
+     scanf with an &. Lines are kept distinct on purpose -- a fault on a line
+     that appears twice in the same lesson is not askable, because the other
+     copy is the answer, sitting on screen. */
+
+  {
+    id: 'collatz-steps',
+    order: 205,
+    group: 'Faults worth practising',
+    title: 'Counting the steps',
+    tagline: 'A loop that changes its own condition, and the counter beside it',
+    icon: 'repeat',
+    file: 'steps.c',
+    match: { requires: ['while', 'ifelse'] },
+    code:
+`#include <stdio.h>
+
+int main(void) {
+    int n = 6;
+    int steps = 0;
+
+    while (n > 1) {
+        if (n % 2 == 0) {
+            n = n / 2;
+        } else {
+            n = 3 * n + 1;
+        }
+        steps++;
+    }
+
+    printf("It took %d steps.\\n", steps);
+    return 0;
+}`,
+    steps: [
+      { line: 4, say: 'Start at 6. This is the only value the program is given — everything else is worked out.', vars: { n: '6', steps: '0' } },
+      { line: 7, say: 'The loop runs while <code>n</code> is more than 1. Nothing counts down here: <code>n</code> is changed inside the body, so the condition is being rewritten as you go.', vars: { n: '6', steps: '0' } },
+      { line: 8, say: '<code>n % 2</code> is the remainder after dividing by two, so <code>== 0</code> asks "is this even?". Two equals signs. One would <em>store</em> 0 in n and then test that, which is always false — and the loop would stop immediately.', vars: { n: '6', steps: '0' } },
+      { line: 9, say: '6 is even, so it halves. 3.', vars: { n: '3', steps: '0' } },
+      { line: 13, say: '<code>steps++</code> adds one. It is outside the if/else on purpose — every trip through the loop counts, whichever branch ran.', vars: { n: '3', steps: '1' } },
+      { line: 11, say: '3 is odd, so it takes the other branch: three times three, plus one. 10.', vars: { n: '10', steps: '2' } },
+      { line: 7, say: 'And on it goes — 10, 5, 16, 8, 4, 2, 1. Eight trips in all before <code>n</code> finally reaches 1 and the condition fails.', vars: { n: '1', steps: '8' } },
+      { line: 16, say: 'Which is what gets printed.', vars: { n: '1', steps: '8' }, out: 'It took 8 steps.\n' }
+    ],
+    recap: 'Two equals signs ask a question; one gives an answer. And a counter that must tick on every trip belongs outside the branches, not in one of them.'
+  },
+
+  {
+    id: 'array-total',
+    order: 210,
+    group: 'Faults worth practising',
+    title: 'Adding up an array',
+    tagline: 'Where the loop has to stop, and why one past the end is the classic',
+    icon: 'sigma',
+    file: 'total.c',
+    match: { requires: ['array', 'for'] },
+    code:
+`#include <stdio.h>
+
+int main(void) {
+    int marks[5] = {70, 82, 65, 91, 58};
+    int total = 0;
+    int i;
+
+    for (i = 0; i < 5; i++) {
+        total = total + marks[i];
+    }
+
+    printf("Total %d\\n", total);
+    printf("Average %d\\n", total / 5);
+    return 0;
+}`,
+    steps: [
+      { line: 4, say: 'Five marks. The indexes are 0, 1, 2, 3 and 4 — there is no <code>marks[5]</code>, and reading it is reading somebody else\'s memory.', vars: { total: '0' } },
+      { line: 8, say: '<code>i &lt; 5</code>, not <code>i &lt;= 5</code>. That single character is the difference between five additions and six, and the sixth reads past the end. C will not stop you.', vars: { i: '0', total: '0' } },
+      { line: 9, say: 'Add the mark at the current index onto the running total. 70.', vars: { i: '0', total: '70' } },
+      { line: 9, say: 'Then 82, 65, 91 and 58 in turn.', vars: { i: '4', total: '366' } },
+      { line: 12, say: 'Five numbers, 366 between them.', vars: { total: '366' }, out: 'Total 366\n' },
+      { line: 13, say: 'And the average — but this is INTEGER division, so 366 / 5 is 73 and the remainder is thrown away, not rounded.', vars: { total: '366' }, out: 'Total 366\nAverage 73\n' }
+    ],
+    recap: 'A loop over n items runs 0 to n-1, which is written <code>i &lt; n</code>. And dividing two ints gives an int — the fraction is dropped, not rounded.'
+  },
+
+  {
+    id: 'array-search',
+    order: 215,
+    group: 'Faults worth practising',
+    title: 'Looking for one value',
+    tagline: 'A search that walks the whole array, and the comparison at its heart',
+    icon: 'search',
+    file: 'find.c',
+    match: { requires: ['array', 'if'] },
+    code:
+`#include <stdio.h>
+
+int main(void) {
+    int ids[6] = {14, 27, 33, 41, 52, 68};
+    int target = 41;
+    int found = -1;
+    int i;
+
+    for (i = 0; i < 6; i++) {
+        if (ids[i] == target) {
+            found = i;
+        }
+    }
+
+    printf("Found at index %d\\n", found);
+    return 0;
+}`,
+    steps: [
+      { line: 6, say: '<code>found</code> starts at -1, which is the "not there" answer. It has to be a value no real index could be, and 0 is a real index.', vars: { found: '-1' } },
+      { line: 9, say: 'Six values, so indexes 0 to 5, so <code>i &lt; 6</code>.', vars: { i: '0', found: '-1' } },
+      { line: 10, say: 'The comparison. <code>==</code> asks whether this element IS the target; a single <code>=</code> would copy the target into the array and report a match every time.', vars: { i: '0', found: '-1' } },
+      { line: 10, say: '14, 27 and 33 do not match. Nothing happens on those trips.', vars: { i: '2', found: '-1' } },
+      { line: 11, say: 'At index 3 the value is 41, so the index is remembered.', vars: { i: '3', found: '3' } },
+      { line: 15, say: 'The loop still finishes the last two — this version does not stop early — and then prints what it found.', vars: { i: '5', found: '3' }, out: 'Found at index 3\n' }
+    ],
+    recap: 'Start the answer at a value that cannot be mistaken for a real one, and remember that <code>==</code> compares while <code>=</code> assigns.'
+  },
+
+  {
+    id: 'read-two',
+    order: 220,
+    group: 'Faults worth practising',
+    title: 'Reading two values',
+    tagline: 'Two prompts, two reads, and two chances to forget the &',
+    icon: 'keyboard',
+    file: 'area.c',
+    match: { requires: ['scanf'] },
+    code:
+`#include <stdio.h>
+
+int main(void) {
+    int width;
+    int height;
+
+    printf("Width: ");
+    scanf("%d", &width);
+    printf("Height: ");
+    scanf("%d", &height);
+
+    printf("Area is %d\\n", width * height);
+    return 0;
+}`,
+    steps: [
+      { line: 7, say: 'Prompt first, with no <code>\\n</code>, so what you type sits on the same line.', vars: { width: '(nothing yet)' }, out: 'Width: ' },
+      { line: 8, say: 'You type <strong>7</strong>. The <code>&amp;</code> is what makes this work: scanf needs somewhere to PUT the number, and <code>&amp;width</code> is the address of the box rather than a copy of what is in it.', vars: { width: '7' }, out: 'Width: ‸7‸\n' },
+      { line: 9, say: 'Second prompt.', vars: { width: '7' }, out: 'Width: ‸7‸\nHeight: ' },
+      { line: 10, say: 'And <strong>4</strong>. Same shape, different box — forget the &amp; on either line and that read writes to whatever number happened to be sitting in the variable, treated as an address.', vars: { width: '7', height: '4' }, out: 'Width: ‸7‸\nHeight: ‸4‸\n' },
+      { line: 12, say: 'Both values are real now, so the multiplication is too.', vars: { width: '7', height: '4' }, out: 'Width: ‸7‸\nHeight: ‸4‸\nArea is 28\n' }
+    ],
+    recap: 'Every scanf of a plain variable takes <code>&amp;</code>. Arrays are the exception, because an array name is already an address.'
+  },
+
+  {
+    id: 'retry-valid',
+    order: 225,
+    group: 'Faults worth practising',
+    title: 'Asking again until it is valid',
+    tagline: 'A loop that guards input, and the counter that watches it',
+    icon: 'rotate-ccw',
+    file: 'retry.c',
+    match: { requires: ['while', 'scanf'] },
+    code:
+`#include <stdio.h>
+
+int main(void) {
+    int age;
+    int tries = 0;
+
+    printf("Age: ");
+    scanf("%d", &age);
+
+    while (age < 0) {
+        tries++;
+        printf("Not a real age. Try again: ");
+        scanf("%d", &age);
+    }
+
+    if (tries == 0) {
+        printf("Got it first time.\\n");
+    }
+
+    printf("Age accepted after %d retries.\\n", tries);
+    return 0;
+}`,
+    steps: [
+      { line: 8, say: 'Read once before the loop. You type <strong>-3</strong>, which is not an age.', vars: { age: '-3', tries: '0' }, out: 'Age: ‸-3‸\n' },
+      { line: 10, say: 'The condition is checked BEFORE the body runs, so a valid first answer skips the loop entirely. -3 is not valid, so in we go.', vars: { age: '-3', tries: '0' }, out: 'Age: ‸-3‸\n' },
+      { line: 11, say: '<code>tries++</code> counts this retry. On its own line, outside the printf, so it counts trips rather than prints.', vars: { age: '-3', tries: '1' }, out: 'Age: ‸-3‸\n' },
+      { line: 13, say: 'Read again into the SAME variable — which is what lets the condition be re-tested against something new. You type <strong>20</strong>.', vars: { age: '20', tries: '1' }, out: 'Age: ‸-3‸\nNot a real age. Try again: ‸20‸\n' },
+      { line: 10, say: '20 is not less than 0, so the loop ends. Had the read gone into a different variable, <code>age</code> would still be -3 and this would never stop.', vars: { age: '20', tries: '1' }, out: 'Age: ‸-3‸\nNot a real age. Try again: ‸20‸\n' },
+      { line: 16, say: '<code>tries</code> is 1, not 0, so this message is skipped.', vars: { age: '20', tries: '1' }, out: 'Age: ‸-3‸\nNot a real age. Try again: ‸20‸\n' },
+      { line: 20, say: 'And the count is reported.', vars: { age: '20', tries: '1' }, out: 'Age: ‸-3‸\nNot a real age. Try again: ‸20‸\nAge accepted after 1 retries.\n' }
+    ],
+    recap: 'A validating loop has to read into the same variable it tests, or the condition never changes and the program hangs.'
+  },
+
+  {
+    id: 'count-and-print',
+    order: 230,
+    group: 'Faults worth practising',
+    title: 'Printing a row and counting it',
+    tagline: 'A loop bound and a tally, side by side',
+    icon: 'list-ordered',
+    file: 'row.c',
+    match: { requires: ['array', 'for'] },
+    code:
+`#include <stdio.h>
+
+int main(void) {
+    int nums[5] = {1, 2, 3, 4, 5};
+    int shown = 0;
+    int i;
+
+    for (i = 0; i < 5; i++) {
+        printf("%d ", nums[i]);
+        shown++;
+    }
+
+    printf("\\n");
+    printf("Printed %d numbers.\\n", shown);
+    return 0;
+}`,
+    steps: [
+      { line: 8, say: 'Five elements, so the bound is <code>i &lt; 5</code>. Written <code>&lt;=</code> it would run six times and print whatever sits past the end of the array.', vars: { i: '0', shown: '0' } },
+      { line: 9, say: 'A space after the <code>%d</code>, not a newline, so the numbers come out along one row.', vars: { i: '0', shown: '0' }, out: '1 ' },
+      { line: 10, say: '<code>shown++</code> tallies what was printed. It counts UP; written <code>--</code> it would run to -5 and the report at the end would be nonsense while the row above still looked right.', vars: { i: '0', shown: '1' }, out: '1 ' },
+      { line: 9, say: 'Round again for 2, 3, 4 and 5.', vars: { i: '4', shown: '5' }, out: '1 2 3 4 5 ' },
+      { line: 13, say: 'One newline of its own, to close the row.', vars: { shown: '5' }, out: '1 2 3 4 5 \n' },
+      { line: 14, say: 'Then the tally — which agrees with the row only because the counter moved the same way the loop did.', vars: { shown: '5' }, out: '1 2 3 4 5 \nPrinted 5 numbers.\n' }
+    ],
+    recap: 'The bound says how many times; the tally says how many happened. When a bug moves one and not the other, the two stop agreeing — which is how you notice.'
   }
 
 
