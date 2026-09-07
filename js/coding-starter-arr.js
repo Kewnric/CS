@@ -116,6 +116,16 @@ function codingStarterArrays() {
        { name: 'one value', stdin: '1\n5\n', expected: '5' }],
       ['printf', 'scanf', 'array', 'loop']),
 
+    _csProgram('arr-menu', 'ar-one', "The gradebook",
+      "The program every course writes: marks in an array, behind a menu.<br><br><code>1</code> asks <code>Enter a mark: </code> and answers <code>Recorded N mark(s)</code>. <code>2</code> prints <code>N. MARK</code> per line. <code>3</code> answers <code>Average X.XX</code> to two decimals. <code>4</code> answers <code>Highest H lowest L</code>. Anything with no marks yet answers <code>No marks yet</code>. <code>0</code> prints <code>Bye</code>.<br><br>One thing to get right: the average is <code>(double) total / count</code>. Without the cast both sides are ints, C does integer division, and 70 and 90 average to 80 while 70 and 91 also average to 80.",
+      [{ title: 'Sample 1', content: "Input:\n1\n70\n1\n90\n1\n80\n2\n3\n4\n0\nOutput:\n=== Gradebook ===\n1. Add a mark\n2. List\n3. Average\n4. Highest and lowest\n0. Exit\nChoice: Enter a mark: Recorded 1 mark(s)\n=== Gradebook ===\n1. Add a mark\n2. List\n3. Average\n4. Highest and lowest\n0. Exit\nChoice: Enter a mark: Recorded 2 mark(s)\n=== Gradebook ===\n1. Add a mark\n2. List\n3. Average\n4. Highest and lowest\n0. Exit\nChoice: Enter a mark: Recorded 3 mark(s)\n=== Gradebook ===\n1. Add a mark\n2. List\n3. Average\n4. Highest and lowest\n0. Exit\nChoice: 1. 70\n2. 90\n3. 80\n=== Gradebook ===\n1. Add a mark\n2. List\n3. Average\n4. Highest and lowest\n0. Exit\nChoice: Average 80.00\n=== Gradebook ===\n1. Add a mark\n2. List\n3. Average\n4. Highest and lowest\n0. Exit\nChoice: Highest 90 lowest 70\n=== Gradebook ===\n1. Add a mark\n2. List\n3. Average\n4. Highest and lowest\n0. Exit\nChoice: Bye" }],
+      [
+       { name: "three marks, average and range", stdin: "1\n70\n1\n90\n1\n80\n2\n3\n4\n0\n",
+         expected: "=== Gradebook ===\n1. Add a mark\n2. List\n3. Average\n4. Highest and lowest\n0. Exit\nChoice: Enter a mark: Recorded 1 mark(s)\n=== Gradebook ===\n1. Add a mark\n2. List\n3. Average\n4. Highest and lowest\n0. Exit\nChoice: Enter a mark: Recorded 2 mark(s)\n=== Gradebook ===\n1. Add a mark\n2. List\n3. Average\n4. Highest and lowest\n0. Exit\nChoice: Enter a mark: Recorded 3 mark(s)\n=== Gradebook ===\n1. Add a mark\n2. List\n3. Average\n4. Highest and lowest\n0. Exit\nChoice: 1. 70\n2. 90\n3. 80\n=== Gradebook ===\n1. Add a mark\n2. List\n3. Average\n4. Highest and lowest\n0. Exit\nChoice: Average 80.00\n=== Gradebook ===\n1. Add a mark\n2. List\n3. Average\n4. Highest and lowest\n0. Exit\nChoice: Highest 90 lowest 70\n=== Gradebook ===\n1. Add a mark\n2. List\n3. Average\n4. Highest and lowest\n0. Exit\nChoice: Bye" },
+       { name: "average of nothing, and a bad choice", stdin: "3\n9\n0\n",
+         expected: "=== Gradebook ===\n1. Add a mark\n2. List\n3. Average\n4. Highest and lowest\n0. Exit\nChoice: No marks yet\n=== Gradebook ===\n1. Add a mark\n2. List\n3. Average\n4. Highest and lowest\n0. Exit\nChoice: No such choice\n=== Gradebook ===\n1. Add a mark\n2. List\n3. Average\n4. Highest and lowest\n0. Exit\nChoice: Bye" }],
+      ['array', 'switch', 'dowhile']),
+
     /* ── B · Into a function ────────────────────────────────── */
 
     _csProgram('ar-fn-sum', 'ar-fn', 'Hand the row to a function',
@@ -291,7 +301,17 @@ function codingStarterArrays() {
       [{ name: 'second row', stdin: '2 3\n1 2 3\n9 5 6\n', expected: '9 at 1 0' },
        { name: 'first cell', stdin: '2 2\n8 1\n2 3\n', expected: '8 at 0 0' },
        { name: 'all negative', stdin: '2 2\n-9 -4\n-7 -2\n', expected: '-2 at 1 1' }],
-      ['printf', 'scanf', 'array', 'nestedloop'])
+      ['printf', 'scanf', 'array', 'nestedloop']),
+
+    _csProgram('grid-menu', 'ar-grid', "Seat booking",
+      "A 2D array doing the job 2D arrays are for: four rows of five seats, booked and cancelled from a menu.<br><br><code>1</code> prints the plan, a row per line, <code>.</code> for free and <code>X</code> for taken. <code>2</code> and <code>3</code> ask <code>Enter row and seat: </code> and answer <code>Booked R C</code> / <code>Cancelled R C</code>, or <code>No such seat</code> when the numbers are outside the grid, or <code>Already taken</code> / <code>Was not booked</code>. <code>4</code> answers <code>N free of 20</code>. <code>0</code> prints <code>Bye</code>.<br><br>Rows are 0 to 3 and seats 0 to 4, and checking that BEFORE touching <code>seats[r][c]</code> is the whole point — C will happily let you write outside the grid and corrupt whatever is next to it.",
+      [{ title: 'Sample 1', content: "Input:\n2\n1 2\n2\n1 2\n1\n4\n0\nOutput:\n=== Seat Booking ===\n1. Show the plan\n2. Book a seat\n3. Cancel a seat\n4. How many left\n0. Exit\nChoice: Enter row and seat: Booked 1 2\n=== Seat Booking ===\n1. Show the plan\n2. Book a seat\n3. Cancel a seat\n4. How many left\n0. Exit\nChoice: Enter row and seat: Already taken\n=== Seat Booking ===\n1. Show the plan\n2. Book a seat\n3. Cancel a seat\n4. How many left\n0. Exit\nChoice: .....\n..X..\n.....\n.....\n=== Seat Booking ===\n1. Show the plan\n2. Book a seat\n3. Cancel a seat\n4. How many left\n0. Exit\nChoice: 19 free of 20\n=== Seat Booking ===\n1. Show the plan\n2. Book a seat\n3. Cancel a seat\n4. How many left\n0. Exit\nChoice: Bye" }],
+      [
+       { name: "book, double-book, plan, count", stdin: "2\n1 2\n2\n1 2\n1\n4\n0\n",
+         expected: "=== Seat Booking ===\n1. Show the plan\n2. Book a seat\n3. Cancel a seat\n4. How many left\n0. Exit\nChoice: Enter row and seat: Booked 1 2\n=== Seat Booking ===\n1. Show the plan\n2. Book a seat\n3. Cancel a seat\n4. How many left\n0. Exit\nChoice: Enter row and seat: Already taken\n=== Seat Booking ===\n1. Show the plan\n2. Book a seat\n3. Cancel a seat\n4. How many left\n0. Exit\nChoice: .....\n..X..\n.....\n.....\n=== Seat Booking ===\n1. Show the plan\n2. Book a seat\n3. Cancel a seat\n4. How many left\n0. Exit\nChoice: 19 free of 20\n=== Seat Booking ===\n1. Show the plan\n2. Book a seat\n3. Cancel a seat\n4. How many left\n0. Exit\nChoice: Bye" },
+       { name: "a seat that is not there, and cancelling a free one", stdin: "2\n9 9\n3\n0 0\n4\n0\n",
+         expected: "=== Seat Booking ===\n1. Show the plan\n2. Book a seat\n3. Cancel a seat\n4. How many left\n0. Exit\nChoice: Enter row and seat: No such seat\n=== Seat Booking ===\n1. Show the plan\n2. Book a seat\n3. Cancel a seat\n4. How many left\n0. Exit\nChoice: Enter row and seat: Was not booked\n=== Seat Booking ===\n1. Show the plan\n2. Book a seat\n3. Cancel a seat\n4. How many left\n0. Exit\nChoice: 20 free of 20\n=== Seat Booking ===\n1. Show the plan\n2. Book a seat\n3. Cancel a seat\n4. How many left\n0. Exit\nChoice: Bye" }],
+      ['nestedloop', 'switch', 'dowhile'])
   ];
 
   return { challenges: challenges, nodes: nodes };

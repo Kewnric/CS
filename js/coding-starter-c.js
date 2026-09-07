@@ -169,6 +169,16 @@ function codingStarterFundamentals() {
        { name: 'a zero in the mix', stdin: '2\n0 3\n2\n5 2\n',
          expected: 'Array[0]: 0\nArray[1]: 0\nArray[2]: 15\nArray[3]: 6' }]),
 
+    _csProgram('mem-menu', 6, "A list that grows",
+      "The array that has no size until you ask for one. Start with <code>NULL</code> and no room at all, and double the capacity with <code>realloc</code> whenever it fills up.<br><br><code>1</code> grows first if it must — printing <code>Room for N now</code> — then asks <code>Enter a number: </code> and answers <code>Holding N of M</code>. <code>2</code> prints <code>N. VALUE</code>, or <code>Empty</code>. <code>3</code> answers <code>Total N</code>. <code>0</code> frees the block and prints <code>Bye</code>.<br><br>Three habits worth keeping. <code>realloc(NULL, n)</code> is the same as <code>malloc(n)</code>, so the first growth needs no special case. Check the result against <code>NULL</code> before using it. And <code>free</code> once at the end — growing is not leaking, because realloc releases the old block itself.",
+      [{ title: 'Sample 1', content: "Input:\n1\n5\n1\n7\n1\n9\n2\n3\n0\nOutput:\n=== Growing List ===\n1. Add a number\n2. List\n3. Total\n0. Exit\nChoice: Room for 2 now\nEnter a number: Holding 1 of 2\n=== Growing List ===\n1. Add a number\n2. List\n3. Total\n0. Exit\nChoice: Enter a number: Holding 2 of 2\n=== Growing List ===\n1. Add a number\n2. List\n3. Total\n0. Exit\nChoice: Room for 4 now\nEnter a number: Holding 3 of 4\n=== Growing List ===\n1. Add a number\n2. List\n3. Total\n0. Exit\nChoice: 1. 5\n2. 7\n3. 9\n=== Growing List ===\n1. Add a number\n2. List\n3. Total\n0. Exit\nChoice: Total 21\n=== Growing List ===\n1. Add a number\n2. List\n3. Total\n0. Exit\nChoice: Bye" }],
+      [
+       { name: "three numbers, so it grows twice", stdin: "1\n5\n1\n7\n1\n9\n2\n3\n0\n",
+         expected: "=== Growing List ===\n1. Add a number\n2. List\n3. Total\n0. Exit\nChoice: Room for 2 now\nEnter a number: Holding 1 of 2\n=== Growing List ===\n1. Add a number\n2. List\n3. Total\n0. Exit\nChoice: Enter a number: Holding 2 of 2\n=== Growing List ===\n1. Add a number\n2. List\n3. Total\n0. Exit\nChoice: Room for 4 now\nEnter a number: Holding 3 of 4\n=== Growing List ===\n1. Add a number\n2. List\n3. Total\n0. Exit\nChoice: 1. 5\n2. 7\n3. 9\n=== Growing List ===\n1. Add a number\n2. List\n3. Total\n0. Exit\nChoice: Total 21\n=== Growing List ===\n1. Add a number\n2. List\n3. Total\n0. Exit\nChoice: Bye" },
+       { name: "empty, then one number", stdin: "2\n1\n4\n3\n0\n",
+         expected: "=== Growing List ===\n1. Add a number\n2. List\n3. Total\n0. Exit\nChoice: Empty\n=== Growing List ===\n1. Add a number\n2. List\n3. Total\n0. Exit\nChoice: Room for 2 now\nEnter a number: Holding 1 of 2\n=== Growing List ===\n1. Add a number\n2. List\n3. Total\n0. Exit\nChoice: Total 4\n=== Growing List ===\n1. Add a number\n2. List\n3. Total\n0. Exit\nChoice: Bye" }],
+      ['pointer', 'switch', 'dowhile']),
+
     /* ── 7 · Structs and a bag ──────────────────────────────── */
 
     _csProgram('struct-one', 7, 'One Pokemon',

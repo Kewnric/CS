@@ -104,6 +104,16 @@ function codingStarterAdvanced() {
        { name: 'nothing but spaces', stdin: '     \n', expected: 'Enter a line: Words: 0' }],
       ['loop', 'if', 'scanf']),
 
+    _csProgram('str-menu', 9, "The word list",
+      "A working program over an array of strings: a menu that runs until you choose 0, with every string function you have met doing a job.<br><br><code>1</code> asks <code>Enter a word: </code> and answers <code>Added WORD (N letters)</code> using <code>strlen</code>. <code>2</code> prints <code>N. WORD</code> per line, or <code>No words yet</code>. <code>3</code> asks <code>Enter a word: </code> and answers <code>Found at N</code> or <code>Not in the list</code> — <code>strcmp</code> returns 0 for a match, and only 0. <code>4</code> answers <code>Longest is WORD</code>. <code>0</code> prints <code>Bye</code>.<br><br>Note that <code>words</code> is <code>char words[50][32]</code> — fifty boxes of thirty-two characters. <code>words[i]</code> is one whole string, which is why it can be handed straight to <code>strcmp</code> and <code>strlen</code>.",
+      [{ title: 'Sample 1', content: "Input:\n1\napple\n1\nkiwi\n2\n3\nkiwi\n4\n0\nOutput:\n=== Word List ===\n1. Add a word\n2. List\n3. Search\n4. Longest\n0. Exit\nChoice: Enter a word: Added apple (5 letters)\n=== Word List ===\n1. Add a word\n2. List\n3. Search\n4. Longest\n0. Exit\nChoice: Enter a word: Added kiwi (4 letters)\n=== Word List ===\n1. Add a word\n2. List\n3. Search\n4. Longest\n0. Exit\nChoice: 1. apple\n2. kiwi\n=== Word List ===\n1. Add a word\n2. List\n3. Search\n4. Longest\n0. Exit\nChoice: Enter a word: Found at 2\n=== Word List ===\n1. Add a word\n2. List\n3. Search\n4. Longest\n0. Exit\nChoice: Longest is apple\n=== Word List ===\n1. Add a word\n2. List\n3. Search\n4. Longest\n0. Exit\nChoice: Bye" }],
+      [
+       { name: "add, list, search, longest", stdin: "1\napple\n1\nkiwi\n2\n3\nkiwi\n4\n0\n",
+         expected: "=== Word List ===\n1. Add a word\n2. List\n3. Search\n4. Longest\n0. Exit\nChoice: Enter a word: Added apple (5 letters)\n=== Word List ===\n1. Add a word\n2. List\n3. Search\n4. Longest\n0. Exit\nChoice: Enter a word: Added kiwi (4 letters)\n=== Word List ===\n1. Add a word\n2. List\n3. Search\n4. Longest\n0. Exit\nChoice: 1. apple\n2. kiwi\n=== Word List ===\n1. Add a word\n2. List\n3. Search\n4. Longest\n0. Exit\nChoice: Enter a word: Found at 2\n=== Word List ===\n1. Add a word\n2. List\n3. Search\n4. Longest\n0. Exit\nChoice: Longest is apple\n=== Word List ===\n1. Add a word\n2. List\n3. Search\n4. Longest\n0. Exit\nChoice: Bye" },
+       { name: "searching an empty list", stdin: "3\nghost\n2\n0\n",
+         expected: "=== Word List ===\n1. Add a word\n2. List\n3. Search\n4. Longest\n0. Exit\nChoice: Enter a word: Not in the list\n=== Word List ===\n1. Add a word\n2. List\n3. Search\n4. Longest\n0. Exit\nChoice: No words yet\n=== Word List ===\n1. Add a word\n2. List\n3. Search\n4. Longest\n0. Exit\nChoice: Bye" }],
+      ['array', 'switch', 'dowhile']),
+
     /* ── 10 · Functions and recursion ───────────────────────── */
 
     _csProgram('rec-factorial', 10, 'Factorial, recursively',
