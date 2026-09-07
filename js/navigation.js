@@ -396,7 +396,7 @@ function renderGlobalSearchResults() {
 function handleGlobalSearchSelect(type, id, parentId) {
   closeGlobalSearch();
   if (type === 'challenge') {
-    setSessionParam('browseActiveProgram', id);
+    browseOpenProgram(id);
     spaNavigate('browse');
     // Already on the browse route? Same-hash navigation won't re-init — open directly.
     if (typeof browseSelectProgram === 'function' && document.getElementById('browse-challenges-container')) {

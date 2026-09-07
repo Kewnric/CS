@@ -100,9 +100,24 @@ function browseInit() {
      Runs before the target selection below, so whatever you are opening still
      expands its own path afterwards. */
   const cameFrom = String(window.cm_prevRoute || '').split('?')[0];
-  if (['practice', 'practice-set', 'solution', 'browse'].indexOf(cameFrom) === -1
-      && typeof collapseAllFolders === 'function') {
-    collapseAllFolders('challenge');
+  /* Did somebody ASK for a program, or is one merely still remembered?
+     browseActiveProgram is a remembered selection that outlives the visit that
+     made it, so collapsing the folders and then honouring it re-opened the path
+     to a program chosen on some earlier visit -- the collapse ran every time and
+     never once reached the screen. The flag is set only by browseOpenProgram, so
+     it means "open this now" rather than "this is where I was". */
+  const focusOnce = getSessionParam('browseFocusOnce') === true;
+  clearSessionParam('browseFocusOnce');
+  if (['practice', 'practice-set', 'solution', 'browse'].indexOf(cameFrom) === -1) {
+    if (typeof collapseAllFolders === 'function') collapseAllFolders('challenge');
+    if (!focusOnce) {
+      // Arrived with nothing asked for: open at the folder view, closed.
+      setSessionParam('browseActiveProgram', null);
+      setSessionParam('browseActiveSet', null);
+      browseActiveProgramId = null;
+      browseActiveSetId = null;
+      browseActiveNodeId = null;
+    }
   }
   /* Put the library's label in step with its contents before anything reads
      it. renderBrowse returns early when its container is not mounted, so the

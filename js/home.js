@@ -433,7 +433,7 @@ function _homeUnfinished() {
 window.homeResumeAttempt = function (kind, itemId) {
   if (kind === 'coding') {
     if (typeof browseResume === 'function') return browseResume(itemId);
-    setSessionParam('browseActiveProgram', itemId);
+    browseOpenProgram(itemId);
     return spaNavigate('browse');
   }
   if (kind === 'notebook') {
@@ -978,7 +978,7 @@ window.selectNotebookFromCarousel = function(id) {
 };
 
 window.selectChallengeFromCarousel = function(id) {
-  setSessionParam('browseActiveProgram', id);
+  browseOpenProgram(id);
   spaNavigate('browse');
 };
 

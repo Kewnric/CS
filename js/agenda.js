@@ -829,7 +829,7 @@ function agGoToEntry(key) {
   if (e.isEvent) { agOpenEventModal(e.sourceId); return; }
   agClosePanel();
   if (e.sourceType === 'challenge') {
-    setSessionParam('browseActiveProgram', e.sourceId);
+    browseOpenProgram(e.sourceId);
     agNavigateEvenIfHere('browse', () => spaNavigate('browse'));
   } else if (e.sourceType === 'snippet') {
     setSessionParam('activeSnippetId', e.sourceId);

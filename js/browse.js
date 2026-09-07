@@ -15,6 +15,26 @@ function debouncedBrowseSearch() {
   _browseSearchTimer = setTimeout(() => { setSessionParam('browsePage', 1); renderBrowse(); }, 180);
 }
 
+/**
+ * Open a program in the library from somewhere else.
+ *
+ * browseActiveProgram is a REMEMBERED SELECTION, not a navigation instruction --
+ * clicking a program in the tree stores it so the library still shows it while
+ * you move around inside the library. That is why leaving and coming back left
+ * the tree open: browseInit collapses the folders on a fresh arrival, and then
+ * re-expanded the path to whatever program was still remembered from an earlier
+ * visit, so the collapse never survived to the screen.
+ *
+ * The remembered selection cannot tell "I chose this ten minutes ago" from
+ * "open this now", so asking to open one sets a flag that browseInit consumes.
+ * A fresh arrival with no flag drops the stale selection and opens at the folder
+ * view; a fresh arrival WITH one honours the target it was given.
+ */
+function browseOpenProgram(id) {
+  setSessionParam('browseActiveProgram', id);
+  setSessionParam('browseFocusOnce', true);
+}
+
 function navigateToFolderAndFocus(parentId, itemId) {
   // Clear search
   const searchInput = document.getElementById('browse-search');

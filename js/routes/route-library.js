@@ -270,7 +270,7 @@ function libHubSearch() {
     });
   };
   push(state.challenges, 'challenge', 'browse', 'file-code',
-    (it) => `setSessionParam('browseActiveProgram','${it.id}'); spaNavigate('browse')`);
+    (it) => `browseOpenProgram('${it.id}'); spaNavigate('browse')`);
   push(state.notebooks, 'notebook', 'study', 'book-open',
     (it) => `setSessionParam('activeNotebook','${it.id}'); spaNavigate('study')`);
   push(state.snippets, 'snippet', 'snippets', 'code',
