@@ -63,6 +63,7 @@ function registerAllRoutes() {
   SpaRouter.register('visualization', { title: 'StudySession Pro — Visualization', templateFn: vizTemplate, initFn: vizInit, destroyFn: vizDestroy, sidebarVisible: true, navId: 'nav-mindmap' });
   SpaRouter.register('quests', { title: 'StudySession Pro — Quest Board', templateFn: questTemplate, initFn: questInit, destroyFn: questDestroy, sidebarVisible: true, navId: 'nav-quests' });
   SpaRouter.register('practice', { title: 'StudySession Pro — Practice', templateFn: practiceTemplate, initFn: practiceInit, destroyFn: practiceDestroy, sidebarVisible: false, navId: null });
+  SpaRouter.register('drills', { title: 'StudySession Pro — Drills', templateFn: drillsTemplate, initFn: drillsInit, destroyFn: drillsDestroy, sidebarVisible: true, navId: null });
   SpaRouter.register('practice-set', { title: 'StudySession Pro — Multi-Problem Session', templateFn: practiceSetTemplate, initFn: practiceSetInit, destroyFn: practiceSetDestroy, sidebarVisible: false, navId: null });
   SpaRouter.register('snippet-attempt', { title: 'SQL Practice — StudySession Pro', templateFn: snippetAttemptTemplate, initFn: snippetAttemptInit, destroyFn: snippetAttemptDestroy, sidebarVisible: false, navId: null });
   SpaRouter.register('lang-attempt', { title: 'Language Drill — StudySession Pro', templateFn: langAttemptTemplate, initFn: langAttemptInit, destroyFn: langAttemptDestroy, sidebarVisible: false, navId: null });

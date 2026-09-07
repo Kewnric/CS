@@ -30,6 +30,11 @@ function browseTemplate() {
                       title="Walkthroughs — see an idea demonstrated" aria-label="Walkthroughs">
                 <i data-lucide="presentation"></i>
               </button>
+              <!-- Reading and repairing, as opposed to writing. -->
+              <button class="tutorial-trigger-btn" onclick="spaNavigate('drills')"
+                      title="Drills — predict the output, or find the bug" aria-label="Drills">
+                <i data-lucide="brain-circuit"></i>
+              </button>
               <button class="tutorial-trigger-btn" onclick="GuidedTutorial.start()" title="Show Page Tour">
                 <i data-lucide="graduation-cap"></i>
               </button>
