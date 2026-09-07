@@ -1016,16 +1016,19 @@ function viewHistoricalDiff(id, challengeId) {
   // ones only kept the main one. Rebuild whichever is available, with the raw
   // sources attached so the solution page can re-diff and copy honestly.
   let fileDiffs = null;
-  if (Array.isArray(entry.targetFiles) && entry.targetFiles.length && Array.isArray(entry.userFiles)) {
-    fileDiffs = entry.targetFiles.map((t, i) => {
-      const u = entry.userFiles.find(f => f.name === t.name && f.ext === t.ext) || entry.userFiles[i] || {};
-      const userCode = u.userCode || '';
-      const expectedCode = t.code || '';
-      return {
-        fileName: (t.name || 'main') + (t.ext || '.c'), name: t.name, ext: t.ext,
-        userCode, expectedCode, diffs: computeDiffs(userCode, expectedCode).diffs
-      };
-    });
+  /* Sourced through historyFilePairs, which finds the reference on the entry
+     when it is still there and in the challenge when it is not -- an older
+     attempt keeps a real comparison instead of an empty right-hand column.
+     See history-compact.js. */
+  if (typeof historyFilePairs === 'function') {
+    const pairs = historyFilePairs(entry).filter(p => p.user || p.target);
+    if (pairs.length) {
+      fileDiffs = pairs.map(p => ({
+        fileName: p.name, name: p.rawName, ext: p.ext,
+        userCode: p.user, expectedCode: p.target,
+        diffs: computeDiffs(p.user, p.target).diffs
+      }));
+    }
   }
   if (!fileDiffs || !fileDiffs.length) {
     const userCode = entry.userCode || '', expectedCode = entry.expectedCode || '';

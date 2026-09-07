@@ -503,7 +503,11 @@ function _practiceBestAttemptExec() {
   return {
     score: best.score,
     ts: best.submitTime || best.startTime || Date.now(),
-    snapshot: { files: best.userFiles, activeFileIndex: 0 },
+    /* Rehydrated, not handed over as stored. De-duplication drops each file's
+       reference when an identical copy is already on the entry's target files,
+       and the editor needs it back -- no reference means no boss bar. */
+    snapshot: { files: (typeof historyRehydrateFiles === 'function'
+                  ? historyRehydrateFiles(best) : best.userFiles), activeFileIndex: 0 },
     label: 'Best past attempt' + (best.date ? ' · ' + best.date : ''),
     historical: true
   };

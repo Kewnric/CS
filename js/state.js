@@ -341,6 +341,13 @@ window.addEventListener('beforeunload', () => {
 
 function _flushSaveData() {
   _saveDataPending = false;
+  /* Compact the record before it is written anywhere. Done here rather than
+     at the point of grading because it has to catch imported and merged
+     history too, and because the cloud payload reads state.history directly --
+     compacting in place keeps memory, localStorage and Firestore identical
+     instead of leaving three different shapes about. See history-compact.js. */
+  if (typeof historyCompact === 'function') historyCompact(state.history);
+
   const dataToSave = {
     categories: getNodeNamesForScope('challenge'),
     snippetCategories: getNodeNamesForScope('snippet'),

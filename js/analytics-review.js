@@ -80,12 +80,10 @@ function anReviewSetFile(i) { anReview.fileIdx = i; anReviewPaint(); }
 
 /** The file pairs stored on an attempt, newest schema first. */
 function _anr_files(entry) {
-  if (Array.isArray(entry.targetFiles) && entry.targetFiles.length && Array.isArray(entry.userFiles)) {
-    return entry.targetFiles.map((t, i) => {
-      const u = entry.userFiles.find(f => f.name === t.name && f.ext === t.ext) || entry.userFiles[i] || {};
-      return { name: (t.name || 'main') + (t.ext || '.c'), user: u.userCode || '', target: t.code || '' };
-    });
-  }
+  /* One source of truth for where the parts of an attempt live, so an entry
+     whose reference has been compacted away still reviews against the
+     challenge's copy rather than against nothing. See history-compact.js. */
+  if (typeof historyFilePairs === 'function') return historyFilePairs(entry);
   return [{ name: 'main.c', user: entry.userCode || '', target: entry.expectedCode || '' }];
 }
 
