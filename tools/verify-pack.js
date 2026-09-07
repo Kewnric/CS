@@ -86,13 +86,31 @@ let progs = 0, ran = 0, passed = 0;
 const failures = [];
 const skipped = [];
 
+/* ── Deliberate omissions ──────────────────────────────────────
+   Not everything missing is a gap. A report that lists a known, reasoned
+   decision every single run teaches you to skim it, and a report you skim
+   catches nothing — so an accounted-for omission is recorded as accounted for
+   rather than counted against the pack.
+
+   CHECKED BOTH WAYS. An entry whose program has since gained tests, or which
+   names a program that no longer exists, is reported as stale. An allowlist
+   nobody re-checks is how a real gap ends up hiding behind an old excuse. */
+const BY_DESIGN = {
+  'starter-list-array-2':
+    'findRetElem returns a dummy whose middle initial is NUL, and printing it '
+    + 'with %-3c puts that byte into stdout — verified: the reference emits '
+    + 'exactly one NUL. Comparing output containing a NUL fails for reasons that '
+    + 'have nothing to do with the exercise, so this one is graded by reference '
+    + 'match instead. Its sample is omitted for the same reason.'
+};
+
 /* ── Coverage, as opposed to correctness ───────────────────────
    The checks above ask "is the pack right". These ask "is it finished": a
    program with no tests cannot be marked, one with no minimum requirements
    contributes nothing to the concept model, and one with no walkthrough has no
    demonstration to send a stuck learner to. Each is a silent gap — nothing
    breaks, the program is simply worth less than the ones beside it. */
-const coverage = { noTests: [], noRequirements: [], noSamples: [], noWalkthrough: [] };
+const coverage = { noTests: [], noRequirements: [], noSamples: [], noWalkthrough: [], byDesign: [] };
 const lessons = (() => {
   try { return vm.runInContext('DEMO_LESSONS', sandbox) || []; } catch (e) { return []; }
 })();
@@ -150,10 +168,15 @@ for (const ch of pack.challenges) {
   const v = (ch.variants || [])[0];
   if (!v) continue;
   if (!reqTypes(v).length) coverage.noRequirements.push(ch.title);
-  if (!((v.samples || []).length)) coverage.noSamples.push(ch.title);
+  if (!((v.samples || []).length) && !BY_DESIGN[ch.id]) coverage.noSamples.push(ch.title);
   if (!hasWalkthrough(ch, v)) coverage.noWalkthrough.push(ch.title);
   const tests = v.tests || [];
-  if (!tests.length) { coverage.noTests.push(ch.title); skipped.push(ch.title + ' (no tests)'); continue; }
+  if (!tests.length) {
+    if (BY_DESIGN[ch.id]) coverage.byDesign.push({ prog: ch.title, why: BY_DESIGN[ch.id] });
+    else coverage.noTests.push(ch.title);
+    skipped.push(ch.title + ' (no tests)');
+    continue;
+  }
 
   const srcFiles = (v.files || []).filter(f => (f.code || '').trim());
   if (!srcFiles.length) { skipped.push(ch.title + ' (no reference)'); continue; }
@@ -237,6 +260,16 @@ for (const ch of pack.challenges) {
   }
 }
 
+/* The allowlist audits itself: an excuse for a program that no longer needs one
+   is worse than no excuse, because it hides the next real gap behind it. */
+const staleExclusions = Object.keys(BY_DESIGN).map(id => {
+  const ch = pack.challenges.find(c => c.id === id);
+  if (!ch) return { id, why: 'no such program any more' };
+  const t = ((ch.variants || [])[0] || {}).tests || [];
+  if (t.length) return { id, why: 'has ' + t.length + ' test(s) now — drop the exclusion' };
+  return null;
+}).filter(Boolean);
+
 console.log(JSON.stringify({
   programs: progs,
   duplicateIds,
@@ -253,6 +286,8 @@ console.log(JSON.stringify({
     noSamples: coverage.noSamples.length,
     noWalkthrough: coverage.noWalkthrough.length,
     lessonsLoaded: lessons.length,
+    byDesign: coverage.byDesign,
+    staleExclusions,
     names: {
       noTests: coverage.noTests,
       noRequirements: coverage.noRequirements.slice(0, 20),
