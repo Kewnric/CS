@@ -32,6 +32,7 @@ function initPractice() {
     variant.files = [{ id: generateId(), name: 'main', ext: '.c', starterCode: variant.starterCode || '', code: variant.code || '' }];
   }
 
+  if (typeof mistakeResetAttempt === 'function') mistakeResetAttempt();
   state.activeChallenge = challenge;
   state.activeVariant = variant;
   state.userCode = variant.files[0].starterCode || '';
@@ -1470,7 +1471,19 @@ async function submitCode() {
     targetFiles: savedTargetFiles, // NEW: Required to prevent data loss in history
     scoreBasis: scoreBasis,
     testsPassed: testResults ? testResults.filter(r => r.passed).length : null,
-    testsTotal: testResults ? testResults.length : null
+    testsTotal: testResults ? testResults.length : null,
+    /* WHAT went wrong, not just how much. Classified during the attempt from
+       every compile error, warning and crash; see mistakes.js. */
+    mistakes: (function () {
+      // A test that ran and produced the wrong text is its own kind of mistake,
+      // and the only one with no compiler diagnostic behind it.
+      if (typeof mistakeNote === 'function' && testResults
+          && testResults.some(r => r && !r.passed && !r.error)) {
+        mistakeNote('wrong-output');
+      }
+      return typeof mistakeFlush === 'function'
+        ? mistakeFlush(state.activeChallenge.id) : [];
+    })()
   };
 
   // Gamification badges
@@ -2362,6 +2375,72 @@ function _bossDamageShards(healthPercent, damage, kind) {
   }
   wrap.appendChild(frag);
   return true;
+}
+
+/* ── Correctness lands as a critical hit ───────────────────────
+   The bar measures how close your text is to the reference, which is a fine
+   thing to watch and the wrong thing to be graded on: a different, entirely
+   correct solution can sit at 40% while every test passes. So passing all of
+   them is its own event — it does not wait for the similarity to arrive.
+
+   A crit, then the break. Two beats rather than one: the hit is the moment the
+   answer is judged right, the shatter is the boss going down, and running them
+   together loses the first. The bar is emptied on the hit so the shatter has
+   something to be the consequence of. */
+const BOSS_CRIT_MS = 620;          // the hit, before the glass goes
+
+/** Every test passed: hit it critically, then break it. */
+function bossCorrectnessWin() {
+  const wrap = document.getElementById('boss-health-wrapper');
+  const crystal = document.getElementById('boss-crystal');
+  if (!wrap) return;
+  /* "Off" in the Feel panel means no effect when the boss goes down, and from
+     where the reader sits the crit and the break are one celebration. Gating
+     only the glass would leave half of it playing for someone who asked for
+     none of it. */
+  if (typeof bossBreakOn === 'function' && !bossBreakOn()) return;
+  if (wrap.dataset.crit === '1') return;      // one per check, not one per row
+  wrap.dataset.crit = '1';
+
+  const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const crit = document.createElement('div');
+  crit.className = 'boss-crit';
+  crit.setAttribute('aria-hidden', 'true');
+  crit.innerHTML = '<span class="boss-crit-word" data-text="CRITICAL">CRITICAL</span>'
+                 + '<span class="boss-crit-ring"></span>'
+                 + '<span class="boss-crit-slash"></span>';
+  wrap.appendChild(crit);
+  wrap.classList.add('is-crit');
+  if (crystal) crystal.classList.add('is-crit');
+  _termCueSafe('anvil');
+
+  /* Emptied here rather than left to the similarity pass, which may never get
+     there — this is the point: correct is correct.
+
+     INSTANT, which is what keeps the two beats apart. A normal paint to zero
+     fires the bar's own defeat shatter on the spot; measured, the glass broke
+     at 30ms, on top of the crit, and the 1100ms cooldown then swallowed the
+     deliberate one 620ms later. The instant path settles the slain look and
+     returns, leaving the break to the callback below. */
+  if (typeof _bossBarPaint === 'function') _bossBarPaint(0, { instant: true });
+
+  const go = () => {
+    crit.remove();
+    wrap.classList.remove('is-crit');
+    if (crystal) crystal.classList.remove('is-crit');
+    wrap.classList.add('boss-slain');
+    if (crystal) crystal.classList.add('boss-slain');
+    if (typeof _bossDefeatShatter === 'function') _bossDefeatShatter();
+    // Released, so re-checking a program you have already beaten plays again.
+    setTimeout(() => { delete wrap.dataset.crit; }, 2000);
+  };
+  if (reduced) go(); else setTimeout(go, BOSS_CRIT_MS);
+}
+
+/** Cue a sound only if the practice cue system is present and wants to. */
+function _termCueSafe(name) {
+  try { if (typeof _termCue === 'function' && _term) _termCue(_term, name); }
+  catch (e) { /* sound is never worth an exception */ }
 }
 
 /**
@@ -3289,6 +3368,8 @@ async function _termRunStep() {
   if (!resA.didExecute) {
     _termCue(session, 'punch');
     session.lines.push({ type: 'error', text: 'Compilation Error:\n' + (termCleanDiagnostics(resA.buildStderr || resA.stderr, session.code) || 'Unknown error') });
+    // Kept, not just shown: see mistakes.js.
+    if (typeof mistakeNoteText === 'function') mistakeNoteText(resA.buildStderr || resA.stderr);
     termPushLint(session);
     session.completed = true;
     session.running = false;
@@ -3381,6 +3462,7 @@ async function _termRunStep() {
     };
     _termCue(session, 'punch');
     session.lines.push({ type: 'error', text: 'Runtime Error: ' + (signalMap[sig] || 'Signal ' + sig) });
+    if (typeof mistakeNoteText === 'function') mistakeNoteText(signalMap[sig] || 'Signal ' + sig);
     const errText = termCleanDiagnostics(resA.stderr, session.code);
     if (errText) session.lines.push({ type: 'error', text: errText });
     session.completed = true;
@@ -3394,6 +3476,9 @@ async function _termRunStep() {
     if (errText) session.lines.push({ type: 'error', text: errText });
   const warnText = termCleanDiagnostics(resA.buildStderr, session.code);
   if (warnText) session.lines.push({ type: 'warning', text: '⚠️ ' + warnText });
+  /* A program that compiled with warnings and ran anyway is where the quiet
+     mistakes live -- the stray %, the = that should have been ==. */
+  if (typeof mistakeNoteText === 'function') mistakeNoteText((resA.buildStderr || '') + '\n' + (resA.stderr || ''));
   termPushLint(session);
 
   session.completed = true;

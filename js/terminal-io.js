@@ -760,5 +760,10 @@ function termPushLint(session) {
   if (!session || session.engine !== 'JSCPP' || session.linted) return;
   session.linted = true;
   const notes = (typeof termLintC === 'function') ? termLintC(session.code) : [];
-  notes.forEach(n => session.lines.push({ type: 'warning', text: '⚠️ ' + n.text }));
+  notes.forEach(n => {
+    session.lines.push({ type: 'warning', text: '⚠️ ' + n.text });
+    // The lint IS the classifier for the offline engine -- GCC's own wording
+    // never reaches mistakes.js on those runs, so the note stands in for it.
+    if (typeof mistakeNoteText === 'function') mistakeNoteText(n.text, { line: n.line });
+  });
 }

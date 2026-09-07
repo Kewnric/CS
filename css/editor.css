@@ -4680,3 +4680,118 @@ body.is-resizing .practice-panel { transition: none; }
     max-height: 62vh;
   }
 }
+
+/* ── The critical hit ──────────────────────────────────────────
+   Fired when every test passes, before the screen breaks. Two beats: the hit
+   is the moment the answer is judged right, the shatter is the boss going
+   down. Anchored to the bar rather than the page — the page-wide effect is the
+   one that follows it, and doing both at once loses the first.
+
+   Nothing here is bigger than the bar's own box except the ring, which is a
+   pseudo-scaled overlay inside an already-positioned parent; the topbar does
+   not scroll, so it cannot grow a scrollbar the way the practice panes would. */
+.boss-crit {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  z-index: 4;
+  overflow: visible;
+}
+.boss-crit-word {
+  position: relative;
+  font-family: var(--font-mono, ui-monospace, Consolas, monospace);
+  font-size: 1.05rem;
+  font-weight: 900;
+  letter-spacing: 0.22em;
+  color: #fff6c2;
+  text-shadow:
+    0 0 6px rgba(255, 226, 120, 0.95),
+    0 0 18px rgba(255, 170, 40, 0.7),
+    0 2px 3px rgba(0, 0, 0, 0.85);
+  animation: bossCritWord 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+/* A second copy offset behind it, so the word reads as struck rather than
+   drawn — the same trick the BREAK text uses. */
+.boss-crit-word::before {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  color: #ff5d7a;
+  transform: translate(2px, -1px);
+  z-index: -1;
+  opacity: 0.75;
+}
+@keyframes bossCritWord {
+  0%   { opacity: 0; transform: scale(2.1) rotate(-7deg); filter: blur(6px); }
+  22%  { opacity: 1; transform: scale(0.92) rotate(-2deg); filter: blur(0); }
+  36%  { transform: scale(1.06) rotate(0deg); }
+  70%  { opacity: 1; transform: scale(1) rotate(0deg); }
+  100% { opacity: 0; transform: scale(1.14) translateY(-6px); }
+}
+
+/* The shockwave, running out along the bar. */
+.boss-crit-ring {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 60px;
+  height: 60px;
+  margin: -30px 0 0 -30px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 214, 120, 0.9);
+  animation: bossCritRing 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes bossCritRing {
+  0%   { opacity: 0.95; transform: scale(0.2); border-width: 3px; }
+  100% { opacity: 0; transform: scale(5.5); border-width: 0.5px; }
+}
+
+/* One diagonal cut across the plate. */
+.boss-crit-slash {
+  position: absolute;
+  left: -6%;
+  top: 50%;
+  width: 112%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #fff6c2 18%, #ffd166 50%, #fff6c2 82%, transparent);
+  box-shadow: 0 0 10px 2px rgba(255, 209, 102, 0.75);
+  transform-origin: 50% 50%;
+  animation: bossCritSlash 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes bossCritSlash {
+  0%   { opacity: 0; transform: rotate(-14deg) scaleX(0); }
+  35%  { opacity: 1; transform: rotate(-14deg) scaleX(1); }
+  100% { opacity: 0; transform: rotate(-14deg) scaleX(1); }
+}
+
+/* The bar itself takes the hit: a hard flash, then a recoil. */
+.sao-boss.is-crit { animation: bossCritShake 420ms cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+.sao-boss.is-crit .sao-track { filter: brightness(2.2) saturate(1.4); }
+@keyframes bossCritShake {
+  0%, 100% { transform: translateX(0); }
+  12% { transform: translateX(-5px); }
+  26% { transform: translateX(4px); }
+  42% { transform: translateX(-3px); }
+  58% { transform: translateX(2px); }
+  76% { transform: translateX(-1px); }
+}
+/* The gem flares with it, so the two ends of the plate react together. */
+.sao-crystal.is-crit { animation: bossCritGem 620ms ease-out both; }
+@keyframes bossCritGem {
+  0%   { filter: brightness(1) drop-shadow(0 0 0 rgba(255, 210, 120, 0)); transform: scale(1); }
+  18%  { filter: brightness(2.6) drop-shadow(0 0 14px rgba(255, 210, 120, 0.95)); transform: scale(1.35); }
+  100% { filter: brightness(1) drop-shadow(0 0 0 rgba(255, 210, 120, 0)); transform: scale(1); }
+}
+
+/* Motion is the unwelcome part. The word still appears and still says what
+   happened; it simply does not fly, shake or pulse to do it. */
+@media (prefers-reduced-motion: reduce) {
+  .boss-crit-word,
+  .boss-crit-ring,
+  .boss-crit-slash,
+  .sao-boss.is-crit,
+  .sao-crystal.is-crit { animation: none; }
+  .boss-crit-ring, .boss-crit-slash { display: none; }
+}

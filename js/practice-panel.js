@@ -402,6 +402,14 @@ async function ppRunAllChecks() {
     testResults.forEach((r, ti) => ppCelebrateRow(ti, !!r.passed, reqLead + ti * 90));
     if (testsPassed === tests.length) ppStarfall();
   }
+
+  /* Everything passed: the answer is right, whatever the similarity bar makes
+     of it. Fired after the per-row reactions have run down the list, so the
+     crit lands on the end of them rather than over the top. */
+  if (allPass && typeof bossCorrectnessWin === 'function') {
+    const lead = reqLead + (tests.length ? tests.length * 90 : 0) + 220;
+    setTimeout(() => bossCorrectnessWin(), lead);
+  }
 }
 
 /**

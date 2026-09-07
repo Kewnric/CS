@@ -115,13 +115,13 @@ function _feelBreakRows() {
   if (typeof bossBreakOn !== 'function') return '';
   const on = bossBreakOn();
   const shake = typeof bossShakeOn === 'function' ? bossShakeOn() : true;
-  return _feelOpt({ name: 'Full break', hint: 'glass shatters across the screen',
+  return _feelOpt({ name: 'Full break', hint: 'critical hit, then the glass shatters',
                     on: on && shake, onclick: 'setBossBreak(true); setBossShake(true);',
                     title: 'Break the screen and shake the layout when the boss reaches 0' })
        + _feelOpt({ name: 'No shake', hint: 'the glass breaks, the page holds still',
                     on: on && !shake, onclick: 'setBossBreak(true); setBossShake(false);',
                     title: 'Keep the shatter but stop the screen shake' })
-       + _feelOpt({ name: 'Off', hint: 'the bar just empties', on: !on,
+       + _feelOpt({ name: 'Off', hint: 'no critical hit, no glass', on: !on,
                     title: 'No effect at all when the boss reaches 0',
                     onclick: 'setBossBreak(false);' });
 }

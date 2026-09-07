@@ -141,3 +141,86 @@
 .anr-row:not(.ok):hover { outline: 1px solid var(--color-primary); outline-offset: -1px; }
 .anr-foot { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.6rem 0.9rem; border-top: 1px solid var(--border-color); }
 .anr-hint { font-size: 0.6875rem; color: var(--text-tertiary); }
+
+/* ── What keeps going wrong ────────────────────────────────────
+   Ranked by the number of ATTEMPTS a mistake cost rather than by raw
+   occurrences: ten recompiles chasing one typo is one bad afternoon, ten
+   separate attempts is a habit. The bar behind each row is that ranking made
+   visible, so the top one reads as the thing to fix next. */
+.mk-list { display: flex; flex-direction: column; gap: 0.5rem; }
+.mk-row {
+  position: relative;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+/* Behind the text, not around it — a filled row would fight the card. */
+.mk-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--mk-w, 0%);
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--color-danger, #ef4444) 16%, transparent),
+    transparent);
+  pointer-events: none;
+}
+.mk-main { position: relative; padding: 0.6rem 0.75rem; }
+.mk-head { display: flex; align-items: baseline; gap: 0.6rem; }
+.mk-label {
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+}
+.mk-count {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: var(--color-danger, #ef4444);
+  font-variant-numeric: tabular-nums;
+}
+.mk-why {
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+.mk-fix {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin-top: 0.4rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-success, #22c55e) 10%, transparent);
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+.mk-fix svg { width: 13px; height: 13px; flex-shrink: 0; margin-top: 2px; color: var(--color-success, #22c55e); }
+.mk-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+  font-size: 0.66rem;
+  color: var(--text-tertiary);
+}
+.mk-concept {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--bg-surface-hover);
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.mk-last { margin-left: auto; font-variant-numeric: tabular-nums; }
+.mk-empty {
+  padding: 1rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+}
