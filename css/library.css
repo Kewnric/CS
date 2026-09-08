@@ -637,8 +637,30 @@
 .lib-due-row:hover { border-color: var(--color-primary); color: var(--text-primary); }
 .lib-due-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
 .lib-due-when { font-size: 0.68rem; color: var(--text-tertiary); font-weight: 700; }
+
+/* Three bands of lateness. Everything overdue used to be one amber, so twenty
+   days looked the same as one and the row order was the only clue. */
 .lib-due-when.over { color: var(--color-warning); }
-.lib-due-more { align-self: center; font-size: 0.75rem; color: var(--text-tertiary); }
+.lib-due-when.over-mid { color: #fb923c; }
+.lib-due-when.over-high { color: var(--color-danger); }
+
+/* The worst ones carry it on the pill too, so the eye finds them without
+   reading a single label. Kept to the top band only -- tinting all of them
+   just makes a wall of orange and loses the distinction again. */
+.lib-due-row:has(.over-high) {
+  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--border-color));
+  background: color-mix(in srgb, var(--color-danger) 7%, var(--bg-surface));
+}
+
+/* A count, not a row. It sat in the same flex line as twelve pills at a similar
+   size and read as a thirteenth you could press. */
+.lib-due-more {
+  align-self: center;
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  padding-left: 0.35rem;
+  font-style: italic;
+}
 .lib-stat-chip.due { border-color: rgba(99, 102, 241, 0.5); color: #a5b4fc; }
 
 /* Wings are real libraries now, so they stop looking disabled. They lost their

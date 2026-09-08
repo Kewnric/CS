@@ -2280,10 +2280,14 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
   font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.05em;
-  text-transform: uppercase;
   color: rgba(168, 205, 255, 0.75);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
 }
+
+/* The kind is a label and stays a label. The timestamp is data, so it drops
+   out of capitals -- see _hcWhen in js/home.js for why that matters here. */
+.hc-kind { text-transform: uppercase; }
+.hc-when { text-transform: none; letter-spacing: 0.01em; font-weight: 500; opacity: 0.92; }
 
 /* The menu's own confirm button. */
 .hc-go {

@@ -460,6 +460,25 @@ window.homeOpenAttemptHistory = function (kind, itemId) {
 /* ── Continue where you left off ──────────────────────────────
    _homeUnfinished() already knows what was abandoned; this puts it where it is
    actually useful rather than at the bottom of the activity list. */
+/* Spelled out, because this line is set in capitals.
+
+   getTimeAgo is compact by design and right everywhere else, but 'left 3d ago'
+   through an uppercase transform renders LEFT 3D AGO -- and 3D reads as three
+   dimensions, not three days. The kind stays a capitalised label; the time is
+   data and now reads as words in normal case, which is also the better
+   hierarchy of the two. */
+function _hcWhen(ts) {
+  const mins = Math.floor((Date.now() - new Date(ts).getTime()) / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return mins + (mins === 1 ? ' minute' : ' minutes') + ' ago';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + (hrs === 1 ? ' hour' : ' hours') + ' ago';
+  const days = Math.floor(hrs / 24);
+  if (days === 1) return 'yesterday';
+  if (days < 7) return days + ' days ago';
+  return 'on ' + new Date(ts).toLocaleDateString();
+}
+
 function renderHomeContinue() {
   const host = document.getElementById('home-continue');
   if (!host) return;
@@ -481,7 +500,7 @@ function renderHomeContinue() {
       <span class="hc-orb hc-orb-${u.kind}" aria-hidden="true"><i data-lucide="${u.icon}"></i></span>
       <div class="hc-text">
         <div class="hc-title">${escapeHTML(u.title)}</div>
-        <div class="hc-sub">${u.label}${u.ts ? ' &middot; left ' + getTimeAgo(u.ts) : ' &middot; in progress'}</div>
+        <div class="hc-sub"><span class="hc-kind">${u.label}</span>${u.ts ? ' &middot; <span class="hc-when">left ' + _hcWhen(u.ts) + '</span>' : ' &middot; <span class="hc-when">in progress</span>'}</div>
       </div>
       <button class="hc-go" onclick="homeResumeAttempt('${u.kind}','${u.itemId}')">
         <i data-lucide="play"></i><span>Continue</span>

@@ -360,6 +360,7 @@
         <label class="form-label">Select Version</label>
         <select id="timer-variant-select" class="form-select" style="font-weight:600;"></select>
       </div>
+      <div class="setup-group-label"><span>Time limit</span><em>leave at zero for none</em></div>
       <div style="display:flex; gap:0.5rem; margin-bottom:1.5rem; text-align:left;">
         <div style="flex:1;"><label class="form-label" for="timer-h" style="text-align:center;">Hours</label><input
             type="number" id="timer-h" min="0" value="0" class="form-input" style="text-align:center;" /></div>
@@ -370,13 +371,13 @@
       </div>
       <div class="setup-constraints">
         <label class="setup-row">
-          <input type="checkbox" id="setup-recall" />
-          <span><strong>Recall</strong><em>Start from an empty file, with the boss bar off. The spec and the
-            tests stay &mdash; only the two things that leak the answer go.</em></span>
+          <span class="setup-row-main"><strong>Recall</strong><em>Start from an empty file, with the boss bar
+            off. The spec and the tests stay &mdash; only the two things that leak the answer go.</em></span>
+          <input type="checkbox" id="setup-recall" class="setup-check" />
         </label>
         <label class="setup-row">
-          <span class="setup-row-main"><strong>Run budget</strong><em>Counts your runs so you notice them.
-            It never blocks Run or Check Code.</em></span>
+          <span class="setup-row-main"><strong>Run budget</strong><em>Counts your runs so you notice them. Zero means no
+            budget, and it never blocks Run or Check Code either way.</em></span>
           <input type="number" id="setup-runs" min="0" max="99" value="0" class="form-input setup-num"
                  aria-label="Run budget, 0 for none" />
         </label>

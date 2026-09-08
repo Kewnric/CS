@@ -214,6 +214,18 @@ function libraryInit() {
 /* ── Due today, across every library ──────────────────────────
    getDueReviewItems() has always returned this, cross-library and sorted by how
    overdue each item is. The hub was the obvious place to show it and didn't. */
+/* How late, in bands. The list is already sorted by it and every badge was
+   painted the same amber regardless, so a thing twenty days overdue looked
+   exactly like one that slipped yesterday -- the sort carried the urgency and
+   nothing on screen did. Three bands rather than a gradient, because the
+   decision this drives is only ever 'now, soon, or whenever'. */
+function _libDueTier(days) {
+  if (days <= 0) return '';
+  if (days <= 2) return 'over';
+  if (days <= 7) return 'over over-mid';
+  return 'over over-high';
+}
+
 function libHubRenderDue() {
   const section = document.getElementById('lib-hub-due-section');
   const host = document.getElementById('lib-hub-due');
@@ -239,7 +251,7 @@ function libHubRenderDue() {
         <button class="lib-due-row" onclick="reviewNavigateTo('${d.type}','${d.id}')" title="${escapeHTML(reviewDueLabel(d.daysOverdue))}">
           <i data-lucide="${icon[d.type] || 'circle'}" style="width:14px;height:14px;"></i>
           <span class="lib-due-name">${escapeHTML(d.title)}</span>
-          <span class="lib-due-when${d.daysOverdue > 0 ? ' over' : ''}">${escapeHTML(reviewDueLabel(d.daysOverdue))}</span>
+          <span class="lib-due-when ${_libDueTier(d.daysOverdue)}">${escapeHTML(reviewDueLabel(d.daysOverdue))}</span>
         </button>`).join('')}
       ${all.length > due.length ? `<span class="lib-due-more">+${all.length - due.length} more</span>` : ''}
     </div>`;

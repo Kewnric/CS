@@ -4807,18 +4807,79 @@ body.is-resizing .practice-panel { transition: none; }
   margin-bottom: 1.25rem;
   text-align: left;
 }
+/* A label above the time fields. Three bare inputs reading 0 said nothing
+   about whether zero meant 'no limit' or 'not filled in yet'. */
+.setup-group-label {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  text-align: left;
+  margin-bottom: 0.35rem;
+}
+.setup-group-label span {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.setup-group-label em {
+  font-style: normal;
+  font-size: 0.68rem;
+  color: var(--text-tertiary);
+}
+
+/* BOTH ROWS THE SAME SHAPE: what it is on the left, the control on the right.
+   Recall used to be [checkbox][text] and Run budget [text][number], so two
+   settings of the same kind read as two unrelated widgets. Centred rather than
+   top-aligned, so a control sits against the middle of its description. */
 .setup-row {
   display: flex;
-  align-items: flex-start;
-  gap: 0.6rem;
+  align-items: center;
+  gap: 0.75rem;
   padding: 0.6rem 0.7rem;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--bg-surface);
   cursor: pointer;
+  transition: background .15s ease, border-color .15s ease;
 }
-.setup-row:hover { background: var(--bg-surface-hover); }
-.setup-row input[type="checkbox"] { margin-top: 3px; flex-shrink: 0; }
+.setup-row:hover { background: var(--bg-surface-hover); border-color: var(--border-color-hover, var(--border-color)); }
+
+/* The one thing on this dialog that was not themed: an unstyled checkbox is a
+   white OS square, which on a dark modal is the brightest object on screen and
+   the only control that does not belong to the app. */
+.setup-check {
+  appearance: none;
+  -webkit-appearance: none;
+  flex-shrink: 0;
+  width: 19px;
+  height: 19px;
+  margin: 0;
+  border: 1.5px solid var(--border-color);
+  border-radius: 5px;
+  background: var(--bg-tertiary, rgba(127,127,127,.14));
+  display: grid;
+  place-content: center;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease;
+}
+.setup-check::after {
+  content: '';
+  width: 11px;
+  height: 11px;
+  background: #fff;
+  transform: scale(0);
+  transition: transform .16s cubic-bezier(.2, .9, .3, 1.4);
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+.setup-check:checked {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+.setup-check:checked::after { transform: scale(1); }
+.setup-check:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.setup-row:has(.setup-check:checked) { border-color: color-mix(in srgb, var(--color-primary) 55%, transparent); }
 .setup-row-main { flex: 1; min-width: 0; }
 .setup-row strong { display: block; font-size: 0.82rem; color: var(--text-primary); }
 .setup-row em {
