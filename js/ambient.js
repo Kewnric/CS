@@ -25,7 +25,7 @@ const AMB_KEY = 'ssp.ambient';
    them look like. */
 const AMB_THEME_KEY = 'ssp.ambientTheme';
 const AMB_THEMES = [
-  { id: 'default', name: 'Crystals',     hint: 'geodes and coloured flecks', icon: 'gem' },
+  { id: 'default', name: 'Crystals',     hint: 'drifting shards, indigo and cyan', icon: 'gem' },
   { id: 'fire',    name: 'Fireflies',    hint: 'campfire warmth, leaves and embers', icon: 'flame' },
   { id: 'night',   name: 'Starry night', hint: 'fairy lights over a quiet room', icon: 'moon' }
 ];
@@ -193,12 +193,7 @@ function _ambFill(host) {
 
     const inner = document.createElement('span');
     inner.className = 'amb-shard-i';
-    /* One of the theme's five colour slots, cycled. This file still does not
-       know what any of them look like -- css/ambient.css decides that, and the
-       Crystals look points them at the same minerals its rocks are cut from.
-       Set here rather than matched in CSS because it lands as an inline style,
-       which no stylesheet rule can outrank. */
-    inner.style.color = 'var(--amb-c' + ((n % 5) + 1) + ')';
+    inner.style.color = (n % 3) ? 'var(--amb-lit)' : 'var(--amb-ink)';
     inner.innerHTML = _ambShapeSVG(n);
     n++;
     el.appendChild(inner);
