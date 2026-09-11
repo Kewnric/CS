@@ -113,11 +113,17 @@ function langSeedOfferHTML(line) {
       <i data-lucide="sparkles"></i>
       <div class="lang-seed-body">
         <strong>Nothing here yet</strong>
-        <span>${escapeHTML(line || 'Add the starter pack: ten words, ten drill sets and ten scenarios. Nothing you already have is replaced.')}</span>
+        <span>${escapeHTML(line || 'Start with the Cebuano core vocabulary — every word with a description of how it is really used and an example sentence. The sample pack adds drill sets and scenarios on top. Nothing you already have is replaced.')}</span>
       </div>
-      <button class="btn btn-primary btn-sm" type="button" onclick="langLoadSamplePack()">
-        <i data-lucide="download" style="width:14px;height:14px;"></i> Add starter pack
-      </button>
+      <div class="lang-seed-actions">
+        <button class="btn btn-primary btn-sm" type="button" onclick="langLoadCebPack()">
+          <i data-lucide="library" style="width:14px;height:14px;"></i>
+          Cebuano core (${typeof langCebPackSize === 'function' ? langCebPackSize() : 0} words)
+        </button>
+        <button class="btn btn-secondary btn-sm" type="button" onclick="langLoadSamplePack()">
+          <i data-lucide="download" style="width:14px;height:14px;"></i> Sample pack
+        </button>
+      </div>
     </div>`;
 }
 
@@ -168,12 +174,23 @@ function renderLangBoard() {
 
   host.innerHTML = `
     <div class="lang-board">
-      ${(!sets && !scenes) ? `
+      ${/* Offers what is actually missing. It used to advertise "10 words" to
+           somebody who already had four hundred, because it only ever checked
+           the sets and the scenarios. */ ""}
+      ${!words ? `
+        <button class="lang-seed-banner" type="button" onclick="langLoadCebPack()">
+          <i data-lucide="library"></i>
+          <span class="lang-seed-banner-body">
+            <strong>Start with the Cebuano core</strong>
+            <span>${typeof langCebPackSize === 'function' ? langCebPackSize() : 0} words across ${typeof LANG_CEB_PACK !== 'undefined' ? LANG_CEB_PACK.length : 0} topics, each with how it is really used and an example — nothing you have is replaced</span>
+          </span>
+          <i data-lucide="download" class="lang-seed-banner-go"></i>
+        </button>` : (!sets && !scenes) ? `
         <button class="lang-seed-banner" type="button" onclick="langLoadSamplePack()">
           <i data-lucide="sparkles"></i>
           <span class="lang-seed-banner-body">
-            <strong>Start with the starter pack</strong>
-            <span>10 words · 10 drill sets · 10 scenarios — nothing you have is replaced</span>
+            <strong>Add drills and scenarios</strong>
+            <span>10 drill sets and 10 scenarios to practise against — nothing you have is replaced</span>
           </span>
           <i data-lucide="download" class="lang-seed-banner-go"></i>
         </button>` : ''}

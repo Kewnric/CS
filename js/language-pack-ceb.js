@@ -1,0 +1,665 @@
+/* ============================================================
+   LANGUAGE-PACK-CEB.JS — the Cebuano starter pack
+   ------------------------------------------------------------
+   A core vocabulary for Cebuano (Bisaya), organised the way somebody actually
+   learns to speak rather than alphabetically: the structural words first, then
+   the topics you need on day one, then the long tail.
+
+   WHY THE FUNCTION WORDS COME FIRST. A thousand nouns will not make you
+   understood in Cebuano; the particles will. `na`, `pa`, `man`, `ba`, `lang`,
+   `gyud`, `kaayo`, `nga`, `ug` and the pronoun sets are what separate somebody
+   reciting vocabulary from somebody talking, and they are also the part a
+   dictionary teaches worst. Every one of them here carries a description of
+   what it DOES, not just an English word it is sometimes swapped for -- most
+   of them have no clean English equivalent at all.
+
+   FORMAT. Each group is { g, tags, w } where w is a list of compact rows:
+
+       [ceb, en, description, example?, note?]
+
+       ceb          the Cebuano term
+       en           the closest English handle -- a label, not a definition
+       description  what it means and when it is used
+       example      'Cebuano sentence|English sentence', optional
+       note         a usage restriction or warning, optional
+
+   The array form is deliberate: at this size an object per field would be
+   thousands of lines of punctuation, and the builder below turns each row into
+   the same record shape langSaveWord expects.
+
+   ACCURACY. This is a learning pack, so a wrong gloss actively teaches the
+   wrong thing. Entries are limited to vocabulary that is in common use and
+   unambiguous. Where a word is regional, or where Cebuano makes a distinction
+   English does not, the note says so rather than the pack pretending the two
+   languages line up.
+   ============================================================ */
+
+const LANG_CEB_PACK = [
+
+/* ── The words that hold sentences together ─────────────────── */
+{ g: 'Particles', tags: ['particles', 'core'], w: [
+  ['na', 'already / now', 'Marks a change of state — something has happened, or is now the case. One of the two most common words in Cebuano.', 'Nahuman na.|It is finished already.', 'Pairs with "pa" as a set: "na" is the change, "pa" is the continuation.'],
+  ['pa', 'still / yet / more', 'Marks continuation — something is still the case, or there is more of it.', 'Gamay pa.|A little more.', 'With a negative it means "not yet": "Wala pa" — not yet.'],
+  ['ba', '(question marker)', 'Turns a statement into a yes/no question. It has no English word; English uses word order instead.', 'Gutom ka ba?|Are you hungry?', 'Optional in speech — a rising tone does the same job — but very common.'],
+  ['man', '(softener / contrast)', 'Softens a statement or marks mild contrast or explanation. Roughly the work English does with "well" or "but".', 'Wala man ko kabalo.|Well, I did not know.', 'Also forms question words: "ngano man" — why, then?'],
+  ['lang', 'just / only', 'Limits or downplays. Extremely common, and often used for politeness rather than quantity.', 'Gamay lang.|Just a little.', 'Written "lamang" in formal Cebuano; nobody says that in conversation.'],
+  ['gyud', 'really / indeed', 'Emphasis — confirms or insists. Spelled "gyud", "jud" or "gid" depending on who is writing.', 'Lami gyud!|It is really delicious!', 'The single most Cebuano-sounding word in the language. Using it well marks you out.'],
+  ['kaayo', 'very', 'Intensifier, placed AFTER the word it strengthens.', 'Nindot kaayo.|Very beautiful.', 'Position matters: "kaayo nindot" is wrong.'],
+  ['nga', '(linker)', 'Links a describing word to what it describes, and introduces clauses. Required, not optional.', 'Dako nga balay.|A big house.', 'Shortens to "ng" after a vowel: "dakong balay".'],
+  ['ug', 'and / (object marker)', 'Joins words, and also marks an indefinite object after a verb.', 'Mipalit ko ug pan.|I bought some bread.', 'Pronounced "og". A very different word from "ug" meaning "and" in writing, but spelled the same.'],
+  ['og', 'and / of', 'The spoken spelling of "ug". You will see both.', 'Tinapay og gatas.|Bread and milk.', ''],
+  ['o', 'or', 'Offers an alternative.', 'Kape o tsa?|Coffee or tea?', ''],
+  ['pero', 'but', 'Contrast. Borrowed from Spanish and completely naturalised.', 'Gusto ko, pero busy ko.|I want to, but I am busy.', '"Apan" is the formal native equivalent, rare in speech.'],
+  ['kay', 'because / than', 'Gives a reason, and also marks the second half of a comparison.', 'Wala ko miadto kay nag-ulan.|I did not go because it was raining.', ''],
+  ['aron', 'so that / in order to', 'Introduces a purpose.', 'Nagtuon ko aron makapasar.|I studied so that I could pass.', ''],
+  ['kung', 'if / when', 'Introduces a condition.', 'Kung gusto ka, adto ta.|If you want, let us go.', 'Also spelled "kon".'],
+  ['basta', 'as long as / provided that', 'Sets a condition informally, often with a note of insistence.', 'Basta mouban ka.|As long as you come along.', ''],
+  ['unya', 'then / later', 'Sequences events, or means "later on".', 'Unya na lang.|Later, then.', ''],
+  ['usab', 'also / again', 'Adds to something already said. Usually shortened to "sab" or "pud" in speech.', 'Ako usab.|Me too.', ''],
+  ['pud', 'also / too', 'The spoken form of "usab". Very common.', 'Ikaw pud?|You too?', 'Also written "sad" or "sab".'],
+  ['ra', 'only / just', 'Close to "lang", slightly more limiting.', 'Duha ra.|Only two.', ''],
+  ['diay', '(realisation)', 'Marks something newly understood — "oh, so it is like that".', 'Ikaw diay!|Oh, it is you!', 'No English equivalent; English uses tone.'],
+  ['tingali', 'maybe / perhaps', 'Marks uncertainty.', 'Moabot tingali siya ugma.|He will perhaps arrive tomorrow.', ''],
+  ['siguro', 'probably / maybe', 'Uncertainty, from Spanish. Slightly more confident than "tingali".', 'Siguro tinuod.|It is probably true.', ''],
+  ['dayon', 'right away / go ahead', 'Immediacy. Also used alone as an invitation to come in or proceed.', 'Dayon!|Come in!', ''],
+  ['pananglitan', 'for example', 'Introduces an example.', 'Pananglitan, ang mangga.|For example, the mango.', 'Formal; "sama sa" is commoner in speech.'],
+]},
+
+/* ── Pronouns: the part of Cebuano that trips everyone ───────── */
+{ g: 'Pronouns', tags: ['pronouns', 'core'], w: [
+  ['ako', 'I', 'The full form of the first person. Used for emphasis or at the start of a sentence.', 'Ako si Juan.|I am Juan.', 'Cebuano pronouns come in three sets by role; this is the topic set.'],
+  ['ko', 'I / me', 'The short form of "ako", used after the verb. This is what you will say most of the time.', 'Gutom ko.|I am hungry.', ''],
+  ['nako', 'my / by me', 'The possessive and actor form of the first person.', 'Balay nako.|My house.', 'Also written "nako\'" — the same word.'],
+  ['kanako', 'to me', 'The first person as a destination or indirect object.', 'Ihatag kanako.|Give it to me.', ''],
+  ['ikaw', 'you', 'The full second-person singular, for emphasis or sentence-initial position.', 'Ikaw ba?|Is it you?', ''],
+  ['ka', 'you / (counting linker)', 'Two jobs. As a pronoun it is the short "you", used after the verb. It is ALSO the linker that sits between a number and what is counted, where it is not optional.', 'Kumusta ka? / Tulo ka libro.|How are you? / Three books.', 'Same spelling, unrelated jobs. "Tulo libro" without the linker is ungrammatical.'],
+  ['nimo', 'your / by you', 'Second-person possessive and actor form.', 'Ngalan nimo?|Your name?', ''],
+  ['kanimo', 'to you', 'Second person as a destination.', 'Para kanimo.|For you.', ''],
+  ['siya', 'he / she', 'Third person singular. Cebuano does not mark gender — one word covers both.', 'Siya ang akong igsoon.|He is my sibling.', 'A genuine difference from English: you cannot tell gender from the pronoun.'],
+  ['niya', 'his / her / by him', 'Third-person possessive and actor form.', 'Libro niya.|His book.', ''],
+  ['kaniya', 'to him / to her', 'Third person as a destination.', 'Isulti kaniya.|Tell him.', ''],
+  ['kami', 'we (not you)', 'First person plural EXCLUDING the listener.', 'Kami ang miadto.|We were the ones who went.', 'Cebuano splits "we" in two. Getting this wrong is the classic learner error.'],
+  ['kita', 'we (including you) / see', 'As a pronoun, the first person plural INCLUDING the listener. As a verb, to see or to meet.', 'Kita tanan. / Magkita ta ugma.|All of us. / Let us meet tomorrow.', 'If the person you are talking to is coming along it is "kita", not "kami". The verb is a separate word that happens to be spelled the same.'],
+  ['ta', 'we (including you)', 'The short form of "kita", used after the verb.', 'Adto ta.|Let us go.', ''],
+  ['namo', 'our (not yours)', 'Exclusive first-person plural possessive.', 'Balay namo.|Our house (not yours).', ''],
+  ['nato', 'our (including yours)', 'Inclusive first-person plural possessive.', 'Yuta nato.|Our land (yours and mine).', ''],
+  ['kamo', 'you (plural)', 'Second person plural.', 'Kamo ba ang mga bisita?|Are you the guests?', ''],
+  ['mo', 'you (plural, short)', 'The short second-person plural.', 'Asa mo?|Where are you all going?', ''],
+  ['ninyo', 'your (plural)', 'Second-person plural possessive.', 'Balay ninyo.|Your house (all of you).', ''],
+  ['sila', 'they', 'Third person plural.', 'Sila ang nag-abot.|They are the ones who arrived.', ''],
+  ['nila', 'their / by them', 'Third-person plural possessive and actor form.', 'Sakyanan nila.|Their vehicle.', ''],
+  ['kanila', 'to them', 'Third person plural as a destination.', 'Ihatag kanila.|Give it to them.', ''],
+  ['akoa', 'mine', 'A standalone possessive — used where English says "mine" rather than "my".', 'Akoa na.|It is mine now.', ''],
+  ['imoha', 'yours', 'Standalone second-person possessive.', 'Imoha ni?|Is this yours?', 'Also "imo".'],
+]},
+
+/* ── Pointing at things ──────────────────────────────────────── */
+{ g: 'This and that', tags: ['deictics', 'core'], w: [
+  ['kini', 'this', 'Near the speaker. Cebuano has three distances where English has two.', 'Kini ang akoa.|This is mine.', 'Often shortened to "ni" in speech.'],
+  ['kana', 'that (near you)', 'Near the listener — the middle distance English lacks.', 'Kana ba?|That one?', 'Shortened to "na". The three-way split is a real difference from English.'],
+  ['kadto', 'that (over there)', 'Far from both speaker and listener.', 'Kadto ang balay nila.|That over there is their house.', 'Shortened to "to".'],
+  ['dinhi', 'here', 'At the speaker.', 'Dinhi ko.|I am here.', 'Also "diri".'],
+  ['diha', 'there (near you)', 'At the listener.', 'Ibutang diha.|Put it there.', ''],
+  ['didto', 'there (over there)', 'Away from both.', 'Didto siya sa Cebu.|He is over there in Cebu.', ''],
+  ['ari', 'come here', 'Movement toward the speaker.', 'Ari ka.|Come here.', ''],
+  ['adto', 'go there', 'Movement away, to a far place.', 'Adto ta sa merkado.|Let us go to the market.', ''],
+  ['ingon niini', 'like this', 'Manner, near.', 'Buhata ingon niini.|Do it like this.', ''],
+]},
+
+/* ── Questions ───────────────────────────────────────────────── */
+{ g: 'Question words', tags: ['questions', 'core'], w: [
+  ['unsa', 'what', 'Asks about a thing.', 'Unsa ni?|What is this?', ''],
+  ['kinsa', 'who', 'Asks about a person.', 'Kinsa ka?|Who are you?', 'For people only — "unsa" for things.'],
+  ['asa', 'where (going)', 'Asks a destination, or where something is.', 'Asa ka padulong?|Where are you headed?', 'Pairs with "diin"; "asa" is the everyday one.'],
+  ['diin', 'where (located)', 'Asks a location. Slightly more formal than "asa".', 'Diin ka nagpuyo?|Where do you live?', ''],
+  ['kanus-a', 'when', 'Asks about time.', 'Kanus-a ka moabot?|When will you arrive?', ''],
+  ['ngano', 'why', 'Asks a reason.', 'Ngano man?|Why, though?', 'Almost always followed by "man".'],
+  ['unsaon', 'how (to do)', 'Asks about method.', 'Unsaon nako pag-adto?|How do I get there?', ''],
+  ['kumusta', 'how (is it)', 'Asks about state or condition. Also the standard greeting.', 'Kumusta ang trabaho?|How is work?', 'From Spanish "cómo está".'],
+  ['pila', 'how many / how much', 'Asks a quantity or a price.', 'Pila ni?|How much is this?', 'The single most useful question word in a market.'],
+  ['unsa nga oras', 'what time', 'Asks the clock time.', 'Unsa nga oras na?|What time is it?', 'Often shortened to "unsang oras".'],
+  ['hain', 'where is', 'Asks the location of a specific thing.', 'Hain ang yawe?|Where is the key?', ''],
+]},
+
+/* ── Yes, no, and getting by ─────────────────────────────────── */
+{ g: 'Yes and no', tags: ['core', 'essentials'], w: [
+  ['oo', 'yes', 'Plain agreement.', 'Oo, tinuod.|Yes, it is true.', 'Say "oo" to friends and "opo"-style politeness is Tagalog, not Cebuano.'],
+  ['dili', 'no / not', 'Negates a description, an identity, or a future action.', 'Dili ko gusto.|I do not want to.', 'Use "dili" for "is not"; use "wala" for "there is not" and for the past.'],
+  ['wala', 'none / not / left', 'Negates existence or possession, and negates completed actions. Quite separately, it is also the left-hand side.', 'Wala koy kwarta. / Liko sa wala.|I have no money. / Turn left.', 'Two things to watch: the "dili" / "wala" split is the commonest learner mistake, and "wala" meaning left is an unrelated word with the same spelling.'],
+  ['ayaw', 'do not', 'Negative command.', 'Ayaw paghilak.|Do not cry.', 'Only for commands; "dili" for statements.'],
+  ['sige', 'okay / go on', 'Agreement, permission, or encouragement to continue. Extremely common.', 'Sige, salamat.|Okay, thanks.', 'Also a goodbye: "Sige, una ko."'],
+  ['ambot', 'I do not know', 'A complete answer on its own. Can sound curt if said flatly.', 'Ambot lagi.|I really do not know.', ''],
+  ['basin', 'perhaps / it might be', 'Softer speculation.', 'Basin moabot siya.|He might come.', ''],
+]},
+
+/* ── Greetings and courtesy ──────────────────────────────────── */
+{ g: 'Greetings', tags: ['greetings', 'essentials'], w: [
+  ['maayong buntag', 'good morning', 'Used from waking until about eleven.', 'Maayong buntag, Nang.|Good morning, ma\'am.', ''],
+  ['maayong udto', 'good noon', 'Around midday — a greeting English does not have.', 'Maayong udto.|Good noon.', ''],
+  ['maayong hapon', 'good afternoon', 'From about one until dusk.', 'Maayong hapon, Dong.|Good afternoon, lad.', ''],
+  ['maayong gabii', 'good evening', 'After dark. Also used as good night.', 'Maayong gabii.|Good evening.', ''],
+  ['kumusta ka', 'how are you', 'The standard greeting to one person.', 'Kumusta ka, migo?|How are you, friend?', ''],
+  ['maayo man', 'I am fine', 'The standard answer.', 'Maayo man, salamat.|I am fine, thank you.', ''],
+  ['salamat', 'thank you', 'Thanks.', 'Salamat kaayo.|Thank you very much.', ''],
+  ['walay sapayan', 'you are welcome', 'The reply to thanks. Literally "no matter".', 'Walay sapayan.|You are welcome.', ''],
+  ['palihug', 'please', 'Softens a request. Also means "to ask a favour".', 'Palihug ko.|Please help me.', ''],
+  ['pasaylo-a ko', 'forgive me', 'A real apology, for something you did.', 'Pasaylo-a ko.|Forgive me.', ''],
+  ['sorry', 'sorry', 'Borrowed and universal, used for small apologies.', 'Sorry, nalimot ko.|Sorry, I forgot.', 'English words are normal in everyday Cebuano; using them is not a failure.'],
+  ['ayo-ayo', 'take care', 'Said on parting.', 'Ayo-ayo sa dalan.|Take care on the road.', ''],
+  ['amping', 'take care / be careful', 'Warmer than "ayo-ayo", said to someone you care about.', 'Amping ka.|Take care of yourself.', ''],
+  ['adto na ko', 'I am going now', 'The normal way to leave.', 'Adto na ko, ha.|I am off now.', ''],
+  ['una ko', 'I will go ahead', 'Said when leaving before the others.', 'Una ko, sige.|I will head off, then.', ''],
+  ['maayong pag-abot', 'welcome', 'Said to someone arriving.', 'Maayong pag-abot!|Welcome!', ''],
+  ['pagkaon ta', 'let us eat', 'The invitation to a shared meal.', 'Dali, pagkaon ta.|Come, let us eat.', 'Refusing outright is rude; "sunod na lang" softens it.'],
+]},
+
+/* ── Counting ────────────────────────────────────────────────── */
+{ g: 'Numbers', tags: ['numbers', 'core'], w: [
+  ['usa', 'one', 'The number one.', 'Usa ka tuig.|One year.', 'Cebuano uses native numbers for counting things and Spanish ones for money and time.'],
+  ['duha', 'two', 'The number two.', 'Duha ka tawo.|Two people.', ''],
+  ['tulo', 'three', 'The number three.', 'Tulo ka adlaw.|Three days.', ''],
+  ['upat', 'four', 'The number four.', 'Upat ka bulan.|Four months.', ''],
+  ['lima', 'five', 'The number five.', 'Lima ka piso.|Five pesos.', ''],
+  ['unom', 'six', 'The number six.', 'Unom ka bata.|Six children.', ''],
+  ['pito', 'seven', 'The number seven.', 'Pito ka adlaw sa semana.|Seven days in a week.', ''],
+  ['walo', 'eight', 'The number eight.', 'Walo ka oras.|Eight hours.', ''],
+  ['siyam', 'nine', 'The number nine.', 'Siyam ka tuig.|Nine years.', ''],
+  ['napulo', 'ten', 'The number ten.', 'Napulo ka buok.|Ten pieces.', ''],
+  ['napulog usa', 'eleven', 'Ten and one.', 'Napulog usa.|Eleven.', 'Teens are formed as "napulog" plus the digit.'],
+  ['baynte', 'twenty', 'Twenty, from Spanish. Used far more than the native "kaluhaan".', 'Baynte pesos.|Twenty pesos.', ''],
+  ['traynta', 'thirty', 'Thirty, from Spanish.', 'Traynta minutos.|Thirty minutes.', ''],
+  ['singkwenta', 'fifty', 'Fifty, from Spanish.', 'Singkwenta ra.|Only fifty.', ''],
+  ['gatos', 'hundred', 'One hundred.', 'Usa ka gatos.|One hundred.', ''],
+  ['libo', 'thousand', 'One thousand.', 'Duha ka libo.|Two thousand.', ''],
+  ['buok', 'piece / whole', 'A counter for individual items.', 'Lima ka buok.|Five pieces.', ''],
+  ['tunga', 'half', 'One half.', 'Tunga sa oras.|Half an hour.', ''],
+  ['una', 'first', 'Ordinal one, and also "ahead".', 'Ang una nga adlaw.|The first day.', ''],
+  ['ikaduha', 'second', 'Ordinal two. Ordinals take "ika-".', 'Ikaduha nga higayon.|The second time.', ''],
+  ['daghan', 'many / a lot', 'A large quantity.', 'Daghan kaayong salamat.|Very many thanks.', ''],
+  ['tanan', 'all', 'The whole of a group.', 'Tanan kita.|All of us.', ''],
+  ['pipila', 'a few / several', 'An unspecified small number.', 'Pipila ka adlaw.|A few days.', ''],
+  ['walay', 'no / without', 'Expresses lacking something.', 'Walay tubig.|There is no water.', ''],
+]},
+
+/* ── Time ────────────────────────────────────────────────────── */
+{ g: 'Time', tags: ['time', 'core'], w: [
+  ['karon', 'now / today', 'The present moment, or the current day.', 'Karon na.|Right now.', ''],
+  ['ugma', 'tomorrow', 'The next day.', 'Ugma ta magkita.|We will meet tomorrow.', ''],
+  ['gahapon', 'yesterday', 'The previous day.', 'Gahapon pa.|Since yesterday.', ''],
+  ['adlaw', 'day / sun', 'Both the day and the sun — one word for both.', 'Init ang adlaw.|The sun is hot.', ''],
+  ['gabii', 'night', 'Night, and also "last night".', 'Gabii kaayo.|Very late at night.', ''],
+  ['buntag', 'morning', 'The morning.', 'Sayo sa buntag.|Early in the morning.', ''],
+  ['hapon', 'afternoon', 'The afternoon.', 'Hapon na.|It is afternoon already.', ''],
+  ['udto', 'noon', 'Midday.', 'Udto na, mangaon ta.|It is noon, let us eat.', ''],
+  ['semana', 'week', 'A week.', 'Sunod semana.|Next week.', ''],
+  ['bulan', 'month / moon', 'Both the month and the moon.', 'Usa ka bulan.|One month.', ''],
+  ['tuig', 'year', 'A year.', 'Bag-ong tuig.|New year.', ''],
+  ['oras', 'hour / time', 'A clock hour, or time in general.', 'Unsa nga oras?|What time is it?', ''],
+  ['minuto', 'minute', 'A minute.', 'Lima ka minuto.|Five minutes.', ''],
+  ['sayo', 'early', 'Before the expected time.', 'Sayo ka.|You are early.', ''],
+  ['ulahi', 'late / last', 'After the expected time, or final in a sequence.', 'Ulahi na ko.|I am late.', ''],
+  ['kanunay', 'always', 'On every occasion.', 'Kanunay siyang ulahi.|He is always late.', ''],
+  ['usahay', 'sometimes', 'On some occasions.', 'Usahay lang.|Only sometimes.', ''],
+  ['kasagaran', 'usually', 'Most of the time.', 'Kasagaran sa buntag.|Usually in the morning.', ''],
+  ['dili gyud', 'never', 'Not on any occasion.', 'Dili gyud ko mokaon niana.|I will never eat that.', ''],
+  ['sunod', 'next', 'The following one.', 'Sunod nga semana.|Next week.', ''],
+  ['kagahapon', 'the other day', 'A recent past day, vaguer than "gahapon".', 'Kagahapon pa siya wala.|He has been away since the other day.', ''],
+  ['karon dayon', 'right away', 'Immediately.', 'Karon dayon.|Right away.', ''],
+  ['taudtaud', 'in a while', 'After a short interval.', 'Taudtaud ra.|In just a while.', ''],
+  ['dugay', 'long (in time)', 'Taking a long time.', 'Dugay kaayo.|That took very long.', ''],
+  ['Lunes', 'Monday', 'The first working day.', 'Lunes ta magsugod.|We start on Monday.', 'Days of the week are Spanish loans.'],
+  ['Martes', 'Tuesday', 'The second day.', 'Martes ang exam.|The exam is on Tuesday.', ''],
+  ['Miyerkules', 'Wednesday', 'The third day.', 'Miyerkules na.|It is Wednesday.', ''],
+  ['Huwebes', 'Thursday', 'The fourth day.', 'Huwebes siya moabot.|He arrives Thursday.', ''],
+  ['Biyernes', 'Friday', 'The fifth day.', 'Biyernes na gyud.|It is finally Friday.', ''],
+  ['Sabado', 'Saturday', 'The sixth day.', 'Sabado ta molangoy.|We will swim on Saturday.', ''],
+  ['Domingo', 'Sunday', 'The seventh day.', 'Domingo ang simba.|Church is on Sunday.', ''],
+]},
+
+/* ── People ──────────────────────────────────────────────────── */
+{ g: 'Family and people', tags: ['family', 'people'], w: [
+  ['tawo', 'person', 'A human being.', 'Daghang tawo.|Many people.', ''],
+  ['bata', 'child', 'A child, or someone young.', 'Gamay pa nga bata.|Still a small child.', ''],
+  ['lalaki', 'man / male', 'A male person.', 'Lalaki nga bata.|A boy.', ''],
+  ['babaye', 'woman / female', 'A female person.', 'Babaye nga doktor.|A woman doctor.', ''],
+  ['amahan', 'father', 'A father.', 'Akong amahan.|My father.', '"Papa" and "tatay" are the everyday address forms.'],
+  ['inahan', 'mother', 'A mother.', 'Akong inahan.|My mother.', '"Mama" and "nanay" in direct address.'],
+  ['anak', 'child (offspring)', 'One\'s son or daughter, at any age.', 'Duha akong anak.|I have two children.', 'Different from "bata", which is about age, not relationship.'],
+  ['igsoon', 'sibling', 'A brother or sister — one word for both.', 'Akong igsoon.|My sibling.', 'Gender is added only if it matters: "igsoon nga lalaki".'],
+  ['lolo', 'grandfather', 'A grandfather.', 'Si lolo natulog.|Grandfather is sleeping.', ''],
+  ['lola', 'grandmother', 'A grandmother.', 'Si lola nagluto.|Grandmother is cooking.', ''],
+  ['apo', 'grandchild', 'A grandchild.', 'Akong apo.|My grandchild.', ''],
+  ['uyoan', 'uncle', 'An uncle.', 'Akong uyoan.|My uncle.', ''],
+  ['iyaan', 'aunt', 'An aunt.', 'Akong iyaan.|My aunt.', ''],
+  ['ig-agaw', 'cousin', 'A cousin.', 'Ig-agaw nako siya.|He is my cousin.', ''],
+  ['asawa', 'wife', 'A wife.', 'Akong asawa.|My wife.', ''],
+  ['bana', 'husband', 'A husband.', 'Iyang bana.|Her husband.', ''],
+  ['pamilya', 'family', 'A family.', 'Dako among pamilya.|Our family is large.', ''],
+  ['higala', 'friend', 'A friend.', 'Suod nga higala.|A close friend.', ''],
+  ['migo', 'friend / mate', 'A casual friend, used in address. "Miga" for a woman.', 'Kumusta, migo?|How are you, mate?', ''],
+  ['silingan', 'neighbour', 'Someone living nearby.', 'Among silingan.|Our neighbour.', ''],
+  ['bisita', 'guest / visitor', 'Someone visiting.', 'Naay bisita.|There is a guest.', ''],
+  ['Dong', '(address: young man)', 'Used to address a boy or younger man. There is no English equivalent.', 'Dong, palihug.|Lad, please.', 'Short for "dodong". Friendly, not rude.'],
+  ['Day', '(address: young woman)', 'Used to address a girl or younger woman.', 'Day, pila ni?|Miss, how much is this?', 'Short for "inday".'],
+  ['Nong', '(address: older man)', 'Respectful address for an older man.', 'Salamat, Nong.|Thank you, sir.', ''],
+  ['Nang', '(address: older woman)', 'Respectful address for an older woman.', 'Nang, palihug.|Ma\'am, please.', ''],
+  ['magtutudlo', 'teacher', 'Someone who teaches.', 'Magtutudlo siya.|She is a teacher.', ''],
+  ['estudyante', 'student', 'Someone studying.', 'Estudyante pa ko.|I am still a student.', ''],
+  ['doktor', 'doctor', 'A physician.', 'Adto sa doktor.|Go to the doctor.', ''],
+  ['tindera', 'vendor / shopkeeper', 'A woman who sells. "Tindero" for a man.', 'Pangutan-a ang tindera.|Ask the vendor.', ''],
+  ['drayber', 'driver', 'Someone who drives for a living.', 'Ang drayber sa jeep.|The jeepney driver.', ''],
+  ['ngalan', 'name', 'A person\'s name.', 'Unsay imong ngalan?|What is your name?', ''],
+]},
+
+/* ── The verb system, which is the whole language ─────────────── */
+{ g: 'Verb affixes', tags: ['verbs', 'grammar', 'core'], w: [
+  ['mag-', '(will do / does)', 'Prefix marking an ongoing or habitual action with the doer as the focus. The workhorse of Cebuano verbs.', 'Magluto ko.|I will cook.', 'Cebuano marks WHO or WHAT the sentence is about by changing the verb, not the word order. This is the hardest and most important thing to learn.'],
+  ['mi-', '(did)', 'Prefix marking a completed action, doer in focus.', 'Mikaon ko.|I ate.', 'Also appears as "ni-" — the same thing, different region.'],
+  ['ni-', '(did)', 'The commoner spoken form of "mi-".', 'Niadto ko didto.|I went there.', ''],
+  ['mo-', '(will do)', 'Prefix for a future or intended action, doer in focus.', 'Moadto ko ugma.|I will go tomorrow.', ''],
+  ['nag-', '(is doing)', 'Prefix for an action in progress.', 'Nagluto siya.|She is cooking.', ''],
+  ['naka-', '(was able to)', 'Marks ability or an accidental completed action.', 'Nakakaon na ko.|I have already eaten.', ''],
+  ['maka-', '(can)', 'Marks ability in the future.', 'Makaadto ko ugma.|I can go tomorrow.', ''],
+  ['-on', '(object focus)', 'Suffix putting the THING acted on in focus.', 'Kan-on nako ni.|I will eat this.', 'Choosing between "mag-" and "-on" is a choice about what the sentence is about, not about tense.'],
+  ['-an', '(location focus)', 'Suffix putting the place or recipient in focus.', 'Hatagan nako siya.|I will give him some.', ''],
+  ['i-', '(instrument focus)', 'Prefix putting the thing given or used in focus.', 'Ihatag nako ni.|I will give this.', ''],
+  ['gi-', '(was done)', 'Marks a completed action with the object in focus — the commonest past form you will hear.', 'Gikaon nako.|I ate it.', ''],
+  ['pag-', '(the act of)', 'Turns a verb into a noun, and forms commands.', 'Pagkaon.|Eating. / Eat.', ''],
+  ['ma-', '(will become)', 'Marks a change of state.', 'Malipay ko.|I will be happy.', ''],
+]},
+
+{ g: 'Everyday verbs', tags: ['verbs', 'core'], w: [
+  ['kaon', 'eat / come and eat', 'To take food. Called out to anyone passing while you are eating, it is an invitation and a courtesy rather than a literal offer.', 'Mangaon ta. / Kaon ta!|Let us eat. / Come eat with us!', 'Declining outright is rude; "salamat, busog pa ko" is the polite refusal.'],
+  ['inom', 'drink', 'To take liquid.', 'Moinom ko ug tubig.|I will drink water.', ''],
+  ['tulog', 'sleep', 'To sleep.', 'Matulog na ko.|I am going to sleep.', ''],
+  ['mata', 'wake up / eye', 'To wake, and also the eye.', 'Nimata ko sayo. / Dako siyag mata.|I woke up early. / He has big eyes.', 'The link is not accidental: opening the eyes is waking.'],
+  ['lakaw', 'walk / go', 'To walk, or to leave.', 'Molakaw na ta.|Let us go now.', ''],
+  ['dagan', 'run', 'To run.', 'Nagdagan ang bata.|The child is running.', ''],
+  ['lingkod', 'sit', 'To sit down.', 'Lingkod sa.|Sit down first.', ''],
+  ['tindog', 'stand', 'To stand up.', 'Tindog ka.|Stand up.', ''],
+  ['sulti', 'say / speak', 'To say something.', 'Unsay imong gisulti?|What did you say?', ''],
+  ['storya', 'talk / chat', 'To converse.', 'Mag-storya ta.|Let us talk.', ''],
+  ['pangutana', 'ask', 'To ask a question.', 'Mangutana ko.|I will ask.', ''],
+  ['tubag', 'answer', 'To reply.', 'Tubaga ko.|Answer me.', ''],
+  ['tan-aw', 'look / watch', 'To look at or watch.', 'Tan-awa ni.|Look at this.', ''],
+  ['paminaw', 'listen / feel', 'To listen, and also to feel or sense.', 'Paminaw sa ko.|Listen to me first.', ''],
+  ['dungog', 'hear', 'To hear.', 'Wala ko kadungog.|I did not hear.', ''],
+  ['hibalo', 'know', 'To know a fact.', 'Wala ko kahibalo.|I do not know.', 'Often "kabalo" in speech.'],
+  ['sabot', 'understand / agree', 'To understand, and also to come to an agreement.', 'Nakasabot ka?|Did you understand?', ''],
+  ['hinumdom', 'remember', 'To remember.', 'Nahinumdom ko.|I remember.', ''],
+  ['kalimot', 'forget', 'To forget.', 'Nakalimot ko.|I forgot.', ''],
+  ['buhat', 'do / make', 'To do or make something.', 'Unsay imong gibuhat?|What are you doing?', ''],
+  ['trabaho', 'work', 'To work, and also a job.', 'Nagtrabaho ko.|I am working.', ''],
+  ['tuon', 'study', 'To study.', 'Nagtuon ko.|I am studying.', ''],
+  ['basa', 'read', 'To read.', 'Nagbasa ko ug libro.|I am reading a book.', 'Also means "wet" as an adjective.'],
+  ['sulat', 'write', 'To write, and also a letter.', 'Nagsulat ko.|I am writing.', ''],
+  ['palit', 'buy', 'To buy.', 'Mopalit ko ug pan.|I will buy bread.', ''],
+  ['baligya', 'sell', 'To sell.', 'Gibaligya nila.|They sold it.', ''],
+  ['bayad', 'pay / payment', 'To pay, and the payment itself. Said alone when handing fare to a jeepney driver.', 'Magbayad ko. / Bayad ko.|I will pay. / Here is my fare.', '"Bayad ko" with the money held out is the whole transaction on a jeepney.'],
+  ['hatag', 'give', 'To give.', 'Ihatag nako nimo.|I will give it to you.', ''],
+  ['kuha', 'get / take', 'To take or fetch.', 'Kuhaa ni.|Take this.', ''],
+  ['dala', 'bring / carry', 'To bring or carry.', 'Dad-a ni.|Bring this.', ''],
+  ['butang', 'put / thing', 'To put, and also a thing.', 'Ibutang diha.|Put it there.', ''],
+  ['abli', 'open', 'To open.', 'Ablihi ang pultahan.|Open the door.', ''],
+  ['sirado', 'close / closed', 'To close, or shut.', 'Sirad-i ang bintana.|Close the window.', ''],
+  ['luto', 'cook', 'To cook.', 'Nagluto si mama.|Mother is cooking.', ''],
+  ['hugas', 'wash (dishes)', 'To wash things.', 'Maghugas ko sa plato.|I will wash the dishes.', ''],
+  ['laba', 'wash (clothes)', 'To launder.', 'Naglaba siya.|She is doing laundry.', 'Cebuano splits washing dishes from washing clothes.'],
+  ['ligo', 'bathe', 'To bathe or shower.', 'Maligo sa ko.|I will take a bath first.', ''],
+  ['limpyo', 'clean', 'To clean, or clean as a state.', 'Limpyohi ang lamesa.|Clean the table.', ''],
+  ['tabang', 'help', 'To help.', 'Tabangi ko.|Help me.', ''],
+  ['hulat', 'wait', 'To wait.', 'Hulat sa.|Wait a moment.', ''],
+  ['abot', 'arrive', 'To arrive.', 'Niabot na siya.|He has arrived.', ''],
+  ['gikan', 'come from', 'To come from a place.', 'Gikan ko sa merkado.|I came from the market.', ''],
+  ['balik', 'return', 'To go back or come back.', 'Mobalik ko ugma.|I will come back tomorrow.', ''],
+  ['sulod', 'enter / inside', 'To go in, and also the inside.', 'Sulod sa.|Come in.', ''],
+  ['gawas', 'go out / outside', 'To go out, and also the outside.', 'Gawas sa ko.|I will step out.', ''],
+  ['saka', 'go up / climb', 'To ascend.', 'Saka sa balay.|Go up into the house.', ''],
+  ['kanaog', 'go down', 'To descend.', 'Kanaog na.|Come down now.', ''],
+  ['sakay', 'ride', 'To board a vehicle.', 'Mosakay ta ug jeep.|Let us ride a jeepney.', ''],
+  ['gusto', 'want / like', 'To want or to like.', 'Gusto ko ana.|I want that.', ''],
+  ['ganahan', 'like / be fond of', 'To enjoy or be fond of.', 'Ganahan ko nimo.|I like you.', 'Warmer than "gusto".'],
+  ['kinahanglan', 'need / must', 'Necessity.', 'Kinahanglan ko motrabaho.|I need to work.', ''],
+  ['mahimo', 'can / may', 'Possibility or permission.', 'Mahimo ba?|May I?', ''],
+  ['puyo', 'live / reside', 'To live somewhere.', 'Asa ka nagpuyo?|Where do you live?', ''],
+  ['hilak', 'cry', 'To weep.', 'Naghilak ang bata.|The child is crying.', ''],
+  ['katawa', 'laugh', 'To laugh.', 'Nagkatawa sila.|They are laughing.', ''],
+  ['dula', 'play', 'To play.', 'Magdula ta.|Let us play.', ''],
+  ['kanta', 'sing / song', 'To sing, and also a song.', 'Kanta sa.|Sing for us.', ''],
+  ['sayaw', 'dance', 'To dance.', 'Mosayaw ta.|Let us dance.', ''],
+  ['hulam', 'borrow', 'To borrow.', 'Manghulam ko.|I will borrow.', ''],
+  ['uli', 'go home', 'To return home.', 'Mouli na ko.|I am going home.', ''],
+  ['pahulay', 'rest', 'To rest.', 'Pahulay sa.|Rest a while.', ''],
+  ['pangita', 'look for', 'To search for.', 'Nangita ko nimo.|I was looking for you.', ''],
+  ['kaplag', 'find', 'To find.', 'Nakaplagan nako.|I found it.', ''],
+]},
+
+/* ── Describing things ───────────────────────────────────────── */
+{ g: 'Adjectives', tags: ['adjectives', 'core'], w: [
+  ['maayo', 'good / well', 'Good, or in good condition.', 'Maayo ni.|This is good.', ''],
+  ['dautan', 'bad / evil', 'Morally bad.', 'Dautan nga binuhatan.|A bad deed.', 'For "bad quality" use "dili maayo".'],
+  ['dako', 'big', 'Large in size.', 'Dako nga isda.|A big fish.', ''],
+  ['gamay', 'small / few', 'Small in size, and also small in quantity — Cebuano uses one word where English splits "small" from "few".', 'Gamay ra ni. / Gamay ra ang tawo.|This is only small. / There are only a few people.', ''],
+  ['taas', 'tall / long', 'Tall, or long.', 'Taas siya.|He is tall.', ''],
+  ['mubo', 'short', 'Short in height or length.', 'Mubo nga buhok.|Short hair.', ''],
+  ['bag-o', 'new', 'Recently made or acquired.', 'Bag-o ni.|This is new.', ''],
+  ['daan', 'old (thing)', 'Not new.', 'Daan nga balay.|An old house.', 'For people use "tigulang".'],
+  ['tigulang', 'old (person)', 'Aged.', 'Tigulang na siya.|He is old now.', ''],
+  ['batan-on', 'young', 'Young in years.', 'Batan-on pa siya.|She is still young.', ''],
+  ['init', 'hot', 'High in temperature.', 'Init kaayo karon.|It is very hot today.', ''],
+  ['bugnaw', 'cold', 'Low in temperature.', 'Bugnaw ang tubig.|The water is cold.', ''],
+  ['lami', 'delicious', 'Tasting good.', 'Lami kaayo!|Very delicious!', 'The word you will use most at a table.'],
+  ['tam-is', 'sweet', 'Sweet in taste.', 'Tam-is ang mangga.|The mango is sweet.', ''],
+  ['aslom', 'sour', 'Sour in taste.', 'Aslom kaayo.|Very sour.', ''],
+  ['parat', 'salty', 'Salty.', 'Parat ang sabaw.|The soup is salty.', ''],
+  ['halang', 'spicy', 'Hot with chilli.', 'Halang kaayo!|Very spicy!', ''],
+  ['pait', 'bitter', 'Bitter in taste, and also of a hard life.', 'Pait ang kape.|The coffee is bitter.', ''],
+  ['nindot', 'beautiful / nice', 'Pleasing to look at.', 'Nindot kaayo.|Very beautiful.', ''],
+  ['guapa', 'pretty', 'Of a woman, good-looking. "Guapo" for a man.', 'Guapa siya.|She is pretty.', 'From Spanish.'],
+  ['hugaw', 'dirty', 'Not clean.', 'Hugaw ang dalan.|The road is dirty.', ''],
+  ['hinlo', 'clean', 'Clean.', 'Hinlo ang kwarto.|The room is clean.', ''],
+  ['kusog', 'strong / fast / loud', 'Strong, and also fast or loud.', 'Kusog ang ulan.|The rain is heavy.', 'One word covers force, speed and volume.'],
+  ['hinay', 'slow / soft', 'Slow, and also quiet.', 'Hinay lang.|Slowly, now.', ''],
+  ['lisod', 'difficult', 'Hard to do.', 'Lisod kaayo.|Very difficult.', ''],
+  ['sayon', 'easy', 'Not hard.', 'Sayon ra.|It is easy.', ''],
+  ['mahal', 'expensive / dear', 'Costly, and also beloved.', 'Mahal kaayo.|Very expensive.', ''],
+  ['barato', 'cheap', 'Low in price.', 'Barato ra.|It is cheap.', ''],
+  ['busog', 'full (from food)', 'Having eaten enough.', 'Busog na ko.|I am full.', ''],
+  ['gutom', 'hungry', 'Needing food.', 'Gutom ko.|I am hungry.', ''],
+  ['uhaw', 'thirsty', 'Needing drink.', 'Uhaw ko.|I am thirsty.', ''],
+  ['kapoy', 'tired', 'Lacking energy. Also used as an exclamation of weariness.', 'Kapoy kaayo.|So tired.', ''],
+  ['sakit', 'painful / sick', 'Hurting, and also an illness.', 'Sakit akong ulo.|My head hurts.', ''],
+  ['layo', 'far', 'Distant.', 'Layo ra kaayo.|It is too far.', ''],
+  ['duol', 'near', 'Close by.', 'Duol ra.|It is near.', ''],
+  ['puno', 'full', 'Filled.', 'Puno ang jeep.|The jeepney is full.', ''],
+  ['walay sulod', 'empty', 'Containing nothing.', 'Walay sulod.|It is empty.', ''],
+  ['tinuod', 'true / real', 'Factual or genuine.', 'Tinuod ba?|Is it true?', ''],
+  ['bakak', 'false / a lie', 'Untrue, and also a lie.', 'Bakak na.|That is a lie.', ''],
+]},
+
+/* ── Food ────────────────────────────────────────────────────── */
+{ g: 'Food and drink', tags: ['food'], w: [
+  ['pagkaon', 'food', 'Food in general.', 'Naay pagkaon.|There is food.', ''],
+  ['kan-on', 'cooked rice', 'Rice that has been cooked. The centre of every meal.', 'Daghang kan-on.|A lot of rice.', 'Different word from uncooked rice — the distinction matters here.'],
+  ['bugas', 'uncooked rice', 'Raw rice grain.', 'Mopalit ug bugas.|Buy some rice.', ''],
+  ['humay', 'rice plant', 'Rice growing in the field.', 'Uma sa humay.|A rice field.', ''],
+  ['tubig', 'water', 'Water.', 'Palihug ug tubig.|Water, please.', ''],
+  ['kape', 'coffee / brown', 'Coffee, and by extension the colour brown.', 'Mag-kape ta. / Kape nga kolor.|Let us have coffee. / Brown in colour.', ''],
+  ['gatas', 'milk', 'Milk.', 'Gatas sa baka.|Cow\'s milk.', ''],
+  ['asukar', 'sugar', 'Sugar.', 'Walay asukar.|No sugar.', ''],
+  ['asin', 'salt', 'Salt.', 'Kulang sa asin.|It needs salt.', ''],
+  ['isda', 'fish', 'Fish.', 'Presko nga isda.|Fresh fish.', ''],
+  ['karne', 'meat', 'Meat.', 'Karne sa baboy.|Pork.', ''],
+  ['manok', 'chicken', 'Chicken, the bird and the meat.', 'Lutoa ang manok.|Cook the chicken.', ''],
+  ['baboy', 'pig / pork', 'Pig, and pork.', 'Lechon baboy.|Roast pig.', ''],
+  ['baka', 'cow / beef', 'Cow, and beef.', 'Karne sa baka.|Beef.', ''],
+  ['itlog', 'egg', 'An egg.', 'Duha ka itlog.|Two eggs.', ''],
+  ['utanon', 'vegetables', 'Vegetables.', 'Kaon ug utanon.|Eat vegetables.', ''],
+  ['prutas', 'fruit', 'Fruit.', 'Tam-is nga prutas.|Sweet fruit.', ''],
+  ['saging', 'banana', 'Banana.', 'Hinog nga saging.|A ripe banana.', ''],
+  ['mangga', 'mango', 'Mango.', 'Lami ang mangga.|The mango is delicious.', ''],
+  ['lubi', 'coconut', 'Coconut.', 'Tubig sa lubi.|Coconut water.', ''],
+  ['kamote', 'sweet potato', 'Sweet potato.', 'Linat-ang kamote.|Boiled sweet potato.', ''],
+  ['pan', 'bread', 'Bread.', 'Pan ug kape.|Bread and coffee.', ''],
+  ['sabaw', 'soup / broth', 'Soup or broth.', 'Init nga sabaw.|Hot soup.', ''],
+  ['sud-an', 'viand', 'The dish eaten with rice — a category English has no word for.', 'Unsay sud-an?|What is the viand?', 'Asking this is asking what is for dinner.'],
+  ['merienda', 'snack', 'A between-meals snack, usually mid-afternoon.', 'Merienda ta.|Let us have a snack.', ''],
+  ['pamahaw', 'breakfast', 'The morning meal.', 'Nagpamahaw na ko.|I have had breakfast.', ''],
+  ['paniudto', 'lunch', 'The midday meal.', 'Paniudto ta.|Let us have lunch.', ''],
+  ['panihapon', 'dinner', 'The evening meal.', 'Andam na ang panihapon.|Dinner is ready.', ''],
+  ['plato', 'plate', 'A plate.', 'Kuhaa ang plato.|Get the plate.', ''],
+  ['kutsara', 'spoon', 'A spoon.', 'Walay kutsara.|There is no spoon.', ''],
+  ['tinidor', 'fork', 'A fork.', 'Kutsara ug tinidor.|Spoon and fork.', ''],
+  ['baso', 'glass', 'A drinking glass.', 'Usa ka baso ug tubig.|A glass of water.', ''],
+]},
+
+/* ── Home and things ─────────────────────────────────────────── */
+{ g: 'Home and objects', tags: ['home', 'objects'], w: [
+  ['balay', 'house / home', 'A house or home.', 'Sa among balay.|At our house.', ''],
+  ['kwarto', 'room', 'A room.', 'Akong kwarto.|My room.', ''],
+  ['pultahan', 'door', 'A door.', 'Sirad-i ang pultahan.|Close the door.', ''],
+  ['bintana', 'window', 'A window.', 'Abli ang bintana.|The window is open.', ''],
+  ['lamesa', 'table', 'A table.', 'Ibutang sa lamesa.|Put it on the table.', ''],
+  ['silya', 'chair', 'A chair.', 'Lingkod sa silya.|Sit on the chair.', ''],
+  ['katre', 'bed', 'A bed.', 'Higda sa katre.|Lie on the bed.', ''],
+  ['banyo', 'bathroom', 'A bathroom.', 'Asa ang banyo?|Where is the bathroom?', ''],
+  ['kusina', 'kitchen', 'A kitchen.', 'Naa siya sa kusina.|She is in the kitchen.', ''],
+  ['suga', 'light / lamp', 'A light.', 'Patya ang suga.|Turn off the light.', ''],
+  ['tubig nga gripo', 'tap water', 'Running water from a tap.', 'Walay tubig sa gripo.|There is no tap water.', ''],
+  ['sinina', 'clothes', 'Clothing.', 'Bag-ong sinina.|New clothes.', ''],
+  ['sapatos', 'shoes', 'Shoes.', 'Itom nga sapatos.|Black shoes.', ''],
+  ['kwarta', 'money', 'Money.', 'Walay kwarta.|No money.', ''],
+  ['libro', 'book', 'A book.', 'Basaha ang libro.|Read the book.', ''],
+  ['papel', 'paper', 'Paper.', 'Usa ka papel.|A piece of paper.', ''],
+  ['bolpen', 'pen', 'A ballpoint pen.', 'Hulam ko sa bolpen.|Lend me the pen.', ''],
+  ['telepono', 'phone', 'A telephone.', 'Tawag sa telepono.|Call on the phone.', ''],
+  ['yawe', 'key', 'A key.', 'Hain ang yawe?|Where is the key?', ''],
+  ['bag', 'bag', 'A bag.', 'Sa akong bag.|In my bag.', ''],
+  ['relo', 'watch / clock', 'A watch or clock.', 'Tan-awa ang relo.|Look at the clock.', ''],
+  ['bugon', 'pillow', 'A pillow.', 'Humok nga unlan.|A soft pillow.', 'More often "unlan".'],
+  ['unlan', 'pillow', 'A pillow.', 'Kuhaa ang unlan.|Get the pillow.', ''],
+  ['habol', 'blanket', 'A blanket.', 'Bugnaw, kuhaa ang habol.|It is cold, get the blanket.', ''],
+]},
+
+/* ── Getting around ──────────────────────────────────────────── */
+{ g: 'Places and travel', tags: ['places', 'travel'], w: [
+  ['dalan', 'road / street', 'A road or the way to somewhere.', 'Unsang dalana?|Which road?', ''],
+  ['merkado', 'market', 'A market.', 'Adto sa merkado.|Go to the market.', ''],
+  ['tindahan', 'store', 'A shop.', 'Duol ra ang tindahan.|The store is near.', ''],
+  ['eskwelahan', 'school', 'A school.', 'Adto sa eskwelahan.|Go to school.', ''],
+  ['simbahan', 'church', 'A church.', 'Sa simbahan.|At the church.', ''],
+  ['ospital', 'hospital', 'A hospital.', 'Dad-a sa ospital.|Take him to the hospital.', ''],
+  ['syudad', 'city', 'A city.', 'Sa syudad sa Cebu.|In Cebu City.', ''],
+  ['baryo', 'village', 'A village or rural neighbourhood.', 'Sa among baryo.|In our village.', ''],
+  ['dagat', 'sea', 'The sea.', 'Adto ta sa dagat.|Let us go to the sea.', ''],
+  ['bukid', 'mountain', 'A mountain.', 'Taas nga bukid.|A tall mountain.', ''],
+  ['uma', 'farm / field', 'A farm or field.', 'Nagtrabaho sa uma.|Working in the field.', ''],
+  ['suba', 'river', 'A river.', 'Naligo sa suba.|Bathed in the river.', ''],
+  ['jeep', 'jeepney', 'The shared passenger jeep, the ordinary way to travel.', 'Sakay ta ug jeep.|Let us take a jeepney.', ''],
+  ['habal-habal', 'motorbike taxi', 'A motorcycle used as transport for hire, common outside cities.', 'Habal-habal ra.|Just a motorbike taxi.', ''],
+  ['traysikad', 'pedicab', 'A bicycle with a sidecar.', 'Traysikad lang ta.|Let us just take a pedicab.', ''],
+  ['barko', 'ship', 'A ship.', 'Mosakay ug barko.|Travel by ship.', ''],
+  ['ayroplano', 'airplane', 'An aeroplane.', 'Mosakay ug ayroplano.|Travel by plane.', ''],
+  ['tabok', 'cross over', 'To cross a road or water.', 'Tabok ta.|Let us cross.', ''],
+  ['diretso', 'straight ahead', 'Continue without turning.', 'Diretso lang.|Just go straight.', ''],
+  ['tuo', 'right', 'The right-hand side.', 'Liko sa tuo.|Turn right.', ''],
+  ['liko', 'turn', 'To turn a corner.', 'Liko diha.|Turn there.', ''],
+  ['unahan', 'further on', 'Ahead of here.', 'Unahan pa.|A bit further on.', ''],
+  ['likod', 'behind / back', 'Behind something, the back of a thing, and the back of the body.', 'Sa likod sa balay. / Sakit akong likod.|Behind the house. / My back hurts.', ''],
+  ['atubangan', 'in front of', 'The front.', 'Sa atubangan.|In front.', ''],
+  ['taliwala', 'in the middle', 'Between or among.', 'Sa taliwala.|In the middle.', ''],
+  ['sulod sa', 'inside', 'Within something.', 'Sulod sa balay.|Inside the house.', ''],
+  ['ibabaw', 'on top of', 'Above or on.', 'Ibabaw sa lamesa.|On the table.', ''],
+  ['ilalom', 'under', 'Beneath.', 'Ilalom sa katre.|Under the bed.', ''],
+]},
+
+/* ── Feeling ─────────────────────────────────────────────────── */
+{ g: 'Feelings', tags: ['feelings'], w: [
+  ['malipayon', 'happy', 'In good spirits.', 'Malipayon ko.|I am happy.', ''],
+  ['masulub-on', 'sad', 'In low spirits.', 'Masulub-on siya.|He is sad.', ''],
+  ['nasuko', 'angry', 'Angry.', 'Nasuko siya nako.|He is angry with me.', ''],
+  ['nahadlok', 'afraid', 'Frightened.', 'Nahadlok ko.|I am afraid.', ''],
+  ['naulaw', 'embarrassed / shy', 'Ashamed or shy — a strong social feeling here.', 'Naulaw ko.|I am embarrassed.', 'Carries more weight than English "shy".'],
+  ['nalipay', 'glad', 'Pleased at something.', 'Nalipay ko nga niabot ka.|I am glad you came.', ''],
+  ['gimingaw', 'missing someone', 'To long for someone absent.', 'Gimingaw ko nimo.|I miss you.', ''],
+  ['gikapoy', 'worn out', 'Exhausted.', 'Gikapoy ko.|I am worn out.', ''],
+  ['nabalaka', 'worried', 'Anxious about something.', 'Nabalaka ko nimo.|I am worried about you.', ''],
+  ['nalingaw', 'enjoying', 'Having a good time.', 'Nalingaw ko.|I am enjoying myself.', ''],
+  ['gimahal', 'loved', 'To love someone.', 'Gimahal tika.|I love you.', ''],
+  ['nahigugma', 'in love', 'To be in love.', 'Nahigugma ko nimo.|I am in love with you.', ''],
+]},
+
+/* ── The world outside ───────────────────────────────────────── */
+{ g: 'Weather and nature', tags: ['weather', 'nature'], w: [
+  ['ulan', 'rain', 'Rain.', 'Nag-ulan.|It is raining.', ''],
+  ['hangin', 'wind / air', 'Wind, and also air.', 'Kusog ang hangin.|The wind is strong.', ''],
+  ['panganod', 'cloud', 'A cloud.', 'Daghang panganod.|Many clouds.', ''],
+  ['bagyo', 'typhoon / storm', 'A typhoon.', 'Naay bagyo.|There is a typhoon.', ''],
+  ['kilat', 'lightning', 'Lightning.', 'Naay kilat.|There is lightning.', ''],
+  ['dalugdog', 'thunder', 'Thunder.', 'Kusog ang dalugdog.|The thunder is loud.', ''],
+  ['kahoy', 'tree / wood', 'A tree, and also wood.', 'Dako nga kahoy.|A big tree.', ''],
+  ['bulak', 'flower', 'A flower.', 'Nindot nga bulak.|A beautiful flower.', ''],
+  ['dahon', 'leaf', 'A leaf.', 'Berde nga dahon.|A green leaf.', ''],
+  ['balas', 'sand', 'Sand.', 'Puti nga balas.|White sand.', ''],
+  ['bato', 'stone / rock', 'A stone.', 'Dako nga bato.|A big rock.', ''],
+  ['yuta', 'land / soil', 'Land or earth.', 'Among yuta.|Our land.', ''],
+  ['kalayo', 'fire', 'Fire.', 'Pataya ang kalayo.|Put out the fire.', ''],
+  ['bituon', 'star', 'A star.', 'Daghang bituon.|Many stars.', ''],
+  ['langit', 'sky / heaven', 'The sky, and also heaven.', 'Tin-aw ang langit.|The sky is clear.', ''],
+]},
+
+{ g: 'Animals', tags: ['animals'], w: [
+  ['iro', 'dog', 'A dog.', 'Ang iro nag-uwang.|The dog is barking.', ''],
+  ['iring', 'cat', 'A cat.', 'Ang iring natulog.|The cat is sleeping.', ''],
+  ['kabaw', 'water buffalo', 'The carabao, the working animal of the farm.', 'Ang kabaw sa uma.|The carabao in the field.', ''],
+  ['kanding', 'goat', 'A goat.', 'Duha ka kanding.|Two goats.', ''],
+  ['langgam', 'bird', 'A bird.', 'Naglupad ang langgam.|The bird is flying.', ''],
+  ['bakbak', 'frog', 'A frog.', 'Naay bakbak.|There is a frog.', ''],
+  ['halas', 'snake', 'A snake.', 'Hadlok ko sa halas.|I am afraid of snakes.', ''],
+  ['lamok', 'mosquito', 'A mosquito.', 'Daghang lamok.|Many mosquitoes.', ''],
+]},
+
+{ g: 'Colours', tags: ['colours'], w: [
+  ['puti', 'white', 'The colour white.', 'Puti nga sinina.|A white shirt.', ''],
+  ['itom', 'black', 'The colour black.', 'Itom nga buhok.|Black hair.', ''],
+  ['pula', 'red', 'The colour red.', 'Pula nga bulak.|A red flower.', ''],
+  ['berde', 'green', 'The colour green.', 'Berde nga dahon.|A green leaf.', ''],
+  ['asul', 'blue', 'The colour blue.', 'Asul nga langit.|A blue sky.', ''],
+  ['dalag', 'yellow', 'The colour yellow.', 'Dalag nga saging.|A yellow banana.', ''],
+  ['abuhon', 'grey', 'The colour grey.', 'Abuhon nga panganod.|A grey cloud.', ''],
+]},
+
+/* ── The body ────────────────────────────────────────────────── */
+{ g: 'Body', tags: ['body'], w: [
+  ['ulo', 'head', 'The head.', 'Sakit akong ulo.|My head hurts.', ''],
+  ['ilong', 'nose', 'The nose.', 'Tubig sa ilong.|A runny nose.', ''],
+  ['baba', 'mouth', 'The mouth.', 'Abli ang baba.|Open your mouth.', ''],
+  ['dalunggan', 'ear', 'The ear.', 'Sakit akong dalunggan.|My ear hurts.', ''],
+  ['kamot', 'hand', 'The hand.', 'Hugasi imong kamot.|Wash your hands.', ''],
+  ['tiil', 'foot / leg', 'The foot and leg together.', 'Sakit akong tiil.|My foot hurts.', ''],
+  ['tiyan', 'stomach', 'The belly.', 'Sakit akong tiyan.|My stomach hurts.', ''],
+  ['buhok', 'hair', 'Hair on the head.', 'Taas iyang buhok.|Her hair is long.', ''],
+  ['ngipon', 'tooth', 'A tooth.', 'Sakit akong ngipon.|My tooth hurts.', ''],
+  ['dugo', 'blood', 'Blood.', 'Naay dugo.|There is blood.', ''],
+  ['kasingkasing', 'heart', 'The heart.', 'Akong kasingkasing.|My heart.', ''],
+]},
+
+/* ── Money and buying ────────────────────────────────────────── */
+{ g: 'Money and shopping', tags: ['money', 'shopping'], w: [
+  ['piso', 'peso', 'The unit of currency.', 'Lima ka piso.|Five pesos.', ''],
+  ['sinsilyo', 'coins / change', 'Small change.', 'Walay sinsilyo.|No change.', ''],
+  ['presyo', 'price', 'The price of something.', 'Pila ang presyo?|What is the price?', ''],
+  ['hangyo', 'bargain / plead', 'To ask for a lower price, or to plead.', 'Mahangyo ba?|Can the price come down?', 'Bargaining at a market is normal and expected.'],
+  ['barato ra', 'that is cheap', 'A judgement that something is inexpensive.', 'Barato ra kaayo.|That is very cheap.', ''],
+  ['mahal ra', 'that is too dear', 'A judgement that something costs too much.', 'Mahal ra kaayo.|That is far too expensive.', 'The standard opening move when bargaining.'],
+  ['utang', 'debt / credit', 'Money owed, and also buying on credit.', 'Utang sa tindahan.|Credit at the store.', ''],
+  ['sukli', 'change (money back)', 'The change returned.', 'Asa ang sukli?|Where is the change?', ''],
+  ['libre', 'free', 'At no cost.', 'Libre ni.|This is free.', ''],
+  ['kulang', 'lacking / short', 'Not enough.', 'Kulang ang bayad.|The payment is short.', ''],
+  ['sobra', 'excess / too much', 'More than needed.', 'Sobra ni.|This is too much.', ''],
+]},
+
+];
+
+
+/* ── Building it ─────────────────────────────────────────────── */
+
+/** Every row, flattened, with its group's tags attached. */
+function langCebPackRows() {
+  const out = [];
+  LANG_CEB_PACK.forEach(group => {
+    (group.w || []).forEach(row => {
+      out.push({
+        ceb: row[0], en: row[1], desc: row[2],
+        example: row[3] || '', note: row[4] || '',
+        group: group.g, tags: (group.tags || []).slice()
+      });
+    });
+  });
+  return out;
+}
+
+/** How many words the pack holds, without building any of them. */
+function langCebPackSize() {
+  return LANG_CEB_PACK.reduce((n, g) => n + ((g.w || []).length), 0);
+}
+
+/**
+ * One row as a word record.
+ *
+ * The English side carries the short handle and the description; the Cebuano
+ * side carries the term, the same description and any usage note, plus the
+ * example sentence. That split matters for the run: langEnemyFromWords asks a
+ * question from the reference language and expects the study language back, so
+ * both sides have to have a term or the word cannot be used in play.
+ */
+function _langCebWord(r) {
+  const rec = langBlankWord();
+  rec.tags = r.tags.concat([r.group.toLowerCase()]);
+  rec.forms.ceb = {
+    term: r.ceb,
+    pos: '',
+    definition: r.desc,
+    examples: r.example && r.example.indexOf('|') > -1
+      ? [{ id: generateId(),
+           text: r.example.split('|')[0].trim(),
+           gloss: r.example.split('|')[1].trim() }]
+      : [],
+    notes: '',
+    restrictions: r.note || ''
+  };
+  rec.forms.en = {
+    term: r.en, pos: '', definition: r.desc,
+    examples: [], notes: '', restrictions: ''
+  };
+  return rec;
+}
+
+/**
+ * Install the pack, skipping anything already there by Cebuano term.
+ *
+ * Skipping rather than replacing, for the same reason the coding pack does it:
+ * a word you have edited is yours, and a starter pack that overwrites your own
+ * definitions is a starter pack you can only safely run once.
+ *
+ * @returns {{added:number, skipped:number, total:number}}
+ */
+function langAddCebPack() {
+  langStore();
+  const res = { added: 0, skipped: 0, total: 0 };
+  const have = new Set();
+  langWords().forEach(w => {
+    const t = langForm(w, 'ceb').term.trim().toLowerCase();
+    if (t) have.add(t);
+  });
+  langCebPackRows().forEach(r => {
+    res.total++;
+    if (have.has(r.ceb.trim().toLowerCase())) { res.skipped++; return; }
+    if (langSaveWord(_langCebWord(r))) { res.added++; have.add(r.ceb.trim().toLowerCase()); }
+  });
+  saveData();
+  if (typeof langRefreshViews === 'function') langRefreshViews();
+  return res;
+}
+
+/** The button. Confirms first, because it writes several hundred records. */
+function langLoadCebPack() {
+  const size = langCebPackSize();
+  const groups = LANG_CEB_PACK.length;
+  const already = langWords().length;
+  showConfirm('Add the Cebuano core pack?',
+    size + ' Cebuano words across ' + groups + ' topics, each with an English gloss, '
+    + 'a description of how it is actually used, and an example sentence. '
+    + 'Nothing is replaced — anything you already have by the same Cebuano term is skipped.'
+    + (already ? ' You currently have ' + already + ' word' + (already === 1 ? '' : 's') + '.' : ''),
+    () => {
+      const r = langAddCebPack();
+      if (typeof toast === 'function') {
+        toast(r.added
+          ? 'Added ' + r.added + ' Cebuano words.'
+            + (r.skipped ? ' ' + r.skipped + ' were already there.' : '')
+          : 'Every word in the pack was already there.',
+          { type: r.added ? 'success' : 'info', duration: 6000 });
+      }
+    });
+}

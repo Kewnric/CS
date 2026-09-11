@@ -1497,3 +1497,7 @@
   font-family: 'Press Start 2P', monospace;
   font-size: 0.6rem;
 }
+
+/* Two packs on offer where there used to be one, so they need to sit as a pair
+   rather than as a button with another button beside it. */
+.lang-seed-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; flex-shrink: 0; }
