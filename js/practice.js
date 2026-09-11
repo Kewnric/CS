@@ -1536,6 +1536,11 @@ async function submitCode() {
   if (attemptCounter >= 5 && !state.badges.includes('Persistent')) { state.badges.push('Persistent'); earnedBadges.push({ name: 'Persistent', icon: '💪', desc: '5+ Attempts on One Challenge' }); }
   if (state.history.length >= 49 && !state.badges.includes('Marathoner')) { state.badges.push('Marathoner'); earnedBadges.push({ name: 'Marathoner', icon: '🏃', desc: '50+ Total Submissions' }); }
 
+  /* A finished program pays into the language run's stamina. Studying is how
+     you refill the tank you spend out there; see langRunEarnStamina in
+     js/language.js. Paid on completion regardless of score -- the run is a
+     reward for doing the work, not a second exam on it. */
+  if (typeof langRunEarnStamina === 'function') langRunEarnStamina(1);
   state.history.unshift(historyEntry);
   _practiceTrimHistoryCode();
   state.activeAttempts[state.activeChallenge.id] = isPerfect ? 0 : attemptCounter;

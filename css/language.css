@@ -979,19 +979,19 @@
    art, the skyline showed through the text, and four options separated by a
    4px gap read as one grey slab rather than as a list you choose from.
 
-   A command window belongs in a corner with the art still visible beside it,
-   which is the point of having drawn the art. Bottom right, sized to its
-   longest label, and solid. */
+   Centred, which is where it was and where it belongs -- the fault was never
+   the position, it was that you could see the skyline through the text. */
 .lq-menu {
   position: absolute;
-  right: 0.85rem;
-  bottom: 0.85rem;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   /* SIZED TO ITS CONTENT, because this one window serves two very different
      menus. The road offers four short commands; a conversation offers the
      actual replies, which are whole phrases (lqReplyMenu uses the answer text
      as the label). A fixed width either cramps the sentences or leaves the
      commands floating in an oversized box. max-content with a generous cap
-     gives a tight corner box for GO FOR A RUN and a wide one for a sentence,
+     gives a tight box for GO FOR A RUN and a wide one for a sentence,
      from the same rule. */
   width: max-content;
   min-width: 232px;

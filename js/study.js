@@ -1094,6 +1094,7 @@ function checkTryCoding() {
 
   const snippet = (state.snippets || []).find(s => s.id === activeSnippetId);
 
+  if (typeof langRunEarnStamina === 'function') langRunEarnStamina(1);
   state.snippetHistory.unshift({
     id: generateId(),
     snippetId: activeSnippetId,

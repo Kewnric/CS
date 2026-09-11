@@ -37,6 +37,7 @@ function handleDataExport() {
        parked, that is their entire library, and an export taken before a
        reset or a move to a new device silently did not contain it. */
     codingPackLayout: state.codingPackLayout || 0,
+    langRun: state.langRun || null,
     codingStash: state.codingStash || null,
     mistakes: Array.isArray(state.mistakes) ? state.mistakes : []
   };
@@ -155,6 +156,7 @@ function handleDataImport(e) {
            the layout was never checked against this build, and letting the
            migration run once on import is exactly right. */
         state.codingPackLayout = parsed.codingPackLayout || 0;
+        state.langRun = parsed.langRun || null;
         state.codingStash = parsed.codingStash || state.codingStash || null;
         state.mistakes = Array.isArray(parsed.mistakes) ? parsed.mistakes
           : (Array.isArray(state.mistakes) ? state.mistakes : []);
@@ -252,6 +254,7 @@ function handleDataReset() {
         wings: {},
         // Named rather than left out, so a reset states what it clears.
         codingPackLayout: 0,
+        langRun: null,
         codingStash: null,
         mistakes: [],
         activeChallenge: null,

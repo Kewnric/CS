@@ -674,6 +674,7 @@ async function _loadV2Domains(uid) {
     // The layout migration's stamp; see state.js. Small metadata, so it
     // rides in the app document rather than the parked-library one.
     state.codingPackLayout = d.codingPackLayout || 0;
+    state.langRun = d.langRun || null;
     state.review = d.review || {};
     state.deadlines = d.deadlines || {};
     state.events = d.events || [];
@@ -774,6 +775,7 @@ function _restoreV1Data(data) {
   state.wings = (parsed.wings && typeof parsed.wings === 'object') ? parsed.wings : {};
   _restoreCheatSheets(parsed.cheatsheets);
   state.codingPackLayout = parsed.codingPackLayout || state.codingPackLayout || 0;
+  state.langRun = parsed.langRun || state.langRun || null;
   state.codingStash = parsed.codingStash || state.codingStash || null;
   state.mistakes = Array.isArray(parsed.mistakes) ? parsed.mistakes : (state.mistakes || []);
   _restoreDraft('ssp.practiceDraft', parsed.practiceDraft);
@@ -943,6 +945,7 @@ function _cacheAllToLocalStorage() {
       nodes: state.nodes,
       expandedNodes: state.expandedNodes,
       codingPackLayout: state.codingPackLayout || 0,
+      langRun: state.langRun || null,
       categoryRequirements: state.categoryRequirements,
       snippetProgress: state.snippetProgress,
       badges: state.badges,
@@ -1100,6 +1103,7 @@ async function saveToFirestore(uid) {
       nodes: state.nodes,
       expandedNodes: state.expandedNodes,
       codingPackLayout: state.codingPackLayout || 0,
+      langRun: state.langRun || null,
       categoryRequirements: state.categoryRequirements,
       snippetProgress: state.snippetProgress,
       badges: state.badges,

@@ -921,6 +921,8 @@ async function _psetDoSubmit() {
     // (library problems also feed the individual-challenge history, SRS & quests).
     const isLib = p.source === 'library' && p.challengeId;
     const attemptCounter = isLib ? (state.activeAttempts[p.challengeId] || 0) + 1 : 1;
+    // One per problem, so a set of five pays five times. See js/language.js.
+    if (typeof langRunEarnStamina === 'function') langRunEarnStamina(1);
     state.history.unshift({
       id: generateId(),
       challengeId: isLib ? p.challengeId : null,

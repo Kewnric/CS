@@ -1625,6 +1625,7 @@ function processSubmission() {
 
   // Save to history
   if (!state.notebookHistory) state.notebookHistory = [];
+  if (typeof langRunEarnStamina === 'function') langRunEarnStamina(1);
   state.notebookHistory.unshift(record);
   saveData();
   // The attempt is finished, so the in-progress copy is no longer wanted.

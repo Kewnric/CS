@@ -70,11 +70,16 @@ function langQuestTemplate() {
 function langQuestInit() {
   langStore();
   const mode = getSessionParam('langRunMode') || 'run';
+  const _lqBank = typeof langRunBank === 'function'
+    ? langRunBank() : { stamina: LANG_RUN_STAMINA, staminaMax: LANG_RUN_STAMINA };
   const scId = getSessionParam('langRunScenario');
 
   _lq = {
     mode, scene: 'road', location: 'street',
-    stamina: LANG_RUN_STAMINA, staminaMax: LANG_RUN_STAMINA,
+    /* From the bank. A scenario overrides both below with its own authored hp
+       and sets banked:false, because an authored encounter is a fixed fight
+       rather than a night out of your own stamina. */
+    stamina: _lqBank.stamina, staminaMax: _lqBank.staminaMax, banked: mode !== 'scenario',
     power: 0, powerMax: 100,
     potions: LANG_POTIONS.map(p => Object.assign({ owned: 1 }, p)),
     steps: 0, defeated: 0, fled: 0, correct: 0, asked: 0,
@@ -90,6 +95,7 @@ function langQuestInit() {
     if (!sc || !(sc.encounters || []).some(ready)) { spaNavigate('language'); return; }
     _lq.location = sc.location || 'street';
     _lq.stamina = _lq.staminaMax = sc.playerHp || LANG_RUN_STAMINA;
+    _lq.banked = false;
     _lq.power = sc.playerMana || 0;
     _lq.enemy = {
       name: sc.npc || 'Stranger', location: _lq.location,
@@ -112,7 +118,21 @@ function langQuestInit() {
   lqRender();
 }
 
-function langQuestDestroy() { lqClearAuto(); _lq = null; }
+/**
+ * Put the balance back.
+ *
+ * On finishing and on leaving, rather than on every change: saveData is
+ * debounced but lqRender runs on every hit, step and tick, and there is no
+ * reason to queue a write for a number that is still moving. Leaving mid-run
+ * banks what is left, so closing the tab halfway is not a way to keep stamina
+ * you already spent.
+ */
+function lqBank() {
+  if (!_lq || !_lq.banked || typeof langRunSetBank !== 'function') return;
+  langRunSetBank(_lq.stamina, _lq.staminaMax);
+}
+
+function langQuestDestroy() { lqBank(); lqClearAuto(); _lq = null; }
 
 function lqExit() {
   if (!_lq || _lq.scene === 'over') { spaNavigate('language'); return; }
@@ -372,7 +392,7 @@ function lqRender() {
     const grown = _lq.staminaMax > LANG_RUN_STAMINA;
     stats.innerHTML = `
       <span class="lq-stat lq-stat-bar"><b class="lq-ico-st">⚡</b>STA ${Math.max(0, Math.round(_lq.stamina))}/${_lq.staminaMax}${
-        grown ? `<em class="lq-grown" title="${_lq.staminaMax - LANG_RUN_STAMINA - _lq.defeated * LANG_RUN_STAMINA_GAIN} from clear blocks, ${_lq.defeated * LANG_RUN_STAMINA_GAIN} from conversations won">+${_lq.staminaMax - LANG_RUN_STAMINA}</em>` : ''}${lqGaugeHTML(_lq.stamina, _lq.staminaMax, 'sta')}</span>
+        grown ? `<em class="lq-grown" title="${_lq.staminaMax - LANG_RUN_STAMINA} above the starting ${LANG_RUN_STAMINA}, earned by walking clear blocks and winning conversations. It is kept between runs.">+${_lq.staminaMax - LANG_RUN_STAMINA}</em>` : ''}${lqGaugeHTML(_lq.stamina, _lq.staminaMax, 'sta')}</span>
       <span class="lq-stat lq-stat-bar"><b class="lq-ico-pw">✦</b>PWR ${Math.round(_lq.power)}%${lqGaugeHTML(_lq.power, _lq.powerMax, 'pwr')}</span>
       <span class="lq-stat"><b class="lq-ico-wk">▮</b>BLOCKS ${_lq.steps}</span>
       ${_lq.scene === 'battle' && _lq.enemy
@@ -821,6 +841,7 @@ function lqFinish(reason) {
     staminaLeft: Math.max(0, Math.round(_lq.stamina)), staminaMax: _lq.staminaMax,
     reason, duration: Math.round((Date.now() - _lq.startTime) / 1000)
   });
+  lqBank();
   lqRender();
 }
 

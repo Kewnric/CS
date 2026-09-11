@@ -187,6 +187,7 @@ function loadData() {
       state.langHistory = parsed.langHistory || [];
       state.wings = (parsed.wings && typeof parsed.wings === 'object') ? parsed.wings : {};
       state.codingPackLayout = parsed.codingPackLayout || 0;
+      state.langRun = parsed.langRun || null;
       state.codingStash = parsed.codingStash || null;
       state.mistakes = Array.isArray(parsed.mistakes) ? parsed.mistakes : [];
       state.expandedNodes = parsed.expandedNodes || [];
@@ -298,6 +299,7 @@ function seedDefaultData() {
   state.activeAttempts = seed.activeAttempts;
   state.review = seed.review || {};
   state.codingPackLayout = 0;
+  state.langRun = null;
   state.codingStash = null;
   state.mistakes = [];
   saveData();
@@ -389,6 +391,10 @@ function _flushSaveData() {
        only ~1.7ms; the spurious save is the cost, since it marks the cloud dirty
        and schedules a write of the whole app document for no change at all. */
     codingPackLayout: state.codingPackLayout || 0,
+    /* The language run's stamina balance. It carries between runs and is
+       refilled by finishing programs, so it is real progress and belongs in
+       the save like any other. See js/language.js. */
+    langRun: state.langRun || null,
     codingStash: state.codingStash || null,
     // The classified error log; see mistakes.js. Also never persisted.
     mistakes: state.mistakes || []

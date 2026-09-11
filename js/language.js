@@ -674,6 +674,65 @@ const LANG_RUN_ENDURANCE_GAIN = 10;  // added to the MAX on every clear block
    actually built on — total up, current down, block after block. */
 const LANG_ENCOUNTER_CHANCE = 0.28;  // per step
 
+/* ── The bank ──────────────────────────────────────────────────
+   Stamina used to be handed out fresh at the top of every run and thrown away
+   at the end of it, which made both halves of the loop meaningless: the max
+   you spent a whole run raising was gone next time, and there was never a
+   reason not to set off again immediately.
+
+   It is a balance now. It carries between runs, the ceiling you earn is kept,
+   and the way to refill it is to go and study -- every program you finish in
+   the coding, notebook or snippet libraries pays into it. So a run is spent
+   from something you built, which is the only way spending it means anything.
+
+   Held on `state` so it rides the same save and the same sync as everything
+   else; see js/state.js. */
+const LANG_STAMINA_PER_PROGRAM = 30;   // earned per program finished anywhere
+
+/** The balance, defaulted for anyone who has never run. */
+function langRunBank() {
+  const b = (state && state.langRun) || {};
+  const max = Number(b.staminaMax);
+  const cur = Number(b.stamina);
+  const staminaMax = isFinite(max) && max > 0 ? max : LANG_RUN_STAMINA;
+  return {
+    staminaMax: staminaMax,
+    stamina: isFinite(cur) && cur >= 0 ? Math.min(cur, staminaMax) : staminaMax
+  };
+}
+
+/** Write the balance back. */
+function langRunSetBank(stamina, staminaMax) {
+  if (!state) return;
+  const max = Math.max(1, Math.round(Number(staminaMax) || LANG_RUN_STAMINA));
+  state.langRun = {
+    staminaMax: max,
+    stamina: Math.max(0, Math.min(max, Math.round(Number(stamina) || 0)))
+  };
+  if (typeof saveData === 'function') saveData();
+}
+
+/**
+ * Pay stamina in, from finishing something.
+ *
+ * Called wherever an attempt is recorded -- one program, one practice set
+ * problem, one notebook, one snippet. Capped at the ceiling you have earned,
+ * so studying tops you up but does not raise what you can hold; only beating
+ * someone on the run does that.
+ *
+ * @returns {number} how much was actually added, after the cap
+ */
+function langRunEarnStamina(programs) {
+  const n = Math.max(0, Math.round(Number(programs) || 0));
+  if (!n || !state) return 0;
+  const b = langRunBank();
+  const before = b.stamina;
+  const after = Math.min(b.staminaMax, before + n * LANG_STAMINA_PER_PROGRAM);
+  if (after === before) return 0;
+  langRunSetBank(after, b.staminaMax);
+  return after - before;
+}
+
 /* Flavour while walking. Placeholders, as asked — they set the beat between
    encounters without pretending to be finished writing. */
 const LANG_RUN_FLAVOUR = [
@@ -842,13 +901,26 @@ function langEnemyFromWords() {
 }
 
 /** Can the adventure run at all? Returns a reason when it cannot. */
+/* TWO SEPARATE CONDITIONS, checked in that order: is there anything to say,
+   and have you the legs to go and say it. The content test used to return null
+   the moment a scenario existed, which would now let a free run start on an
+   empty tank purely because a scenario happened to be written. */
 function langRunBlocker() {
   const study = langStudy(), ref = langRef();
   const ready = (e) => (e.line || '').trim() && (e.options || []).some(o => (o.text || '').trim() && o.correct);
-  if (langScenarios().some(s => (s.encounters || []).some(ready))) return null;
+  const hasScenario = langScenarios().some(s => (s.encounters || []).some(ready));
   const pairs = langWords().filter(w =>
     (w.forms[study] && w.forms[study].term.trim()) && (w.forms[ref] && w.forms[ref].term.trim())).length;
-  if (pairs >= 2) return null;
-  return 'You need either a written scenario, or at least two words that have both a '
-    + langName(study) + ' and a ' + langName(ref) + ' term.';
+  if (!hasScenario && pairs < 2) {
+    return 'You need either a written scenario, or at least two words that have both a '
+      + langName(study) + ' and a ' + langName(ref) + ' term.';
+  }
+  /* Out of legs. The bank is the point of the mode now, so running on empty has
+     to be refused -- and refused with the way to fix it, since the answer is
+     somewhere else in the app entirely. */
+  if (langRunBank().stamina < LANG_RUN_STEP_COST) {
+    return 'No stamina left. Finish a program in the coding, notebook or snippet '
+      + 'library to get ' + LANG_STAMINA_PER_PROGRAM + ' back.';
+  }
+  return null;
 }
