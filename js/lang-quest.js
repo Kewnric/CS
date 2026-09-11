@@ -330,6 +330,25 @@ function lqSceneArt(loc, bd) {
 
 /* ── Render ───────────────────────────────────────────────── */
 
+/**
+ * A bar for a bounded quantity.
+ *
+ * The enemy has had a health bar since this mode existed and the player never
+ * did -- stamina and power were numbers you had to read and subtract. In a
+ * fight that is the wrong way round: the one number you must judge at a glance
+ * is your own, and "94/110" is arithmetic where a bar is a look.
+ *
+ * Stamina changes colour as it falls, because the decision it drives (press on
+ * or go home) changes with it. Power does not -- it only ever fills.
+ */
+function lqGaugeHTML(cur, max, kind) {
+  const pct = Math.max(0, Math.min(100, (cur / (max || 1)) * 100));
+  const low = kind === 'sta' && pct <= 45 ? ' is-low' : '';
+  const crit = kind === 'sta' && pct <= 20 ? ' is-crit' : '';
+  return '<span class="lq-gauge lq-gauge-' + kind + low + crit + '" aria-hidden="true">'
+       + '<span class="lq-gauge-fill" style="width:' + pct.toFixed(1) + '%"></span></span>';
+}
+
 function lqRender() {
   if (!_lq) return;
   const shell = document.getElementById('lq-shell');
@@ -352,9 +371,9 @@ function lqRender() {
     // its own — it only ever rises when you beat someone, and now says so.
     const grown = _lq.staminaMax > LANG_RUN_STAMINA;
     stats.innerHTML = `
-      <span class="lq-stat"><b class="lq-ico-st">⚡</b>STA ${Math.max(0, Math.round(_lq.stamina))}/${_lq.staminaMax}${
-        grown ? `<em class="lq-grown" title="${_lq.staminaMax - LANG_RUN_STAMINA - _lq.defeated * LANG_RUN_STAMINA_GAIN} from clear blocks, ${_lq.defeated * LANG_RUN_STAMINA_GAIN} from conversations won">+${_lq.staminaMax - LANG_RUN_STAMINA}</em>` : ''}</span>
-      <span class="lq-stat"><b class="lq-ico-pw">✦</b>PWR ${Math.round(_lq.power)}%</span>
+      <span class="lq-stat lq-stat-bar"><b class="lq-ico-st">⚡</b>STA ${Math.max(0, Math.round(_lq.stamina))}/${_lq.staminaMax}${
+        grown ? `<em class="lq-grown" title="${_lq.staminaMax - LANG_RUN_STAMINA - _lq.defeated * LANG_RUN_STAMINA_GAIN} from clear blocks, ${_lq.defeated * LANG_RUN_STAMINA_GAIN} from conversations won">+${_lq.staminaMax - LANG_RUN_STAMINA}</em>` : ''}${lqGaugeHTML(_lq.stamina, _lq.staminaMax, 'sta')}</span>
+      <span class="lq-stat lq-stat-bar"><b class="lq-ico-pw">✦</b>PWR ${Math.round(_lq.power)}%${lqGaugeHTML(_lq.power, _lq.powerMax, 'pwr')}</span>
       <span class="lq-stat"><b class="lq-ico-wk">▮</b>BLOCKS ${_lq.steps}</span>
       ${_lq.scene === 'battle' && _lq.enemy
         ? `<span class="lq-stat lq-stat-foe"><b>♥</b>${escapeHTML(lqDisplayName(_lq.enemy))} ${Math.max(0, Math.round(_lq.enemy.hp))}/${_lq.enemy.hpMax}</span>` : ''}`;

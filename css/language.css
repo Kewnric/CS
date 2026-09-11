@@ -787,10 +787,18 @@
   image-rendering: pixelated;
 }
 
+/* A COLUMN THAT FILLS, not a stack that floats. The scene was a fixed 400px
+   and the dialogue box a fixed 220px inside a shell that is 100% tall, so on
+   any normal screen the whole mode sat in the top half with several hundred
+   pixels of nothing under it. The scene takes the slack now and the box sits
+   where a dialogue box belongs, against the bottom. */
 .lq-frame {
   max-width: 1180px;
+  min-height: 100%;
   margin: 0 auto;
-  padding: 1.5rem 5rem 3rem;
+  padding: 1.25rem 5rem 1.5rem;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ── Day plate and stat strip ─────────────────────────────── */
@@ -830,13 +838,41 @@
 .lq-ico-st { color: var(--lqGold); }
 .lq-ico-pw { color: var(--lqCyan); }
 .lq-ico-wk { color: var(--lqDim); }
+
+/* ── The player's own gauges ───────────────────────────────────
+   Small, inline, and beside the numbers rather than instead of them: the exact
+   figure still matters when you are deciding whether one more block is worth
+   it, but the bar is what you read mid-fight. Matched to the foe bar's height
+   and border so both sides of a fight are stated the same way. */
+.lq-stat-bar { gap: 0.45rem; }
+.lq-gauge {
+  width: 76px;
+  height: 10px;
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.6);
+  border: 2px solid var(--lqEdge);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+.lq-gauge-fill {
+  display: block;
+  height: 100%;
+  background: var(--lqCyan);
+  /* Stepped, so a draining bar reads as a pixel gauge ticking down rather than
+     as a smooth CSS transition on a retro screen. */
+  transition: width 0.25s steps(8), background 0.2s steps(2);
+}
+.lq-gauge-sta .lq-gauge-fill { background: #6ee7a5; }
+.lq-gauge-sta.is-low .lq-gauge-fill { background: var(--lqGold); }
+.lq-gauge-sta.is-crit .lq-gauge-fill { background: var(--lqHot); }
+.lq-gauge-pwr .lq-gauge-fill { background: var(--lqCyan); }
 .lq-stat-foe { margin-left: auto; color: var(--lqHot); }
 
 /* ── The scene banner ─────────────────────────────────────── */
 
 .lq-scene {
   position: relative;
-  height: 400px;
+  flex: 1 1 auto;
+  min-height: 300px;
   border: 2px solid var(--lqEdge);
   overflow: hidden;
 }
@@ -938,15 +974,34 @@
 
 /* ── The stacked choice menu ──────────────────────────────── */
 
+/* ANCHORED, AND OPAQUE. It used to sit dead centre at 82% width with items at
+   0.93 alpha and no borders, so it landed straight across the middle of the
+   art, the skyline showed through the text, and four options separated by a
+   4px gap read as one grey slab rather than as a list you choose from.
+
+   A command window belongs in a corner with the art still visible beside it,
+   which is the point of having drawn the art. Bottom right, sized to its
+   longest label, and solid. */
 .lq-menu {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: min(600px, 82%);
+  right: 0.85rem;
+  bottom: 0.85rem;
+  /* SIZED TO ITS CONTENT, because this one window serves two very different
+     menus. The road offers four short commands; a conversation offers the
+     actual replies, which are whole phrases (lqReplyMenu uses the answer text
+     as the label). A fixed width either cramps the sentences or leaves the
+     commands floating in an oversized box. max-content with a generous cap
+     gives a tight corner box for GO FOR A RUN and a wide one for a sentence,
+     from the same rule. */
+  width: max-content;
+  min-width: 232px;
+  max-width: min(560px, 68%);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  background: var(--lqPanel);
+  border: 2px solid var(--lqEdge);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.07),
+              0 6px 0 rgba(0, 0, 0, 0.45);
   z-index: 3;
 }
 
@@ -976,7 +1031,38 @@
 .lq-mi.is-off:hover { background: rgba(58, 51, 74, 0.93); }
 
 /* Long reply text is prose, not a label — let it wrap and shrink. */
-.lq-menu .lq-mi { font-size: 0.95rem; }
+/* Scoped: .lq-mi is also the end-of-run actions, which are fine as they are.
+
+   Left-aligned with room for a caret, the way a pixel menu marks its
+   selection -- centred text with nothing pointing at it gives no sense of
+   which row you are on until the fill moves under the pointer. The rows are
+   divided by a hairline rather than a gap, because a gap let the scene
+   through and broke the window back into floating bars. */
+.lq-menu .lq-mi {
+  position: relative;
+  padding: 0.62rem 0.9rem 0.62rem 2.1rem;
+  background: transparent;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  text-align: left;
+}
+.lq-menu .lq-mi + .lq-mi { box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.35); }
+.lq-menu .lq-mi::before {
+  content: 'B8';
+  position: absolute;
+  left: 0.85rem;
+  opacity: 0;
+  color: var(--lqGold);
+  transition: opacity 0.1s steps(2);
+}
+.lq-menu .lq-mi:hover::before,
+.lq-menu .lq-mi:focus-visible::before { opacity: 1; }
+.lq-menu .lq-mi:hover,
+.lq-menu .lq-mi:focus-visible { background: var(--lqPanelHi); }
+.lq-menu .lq-mi.is-danger:hover { background: #5c2f38; }
+.lq-menu .lq-mi.is-danger:hover::before { color: var(--lqHot); }
+.lq-menu .lq-mi.is-off:hover { background: transparent; }
+.lq-menu .lq-mi.is-off:hover::before { opacity: 0; }
 
 /* ── The battle command row ───────────────────────────────── */
 
@@ -1075,10 +1161,13 @@
 .lq-autoskip.is-on { color: var(--lqCyan); }
 .lq-autoskip.is-on .lq-check { background: var(--lqCyan); }
 
+/* Sized to what it holds. 220px was reserved whether or not there was a line,
+   so an idle box was a tall empty panel with a lone ellipsis in the corner of
+   it. Enough for two lines of dialogue, and it grows for more. */
 .lq-box {
   position: relative;
-  min-height: 220px;
-  padding: 1.5rem 1.75rem 2.5rem;
+  min-height: 118px;
+  padding: 1.25rem 1.6rem 2.1rem;
   background: #191426;
   border: 2px solid var(--lqEdge);
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.05);
