@@ -169,15 +169,28 @@ function langFindWord(id) {
  * that pattern does over time.
  */
 function langForm(w, code) {
-  const f = w && w.forms && w.forms[code];
-  return (f && typeof f === 'object') ? f : langBlankForm();
+  const forms = w && w.forms;
+  const f = (forms && typeof forms === 'object') ? forms[code] : null;
+  if (!f || typeof f !== 'object') return langBlankForm();
+  /* THE SHAPE, not merely the presence. Returning the form as found closed
+     half the hole: a form that exists but carries no term, or a term that is a
+     number, threw on .trim() just as surely as a missing form did. Readers are
+     entitled to a term they can call string methods on.
+
+     The common case allocates nothing -- a well-formed form is handed straight
+     back. This sits under filters that run over every word, and a library is
+     meant to reach the thousands. */
+  if (typeof f.term === 'string') return f;
+  const fixed = Object.assign(langBlankForm(), f);
+  fixed.term = (f.term === null || f.term === undefined) ? '' : String(f.term);
+  return fixed;
 }
 
 function langHeadword(w, code) {
   if (!w || !w.forms) return 'Untitled';
   const order = [code || langStudy(), langRef()].concat(LANG_CODES);
   for (const c of order) {
-    const t = w.forms[c] && w.forms[c].term;
+    const t = langForm(w, c).term;
     if (t && t.trim()) return t.trim();
   }
   return 'Untitled';
@@ -186,7 +199,7 @@ function langHeadword(w, code) {
 /** How many of the four languages actually have a term filled in. */
 function langFilledCount(w) {
   if (!w || !w.forms) return 0;
-  return LANG_CODES.filter(c => w.forms[c] && (w.forms[c].term || '').trim()).length;
+  return LANG_CODES.filter(c => langForm(w, c).term.trim()).length;
 }
 
 function langSaveWord(w) {
