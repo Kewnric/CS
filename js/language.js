@@ -431,8 +431,9 @@ function langDeleteSet(id) {
 
 /* ── Scenarios ────────────────────────────────────────────── */
 
-/* Placeholders for now, as asked — the shape is here so the game has real
-   records to run against and the author form has something to fill in. */
+/* The six places a conversation can happen. Each has its own fixed backdrop in
+   js/lang-art.js, so a location is somewhere you recognise rather than a label
+   over a recoloured gradient. */
 const LANG_LOCATIONS = [
   { key: 'cafeteria', name: 'Cafeteria', icon: 'utensils' },
   { key: 'classroom', name: 'Classroom', icon: 'presentation' },
@@ -733,15 +734,23 @@ function langRunEarnStamina(programs) {
   return after - before;
 }
 
-/* Flavour while walking. Placeholders, as asked — they set the beat between
-   encounters without pretending to be finished writing. */
+/* Flavour while walking: the beat between encounters, so a quiet block is
+   still something rather than a button press at nothing.
+
+   Written rather than marked as unwritten. They are deliberately small and
+   sensory and carry no instruction -- a line here must never look like it
+   needs answering, because the whole mode is built on lines that do. */
 const LANG_RUN_FLAVOUR = [
-  'A wind is too cold for you - placeholder',
-  'The street is quiet for once - placeholder',
-  'Someone is cooking nearby - placeholder',
-  'You pass a closed shutter - placeholder',
-  'Rain is starting, lightly - placeholder',
-  'A tricycle rattles past - placeholder'
+  'The wind comes off the water and goes straight through your shirt.',
+  'Quiet, for once. Just your own footfalls and the hum of a transformer.',
+  'Somebody is cooking nearby — garlic, and something sweet under it.',
+  'A shutter is down over a storefront, padlocked, tagged, and rusting.',
+  'Rain starts, thinks better of it, and stops before you can mind it.',
+  'A tricycle rattles past. The driver lifts his chin at you; you lift yours.',
+  'A dog watches you from a gate and decides you are not worth the bark.',
+  'The sari-sari store is still open, lit blue by a television nobody is watching.',
+  'Someone upstairs is practising the same four bars of a song, over and over.',
+  'You step around a puddle holding the whole streetlight in it.'
 ];
 
 const LANG_POWERUPS = [

@@ -19,21 +19,12 @@
    wrong one drains you. Beating someone raises the MAXIMUM, so a hard
    conversation buys you a longer walk.
 
-   Backdrops and portraits are placeholders and say so.
+   Backdrops and portraits are fixed art in js/lang-art.js. Only the writing
+   changes -- the lines, the options and the vocabulary -- because that is the
+   learning, and a place you recognise is worth more than a place that varies.
    ============================================================ */
 
 let _lq = null;
-
-/* Stand-in scenery — a gradient per location, so the scene reads now and real
-   art can drop into the same box later without the layout moving. */
-const LQ_BACKDROPS = {
-  cafeteria: { from: '#8a6fa8', mid: '#54407a', to: '#2a1f45' },
-  classroom: { from: '#4d84bd', mid: '#2f5488', to: '#1a2c4d' },
-  hallway:   { from: '#5f7b9c', mid: '#3a5171', to: '#1e2c40' },
-  home:      { from: '#a8794c', mid: '#6b4a2e', to: '#33231a' },
-  market:    { from: '#7d9c52', mid: '#4c6132', to: '#26311b' },
-  street:    { from: '#5a7099', mid: '#33456b', to: '#1a2338' }
-};
 
 const LQ_AUTOSKIP_KEY = 'lang.autoskip';
 
@@ -197,157 +188,43 @@ function lqClearAuto() {
    and the whole thing is cached per location.
    ------------------------------------------------------------ */
 
-const _lqSceneCache = {};
-
-/** Deterministic per location, so a place keeps its own skyline. */
-function _lqRng(key) {
-  let seed = 2166136261;
-  for (let i = 0; i < key.length; i++) {
-    seed ^= key.charCodeAt(i);
-    seed = Math.imul(seed, 16777619);
-  }
-  return function () {
-    seed ^= seed << 13; seed >>>= 0;
-    seed ^= seed >> 17;
-    seed ^= seed << 5;  seed >>>= 0;
-    return seed / 4294967296;
-  };
+/**
+ * The place you are standing in.
+ *
+ * Six hand-built scenes out of js/lang-art.js, one per location. This used to
+ * generate a skyline procedurally and recolour it per place, so a cafeteria and
+ * a classroom were the same street in another gradient -- the location name was
+ * the only thing telling you where you were.
+ *
+ * Fixed art on purpose. A backdrop is furniture: it should be the same every
+ * time you walk into it, because that is what makes it a place rather than a
+ * texture. Only the writing changes.
+ */
+function lqSceneArt(loc) {
+  const art = (typeof LANG_SCENE_ART !== 'undefined') ? LANG_SCENE_ART : null;
+  if (!art) return '';
+  return art[loc.key] || art.street || '';
 }
 
-/* What sits in the foreground, per location — the one thing that makes a
-   cafeteria read as a cafeteria and not as another street. */
-const LQ_FOREGROUND = {
-  cafeteria: 'tables',
-  classroom: 'desks',
-  hallway:   'lockers',
-  home:      'rail',
-  market:    'stalls',
-  street:    'lamps'
-};
-
-function lqSceneArt(loc, bd) {
-  if (_lqSceneCache[loc.key]) return _lqSceneCache[loc.key];
-  const rnd = _lqRng(loc.key);
-  const W = 1000, H = 400, HORIZON = 250;
-
-  // ── stars ──
-  let stars = '';
-  for (let i = 0; i < 46; i++) {
-    const x = rnd() * W, y = rnd() * (HORIZON - 70);
-    const r = rnd() < 0.82 ? 1.1 : 1.9;
-    stars += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r}" fill="#fff" opacity="${(0.25 + rnd() * 0.55).toFixed(2)}"/>`;
-  }
-
-  // ── far skyline: pale, low contrast, no windows ──
-  let far = '';
-  let x = -20;
-  while (x < W + 20) {
-    const w = 34 + rnd() * 62;
-    const h = 40 + rnd() * 78;
-    far += `<rect x="${x.toFixed(0)}" y="${(HORIZON - h).toFixed(0)}" width="${w.toFixed(0)}" height="${(h + 30).toFixed(0)}"/>`;
-    x += w + rnd() * 14;
-  }
-
-  // ── near skyline: taller, darker, lit windows ──
-  let near = '', windows = '';
-  x = -30;
-  while (x < W + 30) {
-    const w = 46 + rnd() * 74;
-    const h = 70 + rnd() * 132;
-    const top = HORIZON - h;
-    near += `<rect x="${x.toFixed(0)}" y="${top.toFixed(0)}" width="${w.toFixed(0)}" height="${(h + 30).toFixed(0)}"/>`;
-    // A roof box on some of them, so the tops are not all flat.
-    if (rnd() < 0.34) {
-      const rw = 10 + rnd() * 16;
-      near += `<rect x="${(x + w / 2 - rw / 2).toFixed(0)}" y="${(top - 16).toFixed(0)}" width="${rw.toFixed(0)}" height="18"/>`;
-    }
-    // Windows on a grid, most of them dark.
-    for (let wy = top + 12; wy < HORIZON - 10; wy += 17) {
-      for (let wx = x + 8; wx < x + w - 10; wx += 15) {
-        if (rnd() < 0.34) {
-          windows += `<rect x="${wx.toFixed(0)}" y="${wy.toFixed(0)}" width="6" height="8" fill="#ffd98a" opacity="${(0.35 + rnd() * 0.5).toFixed(2)}"/>`;
-        }
-      }
-    }
-    x += w + 4 + rnd() * 20;
-  }
-
-  // ── foreground, per location ──
-  let fg = '';
-  const kind = LQ_FOREGROUND[loc.key] || 'lamps';
-  if (kind === 'lamps' || kind === 'stalls') {
-    for (let i = 0; i < 4; i++) {
-      const lx = 80 + i * 260 + rnd() * 50;
-      fg += `<rect x="${lx}" y="${HORIZON - 78}" width="5" height="118" fill="#0b0812" opacity="0.85"/>`
-         +  `<circle cx="${(lx + 2.5).toFixed(0)}" cy="${HORIZON - 82}" r="9" fill="#ffd98a" opacity="0.9"/>`
-         +  `<circle cx="${(lx + 2.5).toFixed(0)}" cy="${HORIZON - 82}" r="26" fill="#ffd98a" opacity="0.12"/>`;
-      if (kind === 'stalls') {
-        fg += `<rect x="${lx - 58}" y="${HORIZON + 6}" width="120" height="9" fill="#0b0812" opacity="0.8"/>`;
-      }
-    }
-  } else if (kind === 'tables') {
-    for (let i = 0; i < 3; i++) {
-      const tx = 90 + i * 330;
-      fg += `<rect x="${tx}" y="${HORIZON + 34}" width="200" height="11" fill="#0b0812" opacity="0.82"/>`
-         +  `<rect x="${tx + 16}" y="${HORIZON + 45}" width="8" height="46" fill="#0b0812" opacity="0.82"/>`
-         +  `<rect x="${tx + 176}" y="${HORIZON + 45}" width="8" height="46" fill="#0b0812" opacity="0.82"/>`;
-    }
-  } else if (kind === 'desks') {
-    for (let i = 0; i < 4; i++) {
-      const dx = 60 + i * 250;
-      fg += `<rect x="${dx}" y="${HORIZON + 40}" width="150" height="10" fill="#0b0812" opacity="0.82"/>`
-         +  `<rect x="${dx + 10}" y="${HORIZON + 50}" width="7" height="40" fill="#0b0812" opacity="0.82"/>`
-         +  `<rect x="${dx + 133}" y="${HORIZON + 50}" width="7" height="40" fill="#0b0812" opacity="0.82"/>`;
-    }
-  } else if (kind === 'lockers') {
-    for (let i = 0; i < 14; i++) {
-      fg += `<rect x="${i * 74}" y="${HORIZON - 54}" width="62" height="96" fill="#0b0812" opacity="0.55"/>`
-         +  `<rect x="${i * 74 + 44}" y="${HORIZON - 16}" width="8" height="3" fill="#ffd98a" opacity="0.35"/>`;
-    }
-  } else if (kind === 'rail') {
-    fg += `<rect x="0" y="${HORIZON + 30}" width="${W}" height="7" fill="#0b0812" opacity="0.8"/>`;
-    for (let i = 0; i < 18; i++) {
-      fg += `<rect x="${i * 58 + 12}" y="${HORIZON + 37}" width="5" height="34" fill="#0b0812" opacity="0.8"/>`;
-    }
-  }
-
-  const svg = `
-    <svg class="lq-art" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-      <defs>
-        <linearGradient id="lqsky-${loc.key}" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="${bd.from}"/>
-          <stop offset="62%" stop-color="${bd.mid}"/>
-          <stop offset="100%" stop-color="${bd.to}"/>
-        </linearGradient>
-        <linearGradient id="lqground-${loc.key}" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="${bd.to}"/>
-          <stop offset="100%" stop-color="#07050c"/>
-        </linearGradient>
-        <radialGradient id="lqglow-${loc.key}" cx="50%" cy="58%" r="60%">
-          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.14"/>
-          <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
-        </radialGradient>
-      </defs>
-
-      <rect width="${W}" height="${H}" fill="url(#lqsky-${loc.key})"/>
-      <g>${stars}</g>
-      <circle cx="828" cy="66" r="30" fill="#fdf3d0" opacity="0.92"/>
-      <circle cx="814" cy="58" r="27" fill="${bd.from}" opacity="0.96"/>
-      <rect y="${HORIZON - 130}" width="${W}" height="${130}" fill="url(#lqglow-${loc.key})"/>
-
-      <g fill="#0d0a16" opacity="0.42">${far}</g>
-      <g fill="#0a0712" opacity="0.86">${near}</g>
-      <g>${windows}</g>
-
-      <rect y="${HORIZON}" width="${W}" height="${H - HORIZON}" fill="url(#lqground-${loc.key})"/>
-      <rect y="${HORIZON}" width="${W}" height="2" fill="#ffffff" opacity="0.09"/>
-      <g>${fg}</g>
-    </svg>`;
-
-  _lqSceneCache[loc.key] = svg;
-  return svg;
+/**
+ * Who you are talking to.
+ *
+ * A generated passer-by is already one of the six by name -- langEnemyFromWords
+ * deals from exactly that list. An AUTHORED character has whatever name you
+ * gave them, so they take a face chosen by hashing that name: arbitrary the
+ * first time, and the same for ever after. Ate Marites is always the same
+ * person, which is the whole reason to draw her.
+ */
+function lqPortraitFor(enemy) {
+  if (typeof LANG_PORTRAITS === 'undefined') return '';
+  const keys = Object.keys(LANG_PORTRAITS).sort();
+  if (!keys.length) return '';
+  const raw = String((enemy && enemy.name) || '').toLowerCase().trim();
+  if (LANG_PORTRAITS[raw]) return LANG_PORTRAITS[raw];
+  let h = 2166136261;
+  for (let i = 0; i < raw.length; i++) { h ^= raw.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return LANG_PORTRAITS[keys[(h >>> 0) % keys.length]];
 }
-
 /* ── Render ───────────────────────────────────────────────── */
 
 /**
@@ -381,7 +258,6 @@ function lqRender() {
   if (!scene || !box) return;
 
   const loc = langLocation(_lq.location);
-  const bd = LQ_BACKDROPS[loc.key] || LQ_BACKDROPS.street;
   if (day) day.textContent = _lq.scene === 'battle' ? 'BATTLE' : _lq.scene === 'over' ? 'DONE' : 'RUN';
   if (auto) auto.classList.toggle('is-on', lqAutoSkip());
 
@@ -400,13 +276,13 @@ function lqRender() {
   }
 
   scene.innerHTML = `
-    ${lqSceneArt(loc, bd)}
+    ${lqSceneArt(loc)}
     <div class="lq-scenetag">${escapeHTML(loc.name.toUpperCase())}</div>
     ${_lq.scene === 'battle' && _lq.enemy ? lqFoeHTML() : ''}
     ${_lq.scene === 'battle' && !_lq.say.length && _lq.menu === null ? lqCommandBarHTML() : ''}
     ${_lq.menu && !_lq.say.length ? lqMenuHTML() : ''}
     ${lqVoiceToggleHTML()}
-    <div class="lq-help" title="Placeholder art — backdrops and portraits are stand-ins">?</div>`;
+    <div class="lq-help" title="${escapeHTML(loc.name)} — click the box to read on">?</div>`;
 
   const line = _lq.say[0] || null;
   if (speaker) {
@@ -453,7 +329,7 @@ function lqFoeHTML() {
   const pct = Math.max(0, (_lq.enemy.hp / Math.max(1, _lq.enemy.hpMax)) * 100);
   return `
     <div class="lq-foe">
-      <div class="lq-foe-art">☻</div>
+      <div class="lq-foe-art">${lqPortraitFor(_lq.enemy)}</div>
       <div class="lq-foe-bar"><div class="lq-foe-fill" style="width:${pct}%;"></div></div>
     </div>`;
 }

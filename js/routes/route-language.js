@@ -657,13 +657,6 @@ function langRunHTML() {
           </button>
         </div>`}
 
-      <div class="lang-placeholder-note">
-        <i data-lucide="construction"></i>
-        <div>
-          <strong>Placeholder art</strong>
-          <span>The battle, stamina, power gauge and encounters all run for real. Backdrops and sprites are stand-ins.</span>
-        </div>
-      </div>
     </div>`;
 }
 

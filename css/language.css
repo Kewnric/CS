@@ -267,19 +267,6 @@
 .lang-problems strong { display: flex; align-items: center; gap: 0.35rem; color: var(--color-warning); font-size: 0.85rem; }
 .lang-problems ul { margin: 0.4rem 0 0 1.1rem; padding: 0; color: var(--text-secondary); font-size: 0.8rem; }
 
-.lang-placeholder-note {
-  display: flex;
-  gap: 0.7rem;
-  align-items: flex-start;
-  margin-top: 1.5rem;
-  padding: 0.85rem 1rem;
-  border: 1px dashed var(--border-color);
-  border-radius: var(--radius-md);
-  color: var(--text-tertiary);
-}
-.lang-placeholder-note strong { display: block; color: var(--text-secondary); font-size: 0.82rem; }
-.lang-placeholder-note span { font-size: 0.78rem; }
-
 /* ── Admin ────────────────────────────────────────────────── */
 
 .admin-hub-head { display: flex; align-items: center; margin-bottom: 1rem; }
@@ -912,7 +899,7 @@
   text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.8);
 }
 
-/* The stand-in portrait sits where the reference's art does. */
+/* The portrait sits where the reference's art does. */
 .lq-foe {
   position: absolute;
   right: 2rem;
@@ -928,21 +915,29 @@
 /* A head-and-shoulders silhouette standing on the ground line, backlit by the
    city behind it. The dashed transparent box this replaces read as a cut-out
    pasted over the buildings rather than as somebody in the scene. */
+/* JUST THE PERSON NOW. The arch, the border and the inner glow were a frame
+   built to hold a glyph -- something had to make a smiley in a box read as a
+   character standing there. With a drawn figure in it that frame is a capsule
+   around somebody who is meant to be in the room, so it goes; only the pool of
+   light they stand in is kept. */
 .lq-foe-art {
   width: 186px;
   height: 244px;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
-  font-size: 5.4rem;
-  line-height: 1;
-  color: rgba(255, 255, 255, 0.82);
-  background: linear-gradient(180deg, #16121f 0%, #0a0712 78%);
-  border: 2px solid rgba(255, 217, 138, 0.3);
-  border-bottom: none;
-  border-radius: 94px 94px 8px 8px;
-  box-shadow: 0 0 70px rgba(255, 217, 138, 0.2), inset 0 26px 40px rgba(255, 255, 255, 0.06);
-  text-shadow: 0 3px 14px rgba(0, 0, 0, 0.8);
+  background: radial-gradient(ellipse 60% 30% at 50% 98%, rgba(255, 217, 138, 0.22), transparent 70%);
+}
+
+/* A drawn person, not a glyph in a box. The svg is an 18x24 pixel grid, so it
+   scales by whole pixels and must never be smoothed -- crispEdges is on the
+   element itself, and this keeps the browser from resampling it on the way up. */
+.lq-person {
+  width: 100%;
+  height: 100%;
+  display: block;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 6px 0 rgba(0, 0, 0, 0.45));
 }
 
 .lq-foe-bar {
@@ -1047,12 +1042,22 @@
   text-align: left;
 }
 .lq-menu .lq-mi + .lq-mi { box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.35); }
+/* DRAWN, NOT TYPED. This was a 'B8' glyph, which Press Start 2P does not
+   have -- so it fell back to tofu: a hollow box, wider than the arrow it stood
+   in for, landing on top of the label. A pixel font covers very little beyond
+   ASCII, so anything decorative has to be a shape rather than a character. */
 .lq-menu .lq-mi::before {
-  content: 'B8';
+  content: '';
   position: absolute;
-  left: 0.85rem;
+  left: 0.9rem;
+  top: 50%;
+  margin-top: -5px;
+  width: 0;
+  height: 0;
+  border-left: 7px solid var(--lqGold);
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
   opacity: 0;
-  color: var(--lqGold);
   transition: opacity 0.1s steps(2);
 }
 .lq-menu .lq-mi:hover::before,
@@ -1060,7 +1065,7 @@
 .lq-menu .lq-mi:hover,
 .lq-menu .lq-mi:focus-visible { background: var(--lqPanelHi); }
 .lq-menu .lq-mi.is-danger:hover { background: #5c2f38; }
-.lq-menu .lq-mi.is-danger:hover::before { color: var(--lqHot); }
+.lq-menu .lq-mi.is-danger:hover::before { border-left-color: var(--lqHot); }
 .lq-menu .lq-mi.is-off:hover { background: transparent; }
 .lq-menu .lq-mi.is-off:hover::before { opacity: 0; }
 
