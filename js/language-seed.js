@@ -297,7 +297,7 @@ function langAddSamplePack() {
   const res = { words: 0, sets: 0, scenarios: 0, skipped: 0 };
 
   const haveTerm = (t) => langWords().some(w =>
-    LANG_CODES.some(c => (w.forms[c].term || '').toLowerCase() === t.toLowerCase()));
+    LANG_CODES.some(c => (langForm(w, c).term || '').toLowerCase() === t.toLowerCase()));
   LANG_SAMPLE_WORDS.forEach(w => {
     if (haveTerm(w.ceb.t)) { res.skipped++; return; }
     if (langSaveWord(_langSeedWord(w))) res.words++;

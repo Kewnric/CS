@@ -95,9 +95,9 @@ function langWordListHTML() {
     .map(w => `
       <tr>
         <td><strong>${escapeHTML(langHeadword(w, study))}</strong></td>
-        <td>${LANG_CODES.map(c => (w.forms[c].term || '').trim()
+        <td>${LANG_CODES.map(c => (langForm(w, c).term || '').trim()
               ? `<span class="lang-mini-pill">${escapeHTML(langShort(c))}</span>` : '').join('') || '<em>empty</em>'}</td>
-        <td>${escapeHTML((w.forms[study] && w.forms[study].pos) || '')}</td>
+        <td>${escapeHTML(langForm(w, study).pos || '')}</td>
         <td class="lang-admin-actions">
           <button class="btn btn-ghost btn-sm" onclick="langEditWordDraft('${w.id}')" title="Edit"><i data-lucide="pencil"></i></button>
           <button class="btn btn-ghost btn-sm" onclick="langAdminDeleteWord('${w.id}')" title="Delete"><i data-lucide="trash-2"></i></button>
@@ -147,7 +147,7 @@ function langWordFormHTML() {
           Fill in whichever languages you know it in — a blank one is simply not shown.
           The library compares whichever two you have selected.
         </p>
-        ${LANGS.map(l => langFormFieldsHTML(l.code, w.forms[l.code])).join('')}
+        ${LANGS.map(l => langFormFieldsHTML(l.code, langForm(w, l.code))).join('')}
       </div>
     </div>
     <div class="modal-actions" style="justify-content:flex-end; gap:0.5rem;">

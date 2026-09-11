@@ -153,6 +153,26 @@ function langFindWord(id) {
  * anything at all — a half-filled entry should still be findable rather than
  * appearing as a blank row you cannot click.
  */
+/**
+ * One language's form of a word, whether or not the record has it.
+ *
+ * langBlankWord fills all four and langNormWord repairs anything missing, but
+ * langNormWord only runs on SAVE and on EDIT -- langWords() hands back whatever
+ * is in state, raw. So every reader that walked w.forms[c].term was trusting a
+ * shape nothing guarantees on the read path, and a word missing one language --
+ * from an import, an older build, or a half-written record -- threw on the spot.
+ * Measured: the admin word list, which is the page that shows every word,
+ * crashed to 11 nodes with 'Cannot read properties of undefined'.
+ *
+ * A named accessor rather than a guard at each call site, because the guards
+ * were already there at four sites and missing at three, which is exactly what
+ * that pattern does over time.
+ */
+function langForm(w, code) {
+  const f = w && w.forms && w.forms[code];
+  return (f && typeof f === 'object') ? f : langBlankForm();
+}
+
 function langHeadword(w, code) {
   if (!w || !w.forms) return 'Untitled';
   const order = [code || langStudy(), langRef()].concat(LANG_CODES);
@@ -218,7 +238,7 @@ function langMatches(w, q) {
   if (!q) return true;
   const needle = q.toLowerCase();
   return LANG_CODES.some(c => {
-    const f = w.forms[c];
+    const f = langForm(w, c);
     if (!f) return false;
     if ((f.term || '').toLowerCase().includes(needle)) return true;
     if ((f.definition || '').toLowerCase().includes(needle)) return true;
@@ -880,17 +900,18 @@ function langRandomEnemy(nearLocation) {
 function langEnemyFromWords() {
   const study = langStudy(), ref = langRef();
   const usable = langWords().filter(w =>
-    (w.forms[study] && w.forms[study].term.trim()) && (w.forms[ref] && w.forms[ref].term.trim()));
+    langForm(w, study).term.trim() && langForm(w, ref).term.trim());
   if (usable.length < 2) return null;
 
   const picked = langShuffle(usable).slice(0, Math.min(4, usable.length));
   const turns = picked.map(w => {
     const wrong = langShuffle(usable.filter(x => x.id !== w.id)).slice(0, 3)
-      .map(x => ({ text: x.forms[study].term, correct: false, note: 'That one means "' + x.forms[ref].term + '".' }));
-    const right = { text: w.forms[study].term, correct: true, note: w.forms[study].definition || '' };
+      .map(x => ({ text: langForm(x, study).term, correct: false,
+                   note: 'That one means "' + langForm(x, ref).term + '".' }));
+    const right = { text: langForm(w, study).term, correct: true, note: langForm(w, study).definition || '' };
     return {
       situation: 'They are waiting for the word.',
-      line: w.forms[ref].term + '?',
+      line: langForm(w, ref).term + '?',
       options: langShuffle(wrong.concat([right])),
       damage: 25,
       backlash: 18
@@ -919,7 +940,7 @@ function langRunBlocker() {
   const ready = (e) => (e.line || '').trim() && (e.options || []).some(o => (o.text || '').trim() && o.correct);
   const hasScenario = langScenarios().some(s => (s.encounters || []).some(ready));
   const pairs = langWords().filter(w =>
-    (w.forms[study] && w.forms[study].term.trim()) && (w.forms[ref] && w.forms[ref].term.trim())).length;
+    langForm(w, study).term.trim() && langForm(w, ref).term.trim()).length;
   if (!hasScenario && pairs < 2) {
     return 'You need either a written scenario, or at least two words that have both a '
       + langName(study) + ' and a ' + langName(ref) + ' term.';

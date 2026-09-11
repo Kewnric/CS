@@ -226,13 +226,13 @@ function langDictionaryHTML() {
   const study = langStudy(), ref = langRef();
   let list = langWords().filter(w => langMatches(w, langQuery));
   if (langTagFilter) list = list.filter(w => (w.tags || []).includes(langTagFilter));
-  if (langPosFilter) list = list.filter(w => (w.forms[study] || {}).pos === langPosFilter);
+  if (langPosFilter) list = list.filter(w => langForm(w, study).pos === langPosFilter);
   list = list.slice().sort((a, b) =>
     langHeadword(a, study).localeCompare(langHeadword(b, study), undefined, { sensitivity: 'base' }));
 
   const rows = list.map(w => {
-    const f = w.forms[study] || langBlankForm();
-    const g = w.forms[ref] || langBlankForm();
+    const f = langForm(w, study);
+    const g = langForm(w, ref);
     const exCount = (f.examples || []).length + (g.examples || []).length;
     return `
       <div class="lang-entry">
@@ -297,7 +297,7 @@ function langFilterBarHTML() {
   const tags = langAllTags();
   const posUsed = [];
   langWords().forEach(w => {
-    const p = (w.forms[study] || {}).pos;
+    const p = langForm(w, study).pos;
     if (p && posUsed.indexOf(p) === -1) posUsed.push(p);
   });
   return `
@@ -345,7 +345,7 @@ function langShowExamples(id) {
   const w = langFindWord(id);
   if (!w) return;
   const body = LANG_CODES.map(c => {
-    const f = w.forms[c];
+    const f = langForm(w, c);
     if (!f || !(f.examples || []).length) return '';
     return `
       <div class="lang-pop-lang">
@@ -365,7 +365,7 @@ function langShowNotes(id) {
   const w = langFindWord(id);
   if (!w) return;
   const body = LANG_CODES.map(c => {
-    const f = w.forms[c];
+    const f = langForm(w, c);
     if (!f || (!f.notes && !f.restrictions)) return '';
     return `
       <div class="lang-pop-lang">
@@ -438,7 +438,7 @@ function langCompareHTML() {
 }
 
 function langFormColumnHTML(w, code, isStudy) {
-  const f = w.forms[code] || langBlankForm();
+  const f = langForm(w, code);
   const empty = !(f.term || '').trim();
   return `
     <div class="lang-col${isStudy ? ' is-study' : ''}${empty ? ' is-empty' : ''}">
@@ -468,7 +468,7 @@ function langFormColumnHTML(w, code, isStudy) {
 
 function langOtherLangsHTML(w, shown) {
   const rest = LANG_CODES.filter(c => shown.indexOf(c) === -1);
-  const filled = rest.filter(c => (w.forms[c].term || '').trim());
+  const filled = rest.filter(c => (langForm(w, c).term || '').trim());
   if (!filled.length) return '';
   return `
     <h2 class="prog-detail-section-title" style="margin-top:1.5rem;"><i data-lucide="languages"></i> Also recorded</h2>
@@ -476,7 +476,7 @@ function langOtherLangsHTML(w, shown) {
       ${filled.map(c => `
         <button class="lang-other" type="button" onclick="langSetStudy('${c}')" title="Switch to ${escapeHTML(langName(c))}">
           <span class="lang-col-code">${escapeHTML(langShort(c))}</span>
-          <span class="lang-other-term">${escapeHTML(w.forms[c].term)}</span>
+          <span class="lang-other-term">${escapeHTML(langForm(w, c).term)}</span>
         </button>`).join('')}
     </div>`;
 }
