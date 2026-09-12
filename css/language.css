@@ -562,6 +562,68 @@
 .lang-board-title:first-child { margin-top: 0; }
 .lang-board-title i, .lang-board-title svg { width: 13px; height: 13px; }
 
+/* --- Collapsible sections ---
+   The heading became a button, so it needs every one of the UA's button
+   defaults undone: without font: inherit it renders in the system face at
+   13px and the whole board changes shape. Nothing below alters how the
+   heading looks -- only what it can do. */
+.lang-board-title {
+  background: none;
+  border: 0;
+  padding: 0;
+  width: 100%;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.lang-board-title:hover { color: var(--text-secondary); }
+.lang-board-title:focus-visible {
+  outline: 2px solid var(--accent-primary, var(--text-secondary));
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+/* Same spring as the tree's chevron in the coding library, so the two
+   libraries open the same way. */
+.lang-board-caret {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.lang-board-caret.expanded { transform: rotate(90deg); }
+
+/* And the same open: rows from 0fr to 1fr, which animates a height nobody
+   has to measure, with the content fading in just behind the space. */
+.lang-board-group {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+.lang-board-group.collapsed {
+  grid-template-rows: 0fr;
+  /* The board is a flex column with a gap, and that gap is still paid around
+     a zero-height child. Take one back so two closed sections sit as close
+     as two headings used to. */
+  margin-bottom: -0.4rem;
+}
+.lang-board-group-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;            /* the gap .lang-board used to give these cards */
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity 0.7s ease 0.08s;
+}
+.lang-board-group.collapsed .lang-board-group-inner {
+  opacity: 0;
+  transition: opacity 0.7s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lang-board-caret,
+  .lang-board-group,
+  .lang-board-group-inner { transition: none !important; }
+}
+
 .lang-card {
   display: flex;
   align-items: center;
@@ -623,14 +685,19 @@
   padding: 0.1rem 0.42rem;
 }
 
+/* The button that stood here moved to the header, so this is one line of
+   text now and does not need the room a button needed under it. */
 .lang-board-foot {
-  padding: 1rem 0.6rem 1.5rem;
+  padding: 0.75rem 0.6rem 1.25rem;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
   align-items: flex-start;
 }
 .lang-board-hint { font-size: 0.68rem; color: var(--text-tertiary); }
+
+/* Sits in the header's corner, away from the title and the Back button. */
+.lang-admin-btn { margin-left: auto; flex-shrink: 0; }
 
 /* ── Dictionary entries ───────────────────────────────────── */
 

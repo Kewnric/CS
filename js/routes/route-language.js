@@ -18,6 +18,50 @@ let langQuery = '';
 let langTagFilter = null;
 let langPosFilter = null;
 
+/* Which board sections are open.
+   Collapsed on arrival, every arrival — the board is a menu of eleven cards
+   across three unrelated jobs, and the whole point of the headings is to let
+   you skip the two you did not come for. Deliberately not persisted, for the
+   same reason the coding library's tree collapses when you leave it: coming
+   back to yesterday's open sections is somebody else's shape, not yours. */
+let langBoardOpen = { dictionary: false, drills: false, adventure: false };
+
+function langBoardReset() {
+  langBoardOpen = { dictionary: false, drills: false, adventure: false };
+}
+
+/** Paint one section's open or closed state onto the DOM already there. */
+function langPaintBoardSection(key) {
+  const open = !!langBoardOpen[key];
+  const group = document.querySelector('.lang-board-group[data-section="' + key + '"]');
+  const head = document.querySelector('.lang-board-title[data-section="' + key + '"]');
+  if (group) group.classList.toggle('collapsed', !open);
+  if (head) {
+    head.setAttribute('aria-expanded', open ? 'true' : 'false');
+    const caret = head.querySelector('.lang-board-caret');
+    if (caret) caret.classList.toggle('expanded', open);
+  }
+}
+
+/**
+ * Open one section and close the rest; clicking the open one closes it.
+ *
+ * One at a time, because all three open is the wall of cards the headings
+ * exist to break up — and because with three open the one you want scrolls
+ * off, which is worse than the flat list this replaced.
+ *
+ * Flips classes in place rather than re-rendering the board: the open and the
+ * close are a CSS grid-rows transition, and an element replaced mid-animation
+ * simply appears at its new size. Closing the others by the same route is
+ * what makes the two halves animate together rather than one snapping shut.
+ */
+function langToggleBoardSection(key) {
+  if (!(key in langBoardOpen)) return;
+  const open = !langBoardOpen[key];
+  Object.keys(langBoardOpen).forEach(k => { langBoardOpen[k] = (k === key) ? open : false; });
+  Object.keys(langBoardOpen).forEach(langPaintBoardSection);
+}
+
 function languageTemplate() {
   return `
     <div class="messenger-layout" id="lang-lib-root">
@@ -37,6 +81,17 @@ function languageTemplate() {
                 <span class="section-header-subtitle" id="lang-header-stats"></span>
               </span>
             </h2>
+            ${/* Authoring lives in Admin, and the way there used to be a
+                 full-width button under the board — below eleven cards, so
+                 you scrolled past everything to reach it. It is an icon in
+                 the header now, in the corner every other pane keeps its
+                 settings in. */ ''}
+            <button class="ag-icon-btn lang-admin-btn" type="button"
+                    onclick="spaNavigate('admin-language')"
+                    title="Manage in Admin — write words, drills and scenarios"
+                    aria-label="Manage in Admin">
+              <i data-lucide="settings"></i>
+            </button>
           </div>
           <div id="lang-pair-bar"></div>
         </div>
@@ -51,6 +106,7 @@ function languageTemplate() {
 
 function languageInit() {
   langStore();
+  langBoardReset();
   langView = getSessionParam('langView') || 'dictionary';
   langViewArg = getSessionParam('langViewArg') || null;
   const target = getSessionParam('langActiveWord');
@@ -167,6 +223,27 @@ function langBoardCard(view, arg, icon, name, desc, chip, cls) {
     </button>`;
 }
 
+/**
+ * One collapsible section of the board: its heading, and the cards under it.
+ *
+ * The heading is a button rather than an h3 because it now does something, and
+ * a heading you can only reach with a mouse is a control half the people using
+ * it cannot press. It still looks exactly like the heading it replaced.
+ */
+function langBoardSection(key, icon, label, cards) {
+  const open = !!langBoardOpen[key];
+  return `
+    <button class="lang-board-title" type="button" data-section="${key}"
+            aria-expanded="${open ? 'true' : 'false'}"
+            onclick="langToggleBoardSection('${key}')">
+      <i data-lucide="chevron-right" class="lang-board-caret${open ? ' expanded' : ''}"></i>
+      <i data-lucide="${icon}"></i> ${escapeHTML(label)}
+    </button>
+    <div class="lang-board-group${open ? '' : ' collapsed'}" data-section="${key}" role="group">
+      <div class="lang-board-group-inner">${cards}</div>
+    </div>`;
+}
+
 function renderLangBoard() {
   const host = document.getElementById('lang-board');
   if (!host) return;
@@ -195,30 +272,27 @@ function renderLangBoard() {
           </span>
           <i data-lucide="download" class="lang-seed-banner-go"></i>
         </button>` : ''}
-      <h3 class="lang-board-title"><i data-lucide="book-a"></i> Dictionary</h3>
-      ${langBoardCard('dictionary', null, 'library-big', 'Dictionary',
-        'Every entry with its meaning, and its example sentences a tap away.', `${words}`)}
-      ${langBoardCard('compare', null, 'columns-2', 'Search & compare',
-        'Find a word and read it in two languages side by side.', '')}
+      ${langBoardSection('dictionary', 'book-a', 'Dictionary',
+        langBoardCard('dictionary', null, 'library-big', 'Dictionary',
+          'Every entry with its meaning, and its example sentences a tap away.', `${words}`)
+        + langBoardCard('compare', null, 'columns-2', 'Search & compare',
+          'Find a word and read it in two languages side by side.', ''))}
 
-      <h3 class="lang-board-title"><i data-lucide="dumbbell"></i> Drills</h3>
-      ${LANG_PUZZLE_TYPES.map(p => {
-        const n = langTypeCount(p.type);
-        return langBoardCard('drill', p.type, p.icon, p.name, p.hint, `${n}`, n ? '' : 'is-empty');
-      }).join('')}
-      ${langBoardCard('sets', null, 'layers', 'Your drill sets',
-        'The sets you have written, run start to finish.', `${sets}`)}
+      ${langBoardSection('drills', 'dumbbell', 'Drills',
+        LANG_PUZZLE_TYPES.map(p => {
+          const n = langTypeCount(p.type);
+          return langBoardCard('drill', p.type, p.icon, p.name, p.hint, `${n}`, n ? '' : 'is-empty');
+        }).join('')
+        + langBoardCard('sets', null, 'layers', 'Your drill sets',
+          'The sets you have written, run start to finish.', `${sets}`))}
 
-      <h3 class="lang-board-title"><i data-lucide="swords"></i> Adventure</h3>
-      ${langBoardCard('run', null, 'footprints', 'Free run',
-        'Walk, meet people, and talk your way past them. Stamina is your health.', '')}
-      ${langBoardCard('scenarios', null, 'map', 'Scenarios',
-        'The encounters you have written, and who you meet in them.', `${scenes}`)}
+      ${langBoardSection('adventure', 'swords', 'Adventure',
+        langBoardCard('run', null, 'footprints', 'Free run',
+          'Walk, meet people, and talk your way past them. Stamina is your health.', '')
+        + langBoardCard('scenarios', null, 'map', 'Scenarios',
+          'The encounters you have written, and who you meet in them.', `${scenes}`))}
     </div>
     <div class="lang-board-foot">
-      <button class="btn btn-secondary btn-sm" type="button" onclick="spaNavigate('admin-language')">
-        <i data-lucide="settings" style="width:14px;height:14px;"></i> Manage in Admin
-      </button>
       <span class="lang-board-hint">Words, drills and scenarios are written in Admin.</span>
     </div>`;
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: host });
