@@ -1058,22 +1058,101 @@ details[open]>.snippet-folder-summary>.folder-icon {
   transition: color 0.25s ease;
 }
 
-/* The depth rail is already drawn per level below. Selection turns it into the
-   same travelling gradient the sidebar's rail uses, so the two selections in
-   the app read as one idea. */
+/* ── The selected row's right edge ─────────────────────────────
+   Selection used to repaint this rail cyan whatever the depth, which threw
+   away the one thing the rail is for: level 0 is cyan, level 1 purple, level
+   2 green, and selecting a purple folder turned it cyan and told you nothing.
+   Every level now carries its own --rail, and selection keeps it.
+
+   And it is a dither, not a bar. A 3px stripe of solid colour is the least
+   interesting thing a selected row could do; this widens into a small field
+   of pixels that thickens toward the edge -- sparse and transparent on the
+   left, solid at the right margin -- which is the same idea as the digital
+   ramp on a two-ended slider. Built from two offset dot grids so the pattern
+   does not read as a regular lattice, marched with steps() rather than a
+   linear slide, because a pixel that eases is not a pixel. */
+.tree-node[data-level="0"] > .tree-node-row { --rail: 34, 211, 238; }
+.tree-node[data-level="1"] > .tree-node-row { --rail: 168, 85, 247; }
+.tree-node[data-level="2"] > .tree-node-row { --rail: 34, 197, 94; }
+.tree-node[data-level="3"] > .tree-node-row { --rail: 245, 158, 11; }
+.tree-node[data-level="4"] > .tree-node-row,
+.tree-node[data-level="5"] > .tree-node-row { --rail: 239, 68, 68; }
+
 .tree-node[data-level] > .tree-node-row.active::after,
 .tree-node-row.active::after {
-  background: linear-gradient(180deg, #67e8f9 0%, #22d3ee 25%, #0891b2 50%, #22d3ee 75%, #67e8f9 100%);
-  background-size: 100% 200%;
+  --rail-c: rgba(var(--rail, 34, 211, 238), 1);
+  width: 26px;
+  top: 0;
+  bottom: 0;
+  border-radius: 0;
   opacity: 1;
   box-shadow: none;
-  animation: railFlow 2.4s linear infinite, railBreathe 2.4s ease-in-out infinite;
+  background-image:
+    /* the solid margin the pixels build up to */
+    linear-gradient(90deg, transparent 0 calc(100% - 3px), var(--rail-c) calc(100% - 3px) 100%),
+    /* two dot grids, offset from each other so the field looks scattered */
+    radial-gradient(circle at 50% 50%, var(--rail-c) 0 0.9px, transparent 1.1px),
+    radial-gradient(circle at 50% 50%, rgba(var(--rail, 34, 211, 238), 0.55) 0 0.8px, transparent 1px);
+  background-size: 100% 100%, 4px 4px, 5px 5px;
+  background-position: 0 0, 0 0, 2px 1px;
+  background-repeat: no-repeat, repeat, repeat;
+  /* The ramp: nothing at the left, everything at the right. This is what
+     makes it read as density rather than as a texture laid over a bar. */
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.22) 38%, rgba(0,0,0,0.72) 72%, #000 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.22) 38%, rgba(0,0,0,0.72) 72%, #000 100%);
+  animation: railDither 1.6s steps(4, end) infinite, railGlow 2.4s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .tree-node-row { transition: none !important; }
   .tree-node-row::after { transition: none !important; }
   .tree-node-row.active::after { animation: none !important; }
+}
+
+/* ── Picking several rows ──────────────────────────────────────
+   A ticked row is a different thing from the selected one: you can be looking
+   at one folder while five others are ticked for a batch change. So the tick
+   gets its own mark on the left, where the selected row's rail is on the
+   right, and the two can be true at once without fighting. */
+.tree-picking .tree-node-row {
+  cursor: copy;
+}
+.tree-picking .tree-node-row::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 50%;
+  width: 13px;
+  height: 13px;
+  margin-top: -6.5px;
+  border: 1.5px solid var(--border-color);
+  border-radius: 3px;
+  background: var(--bg-body);
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.18s var(--ease-spring);
+  z-index: 1;
+}
+.tree-picking .tree-node-row:hover::before { border-color: var(--color-primary); }
+.tree-picking .tree-node-row.tree-ticked::before {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  transform: scale(1.08);
+  /* A real check, as a background over the fill. Two crossed gradients were
+     the first attempt and they draw an X, which on a checkbox reads as
+     "excluded" -- the exact opposite of what a ticked row means. Not a mask
+     either: a mask applies to the whole pseudo-element, so it would take the
+     box and its border away and leave a bare tick floating.
+
+     The stroke is dark rather than a token because it sits on a saturated
+     accent fill, which is dark-on-bright in every theme this app has. */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path d='M2.6 6.3 L4.9 8.6 L9.4 3.7' fill='none' stroke='%230b1220' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-size: 11px 11px;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+/* Room for the box, so it does not sit on top of the chevron. */
+.tree-picking .tree-node-row { padding-left: 20px; }
+.tree-picking .tree-node-row.tree-ticked {
+  background: color-mix(in srgb, var(--color-primary) 12%, var(--bg-surface-hover));
 }
 
 .tree-node-row.active .tree-node-icon {

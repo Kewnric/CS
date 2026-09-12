@@ -115,6 +115,13 @@ function practiceTemplate() {
                       title="Walkthroughs" aria-label="Walkthroughs">
                 <i data-lucide="presentation"></i>
               </button>
+              <!-- And the whole shelf of them, without leaving the attempt.
+                   The button above shows the one that matches this program;
+                   this one is the list, the same as the Library's. -->
+              <button class="practice-desc-edit" onclick="demoOpenLibrary()"
+                      title="All walkthroughs" aria-label="All walkthroughs">
+                <i data-lucide="layout-grid"></i>
+              </button>
               <button class="practice-desc-edit" id="practice-desc-speak" onclick="practiceSpeakDescription()"
                       title="Read this description aloud" aria-label="Read this description aloud">
                 <i data-lucide="volume-2"></i>

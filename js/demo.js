@@ -473,6 +473,14 @@ function demoShellHTML(lesson, auto) {
         <div class="demo-head-actions">
           ${auto ? `<button type="button" class="demo-ghost" onclick="demoSetAuto(false);demoClose();"
                 title="Stop walkthroughs opening on their own">Don't show these</button>` : ''}
+          ${/* From inside a lesson to all of them. Opening a walkthrough from
+               an attempt used to be a dead end -- you got the one lesson that
+               matched the program and had no way through to the other 37
+               without leaving the attempt for the library first. */ ''}
+          <button type="button" class="demo-icon-btn" onclick="demoBrowseAll()"
+                  title="All walkthroughs" aria-label="All walkthroughs">
+            <i data-lucide="layout-grid"></i>
+          </button>
           <button type="button" class="demo-icon-btn demo-voice-btn" id="demo-voice-btn"
                   onclick="demoToggleVoice()" oncontextmenu="demoVoiceMenu(event)"
                   aria-pressed="false" aria-haspopup="true" aria-label="Read the walkthrough aloud">
@@ -776,6 +784,17 @@ function demoShowForCurrent() {
   const lesson = ch ? demoMatchFor(ch, v) : null;
   if (lesson) demoOpen(lesson.id);
   else demoOpenLibrary();
+}
+
+/**
+ * Leave the lesson you are in for the list of all of them.
+ *
+ * Closes silently, so stepping out to browse does not mark a walkthrough you
+ * only glanced at as seen -- closing it deliberately still does.
+ */
+function demoBrowseAll() {
+  demoClose(true);
+  demoOpenLibrary();
 }
 
 /** Keep the practice button labelled with what it will actually do. */

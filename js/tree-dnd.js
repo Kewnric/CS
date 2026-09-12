@@ -711,12 +711,75 @@ function treeStaggerIn(container) {
 
 /** The one place a tree row becomes selected. */
 function treeApplySelection(container, selectedId) {
+  const ns = container.dataset ? container.dataset.treeNs : null;
+  const host = (ns && TREE_HOSTS[ns]) || {};
+  const selNs = host.selectNs;
+  const picking = !!(selNs && typeof libSelectMode === 'function' && libSelectMode(selNs));
+  container.classList.toggle('tree-picking', picking);
   container.querySelectorAll('.tree-node-row').forEach(row => {
     const on = selectedId != null && row.dataset.nodeId === String(selectedId);
     row.classList.toggle('active', on);
     if (on) row.setAttribute('aria-selected', 'true');
     else row.removeAttribute('aria-selected');
+    /* Ticked rows are a separate mark from the selected one: you can be
+       looking at one folder while five others are ticked for a batch change,
+       and collapsing those two states into one class made the batch invisible
+       the moment you clicked anything. */
+    const ticked = picking && typeof libIsSelected === 'function' && libIsSelected(selNs, row.dataset.nodeId);
+    row.classList.toggle('tree-ticked', !!ticked);
+    if (picking) row.setAttribute('aria-checked', ticked ? 'true' : 'false');
+    else row.removeAttribute('aria-checked');
   });
+}
+
+/* ── Picking several rows at once ──────────────────────────────
+   The selection machinery already existed in library-common -- the card grids
+   used it and a multi-row drag already moved everything ticked. The tree had
+   no way IN to it: no way to turn the mode on from a row, and a click on a row
+   opened it whatever the mode said. So the one place you organise a library
+   was the one place you could not organise it in bulk.
+
+   Clicks are caught here on the capture phase rather than by rewriting every
+   row's onclick, because there are four of those in the coding library alone
+   and one in each of the other trees, and they would drift.
+   ------------------------------------------------------------ */
+
+/** The namespace a tree row belongs to, or null when it is not in a tree. */
+function _treePickNs(el) {
+  const holder = el && el.closest ? el.closest('[data-tree-ns]') : null;
+  if (!holder) return null;
+  const host = TREE_HOSTS[holder.dataset.treeNs] || {};
+  return host.selectNs || null;
+}
+
+function treePickClick(e) {
+  const row = e.target && e.target.closest ? e.target.closest('.tree-node-row[data-node-id]') : null;
+  if (!row) return;
+  const selNs = _treePickNs(row);
+  if (!selNs || typeof libSelectMode !== 'function' || !libSelectMode(selNs)) return;
+  // The chevron still expands while picking — you have to be able to reach
+  // the rows inside a folder in order to tick them.
+  if (e.target.closest && e.target.closest('.tree-node-chevron')) return;
+  const id = row.dataset.nodeId;
+  if (!id || id === TREE_ROOT_ID) return;
+  e.preventDefault();
+  e.stopPropagation();
+  libToggleSelect(selNs, id);
+}
+document.addEventListener('click', treePickClick, true);
+
+/** Turn picking on or off for whichever tree this row is in. */
+function treeTogglePicking(ns) {
+  const host = TREE_HOSTS[ns] || {};
+  if (!host.selectNs || typeof libToggleSelectMode !== 'function') return;
+  libToggleSelectMode(host.selectNs);
+}
+
+/** Every ticked row in this tree. */
+function treePicked(ns) {
+  const host = TREE_HOSTS[ns] || {};
+  if (!host.selectNs || typeof libSelectedIds !== 'function') return [];
+  return libSelectedIds(host.selectNs);
 }
 
 /**
@@ -816,6 +879,17 @@ function treeContextMenu(e, id, ns) {
     _treeShowMenu(e, actions);
     return;
   }
+  /* Right-clicking a ticked row asks about the whole batch, not about the row
+     under the cursor. Anything that only makes sense for one thing is left
+     out: Rename, because a batch has no single title; Practice and Compare
+     with solution, because they open one attempt and would silently act on
+     whichever row you happened to be over. */
+  const picked = treePicked(ns);
+  if (picked.length && picked.indexOf(id) > -1) {
+    _treeShowMenu(e, treeBatchActions(ns, picked, host, scope));
+    return;
+  }
+
   if (host.onRename) actions.push({ icon: 'pencil', label: 'Rename', fn: () => host.onRename(id, found.kind) });
   actions.push({ icon: 'folder-input', label: 'Move to…', fn: () => treeMovePrompt(id, ns) });
   // Anything only this tree can offer (duplicate, share, pin, compare…).
@@ -826,12 +900,52 @@ function treeContextMenu(e, id, ns) {
   if (treeParentOf(id, scope)) {
     actions.push({ icon: 'corner-left-up', label: 'Move to top level', fn: () => treeApplyMove([id], ns, null, null) });
   }
+  if (host.selectNs && typeof libToggleSelectMode === 'function') {
+    actions.push({ sep: true });
+    const on = typeof libSelectMode === 'function' && libSelectMode(host.selectNs);
+    actions.push({
+      icon: on ? 'square' : 'list-checks',
+      label: on ? 'Stop selecting' : 'Select multiple',
+      fn: () => {
+        treeTogglePicking(ns);
+        // Turning it on from a row ticks that row: nobody enables selection
+        // mode in order to select nothing.
+        if (!on && typeof libToggleSelect === 'function') libToggleSelect(host.selectNs, id);
+      }
+    });
+  }
+
   if (host.onDelete) {
     actions.push({ sep: true });
     actions.push({ icon: 'trash-2', label: 'Delete', danger: true, fn: () => host.onDelete(id, found.kind) });
   }
 
   _treeShowMenu(e, actions);
+}
+
+/**
+ * The menu for a batch of ticked rows.
+ *
+ * Built from the host's own `batchActions` where it has them, so each library
+ * decides what can sensibly be done to several of its things at once, plus
+ * the moves and the delete, which every tree can do.
+ */
+function treeBatchActions(ns, ids, host, scope) {
+  const n = ids.length;
+  const out = [];
+  out.push({ icon: 'check-square', label: n + ' selected', fn: () => {} });
+  out.push({ sep: true });
+  out.push({ icon: 'folder-input', label: 'Move all to…', fn: () => treeMovePrompt(ids[0], ns, ids) });
+  if (ids.some(x => treeParentOf(x, scope))) {
+    out.push({ icon: 'corner-left-up', label: 'Move all to top level', fn: () => treeApplyMove(ids, ns, null, null) });
+  }
+  if (host.batchActions) (host.batchActions(ids) || []).forEach(a => out.push(a));
+  out.push({ sep: true });
+  out.push({ icon: 'square', label: 'Clear selection', fn: () => treeTogglePicking(ns) });
+  if (host.onBatchDelete) {
+    out.push({ icon: 'trash-2', label: 'Delete all ' + n, danger: true, fn: () => host.onBatchDelete(ids) });
+  }
+  return out;
 }
 
 /**
@@ -939,15 +1053,23 @@ function treePaneContextMenu(e, ns) {
 }
 
 /** "Move to…" — every folder in this tree, as a pickable list. */
-function treeMovePrompt(id, ns) {
+/**
+ * @param {string} id the row the move is anchored on -- its own subtree is
+ *   excluded from the destinations, so a folder cannot be moved into itself
+ * @param {string} ns which tree
+ * @param {string[]} [ids] a whole batch to move; defaults to just `id`
+ */
+function treeMovePrompt(id, ns, ids) {
   _treeNs = ns;
   const scope = treeScope(ns);
+  const moving = (ids && ids.length) ? ids : [id];
   treeCloseMenu();
   const options = [{ id: '', label: 'Top level', depth: 0 }];
   (function walk(parentId, depth) {
     treeChildren(parentId, scope).forEach(e => {
       if (e.kind !== 'folder') return;
-      if (e.node.id === id || treeIsAncestor(id, e.node.id, scope)) return;   // no cycles
+      // No cycles, and for a batch that means clear of EVERY folder in it.
+      if (moving.some(m => e.node.id === m || treeIsAncestor(m, e.node.id, scope))) return;
       options.push({ id: e.node.id, label: e.node.name, depth });
       walk(e.node.id, depth + 1);
     });
@@ -958,7 +1080,9 @@ function treeMovePrompt(id, ns) {
   overlay.className = 'modal-overlay fd-overlay';
   overlay.innerHTML = `
     <div class="modal-content fd-box" role="dialog" aria-modal="true" aria-label="Move to folder">
-      <h3 class="fd-title"><i data-lucide="folder-input"></i> Move “${escapeHTML(treeLabelOf(id, scope))}” to…</h3>
+      <h3 class="fd-title"><i data-lucide="folder-input"></i> ${moving.length > 1
+        ? 'Move ' + moving.length + ' items to…'
+        : 'Move “' + escapeHTML(treeLabelOf(id, scope)) + '” to…'}</h3>
       <div class="tree-move-list">
         ${options.map(o => `<button class="tree-move-opt" data-id="${o.id}" style="padding-left:${0.7 + o.depth * 0.8}rem;">
             <i data-lucide="${o.id ? 'folder' : 'corner-left-up'}" style="width:14px;height:14px;"></i> ${escapeHTML(o.label)}
@@ -973,7 +1097,7 @@ function treeMovePrompt(id, ns) {
   overlay.addEventListener('click', ev => { if (ev.target === overlay) close(); });
   overlay.addEventListener('keydown', ev => { if (ev.key === 'Escape') close(); });
   overlay.querySelectorAll('.tree-move-opt').forEach(btn => {
-    btn.onclick = () => { close(); treeApplyMove([id], ns, btn.dataset.id || null, null); };
+    btn.onclick = () => { close(); treeApplyMove(moving, ns, btn.dataset.id || null, null); };
   });
   const first = overlay.querySelector('.tree-move-opt');
   if (first) first.focus();

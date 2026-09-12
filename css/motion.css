@@ -548,6 +548,18 @@ textarea:focus-visible,
    ============================================================ */
 
 @keyframes railFlow { 0% { background-position: 0 0; } 100% { background-position: 0 -200%; } }
+
+/* The selected tree row's dither. Only the two dot layers move -- the solid
+   margin is the first background and stays put, or the whole edge would
+   crawl. Driven by steps(), so the pixels jump a whole cell at a time. */
+@keyframes railDither {
+  0%   { background-position: 0 0,  0 0,    2px 1px; }
+  100% { background-position: 0 0, -4px 4px, -3px 6px; }
+}
+@keyframes railGlow {
+  0%, 100% { filter: drop-shadow(-1px 0 3px rgba(var(--rail, 34, 211, 238), 0.35)); }
+  50%      { filter: drop-shadow(-2px 0 9px rgba(var(--rail, 34, 211, 238), 0.7)); }
+}
 @keyframes railBreathe {
   0%, 100% { opacity: 0.7; box-shadow: 2px 0 6px rgba(34, 211, 238, 0.35); }
   50% { opacity: 1; box-shadow: 3px 0 14px rgba(34, 211, 238, 0.75), 6px 0 26px rgba(34, 211, 238, 0.25); }

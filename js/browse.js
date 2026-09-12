@@ -2155,6 +2155,130 @@ function browseSetIcon(id) {
   }
 }
 
+/* ── The same edits, over a batch ─────────────────────────────
+   Each of these takes the ids the tree has ticked and walks them through the
+   single-row helper's own writer, so a batch cannot drift from what one row
+   does. A batch may hold folders and programs together -- browseBatchTargets
+   resolves either, and skips whichever kind an edit does not apply to rather
+   than throwing halfway through and leaving half the selection changed. */
+
+function browseBatchTargets(ids) {
+  return (ids || []).map(id => {
+    const item = browseFindItem(id);
+    if (item) return { id, kind: 'item', rec: item };
+    const folder = (state.nodes || []).find(n => n.id === id);
+    if (folder) return { id, kind: 'folder', rec: folder };
+    return null;
+  }).filter(Boolean);
+}
+
+function _browseBatchDone(n, what) {
+  saveData();
+  invalidateBrowseCache();
+  treeRefreshHosts();
+  if (typeof toast === 'function') {
+    toast(n ? what + ' for ' + n + ' item' + (n === 1 ? '' : 's') + '.' : 'Nothing to change.',
+      { type: n ? 'success' : 'info' });
+  }
+}
+
+function browseBatchColor(ids) {
+  const targets = browseBatchTargets(ids);
+  if (!targets.length) return;
+  const swatches = TREE_COLORS.map(c =>
+    '<button class="tree-color-swatch" title="' + c.name + '"' +
+    ' style="background:' + (c.id ? c.css : 'var(--bg-surface-hover)') + '"' +
+    ' data-color="' + c.id + '">' + (c.id ? '' : '✕') + '</button>').join('');
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay fd-overlay';
+  overlay.id = 'tree-color-dlg';
+  overlay.innerHTML = '<div class="modal-content fd-box" role="dialog" aria-label="Highlight colour">' +
+    '<h3 class="fd-title"><i data-lucide="palette"></i> Highlight colour for ' + targets.length + '</h3>' +
+    '<div class="tree-color-grid">' + swatches + '</div>' +
+    '<div class="fd-actions"><button class="btn btn-secondary btn-sm" id="tcd-close">Close</button></div></div>';
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  overlay.querySelector('#tcd-close').onclick = close;
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  overlay.querySelectorAll('.tree-color-swatch').forEach(btn => {
+    btn.onclick = () => {
+      const color = btn.dataset.color;
+      targets.forEach(t => { if (color) t.rec.color = color; else delete t.rec.color; });
+      close();
+      _browseBatchDone(targets.length, 'Colour set');
+    };
+  });
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: overlay });
+}
+
+function browseBatchIcon(ids) {
+  const targets = browseBatchTargets(ids);
+  if (!targets.length) return;
+  const apply = (v) => {
+    const name = (v || '').trim();
+    targets.forEach(t => { if (name) t.rec.icon = name; else delete t.rec.icon; });
+    _browseBatchDone(targets.length, name ? 'Icon set' : 'Icon cleared');
+  };
+  if (typeof showIconPicker === 'function') {
+    showIconPicker('Change icon for ' + targets.length, 'Search and pick one, or clear it.', '', apply);
+  } else {
+    showInputDialog('Change icon for ' + targets.length, 'A Lucide icon name, for example "rocket".', 'Icon', '', apply);
+  }
+}
+
+function browseBatchLevel(ids) {
+  // Levels live on programs. A folder in the selection is simply not levelled.
+  const targets = browseBatchTargets(ids).filter(t => t.kind === 'item');
+  if (!targets.length) {
+    if (typeof toast === 'function') toast('Levels apply to programs, and none are selected.', { type: 'info' });
+    return;
+  }
+  showInputDialog('Set level for ' + targets.length, 'A number used for sorting and filtering. Leave empty to clear.',
+    'Level', '', (v) => {
+      const n = parseInt(v, 10);
+      targets.forEach(t => { if (isNaN(n)) delete t.rec.level; else t.rec.level = n; });
+      _browseBatchDone(targets.length, isNaN(n) ? 'Level cleared' : 'Level set');
+    });
+}
+
+function browseBatchFavorite(ids, on) {
+  const targets = browseBatchTargets(ids).filter(t => t.kind === 'item');
+  if (!targets.length) {
+    if (typeof toast === 'function') toast('Favourites apply to programs, and none are selected.', { type: 'info' });
+    return;
+  }
+  targets.forEach(t => { t.rec.favorite = !!on; });
+  _browseBatchDone(targets.length, on ? 'Favourited' : 'Unfavourited');
+}
+
+function browseBatchDelete(ids) {
+  const targets = browseBatchTargets(ids);
+  if (!targets.length) return;
+  const items = targets.filter(t => t.kind === 'item');
+  const folders = targets.filter(t => t.kind === 'folder');
+  const parts = [];
+  if (items.length) parts.push(items.length + ' program' + (items.length === 1 ? '' : 's'));
+  if (folders.length) parts.push(folders.length + ' folder' + (folders.length === 1 ? '' : 's'));
+  showConfirm('Delete ' + parts.join(' and ') + '?',
+    'Deleting a folder deletes what is inside it. This can be undone from the toast.',
+    () => {
+      /* Programs first: deleting their folder out from under them would leave
+         the delete looking for rows that are already gone.
+
+         softDeleteFolder, not ctxDeleteFolder -- the latter opens its OWN
+         confirm dialog, so routing a batch through it would stack one
+         "Delete Folder?" prompt per folder on top of the one just answered. */
+      items.forEach(t => { if (typeof softDeleteChallenge === 'function') softDeleteChallenge(t.id, () => {}); });
+      folders.forEach(t => {
+        if (browseActiveNodeId === t.id) browseActiveNodeId = null;
+        if (typeof softDeleteFolder === 'function') softDeleteFolder(t.id, () => {});
+      });
+      if (typeof libToggleSelectMode === 'function' && libSelectMode('browse')) libToggleSelectMode('browse');
+      invalidateBrowseCache();
+      treeRefreshHosts();
+    });
+}
+
 function browseCollapseAll(collapse) {
   const folders = (state.nodes || []).filter(function (n) { return n.type === 'folder' && n.scope === 'challenge'; });
   state.expandedNodes = collapse ? [] : folders.map(function (f) { return f.id; }).concat('__root__');
@@ -2212,6 +2336,18 @@ registerTreeHost('browse', {
       { icon: 'git-compare', label: 'Compare with solution', fn: () => { if (typeof anOpenReview === 'function') anOpenReview(id); } }
     ];
   },
+  /* What can be done to several rows at once. Everything the single-row menu
+     offers EXCEPT the three that cannot mean anything in a batch: Rename, for
+     want of one title; Practice and Compare with solution, which open one
+     attempt and would quietly pick whichever row the cursor was over. */
+  batchActions: (ids) => ([
+    { icon: 'image', label: 'Change icon for all…', fn: () => browseBatchIcon(ids) },
+    { icon: 'palette', label: 'Highlight colour for all…', fn: () => browseBatchColor(ids) },
+    { icon: 'hash', label: 'Set level for all…', fn: () => browseBatchLevel(ids) },
+    { icon: 'star', label: 'Favourite all', fn: () => browseBatchFavorite(ids, true) },
+    { icon: 'star-off', label: 'Unfavourite all', fn: () => browseBatchFavorite(ids, false) }
+  ]),
+  onBatchDelete: (ids) => browseBatchDelete(ids),
   // Right-click the empty pane: what the rows show, and new folders.
   paneActions: () => ([
     { icon: 'folder-plus', label: 'New root folder', fn: () => { ctxTargetNodeId = null; ctxNewFolder(); } },

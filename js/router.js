@@ -152,18 +152,25 @@ const SpaRouter = (() => {
     // Update document title
     document.title = routeConfig.title || 'StudySession Pro';
 
-    // Toggle sidebar visibility
     const sidebar = document.querySelector('.app-sidebar');
     const spaContent = document.getElementById('spa-content');
     const focused = routeConfig.sidebarVisible === false;
-    if (sidebar) {
-      sidebar.style.display = focused ? 'none' : '';
-    }
-    // Focused routes are the attempt/result screens (practice, practice-set,
-    // solution, notebook session…). Flagging them on <body> lets chrome that
-    // belongs to the app shell — the settings FAB — stay out of an attempt.
-    document.body.classList.toggle('route-focused', focused);
-    document.body.dataset.route = hash;
+
+    /* THE SIDEBAR IS NOT TOGGLED HERE, AND THAT IS THE POINT.
+       It used to be, synchronously, while renderAndInit below is deferred
+       inside a View Transition. So leaving an attempt un-hid the sidebar a
+       frame or more before the attempt's own DOM was replaced: the attempt
+       visibly shrank to make room for a sidebar, and only then did the page
+       change. A flash of the next screen's chrome wearing the last screen's
+       content. Both now happen in the same commit -- see applyChrome(). */
+    const applyChrome = () => {
+      if (sidebar) sidebar.style.display = focused ? 'none' : '';
+      // Focused routes are the attempt/result screens (practice, practice-set,
+      // solution, notebook session…). Flagging them on <body> lets chrome that
+      // belongs to the app shell — the settings FAB — stay out of an attempt.
+      document.body.classList.toggle('route-focused', focused);
+      document.body.dataset.route = hash;
+    };
 
     // Close mobile sidebar overlay on every navigation (before the transition
     // snapshot so the sidebar isn't animated).
@@ -173,6 +180,9 @@ const SpaRouter = (() => {
     // View Transition (whose update callback is async), initFn/icons/reveal all
     // execute against the NEW DOM — never the stale previous route.
     const renderAndInit = () => {
+      // Chrome first, then content, both inside this one callback so the
+      // browser paints them together.
+      applyChrome();
       // Inject template
       if (spaContent && routeConfig.templateFn) {
         spaContent.innerHTML = routeConfig.templateFn();
