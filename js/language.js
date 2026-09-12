@@ -256,6 +256,8 @@ function langMatches(w, q) {
     if ((f.term || '').toLowerCase().includes(needle)) return true;
     if ((f.definition || '').toLowerCase().includes(needle)) return true;
     if ((f.notes || '').toLowerCase().includes(needle)) return true;
+    /* Restrictions are printed on the card, so they must be findable from it. */
+    if ((f.restrictions || '').toLowerCase().includes(needle)) return true;
     return (f.examples || []).some(e =>
       (e.text || '').toLowerCase().includes(needle) || (e.gloss || '').toLowerCase().includes(needle));
   }) || (w.tags || []).some(t => t.toLowerCase().includes(needle));

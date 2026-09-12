@@ -261,6 +261,7 @@ function langDictionaryHTML() {
             ${typeof agDeadlineTextHTML === 'function' ? agDeadlineTextHTML('langword', w.id) : ''}
           </div>
           <div class="lang-entry-def">${escapeHTML(f.definition || g.definition || 'No definition recorded.')}</div>
+          ${f.notes ? `<div class="lang-entry-note"><i data-lucide="sticky-note"></i> ${escapeHTML(f.notes)}</div>` : ''}
           ${f.restrictions ? `<div class="lang-entry-warn"><i data-lucide="alert-triangle"></i> ${escapeHTML(f.restrictions)}</div>` : ''}
         </div>
         <div class="lang-entry-tools">
@@ -296,7 +297,7 @@ function langDictionaryHTML() {
             <div class="prog-stat"><i data-lucide="book-a" style="width:13px;height:13px;"></i>
               <span class="prog-stat-body"><em>Entries</em><strong>${langWords().length}</strong></span></div>
             <div class="prog-stat"><i data-lucide="filter" style="width:13px;height:13px;"></i>
-              <span class="prog-stat-body"><em>Showing</em><strong>${list.length}</strong></span></div>
+              <span class="prog-stat-body"><em>Showing</em><strong id="lang-showing">${list.length}</strong></span></div>
             <div class="prog-stat"><i data-lucide="languages" style="width:13px;height:13px;"></i>
               <span class="prog-stat-body"><em>Reading</em><strong>${escapeHTML(langShort(study))} / ${escapeHTML(langShort(ref))}</strong></span></div>
           </div>
@@ -351,6 +352,11 @@ function langSetQuery(v) {
   fresh.innerHTML = langView === 'compare' ? langCompareHTML() : langDictionaryHTML();
   const next = fresh.querySelector('.lang-entries') || fresh.querySelector('.lang-compare-results');
   if (next) { host.innerHTML = next.innerHTML; if (typeof lucide !== 'undefined') lucide.createIcons({ root: host }); }
+  /* Only the list is swapped, to keep focus in the box -- so the count above it,
+     which lives outside that container, has to be carried over by hand. */
+  const count = document.getElementById('lang-showing');
+  const freshCount = fresh.querySelector('#lang-showing');
+  if (count && freshCount) count.textContent = freshCount.textContent;
 }
 
 function langSetTag(tag) { langTagFilter = langTagFilter === tag ? null : tag; renderLangDetail(); }
