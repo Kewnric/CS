@@ -1295,9 +1295,10 @@ function _langCebWord(r) {
  * a word you have edited is yours, and a starter pack that overwrites your own
  * definitions is a starter pack you can only safely run once.
  *
+ * @param {boolean} [quiet] Skip the save and the re-render, for langAddStarter.
  * @returns {{added:number, skipped:number, total:number}}
  */
-function langAddCebPack() {
+function langAddCebPack(quiet) {
   langStore();
   const res = { added: 0, skipped: 0, total: 0 };
   const have = new Set();
@@ -1310,29 +1311,13 @@ function langAddCebPack() {
     if (have.has(r.ceb.trim().toLowerCase())) { res.skipped++; return; }
     if (langSaveWord(_langCebWord(r))) { res.added++; have.add(r.ceb.trim().toLowerCase()); }
   });
-  saveData();
-  if (typeof langRefreshViews === 'function') langRefreshViews();
+  if (!quiet) {
+    saveData();
+    if (typeof langRefreshViews === 'function') langRefreshViews();
+  }
   return res;
 }
 
-/** The button. Confirms first, because it writes several hundred records. */
-function langLoadCebPack() {
-  const size = langCebPackSize();
-  const groups = LANG_CEB_PACK.length;
-  const already = langWords().length;
-  showConfirm('Add the Cebuano core pack?',
-    size + ' Cebuano words across ' + groups + ' topics, each with an English gloss, '
-    + 'a description of how it is actually used, and an example sentence. '
-    + 'Nothing is replaced — anything you already have by the same Cebuano term is skipped.'
-    + (already ? ' You currently have ' + already + ' word' + (already === 1 ? '' : 's') + '.' : ''),
-    () => {
-      const r = langAddCebPack();
-      if (typeof toast === 'function') {
-        toast(r.added
-          ? 'Added ' + r.added + ' Cebuano words.'
-            + (r.skipped ? ' ' + r.skipped + ' were already there.' : '')
-          : 'Every word in the pack was already there.',
-          { type: r.added ? 'success' : 'info', duration: 6000 });
-      }
-    });
-}
+/* The button that installs this lives in language-seed.js as langLoadStarter,
+   with the drill sets and the scenarios, because from outside there is one
+   starter pack, not two. */

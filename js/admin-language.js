@@ -23,14 +23,10 @@ function adminLanguageTemplate() {
         </div>
         <div class="lang-admin-head">
           <div class="lang-tabs lang-tabs-admin" id="lang-admin-tabs"></div>
-          <button class="btn btn-secondary btn-sm" type="button" onclick="langLoadSamplePack()"
-                  title="Ten words, ten drill sets and ten scenarios — nothing is replaced">
-            <i data-lucide="sparkles" style="width:14px;height:14px;"></i> Sample pack
-          </button>
-          <button class="btn btn-primary btn-sm" type="button" onclick="langLoadCebPack()"
-                  title="The Cebuano core vocabulary — nothing you already have is replaced">
-            <i data-lucide="library" style="width:14px;height:14px;"></i>
-            Cebuano core (${typeof langCebPackSize === 'function' ? langCebPackSize() : 0})
+          <button class="btn btn-primary btn-sm" type="button" onclick="langLoadStarter()"
+                  title="The Cebuano vocabulary, ten drill sets and ten scenarios — nothing you already have is replaced">
+            <i data-lucide="sparkles" style="width:14px;height:14px;"></i>
+            Starter pack (${typeof langStarterSize === 'function' ? langStarterSize() : 0} words)
           </button>
         </div>
         <div id="lang-admin-body"></div>

@@ -290,9 +290,11 @@ function _langSeedScenarios() {
 
 /**
  * Add the pack, skipping anything already present by name.
+ * @param {boolean} [quiet] Skip the save and the re-render — for a caller that
+ *                          runs several installs and wants one of each at the end.
  * @returns {{words:number, sets:number, scenarios:number, skipped:number}}
  */
-function langAddSamplePack() {
+function langAddSamplePack(quiet) {
   langStore();
   const res = { words: 0, sets: 0, scenarios: 0, skipped: 0 };
 
@@ -315,20 +317,72 @@ function langAddSamplePack() {
     if (langSaveScenario(s)) res.scenarios++;
   });
 
-  saveData();
-  langRefreshViews();
+  if (!quiet) { saveData(); langRefreshViews(); }
   return res;
 }
 
-/** The button in Language Admin. Confirms first — it writes to your store. */
-function langLoadSamplePack() {
+
+/* ── The one starter pack ─────────────────────────────────────
+   There used to be two buttons side by side — "Sample pack" and "Cebuano
+   core" — which asked the reader to know the difference between two things
+   they had not seen yet. There is one pack now, and it installs whatever is
+   missing: the vocabulary, the drill sets and the scenarios.
+
+   The ten sample words go in FIRST, on purpose. They carry all four
+   languages, and both installs skip a term that is already there — so
+   whichever runs first is the version that survives. The richer one should.
+   ------------------------------------------------------------ */
+
+/**
+ * Everything the library needs to be usable, skipping anything already there.
+ * @returns {{words:number, sets:number, scenarios:number, skipped:number}}
+ */
+function langAddStarter() {
+  langStore();
+  const sample = langAddSamplePack(true);
+  const ceb = (typeof langAddCebPack === 'function')
+    ? langAddCebPack(true)
+    : { added: 0, skipped: 0 };
+  saveData();
+  langRefreshViews();
+
+  const words = sample.words + ceb.added;
+  /* Skipped means "you already had it", so it is measured against what the
+     pack offers, not against the two installs' own counts. Adding those would
+     report the ten sample words as already there on a first run into an empty
+     library -- they were, but only because this same run had just put them in. */
+  const skipped = (langStarterSize() - words)
+                + (LANG_SAMPLE_WORDS.length - sample.sets)
+                + (LANG_SAMPLE_SCENARIOS.length - sample.scenarios);
+  return { words: words, sets: sample.sets, scenarios: sample.scenarios, skipped: skipped };
+}
+
+/**
+ * How many words the pack holds, for the buttons that name the number.
+ *
+ * The union, not the sum: every one of the ten sample words is also in the
+ * Cebuano pack, so adding the two counts together would promise ten words
+ * that never arrive.
+ */
+function langStarterSize() {
+  if (typeof LANG_CEB_PACK === 'undefined') return LANG_SAMPLE_WORDS.length;
+  const terms = new Set();
+  LANG_CEB_PACK.forEach(g => g.w.forEach(r => terms.add(String(r[0]).trim().toLowerCase())));
+  LANG_SAMPLE_WORDS.forEach(w => terms.add(String(w.ceb.t).trim().toLowerCase()));
+  return terms.size;
+}
+
+/** The starter-pack button, wherever it appears. Confirms — it writes to your store. */
+function langLoadStarter() {
+  const size = langStarterSize();
   const already = langWords().length + langSets().length + langScenarios().length;
   showConfirm('Add the starter pack?',
-    'Ten words, ten drill sets and ten scenarios are added to your Language Library. '
-    + 'Nothing is replaced — anything already there by name is skipped.'
+    size + ' words — each with how it is really used and an example sentence — '
+    + 'plus ten drill sets and ten scenarios to practise against. '
+    + 'Nothing is replaced: anything you already have by the same term or title is skipped.'
     + (already ? ' You currently have ' + already + ' entr' + (already === 1 ? 'y' : 'ies') + '.' : ''),
     () => {
-      const r = langAddSamplePack();
+      const r = langAddStarter();
       const added = r.words + r.sets + r.scenarios;
       if (typeof toast === 'function') {
         toast(added

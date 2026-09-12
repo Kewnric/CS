@@ -107,23 +107,25 @@ function langSwapPair() {
  * reason a page is empty — the offer belongs beside the emptiness it fixes.
  */
 function langSeedOfferHTML(line) {
-  if (typeof langLoadSamplePack !== 'function') return '';
+  if (typeof langLoadStarter !== 'function') return '';
+  /* The sidebar banner offers the same pack from the same screen, and two
+     buttons for one pack is the thing being fixed. When the banner is up this
+     still says what is missing — it just does not repeat the button. */
+  const bannerUp = !langWords().length || (!langSets().length && !langScenarios().length);
   return `
     <div class="lang-seed-offer">
       <i data-lucide="sparkles"></i>
       <div class="lang-seed-body">
         <strong>Nothing here yet</strong>
-        <span>${escapeHTML(line || 'Start with the Cebuano core vocabulary — every word with a description of how it is really used and an example sentence. The sample pack adds drill sets and scenarios on top. Nothing you already have is replaced.')}</span>
+        <span>${escapeHTML(line || 'The starter pack brings the Cebuano vocabulary — every word with a description of how it is really used and an example sentence — plus the drill sets and scenarios to practise it against. Nothing you already have is replaced.')}</span>
       </div>
+      ${bannerUp ? '' : `
       <div class="lang-seed-actions">
-        <button class="btn btn-primary btn-sm" type="button" onclick="langLoadCebPack()">
-          <i data-lucide="library" style="width:14px;height:14px;"></i>
-          Cebuano core (${typeof langCebPackSize === 'function' ? langCebPackSize() : 0} words)
+        <button class="btn btn-primary btn-sm" type="button" onclick="langLoadStarter()">
+          <i data-lucide="sparkles" style="width:14px;height:14px;"></i>
+          Starter pack (${typeof langStarterSize === 'function' ? langStarterSize() : 0} words)
         </button>
-        <button class="btn btn-secondary btn-sm" type="button" onclick="langLoadSamplePack()">
-          <i data-lucide="download" style="width:14px;height:14px;"></i> Sample pack
-        </button>
-      </div>
+      </div>`}
     </div>`;
 }
 
@@ -174,23 +176,22 @@ function renderLangBoard() {
 
   host.innerHTML = `
     <div class="lang-board">
-      ${/* Offers what is actually missing. It used to advertise "10 words" to
-           somebody who already had four hundred, because it only ever checked
-           the sets and the scenarios. */ ""}
-      ${!words ? `
-        <button class="lang-seed-banner" type="button" onclick="langLoadCebPack()">
-          <i data-lucide="library"></i>
-          <span class="lang-seed-banner-body">
-            <strong>Start with the Cebuano core</strong>
-            <span>${typeof langCebPackSize === 'function' ? langCebPackSize() : 0} words across ${typeof LANG_CEB_PACK !== 'undefined' ? LANG_CEB_PACK.length : 0} topics, each with how it is really used and an example — nothing you have is replaced</span>
-          </span>
-          <i data-lucide="download" class="lang-seed-banner-go"></i>
-        </button>` : (!sets && !scenes) ? `
-        <button class="lang-seed-banner" type="button" onclick="langLoadSamplePack()">
+      ${/* One banner, one pack, and a caption that names what is actually
+           missing. It used to advertise "10 words" to somebody who already
+           had four hundred, because it only ever checked the sets and the
+           scenarios; then it offered two different packs depending on which
+           half was empty, which read as two starter packs. */ ""}
+      ${(!words || (!sets && !scenes)) ? `
+        <button class="lang-seed-banner" type="button" onclick="langLoadStarter()">
           <i data-lucide="sparkles"></i>
           <span class="lang-seed-banner-body">
-            <strong>Add drills and scenarios</strong>
-            <span>10 drill sets and 10 scenarios to practise against — nothing you have is replaced</span>
+            <strong>${words ? 'Add drills and scenarios' : 'Start with the starter pack'}</strong>
+            <span>${words
+              ? '10 drill sets and 10 scenarios to practise against — nothing you have is replaced'
+              : (typeof langStarterSize === 'function' ? langStarterSize() : 0)
+                + ' words across ' + (typeof LANG_CEB_PACK !== 'undefined' ? LANG_CEB_PACK.length : 0)
+                + ' topics, each with how it is really used and an example, plus drills and scenarios'
+                + ' — nothing you have is replaced'}</span>
           </span>
           <i data-lucide="download" class="lang-seed-banner-go"></i>
         </button>` : ''}
