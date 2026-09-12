@@ -119,10 +119,21 @@ function languageTemplate() {
 function languageInit() {
   langStore();
   langBoardReset();
+  /* Paging and filters are per-visit, like the board's sections. Leaving with
+     600 rows painted and a tag selected and coming back to exactly that is
+     somebody else's screen -- and the 600 rows are paid for again on arrival,
+     which is the cost the cap exists to avoid. */
+  langShownCount = LANG_PAGE;
+  langQuery = '';
+  langTagFilters = [];
+  langPosFilter = null;
+  langTagsExpanded = false;
   langView = getSessionParam('langView') || 'dictionary';
   langViewArg = getSessionParam('langViewArg') || null;
   const target = getSessionParam('langActiveWord');
   langActiveWordId = target && langFindWord(target) ? target : null;
+  // Once a visit is enough to clear out records for words that have gone.
+  if (typeof langRecallPrune === 'function') langRecallPrune();
   renderLangLibrary();
 }
 
@@ -326,8 +337,17 @@ function renderLangDetail() {
 
 /* ── Dictionary ───────────────────────────────────────────── */
 
-/** Every filter in one place, so the dictionary and the compare view agree. */
-function langFilteredWords(study) {
+/**
+ * Every filter in one place, so the dictionary and the compare view agree.
+ *
+ * @param {string} study the language being learnt
+ * @param {boolean} [withPos] apply the part-of-speech filter too. Only the
+ *   dictionary passes this: the dropdown lives there, and compare has no way
+ *   to show a filter it inherited, so a list silently missing two thirds of
+ *   its words was the result. It only became reachable once the pack started
+ *   carrying parts of speech at all.
+ */
+function langFilteredWords(study, withPos) {
   let list = langWords().filter(w => langMatches(w, langQuery));
   // Every selected tag must match, not any -- the point of a second tag is to
   // narrow. "verbs" plus "food" means verbs about food.
@@ -337,13 +357,13 @@ function langFilteredWords(study) {
       return langTagFilters.every(t => tags.includes(t));
     });
   }
-  if (langPosFilter) list = list.filter(w => langForm(w, study).pos === langPosFilter);
+  if (withPos && langPosFilter) list = list.filter(w => langForm(w, study).pos === langPosFilter);
   return list;
 }
 
 function langDictionaryHTML() {
   const study = langStudy(), ref = langRef();
-  const all = langFilteredWords(study);
+  const all = langFilteredWords(study, true);
   const collator = new Intl.Collator(undefined, { sensitivity: 'base' });
   /* sort() calls the comparator O(n log n) times, and each call was building
      two headwords and a fresh collator. Decorate once, compare cheaply: 35ms
@@ -434,9 +454,25 @@ function langResultStatus(n) {
   return n + (n === 1 ? ' entry matches.' : ' entries match.');
 }
 
+/**
+ * Show the next page.
+ *
+ * Re-rendering replaces the button that was just pressed, and the browser
+ * then drops focus to <body> -- so a keyboard user who pressed Enter on
+ * "Show more" was thrown to the top of the tab order and had to walk back
+ * through every row they had just revealed. Put focus back on the button in
+ * its new incarnation, or on the last row when the button is gone because
+ * there is nothing left to show.
+ */
 function langShowMore() {
   langShownCount += LANG_PAGE;
   renderLangDetail();
+  const next = document.querySelector('.lang-more button');
+  if (next) { next.focus(); return; }
+  const rows = document.querySelectorAll('.lang-entry');
+  const last = rows[rows.length - 1];
+  const btn = last && last.querySelector('button:not([disabled])');
+  if (btn) btn.focus();
 }
 
 function langFilterBarHTML() {

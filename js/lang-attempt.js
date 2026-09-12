@@ -41,7 +41,13 @@ function langAttemptInit() {
     const pool = langItemsOfType(type);
     if (!pool.length) { spaNavigate('language'); return; }
     set = { id: 'type:' + type, title: langPuzzleMeta(type).name, lang: langStudy(), refLang: langRef(), isType: true, type: type };
-    queue = langShuffle(pool.map(p => p.item));
+    /* NOT shuffled. langItemsOfType has already ordered this pool -- words
+       that are due first, then your own questions in a fresh order, then the
+       rest by how long since you saw them. Shuffling here threw that away and
+       turned a review queue back into a raffle. An authored set below still
+       gets its shuffle, because a fixed five in a fixed order is exactly the
+       muscle memory that shuffle exists to break. */
+    queue = pool.map(p => p.item);
   } else {
     set = setId ? langFindSet(setId) : null;
     if (!set || langSetProblems(set).length) { spaNavigate('language'); return; }

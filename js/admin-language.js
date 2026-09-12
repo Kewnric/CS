@@ -36,6 +36,11 @@ function adminLanguageTemplate() {
 
 function adminLanguageInit() {
   langStore();
+  /* Same rule as the library's: a search left behind is a screen that opens
+     already filtered by something you do not remember typing, and 600 rows
+     left paged in are 600 rows paid for again on arrival. */
+  langAdminQuery = '';
+  langAdminShown = LANG_ADMIN_PAGE;
   langAdminTab = getSessionParam('langAdminTab') || 'words';
   const editId = getSessionParam('langAdminEdit');
   const wordId = getSessionParam('langAdminWord');

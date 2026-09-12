@@ -743,21 +743,35 @@ function langItemProblems(it) {
  * still offering the ten questions somebody typed by hand.
  */
 function langItemsOfType(type, want) {
-  const out = [];
+  const authored = [];
   langSets().forEach(set => {
     (set.items || []).forEach(it => {
       if (it.type !== type) return;
       // Only questions that are actually answerable — a half-written one would
       // mark the learner wrong for something the author never finished.
       if (langItemProblems(it).length) return;
-      out.push({ item: it, set });
+      authored.push({ item: it, set });
     });
   });
-  if (typeof langGeneratedItems === 'function') {
-    const need = Math.max(0, (want || 40) - out.length);
-    if (need) out.push(...langGeneratedItems(type, need));
-  }
-  return out;
+  if (typeof langGeneratedItems !== 'function') return authored;
+
+  const need = Math.max(0, (want || 40) - authored.length);
+  const generated = need ? langGeneratedItems(type, need) : [];
+
+  /* ORDER IS THE SCHEDULE, and it has to survive being returned.
+     The generator sorts due words first, then unseen; the runner then shuffled
+     the whole pool and the schedule was gone. Worse, authored questions came
+     first, and with ten of those against a run of ten you never reached a
+     scheduled word at all.
+
+     So: words that are actually DUE lead, because that is what being due
+     means. Your own questions come next, in a fresh order each time so a set
+     of five is not muscle memory. Everything else follows in recall order. */
+  const isDue = x => x.item.wordId && typeof langRecall === 'function'
+                  && (r => r && r.due <= langToday())(langRecall(x.item.wordId));
+  const due = generated.filter(isDue);
+  const restGen = generated.filter(x => !isDue(x));
+  return due.concat(langShuffle(authored), restGen);
 }
 
 /**

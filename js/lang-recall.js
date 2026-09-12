@@ -36,9 +36,20 @@ function langRecallStore() {
   return state.langRecall;
 }
 
-/** @returns {number} whole days since the epoch, so a day boundary is a date change */
+/**
+ * @returns {number} whole days since the epoch, counted in LOCAL time
+ *
+ * Date.now()/86400000 counts UTC days, and that is not what "tomorrow" means
+ * to the person using this. Measured on the machine this was written on --
+ * UTC+8, the Philippines, which is exactly where a Cebuano learner is -- the
+ * review day rolled over at 16:00 local. A word scheduled for tomorrow came
+ * due mid-afternoon today, and anything practised after four in the afternoon
+ * was filed under the next day. Subtracting the offset makes the boundary
+ * local midnight, where the user's own idea of a day already is.
+ */
 function langToday() {
-  return Math.floor(Date.now() / 86400000);
+  const now = new Date();
+  return Math.floor((now.getTime() - now.getTimezoneOffset() * 60000) / 86400000);
 }
 
 /** The record for a word, or null when it has never been asked. */
@@ -152,4 +163,27 @@ function langRecallSummary() {
 function langRecallForget(wordId) {
   const store = langRecallStore();
   if (store[wordId]) { delete store[wordId]; saveData(); }
+}
+
+/**
+ * Drop records for words that are no longer there.
+ *
+ * langDeleteWord takes its own record with it, and gives it back on undo. But
+ * a word can also leave by routes that never touch this: an import replacing
+ * the store, a starter pack being swapped out, a record hand-edited in a
+ * backup file. Those leave a record keyed to nothing -- invisible, harmless
+ * to read, and permanent, in a document whose whole problem is bytes.
+ *
+ * @returns {number} how many were dropped
+ */
+function langRecallPrune() {
+  const store = langRecallStore();
+  const ids = Object.keys(store);
+  if (!ids.length) return 0;
+  const live = {};
+  langWords().forEach(w => { live[w.id] = true; });
+  let n = 0;
+  ids.forEach(id => { if (!live[id]) { delete store[id]; n++; } });
+  if (n) saveData();
+  return n;
 }
