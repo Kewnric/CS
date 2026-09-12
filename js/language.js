@@ -95,6 +95,8 @@ function langStore() {
   if (!Array.isArray(state.langSets)) state.langSets = [];
   if (!Array.isArray(state.langScenarios)) state.langScenarios = [];
   if (!Array.isArray(state.langHistory)) state.langHistory = [];
+  // Per-word recall, keyed by word id. See js/lang-recall.js.
+  if (!state.langRecall || typeof state.langRecall !== 'object') state.langRecall = {};
   return state;
 }
 
@@ -112,19 +114,36 @@ function langBlankWord() {
   };
 }
 
-/** Fills in anything a record is missing, so older/imported data still reads. */
+/**
+ * Fills in anything a record is missing, so older/imported data still reads —
+ * and drops everything a record does not actually carry, so it does not cost
+ * bytes in the cloud document.
+ *
+ * WHY THE DROPPING MATTERS. This whole library is one field of one Firestore
+ * document, the cloud write is a single atomic batch, and the per-document cap
+ * is 1MB. Measured with the 1,008-word starter pack and no user content at
+ * all, the language domain sat at 68.8% of that cap — and 256KB of the 682KB
+ * was three empty forms per word, for languages the word does not have. An
+ * empty form is `{term:'',pos:'',definition:'',examples:[],notes:'',
+ * restrictions:''}`: 74 bytes to say nothing, times three, times every word.
+ *
+ * Dropping them is safe because langForm() already answers for a form that is
+ * not there — it is the accessor that makes this possible, and the reason
+ * nothing else has to change. The example ids go for the same reason: 36 bytes
+ * of uuid each, 43KB over the pack, and nothing anywhere addresses a language
+ * example by id. The admin editor rebuilds both on demand.
+ */
 function langNormWord(w) {
   if (!w || typeof w !== 'object') return null;
   if (!w.forms || typeof w.forms !== 'object') w.forms = {};
   LANG_CODES.forEach(c => {
     const f = w.forms[c] && typeof w.forms[c] === 'object' ? w.forms[c] : {};
-    w.forms[c] = {
+    const form = {
       term: String(f.term || '').trim(),
       pos: LANG_POS.indexOf(f.pos) > -1 ? f.pos : '',
       definition: String(f.definition || ''),
       examples: Array.isArray(f.examples)
         ? f.examples.filter(e => e && (e.text || e.gloss)).map(e => ({
-            id: e.id || generateId(),
             text: String(e.text || ''),
             gloss: String(e.gloss || '')
           }))
@@ -132,6 +151,21 @@ function langNormWord(w) {
       notes: String(f.notes || ''),
       restrictions: String(f.restrictions || '')
     };
+    /* A form with nothing in it at all is not a form. Note the test is the
+       whole form, not just the term: a record carrying a definition but no
+       term yet is half-written, not empty, and must survive a save. */
+    const empty = !form.term && !form.definition && !form.notes
+                && !form.restrictions && !form.pos && !form.examples.length;
+    if (empty) delete w.forms[c];
+    else {
+      // Drop the individual empties too — same reasoning, finer grain.
+      if (!form.pos) delete form.pos;
+      if (!form.notes) delete form.notes;
+      if (!form.restrictions) delete form.restrictions;
+      if (!form.examples.length) delete form.examples;
+      if (!form.definition) delete form.definition;
+      w.forms[c] = form;
+    }
   });
   if (!Array.isArray(w.tags)) w.tags = [];
   return w;
@@ -207,7 +241,7 @@ function langSaveWord(w) {
   const norm = langNormWord(w);
   if (!norm) return null;
   // A record with no term in any language is not a word yet.
-  if (!LANG_CODES.some(c => norm.forms[c].term)) return null;
+  if (!LANG_CODES.some(c => langForm(norm, c).term)) return null;
   norm.updatedAt = Date.now();
   const i = state.langWords.findIndex(x => x.id === norm.id);
   if (i > -1) state.langWords[i] = norm;
@@ -231,6 +265,10 @@ function langDeleteWord(id) {
   // used to bring the word back without its due date, which is the one thing
   // an undo is supposed to make impossible. langDeleteSet does the same.
   const deadline = typeof agDetachDeadline === 'function' ? agDetachDeadline('langword', id) : null;
+  // The recall record goes with it, and comes back with it -- a word restored
+  // without its schedule would present as new after months of practice.
+  const recall = (state.langRecall && state.langRecall[id]) || null;
+  if (recall) delete state.langRecall[id];
   saveData();
   langRefreshViews();
   if (typeof pushUndo === 'function') {
@@ -238,6 +276,7 @@ function langDeleteWord(id) {
       langStore();
       state.langWords.splice(Math.min(i, state.langWords.length), 0, rec);
       if (deadline && typeof agAttachDeadline === 'function') agAttachDeadline(deadline);
+      if (recall) { langStore(); state.langRecall[id] = recall; }
       saveData();
       langRefreshViews();
     });
@@ -304,6 +343,71 @@ const LANG_SPEECH_TAG = { en: 'en-US', fil: 'fil-PH', ceb: 'ceb-PH', war: 'war-P
 function langSpeechTag(code) { return LANG_SPEECH_TAG[code] || undefined; }
 
 /**
+ * Whether this device actually has a voice for a language.
+ *
+ * Measured on a normal desktop Chrome: three voices, all en-US. There is no
+ * ceb-PH voice, no fil-PH, no war-PH — anywhere, on most machines. So every
+ * speaker button in a Cebuano dictionary was offering "Hear this" and
+ * delivering an American voice sounding out Cebuano spelling, which is not
+ * nothing, but is not what the label promised either.
+ *
+ * The voice list arrives asynchronously and can be empty on first call, so
+ * this is computed on demand and re-read until it has seen a list.
+ */
+let _langVoiceLangs = null;
+function langVoiceAvailable(code) {
+  if (typeof speechSynthesis === 'undefined') return false;
+  if (!_langVoiceLangs || !_langVoiceLangs.length) {
+    const voices = speechSynthesis.getVoices() || [];
+    _langVoiceLangs = voices.map(v => String(v.lang || '').toLowerCase());
+  }
+  const tag = String(langSpeechTag(code) || '').toLowerCase();
+  if (!tag) return false;
+  const base = tag.split('-')[0];
+  return _langVoiceLangs.some(l => l === tag || l.split('-')[0] === base);
+}
+
+/** The speaker's tooltip: honest about a substitute voice when that is what it is. */
+function langSpeakTitle(code) {
+  if (!code || langVoiceAvailable(code)) return 'Hear this';
+  return 'Hear this — read by an English voice, as this device has no '
+       + langName(code) + ' voice';
+}
+
+/* ── Icons in repeated rows ───────────────────────────────────
+   lucide.createIcons walks the container and builds an <svg> for every
+   <i data-lucide>. Fine for a header; ruinous for a list. Measured on the
+   1,008-word dictionary: 5,179 icons, 70ms of the 111ms it took to paint,
+   every single repaint — and a repaint happens on every keystroke.
+
+   These are five fixed shapes. Serialise each one ONCE from lucide's own icon
+   data and paste the string, so the row costs nothing to draw and the shapes
+   still come from whatever lucide version is installed rather than from paths
+   copied into this file to rot.
+   ------------------------------------------------------------ */
+
+const _langIconCache = {};
+
+/** @param {string} name kebab-case lucide name @returns {string} an <svg>, or an <i> to be filled in later */
+function langIcon(name, size) {
+  const key = name + '@' + (size || 0);
+  if (_langIconCache[key]) return _langIconCache[key];
+  const pascal = String(name).split('-')
+    .map(p => p.charAt(0).toUpperCase() + p.slice(1)).join('');
+  const def = (typeof lucide !== 'undefined' && lucide.icons) ? lucide.icons[pascal] : null;
+  // Before lucide loads, fall back to the tag it would have replaced anyway.
+  if (!def) return '<i data-lucide="' + name + '"></i>';
+  const attrs = Object.assign({}, def[1], { 'aria-hidden': 'true' });
+  if (size) { attrs.width = size; attrs.height = size; }
+  const open = Object.keys(attrs).map(k => k + '="' + attrs[k] + '"').join(' ');
+  const kids = (def[2] || []).map(c =>
+    '<' + c[0] + ' ' + Object.keys(c[1]).map(k => k + '="' + c[1][k] + '"').join(' ') + '/>').join('');
+  const svg = '<svg ' + open + '>' + kids + '</svg>';
+  _langIconCache[key] = svg;
+  return svg;
+}
+
+/**
  * A speaker button for one piece of text.
  *
  * @param {string} text what to say
@@ -317,8 +421,8 @@ function langSpeakBtn(text, code, cls) {
   return '<button type="button" class="ag-icon-btn lang-speak-btn ' + (cls || '') + '"'
        + ' data-speak="' + escapeHTML(say) + '"'
        + (code ? ' data-speak-lang="' + escapeHTML(code) + '"' : '')
-       + ' title="Hear this" aria-label="Hear this">'
-       + '<i data-lucide="volume-2"></i></button>';
+       + ' title="' + escapeHTML(langSpeakTitle(code)) + '" aria-label="Hear this">'
+       + langIcon('volume-2') + '</button>';
 }
 
 /**
@@ -337,8 +441,8 @@ function langSpeakChip(text, code) {
   return '<span class="lang-speak-chip" role="button" tabindex="0"'
        + ' data-speak="' + escapeHTML(say) + '"'
        + (code ? ' data-speak-lang="' + escapeHTML(code) + '"' : '')
-       + ' title="Hear this" aria-label="Hear this">'
-       + '<i data-lucide="volume-2"></i></span>';
+       + ' title="' + escapeHTML(langSpeakTitle(code)) + '" aria-label="Hear this">'
+       + langIcon('volume-2') + '</span>';
 }
 
 /**
@@ -630,8 +734,15 @@ function langItemProblems(it) {
   return out;
 }
 
-/** Every question of one type, across every set, each tagged with its set. */
-function langItemsOfType(type) {
+/**
+ * Every question of one type, across every set, each tagged with its set.
+ *
+ * Authored questions first, then as many as are wanted built from the
+ * dictionary. Yours come first because you wrote them for a reason; the
+ * generated ones exist so that a library holding a thousand words is not
+ * still offering the ten questions somebody typed by hand.
+ */
+function langItemsOfType(type, want) {
   const out = [];
   langSets().forEach(set => {
     (set.items || []).forEach(it => {
@@ -642,10 +753,30 @@ function langItemsOfType(type) {
       out.push({ item: it, set });
     });
   });
+  if (typeof langGeneratedItems === 'function') {
+    const need = Math.max(0, (want || 40) - out.length);
+    if (need) out.push(...langGeneratedItems(type, need));
+  }
   return out;
 }
 
-function langTypeCount(type) { return langItemsOfType(type).length; }
+/**
+ * How many questions of a type exist, for the number on the board's card.
+ *
+ * Counted rather than built. langItemsOfType caps what it produces, because
+ * a drill plays a handful of questions and building a thousand to answer
+ * "how many?" would cost more than drawing the whole screen.
+ */
+function langTypeCount(type) {
+  let n = 0;
+  langSets().forEach(set => {
+    (set.items || []).forEach(it => {
+      if (it.type === type && !langItemProblems(it).length) n++;
+    });
+  });
+  if (typeof langGeneratedCount === 'function') n += langGeneratedCount(type);
+  return n;
+}
 
 /* How each drill is played, in the learner's words. Shown before they start,
    because a puzzle whose rules you have to infer from failing it is a bad

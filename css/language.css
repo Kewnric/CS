@@ -699,6 +699,62 @@
 /* Sits in the header's corner, away from the title and the Back button. */
 .lang-admin-btn { margin-left: auto; flex-shrink: 0; }
 
+/* --- The tail of a capped list --- */
+.lang-more {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.9rem 0 0.4rem;
+}
+.lang-more-hint { font-size: 0.72rem; color: var(--text-tertiary); }
+
+/* --- The chip cloud's tail --- */
+.lang-tag-more {
+  background: none;
+  border: 1px dashed var(--border-color);
+  color: var(--text-tertiary);
+  font-family: inherit;
+  font-size: 0.68rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.lang-tag-more:hover { color: var(--text-primary); border-color: var(--text-tertiary); }
+
+/* --- What the drills know about a word ---
+   Four states, and the colour has to survive being the only thing on a row
+   that is coloured, so it reads as a status rather than as decoration. */
+.lang-recall-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.22rem;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.1rem 0.34rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.lang-recall-badge i, .lang-recall-badge svg { width: 10px; height: 10px; }
+.lang-recall-new     { color: var(--text-tertiary); border-color: var(--border-color); }
+.lang-recall-due     { color: var(--color-warning); border-color: color-mix(in srgb, var(--color-warning) 45%, transparent); }
+.lang-recall-learning{ color: var(--accent-primary, #818cf8); border-color: color-mix(in srgb, var(--accent-primary, #818cf8) 45%, transparent); }
+.lang-recall-known   { color: var(--color-success, #34d399); border-color: color-mix(in srgb, var(--color-success, #34d399) 45%, transparent); }
+
+/* --- Admin's search and its capped table --- */
+.lang-admin-search { flex: 1; min-width: 180px; max-width: 340px; }
+.lang-admin-more {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.85rem 0 0.2rem;
+}
+.lang-admin-table td .lang-recall-badge { margin-left: 0.4rem; vertical-align: middle; }
+
 /* ── Dictionary entries ───────────────────────────────────── */
 
 .lang-filterbar { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin: 1rem 0 0.5rem; }

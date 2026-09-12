@@ -15,8 +15,20 @@ let langView = 'dictionary';      // which card is open
 let langViewArg = null;           // its subject, when it has one
 let langActiveWordId = null;
 let langQuery = '';
-let langTagFilter = null;
+/* Tags filter as a SET, not one at a time. "verbs" and "food" is a question
+   people actually have, and the old single slot could not answer it. */
+let langTagFilters = [];
 let langPosFilter = null;
+let langTagsExpanded = false;   // the chip cloud is 83 chips at pack size
+
+/* How many entries the dictionary paints before it stops.
+   The list used to paint every match: 1,008 entries is 28,972 DOM nodes and
+   1.6MB of HTML string, 111ms a repaint, and a repaint runs on every
+   keystroke -- 156ms just to clear the box. Capped at 120 it is 12ms. The
+   cap is a render limit, never a search limit: the count above the list, and
+   the button below it, both speak for the whole result. */
+const LANG_PAGE = 120;
+let langShownCount = LANG_PAGE;
 
 /* Which board sections are open.
    Collapsed on arrival, every arrival — the board is a menu of eleven cards
@@ -71,7 +83,7 @@ function languageTemplate() {
             <button onclick="spaNavigate('library')" class="btn-back-dark" style="margin-right:0.5rem; padding:0.25rem 0.5rem; font-size:0.75rem; flex-shrink:0;">
               <i data-lucide="chevron-left" style="width:14px;height:14px;"></i> Back
             </button>
-            <h2 class="section-header-animated" style="margin:0; display:flex; align-items:center;">
+            <h1 class="section-header-animated" style="margin:0; display:flex; align-items:center;">
               <span class="section-header-icon-wrap">
                 <i data-lucide="languages"></i>
                 <span class="section-header-icon-ring"></span>
@@ -80,7 +92,7 @@ function languageTemplate() {
                 <span class="section-header-title">Language Library</span>
                 <span class="section-header-subtitle" id="lang-header-stats"></span>
               </span>
-            </h2>
+            </h1>
             ${/* Authoring lives in Admin, and the way there used to be a
                  full-width button under the board — below eleven cards, so
                  you scrolled past everything to reach it. It is an icon in
@@ -314,50 +326,69 @@ function renderLangDetail() {
 
 /* ── Dictionary ───────────────────────────────────────────── */
 
+/** Every filter in one place, so the dictionary and the compare view agree. */
+function langFilteredWords(study) {
+  let list = langWords().filter(w => langMatches(w, langQuery));
+  // Every selected tag must match, not any -- the point of a second tag is to
+  // narrow. "verbs" plus "food" means verbs about food.
+  if (langTagFilters.length) {
+    list = list.filter(w => {
+      const tags = w.tags || [];
+      return langTagFilters.every(t => tags.includes(t));
+    });
+  }
+  if (langPosFilter) list = list.filter(w => langForm(w, study).pos === langPosFilter);
+  return list;
+}
+
 function langDictionaryHTML() {
   const study = langStudy(), ref = langRef();
-  let list = langWords().filter(w => langMatches(w, langQuery));
-  if (langTagFilter) list = list.filter(w => (w.tags || []).includes(langTagFilter));
-  if (langPosFilter) list = list.filter(w => langForm(w, study).pos === langPosFilter);
-  list = list.slice().sort((a, b) =>
-    langHeadword(a, study).localeCompare(langHeadword(b, study), undefined, { sensitivity: 'base' }));
+  const all = langFilteredWords(study);
+  const collator = new Intl.Collator(undefined, { sensitivity: 'base' });
+  /* sort() calls the comparator O(n log n) times, and each call was building
+     two headwords and a fresh collator. Decorate once, compare cheaply: 35ms
+     to 4ms over the pack. */
+  const sorted = all
+    .map(w => ({ w: w, key: langHeadword(w, study) }))
+    .sort((a, b) => collator.compare(a.key, b.key))
+    .map(x => x.w);
+  const list = sorted.slice(0, langShownCount);
+  const hidden = sorted.length - list.length;
 
   const rows = list.map(w => {
     const f = langForm(w, study);
     const g = langForm(w, ref);
     const exCount = (f.examples || []).length + (g.examples || []).length;
+    const head = langHeadword(w, study);
     return `
-      <div class="lang-entry">
+      <div class="lang-entry" role="listitem">
         <div class="lang-entry-main">
           <div class="lang-entry-head">
-            <span class="lang-entry-term">${escapeHTML(langHeadword(w, study))}</span>
+            <span class="lang-entry-term">${escapeHTML(head)}</span>
             ${f.pos ? `<span class="lang-pos">${escapeHTML(f.pos)}</span>` : ''}
             ${g.term ? `<span class="lang-entry-gloss">${escapeHTML(g.term)}</span>` : ''}
+            ${langRecallBadgeHTML(w)}
             ${typeof agDeadlineTextHTML === 'function' ? agDeadlineTextHTML('langword', w.id) : ''}
           </div>
           <div class="lang-entry-def">${escapeHTML(f.definition || g.definition || 'No definition recorded.')}</div>
-          ${f.notes ? `<div class="lang-entry-note"><i data-lucide="sticky-note"></i> ${escapeHTML(f.notes)}</div>` : ''}
-          ${f.restrictions ? `<div class="lang-entry-warn"><i data-lucide="alert-triangle"></i> ${escapeHTML(f.restrictions)}</div>` : ''}
+          ${f.notes ? `<div class="lang-entry-note">${langIcon('sticky-note')} ${escapeHTML(f.notes)}</div>` : ''}
+          ${f.restrictions ? `<div class="lang-entry-warn">${langIcon('alert-triangle')} ${escapeHTML(f.restrictions)}</div>` : ''}
         </div>
         <div class="lang-entry-tools">
-          ${langSpeakBtn(langHeadword(w, study), study)}
+          ${langSpeakBtn(head, study)}
           <button class="ag-icon-btn" type="button" onclick="langShowExamples('${w.id}')"
                   title="${exCount ? exCount + ' example sentence' + (exCount !== 1 ? 's' : '') : 'No examples recorded'}"
-                  ${exCount ? '' : 'disabled'}>
-            <i data-lucide="quote"></i>
-          </button>
+                  aria-label="Example sentences for ${escapeHTML(head)}"
+                  ${exCount ? '' : 'disabled'}>${langIcon('quote')}</button>
           <button class="ag-icon-btn" type="button" onclick="langShowNotes('${w.id}')"
-                  title="Notes and restrictions">
-            <i data-lucide="sticky-note"></i>
-          </button>
+                  title="Notes and restrictions"
+                  aria-label="Notes for ${escapeHTML(head)}">${langIcon('sticky-note')}</button>
           <button class="ag-icon-btn" type="button" onclick="langOpen('compare'); langActiveWordId='${w.id}'; renderLangDetail();"
-                  title="Compare side by side">
-            <i data-lucide="columns-2"></i>
-          </button>
+                  title="Compare side by side"
+                  aria-label="Compare ${escapeHTML(head)} side by side">${langIcon('columns-2')}</button>
           <button class="ag-icon-btn" type="button" onclick="agOpenDeadlineModal('langword', '${w.id}')"
-                  title="Put a due date on this word">
-            <i data-lucide="flag"></i>
-          </button>
+                  title="Put a due date on this word"
+                  aria-label="Due date for ${escapeHTML(head)}">${langIcon('flag')}</button>
         </div>
       </div>`;
   }).join('');
@@ -367,22 +398,45 @@ function langDictionaryHTML() {
       <div class="prog-detail-header">
         <div class="prog-detail-icon"><i data-lucide="library-big"></i></div>
         <div style="flex:1; min-width:0;">
-          <h1 class="prog-detail-title">Dictionary</h1>
+          <h2 class="prog-detail-title">Dictionary</h2>
           <div class="prog-stats">
             <div class="prog-stat"><i data-lucide="book-a" style="width:13px;height:13px;"></i>
               <span class="prog-stat-body"><em>Entries</em><strong>${langWords().length}</strong></span></div>
             <div class="prog-stat"><i data-lucide="filter" style="width:13px;height:13px;"></i>
-              <span class="prog-stat-body"><em>Showing</em><strong id="lang-showing">${list.length}</strong></span></div>
+              <span class="prog-stat-body"><em>Showing</em><strong id="lang-showing">${sorted.length}</strong></span></div>
             <div class="prog-stat"><i data-lucide="languages" style="width:13px;height:13px;"></i>
               <span class="prog-stat-body"><em>Reading</em><strong>${escapeHTML(langShort(study))} / ${escapeHTML(langShort(ref))}</strong></span></div>
           </div>
         </div>
       </div>
       ${langFilterBarHTML()}
-      <div class="lang-entries">${rows || (langWords().length
+      ${/* aria-live, because filtering changes the list silently. A screen
+           reader user typing in the box had no way to know whether they had
+           narrowed it to 40 entries or to none. */ ''}
+      <p class="sr-only" role="status" aria-live="polite" id="lang-result-status">${langResultStatus(sorted.length)}</p>
+      <div class="lang-entries" role="list">${rows || (langWords().length
         ? '<div class="lang-empty">No entries match those filters.</div>'
         : langSeedOfferHTML('Add the starter pack — ten words across all four languages, with definitions and example sentences.'))}</div>
+      ${hidden > 0 ? `
+        <div class="lang-more">
+          <button class="btn btn-secondary btn-sm" type="button" onclick="langShowMore()">
+            <i data-lucide="chevron-down" style="width:14px;height:14px;"></i>
+            Show ${Math.min(hidden, LANG_PAGE)} more
+          </button>
+          <span class="lang-more-hint">${list.length} of ${sorted.length} shown${langQuery || langTagFilters.length || langPosFilter ? ' — every match is counted above, search covers all of them' : ''}</span>
+        </div>` : ''}
     </div>`;
+}
+
+/** The sentence a screen reader hears when the result set changes. */
+function langResultStatus(n) {
+  if (!n) return 'No entries match.';
+  return n + (n === 1 ? ' entry matches.' : ' entries match.');
+}
+
+function langShowMore() {
+  langShownCount += LANG_PAGE;
+  renderLangDetail();
 }
 
 function langFilterBarHTML() {
@@ -405,38 +459,103 @@ function langFilterBarHTML() {
           <option value="">Any part of speech</option>
           ${posUsed.sort().map(p => `<option value="${p}"${langPosFilter === p ? ' selected' : ''}>${p}</option>`).join('')}
         </select>` : ''}
-      ${(langQuery || langTagFilter || langPosFilter) ? `
+      ${(langQuery || langTagFilters.length || langPosFilter) ? `
         <button class="btn btn-ghost btn-sm" onclick="langClearFilters()">
           <i data-lucide="filter-x" style="width:14px;height:14px;"></i> Clear
         </button>` : ''}
     </div>
-    ${tags.length ? `<div class="lang-tagbar">
-      ${tags.map(t => `
-        <button class="lang-tag-chip${langTagFilter === t.tag ? ' is-active' : ''}" type="button"
-                onclick="langSetTag(${JSON.stringify(t.tag)})">${escapeHTML(t.tag)} <span>${t.count}</span></button>`).join('')}
-    </div>` : ''}`;
+    ${langTagbarHTML(tags)}`;
+}
+
+/* The chip cloud was 83 chips at pack size, unconditionally, taking a third
+   of the pane before a single word. Selected tags first, then the rest up to
+   a dozen, then a button for the tail. */
+const LANG_TAGS_SHOWN = 12;
+
+function langTagbarHTML(tags) {
+  if (!tags.length) return '';
+  const chosen = tags.filter(t => langTagFilters.includes(t.tag));
+  const rest = tags.filter(t => !langTagFilters.includes(t.tag));
+  const shown = langTagsExpanded ? rest : rest.slice(0, Math.max(0, LANG_TAGS_SHOWN - chosen.length));
+  const hidden = rest.length - shown.length;
+  /* THE BUG THIS REPLACES: the handler was built with JSON.stringify inside a
+     double-quoted attribute, so it emitted onclick="langSetTag("food")" and
+     the attribute ended at the first quote it wrote. Every one of the 83
+     chips threw "Unexpected end of input" on click and filtered nothing --
+     silently, because an inline handler only fails when you press it. A data
+     attribute cannot be broken by its own contents. */
+  const chip = t => `
+    <button class="lang-tag-chip${langTagFilters.includes(t.tag) ? ' is-active' : ''}" type="button"
+            data-lang-tag="${escapeHTML(t.tag)}"
+            aria-pressed="${langTagFilters.includes(t.tag) ? 'true' : 'false'}"
+            >${escapeHTML(t.tag)} <span>${t.count}</span></button>`;
+  return `
+    <div class="lang-tagbar" onclick="langTagbarClick(event)">
+      ${chosen.map(chip).join('')}
+      ${shown.map(chip).join('')}
+      ${hidden > 0 || langTagsExpanded ? `
+        <button class="lang-tag-more" type="button" onclick="langToggleTags(event)">
+          ${langTagsExpanded ? 'Show fewer' : '+' + hidden + ' more'}
+        </button>` : ''}
+    </div>`;
+}
+
+/** One listener for the whole cloud, so a chip's own text cannot break it. */
+function langTagbarClick(e) {
+  const chip = e.target && e.target.closest ? e.target.closest('[data-lang-tag]') : null;
+  if (!chip) return;
+  langSetTag(chip.getAttribute('data-lang-tag'));
+}
+
+function langToggleTags(e) {
+  if (e) e.stopPropagation();
+  langTagsExpanded = !langTagsExpanded;
+  renderLangDetail();
 }
 
 /* The query is kept out of the re-render: replacing the input while it has
    focus would drop the caret to the end on every keystroke. */
 function langSetQuery(v) {
   langQuery = (v || '').trim();
+  langShownCount = LANG_PAGE;   // a new query starts a new list
   const host = document.querySelector('.lang-entries');
   if (!host) { renderLangDetail(); return; }
   const fresh = document.createElement('div');
   fresh.innerHTML = langView === 'compare' ? langCompareHTML() : langDictionaryHTML();
   const next = fresh.querySelector('.lang-entries') || fresh.querySelector('.lang-compare-results');
   if (next) { host.innerHTML = next.innerHTML; if (typeof lucide !== 'undefined') lucide.createIcons({ root: host }); }
-  /* Only the list is swapped, to keep focus in the box -- so the count above it,
-     which lives outside that container, has to be carried over by hand. */
-  const count = document.getElementById('lang-showing');
-  const freshCount = fresh.querySelector('#lang-showing');
-  if (count && freshCount) count.textContent = freshCount.textContent;
+  /* Only the list is swapped, to keep focus in the box -- so everything that
+     lives outside that container has to be carried over by hand. */
+  const carry = (sel, prop) => {
+    const a = document.querySelector(sel), b = fresh.querySelector(sel);
+    if (a && b) a[prop] = b[prop];
+  };
+  carry('#lang-showing', 'textContent');
+  carry('#lang-result-status', 'textContent');
+  const more = document.querySelector('.lang-more');
+  const freshMore = fresh.querySelector('.lang-more');
+  if (more && freshMore) more.innerHTML = freshMore.innerHTML;
+  else if (more && !freshMore) more.remove();
+  else if (!more && freshMore) host.insertAdjacentElement('afterend', freshMore);
+  const moreNow = document.querySelector('.lang-more');
+  if (moreNow && typeof lucide !== 'undefined') lucide.createIcons({ root: moreNow });
 }
 
-function langSetTag(tag) { langTagFilter = langTagFilter === tag ? null : tag; renderLangDetail(); }
-function langSetPos(p) { langPosFilter = p || null; renderLangDetail(); }
-function langClearFilters() { langQuery = ''; langTagFilter = null; langPosFilter = null; renderLangDetail(); }
+/** Add or remove one tag from the set. Narrowing the filter starts the list over. */
+function langSetTag(tag) {
+  if (!tag) return;
+  const i = langTagFilters.indexOf(tag);
+  if (i > -1) langTagFilters.splice(i, 1);
+  else langTagFilters.push(tag);
+  langShownCount = LANG_PAGE;
+  renderLangDetail();
+}
+function langSetPos(p) { langPosFilter = p || null; langShownCount = LANG_PAGE; renderLangDetail(); }
+function langClearFilters() {
+  langQuery = ''; langTagFilters = []; langPosFilter = null;
+  langTagsExpanded = false; langShownCount = LANG_PAGE;
+  renderLangDetail();
+}
 
 /** Example sentences, in a popup rather than crowding every row. */
 function langShowExamples(id) {
@@ -504,8 +623,7 @@ function langPopup(title, icon, bodyHtml) {
 
 function langCompareHTML() {
   const study = langStudy(), ref = langRef();
-  let list = langWords().filter(w => langMatches(w, langQuery));
-  if (langTagFilter) list = list.filter(w => (w.tags || []).includes(langTagFilter));
+  const list = langFilteredWords(study);
   const w = langActiveWordId ? langFindWord(langActiveWordId) : (list[0] || null);
 
   return `
@@ -513,7 +631,7 @@ function langCompareHTML() {
       <div class="prog-detail-header">
         <div class="prog-detail-icon"><i data-lucide="columns-2"></i></div>
         <div style="flex:1; min-width:0;">
-          <h1 class="prog-detail-title">Search &amp; compare</h1>
+          <h2 class="prog-detail-title">Search &amp; compare</h2>
           <p class="prog-detail-desc" style="margin:0;">Reading ${escapeHTML(langName(study))} against ${escapeHTML(langName(ref))}.</p>
         </div>
       </div>
@@ -595,7 +713,7 @@ function langDrillTypeHTML(type) {
       <div class="prog-detail-header">
         <div class="prog-detail-icon"><i data-lucide="${meta.icon}"></i></div>
         <div style="flex:1; min-width:0;">
-          <h1 class="prog-detail-title">${escapeHTML(meta.name)}</h1>
+          <h2 class="prog-detail-title">${escapeHTML(meta.name)}</h2>
           <div class="prog-stats">
             <div class="prog-stat"><i data-lucide="list" style="width:13px;height:13px;"></i>
               <span class="prog-stat-body"><em>Questions ready</em><strong>${pool.length}</strong></span></div>
@@ -655,7 +773,7 @@ function langSetsHTML() {
       <div class="prog-detail-header">
         <div class="prog-detail-icon"><i data-lucide="layers"></i></div>
         <div style="flex:1; min-width:0;">
-          <h1 class="prog-detail-title">Your drill sets</h1>
+          <h2 class="prog-detail-title">Your drill sets</h2>
           <p class="prog-detail-desc" style="margin:0;">Run a set exactly as you wrote it, in its own order.</p>
         </div>
       </div>
@@ -701,7 +819,7 @@ function langRunHTML() {
       <div class="prog-detail-header">
         <div class="prog-detail-icon"><i data-lucide="footprints"></i></div>
         <div style="flex:1; min-width:0;">
-          <h1 class="prog-detail-title">Free run</h1>
+          <h2 class="prog-detail-title">Free run</h2>
           <div class="prog-stats">
             <div class="prog-stat"><i data-lucide="flame" style="width:13px;height:13px;"></i>
               <span class="prog-stat-body"><em>Stamina</em><strong>${LANG_RUN_STAMINA}</strong></span></div>
@@ -765,7 +883,7 @@ function langScenariosHTML() {
       <div class="prog-detail-header">
         <div class="prog-detail-icon"><i data-lucide="map"></i></div>
         <div style="flex:1; min-width:0;">
-          <h1 class="prog-detail-title">Scenarios</h1>
+          <h2 class="prog-detail-title">Scenarios</h2>
           <p class="prog-detail-desc" style="margin:0;">The encounters you have written. A run draws its opponents from these.</p>
         </div>
       </div>

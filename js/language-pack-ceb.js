@@ -37,7 +37,7 @@
 const LANG_CEB_PACK = [
 
 /* ── The words that hold sentences together ─────────────────── */
-{ g: 'Particles', tags: ['particles', 'core'], w: [
+{ g: 'Particles', tags: ['particles', 'core'], pos: 'particle', w: [
   ['na', 'already / now', 'Marks a change of state — something has happened, or is now the case. One of the two most common words in Cebuano.', 'Nahuman na.|It is finished already.', 'Pairs with "pa" as a set: "na" is the change, "pa" is the continuation.'],
   ['pa', 'still / yet / more', 'Marks continuation — something is still the case, or there is more of it.', 'Gamay pa.|A little more.', 'With a negative it means "not yet": "Wala pa" — not yet.'],
   ['ba', '(question marker)', 'Turns a statement into a yes/no question. It has no English word; English uses word order instead.', 'Gutom ka ba?|Are you hungry?', 'Optional in speech — a rising tone does the same job — but very common.'],
@@ -66,7 +66,7 @@ const LANG_CEB_PACK = [
 ]},
 
 /* ── Pronouns: the part of Cebuano that trips everyone ───────── */
-{ g: 'Pronouns', tags: ['pronouns', 'core'], w: [
+{ g: 'Pronouns', tags: ['pronouns', 'core'], pos: 'pronoun', w: [
   ['ako', 'I', 'The full form of the first person. Used for emphasis or at the start of a sentence.', 'Ako si Juan.|I am Juan.', 'Cebuano pronouns come in three sets by role; this is the topic set.'],
   ['ko', 'I / me', 'The short form of "ako", used after the verb. This is what you will say most of the time.', 'Gutom ko.|I am hungry.', ''],
   ['nako', 'my / by me', 'The possessive and actor form of the first person.', 'Balay nako.|My house.', 'Also written "nako\'" — the same word.'],
@@ -94,7 +94,7 @@ const LANG_CEB_PACK = [
 ]},
 
 /* ── Pointing at things ──────────────────────────────────────── */
-{ g: 'This and that', tags: ['deictics', 'core'], w: [
+{ g: 'This and that', tags: ['deictics', 'core'], pos: 'pronoun', w: [
   ['kini', 'this', 'Near the speaker. Cebuano has three distances where English has two.', 'Kini ang akoa.|This is mine.', 'Often shortened to "ni" in speech.'],
   ['kana', 'that (near you)', 'Near the listener — the middle distance English lacks.', 'Kana ba?|That one?', 'Shortened to "na". The three-way split is a real difference from English.'],
   ['kadto', 'that (over there)', 'Far from both speaker and listener.', 'Kadto ang balay nila.|That over there is their house.', 'Shortened to "to".'],
@@ -122,7 +122,7 @@ const LANG_CEB_PACK = [
 ]},
 
 /* ── Yes, no, and getting by ─────────────────────────────────── */
-{ g: 'Yes and no', tags: ['core', 'essentials'], w: [
+{ g: 'Yes and no', tags: ['core', 'essentials'], pos: 'particle', w: [
   ['oo', 'yes', 'Plain agreement.', 'Oo, tinuod.|Yes, it is true.', 'Say "oo" to friends and "opo"-style politeness is Tagalog, not Cebuano.'],
   ['dili', 'no / not', 'Negates a description, an identity, or a future action.', 'Dili ko gusto.|I do not want to.', 'Use "dili" for "is not"; use "wala" for "there is not" and for the past.'],
   ['wala', 'none / not / left', 'Negates existence or possession, and negates completed actions. Quite separately, it is also the left-hand side.', 'Wala koy kwarta. / Liko sa wala.|I have no money. / Turn left.', 'Two things to watch: the "dili" / "wala" split is the commonest learner mistake, and "wala" meaning left is an unrelated word with the same spelling.'],
@@ -133,7 +133,7 @@ const LANG_CEB_PACK = [
 ]},
 
 /* ── Greetings and courtesy ──────────────────────────────────── */
-{ g: 'Greetings', tags: ['greetings', 'essentials'], w: [
+{ g: 'Greetings', tags: ['greetings', 'essentials'], pos: 'phrase', w: [
   ['maayong buntag', 'good morning', 'Used from waking until about eleven.', 'Maayong buntag, Nang.|Good morning, ma\'am.', ''],
   ['maayong udto', 'good noon', 'Around midday — a greeting English does not have.', 'Maayong udto.|Good noon.', ''],
   ['maayong hapon', 'good afternoon', 'From about one until dusk.', 'Maayong hapon, Dong.|Good afternoon, lad.', ''],
@@ -154,7 +154,7 @@ const LANG_CEB_PACK = [
 ]},
 
 /* ── Counting ────────────────────────────────────────────────── */
-{ g: 'Numbers', tags: ['numbers', 'core'], w: [
+{ g: 'Numbers', tags: ['numbers', 'core'], pos: 'adjective', w: [
   ['usa', 'one', 'The number one.', 'Usa ka tuig.|One year.', 'Cebuano uses native numbers for counting things and Spanish ones for money and time.'],
   ['duha', 'two', 'The number two.', 'Duha ka tawo.|Two people.', ''],
   ['tulo', 'three', 'The number three.', 'Tulo ka adlaw.|Three days.', ''],
@@ -217,7 +217,7 @@ const LANG_CEB_PACK = [
 ]},
 
 /* ── People ──────────────────────────────────────────────────── */
-{ g: 'Family and people', tags: ['family', 'people'], w: [
+{ g: 'Family and people', tags: ['family', 'people'], pos: 'noun', w: [
   ['tawo', 'person', 'A human being.', 'Daghang tawo.|Many people.', ''],
   ['bata', 'child', 'A child, or someone young.', 'Gamay pa nga bata.|Still a small child.', ''],
   ['lalaki', 'man / male', 'A male person.', 'Lalaki nga bata.|A boy.', ''],
@@ -252,7 +252,7 @@ const LANG_CEB_PACK = [
 ]},
 
 /* ── The verb system, which is the whole language ─────────────── */
-{ g: 'Verb affixes', tags: ['verbs', 'grammar', 'core'], w: [
+{ g: 'Verb affixes', tags: ['verbs', 'grammar', 'core'], pos: 'particle', w: [
   ['mag-', '(will do / does)', 'Prefix marking an ongoing or habitual action with the doer as the focus. The workhorse of Cebuano verbs.', 'Magluto ko.|I will cook.', 'Cebuano marks WHO or WHAT the sentence is about by changing the verb, not the word order. This is the hardest and most important thing to learn.'],
   ['mi-', '(did)', 'Prefix marking a completed action, doer in focus.', 'Mikaon ko.|I ate.', 'Also appears as "ni-" — the same thing, different region.'],
   ['ni-', '(did)', 'The commoner spoken form of "mi-".', 'Niadto ko didto.|I went there.', ''],
@@ -268,7 +268,7 @@ const LANG_CEB_PACK = [
   ['ma-', '(will become)', 'Marks a change of state.', 'Malipay ko.|I will be happy.', ''],
 ]},
 
-{ g: 'Everyday verbs', tags: ['verbs', 'core'], w: [
+{ g: 'Everyday verbs', tags: ['verbs', 'core'], pos: 'verb', w: [
   ['kaon', 'eat / come and eat', 'To take food. Called out to anyone passing while you are eating, it is an invitation and a courtesy rather than a literal offer.', 'Mangaon ta. / Kaon ta!|Let us eat. / Come eat with us!', 'Declining outright is rude; "salamat, busog pa ko" is the polite refusal.'],
   ['inom', 'drink / drinking session', 'To take liquid. As a noun it is a drinking gathering, which is a social institution rather than just an event.', 'Moinom ko ug tubig. / Naay inom karong gabii.|I will drink water. / There is a drinking session tonight.', ''],
   ['tulog', 'sleep', 'To sleep.', 'Matulog na ko.|I am going to sleep.', ''],
@@ -335,7 +335,7 @@ const LANG_CEB_PACK = [
 ]},
 
 /* ── Describing things ───────────────────────────────────────── */
-{ g: 'Adjectives', tags: ['adjectives', 'core'], w: [
+{ g: 'Adjectives', tags: ['adjectives', 'core'], pos: 'adjective', w: [
   ['maayo', 'good / well', 'Good, or in good condition.', 'Maayo ni.|This is good.', ''],
   ['dautan', 'bad / evil', 'Morally bad.', 'Dautan nga binuhatan.|A bad deed.', 'For "bad quality" use "dili maayo".'],
   ['dako', 'big', 'Large in size.', 'Dako nga isda.|A big fish.', ''],
@@ -378,7 +378,7 @@ const LANG_CEB_PACK = [
 ]},
 
 /* ── Food ────────────────────────────────────────────────────── */
-{ g: 'Food and drink', tags: ['food'], w: [
+{ g: 'Food and drink', tags: ['food'], pos: 'noun', w: [
   ['pagkaon', 'food', 'Food in general.', 'Naay pagkaon.|There is food.', ''],
   ['kan-on', 'cooked rice', 'Rice that has been cooked. The centre of every meal.', 'Daghang kan-on.|A lot of rice.', 'Different word from uncooked rice — the distinction matters here.'],
   ['bugas', 'uncooked rice', 'Raw rice grain.', 'Mopalit ug bugas.|Buy some rice.', ''],
@@ -414,7 +414,7 @@ const LANG_CEB_PACK = [
 ]},
 
 /* ── Home and things ─────────────────────────────────────────── */
-{ g: 'Home and objects', tags: ['home', 'objects'], w: [
+{ g: 'Home and objects', tags: ['home', 'objects'], pos: 'noun', w: [
   ['balay', 'house / home', 'A house or home.', 'Sa among balay.|At our house.', ''],
   ['kwarto', 'room', 'A room.', 'Akong kwarto.|My room.', ''],
   ['pultahan', 'door', 'A door.', 'Sirad-i ang pultahan.|Close the door.', ''],
@@ -442,7 +442,7 @@ const LANG_CEB_PACK = [
 ]},
 
 /* ── Getting around ──────────────────────────────────────────── */
-{ g: 'Places and travel', tags: ['places', 'travel'], w: [
+{ g: 'Places and travel', tags: ['places', 'travel'], pos: 'noun', w: [
   ['dalan', 'road / street', 'A road or the way to somewhere.', 'Unsang dalana?|Which road?', ''],
   ['merkado', 'market', 'A market.', 'Adto sa merkado.|Go to the market.', ''],
   ['tindahan', 'store', 'A shop.', 'Duol ra ang tindahan.|The store is near.', ''],
@@ -474,7 +474,7 @@ const LANG_CEB_PACK = [
 ]},
 
 /* ── Feeling ─────────────────────────────────────────────────── */
-{ g: 'Feelings', tags: ['feelings'], w: [
+{ g: 'Feelings', tags: ['feelings'], pos: 'adjective', w: [
   ['malipayon', 'happy', 'In good spirits.', 'Malipayon ko.|I am happy.', ''],
   ['masulub-on', 'sad', 'In low spirits.', 'Masulub-on siya.|He is sad.', ''],
   ['nasuko', 'angry', 'Angry.', 'Nasuko siya nako.|He is angry with me.', ''],
@@ -490,7 +490,7 @@ const LANG_CEB_PACK = [
 ]},
 
 /* ── The world outside ───────────────────────────────────────── */
-{ g: 'Weather and nature', tags: ['weather', 'nature'], w: [
+{ g: 'Weather and nature', tags: ['weather', 'nature'], pos: 'noun', w: [
   ['ulan', 'rain', 'Rain.', 'Nag-ulan.|It is raining.', ''],
   ['hangin', 'wind / air', 'Wind, and also air.', 'Kusog ang hangin.|The wind is strong.', ''],
   ['panganod', 'cloud', 'A cloud.', 'Daghang panganod.|Many clouds.', ''],
@@ -508,7 +508,7 @@ const LANG_CEB_PACK = [
   ['langit', 'sky / heaven', 'The sky, and also heaven.', 'Tin-aw ang langit.|The sky is clear.', ''],
 ]},
 
-{ g: 'Animals', tags: ['animals'], w: [
+{ g: 'Animals', tags: ['animals'], pos: 'noun', w: [
   ['iro', 'dog', 'A dog.', 'Ang iro nag-uwang.|The dog is barking.', ''],
   ['iring', 'cat', 'A cat.', 'Ang iring natulog.|The cat is sleeping.', ''],
   ['kabaw', 'water buffalo', 'The carabao, the working animal of the farm.', 'Ang kabaw sa uma.|The carabao in the field.', ''],
@@ -519,7 +519,7 @@ const LANG_CEB_PACK = [
   ['lamok', 'mosquito', 'A mosquito.', 'Daghang lamok.|Many mosquitoes.', ''],
 ]},
 
-{ g: 'Colours', tags: ['colours'], w: [
+{ g: 'Colours', tags: ['colours'], pos: 'adjective', w: [
   ['puti', 'white', 'The colour white.', 'Puti nga sinina.|A white shirt.', ''],
   ['itom', 'black', 'The colour black.', 'Itom nga buhok.|Black hair.', ''],
   ['pula', 'red', 'The colour red.', 'Pula nga bulak.|A red flower.', ''],
@@ -530,7 +530,7 @@ const LANG_CEB_PACK = [
 ]},
 
 /* ── The body ────────────────────────────────────────────────── */
-{ g: 'Body', tags: ['body'], w: [
+{ g: 'Body', tags: ['body'], pos: 'noun', w: [
   ['ulo', 'head', 'The head.', 'Sakit akong ulo.|My head hurts.', ''],
   ['ilong', 'nose', 'The nose.', 'Tubig sa ilong.|A runny nose.', ''],
   ['baba', 'mouth', 'The mouth.', 'Abli ang baba.|Open your mouth.', ''],
@@ -560,7 +560,7 @@ const LANG_CEB_PACK = [
 ]},
 
 /* ── Whole things you can say ────────────────────────────────── */
-{ g: 'Everyday phrases', tags: ['phrases', 'essentials'], w: [
+{ g: 'Everyday phrases', tags: ['phrases', 'essentials'], pos: 'phrase', w: [
   ['unsay imong ngalan', 'what is your name', 'The standard way to ask a name.', 'Unsay imong ngalan?|What is your name?', ''],
   ['ako si', 'I am', 'Introduces yourself by name.', 'Ako si Maria.|I am Maria.', '"Si" marks a personal name and is not optional.'],
   ['taga-asa ka', 'where are you from', 'Asks someone\'s origin.', 'Taga-asa ka?|Where are you from?', '"Taga-" means "from" with a place.'],
@@ -598,7 +598,7 @@ const LANG_CEB_PACK = [
 ]},
 
 /* ── Work and school ─────────────────────────────────────────── */
-{ g: 'Work and school', tags: ['work', 'school'], w: [
+{ g: 'Work and school', tags: ['work', 'school'], pos: 'noun', w: [
   ['trabahante', 'worker', 'Someone who works.', 'Trabahante siya sa pabrika.|He is a worker at the factory.', ''],
   ['opisina', 'office', 'An office.', 'Adto ko sa opisina.|I am going to the office.', ''],
   ['suweldo', 'salary / wages', 'Pay for work.', 'Gamay ang suweldo.|The pay is small.', ''],
@@ -646,7 +646,7 @@ const LANG_CEB_PACK = [
 ]},
 
 /* ── Clothes ─────────────────────────────────────────────────── */
-{ g: 'Clothing', tags: ['clothing', 'objects'], w: [
+{ g: 'Clothing', tags: ['clothing', 'objects'], pos: 'noun', w: [
   ['sanina', 'shirt / clothes', 'A shirt or clothing generally.', 'Bag-ong sanina.|A new shirt.', 'Also spelled "sinina".'],
   ['karsones', 'trousers', 'Trousers.', 'Itom nga karsones.|Black trousers.', ''],
   ['tsinelas', 'slippers', 'Flip-flops — the everyday footwear.', 'Tsinelas ra.|Just slippers.', ''],
@@ -683,7 +683,7 @@ const LANG_CEB_PACK = [
 ]},
 
 /* ── More of the verbs you need daily ────────────────────────── */
-{ g: 'More verbs', tags: ['verbs'], w: [
+{ g: 'More verbs', tags: ['verbs'], pos: 'verb', w: [
   ['higda', 'lie down', 'To lie down.', 'Higda sa katre.|Lie on the bed.', ''],
   ['bangon', 'get up', 'To rise from lying.', 'Bangon na.|Get up now.', ''],
   ['pahulam', 'lend', 'To give temporarily.', 'Pahulama ko.|Lend it to me.', ''],
@@ -888,7 +888,7 @@ const LANG_CEB_PACK = [
 ]},
 
 /* ── Ideas and abstractions ──────────────────────────────────── */
-{ g: 'Ideas', tags: ['abstract'], w: [
+{ g: 'Ideas', tags: ['abstract'], pos: 'noun', w: [
   ['kinabuhi', 'life', 'Life.', 'Lisod ang kinabuhi.|Life is hard.', ''],
   ['kamatayon', 'death', 'Death.', 'Hadlok sa kamatayon.|Fear of death.', ''],
   ['gugma', 'love', 'Love.', 'Gugma sa pamilya.|Family love.', ''],
@@ -915,7 +915,7 @@ const LANG_CEB_PACK = [
 ]},
 
 /* ── Describing people ───────────────────────────────────────── */
-{ g: 'Character', tags: ['adjectives', 'people'], w: [
+{ g: 'Character', tags: ['adjectives', 'people'], pos: 'adjective', w: [
   ['buotan', 'kind / well-behaved', 'Good-natured. High praise for a person.', 'Buotan kaayo siya.|He is very kind.', 'The commonest compliment about someone\'s character.'],
   ['bugoy', 'unruly / troublemaker', 'Rough or badly behaved.', 'Bugoy nga bata.|An unruly child.', ''],
   ['tapulan', 'lazy', 'Unwilling to work.', 'Tapulan siya.|He is lazy.', ''],
@@ -939,7 +939,7 @@ const LANG_CEB_PACK = [
 ]},
 
 /* ── Reactions ───────────────────────────────────────────────── */
-{ g: 'Reactions', tags: ['phrases', 'feelings'], w: [
+{ g: 'Reactions', tags: ['phrases', 'feelings'], pos: 'interjection', w: [
   ['pastilan', 'good grief / my word', 'An exclamation of dismay or amazement. Very Visayan.', 'Pastilan!|Good grief!', 'Mild and widely used; the closest thing to a signature Cebuano exclamation.'],
   ['sus', 'goodness', 'A short exclamation of surprise or exasperation.', 'Sus, ikaw gyud.|Goodness, it is you.', 'From "Jesus"; entirely mild in use.'],
   ['agi', 'ouch / oh', 'An exclamation of small pain or surprise.', 'Agi!|Ouch!', ''],
@@ -979,7 +979,7 @@ const LANG_CEB_PACK = [
 ]},
 
 /* ── Sounds, textures, states ────────────────────────────────── */
-{ g: 'More descriptions', tags: ['adjectives'], w: [
+{ g: 'More descriptions', tags: ['adjectives'], pos: 'adjective', w: [
   ['hait', 'sharp', 'Having a fine edge.', 'Hait nga kutsilyo.|A sharp knife.', ''],
   ['humok', 'soft', 'Soft to the touch.', 'Humok nga unlan.|A soft pillow.', ''],
   ['gahi', 'hard / stubborn', 'Hard, and of a person, stubborn.', 'Gahi ang bato.|The stone is hard.', ''],
@@ -1008,7 +1008,7 @@ const LANG_CEB_PACK = [
 ]},
 
 /* ── Endearment and address ──────────────────────────────────── */
-{ g: 'Terms of address', tags: ['social', 'people'], w: [
+{ g: 'Terms of address', tags: ['social', 'people'], pos: 'noun', w: [
   ['langga', 'darling', 'An affectionate term for a partner, child or close friend.', 'Kumusta, langga?|How are you, darling?', 'Warm and common; not restricted to romance.'],
   ['gwapa ko', 'I am pretty', 'Said playfully about oneself.', 'Gwapa ko, no?|I am pretty, right?', ''],
   ['bai', 'mate / bro', 'Casual address between men, very Cebuano.', 'Bai, asa ka?|Mate, where are you going?', ''],
@@ -1022,7 +1022,7 @@ const LANG_CEB_PACK = [
   ['dodong', 'boy / lad', 'Address for a boy or young man.', 'Dodong, tabangi ko.|Lad, help me.', ''],
 ]},
 
-{ g: 'Government and community', tags: ['civic', 'places'], w: [
+{ g: 'Government and community', tags: ['civic', 'places'], pos: 'noun', w: [
   ['barangay', 'barangay', 'The smallest unit of local government -- your neighbourhood, officially.', 'Asa nga barangay ka?|Which barangay are you from?', 'Every Filipino address has one. It is the first office you go to for almost anything.'],
   ['kapitan', 'barangay captain', 'The elected head of a barangay.', 'Ang kapitan mao ang nagpirma.|The captain was the one who signed.', ''],
   ['alkalde', 'mayor', 'The mayor of a town or city.', 'Bag-o ang among alkalde.|Our mayor is new.', 'From Spanish "alcalde". You will also hear the English "mayor".'],
@@ -1115,7 +1115,7 @@ const LANG_CEB_PACK = [
   ['kapin', 'surplus / left over', 'More than enough; the remainder.', 'Naa pay kapin nga kwarta.|There is money left over.', ''],
 ]},
 
-{ g: 'Idioms', tags: ['idioms', 'phrases'], w: [
+{ g: 'Idioms', tags: ['idioms', 'phrases'], pos: 'phrase', w: [
   ['gaan ug dugo', 'likeable', 'Literally light of blood: someone you take to immediately.', 'Gaan kaayo siya ug dugo.|He is very easy to like.', 'The single most useful compliment in this list.'],
   ['bug-at ug dugo', 'off-putting', 'Heavy of blood: someone you dislike on sight, for no stated reason.', 'Bug-at siya ug dugo nako.|I just cannot warm to him.', ''],
   ['taas ug ilong', 'snobbish', 'High of nose -- stuck-up.', 'Taas siya ug ilong sukad nadato.|She has been snobbish since she got rich.', ''],
@@ -1139,7 +1139,7 @@ const LANG_CEB_PACK = [
   ['kumusta na lang', 'well, what can you do', 'A resigned shrug, said of a situation nobody can change.', 'Kumusta na lang, bai.|Well, what can you do.', ''],
 ]},
 
-{ g: 'Joining words', tags: ['grammar', 'core'], w: [
+{ g: 'Joining words', tags: ['grammar', 'core'], pos: 'conjunction', w: [
   ['apan', 'but / however', 'But, in writing and careful speech.', 'Lisod, apan mahimo.|It is hard, but it can be done.', ''],
   ['mao nga', 'that is why', 'And so; for that reason.', 'Nagdali ko, mao nga nakalimot ko.|I was in a hurry, that is why I forgot.', ''],
   ['busa', 'therefore', 'Therefore -- more formal than "mao nga".', 'Busa, mouli na ta.|Therefore, let us go home.', ''],
@@ -1152,7 +1152,7 @@ const LANG_CEB_PACK = [
   ['bisan pa', 'even so', 'Nevertheless.', 'Bisan pa niana, nagpadayon siya.|Even so, he carried on.', ''],
 ]},
 
-{ g: 'Church and fiesta', tags: ['culture', 'belief'], w: [
+{ g: 'Church and fiesta', tags: ['culture', 'belief'], pos: 'noun', w: [
   ['misa', 'mass', 'The mass.', 'Alas sais ang misa.|The mass is at six.', ''],
   ['pari', 'priest', 'A priest.', 'Ang pari mibendisyon sa balay.|The priest blessed the house.', ''],
   ['Diyos', 'God', 'God.', 'Buhaton ni sa Diyos.|God will do this.', ''],
@@ -1187,7 +1187,7 @@ const LANG_CEB_PACK = [
   ['padulong', 'heading to', 'On the way to.', 'Padulong ko sa merkado.|I am on my way to the market.', ''],
 ]},
 
-{ g: 'Tools and materials', tags: ['objects', 'work'], w: [
+{ g: 'Tools and materials', tags: ['objects', 'work'], pos: 'noun', w: [
   ['martilyo', 'hammer', 'A hammer.', 'Hulami ko sa martilyo.|Lend me the hammer.', ''],
   ['lansang', 'nail', 'A nail.', 'Kulang ang lansang.|There are not enough nails.', ''],
   ['lagari', 'saw', 'A saw, and to saw.', 'Gilagari niya ang kahoy.|He sawed the wood.', ''],
@@ -1203,7 +1203,7 @@ const LANG_CEB_PACK = [
   ['barena', 'drill', 'A drill, and to drill.', 'Barenahi ang bungbong.|Drill the wall.', ''],
 ]},
 
-{ g: 'Hedging and hearsay', tags: ['particles', 'grammar'], w: [
+{ g: 'Hedging and hearsay', tags: ['particles', 'grammar'], pos: 'particle', w: [
   ['kuno', 'reportedly / they say', 'Marks the whole sentence as something you were told, not something you know.', 'Moabot siya ugma kuno.|He is coming tomorrow, they say.', 'Drop this in and you are no longer responsible for the claim. Enormously useful.'],
   ['daw', 'apparently', 'Like "kuno" but a shade softer: it seems, by report.', 'Naa daw bagyo.|There is apparently a storm coming.', ''],
   ['unta', 'hopefully / would that', 'Marks a wish, or something that was supposed to happen and did not.', 'Moadto unta ko.|I was going to go. / I wish I could go.', 'With a past verb it becomes regret: "nakaadto unta ko", I could have gone.'],
@@ -1213,7 +1213,7 @@ const LANG_CEB_PACK = [
   ['kunohay', 'supposedly / pretending', 'Says the claim is a pretence.', 'Kunohay busy siya.|He is supposedly busy.', 'Sharper than "kuno" -- this one doubts out loud.'],
 ]},
 
-{ g: 'Around the neighbourhood', tags: ['places', 'home'], w: [
+{ g: 'Around the neighbourhood', tags: ['places', 'home'], pos: 'noun', w: [
   ['purok', 'purok', 'A named sub-area of a barangay -- the level below your address.', 'Taga Purok Tres ko.|I am from Purok Three.', ''],
   ['sitio', 'sitio', 'A small outlying settlement within a barangay.', 'Layo ang ilang sitio.|Their sitio is far.', ''],
   ['eskina', 'street corner', 'A corner where two streets meet, and the loitering spot it implies.', 'Naghulat ko sa eskina.|I waited at the corner.', ''],
@@ -1243,6 +1243,11 @@ function langCebPackRows() {
       out.push({
         ceb: row[0], en: row[1], desc: row[2],
         example: row[3] || '', note: row[4] || '',
+        /* Part of speech comes from the group, and only from groups whose
+           part of speech is actually uniform -- a wrong label is worse than a
+           blank one, so a mixed group like Time (nouns and adverbs together)
+           carries none. A row may still override with a sixth field. */
+        pos: row[5] || group.pos || '',
         group: group.g, tags: (group.tags || []).slice()
       });
     });
@@ -1269,7 +1274,7 @@ function _langCebWord(r) {
   rec.tags = r.tags.concat([r.group.toLowerCase()]);
   rec.forms.ceb = {
     term: r.ceb,
-    pos: '',
+    pos: r.pos || '',
     definition: r.desc,
     examples: r.example && r.example.indexOf('|') > -1
       ? [{ id: generateId(),
@@ -1281,10 +1286,13 @@ function _langCebWord(r) {
     notes: r.note || '',
     restrictions: ''
   };
-  rec.forms.en = {
-    term: r.en, pos: '', definition: r.desc,
-    examples: [], notes: '', restrictions: ''
-  };
+  /* The English side carries the gloss and nothing else. The description is
+     written in English but it is a description OF THE CEBUANO WORD -- storing
+     it again here defined the English word as though "already / now" meant
+     "marks a change of state", which it does not, and cost 40KB of a document
+     already at two thirds of its cap. Readers fall back to the study
+     language's definition, which is the one that was always being read. */
+  rec.forms.en = { term: r.en, pos: '', definition: '', examples: [], notes: '', restrictions: '' };
   return rec;
 }
 

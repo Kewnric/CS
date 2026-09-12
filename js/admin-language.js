@@ -89,30 +89,85 @@ function renderLangAdmin() {
 
 /* ── Words ────────────────────────────────────────────────── */
 
+/* Admin had no search at all. With the starter pack that is 1,008 rows,
+   19,223 DOM nodes and 2,022 icons, rebuilt in full after every single edit
+   or delete -- and the only way to reach a word was to scroll to it. A box
+   and a cap; the same two things the library itself already had. */
+const LANG_ADMIN_PAGE = 60;
+let langAdminQuery = '';
+let langAdminShown = LANG_ADMIN_PAGE;
+
+function langAdminSetQuery(v) {
+  langAdminQuery = (v || '').trim();
+  langAdminShown = LANG_ADMIN_PAGE;
+  const host = document.getElementById('lang-admin-body');
+  if (!host) { renderLangAdmin(); return; }
+  /* Swap only the table, so the caret stays in the box. */
+  const fresh = document.createElement('div');
+  fresh.innerHTML = langWordListHTML();
+  const a = host.querySelector('.lang-admin-table'), b = fresh.querySelector('.lang-admin-table');
+  const ca = host.querySelector('.lang-admin-count'), cb = fresh.querySelector('.lang-admin-count');
+  if (a && b) { a.innerHTML = b.innerHTML; if (typeof lucide !== 'undefined') lucide.createIcons({ root: a }); }
+  if (ca && cb) ca.textContent = cb.textContent;
+  const fa = host.querySelector('.lang-admin-more'), fb = fresh.querySelector('.lang-admin-more');
+  if (fa && fb) fa.innerHTML = fb.innerHTML;
+  else if (fa) fa.remove();
+  else if (fb && a) a.insertAdjacentElement('afterend', fb);
+}
+
+function langAdminShowMore() { langAdminShown += LANG_ADMIN_PAGE; renderLangAdmin(); }
+
 function langWordListHTML() {
   const study = langStudy();
-  const rows = langWords().slice()
-    .sort((a, b) => langHeadword(a, study).localeCompare(langHeadword(b, study), undefined, { sensitivity: 'base' }))
-    .map(w => `
+  const collator = new Intl.Collator(undefined, { sensitivity: 'base' });
+  const all = langWords().filter(w => langMatches(w, langAdminQuery));
+  const sorted = all
+    .map(w => ({ w: w, key: langHeadword(w, study) }))
+    .sort((a, b) => collator.compare(a.key, b.key))
+    .map(x => x.w);
+  const shown = sorted.slice(0, langAdminShown);
+  const hidden = sorted.length - shown.length;
+  const total = langWords().length;
+
+  const rows = shown.map(w => `
       <tr>
-        <td><strong>${escapeHTML(langHeadword(w, study))}</strong></td>
+        <td><strong>${escapeHTML(langHeadword(w, study))}</strong>
+          ${typeof langRecallBadgeHTML === 'function' ? langRecallBadgeHTML(w) : ''}</td>
         <td>${LANG_CODES.map(c => (langForm(w, c).term || '').trim()
               ? `<span class="lang-mini-pill">${escapeHTML(langShort(c))}</span>` : '').join('') || '<em>empty</em>'}</td>
         <td>${escapeHTML(langForm(w, study).pos || '')}</td>
         <td class="lang-admin-actions">
-          <button class="btn btn-ghost btn-sm" onclick="langEditWordDraft('${w.id}')" title="Edit"><i data-lucide="pencil"></i></button>
-          <button class="btn btn-ghost btn-sm" onclick="langAdminDeleteWord('${w.id}')" title="Delete"><i data-lucide="trash-2"></i></button>
+          <button class="btn btn-ghost btn-sm" onclick="langEditWordDraft('${w.id}')" title="Edit"
+                  aria-label="Edit ${escapeHTML(langHeadword(w, study))}">${langIcon('pencil')}</button>
+          <button class="btn btn-ghost btn-sm" onclick="langAdminDeleteWord('${w.id}')" title="Delete"
+                  aria-label="Delete ${escapeHTML(langHeadword(w, study))}">${langIcon('trash-2')}</button>
         </td>
       </tr>`).join('');
+
   return `
     <div class="lang-admin-bar">
       <button class="btn btn-primary" onclick="langNewWordDraft()"><i data-lucide="plus" style="width:15px;height:15px;"></i> New word</button>
-      <span class="lang-admin-count">${langWords().length} word${langWords().length !== 1 ? 's' : ''}</span>
+      <div class="search-container lang-admin-search">
+        <i data-lucide="search"></i>
+        <input type="text" class="search-input" id="lang-admin-q" placeholder="Search words…"
+               autocomplete="off" aria-label="Search words"
+               value="${escapeHTML(langAdminQuery)}" oninput="langAdminSetQuery(this.value)" />
+      </div>
+      <span class="lang-admin-count">${langAdminQuery
+        ? sorted.length + ' of ' + total + ' word' + (total !== 1 ? 's' : '')
+        : total + ' word' + (total !== 1 ? 's' : '')}</span>
     </div>
     <table class="lang-admin-table">
       <thead><tr><th>Headword</th><th>Languages</th><th>Part of speech</th><th></th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="4"><em>No words yet.</em></td></tr>'}</tbody>
-    </table>`;
+      <tbody>${rows || `<tr><td colspan="4"><em>${langAdminQuery ? 'No words match that search.' : 'No words yet.'}</em></td></tr>`}</tbody>
+    </table>
+    ${hidden > 0 ? `
+      <div class="lang-admin-more">
+        <button class="btn btn-secondary btn-sm" onclick="langAdminShowMore()">
+          Show ${Math.min(hidden, LANG_ADMIN_PAGE)} more
+        </button>
+        <span class="lang-board-hint">${shown.length} of ${sorted.length} shown — search covers all of them</span>
+      </div>` : ''}`;
 }
 
 function langNewWordDraft() { langWordDraft = langBlankWord(); renderLangAdmin(); }

@@ -411,6 +411,10 @@ function laPrimary() {
   _la.answered.push({ id: it.id, type: it.type, ok, given, expected });
   if (ok) _la.correct++;
   else _la.hearts = Math.max(0, _la.hearts - 1);
+  /* Tell the library what just happened to this WORD, not only to this run.
+     A question generated from the dictionary carries the word it came from,
+     which is what turns a drill into a review schedule rather than a score. */
+  if (it.wordId && typeof langRecallGrade === 'function') langRecallGrade(it.wordId, ok);
   _la.state = 'checked';
   laRender();
 }
@@ -420,6 +424,8 @@ function laSkip() {
   const it = laCurrent();
   _la.answered.push({ id: it.id, type: it.type, ok: false, given: '(skipped)', expected: laExpectedOf(it) });
   _la.hearts = Math.max(0, _la.hearts - 1);
+  // A skip is not knowing it, so it schedules like a miss.
+  if (it.wordId && typeof langRecallGrade === 'function') langRecallGrade(it.wordId, false);
   _la.state = 'checked';
   laRender();
 }
