@@ -710,8 +710,36 @@ function treeStaggerIn(container) {
 }
 
 /** The one place a tree row becomes selected. */
+/**
+ * Which tree a container belongs to.
+ *
+ * Every renderer sets container.dataset.treeNs -- one line AFTER it calls
+ * treeCommit. The attribute survives an innerHTML rewrite, so that ordering
+ * never mattered while the element lived; but a route change rebuilds
+ * #spa-content, and the first render into the new container therefore had no
+ * namespace to read. Selection mode persists across navigation, so arriving
+ * at a library with rows already ticked drew no checkboxes and no highlight
+ * while clicks went on ticking: an invisible selection mode.
+ *
+ * Falling back to the registered hosts' own container selectors fixes it for
+ * every tree at once, including any added later, rather than depending on
+ * four call sites remembering to assign before they commit.
+ */
+function _treeNsOf(container) {
+  if (container && container.dataset && container.dataset.treeNs) return container.dataset.treeNs;
+  const names = Object.keys(TREE_HOSTS);
+  for (let i = 0; i < names.length; i++) {
+    const sel = TREE_HOSTS[names[i]].container;
+    if (sel && container && container.matches && container.matches(sel)) {
+      if (container.dataset) container.dataset.treeNs = names[i];
+      return names[i];
+    }
+  }
+  return null;
+}
+
 function treeApplySelection(container, selectedId) {
-  const ns = container.dataset ? container.dataset.treeNs : null;
+  const ns = _treeNsOf(container);
   const host = (ns && TREE_HOSTS[ns]) || {};
   const selNs = host.selectNs;
   const picking = !!(selNs && typeof libSelectMode === 'function' && libSelectMode(selNs));
@@ -725,9 +753,13 @@ function treeApplySelection(container, selectedId) {
        looking at one folder while five others are ticked for a batch change,
        and collapsing those two states into one class made the batch invisible
        the moment you clicked anything. */
-    const ticked = picking && typeof libIsSelected === 'function' && libIsSelected(selNs, row.dataset.nodeId);
+    /* Uncategorized is a view of parentId: null, not a node -- it cannot be
+       ticked, so it must not be offered a checkbox either. */
+    const tickable = picking && row.dataset.nodeId && row.dataset.nodeId !== TREE_ROOT_ID;
+    row.classList.toggle('tree-tickable', !!tickable);
+    const ticked = tickable && typeof libIsSelected === 'function' && libIsSelected(selNs, row.dataset.nodeId);
     row.classList.toggle('tree-ticked', !!ticked);
-    if (picking) row.setAttribute('aria-checked', ticked ? 'true' : 'false');
+    if (tickable) row.setAttribute('aria-checked', ticked ? 'true' : 'false');
     else row.removeAttribute('aria-checked');
   });
 }

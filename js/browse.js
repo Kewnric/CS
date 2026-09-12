@@ -2162,8 +2162,21 @@ function browseSetIcon(id) {
    resolves either, and skips whichever kind an edit does not apply to rather
    than throwing halfway through and leaving half the selection changed. */
 
+/**
+ * Resolve ticked ids into what they actually are.
+ *
+ * THREE kinds, not two. browseFindItem answers for exercise sets as well as
+ * programs, so a set arrived here labelled 'item' -- got counted in the
+ * delete confirmation, and was then handed to softDeleteChallenge, which
+ * only ever looks in state.challenges. It returned quietly, the set survived,
+ * and the confirmation had already promised otherwise.
+ */
 function browseBatchTargets(ids) {
+  const sets = state.codingSets || [];
   return (ids || []).map(id => {
+    if (sets.some(s => s.id === id)) {
+      return { id, kind: 'set', rec: sets.find(s => s.id === id) };
+    }
     const item = browseFindItem(id);
     if (item) return { id, kind: 'item', rec: item };
     const folder = (state.nodes || []).find(n => n.id === id);
@@ -2255,9 +2268,11 @@ function browseBatchDelete(ids) {
   const targets = browseBatchTargets(ids);
   if (!targets.length) return;
   const items = targets.filter(t => t.kind === 'item');
+  const sets = targets.filter(t => t.kind === 'set');
   const folders = targets.filter(t => t.kind === 'folder');
   const parts = [];
   if (items.length) parts.push(items.length + ' program' + (items.length === 1 ? '' : 's'));
+  if (sets.length) parts.push(sets.length + ' practice set' + (sets.length === 1 ? '' : 's'));
   if (folders.length) parts.push(folders.length + ' folder' + (folders.length === 1 ? '' : 's'));
   showConfirm('Delete ' + parts.join(' and ') + '?',
     'Deleting a folder deletes what is inside it. This can be undone from the toast.',
@@ -2269,6 +2284,22 @@ function browseBatchDelete(ids) {
          confirm dialog, so routing a batch through it would stack one
          "Delete Folder?" prompt per folder on top of the one just answered. */
       items.forEach(t => { if (typeof softDeleteChallenge === 'function') softDeleteChallenge(t.id, () => {}); });
+      /* Sets are spliced here rather than through deleteCodingSet, which — like
+         ctxDeleteFolder — raises its own confirm. Undo is pushed per set so a
+         batch is as recoverable as a single delete. */
+      sets.forEach(t => {
+        const i = (state.codingSets || []).findIndex(s => s.id === t.id);
+        if (i === -1) return;
+        const rec = state.codingSets[i];
+        state.codingSets.splice(i, 1);
+        if (typeof pushUndo === 'function') {
+          pushUndo('Deleted set "' + (rec.title || 'Untitled') + '"', () => {
+            if (!state.codingSets) state.codingSets = [];
+            state.codingSets.splice(Math.min(i, state.codingSets.length), 0, rec);
+            saveData(); invalidateBrowseCache(); treeRefreshHosts();
+          });
+        }
+      });
       folders.forEach(t => {
         if (browseActiveNodeId === t.id) browseActiveNodeId = null;
         if (typeof softDeleteFolder === 'function') softDeleteFolder(t.id, () => {});

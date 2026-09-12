@@ -1082,6 +1082,11 @@ details[open]>.snippet-folder-summary>.folder-icon {
 .tree-node-row.active::after {
   --rail-c: rgba(var(--rail, 34, 211, 238), 1);
   width: 26px;
+  /* Decoration. At 3px it never reached anything; at 26px it lies over the
+     right end of the row, where the item count sits -- measured covering
+     14px of a 23px badge -- so it must not take the pointer, and the badge
+     has to paint above it. */
+  pointer-events: none;
   top: 0;
   bottom: 0;
   border-radius: 0;
@@ -1117,7 +1122,10 @@ details[open]>.snippet-folder-summary>.folder-icon {
 .tree-picking .tree-node-row {
   cursor: copy;
 }
-.tree-picking .tree-node-row::before {
+/* Only rows that can actually be ticked. The Uncategorized pseudo-row is a
+   view of parentId: null, and a checkbox it refuses to tick is a broken
+   control. */
+.tree-picking .tree-node-row.tree-tickable::before {
   content: '';
   position: absolute;
   left: 3px;
@@ -1131,7 +1139,7 @@ details[open]>.snippet-folder-summary>.folder-icon {
   transition: background 0.15s ease, border-color 0.15s ease, transform 0.18s var(--ease-spring);
   z-index: 1;
 }
-.tree-picking .tree-node-row:hover::before { border-color: var(--color-primary); }
+.tree-picking .tree-node-row.tree-tickable:hover::before { border-color: var(--color-primary); }
 .tree-picking .tree-node-row.tree-ticked::before {
   background: var(--color-primary);
   border-color: var(--color-primary);
@@ -1149,8 +1157,15 @@ details[open]>.snippet-folder-summary>.folder-icon {
   background-position: center;
   background-repeat: no-repeat;
 }
-/* Room for the box, so it does not sit on top of the chevron. */
-.tree-picking .tree-node-row { padding-left: 20px; }
+/* Room for the box, so it does not sit on top of the chevron.
+
+   !important because every row carries an inline `padding-left: calc(0.75rem)`
+   written by the renderer, which a class rule cannot beat -- without this the
+   declaration was simply ignored and the box (3px..16px) sat across the
+   chevron (from 8px). The inline value is a constant, not the per-depth
+   indent -- that comes from .tree-children's margin -- so overriding it
+   shifts every row equally and the tree keeps its shape. */
+.tree-picking .tree-node-row.tree-tickable { padding-left: 24px !important; }
 .tree-picking .tree-node-row.tree-ticked {
   background: color-mix(in srgb, var(--color-primary) 12%, var(--bg-surface-hover));
 }
@@ -1279,6 +1294,11 @@ details[open]>.snippet-folder-summary>.folder-icon {
   color: var(--text-tertiary);
   margin-left: auto;
   flex-shrink: 0;
+  /* Above the selected row's dither, which reaches 26px in from the right and
+     otherwise lies across the count. The badge is opaque, so it reads as a
+     chip sitting on the field rather than as something half-buried in it. */
+  position: relative;
+  z-index: 1;
 }
 
 .tree-children {
