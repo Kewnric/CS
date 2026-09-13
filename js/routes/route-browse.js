@@ -20,31 +20,54 @@ function browseTemplate() {
                 </span>
               </h2>
             </div>
-            <div style="display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0;">
-              <button class="tutorial-trigger-btn" id="browse-toggle-items-btn" onclick="toggleBrowseTreeItems()" title="Toggle file visibility">
-                <i data-lucide="${localStorage.getItem('browseHideItems') === 'true' ? 'eye-off' : 'eye'}" id="browse-toggle-items-icon"></i>
+            <!-- ONE button for the row of tools. Six side by side squeezed the
+                 title and its count into a wrapped column beside them; behind one
+                 they drop down under it as a block, the way a folder opens in the
+                 tree below. Hover opens it where there is a pointer to hover
+                 with; on a phone or tablet it is a tap (browseHeadMenuToggle).
+                 js-hold-pop gives it the shared close-on-tap-outside. Every
+                 button keeps its id, so the code that repaints the eye, the
+                 hidden view and the starter switch finds them as before. -->
+            <div class="browse-head-menu js-hold-pop" id="browse-head-menu"
+                 onmouseleave="browseHeadMenuLeave()" onfocusout="browseHeadMenuFocusOut(event)"
+                 onkeydown="browseHeadMenuKey(event)">
+              <button class="tutorial-trigger-btn browse-head-trigger" id="browse-head-trigger"
+                      onclick="browseHeadMenuToggle(event)" aria-expanded="false"
+                      aria-controls="browse-head-drop" title="Library tools" aria-label="Library tools">
+                <i data-lucide="ellipsis-vertical"></i>
               </button>
-              <!-- Hidden programs: the same folders, viewed separately. Not the
-                   eye beside it, which hides every program row to show folders
-                   only. See browseToggleHiddenView. -->
-              <button class="tutorial-trigger-btn browse-hidden-btn" id="browse-hidden-btn" onclick="browseToggleHiddenView()"
-                      aria-pressed="false" title="Show hidden programs" aria-label="Show hidden programs">
-                <i data-lucide="archive"></i>
-              </button>
-              ${typeof codingStarterButtonTemplate === 'function' ? codingStarterButtonTemplate() : ''}
-              <!-- Every walkthrough, browsable outside an attempt. -->
-              <button class="tutorial-trigger-btn" onclick="demoOpenLibrary()"
-                      title="Walkthroughs — see an idea demonstrated" aria-label="Walkthroughs">
-                <i data-lucide="presentation"></i>
-              </button>
-              <!-- Reading and repairing, as opposed to writing. -->
-              <button class="tutorial-trigger-btn" onclick="spaNavigate('drills')"
-                      title="Drills — predict the output, or find the bug" aria-label="Drills">
-                <i data-lucide="brain-circuit"></i>
-              </button>
-              <button class="tutorial-trigger-btn" onclick="GuidedTutorial.start()" title="Show Page Tour">
-                <i data-lucide="graduation-cap"></i>
-              </button>
+              <div class="browse-head-drop" id="browse-head-drop" role="group" aria-label="Library tools">
+                <div class="browse-head-drop-inner">
+                  <div class="browse-head-drop-list" onclick="browseHeadMenuPicked(event)">
+                    <button class="tutorial-trigger-btn" id="browse-toggle-items-btn" onclick="toggleBrowseTreeItems()"
+                            title="Toggle file visibility" aria-label="Toggle file visibility">
+                      <i data-lucide="${localStorage.getItem('browseHideItems') === 'true' ? 'eye-off' : 'eye'}" id="browse-toggle-items-icon"></i>
+                    </button>
+                    <!-- Hidden programs: the same folders, viewed separately. Not the
+                         eye above it, which hides every program row to show folders
+                         only. See browseToggleHiddenView. -->
+                    <button class="tutorial-trigger-btn browse-hidden-btn" id="browse-hidden-btn" onclick="browseToggleHiddenView()"
+                            aria-pressed="false" title="Show hidden programs" aria-label="Show hidden programs">
+                      <i data-lucide="archive"></i>
+                    </button>
+                    ${typeof codingStarterButtonTemplate === 'function' ? codingStarterButtonTemplate() : ''}
+                    <!-- Every walkthrough, browsable outside an attempt. -->
+                    <button class="tutorial-trigger-btn" onclick="demoOpenLibrary()"
+                            title="Walkthroughs — see an idea demonstrated" aria-label="Walkthroughs">
+                      <i data-lucide="presentation"></i>
+                    </button>
+                    <!-- Reading and repairing, as opposed to writing. -->
+                    <button class="tutorial-trigger-btn" onclick="spaNavigate('drills')"
+                            title="Drills — predict the output, or find the bug" aria-label="Drills">
+                      <i data-lucide="brain-circuit"></i>
+                    </button>
+                    <button class="tutorial-trigger-btn" onclick="GuidedTutorial.start()"
+                            title="Show Page Tour" aria-label="Show Page Tour">
+                      <i data-lucide="graduation-cap"></i>
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           <div class="search-container search-animated" style="width: 100%;">

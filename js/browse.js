@@ -260,6 +260,71 @@ function toggleBrowseTreeItems() {
   }
 }
 
+/* ── The header's tools, behind one button ─────────────────────
+   Hover opens the list where hover is real -- the same media test the
+   stylesheet makes. Everywhere else the trigger is a tap toggle. .is-open is
+   only ever the tapped or keyboard state; a hover never sets it, so moving the
+   pointer away is all it takes to shut a hovered list. */
+const BROWSE_HEAD_HOVER_MQ = '(hover: hover) and (pointer: fine) and (min-width: 641px)';
+
+function _browseHeadHoverMode() {
+  return !!(window.matchMedia && window.matchMedia(BROWSE_HEAD_HOVER_MQ).matches);
+}
+
+function _browseHeadMenuSet(open) {
+  const menu = document.getElementById('browse-head-menu');
+  if (!menu) return;
+  if (open) {
+    document.querySelectorAll('.js-hold-pop.is-open').forEach(c => { if (c !== menu) c.classList.remove('is-open'); });
+  }
+  menu.classList.toggle('is-open', !!open);
+  const trigger = document.getElementById('browse-head-trigger');
+  if (trigger) trigger.setAttribute('aria-expanded', String(!!open));
+}
+
+function browseHeadMenuToggle(ev) {
+  if (ev) ev.stopPropagation();
+  const menu = document.getElementById('browse-head-menu');
+  if (!menu) return;
+  /* A mouse click where hover opens it: the list is already open under the
+     pointer, and toggling would only pin it open behind the pointer's back.
+     A tap on a touch laptop, or Enter from the keyboard, still toggles --
+     neither has a hover to lean on. */
+  if (ev && ev.pointerType === 'mouse' && _browseHeadHoverMode()) return;
+  _browseHeadMenuSet(!menu.classList.contains('is-open'));
+}
+
+function browseHeadMenuLeave() {
+  if (_browseHeadHoverMode()) _browseHeadMenuSet(false);
+}
+
+function browseHeadMenuFocusOut(ev) {
+  const menu = document.getElementById('browse-head-menu');
+  if (menu && !menu.contains(ev.relatedTarget)) _browseHeadMenuSet(false);
+}
+
+function browseHeadMenuKey(ev) {
+  if (ev.key !== 'Escape') return;
+  const menu = document.getElementById('browse-head-menu');
+  if (!menu || !menu.classList.contains('is-open')) return;
+  ev.stopPropagation();
+  _browseHeadMenuSet(false);
+  const trigger = document.getElementById('browse-head-trigger');
+  if (trigger) trigger.focus();
+}
+
+/** A tool was picked, so the list has done its job. A hovered list stays open
+    under the pointer regardless, which is what lets you flip several. */
+function browseHeadMenuPicked(ev) {
+  /* composedPath, not target.closest: the path is fixed when the click is
+     dispatched, and the eye rebuilds its own icon inside its click handler --
+     so by the time the click bubbles here the element that was tapped has left
+     the document and closest('button') finds nothing. Measured: the list
+     stayed open after tapping the eye. */
+  const path = ev && ev.composedPath ? ev.composedPath() : [];
+  if (path.some(n => n && n.tagName === 'BUTTON')) _browseHeadMenuSet(false);
+}
+
 /**
  * The tree's markup, with no selection in it.
  *

@@ -2458,5 +2458,8 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
    other libraries have no equivalent of, and that banner is now empty whenever
    there is no update to install. An empty div is still a flex item: it took a
    full gap below the mini-stats, which is the space the notes library does not
-   have there and the coding one did. */
-#browse-starter-banner:empty { display: none; }
+   have there and the coding one did. The hidden-programs banner sits in the
+   same header, is empty whenever the hidden view is off, and took the same
+   16px until it was listed here too. */
+#browse-starter-banner:empty,
+#browse-hidden-banner:empty { display: none; }
