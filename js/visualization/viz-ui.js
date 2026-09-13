@@ -862,7 +862,7 @@ function vizBreadcrumbTo(folderId) {
 /** One row for a library heading, a real folder, or the pseudo-folder. */
 function _vizFolderRow(o) {
   return `
-    <div class="tree-node${o.head ? ' viz-gen-head' : ''}${o.accent ? ' has-accent' : ''}" data-level="${o.level}" data-node-id="${o.id}"${o.accent ? ` style="--row-accent:${o.accent}"` : ''}>
+    <div class="tree-node${o.head ? ' viz-gen-head' : ''}${(o.acc || { cls: '', style: '' }).cls}" data-level="${o.level}" data-node-id="${o.id}"${(o.acc || { cls: '', style: '' }).style}>
       <div class="tree-node-row${o.active ? ' active' : ''}"
            ${treeRowAttrs({
     ns: 'viz', id: o.id, kind: 'folder', level: o.level, expanded: o.open, selected: !!o.active,
@@ -926,11 +926,11 @@ function vizRenderContentPane() {
     const isActive = viz.selectedNodeId && (viz.nodes.find(n => n.id === viz.selectedNodeId) || {}).dataId === it.id;
     const onCanvas = viz.nodes.some(n => n.dataId === it.id);
     // The badges, the star and the highlight colour the library rows carry.
-    const accent = it.color && typeof treeColorOf === 'function' ? treeColorOf(it.color) : '';
+    const acc = typeof treeAccentAttrs === 'function' ? treeAccentAttrs(it) : { cls: '', style: '' };
     const showLevel = typeof browseShow === 'function' && browseShow('level');
     const showTags = typeof browseShow === 'function' && browseShow('tags');
     return `
-      <div class="tree-node tree-item-node${accent ? ' has-accent' : ''}" data-level="${level}" data-node-id="${it.id}" data-scope="${scope}"${accent ? ` style="--row-accent:${accent}"` : ''}>
+      <div class="tree-node tree-item-node${acc.cls}" data-level="${level}" data-node-id="${it.id}" data-scope="${scope}"${acc.style}>
         <div class="tree-node-row ${isActive ? 'active' : ''}"
              ${treeRowAttrs({ ns: 'viz', id: it.id, kind: 'item', level, selected: isActive, dragStart: `vizTreeDragStart(event,'${it.id}','item')` })}
              style="padding-left: calc(0.75rem + ${TREE_ITEM_INSET}rem)"
@@ -992,7 +992,7 @@ function vizRenderContentPane() {
           active: viz.selectedFolderId === n.id,
           lock: _vizFolderLock(n.id),
           tier: typeof getTierBadgeHTML === 'function' ? getTierBadgeHTML(n.tier) : '',
-          accent: n.color && typeof treeColorOf === 'function' ? treeColorOf(n.color) : '',
+          acc: typeof treeAccentAttrs === 'function' ? treeAccentAttrs(n) : null,
           open: viz.expandedFolderIds.has(n.id) || narrowed,
           children: renderUnder(n.id, scope, level + 1)
         });

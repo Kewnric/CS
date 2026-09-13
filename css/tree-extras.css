@@ -30,6 +30,170 @@
 }
 .tree-node.has-accent > .tree-node-row .tree-node-label { color: var(--row-accent, inherit); }
 
+/* ── A chosen colour for the RIGHT edge ────────────────────────
+   The rail already draws from --rail, set per depth in layout.css. A row with
+   its own rail colour overrides that variable ON THE ROW -- not on the
+   wrapper, because the depth rule defines --rail on the row itself, and a
+   value defined there beats one inherited from the parent every time.
+   Specificity: .tree-node.has-rail[data-level] > .tree-node-row is 0,4,0
+   against the depth rule's 0,3,0, whatever order the sheets load in.
+
+   Everything downstream follows for free: the selected row's dither reads
+   --rail, so it takes the chosen colour without a rule of its own. */
+.tree-node.has-rail[data-level] > .tree-node-row { --rail: var(--rail-custom); }
+
+/* Geometry and colour for depths the per-level rules do not reach (6+).
+
+   Wrapped in :where() so it weighs nothing. The first version was described as
+   low specificity at "0,2,1" and was in fact 0,3,1 -- equal to the depth rules
+   and later in the cascade -- so on a coloured row it quietly replaced level
+   0's 10% inset with 25% and shortened the bar. At 0,1,1 every depth rule
+   outranks it and keeps its own insets.
+
+   No separate resting-colour rule: every depth rule draws from --rail now, so
+   a chosen colour reaches the resting bar through the variable alone. */
+:where(.tree-node.has-rail) > .tree-node-row::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 25%;
+  bottom: 25%;
+  width: 3px;
+  border-radius: 4px 0 0 4px;
+  background: rgb(var(--rail));
+  box-shadow: -2px 0 8px rgba(var(--rail), 0.4);
+}
+
+/* ── The colour dialog: which part, and a preview ──────────────── */
+.tree-color-box { max-width: 380px; width: 100%; }
+
+.tree-color-seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  margin: 0.2rem 0 0.7rem;
+  background: var(--bg-body);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+}
+.tree-color-seg-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  padding: 0.5rem 0.6rem;
+  border: 0;
+  border-radius: calc(var(--radius-md) - 3px);
+  background: transparent;
+  color: var(--text-tertiary);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+.tree-color-seg-btn:hover { color: var(--text-primary); }
+.tree-color-seg-btn.is-on {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.tree-color-seg-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+/* A drawing of the part each side paints, so the words are not the only clue. */
+.tree-color-seg-glyph {
+  position: relative;
+  width: 16px;
+  height: 12px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  background: rgba(148, 163, 184, 0.18);
+}
+.tree-color-seg-glyph.is-text::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 2px; bottom: 2px;
+  width: 2px;
+  border-radius: 1px;
+  background: currentColor;
+}
+.tree-color-seg-glyph.is-text::after {
+  content: '';
+  position: absolute;
+  left: 4px; right: 3px; top: 5px;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+}
+.tree-color-seg-glyph.is-rail::after {
+  content: '';
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  width: 5px;
+  border-radius: 0 2px 2px 0;
+  background: repeating-linear-gradient(0deg, currentColor 0 1px, transparent 1px 2px);
+}
+/* Which parts already carry a colour, in that colour. */
+.tree-color-seg-dot {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.tree-color-seg-btn:not(.has-value) .tree-color-seg-dot { display: none; }
+
+.tree-color-preview {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 38px;
+  padding: 0 2.4rem 0 0.9rem;
+  margin-bottom: 0.6rem;
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-hover);
+  overflow: hidden;
+}
+.tree-color-preview-bar {
+  position: absolute;
+  left: 0; top: 6px; bottom: 6px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--pv-bar, transparent);
+}
+.tree-color-preview-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--pv-text, var(--text-primary));
+}
+.tree-color-preview-rail {
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  width: 26px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+/* The same dither the selected row wears, so the preview is the real thing. */
+.tree-color-preview.has-rail .tree-color-preview-rail {
+  opacity: 1;
+  background-image:
+    linear-gradient(90deg, transparent 0 calc(100% - 3px), rgb(var(--pv-rail)) calc(100% - 3px) 100%),
+    radial-gradient(circle at 50% 50%, rgb(var(--pv-rail)) 0 0.9px, transparent 1.1px),
+    radial-gradient(circle at 50% 50%, rgba(var(--pv-rail), 0.55) 0 0.8px, transparent 1px);
+  background-size: 100% 100%, 4px 4px, 5px 5px;
+  background-position: 0 0, 0 0, 2px 1px;
+  background-repeat: no-repeat, repeat, repeat;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.22) 38%, rgba(0,0,0,0.72) 72%, #000 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.22) 38%, rgba(0,0,0,0.72) 72%, #000 100%);
+  animation: railDither 1.6s steps(4, end) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tree-color-preview.has-rail .tree-color-preview-rail { animation: none; }
+}
+
 /* Optional badges, toggled from the pane menu. */
 .tree-badge-level,
 .tree-badge-tag {

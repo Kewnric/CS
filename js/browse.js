@@ -395,9 +395,10 @@ function renderTreeRecursive(parentId, scope, depth, query, activeId, itemsOnly,
       }
 
       const chevronClass = hasChildren || totalItems > 0 ? (expanded ? 'expanded' : '') : 'invisible';
+      const acc = treeAccentAttrs(folder);
 
       html += `
-        <div class="tree-node" data-level="${depth}" data-node-id="${folder.id}">
+        <div class="tree-node${acc.cls}" data-level="${depth}" data-node-id="${folder.id}"${acc.style}>
           <div class="tree-node-row"
                ${treeRowAttrs({ ns: 'browse', id: folder.id, kind: 'folder', level: depth, expanded })}
                style="padding-left: calc(0.75rem + 0rem)"
@@ -434,9 +435,9 @@ function renderTreeRecursive(parentId, scope, depth, query, activeId, itemsOnly,
       // A favourited program showed no star anywhere in the tree — the only
       // clue was on its card. The row now carries the star, the per-item
       // highlight colour, and whichever badges the view toggles ask for.
-      const hue = item.color ? ` style="--row-accent:${treeColorOf(item.color)}"` : '';
+      const acc = treeAccentAttrs(item);
       html += `
-        <div class="tree-node tree-item-node${item.color ? ' has-accent' : ''}" data-level="${depth + 1}" data-node-id="${item.id}"${hue}>
+        <div class="tree-node tree-item-node${acc.cls}" data-level="${depth + 1}" data-node-id="${item.id}"${acc.style}>
           <div class="tree-node-row"
                ${treeRowAttrs({ ns: 'browse', id: item.id, kind: 'item', level: depth + 1 })}
                style="padding-left: calc(0.75rem + ${TREE_ITEM_INSET}rem)"
@@ -460,7 +461,7 @@ function renderTreeRecursive(parentId, scope, depth, query, activeId, itemsOnly,
       if (query && !fuzzyMatch(set.title, query)) return;
       const n = (set.problems || []).length;
       html += `
-        <div class="tree-node tree-item-node tree-set-node" data-level="${depth + 1}" data-node-id="${set.id}">
+        <div class="tree-node tree-item-node tree-set-node${treeAccentAttrs(set).cls}" data-level="${depth + 1}" data-node-id="${set.id}"${treeAccentAttrs(set).style}>
           <div class="tree-node-row"
                ${treeRowAttrs({ ns: 'browse', id: set.id, kind: 'set', level: depth + 1 })}
                style="padding-left: calc(0.75rem + ${TREE_ITEM_INSET}rem)"
@@ -2067,18 +2068,73 @@ function browseToggleShow(what) {
   invalidateBrowseCache(); treeRefreshHosts();
 }
 
+/* Highlight colours. The id is what gets saved on a record, so the original
+   eight keep theirs -- something coloured "purple" last month must still be
+   purple -- and the new ones are placed around them. Ordered as a hue wheel
+   with the neutrals last, so neighbouring swatches look like neighbours. */
 const TREE_COLORS = [
   { id: '', name: 'None', css: 'transparent' },
   { id: 'red', name: 'Red', css: '#ef4444' },
+  { id: 'rose', name: 'Rose', css: '#f43f5e' },
   { id: 'orange', name: 'Orange', css: '#f97316' },
+  { id: 'amber', name: 'Amber', css: '#f59e0b' },
   { id: 'yellow', name: 'Yellow', css: '#eab308' },
+  { id: 'lime', name: 'Lime', css: '#84cc16' },
   { id: 'green', name: 'Green', css: '#22c55e' },
+  { id: 'emerald', name: 'Emerald', css: '#10b981' },
+  { id: 'teal', name: 'Teal', css: '#14b8a6' },
+  { id: 'cyan', name: 'Cyan', css: '#06b6d4' },
+  { id: 'sky', name: 'Sky', css: '#0ea5e9' },
   { id: 'blue', name: 'Blue', css: '#3b82f6' },
+  { id: 'indigo', name: 'Indigo', css: '#6366f1' },
+  { id: 'violet', name: 'Violet', css: '#8b5cf6' },
   { id: 'purple', name: 'Purple', css: '#a855f7' },
+  { id: 'fuchsia', name: 'Fuchsia', css: '#d946ef' },
   { id: 'pink', name: 'Pink', css: '#ec4899' },
-  { id: 'cyan', name: 'Cyan', css: '#06b6d4' }
+  { id: 'slate', name: 'Slate', css: '#94a3b8' },
+  { id: 'silver', name: 'Silver', css: '#e2e8f0' }
 ];
 function treeColorOf(id) { const c = TREE_COLORS.find(x => x.id === id); return c ? c.css : 'transparent'; }
+
+/** "r, g, b" for a colour id -- the rail mixes in its own alpha, so it needs the channels. */
+function treeRgbOf(id) {
+  const c = TREE_COLORS.find(x => x.id === id);
+  if (!c || !c.id) return '';
+  const h = c.css.slice(1);
+  return parseInt(h.slice(0, 2), 16) + ', ' + parseInt(h.slice(2, 4), 16) + ', ' + parseInt(h.slice(4, 6), 16);
+}
+
+/**
+ * The class and style a tree row's wrapper needs for its colours.
+ *
+ * Two independent parts, because the colour dialog paints either:
+ *   color      the label and a bar down the LEFT edge
+ *   railColor  the rail on the RIGHT edge -- the resting bar, and the dither
+ *              when the row is selected
+ *
+ * One helper for every tree. The coding, notebook and snippet trees each
+ * wrote their own `style="--row-accent:..."` for items and nothing at all for
+ * folders -- so a folder's colour was saved by the dialog and then never read
+ * back by three of the four trees that offer it. A colour id this palette does
+ * not know is ignored rather than painted transparent.
+ *
+ * @returns {{cls: string, style: string}} ready to splice into the wrapper tag
+ */
+function treeAccentAttrs(rec) {
+  const known = id => !!id && TREE_COLORS.some(c => c.id === id);
+  const text = rec && known(rec.color) ? rec.color : '';
+  const rail = rec && known(rec.railColor) ? rec.railColor : '';
+  const cls = (text ? ' has-accent' : '') + (rail ? ' has-rail' : '');
+  const vars = (text ? '--row-accent:' + treeColorOf(text) + ';' : '')
+             + (rail ? '--rail-custom:' + treeRgbOf(rail) + ';' : '');
+  return { cls: cls, style: vars ? ' style="' + vars + '"' : '' };
+}
+
+/** Write one colour to one part of a record. An empty id clears that part and leaves the other alone. */
+function _treeWriteColor(rec, target, colorId) {
+  const key = target === 'rail' ? 'railColor' : 'color';
+  if (colorId) rec[key] = colorId; else delete rec[key];
+}
 
 function browseFindItem(id) {
   return (state.challenges || []).find(c => c.id === id) ||
@@ -2091,32 +2147,138 @@ function browseFindItem(id) {
 }
 
 /** A small swatch grid, opened from the row menu. */
-function browseSetColor(id) {
-  const it = browseFindItem(id);
-  if (!it) return;
-  const swatches = TREE_COLORS.map(function (c) {
-    return '<button class="tree-color-swatch ' + ((it.color || '') === c.id ? 'active' : '') + '"' +
-      ' title="' + c.name + '" style="background:' + (c.id ? c.css : 'var(--bg-surface-hover)') + '"' +
-      ' onclick="browseApplyColor(\'' + id + '\',\'' + c.id + '\')">' + (c.id ? '' : '\u2715') + '</button>';
-  }).join('');
+const TREE_COLOR_TARGET_KEY = 'ssp.treeColorTarget';
+
+/** Which part the dialog paints, remembered so it opens where you left it. */
+function _treeColorTarget() {
+  try { return localStorage.getItem(TREE_COLOR_TARGET_KEY) === 'rail' ? 'rail' : 'text'; }
+  catch (e) { return 'text'; }
+}
+
+/**
+ * The highlight-colour dialog.
+ *
+ * A segmented switch at the top chooses WHICH PART the swatches paint -- the
+ * text and its left edge, or the rail on the right edge -- and the two are
+ * independent, so a row can carry a red label and a blue rail. The switch is
+ * a target, not a mode: flipping it does not undo anything, it only changes
+ * where the next click lands.
+ *
+ * It stays open after a pick. Closing on every click was fine when there was
+ * one thing to colour; with two, closing meant reopening the dialog to do the
+ * second half. The tree repaints live behind it and a preview row shows both
+ * parts together.
+ *
+ * @param {object} o
+ *   .title
+ *   .current  {text, rail} colour ids on the record now. null for a batch,
+ *             which has no single current value -- no swatch is marked until
+ *             something is picked.
+ *   .apply    (target, colorId) => void
+ */
+function treeColorDialog(o) {
+  const stale = document.getElementById('tree-color-dlg');
+  if (stale) stale.remove();
+  let target = _treeColorTarget();
+  const cur = Object.assign({ text: '', rail: '' }, o.current || {});
+  const known = { text: !!o.current, rail: !!o.current };
+
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay fd-overlay';
   overlay.id = 'tree-color-dlg';
-  overlay.innerHTML = '<div class="modal-content fd-box" role="dialog" aria-label="Highlight colour">' +
-    '<h3 class="fd-title"><i data-lucide="palette"></i> Highlight colour</h3>' +
-    '<div class="tree-color-grid">' + swatches + '</div>' +
-    '<div class="fd-actions"><button class="btn btn-secondary btn-sm" onclick="document.getElementById(\'tree-color-dlg\').remove()">Close</button></div></div>';
+  overlay.innerHTML =
+    '<div class="modal-content fd-box tree-color-box" role="dialog" aria-modal="true" aria-label="' + escapeHTML(o.title) + '">' +
+      '<h3 class="fd-title"><i data-lucide="palette"></i> ' + escapeHTML(o.title) + '</h3>' +
+      '<div class="tree-color-seg" role="radiogroup" aria-label="What the colour paints">' +
+        '<button type="button" class="tree-color-seg-btn" role="radio" data-target="text">' +
+          '<span class="tree-color-seg-glyph is-text" aria-hidden="true"></span>Text &amp; left edge' +
+          '<span class="tree-color-seg-dot" aria-hidden="true"></span></button>' +
+        '<button type="button" class="tree-color-seg-btn" role="radio" data-target="rail">' +
+          '<span class="tree-color-seg-glyph is-rail" aria-hidden="true"></span>Right edge' +
+          '<span class="tree-color-seg-dot" aria-hidden="true"></span></button>' +
+      '</div>' +
+      '<div class="tree-color-preview" aria-hidden="true">' +
+        '<span class="tree-color-preview-bar"></span>' +
+        '<span class="tree-color-preview-label">Preview</span>' +
+        '<span class="tree-color-preview-rail"></span>' +
+      '</div>' +
+      '<div class="tree-color-grid">' +
+        TREE_COLORS.map(c =>
+          '<button type="button" class="tree-color-swatch" data-color="' + c.id + '"' +
+          ' title="' + c.name + '" aria-label="' + c.name + '"' +
+          ' style="background:' + (c.id ? c.css : 'var(--bg-surface-hover)') + '">' +
+          (c.id ? '' : '✕') + '</button>').join('') +
+      '</div>' +
+      '<div class="fd-actions"><button type="button" class="btn btn-secondary btn-sm" id="tcd-close">Done</button></div>' +
+    '</div>';
   document.body.appendChild(overlay);
-  overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
+
+  const paint = () => {
+    overlay.querySelectorAll('.tree-color-seg-btn').forEach(b => {
+      const t = b.dataset.target;
+      const on = t === target;
+      b.classList.toggle('is-on', on);
+      b.setAttribute('aria-checked', on ? 'true' : 'false');
+      b.classList.toggle('has-value', !!cur[t]);
+      const dot = b.querySelector('.tree-color-seg-dot');
+      if (dot) dot.style.background = cur[t] ? treeColorOf(cur[t]) : '';
+    });
+    overlay.querySelectorAll('.tree-color-swatch').forEach(sw => {
+      const on = known[target] && sw.dataset.color === cur[target];
+      sw.classList.toggle('active', on);
+      sw.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    const pv = overlay.querySelector('.tree-color-preview');
+    pv.style.setProperty('--pv-text', cur.text ? treeColorOf(cur.text) : 'var(--text-primary)');
+    pv.style.setProperty('--pv-bar', cur.text ? treeColorOf(cur.text) : 'transparent');
+    if (cur.rail) pv.style.setProperty('--pv-rail', treeRgbOf(cur.rail));
+    pv.classList.toggle('has-rail', !!cur.rail);
+  };
+
+  overlay.querySelectorAll('.tree-color-seg-btn').forEach(b => {
+    b.onclick = () => {
+      target = b.dataset.target;
+      try { localStorage.setItem(TREE_COLOR_TARGET_KEY, target); } catch (e) { /* private window */ }
+      paint();
+    };
+  });
+  overlay.querySelectorAll('.tree-color-swatch').forEach(sw => {
+    sw.onclick = () => {
+      cur[target] = sw.dataset.color;
+      known[target] = true;
+      o.apply(target, sw.dataset.color);
+      paint();
+    };
+  });
+
+  const onKey = (e) => { if (e.key === 'Escape') { e.stopPropagation(); close(); } };
+  const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey, true); };
+  document.addEventListener('keydown', onKey, true);
+  overlay.querySelector('#tcd-close').onclick = close;
+  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
+  paint();
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: overlay });
+  const focusBtn = overlay.querySelector('.tree-color-seg-btn.is-on');
+  if (focusBtn) focusBtn.focus();
 }
-window.browseApplyColor = function (id, color) {
+
+function browseSetColor(id) {
   const it = browseFindItem(id);
   if (!it) return;
-  if (color) it.color = color; else delete it.color;
+  treeColorDialog({
+    title: 'Highlight colour',
+    current: { text: it.color || '', rail: it.railColor || '' },
+    apply: (target, colorId) => {
+      _treeWriteColor(it, target, colorId);
+      saveData(); invalidateBrowseCache(); treeRefreshHosts();
+    }
+  });
+}
+window.browseApplyColor = function (id, color, target) {
+  const it = browseFindItem(id);
+  if (!it) return;
+  _treeWriteColor(it, target === 'rail' ? 'rail' : 'text', color);
   saveData();
-  const dlg = document.getElementById('tree-color-dlg');
-  if (dlg) dlg.remove();
   invalidateBrowseCache(); treeRefreshHosts();
 };
 
@@ -2198,30 +2360,14 @@ function _browseBatchDone(n, what) {
 function browseBatchColor(ids) {
   const targets = browseBatchTargets(ids);
   if (!targets.length) return;
-  const swatches = TREE_COLORS.map(c =>
-    '<button class="tree-color-swatch" title="' + c.name + '"' +
-    ' style="background:' + (c.id ? c.css : 'var(--bg-surface-hover)') + '"' +
-    ' data-color="' + c.id + '">' + (c.id ? '' : '✕') + '</button>').join('');
-  const overlay = document.createElement('div');
-  overlay.className = 'modal-overlay fd-overlay';
-  overlay.id = 'tree-color-dlg';
-  overlay.innerHTML = '<div class="modal-content fd-box" role="dialog" aria-label="Highlight colour">' +
-    '<h3 class="fd-title"><i data-lucide="palette"></i> Highlight colour for ' + targets.length + '</h3>' +
-    '<div class="tree-color-grid">' + swatches + '</div>' +
-    '<div class="fd-actions"><button class="btn btn-secondary btn-sm" id="tcd-close">Close</button></div></div>';
-  document.body.appendChild(overlay);
-  const close = () => overlay.remove();
-  overlay.querySelector('#tcd-close').onclick = close;
-  overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
-  overlay.querySelectorAll('.tree-color-swatch').forEach(btn => {
-    btn.onclick = () => {
-      const color = btn.dataset.color;
-      targets.forEach(t => { if (color) t.rec.color = color; else delete t.rec.color; });
-      close();
-      _browseBatchDone(targets.length, 'Colour set');
-    };
+  treeColorDialog({
+    title: 'Highlight colour for ' + targets.length,
+    current: null,
+    apply: (part, colorId) => {
+      targets.forEach(t => _treeWriteColor(t.rec, part, colorId));
+      saveData(); invalidateBrowseCache(); treeRefreshHosts();
+    }
   });
-  if (typeof lucide !== 'undefined') lucide.createIcons({ root: overlay });
 }
 
 function browseBatchIcon(ids) {

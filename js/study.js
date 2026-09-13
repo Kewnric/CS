@@ -156,9 +156,10 @@ function renderSnippetTreeRecursive(parentId, depth, query, itemsOnly, rootList)
       const expanded = isNodeExpanded(folder.id);
       if (query && !folderHasMatchingSnippets(folder.id, query)) return;
       const chevronClass = (hasChildren || totalItems > 0) ? (expanded ? 'expanded' : '') : 'invisible';
+      const acc = typeof treeAccentAttrs === 'function' ? treeAccentAttrs(folder) : { cls: '', style: '' };
 
       html += `
-        <div class="tree-node" data-level="${depth}" data-node-id="${folder.id}">
+        <div class="tree-node${acc.cls}" data-level="${depth}" data-node-id="${folder.id}"${acc.style}>
           <div class="tree-node-row"
                ${treeRowAttrs({ ns: 'snippets', id: folder.id, kind: 'folder', level: depth, expanded: expanded })}
                style="padding-left: calc(0.5rem + 0rem)"
@@ -184,7 +185,7 @@ function renderSnippetTreeRecursive(parentId, depth, query, itemsOnly, rootList)
     const sn = node;
     if (query && !libMatches(sn, query, 'snippet')) return;
     html += `
-      <div class="tree-node tree-item-node${sn.color ? ' has-accent' : ''}" data-level="${depth + 1}" data-node-id="${sn.id}"${sn.color && typeof treeColorOf === 'function' ? ` style="--row-accent:${treeColorOf(sn.color)}"` : ''}>
+      <div class="tree-node tree-item-node${(typeof treeAccentAttrs === 'function' ? treeAccentAttrs(sn) : { cls: '', style: '' }).cls}" data-level="${depth + 1}" data-node-id="${sn.id}"${(typeof treeAccentAttrs === 'function' ? treeAccentAttrs(sn) : { cls: '', style: '' }).style}>
         <div class="tree-node-row"
              ${treeRowAttrs({ ns: 'snippets', id: sn.id, kind: 'item', level: depth + 1 })}
              style="padding-left: calc(0.5rem + ${TREE_ITEM_INSET}rem)"

@@ -154,13 +154,14 @@ function renderNotebookTreeRecursive(parentId, depth, query, itemsOnly, rootList
       // Only one row highlights: the selected notebook, or (if none) the folder.
       if (query && !folderHasMatchingNotebooks(folder.id, query)) return;
       const chevronClass = (hasChildren || totalItems > 0) ? (expanded ? 'expanded' : '') : 'invisible';
+      const acc = typeof treeAccentAttrs === 'function' ? treeAccentAttrs(folder) : { cls: '', style: '' };
       // "Set prerequisites..." has always been offered on notebook folders, but
       // nothing ever drew the lock, so a locked folder looked identical to an
       // open one. Same badge the coding tree uses.
       const lockIcon = notesFolderLocked(folder.id) ? '<i data-lucide="lock" class="tree-node-lock"></i>' : '';
 
       html += `
-        <div class="tree-node" data-level="${depth}" data-node-id="${folder.id}">
+        <div class="tree-node${acc.cls}" data-level="${depth}" data-node-id="${folder.id}"${acc.style}>
           <div class="tree-node-row"
                ${treeRowAttrs({ ns: 'notes', id: folder.id, kind: 'folder', level: depth, expanded: expanded })}
                style="padding-left: calc(0.5rem + 0rem)"
@@ -189,9 +190,9 @@ function renderNotebookTreeRecursive(parentId, depth, query, itemsOnly, rootList
     // A favourited notebook showed no star anywhere in the tree, and the
     // per-item colour the coding tree got was missing here entirely.
     const qCount = (nb.sections || []).reduce((n, sec) => n + ((sec.questions || []).length), 0);
-    const hue = nb.color && typeof treeColorOf === 'function' ? ` style="--row-accent:${treeColorOf(nb.color)}"` : '';
+    const acc = typeof treeAccentAttrs === 'function' ? treeAccentAttrs(nb) : { cls: '', style: '' };
     html += `
-      <div class="tree-node tree-item-node${nb.color ? ' has-accent' : ''}" data-level="${depth + 1}" data-node-id="${nb.id}"${hue}>
+      <div class="tree-node tree-item-node${acc.cls}" data-level="${depth + 1}" data-node-id="${nb.id}"${acc.style}>
         <div class="tree-node-row"
              ${treeRowAttrs({ ns: 'notes', id: nb.id, kind: 'item', level: depth + 1 })}
              style="padding-left: calc(0.5rem + ${TREE_ITEM_INSET}rem)"
