@@ -185,6 +185,15 @@ slivers for soft round glows that wander and blink, Starry night for points
 that twinkle where they hang. All of it is CSS keyframes; there is no canvas
 and no `rAF` loop behind the panes.
 
+**Every loop must close.** A non-alternating animation restarts on its first
+frame, so its last frame has to be the same picture: the field drifts exactly
+one tile (`--amb-tile`, set per theme), the Crystals shafts one 1010px tile, a
+light that never goes out ends where it started, and a gust's turn resets only
+while its members are dark. Check it by seeking WAAPI across the restart and
+comparing screen positions, not by watching. A pane that re-renders sets its
+content with `ambSetContent`, which keeps the scene and shards in the document —
+rebuilding them restarts every phase, and that reads as the background snapping.
+
 ---
 
 ## Traps that have already cost time

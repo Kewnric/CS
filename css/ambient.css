@@ -48,6 +48,13 @@
 /* ── The field of crystals ────────────────────────────────────
    Exactly the pane, drifting by background-position. One whole tile in each
    direction, so the loop closes on itself with no jump at the restart.
+
+   WHOSE tile is --amb-tile, and a theme that draws a different tile must set
+   it. This was a literal 140px, which is the Crystals tile -- Fireflies draws
+   160 and Starry night 150, so in those two the loop restarted short of a
+   whole tile and every 90 seconds the field in both panes jumped 20px (10px)
+   diagonally at once. --amb-drift scales with the tile, so all three drift at
+   the same speed.
    ------------------------------------------------------------ */
 .amb-host::before {
   content: '';
@@ -59,12 +66,12 @@
   opacity: 0.45;
   background-repeat: repeat;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140' viewBox='0 0 140 140'%3E%3Cg fill='none' stroke='%236366f1' stroke-width='1.1' opacity='.55'%3E%3Cpath d='M26 16 L35 27 L26 50 L17 27 Z'/%3E%3Cpath d='M17 27 L35 27 M26 16 L26 50'/%3E%3Cpath d='M100 78 L108 87 L100 105 L92 87 Z'/%3E%3Cpath d='M92 87 L108 87'/%3E%3C/g%3E%3Cg fill='none' stroke='%2322d3ee' stroke-width='1' opacity='.4'%3E%3Cpath d='M68 60 l3.5 -7 l3.5 7 l7 3.5 l-7 3.5 l-3.5 7 l-3.5 -7 l-7 -3.5 Z'/%3E%3Cpath d='M118 26 L124 33 L118 45 L112 33 Z'/%3E%3C/g%3E%3Cg fill='%2322d3ee' opacity='.34'%3E%3Ccircle cx='82' cy='30' r='1.7'/%3E%3Ccircle cx='46' cy='96' r='1.7'/%3E%3Ccircle cx='12' cy='112' r='1.3'/%3E%3Ccircle cx='128' cy='118' r='1.3'/%3E%3Ccircle cx='60' cy='128' r='1.1'/%3E%3C/g%3E%3C/svg%3E");
-  animation: ambDrift 90s linear infinite;
+  animation: ambDrift var(--amb-drift, 90s) linear infinite;
 }
 
 @keyframes ambDrift {
   from { background-position: 0 0; }
-  to   { background-position: -140px -140px; }
+  to   { background-position: calc(var(--amb-tile, 140px) * -1) calc(var(--amb-tile, 140px) * -1); }
 }
 
 /* ── The glow ─────────────────────────────────────────────────
@@ -300,6 +307,9 @@ body.amb-theme-fire {
   --amb-lit: #fbbf24;                 /* flame gold */
 }
 body.amb-theme-fire .amb-host::before {
+  /* The tile below is 160px, not the default 140 -- see ambDrift. */
+  --amb-tile: 160px;
+  --amb-drift: 103s;
   opacity: 0.5;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='none' stroke='%23b45309' stroke-width='1.2' opacity='.6'%3E%3Cpath d='M18 34 C28 16 48 16 55 27 C48 46 28 48 18 34 Z'/%3E%3Cpath d='M18 34 L55 27'/%3E%3Cpath d='M112 128 C122 112 140 112 146 122 C140 139 122 141 112 128 Z'/%3E%3Cpath d='M112 128 L146 122'/%3E%3C/g%3E%3Cg fill='none' stroke='%23ea580c' stroke-width='1.2' opacity='.55'%3E%3Cpath d='M104 30 C110 38 117 43 117 52 A13 13 0 0 1 91 52 C91 43 98 38 104 30 Z'/%3E%3Cpath d='M104 42 C107 46 110 49 110 53 A6 6 0 0 1 98 53 C98 49 101 46 104 42 Z'/%3E%3Cpath d='M38 104 C42 110 47 113 47 119 A9 9 0 0 1 29 119 C29 113 34 110 38 104 Z'/%3E%3C/g%3E%3Cg fill='none' stroke='%23fbbf24' stroke-width='1.1' opacity='.5'%3E%3Cpath d='M140 34 a13 13 0 1 0 2 25 a10 10 0 1 1 -2 -25 Z'/%3E%3Cpath d='M72 74 l4 -9 l4 9 l9 4 l-9 4 l-4 9 l-4 -9 l-9 -4 Z'/%3E%3C/g%3E%3Cg fill='%23fbbf24' opacity='.4'%3E%3Ccircle cx='24' cy='72' r='1.8'/%3E%3Ccircle cx='128' cy='88' r='1.6'/%3E%3Ccircle cx='64' cy='142' r='1.4'/%3E%3Ccircle cx='90' cy='12' r='1.3'/%3E%3Ccircle cx='8' cy='128' r='1.2'/%3E%3Ccircle cx='152' cy='150' r='1.2'/%3E%3C/g%3E%3C/svg%3E");
 }
@@ -366,6 +376,24 @@ body.amb-theme-fire .amb-shard-i {
          transform: translate(var(--len, 90px), 0) scale(calc(var(--s, 1) * 0.7)); }
 }
 
+/* A gust turns its members through a wide arc and then starts again from where
+   it began. For Crystals that reset is invisible -- a fleck is long out by
+   then -- but a firefly is alight for most of its cycle: measured, all five in
+   a gust were still glowing (up to 40%) when the turn reset, and jumped
+   130-200px at once. The swirl itself is exactly as it was; the gust only dims
+   over the last 8% of its cycle and back over the first 3%, so the reset
+   happens with nothing lit. */
+body.amb-theme-fire .amb-gust {
+  animation: ambSwirl var(--gt, 9s) linear infinite,
+             ambGustVeil var(--gt, 9s) linear infinite;
+  animation-delay: var(--gd, 0s), var(--gd, 0s);
+}
+@keyframes ambGustVeil {
+  0%   { opacity: 0; }
+  3%   { opacity: 1; }
+  92%  { opacity: 1; }
+  100% { opacity: 0; }
+}
 /* -- Starry night --------------------------------------------
    The room in the reference: violet walls, a ceiling full of warm pinprick
    lights, a moon on the wall, and lamps pooling low. Violet is the AIR and the
@@ -377,6 +405,9 @@ body.amb-theme-night {
   --amb-lit: #ffdfa6;                 /* bulb warm */
 }
 body.amb-theme-night .amb-host::before {
+  /* The tile below is 150px, not the default 140 -- see ambDrift. */
+  --amb-tile: 150px;
+  --amb-drift: 96s;
   opacity: 0.6;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 150 150'%3E%3Cg fill='%23ffe0a8'%3E%3Ccircle cx='12' cy='18' r='1.5' opacity='.85'/%3E%3Ccircle cx='40' cy='9' r='1.1' opacity='.6'/%3E%3Ccircle cx='66' cy='24' r='1.7' opacity='.9'/%3E%3Ccircle cx='95' cy='14' r='1.2' opacity='.65'/%3E%3Ccircle cx='124' cy='28' r='1.5' opacity='.8'/%3E%3Ccircle cx='142' cy='10' r='1' opacity='.5'/%3E%3Ccircle cx='20' cy='52' r='1.2' opacity='.6'/%3E%3Ccircle cx='52' cy='60' r='1.6' opacity='.85'/%3E%3Ccircle cx='84' cy='48' r='1.1' opacity='.55'/%3E%3Ccircle cx='112' cy='64' r='1.5' opacity='.8'/%3E%3Ccircle cx='136' cy='54' r='1.2' opacity='.6'/%3E%3Ccircle cx='8' cy='84' r='1.4' opacity='.75'/%3E%3Ccircle cx='34' cy='96' r='1.1' opacity='.55'/%3E%3Ccircle cx='72' cy='88' r='1.6' opacity='.85'/%3E%3Ccircle cx='102' cy='100' r='1.2' opacity='.6'/%3E%3Ccircle cx='130' cy='92' r='1.4' opacity='.75'/%3E%3Ccircle cx='18' cy='124' r='1.5' opacity='.8'/%3E%3Ccircle cx='48' cy='136' r='1.1' opacity='.55'/%3E%3Ccircle cx='80' cy='126' r='1.3' opacity='.7'/%3E%3Ccircle cx='116' cy='140' r='1.5' opacity='.8'/%3E%3Ccircle cx='144' cy='120' r='1.1' opacity='.55'/%3E%3C/g%3E%3Cg fill='none' stroke='%23fff2d0' stroke-width='1' opacity='.6'%3E%3Cpath d='M58 112 l3 -7 l3 7 l7 3 l-7 3 l-3 7 l-3 -7 l-7 -3 Z'/%3E%3Cpath d='M118 36 l2.5 -6 l2.5 6 l6 2.5 l-6 2.5 l-2.5 6 l-2.5 -6 l-6 -2.5 Z'/%3E%3C/g%3E%3Cg fill='none' stroke='%23ffd58a' stroke-width='1.2' opacity='.55'%3E%3Cpath d='M28 30 a11 11 0 1 0 2 21 a8.5 8.5 0 1 1 -2 -21 Z'/%3E%3C/g%3E%3C/svg%3E");
 }
@@ -420,7 +451,11 @@ body.amb-theme-night .amb-shard-i {
   animation: ambTwinkle var(--t, 9s) ease-in-out infinite;
 }
 /* Never fully out and never fully steady. A bulb that goes to zero reads as
-   broken, and one that holds still stops being a light and becomes a dot. */
+   broken, and one that holds still stops being a light and becomes a dot.
+
+   And it comes back to where it started. It used to end 0.13 of --len along
+   from its start, and since it never goes out it was still lit there: at every
+   loop each of the 26 lights hopped 5-17px, one of them every half second. */
 @keyframes ambTwinkle {
   0%   { opacity: calc(var(--o, 1) * 0.22);
          transform: translate(0, 0) scale(calc(var(--s, 1) * 0.72)); }
@@ -431,12 +466,19 @@ body.amb-theme-night .amb-shard-i {
   46%  { opacity: calc(var(--o, 1) * 0.9);
          transform: translate(calc(var(--len, 90px) * 0.07), -3px) scale(var(--s, 1)); }
   62%  { opacity: calc(var(--o, 1) * 0.3);
-         transform: translate(calc(var(--len, 90px) * 0.09), -1px) scale(calc(var(--s, 1) * 0.78)); }
+         transform: translate(calc(var(--len, 90px) * 0.06), -1px) scale(calc(var(--s, 1) * 0.78)); }
   80%  { opacity: calc(var(--o, 1) * 0.78);
-         transform: translate(calc(var(--len, 90px) * 0.11), -3px) scale(calc(var(--s, 1) * 1.08)); }
+         transform: translate(calc(var(--len, 90px) * 0.03), -3px) scale(calc(var(--s, 1) * 1.08)); }
   100% { opacity: calc(var(--o, 1) * 0.22);
-         transform: translate(calc(var(--len, 90px) * 0.13), 0) scale(calc(var(--s, 1) * 0.72)); }
+         transform: translate(0, 0) scale(calc(var(--s, 1) * 0.72)); }
 }
+
+/* Fairy lights hang, so a gust here does not swirl. Turning them through a wide
+   arc was the flying this theme says they do not do -- and because they never
+   go out, there is no dark moment to hide the turn's reset in: measured, all
+   five in a gust jumped 65-130px at once while lit, every 7-12 seconds. A gust
+   in this theme is a short strand that stays where it was hung. */
+body.amb-theme-night .amb-gust { animation: none; }
 
 /* ── Off ────────────────────────────────────────────────────── */
 .amb-off .amb-host::before,
@@ -509,7 +551,7 @@ body.amb-theme-night .amb-shard-i {
 /* Distance, in four amplitudes and four periods. The far line moves 3px over a
    minute and the canopy 14px over twenty seconds — near things move more and
    sooner, which is the whole of the effect. */
-.amb-cast   { animation: ambCast 48s linear infinite; animation-delay: var(--sway-d, 0s); }
+.amb-cast   { animation: ambCast 101s linear infinite; animation-delay: var(--sway-d, 0s); }
 .amb-far    { animation: ambSwayFar 68s ease-in-out infinite alternate; animation-delay: var(--sway-d, 0s); }
 .amb-canopy { animation: ambSwayCanopy 21s ease-in-out infinite alternate; animation-delay: var(--sway-d, 0s); }
 .amb-under  { animation: ambSwayUnder 31s ease-in-out infinite alternate; animation-delay: var(--sway-d, 0s); }
@@ -526,10 +568,12 @@ body.amb-theme-night .amb-shard-i {
   from { background-position: calc(50% - 8px) 100%; }
   to   { background-position: calc(50% + 8px) 100%; }
 }
-/* Light does not sway back and forth; it travels. */
+/* Light does not sway back and forth; it travels -- exactly one tile, so the
+   last frame of the loop is the same picture as the first. 1010px in 101s is
+   the 10px a second the old percentage travel gave a 340px pane. */
 @keyframes ambCast {
-  from { background-position: 0% 0%; }
-  to   { background-position: 100% 0%; }
+  from { background-position: 0 0; }
+  to   { background-position: -1010px 0; }
 }
 
 /* The shards fly in FRONT of the far line and behind the near growth, which is
@@ -593,7 +637,14 @@ body:not(.amb-theme-fire):not(.amb-theme-night) .amb-cast {
     transparent 116px,
     color-mix(in srgb, #a5b4fc 4%, transparent) 152px,
     transparent 196px);
-  background-size: 240% 100%;
+  /* A tile the shafts repeat across exactly, so the travel can loop. At 104deg
+     a 196px period repeats every 196 / sin 104deg = 202.0px along x and every
+     196 / |cos 104deg| = 810.2px down y, so a 1010 x 810 tile -- five across,
+     one down -- meets its neighbours to a twentieth of a pixel. The old tile
+     was 240% of the pane and travelled 0% to 100%, then started over: a jump
+     of 1.4 pane widths, 475px or 2.35 shafts on a 340px pane, every 48
+     seconds. Fixed in px it also stays put when a pane changes height. */
+  background-size: 1010px 810px;
   background-repeat: repeat;
   opacity: 0.55;
 }

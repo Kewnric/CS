@@ -7,8 +7,9 @@
    element rather than nodes inside it.
 
    The crystals cannot be done that way — each needs its own path, size and
-   timing — so they are nodes, and nodes have to be put back when the pane
-   that holds them is rebuilt. That is all this file does, plus the switch.
+   timing — so they are nodes, and nodes have to survive the pane that holds
+   them re-rendering (ambSetContent), or be put back when it is built anew.
+   That is all this file does, plus the switch.
    ============================================================ */
 
 const AMB_KEY = 'ssp.ambient';
@@ -300,6 +301,28 @@ function _ambScene(host) {
     scene.appendChild(el);
   });
   host.insertBefore(scene, host.firstChild);
+}
+
+/**
+ * Replace a pane's content and keep its scene and shards.
+ *
+ * `host.innerHTML = ...` takes both with it, and ambMount() then builds new
+ * ones on new random phases -- so every Check Code snapped the results panel's
+ * growth to a different sway and threw every fleck somewhere else. Detaching
+ * them and putting them back would not help: a CSS animation starts over when
+ * its element leaves the document. So they never leave. Everything else goes,
+ * and the new content goes in after them, where it always was.
+ */
+function ambSetContent(host, html) {
+  if (!host) return;
+  const isLayer = n => n.nodeType === 1 &&
+    (n.classList.contains('amb-shards') || n.classList.contains('amb-scene'));
+  const nodes = Array.from(host.childNodes);
+  if (!nodes.some(isLayer)) { host.innerHTML = html; return; }
+  nodes.forEach(n => { if (!isLayer(n)) n.remove(); });
+  const tpl = document.createElement('template');
+  tpl.innerHTML = html;
+  host.appendChild(tpl.content);
 }
 
 /** Put the shards back wherever they are missing, or take them all away. */

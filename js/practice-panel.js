@@ -84,14 +84,14 @@ function initPanelResizerDrag(e, resizer) {
 function renderPracticePanel() {
   const host = document.getElementById('practice-panel');
   if (!host || !_ppCtx) return;
-  /* This replaces the panel's contents wholesale, which takes the ambient
-     crystals with it. They are put back at the end -- the field and the colour
-     wash need no such help, being properties of the panel rather than nodes
-     inside it. */
+  /* This replaces the panel's contents but not the scene and shards behind
+     them: ambSetContent keeps those in the document. Replacing them too gave
+     each render new random phases, so every Check Code snapped the growth and
+     respawned every fleck. ambMount() below only fills a panel that has none. */
   // Finish sits at the very bottom of the panel: it's the end of the flow, and
   // pinning it to the top put the most destructive action under the cursor while
   // reading test results.
-  host.innerHTML = `
+  const html = `
     ${(_ppCtx.problems() || []).length > 1 ? `
     <div class="pp-section pp-problems-section">
       <div class="pp-section-title"><i data-lucide="layout-grid" style="width:13px;height:13px;"></i> Problems</div>
@@ -116,6 +116,8 @@ function renderPracticePanel() {
       </button>
     </div>
   `;
+  if (typeof ambSetContent === 'function') ambSetContent(host, html);
+  else host.innerHTML = html;
   _ppRenderProblems();
   _ppRenderTabBody();
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: host });
