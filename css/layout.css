@@ -900,10 +900,19 @@ details[open]>.snippet-folder-summary>.folder-icon {
    which they have to outrank. */
 .tree-node-row::after {
   opacity: 0.55;
+  /* No width in this list -- it is on the states that GROW the rail (hover and
+     .active, below). A transition runs from the rule being arrived at, so this
+     list is the one used whenever a row goes back to rest, including when it
+     stops being the selected row. With width here, a row losing selection
+     shrank from the 26px dither to 3px over 0.28s -- but the dither and its
+     fade mask cannot animate and were already gone, so what shrank was a solid
+     block of the rail colour at full opacity. Measured: 26px wide on the first
+     frame, 13.5px at 40ms, then the spring undershot to 0.75px. Now the width
+     lands at once and only the length and the brightness ease back. Leaving a
+     hover snaps its 2px the same way. */
   transition: opacity 0.25s ease,
               top 0.28s var(--ease-spring),
-              bottom 0.28s var(--ease-spring),
-              width 0.28s var(--ease-spring);
+              bottom 0.28s var(--ease-spring);
 }
 
 .tree-node[data-level="4"]>.tree-node-row::after,
@@ -948,6 +957,11 @@ details[open]>.snippet-folder-summary>.folder-icon {
   top: 4px;
   bottom: 4px;
   width: 5px;
+  /* Growing is eased; the resting rule says why shrinking is not. */
+  transition: opacity 0.25s ease,
+              top 0.28s var(--ease-spring),
+              bottom 0.28s var(--ease-spring),
+              width 0.28s var(--ease-spring);
 }
 
 /* Selection matches hover's SIZE and differs in colour. Making it the fullest
@@ -963,6 +977,11 @@ details[open]>.snippet-folder-summary>.folder-icon {
   top: 4px;
   bottom: 4px;
   width: 5px;
+  /* Selection grows the rail into the dither, so it keeps the eased width. */
+  transition: opacity 0.25s ease,
+              top 0.28s var(--ease-spring),
+              bottom 0.28s var(--ease-spring),
+              width 0.28s var(--ease-spring);
 }
 
 /* ── Folders are the exception, and they have to be ────────────────────────
