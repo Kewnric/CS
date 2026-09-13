@@ -53,26 +53,51 @@ function termInstrumentC(code) {
 
   const shim = [
     '#include <stdio.h>',
+    '#include <stdlib.h>',
     // `static inline`, not plain `static`: an unused plain static function
     // triggers -Wunused-function, and those warnings would surface in the
     // terminal as if they were the user's own.
     // The marker is split across string literals on purpose — "\x010" would be
     // read as a single hex escape.
-    'static inline int __ssp_i(int r){ fputs(r==EOF?"\\x01" "0" "\\x01":"\\x01" "1" "\\x01", stdout); return r; }',
-    'static inline char *__ssp_p(char *r){ fputs(r?"\\x01" "1" "\\x01":"\\x01" "0" "\\x01", stdout); return r; }',
-    'static inline long __ssp_l(long r){ fputs(r<0?"\\x01" "0" "\\x01":"\\x01" "1" "\\x01", stdout); return r; }',
+    //
+    // STDIN RAN DRY: that is exactly where a real terminal would block, so mark
+    // it and STOP. The old shim marked it and let the program carry on, which
+    // was harmless only when nothing after the read mattered. `scanf("%d", &x)`
+    // failing leaves x uninitialised, so a following `for (i = 1; i <= x; i++)`
+    // counted to a garbage bound until the sandbox killed it -- exit 143, every
+    // prompt paying the full time limit, and a false "this program keeps
+    // running instead of stopping" note. Measured on that program: 32,780 bytes
+    // of output generated and thrown away before the prompt could appear.
+    // termSplitAtBlockingRead never reads past the first "0" marker, so ending
+    // the run here changes nothing that is shown.
+    'static inline void __ssp_dry(void){ fputs("\\x01" "0" "\\x01", stdout); fflush(stdout); exit(0); }',
+    'static inline int __ssp_i(int r){ if (r==EOF) __ssp_dry(); fputs("\\x01" "1" "\\x01", stdout); return r; }',
+    'static inline char *__ssp_p(char *r){ if (!r) __ssp_dry(); fputs("\\x01" "1" "\\x01", stdout); return r; }',
+    'static inline long __ssp_l(long r){ if (r<0) __ssp_dry(); fputs("\\x01" "1" "\\x01", stdout); return r; }',
+    // ONLY STDIN IS THE TERMINAL. fscanf, fgets and getline take a stream, and
+    // the old shim marked the end of EVERY stream as a blocking read -- so a
+    // program that reads a file to its end was reported as waiting for input
+    // and showed nothing at all. Measured: a write-then-read-to-EOF program
+    // that prints "sum=6" displayed "" and sat on "Waiting for input". A file
+    // reaching its end is ordinary; only stdin running dry is a prompt.
+    // The stream is evaluated once, inside a GCC statement expression, so
+    // fscanf(fopen(...), ...) cannot open the file twice. Warning-free under
+    // every flag set termCompilerArgs can produce -- none of them is -pedantic.
+    'static inline int __ssp_fi(FILE *s, int r){ return s == stdin ? __ssp_i(r) : r; }',
+    'static inline char *__ssp_fp(FILE *s, char *r){ return s == stdin ? __ssp_p(r) : r; }',
+    'static inline long __ssp_fl(FILE *s, long r){ return s == stdin ? __ssp_l(r) : r; }',
     '#undef scanf',
     '#define scanf(...) __ssp_i(scanf(__VA_ARGS__))',
-    '#undef fscanf',
-    '#define fscanf(...) __ssp_i(fscanf(__VA_ARGS__))',
     '#undef getchar',
     '#define getchar() __ssp_i(getchar())',
-    '#undef fgets',
-    '#define fgets(...) __ssp_p(fgets(__VA_ARGS__))',
     '#undef gets',
     '#define gets(...) __ssp_p(gets(__VA_ARGS__))',
+    '#undef fscanf',
+    '#define fscanf(s, ...) ({ FILE *__ssp_s = (s); __ssp_fi(__ssp_s, fscanf(__ssp_s, __VA_ARGS__)); })',
+    '#undef fgets',
+    '#define fgets(b, n, s) ({ FILE *__ssp_s = (s); __ssp_fp(__ssp_s, fgets((b), (n), __ssp_s)); })',
     '#undef getline',
-    '#define getline(...) __ssp_l(getline(__VA_ARGS__))'
+    '#define getline(p, n, s) ({ FILE *__ssp_s = (s); __ssp_fl(__ssp_s, getline((p), (n), __ssp_s)); })'
   ];
 
   // Must land AFTER the includes: defining these before <stdio.h> is parsed
