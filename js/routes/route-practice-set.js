@@ -45,7 +45,7 @@ function practiceSetTemplate() {
             <h1 class="practice-program-title" id="pset-problem-title">Problem</h1>
             <span class="practice-program-version" id="pset-set-name"></span>
           </header>
-          <div>
+          <div class="practice-desc-block">
             <div class="practice-desc-head">
               <h2>Description</h2>
               <button class="practice-desc-edit" onclick="psetEditDescription()"

@@ -4327,7 +4327,11 @@ body.is-resizing .practice-panel { transition: none; }
 
 .practice-desc-edit svg { width: 14px; height: 14px; }
 
-.practice-desc-head:hover .practice-desc-edit,
+/* Full strength as soon as the pointer is anywhere over the description -- the
+   heading, the text, or the gap between -- not only over the thin heading row.
+   Reading the text is exactly when you reach for Read aloud or Edit, and the
+   old rule made you aim at the heading first before they would light up. */
+.practice-desc-block:hover .practice-desc-edit,
 .practice-desc-edit:focus-visible { opacity: 1; }
 
 .practice-desc-edit:hover {

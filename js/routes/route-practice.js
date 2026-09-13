@@ -105,7 +105,7 @@ function practiceTemplate() {
             <h1 class="practice-program-title" id="practice-program-title"></h1>
             <span class="practice-program-version" id="practice-program-version"></span>
           </header>
-          <div>
+          <div class="practice-desc-block">
             <div class="practice-desc-head">
               <h2>Description</h2>
               <!-- The walkthrough for whatever idea this program is about. It
