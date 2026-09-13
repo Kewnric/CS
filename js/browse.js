@@ -276,7 +276,7 @@ function browseBuildTreeHtml() {
 
   // The pseudo-folder: uncategorized items, or your favourites — right-click
   // the row to switch (see libRootMode).
-  const rootList = libRootItems('browse', state.challenges, state.codingSets || []);
+  const rootList = libRootItems('browse', state.challenges, state.codingSets || []).filter(browseInView);
   const rootMeta = libRootMeta('browse');
   if (rootList.length > 0 || state.nodes.filter(n => n.scope === 'challenge').length === 0) {
     const count = rootList.length;
@@ -374,12 +374,14 @@ function renderTreeRecursive(parentId, scope, depth, query, activeId, itemsOnly,
 
     if (entry.kind === 'folder') {
       const folder = node;
-      const totalItems = countItemsRecursive(folder.id, scope);
+      const totalItems = browseCountInView(folder.id);
       const hasChildren = getChildFolders(folder.id, scope).length > 0;
       const expanded = isNodeExpanded(folder.id);
 
       // If searching, skip folders with no matching items
       if (query && !folderHasMatchingItems(folder.id, scope, query)) return;
+      // The hidden view shows only the path down to something hidden.
+      if (browseHiddenView() && totalItems === 0) return;
 
       // Lock status
       let lockIcon = '';
@@ -431,6 +433,7 @@ function renderTreeRecursive(parentId, scope, depth, query, activeId, itemsOnly,
       const item = node;
       // Must use the same predicate as folderHasMatchingItems (title OR tag), or a
       // folder kept by a tag match renders with no rows under it.
+      if (!browseInView(item)) return;
       if (query && !itemMatchesQuery(item, query)) return;
       // A favourited program showed no star anywhere in the tree — the only
       // clue was on its card. The row now carries the star, the per-item
@@ -458,6 +461,7 @@ function renderTreeRecursive(parentId, scope, depth, query, activeId, itemsOnly,
     // Practice sets live in the challenge tree too — distinct grid icon.
     if (entry.kind === 'set') {
       const set = node;
+      if (!browseInView(set)) return;
       if (query && !fuzzyMatch(set.title, query)) return;
       const n = (set.problems || []).length;
       html += `
@@ -490,11 +494,11 @@ function itemMatchesQuery(item, query) {
 function folderHasMatchingItems(folderId, scope, query) {
   // Check direct items
   const items = getItemsInFolder(folderId, scope);
-  if (items.some(item => itemMatchesQuery(item, query))) return true;
+  if (items.some(item => browseInView(item) && itemMatchesQuery(item, query))) return true;
 
   // Practice sets live in the challenge tree too — a set title must keep its
   // folder visible, otherwise searching for a set name empties the whole tree.
-  if (scope === 'challenge' && getSetsInFolder(folderId).some(s => fuzzyMatch(s.title, query))) return true;
+  if (scope === 'challenge' && getSetsInFolder(folderId).some(s => browseInView(s) && fuzzyMatch(s.title, query))) return true;
 
   // Check child folders recursively
   const childFolders = getChildFolders(folderId, scope);
@@ -1563,15 +1567,16 @@ function renderBrowseContent() {
 
   let sets = [];
   if (query) {
-    challenges = state.challenges.filter(c => itemMatchesQuery(c, query));
-    sets = (state.codingSets || []).filter(s => fuzzyMatch(s.title, query));
+    challenges = state.challenges.filter(c => browseInView(c) && itemMatchesQuery(c, query));
+    sets = (state.codingSets || []).filter(s => browseInView(s) && fuzzyMatch(s.title, query));
   } else {
     const folderId = isRoot ? null : browseActiveNodeId;
     // Normalize parentId: legacy/imported programs can carry `undefined` instead of
     // null, which used to make them count towards "Uncategorized" without ever listing.
-    challenges = state.challenges.filter(c => (c.parentId || null) === folderId);
-    childFolders = isRoot ? [] : getChildFolders(browseActiveNodeId, 'challenge');
-    sets = getSetsInFolder(folderId);
+    challenges = state.challenges.filter(c => (c.parentId || null) === folderId && browseInView(c));
+    childFolders = isRoot ? [] : getChildFolders(browseActiveNodeId, 'challenge')
+      .filter(f => !browseHiddenView() || browseCountInView(f.id) > 0);
+    sets = getSetsInFolder(folderId).filter(browseInView);
   }
 
   // Filter & sort the program list (status / difficulty / sort). Keep the
@@ -1587,7 +1592,7 @@ function renderBrowseContent() {
        is why they were the one row on the page that just appeared. */
     subfoldersHtml = `<div class="card-grid subfolder-grid ${window.disableNextStagger ? '' : 'stagger-children'}">`;
     childFolders.forEach(sf => {
-      const sfCount = countItemsRecursive(sf.id, 'challenge');
+      const sfCount = browseCountInView(sf.id);
       subfoldersHtml += `
         <div class="subfolder-card" onclick="selectBrowseNode('${sf.id}'); toggleNodeExpanded('${sf.id}');">
           <i data-lucide="folder"></i>
@@ -1613,9 +1618,9 @@ function renderBrowseContent() {
           <i data-lucide="folder-open" style="width: 48px; height: 48px; opacity: 0.5;"></i>
           <div class="empty-state-pulse-ring"></div>
         </div>
-        <h2>No programs found</h2>
+        <h2>${browseHiddenView() && !query ? 'Nothing hidden here' : 'No programs found'}</h2>
         <p style="font-size: 0.875rem; margin-top: 0.5rem;">
-          ${query ? `No results for "${escapeHTML(query)}"` : `No programs available in ${escapeHTML(folderName)}.`}
+          ${query ? `No results for "${escapeHTML(query)}"` : browseHiddenView() ? `Nothing in ${escapeHTML(folderName)} is hidden.` : `No programs available in ${escapeHTML(folderName)}.`}
         </p>
       </div>`;
   } else {
@@ -2146,6 +2151,136 @@ function browseFindItem(id) {
          (state.nodes || []).find(n => n.id === id) || null;
 }
 
+/* ── Hidden programs ─────────────────────────────────────────────
+   An archive that is not a folder. A program you are finished with can be
+   hidden: it stays exactly where it was -- same folder, same order, same
+   history -- and simply stops being listed. The Show hidden toggle swaps the
+   library to the other half, so the two sets are viewed separately while
+   still organised as one tree.
+
+   The field is hiddenInLibrary, not `hidden` or `archived`. `hidden` already
+   means a hidden TEST CASE on variants and sets, and isArchived means archived
+   ATTEMPT HISTORY; a third meaning on either word would be a trap for anyone
+   reading the data later. This one is only about what is listed.
+
+   The view is a tab-session setting (sessionStorage), not a saved one: it
+   survives going into an attempt and back, and a reload of the same tab, but a
+   new tab or window opens on your programs. Because it CAN still be on when you
+   arrive, the banner under the header says so in words whenever it is -- a
+   library showing nine programs instead of a hundred and fifty has to explain
+   itself, or it reads as data loss.
+   ------------------------------------------------------------ */
+
+function browseIsHidden(rec) { return !!(rec && rec.hiddenInLibrary); }
+function browseHiddenView() { return getSessionParam('browseHiddenView') === true; }
+
+/** Does this program or set belong to the half of the library on screen? */
+function browseInView(rec) { return browseIsHidden(rec) === browseHiddenView(); }
+
+/**
+ * Programs and sets under a folder, all the way down, that are in the current
+ * view. countItemsRecursive is shared with every other library and counts
+ * everything, so the Coding Library counts for itself.
+ */
+function browseCountInView(folderId) {
+  const pid = folderId || null;
+  let n = state.challenges.filter(c => (c.parentId || null) === pid && browseInView(c)).length
+        + (state.codingSets || []).filter(s => (s.parentId || null) === pid && browseInView(s)).length;
+  (state.nodes || []).forEach(f => {
+    if (f.type === 'folder' && f.scope === 'challenge' && (f.parentId || null) === pid) n += browseCountInView(f.id);
+  });
+  return n;
+}
+
+/* A selection only makes sense over what is on screen. Rows that leave the
+   view while ticked would stay in the selection invisibly, and a later
+   "Delete all 3" would delete things you can no longer see -- so any change
+   of view, and any hide, ends selecting. */
+function _browseEndSelecting() {
+  if (typeof libSelectMode === 'function' && libSelectMode('browse')) libToggleSelectMode('browse');
+}
+
+/** Swap between your programs and the hidden ones. */
+function browseToggleHiddenView() {
+  const next = !browseHiddenView();
+  _browseEndSelecting();
+  setSessionParam('browseHiddenView', next);
+  // Stay in the same folder -- the point is that nothing moved -- but close a
+  // program or set, since it belongs to the other half.
+  browseActiveProgramId = null;
+  browseActiveSetId = null;
+  setSessionParam('browseActiveProgram', null);
+  setSessionParam('browseActiveSet', null);
+  setSessionParam('browsePage', 1);
+  invalidateBrowseCache();
+  renderBrowse();
+  if (typeof updateBrowseHeaderStats === 'function') updateBrowseHeaderStats();
+  if (typeof treeAnnounce === 'function') treeAnnounce(next ? 'Showing hidden programs' : 'Showing your programs');
+}
+
+/**
+ * Hide or unhide programs and sets, with undo.
+ * Folders in the list are ignored -- only programs and sets can be hidden.
+ * @param {string[]} ids
+ * @param {boolean} hide
+ */
+function browseSetHidden(ids, hide) {
+  const sets = state.codingSets || [];
+  const recs = (ids || []).map(id =>
+    state.challenges.find(c => c.id === id) || sets.find(x => x.id === id)).filter(Boolean);
+  const changed = recs.filter(r => browseIsHidden(r) !== !!hide);
+  if (!changed.length) return;
+  const apply = (on) => changed.forEach(r => { if (on) r.hiddenInLibrary = true; else delete r.hiddenInLibrary; });
+  const refresh = () => {
+    saveData(); invalidateBrowseCache(); renderBrowse();
+    if (typeof updateBrowseHeaderStats === 'function') updateBrowseHeaderStats();
+  };
+  _browseEndSelecting();
+  apply(hide);
+  // The program you were reading just left the view: go back to its folder.
+  if (changed.some(r => r.id === browseActiveProgramId || r.id === browseActiveSetId)) {
+    browseActiveProgramId = null;
+    browseActiveSetId = null;
+    setSessionParam('browseActiveProgram', null);
+    setSessionParam('browseActiveSet', null);
+  }
+  refresh();
+  const what = changed.length === 1 ? '"' + (changed[0].title || 'Untitled') + '"' : changed.length + ' items';
+  const them = changed.length === 1 ? 'it' : 'them';
+  const label = hide ? 'Hid ' + what + ' — find ' + them + ' under Show hidden' : 'Unhid ' + what + ' — back with your programs';
+  if (typeof pushUndo === 'function') pushUndo(label, () => { apply(!hide); refresh(); });
+}
+
+/** The header toggle and the banner, in step with the view and the count. */
+function _browseSyncHiddenBtn() {
+  const on = browseHiddenView();
+  const n = state.challenges.filter(browseIsHidden).length + (state.codingSets || []).filter(browseIsHidden).length;
+  const btn = document.getElementById('browse-hidden-btn');
+  if (btn) {
+    const label = on ? 'Back to your programs' : (n ? 'Show hidden (' + n + ')' : 'Show hidden — nothing hidden yet');
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+    btn.innerHTML = '<i data-lucide="' + (on ? 'archive-restore' : 'archive') + '"></i>'
+      + (!on && n ? '<span class="browse-hidden-count" aria-hidden="true">' + n + '</span>' : '');
+    if (typeof lucide !== 'undefined') lucide.createIcons({ root: btn });
+  }
+  const banner = document.getElementById('browse-hidden-banner');
+  if (banner) {
+    banner.innerHTML = on
+      ? '<div class="browse-hidden-banner" role="status">'
+        + '<i data-lucide="archive"></i>'
+        + '<span>' + (n
+            ? '<strong>Hidden programs</strong> · ' + n + ' hidden, still in their own folders.'
+            : '<strong>Nothing is hidden yet.</strong> Right-click a program and choose Hide.') + '</span>'
+        + '<button type="button" class="btn btn-ghost btn-sm" onclick="browseToggleHiddenView()">Back</button>'
+        + '</div>'
+      : '';
+    if (on && typeof lucide !== 'undefined') lucide.createIcons({ root: banner });
+  }
+}
+
 /** A small swatch grid, opened from the row menu. */
 const TREE_COLOR_TARGET_KEY = 'ssp.treeColorTarget';
 
@@ -2510,7 +2645,8 @@ registerTreeHost('browse', {
       { icon: 'palette', label: 'Highlight colour...', fn: () => browseSetColor(id) },
       { icon: 'image', label: 'Change icon...', fn: () => browseSetIcon(id) },
       { icon: 'hash', label: 'Set level...', fn: () => browseSetLevel(id) },
-      { icon: 'git-compare', label: 'Compare with solution', fn: () => { if (typeof anOpenReview === 'function') anOpenReview(id); } }
+      { icon: 'git-compare', label: 'Compare with solution', fn: () => { if (typeof anOpenReview === 'function') anOpenReview(id); } },
+      { icon: browseIsHidden(it) ? 'eye' : 'eye-off', label: browseIsHidden(it) ? 'Unhide' : 'Hide', fn: () => browseSetHidden([id], !browseIsHidden(it)) }
     ];
   },
   /* What can be done to several rows at once. Everything the single-row menu
@@ -2522,7 +2658,10 @@ registerTreeHost('browse', {
     { icon: 'palette', label: 'Highlight colour for all…', fn: () => browseBatchColor(ids) },
     { icon: 'hash', label: 'Set level for all…', fn: () => browseBatchLevel(ids) },
     { icon: 'star', label: 'Favourite all', fn: () => browseBatchFavorite(ids, true) },
-    { icon: 'star-off', label: 'Unfavourite all', fn: () => browseBatchFavorite(ids, false) }
+    { icon: 'star-off', label: 'Unfavourite all', fn: () => browseBatchFavorite(ids, false) },
+    browseHiddenView()
+      ? { icon: 'eye', label: 'Unhide all', fn: () => browseSetHidden(ids, false) }
+      : { icon: 'eye-off', label: 'Hide all', fn: () => browseSetHidden(ids, true) }
   ]),
   onBatchDelete: (ids) => browseBatchDelete(ids),
   // Right-click the empty pane: what the rows show, and new folders.
@@ -2533,7 +2672,9 @@ registerTreeHost('browse', {
     { icon: browseShow('tags') ? 'check-square' : 'square', label: 'Show topic badge', fn: () => browseToggleShow('tags') },
     { sep: true },
     { icon: 'chevrons-down-up', label: 'Collapse all folders', fn: () => browseCollapseAll(true) },
-    { icon: 'chevrons-up-down', label: 'Expand all folders', fn: () => browseCollapseAll(false) }
+    { icon: 'chevrons-up-down', label: 'Expand all folders', fn: () => browseCollapseAll(false) },
+    { sep: true },
+    { icon: browseHiddenView() ? 'archive-restore' : 'archive', label: browseHiddenView() ? 'Back to your programs' : 'Show hidden programs', fn: () => browseToggleHiddenView() }
   ]),
   // Moving between folders asks first; reordering inside one does not.
   confirmMove: true,

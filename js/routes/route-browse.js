@@ -24,6 +24,13 @@ function browseTemplate() {
               <button class="tutorial-trigger-btn" id="browse-toggle-items-btn" onclick="toggleBrowseTreeItems()" title="Toggle file visibility">
                 <i data-lucide="${localStorage.getItem('browseHideItems') === 'true' ? 'eye-off' : 'eye'}" id="browse-toggle-items-icon"></i>
               </button>
+              <!-- Hidden programs: the same folders, viewed separately. Not the
+                   eye beside it, which hides every program row to show folders
+                   only. See browseToggleHiddenView. -->
+              <button class="tutorial-trigger-btn browse-hidden-btn" id="browse-hidden-btn" onclick="browseToggleHiddenView()"
+                      aria-pressed="false" title="Show hidden programs" aria-label="Show hidden programs">
+                <i data-lucide="archive"></i>
+              </button>
               ${typeof codingStarterButtonTemplate === 'function' ? codingStarterButtonTemplate() : ''}
               <!-- Every walkthrough, browsable outside an attempt. -->
               <button class="tutorial-trigger-btn" onclick="demoOpenLibrary()"
@@ -47,6 +54,7 @@ function browseTemplate() {
           </div>
           <div class="browse-mini-stats" id="browse-mini-stats"></div>
           <div id="browse-starter-banner">${typeof codingStarterBannerTemplate === 'function' ? codingStarterBannerTemplate() : ''}</div>
+          <div id="browse-hidden-banner"></div>
         </div>
         <div class="pane-1-content tree-container" id="browse-category-list"></div>
       </main>
@@ -150,13 +158,22 @@ function browseInit() {
 function browseDestroy() { }
 
 function updateBrowseHeaderStats() {
+  if (typeof _browseSyncHiddenBtn === 'function') _browseSyncHiddenBtn();
   const totalPrograms = state.challenges.length;
   const completedPrograms = countCompletedPrograms();
   const folders = state.nodes.filter(n => n.scope === 'challenge' && n.type === 'folder').length;
 
   const headerSub = document.getElementById('browse-header-stats');
   if (headerSub) {
-    headerSub.textContent = `${totalPrograms} program${totalPrograms !== 1 ? 's' : ''} across ${folders} folder${folders !== 1 ? 's' : ''}`;
+    /* The count follows the view: a hidden program is still yours and still in
+       its folder, but it is not one of the programs on screen. Done, Due and
+       the progress bar below deliberately still count everything -- they are
+       about your progress, not about what is listed. */
+    const hiddenN = typeof browseIsHidden === 'function' ? state.challenges.filter(browseIsHidden).length : 0;
+    const inHidden = typeof browseHiddenView === 'function' && browseHiddenView();
+    const shownN = inHidden ? hiddenN : totalPrograms - hiddenN;
+    headerSub.textContent = `${shownN} ${inHidden ? 'hidden program' : 'program'}${shownN !== 1 ? 's' : ''} across ${folders} folder${folders !== 1 ? 's' : ''}`
+      + (!inHidden && hiddenN ? ` · ${hiddenN} hidden` : '');
   }
 
   const miniStats = document.getElementById('browse-mini-stats');

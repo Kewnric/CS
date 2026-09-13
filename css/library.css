@@ -2114,3 +2114,50 @@ body.tree-dragging [data-tree-ns]::-webkit-scrollbar { width: 0; height: 0; }
 }
 .prog-move-btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
 .prog-move-btn svg { width: 11px; height: 11px; }
+
+/* ── Hidden programs ─────────────────────────────────────────────
+   The toggle is lit amber while the hidden half is on screen, and a banner
+   under the header says so in words -- a library that suddenly shows nine
+   programs instead of a hundred and fifty has to explain itself at a glance,
+   or it reads as data loss. */
+.browse-hidden-btn { position: relative; }
+.browse-hidden-btn.active {
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 14%, transparent);
+  border-color: color-mix(in srgb, var(--color-warning) 45%, transparent);
+}
+/* How many are hidden, so the toggle is not a mystery button while off. */
+.browse-hidden-count {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface-hover);
+  color: var(--text-secondary);
+  font-size: 0.55rem;
+  font-weight: 800;
+  line-height: 13px;
+  text-align: center;
+  pointer-events: none;
+}
+.browse-hidden-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.55rem;
+  padding: 0.45rem 0.45rem 0.45rem 0.65rem;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-warning) 10%, var(--bg-surface));
+  border: 1px solid color-mix(in srgb, var(--color-warning) 32%, transparent);
+  font-size: 0.74rem;
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+.browse-hidden-banner > i,
+.browse-hidden-banner > svg { width: 14px; height: 14px; color: var(--color-warning); flex-shrink: 0; }
+.browse-hidden-banner > span { flex: 1; min-width: 0; }
+.browse-hidden-banner strong { color: var(--text-primary); font-weight: 700; }
