@@ -969,7 +969,7 @@ details[open]>.snippet-folder-summary>.folder-icon {
    row height, and half again the resting thickness -- which read as oversized
    rather than as emphasis. It does not need the size: .active swaps the flat
    per-level bar for a dither in the SAME colour, takes opacity to 1, and runs
-   railDither/railGlow, none of which hover does. That is already the loudest
+   railDither, none of which hover does. That is already the loudest
    thing in the tree. */
 .tree-node[data-level] > .tree-node-row.active::after,
 .tree-node-row.active::after {
@@ -1122,6 +1122,16 @@ details[open]>.snippet-folder-summary>.folder-icon {
   border-radius: 0;
   opacity: 1;
   box-shadow: none;
+  /* Transparent, not inherited. The resting bar is `background: rgb(var(--rail))`,
+     a shorthand that sets the COLOUR too, and this rule only replaced the
+     image -- so a solid fill of the rail colour sat under the dots, and dots
+     the same colour as their fill cannot be seen. The edge read as a smooth
+     ramp instead of as pixels, and not as the colour dialog's preview draws it
+     (.tree-color-preview-rail), which has no fill. Measured on one row in one
+     colour, the preview and this differed in exactly two things: this fill,
+     and a pulsing drop-shadow glow that ran here and not there. Both are gone,
+     so the preview is the selected row. */
+  background-color: transparent;
   background-image:
     /* the solid margin the pixels build up to */
     linear-gradient(90deg, transparent 0 calc(100% - 3px), var(--rail-c) calc(100% - 3px) 100%),
@@ -1135,7 +1145,7 @@ details[open]>.snippet-folder-summary>.folder-icon {
      makes it read as density rather than as a texture laid over a bar. */
   -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.22) 38%, rgba(0,0,0,0.72) 72%, #000 100%);
   mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.22) 38%, rgba(0,0,0,0.72) 72%, #000 100%);
-  animation: railDither 1.6s steps(4, end) infinite, railGlow 2.4s ease-in-out infinite;
+  animation: railDither 1.6s steps(4, end) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
