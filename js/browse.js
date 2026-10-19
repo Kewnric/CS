@@ -759,6 +759,7 @@ function browseStartFresh(challengeId) {
     const go = () => {
       clearSessionParam('autoSavedFiles');
       clearSessionParam('practiceStartTime');
+      clearSessionParam('practiceExecs');
       promptTimer(challengeId);
     };
     if (typeof showConfirm === 'function') {

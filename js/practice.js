@@ -1387,6 +1387,8 @@ async function submitCode() {
   if (_autoSaveInterval) { clearInterval(_autoSaveInterval); _autoSaveInterval = null; }
   clearSessionParam('autoSavedFiles');
   clearSessionParam('practiceStartTime');
+  // The attempt is over; its restore points must not reload into the next one.
+  clearSessionParam('practiceExecs');
 
   // Save the currently active file's code
   savePracticeFileCode();
@@ -1670,6 +1672,7 @@ function retryPractice() {
   // Fresh attempt: reset the persisted timer anchor too
   setSessionParam('practiceStartTime', state.sessionData.startTime);
   clearSessionParam('autoSavedFiles');
+  clearSessionParam('practiceExecs');
   /* And the music, for the same reason. A retry does not leave and re-enter the
      route, so the rewind in initPractice never sees it -- but it resets the
      code, the clock and the hints, which is what "a fresh attempt" means. */
