@@ -14,8 +14,77 @@ function vizSwapPanes() {
   setTimeout(() => {
     workspace.classList.toggle('panes-swapped', viz.panesSwapped);
     workspace.classList.remove('swapping');
+    _vizSyncFoldButtons();   // the pane changed sides, so its arrow flips
   }, 180);
   vizSave();
+}
+
+/* ── Fold arrows, as on the coding attempt ─────────────────────
+   The divider's arrow folds the first pane away and brings it back; the seam
+   under the topbar folds the topbar. Both remember their state. */
+function vizTogglePane() {
+  const ws = document.querySelector('.viz-workspace');
+  if (!ws) return;
+  const on = ws.classList.toggle('hide-pane');
+  try { localStorage.setItem('ssp.vizPaneHidden', on ? '1' : '0'); } catch (_) { /* private mode */ }
+  _vizSyncFoldButtons();
+  window.dispatchEvent(new Event('resize'));
+}
+
+function vizToggleTopbar() {
+  const page = document.querySelector('.viz-page');
+  const bar = page && page.querySelector(':scope > .viz-topbar');
+  if (!bar) return;
+  // max-height cannot animate from `none`; pin the bar's real height for the
+  // length of the fold, both ways (practice.js _tbPrepareFold does the same).
+  const folded = bar.offsetHeight < 4;
+  bar.style.maxHeight = (folded ? bar.scrollHeight + 25 : bar.offsetHeight) + 'px';
+  void bar.offsetHeight;
+  clearTimeout(bar._vizFoldTimer);
+  bar._vizFoldTimer = setTimeout(() => { bar.style.maxHeight = ''; }, 320);
+  const on = page.classList.toggle('hide-top');
+  try { localStorage.setItem('ssp.vizTopHidden', on ? '1' : '0'); } catch (_) { /* private mode */ }
+  _vizSyncFoldButtons();
+  window.dispatchEvent(new Event('resize'));
+}
+
+/** Point each arrow at what it will do next, and label it to match. */
+function _vizSyncFoldButtons() {
+  const ws = document.querySelector('.viz-workspace');
+  const paneBtn = document.getElementById('rz-viz-pane-btn');
+  if (ws && paneBtn) {
+    const hidden = ws.classList.contains('hide-pane');
+    // The pane sits on the left unless the panes are swapped. Expanded, the
+    // arrow points toward it (fold it away); folded, back into the canvas.
+    const paneSide = ws.classList.contains('panes-swapped') ? 'right' : 'left';
+    const dir = hidden ? (paneSide === 'left' ? 'right' : 'left') : paneSide;
+    const divider = paneBtn.closest('.resizer-divider');
+    if (divider) divider.classList.toggle('collapsed', hidden);
+    paneBtn.title = hidden ? 'Show the side pane' : 'Collapse the side pane';
+    paneBtn.setAttribute('aria-label', paneBtn.title);
+    // Rebuilt rather than re-pointed: lucide keeps the old svg's classes, so
+    // flipping in place stacks both chevrons on one element.
+    if (paneBtn.dataset.dir !== dir) {
+      paneBtn.dataset.dir = dir;
+      paneBtn.innerHTML = '<i data-lucide="chevron-' + dir + '"></i>';
+      if (typeof lucide !== 'undefined') lucide.createIcons({ root: paneBtn });
+    }
+  }
+  const page = document.querySelector('.viz-page');
+  const topBtn = document.getElementById('rz-viz-top-btn');
+  if (page && topBtn) {
+    const hidden = page.classList.contains('hide-top');
+    const dir = hidden ? 'down' : 'up';
+    topBtn.title = hidden ? 'Show the top bar' : 'Collapse the top bar';
+    topBtn.setAttribute('aria-label', topBtn.title);
+    if (topBtn.dataset.dir !== dir) {
+      topBtn.dataset.dir = dir;
+      topBtn.innerHTML = '<i data-lucide="chevron-' + dir + '"></i>';
+      if (typeof lucide !== 'undefined') lucide.createIcons({ root: topBtn });
+    }
+  }
+  // The clicked arrow is moving or vanishing; drop its focus so it isn't left lit.
+  [paneBtn, topBtn].forEach(b => { if (b && document.activeElement === b) b.blur(); });
 }
 
 /* --- Collapsible Module Tabs --- */
@@ -88,8 +157,17 @@ function vizRestoreUiState() {
     if (wrap) wrap.classList.add('toolbar-collapsed');
     if (btn) btn.title = 'Show toolbar';
   }
-  let zen = false;
-  try { zen = localStorage.getItem('ssp.vizZen') === '1'; } catch (_) { /* private mode */ }
+  let zen = false, paneHidden = false, topHidden = false;
+  try {
+    zen = localStorage.getItem('ssp.vizZen') === '1';
+    paneHidden = localStorage.getItem('ssp.vizPaneHidden') === '1';
+    topHidden = localStorage.getItem('ssp.vizTopHidden') === '1';
+  } catch (_) { /* private mode */ }
+  const ws = document.querySelector('.viz-workspace');
+  if (ws) ws.classList.toggle('hide-pane', paneHidden);
+  const page = document.querySelector('.viz-page');
+  if (page) page.classList.toggle('hide-top', topHidden);
+  _vizSyncFoldButtons();
   if (zen) vizToggleZen(true);
 }
 

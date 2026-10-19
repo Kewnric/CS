@@ -54,7 +54,7 @@ function vizSwatchesHTML(fn) {
 
 function vizTemplate() {
   return `
-    <div style="flex:1; display:flex; flex-direction:column; overflow:hidden; height: 100%;">
+    <div class="viz-page" style="flex:1; display:flex; flex-direction:column; overflow:hidden; height: 100%;">
       <div class="viz-topbar">
         <div class="viz-topbar-left">
           <h1><i data-lucide="git-branch"></i> Visualization</h1>
@@ -74,6 +74,11 @@ function vizTemplate() {
           <button class="btn btn-ghost btn-sm viz-tip" id="viz-snap-btn" onclick="vizToggleSnap()" data-tip="Snap to grid: off" title="Snap to grid" aria-label="Snap to grid" aria-pressed="false"><i data-lucide="grid" style="width:14px;height:14px;"></i></button>
           <button class="viz-swap-btn viz-tip" onclick="vizSwapPanes()" data-tip="Swap panes" title="Swap panes" aria-label="Swap the two panes"><i data-lucide="arrow-left-right"></i></button>
         </div>
+      </div>
+      <!-- The coding attempt's fold arrows (layout.css .tb-seam / .rz-collapse):
+           this one folds the topbar away, the divider's folds the first pane. -->
+      <div class="tb-seam viz-tb-seam">
+        <button class="rz-collapse tb-collapse" id="rz-viz-top-btn" type="button" onclick="vizToggleTopbar()" tabindex="-1" aria-hidden="true"><i data-lucide="chevron-up"></i></button>
       </div>
       <div class="viz-workspace">
         <div class="viz-content-pane">
@@ -116,7 +121,9 @@ function vizTemplate() {
           </div>
           <div class="viz-content-body" id="viz-content-body"></div>
         </div>
-        <div class="resizer-divider" onmousedown="initResizerDrag(event, this)"></div>
+        <div class="resizer-divider" onmousedown="initResizerDrag(event, this)">
+          <button class="rz-collapse" id="rz-viz-pane-btn" type="button" onmousedown="event.stopPropagation()" onclick="vizTogglePane()" tabindex="-1" aria-hidden="true"><i data-lucide="chevron-left"></i></button>
+        </div>
         <div class="viz-canvas-pane">
           <div class="viz-canvas-toolbar-wrap" id="viz-canvas-toolbar-wrap">
           <!-- Seventeen unlabelled icons in one flat row, mixing view toggles,

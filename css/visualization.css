@@ -4087,3 +4087,71 @@ body.viz-zen .viz-workspace > .resizer-divider {
   color: var(--color-primary);
   background: var(--color-primary-subtle);
 }
+
+/* ── Fold arrows (vizTogglePane / vizToggleTopbar) ─────────────
+   The coding attempt's .rz-collapse and .tb-seam from layout.css. */
+
+/* The side pane folds to nothing. Visibility waits for the width to finish, so
+   the fold animates, and then nothing in it can take focus. */
+.viz-workspace.hide-pane .viz-content-pane {
+  width: 0 !important;
+  min-width: 0 !important;
+  border-width: 0 !important;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+  visibility: hidden;
+  transition: width 0.3s ease, opacity 0.2s ease, visibility 0s linear 0.3s;
+}
+/* Nothing left to drag: the seam is a narrow rail holding the arrow back. */
+.viz-workspace > .resizer-divider.collapsed {
+  width: 18px;
+  cursor: default;
+}
+
+.viz-topbar {
+  transition:
+    max-height 0.26s cubic-bezier(0.4, 0, 0.2, 1),
+    padding 0.26s cubic-bezier(0.4, 0, 0.2, 1),
+    border-width 0.26s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.16s ease,
+    visibility 0s;
+}
+.viz-page.hide-top > .viz-topbar {
+  max-height: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  border-bottom-width: 0 !important;
+  overflow: hidden !important;
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+  transition-delay: 0s, 0s, 0s, 0s, 0.26s;
+}
+/* Folded, the seam's arrow stays out: a tab hanging from the top edge, pulled
+   down from where the bar went (the attempt's .tb-dock). */
+.viz-page.hide-top > .viz-tb-seam .tb-collapse {
+  opacity: 0.6;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+}
+.viz-page.hide-top > .viz-tb-seam .tb-collapse:hover { opacity: 1; }
+body.viz-zen .viz-tb-seam { display: none; }
+
+/* With the topbar folded, the agenda flag (fixed, top-right) hangs over the
+   first row of whichever pane is on the right. Give that row the 72px the
+   topbar used to reserve. */
+body:not(.route-focused) .viz-page.hide-top .viz-workspace:not(.panes-swapped) .viz-canvas-toolbar,
+body:not(.route-focused) .viz-page.hide-top .viz-workspace.panes-swapped.hide-pane .viz-canvas-toolbar {
+  padding-right: calc(0.75rem + 72px);
+}
+body:not(.route-focused) .viz-page.hide-top .viz-workspace.panes-swapped:not(.hide-pane) .viz-content-header {
+  padding-right: calc(1rem + 72px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viz-topbar,
+  .viz-workspace.hide-pane .viz-content-pane { transition: none; }
+}
