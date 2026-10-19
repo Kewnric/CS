@@ -1,10 +1,9 @@
 /* ============================================================
    AMBIENT.JS — the crystals that blow through the practice panes
    ------------------------------------------------------------
-   The field and the colour wash are pure CSS on the panes themselves (see
-   css/ambient.css), which is deliberate: those two survive every re-render
-   without anything here having to notice, because they are properties of the
-   element rather than nodes inside it.
+   The field and the colour wash are pure CSS (see css/ambient.css): the
+   ::before and ::after of .amb-pin, the one element every layer lives in,
+   which the stylesheet holds still while the pane scrolls.
 
    The crystals cannot be done that way — each needs its own path, size and
    timing — so they are nodes, and nodes have to survive the pane that holds
@@ -150,27 +149,51 @@ const _ambRand = (lo, hi) => lo + Math.random() * (hi - lo);
  * would fire every shard at once, which is the one thing that would make them
  * look like a mechanism instead of weather.
  */
-/* Keep the background on the pane, not on its content. Every layer is
-   absolute inset:0 inside the pane, and the pane is the scroller -- so the
-   layers scrolled away with the description, and the scene slid up out of
-   view. The pane's scroll offset moves them back down by exactly as much
-   (ambient.css reads --amb-scroll into top/bottom), which keeps them inside
-   the scroll area, so the scrollbars do not grow. */
-function _ambPin(host) {
-  if (host._ambPinned) return;
-  host._ambPinned = true;
-  const pin = () => host.style.setProperty('--amb-scroll', host.scrollTop + 'px');
-  host.addEventListener('scroll', pin, { passive: true });
-  pin();
+/* Can the browser hold the background still by itself? ambient.css pins
+   .amb-pin with a scroll-driven animation, which the browser moves in the same
+   frame as the scroll. Where that is missing, _ambStage follows the scroll
+   event instead -- a frame late, so the layers judder, but they stay over the
+   visible part of the pane rather than scrolling away. */
+const AMB_SCROLL_LINKED = typeof CSS !== 'undefined' && typeof CSS.supports === 'function'
+  && CSS.supports('animation-timeline: scroll()');
+
+/* The one element every layer lives in, pinned to the pane.
+
+   The pane is the scroller, so anything absolute inside it scrolls with the
+   description. This used to be undone from a scroll listener writing
+   scrollTop into top/bottom, and that is what made the background judder:
+   the browser scrolls the pane on its compositor first and fires `scroll`
+   after, so for a frame the scene rode up with the text and then snapped
+   back. The pin now moves on the scroll timeline itself (see .amb-pin in
+   ambient.css), which is never a frame behind.
+
+   The glow and the field are this element's ::after and ::before, not the
+   pane's, so they move with it. */
+function _ambStage(host) {
+  let pin = host.querySelector(':scope > .amb-pin');
+  if (!pin) {
+    pin = document.createElement('div');
+    pin.className = 'amb-pin';
+    pin.setAttribute('aria-hidden', 'true');
+    // First child, so it sits behind everything the pane already holds.
+    host.insertBefore(pin, host.firstChild);
+  }
+  if (!AMB_SCROLL_LINKED && !host._ambFollow) {
+    host._ambFollow = true;
+    const follow = () => host.style.setProperty('--amb-scroll', host.scrollTop + 'px');
+    host.addEventListener('scroll', follow, { passive: true });
+    follow();
+  }
+  return pin;
 }
 
 function _ambFill(host) {
   if (!host) return;
-  _ambPin(host);
+  const pin = _ambStage(host);
   // Before the early return: a pane filled by an older build has shards but no
   // scene, and bailing out above would leave it without one for the session.
   _ambScene(host);
-  if (host.querySelector(':scope > .amb-shards')) return;
+  if (pin.querySelector(':scope > .amb-shards')) return;
 
   const layer = document.createElement('div');
   layer.className = 'amb-shards';
@@ -277,8 +300,8 @@ function _ambFill(host) {
     layer.appendChild(gust);
   }
 
-  // First child, so it sits behind everything the pane already holds.
-  host.insertBefore(layer, host.firstChild);
+  // First in the pin, so it sits behind the scene, as it always has.
+  pin.insertBefore(layer, pin.firstChild);
   _ambScene(host);
 }
 
@@ -303,7 +326,9 @@ function _ambFill(host) {
 
    Idempotent, like _ambFill: a pane that still has its scene is left alone. */
 function _ambScene(host) {
-  if (!host || host.querySelector(':scope > .amb-scene')) return;
+  if (!host) return;
+  const pin = _ambStage(host);
+  if (pin.querySelector(':scope > .amb-scene')) return;
   const scene = document.createElement('div');
   scene.className = 'amb-scene';
   scene.setAttribute('aria-hidden', 'true');
@@ -315,7 +340,7 @@ function _ambScene(host) {
     el.style.setProperty('--sway-d', (-Math.random() * 40).toFixed(1) + 's');
     scene.appendChild(el);
   });
-  host.insertBefore(scene, host.firstChild);
+  pin.insertBefore(scene, pin.firstChild);
 }
 
 /**
@@ -330,8 +355,7 @@ function _ambScene(host) {
  */
 function ambSetContent(host, html) {
   if (!host) return;
-  const isLayer = n => n.nodeType === 1 &&
-    (n.classList.contains('amb-shards') || n.classList.contains('amb-scene'));
+  const isLayer = n => n.nodeType === 1 && n.classList.contains('amb-pin');
   const nodes = Array.from(host.childNodes);
   if (!nodes.some(isLayer)) { host.innerHTML = html; return; }
   nodes.forEach(n => { if (!isLayer(n)) n.remove(); });
@@ -346,7 +370,7 @@ function ambMount() {
   document.body.classList.toggle('amb-off', !on);
   _ambApplyThemeClass();
   if (!on) {
-    document.querySelectorAll('.amb-shards, .amb-scene').forEach(el => el.remove());
+    document.querySelectorAll('.amb-pin').forEach(el => el.remove());
     document.querySelectorAll('.amb-host').forEach(el => el.classList.remove('amb-host'));
     return;
   }

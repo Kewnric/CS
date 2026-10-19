@@ -43,6 +43,64 @@
 .amb-host {
   position: relative;
   isolation: isolate;      /* the layers below can never rise past the content */
+  scroll-timeline: --amb-pane block;   /* what .amb-pin rides on */
+}
+
+/* ── The pin: every layer, held still while the pane scrolls ──
+   The pane is the scroller, so anything absolute inside it scrolls with the
+   description and the scene slides up out of view. Every layer lives in this
+   one element instead, and it moves down by exactly the pane's scroll offset.
+
+   ON THE SCROLL TIMELINE, NOT FROM A SCROLL LISTENER. A listener writing
+   scrollTop into top/bottom was the first version, and the background
+   juddered: the browser scrolls the pane on its compositor first and fires
+   `scroll` after, so for a frame the scene rode up with the text and then
+   snapped back. A scroll-driven animation is moved in the same frame as the
+   scroll. The range is 0 to 100000px of scroll mapped onto 0 to 100000px of
+   translate, so the offset is the scroll position itself; the pane never
+   scrolls that far, so the end is never reached.
+
+   This is the ONE transformed layer, and it is safe for the same reason the
+   rule against transforms exists: the pin is the pane's visible size, and
+   moved by the scroll offset its bottom sits exactly at the bottom of what is
+   in view -- never past the end of the content, so the scrollbars do not
+   grow. overflow:hidden keeps anything inside it from reaching them either.
+
+   The !importants are against global.css, whose reduced-motion and
+   no-entry-animation rules zero every animation's duration. This one is not
+   motion, it is where the background sits, and with no duration it would not
+   follow the scroll at all. */
+.amb-pin {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+}
+@supports (animation-timeline: scroll()) {
+  .amb-host > .amb-pin {
+    animation-name: ambPin;
+    animation-duration: auto !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    animation-timing-function: linear;
+    animation-fill-mode: both;
+    animation-timeline: --amb-pane;
+    animation-range: 0px 100000px;
+  }
+}
+@keyframes ambPin {
+  from { transform: translateY(0); }
+  to   { transform: translateY(100000px); }
+}
+/* No scroll timeline: js/ambient.js follows the scroll event and writes the
+   offset here. A frame late, but over the visible part of the pane. */
+@supports not (animation-timeline: scroll()) {
+  .amb-host > .amb-pin {
+    top: var(--amb-scroll, 0px);
+    bottom: calc(0px - var(--amb-scroll, 0px));
+  }
 }
 
 /* ── The field of crystals ────────────────────────────────────
@@ -56,7 +114,7 @@
    diagonally at once. --amb-drift scales with the tile, so all three drift at
    the same speed.
    ------------------------------------------------------------ */
-.amb-host::before {
+.amb-pin::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -83,7 +141,7 @@
    It breathes by growing and fading rather than by scaling the element,
    which would put the box outside the pane again.
    ------------------------------------------------------------ */
-.amb-host::after {
+.amb-pin::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -306,7 +364,7 @@ body.amb-theme-fire {
   --amb-ink: #b45309;                 /* ember brown */
   --amb-lit: #fbbf24;                 /* flame gold */
 }
-body.amb-theme-fire .amb-host::before {
+body.amb-theme-fire .amb-pin::before {
   /* The tile below is 160px, not the default 140 -- see ambDrift. */
   --amb-tile: 160px;
   --amb-drift: 103s;
@@ -316,7 +374,7 @@ body.amb-theme-fire .amb-host::before {
 /* Low and wide, and warmer at the core than at the edge, the way a fire lights
    a room. Two stops of the same hue rather than two colours, so it reads as
    one source at a distance instead of a gradient. */
-body.amb-theme-fire .amb-host::after {
+body.amb-theme-fire .amb-pin::after {
   background-position: 50% 88%;
   background-image: radial-gradient(closest-side,
     color-mix(in srgb, #f59e0b 34%, transparent),
@@ -404,7 +462,7 @@ body.amb-theme-night {
   --amb-ink: #8b5cf6;                 /* the violet the room is bathed in */
   --amb-lit: #ffdfa6;                 /* bulb warm */
 }
-body.amb-theme-night .amb-host::before {
+body.amb-theme-night .amb-pin::before {
   /* The tile below is 150px, not the default 140 -- see ambDrift. */
   --amb-tile: 150px;
   --amb-drift: 96s;
@@ -415,7 +473,7 @@ body.amb-theme-night .amb-host::before {
    -- and it earns it here. The violet one sits high and is the air of the
    room; the warm one sits low and small and is a lamp on a desk. The reflected
    warmth under it is the difference between a dark pane and a lit one. */
-body.amb-theme-night .amb-host::after {
+body.amb-theme-night .amb-pin::after {
   background-position: 50% 18%, 50% 96%;
   background-size: 120% 66%, 78% 34%;
   background-image:
@@ -481,22 +539,22 @@ body.amb-theme-night .amb-shard-i {
 body.amb-theme-night .amb-gust { animation: none; }
 
 /* ── Off ────────────────────────────────────────────────────── */
-.amb-off .amb-host::before,
-.amb-off .amb-host::after { content: none; }
+.amb-off .amb-pin::before,
+.amb-off .amb-pin::after { content: none; }
 .amb-off .amb-shards { display: none; }
 
 /* Movement is the unwelcome part, not the decoration, so the field and the
    glow stay and simply stop. The shapes go: their whole point is travel, and a
    row of them frozen mid-pane reads as a rendering fault. */
 @media (prefers-reduced-motion: reduce) {
-  .amb-host::before,
-  .amb-host::after,
+  .amb-pin::before,
+  .amb-pin::after,
   /* The themes set `animation` on the glow, and a theme selector outranks the
      bare one above -- without naming them here their flicker would survive a
      reader asking for no motion, which is the one thing this block exists to
      prevent. */
-  body.amb-theme-fire .amb-host::after,
-  body.amb-theme-night .amb-host::after { animation: none; }
+  body.amb-theme-fire .amb-pin::after,
+  body.amb-theme-night .amb-pin::after { animation: none; }
   .amb-shards { display: none; }
 }
 
@@ -744,18 +802,4 @@ body.amb-theme-night .amb-cast {
   .amb-cast, .amb-far, .amb-canopy, .amb-under,
   body.amb-theme-fire .amb-cast,
   body.amb-theme-night .amb-cast { animation: none; }
-}
-
-/* ── Pinned to the pane, not to its content ────────────────────
-   The pane is the scroller, so its inset:0 layers scrolled with the text and
-   the scene slid out of view. js/ambient.js (_ambPin) writes the pane's
-   scrollTop into --amb-scroll; moving top AND bottom by it keeps each layer
-   exactly the pane's size and exactly over the visible part, and its bottom
-   never passes the end of the content, so the scrollbars do not grow. */
-.amb-host::before,
-.amb-host::after,
-.amb-host > .amb-shards,
-.amb-host > .amb-scene {
-  top: var(--amb-scroll, 0px);
-  bottom: calc(0px - var(--amb-scroll, 0px));
 }
