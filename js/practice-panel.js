@@ -297,7 +297,7 @@ function _ppTestsHtml() {
 
   const scoreLine = check
     ? `<div class="pp-score ${check.allPass ? 'pass' : 'fail'}">Score: ${check.passed}/${check.total}${stale ? ' <span class="pp-stale">· code changed, re-check</span>' : ''}</div>`
-    : `<div class="pp-score idle">Not checked yet — press <strong>Check Code</strong>.</div>`;
+    : '';
 
   return `<div class="pp-tests">${reqHtml}${testHtml}${scoreLine}</div>`;
 }
