@@ -436,7 +436,7 @@ function langDictionaryHTML() {
       <p class="sr-only" role="status" aria-live="polite" id="lang-result-status">${langResultStatus(sorted.length)}</p>
       <div class="lang-entries" role="list">${rows || (langWords().length
         ? '<div class="lang-empty">No entries match those filters.</div>'
-        : langSeedOfferHTML('Add the starter pack — ten words across all four languages, with definitions and example sentences.'))}</div>
+        : langSeedOfferHTML('Add the starter pack — ' + langStarterSize() + ' words with how each is really used and an example sentence, plus drill sets and scenarios.'))}</div>
       ${hidden > 0 ? `
         <div class="lang-more">
           <button class="btn btn-secondary btn-sm" type="button" onclick="langShowMore()">
