@@ -700,7 +700,7 @@ function _buildChallengeCard(c, query) {
           ? `<span class="card-tag-more" title="${escapeHTML((c.tags || []).slice(CARD_TAGS_SHOWN).join(', '))}">+${(c.tags || []).length - CARD_TAGS_SHOWN}</span>` : ''}
       </div>` : ''}
       <p class="line-clamp-2" style="font-size:0.875rem; color:var(--text-secondary); margin-bottom:0.75rem; min-height:2.5rem;">
-        ${escapeHTML(c.coverDescription || c.variants[0]?.description || 'No description.')}
+        ${escapeHTML(programExcerpt(c) || 'No description.')}
       </p>
       ${bestScore >= 0 ? `
       <div class="card-score-bar">
@@ -1415,7 +1415,7 @@ function _renderProgramDetail(container, c) {
         ${isPerfect ? '<div class="card-completed-badge" style="position:static;flex-shrink:0;"><i data-lucide="check" style="width:12px;height:12px;"></i></div>' : ''}
       </div>
 
-      <p class="prog-detail-desc">${escapeHTML(c.coverDescription || c.variants[0]?.description || 'No description.')}</p>
+      <p class="prog-detail-desc">${escapeHTML(programExcerpt(c) || 'No description.')}</p>
 
       <div class="prog-detail-actions">
         ${resumable ? `

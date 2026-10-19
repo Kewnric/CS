@@ -1983,7 +1983,7 @@ window.renderAnalyticsFolderDetail = function(folderId, scope) {
             ${(c.tags || []).map(t => `<span class="badge badge-primary">${escapeHTML(t)}</span>`).join('')}
           </div>
           <p class="line-clamp-2" style="font-size:0.875rem; color:var(--text-secondary); margin-bottom:0.75rem; min-height:2.5rem;">
-            ${escapeHTML(c.coverDescription || c.variants[0]?.description || 'No description.')}
+            ${escapeHTML(programExcerpt(c) || 'No description.')}
           </p>
           <div style="margin-top:auto; display:flex; gap:0.5rem; padding-top:0.5rem;">
             <button onclick="event.stopPropagation(); showHistoryDetail('${c.id}')" class="btn btn-practice" style="flex:1;">

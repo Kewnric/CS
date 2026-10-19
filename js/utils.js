@@ -457,6 +457,26 @@ function formatRichText(text) {
   return html;
 }
 
+/**
+ * A program's description as one line of plain text, for cards and summaries.
+ *
+ * Descriptions are stored as markup (the starter pack's use <br> and <code>)
+ * and the cards escaped what they showed, so they only ever read a variant's
+ * plain description -- which the pack leaves empty. Every starter card said
+ * "No description." DOMParser rather than a detached element: it neither runs
+ * scripts nor fetches images.
+ */
+function programExcerpt(c) {
+  if (!c) return '';
+  const raw = c.coverDescription
+    || (c.variants && c.variants[0] && c.variants[0].description)
+    || c.description || '';
+  if (!raw) return '';
+  const html = String(raw).replace(/<br\s*\/?>/gi, ' ');
+  const text = new DOMParser().parseFromString(html, 'text/html').body.textContent || '';
+  return text.replace(/\s+/g, ' ').trim();
+}
+
 /** @param {Function} fn @param {number} wait ms @returns {Function} debounced wrapper */
 function debounce(fn, wait) {
   let timer;
