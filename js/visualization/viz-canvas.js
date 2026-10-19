@@ -682,8 +682,11 @@ function _vizBuildDefs(svg) {
   const colors = { red: '#ef4444', orange: '#f97316', yellow: '#eab308', green: '#22c55e', blue: '#3b82f6', purple: '#a855f7', pink: '#ec4899', cyan: '#06b6d4' };
   // Heads are solid. The line runs on under the head to the port, and at
   // 60–90% opacity its dashes showed through the arrow.
-  const fwd = (id, fill) => `<marker id="${id}" markerWidth="8" markerHeight="6" refX="6" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="${fill}"/></marker>`;
-  const back = (id, fill) => `<marker id="${id}-back" markerWidth="8" markerHeight="6" refX="2" refY="3" orient="auto"><polygon points="8 0, 0 3, 8 6" fill="${fill}"/></marker>`;
+  // refX puts the TIP on the path's end, which is the node's edge. It was 6
+  // (and 2 for the back head), so the tip ran 2 units — 4px at stroke 2 — past
+  // the edge and into the card.
+  const fwd = (id, fill) => `<marker id="${id}" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="${fill}"/></marker>`;
+  const back = (id, fill) => `<marker id="${id}-back" markerWidth="8" markerHeight="6" refX="0" refY="3" orient="auto"><polygon points="8 0, 0 3, 8 6" fill="${fill}"/></marker>`;
   let html = fwd('viz-arrowhead', 'var(--text-tertiary)') + back('viz-arrowhead', 'var(--text-tertiary)')
     + fwd('viz-arrowhead-locked', '#f59e0b') + back('viz-arrowhead-locked', '#f59e0b')
     + fwd('viz-arrowhead-custom', '#f59e0b') + back('viz-arrowhead-custom', '#f59e0b');
