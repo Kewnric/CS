@@ -3355,9 +3355,13 @@
    181 absolutely-positioned cards inside one transformed layer, and not a
    single `contain` or `will-change` in 3,300 lines. Telling the browser that a
    node's layout cannot affect anything outside it took a full re-render from
-   100 ms to 80 ms. */
+   100 ms to 80 ms.
+   Not `paint`: paint containment clips to the node's own box, which cut off
+   every shadow, glow, port and badge drawn outside it — and when a hovered
+   brain note lifted by translate(-2px,-2px), its top and left border went
+   with them. */
 .viz-node {
-  contain: layout style paint;
+  contain: layout style;
 }
 .viz-nodes-layer,
 .viz-canvas-svg {
