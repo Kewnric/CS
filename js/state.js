@@ -197,7 +197,8 @@ function loadData() {
         state.nodes = parsed.nodes;
       } else {
         state.nodes = migrateCategoriesToNodes(parsed);
-        console.log('[Migration] Converted flat categories → tree nodes:', state.nodes.length, 'folders created');
+        // Every load with no folders came through here and logged "0 created".
+        if (state.nodes.length) console.log('[Migration] Converted flat categories → tree nodes:', state.nodes.length, 'folders created');
       }
 
       // Sample content used to be merged back in here on EVERY load: anything
