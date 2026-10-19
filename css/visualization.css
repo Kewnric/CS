@@ -480,6 +480,14 @@
   stroke: transparent !important;
   animation: none !important;
 }
+/* ...so the line layer draws none of its own. It kept them, and hovering a
+   link (stroke-width 3) scaled its hidden-underneath copy up past the one on
+   top: two heads, one big and one small. A CSS marker property outranks the
+   marker-end attribute; exports build their own SVG and keep theirs. */
+#viz-canvas-svg .viz-link {
+  marker-start: none;
+  marker-end: none;
+}
 .viz-canvas-container.brain-hide-links #viz-heads-svg { opacity: 0; }
 
 .viz-nodes-layer {
