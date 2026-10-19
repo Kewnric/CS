@@ -21,6 +21,12 @@
 /* The attempt screens are their own world — no app chrome over an editor. */
 body.route-focused .ag-root { display: none; }
 
+/* The flag hangs over the top-right corner of every page with a sidebar. Two
+   headers put controls there: the Visualization toolbar (Undo and Snap sat
+   under it at ~960px) and the Quest Board status bar. Give them its 72px. */
+body:not(.route-focused) .viz-topbar { padding-right: calc(1rem + 72px); }
+body:not(.route-focused) .system-status-bar { padding-right: calc(1.25rem + 72px); }
+
 /* -- The flag ---------------------------------------------- */
 
 /* The wrapper exists only to carry the shadow. clip-path clips a box-shadow

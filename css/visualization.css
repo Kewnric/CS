@@ -5,6 +5,11 @@
 /* --- Top Navigation Bar --- */
 .viz-topbar {
   display: flex;
+  /* The title and scope tabs (~660px) do not shrink, so below ~1000px the
+     action buttons ran off the right edge -- Swap panes past the viewport, Undo
+     and Snap under the Agenda ribbon. They drop to a second row instead. */
+  flex-wrap: wrap;
+  row-gap: 0.5rem;
   align-items: center;
   justify-content: space-between;
   padding: 0.625rem 1rem;
