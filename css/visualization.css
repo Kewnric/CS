@@ -4086,16 +4086,16 @@ body.viz-zen .viz-workspace > .resizer-divider:not(.viz-side-seam) {
 body.viz-zen .viz-workspace.panes-swapped { flex-direction: row; }
 
 /* The sidebar's rail: the attempt's divider arrow, folding the app sidebar.
-   It stands in for the workspace's left padding, so the canvas doesn't move. */
+   It takes the workspace's left padding, and is as wide as the 18px arrow
+   itself — at 8px the arrow spilled over the sidebar's edge and the canvas's. */
 .viz-side-seam { display: none; }
 body.viz-zen .viz-side-seam {
   display: flex;
-  width: 0.5rem;
+  width: 18px;
   cursor: default;
 }
 body.viz-zen .viz-workspace { padding-left: 0; }
 .viz-side-seam::after { display: none; }
-body.viz-zen .viz-workspace > .viz-side-seam.collapsed { width: 18px; }
 
 /* Folded: width, not display, so the sidebar's own width transition animates
    it; it leaves the tab order once it has finished closing. */
