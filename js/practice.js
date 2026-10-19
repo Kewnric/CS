@@ -275,7 +275,7 @@ function initPractice() {
       setCheck: (obj) => { _practiceCheck = obj; },
       // The best previous graded attempt rides along as a read-only restore
       // point, so "go back to the version that scored well" spans sessions.
-      getExecs: () => { const b = _practiceBestAttemptExec(); return b ? [b, ..._practiceExecs] : _practiceExecs; },
+      getExecs: () => _practiceExecs,   // this attempt's checks only; past attempts live in History
       pushExec: (e) => {
         _practiceExecs.push(e);
         if (_practiceExecs.length > 20) _practiceExecs.shift();
@@ -486,31 +486,6 @@ function _practiceLoadExecs() {
   const key = _practiceExecKey();
   const saved = getSessionParam('practiceExecs');
   _practiceExecs = (saved && saved.key === key && Array.isArray(saved.execs)) ? saved.execs : [];
-}
-
-/**
- * The best previously GRADED attempt at this program, as a restore point.
- * History stores full userFiles per attempt, so this is real code you can
- * return to — not just a score.
- */
-function _practiceBestAttemptExec() {
-  const ch = state.activeChallenge;
-  if (!ch || !Array.isArray(state.history)) return null;
-  const logs = state.history.filter(h =>
-    h.challengeId === ch.id && Array.isArray(h.userFiles) && h.userFiles.length);
-  if (!logs.length) return null;
-  const best = logs.reduce((a, b) => (b.score > a.score ? b : a));
-  return {
-    score: best.score,
-    ts: best.submitTime || best.startTime || Date.now(),
-    /* Rehydrated, not handed over as stored. De-duplication drops each file's
-       reference when an identical copy is already on the entry's target files,
-       and the editor needs it back -- no reference means no boss bar. */
-    snapshot: { files: (typeof historyRehydrateFiles === 'function'
-                  ? historyRehydrateFiles(best) : best.userFiles), activeFileIndex: 0 },
-    label: 'Best past attempt' + (best.date ? ' · ' + best.date : ''),
-    historical: true
-  };
 }
 
 /** "Saved · Ns ago" chip in the editor toolbar, so the autosave is visible. */
