@@ -575,6 +575,10 @@ function notesStartAttempt() {
     // Replace variant select with a simple minutes input for notebook timer
     variantSelect.closest('div').style.display = 'none';
   }
+  // Recall and the run budget are coding-only: an empty file, a boss bar, Run
+  // presses. A notebook has none of those.
+  const setupRows = document.querySelector('#timer-modal .setup-constraints');
+  if (setupRows) setupRows.style.display = 'none';
 
   const timerModal = document.getElementById('timer-modal');
   if (!timerModal) {
@@ -592,7 +596,7 @@ function notesStartAttempt() {
   const modalTitle = timerModal.querySelector('.modal-title');
   const modalDesc = timerModal.querySelector('.modal-desc');
   if (modalTitle) modalTitle.textContent = 'Start Notebook Session';
-  if (modalDesc) modalDesc.textContent = 'Set an optional time limit in minutes (0 for untimed).';
+  if (modalDesc) modalDesc.textContent = 'Set an optional time limit, or leave it at zero for none.';
 
   document.getElementById('timer-h').value = '0';
   document.getElementById('timer-m').value = '0';
@@ -618,6 +622,8 @@ function notesConfirmStart() {
     // Restore the variant select visibility and confirm button
     const variantSelect = document.getElementById('timer-variant-select');
     if (variantSelect) variantSelect.closest('div').style.display = '';
+    const setupRows = timerModal.querySelector('.setup-constraints');
+    if (setupRows) setupRows.style.display = '';
     const confirmBtn = timerModal.querySelector('button[onclick="notesConfirmStart()"]');
     if (confirmBtn) confirmBtn.setAttribute('onclick', 'confirmStartPractice()');
     const modalTitle = timerModal.querySelector('.modal-title');
