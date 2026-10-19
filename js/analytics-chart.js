@@ -113,7 +113,12 @@ function _ac_trendSvg(series) {
   }
 
   const linePts = series.map((p) => `${xAt(p.x).toFixed(1)},${yAt(p.score).toFixed(1)}`).join(' ');
-  const areaPts = `${padL},${yAt(0)} ${linePts} ${xAt(n - 1)},${yAt(0)}`;
+  // From under the first point, not from the left edge. With one attempt the
+  // point sits mid-chart and an edge-anchored area drew a ramp up to it from a
+  // 0 that never happened. One point is just a dot.
+  const areaPts = n > 1
+    ? `${xAt(series[0].x)},${yAt(0)} ${linePts} ${xAt(series[n - 1].x)},${yAt(0)}`
+    : '';
 
   const dots = series
     .map((p) => {
@@ -145,7 +150,7 @@ function _ac_trendSvg(series) {
         </linearGradient>
       </defs>
       ${grid}
-      <polygon points="${areaPts}" fill="url(#ac-area)" />
+      ${areaPts ? `<polygon points="${areaPts}" fill="url(#ac-area)" />` : ''}
       <polyline class="ac-line" points="${linePts}" fill="none" stroke="var(--color-primary)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
       ${dots}
     </svg>`;
