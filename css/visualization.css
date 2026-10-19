@@ -4200,3 +4200,10 @@ body.viz-no-anim .viz-page *::after,
 body.viz-no-anim .app-sidebar {
   transition: none !important;
 }
+
+/* While the first pane slides open or shut (vizTogglePane), its contents keep
+   their open width and the pane's edge clips them, so nothing inside re-lays
+   out frame by frame. */
+.viz-content-pane.viz-pane-sliding > * {
+  min-width: var(--viz-pane-w);
+}

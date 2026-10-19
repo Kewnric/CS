@@ -25,6 +25,27 @@ function vizSwapPanes() {
 function vizTogglePane() {
   const ws = document.querySelector('.viz-workspace');
   if (!ws) return;
+  // The pane's contents hold their open width for the whole slide and its edge
+  // clips them. Left to follow the animated width, they re-laid out every
+  // frame — the stat chips rewrapping, the row badges' container queries
+  // flipping — and each rewrap was a visible snap while the pane opened.
+  const pane = ws.querySelector('.viz-content-pane');
+  if (pane) {
+    let w = pane.offsetWidth;
+    if (ws.classList.contains('hide-pane')) {
+      // Opening: measure the open width without showing it.
+      document.body.classList.add('viz-no-anim');
+      ws.classList.remove('hide-pane');
+      w = pane.offsetWidth;
+      ws.classList.add('hide-pane');
+      void pane.offsetWidth;
+      document.body.classList.remove('viz-no-anim');
+    }
+    pane.style.setProperty('--viz-pane-w', w + 'px');
+    pane.classList.add('viz-pane-sliding');
+    clearTimeout(pane._vizSlideTimer);
+    pane._vizSlideTimer = setTimeout(() => pane.classList.remove('viz-pane-sliding'), 360);
+  }
   const on = ws.classList.toggle('hide-pane');
   try { localStorage.setItem('ssp.vizPaneHidden', on ? '1' : '0'); } catch (_) { /* private mode */ }
   _vizSyncFoldButtons();
