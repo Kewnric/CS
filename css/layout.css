@@ -378,6 +378,16 @@
     color 0.16s ease;
 }
 .rz-collapse svg { width: 13px; height: 13px; }
+/* The arrow's own spot reveals it, not just the thin seam. Hidden, the button
+   ignores the pointer -- but this band does not, so hovering where the arrow
+   will appear lights it. -34% each way is the full button again while it
+   sits shrunk to 0.6, and a slightly larger target once it is shown. */
+.rz-collapse::before {
+  content: '';
+  position: absolute;
+  inset: -34%;
+  pointer-events: auto;
+}
 
 .resizer-divider:hover .rz-collapse,
 .resizer-divider:has(.rz-collapse:focus-visible) .rz-collapse {
@@ -481,7 +491,7 @@
   grid-column: 1;
   grid-row: 1;
   justify-self: center;
-  align-self: center;
+  align-self: start;
   position: relative;
   z-index: 50;
   width: 34px;
@@ -489,13 +499,16 @@
   display: none;
 }
 .practice-layout.tb-folded:not(.zen) .tb-dock { display: block; }
+/* Hangs from the very top edge, a tab pulled down from where the bar went. */
 .tb-dock .tb-collapse {
-  top: 50%;
+  top: 0;
   width: 34px;
   height: 18px;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
   opacity: 0.6;
   pointer-events: auto;
-  transform: translate(-50%, -50%) scale(1);
+  transform: translate(-50%, 0);
 }
 .tb-dock .tb-collapse:hover { opacity: 1; }
 @media (hover: none) {
