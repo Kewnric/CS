@@ -458,6 +458,20 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+// "/" jumps to the search box of the library on screen. The boxes said Ctrl+K,
+// which opens the global palette instead -- the hint pointed at the wrong
+// search. Visualization already uses "/" for its own box (viz-init.js).
+document.addEventListener('keydown', (e) => {
+  if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey) return;
+  const t = e.target;
+  if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+  if (document.querySelector('.modal-overlay:not(.hidden)')) return;
+  const box = document.querySelector('#browse-search, #spa-content #snippet-search');
+  if (!box || !box.offsetParent) return;
+  e.preventDefault();
+  box.focus();
+});
+
 // --- Unsaved Changes Interceptor (SPA version) ---
 document.addEventListener('DOMContentLoaded', () => {
   document.addEventListener('click', (e) => {

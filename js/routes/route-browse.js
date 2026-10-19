@@ -73,7 +73,7 @@ function browseTemplate() {
           <div class="search-container search-animated" style="width: 100%;">
             <i data-lucide="search"></i>
             <input type="text" id="browse-search" oninput="debouncedBrowseSearch()" placeholder="Search programs..." class="search-input">
-            <span class="search-shortcut-hint">Ctrl+K</span>
+            <span class="search-shortcut-hint">/</span>
           </div>
           <div class="browse-mini-stats" id="browse-mini-stats"></div>
           <div id="browse-starter-banner">${typeof codingStarterBannerTemplate === 'function' ? codingStarterBannerTemplate() : ''}</div>
