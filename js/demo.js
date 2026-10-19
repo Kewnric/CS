@@ -427,6 +427,15 @@ function demoOpen(id, opts) {
   demoState.id = id;
   demoState.step = 0;
   demoState.fromLibrary = !!(opts && opts.fromLibrary);
+  /* An attempt's clock is not the walkthrough's. demoMaybeAutoOpen puts this
+     over the practice screen 650ms after the timer starts, and the time spent
+     reading it was charged to the attempt -- measured, 45s of a 2m11s result.
+     Hold the clock while it is up; demoClose lets it go. */
+  if (opts && opts.auto && document.body.dataset.route === 'practice'
+      && state.sessionData && !state.sessionData.paused && typeof togglePauseTimer === 'function') {
+    togglePauseTimer();
+    demoState.heldTimer = true;
+  }
 
   const ov = document.createElement('div');
   ov.id = 'demo-overlay';
@@ -656,6 +665,10 @@ function demoClose(silent) {
   if (demoState.keyHandler) {
     document.removeEventListener('keydown', demoState.keyHandler, true);
     demoState.keyHandler = null;
+  }
+  if (demoState.heldTimer) {
+    demoState.heldTimer = false;
+    if (state.sessionData && state.sessionData.paused && typeof togglePauseTimer === 'function') togglePauseTimer();
   }
   // Marked as seen however it is closed: skipping is a decision about this
   // lesson, and reopening it is one click away.
