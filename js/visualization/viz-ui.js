@@ -31,20 +31,30 @@ function vizTogglePane() {
   // flipping — and each rewrap was a visible snap while the pane opened.
   const pane = ws.querySelector('.viz-content-pane');
   if (pane) {
-    let w = pane.offsetWidth;
-    if (ws.classList.contains('hide-pane')) {
-      // Opening: measure the open width without showing it.
+    // Commit a style change with transitions off, so it lands without playing.
+    const instantly = (fn) => {
       document.body.classList.add('viz-no-anim');
+      fn();
+      void pane.offsetWidth;
+      document.body.classList.remove('viz-no-anim');
+    };
+    let w = pane.offsetWidth;
+    // Opening: measure the open width without showing it.
+    if (ws.classList.contains('hide-pane')) instantly(() => {
       ws.classList.remove('hide-pane');
       w = pane.offsetWidth;
       ws.classList.add('hide-pane');
-      void pane.offsetWidth;
-      document.body.classList.remove('viz-no-anim');
-    }
-    pane.style.setProperty('--viz-pane-w', w + 'px');
-    pane.classList.add('viz-pane-sliding');
+    });
+    // Hold that width in px BEFORE the slide starts. Added in the same frame as
+    // the fold, the slide began from the pane's CSS 40% with its min/max limits
+    // already lifted, so folding jumped (usually wider) on its first frame.
+    instantly(() => {
+      pane.style.setProperty('--viz-pane-w', w + 'px');
+      pane.classList.add('viz-pane-sliding');
+    });
     clearTimeout(pane._vizSlideTimer);
-    pane._vizSlideTimer = setTimeout(() => pane.classList.remove('viz-pane-sliding'), 360);
+    // Let go the same way: trading the held px back for 40% must not animate.
+    pane._vizSlideTimer = setTimeout(() => instantly(() => pane.classList.remove('viz-pane-sliding')), 360);
   }
   const on = ws.classList.toggle('hide-pane');
   try { localStorage.setItem('ssp.vizPaneHidden', on ? '1' : '0'); } catch (_) { /* private mode */ }
