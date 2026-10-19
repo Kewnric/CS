@@ -4068,3 +4068,22 @@ button.viz-link-type-option {
   .viz-content-body .tree-badge-level { display: none; }
   .viz-content-body .tier-badge { font-size: 0.55rem; padding-inline: 0.22rem; }
 }
+
+/* ── Canvas only (vizToggleZen) ────────────────────────────────
+   The coding attempt's zen mode for the canvas: the app sidebar, this page's
+   topbar, the library pane and its divider go, and the canvas takes the
+   window. The corner agenda flag goes too — with the topbar gone the canvas
+   toolbar is the top row, and the flag sat on its last buttons. */
+body.viz-zen .app-sidebar,
+body.viz-zen #mobile-menu-btn,
+body.viz-zen .sidebar-backdrop,
+body.viz-zen .ag-root,
+body.viz-zen .viz-topbar,
+body.viz-zen .viz-content-pane,
+body.viz-zen .viz-workspace > .resizer-divider {
+  display: none !important;
+}
+#viz-zen-btn.is-active {
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}

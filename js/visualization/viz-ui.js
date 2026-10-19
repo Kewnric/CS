@@ -40,6 +40,34 @@ function vizToggleCanvasToolbar() {
   vizSave();
 }
 
+/* ── Canvas only ───────────────────────────────────────────────
+   The coding attempt's zen mode, for the canvas: the app sidebar, this page's
+   topbar and the library pane all go, and the canvas takes the window. The
+   canvas toolbar stays, because it holds the way back out. A body class,
+   because the sidebar lives outside this route; destroyVisualization drops it. */
+function vizIsZen() { return document.body.classList.contains('viz-zen'); }
+
+function vizToggleZen(force) {
+  const on = typeof force === 'boolean' ? force : !vizIsZen();
+  document.body.classList.toggle('viz-zen', on);
+  try { localStorage.setItem('ssp.vizZen', on ? '1' : '0'); } catch (_) { /* private mode */ }
+  const btn = document.getElementById('viz-zen-btn');
+  if (btn) {
+    btn.classList.toggle('is-active', on);
+    btn.setAttribute('aria-pressed', String(on));
+    btn.title = on ? 'Leave canvas only (Ctrl+\\ or Esc)' : 'Canvas only (Ctrl+\\)';
+    const glyph = btn.querySelector('i, svg');
+    if (glyph) {
+      const fresh = document.createElement('i');
+      fresh.setAttribute('data-lucide', on ? 'shrink' : 'expand');
+      glyph.replaceWith(fresh);
+      if (typeof lucide !== 'undefined') lucide.createIcons({ root: btn });
+    }
+  }
+  // The canvas just changed size; the minimap and anything measuring it follow.
+  window.dispatchEvent(new Event('resize'));
+}
+
 /* --- Restore UI state after init --- */
 function vizRestoreUiState() {
   if (viz.panesSwapped) {
@@ -60,6 +88,9 @@ function vizRestoreUiState() {
     if (wrap) wrap.classList.add('toolbar-collapsed');
     if (btn) btn.title = 'Show toolbar';
   }
+  let zen = false;
+  try { zen = localStorage.getItem('ssp.vizZen') === '1'; } catch (_) { /* private mode */ }
+  if (zen) vizToggleZen(true);
 }
 
 /* ── The strip ─────────────────────────────────────────────────
@@ -2410,7 +2441,8 @@ const VIZ_SHORTCUTS = {
     [['−'], 'Zoom out'],
     [['Ctrl', 'A'], 'Select every node on the canvas'],
     [['Del'], 'Delete what is selected — asks first if it is a library record'],
-    [['Esc'], 'Clear the focus, then the selection, then any open menu'],
+    [['Esc'], 'Clear the focus, then the selection, then any open menu, then leave canvas only'],
+    [['Ctrl', '\\'], 'Canvas only — hide everything but the canvas'],
     [['Ctrl', 'Z'], 'Undo']
   ],
   Mouse: [

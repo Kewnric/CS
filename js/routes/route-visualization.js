@@ -243,8 +243,10 @@ function vizTemplate() {
                 <button class="viz-zoom-btn" onclick="vizZoomOut()" title="Zoom out (-)" aria-label="Zoom out"><i data-lucide="minus"></i></button>
                 <span class="viz-zoom-level" id="viz-zoom-level" aria-live="polite">100%</span>
                 <button class="viz-zoom-btn" onclick="vizZoomIn()" title="Zoom in (+)" aria-label="Zoom in"><i data-lucide="plus"></i></button>
-                <button class="viz-zoom-btn" onclick="vizZoomReset()" title="Fit (F)" aria-label="Fit the graph on screen"><i data-lucide="maximize-2"></i></button>
+                <!-- Fit frames the graph; it used maximize-2, the usual full-screen glyph. -->
+                <button class="viz-zoom-btn" onclick="vizZoomReset()" title="Fit (F)" aria-label="Fit the graph on screen"><i data-lucide="scan"></i></button>
               </div>
+              <button class="viz-zoom-btn" id="viz-zen-btn" onclick="vizToggleZen()" title="Canvas only (Ctrl+\\)" aria-label="Canvas only" aria-pressed="false"><i data-lucide="expand"></i></button>
               <div class="viz-toolbar-sep"></div>
 
               <!-- ── The rest, behind one button ── -->

@@ -184,12 +184,22 @@ function initVisualization() {
       vizSelectAll();
       return;
     }
+    // Canvas only — the same chord as zen mode on the coding attempt.
+    if ((e.ctrlKey || e.metaKey) && e.key === '\\') {
+      e.preventDefault();
+      vizToggleZen();
+      return;
+    }
     // Ctrl+Z is handled in the capture listener above; everything else with a
     // modifier belongs to the browser or the OS.
     if (e.ctrlKey || e.metaKey || e.altKey) return;
 
     if (isBrain) {
-      if (e.key === 'Escape') { brainCancelLinking(); brainHideAllMenus(); }
+      if (e.key === 'Escape') {
+        const wasLinking = !!brain.linkingFrom;
+        brainCancelLinking(); brainHideAllMenus();
+        if (!wasLinking && vizIsZen()) vizToggleZen(false);
+      }
       if (e.key === 'Delete') { if (brain.selectedNodeId) brainDeleteNode(brain.selectedNodeId); }
       if (e.key === 'f' || e.key === 'F') { brainZoomReset(); }
       if (e.key === 'l' || e.key === 'L') { brainToggleLinkMode(); }
@@ -201,7 +211,9 @@ function initVisualization() {
     if (e.key === 'Escape') {
       if (viz.focusNodeId) { vizClearFocus(); return; }
       if (viz.selectedNodeIds.size) { vizClearSelection(); return; }
+      const wasLinking = !!viz.linkingFrom;
       vizCancelLinking(); vizHideAllMenus(); vizHideNodePopup();
+      if (!wasLinking && vizIsZen()) vizToggleZen(false);
     }
     /* Delete only. Backspace used to do this too, and it deletes the LIBRARY
        record, not just the node on the canvas — a key people press reflexively
@@ -241,6 +253,9 @@ function initVisualization() {
 /** Remove all document-level listeners added by initVisualization so they
  *  don't stack across SPA navigations. */
 function destroyVisualization() {
+  // Canvas only hides the app sidebar; no other page should inherit that.
+  // (The preference stays, so coming back restores it.)
+  document.body.classList.remove('viz-zen');
   if (typeof vizForceStop === 'function') vizForceStop(true); // halt physics loop
   if (typeof vizHoverClear === 'function') vizHoverClear();
   if (typeof vizStopTween === 'function') vizStopTween();
