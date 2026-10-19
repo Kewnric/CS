@@ -27,6 +27,13 @@
 const CACHE = 'ssp-v308';
 const SHELL = ['./index.html', './manifest.json'];
 
+/* Third-party libraries the page loads. Every URL in index.html pins an exact
+   version, so a cached copy never goes stale and cache-first is safe. Without
+   this the worker let them all pass, and an offline start had no icons,
+   Markdown or editor -- the shell came from cache and nothing it needed did.
+   Fonts (unversioned CSS) are left to the browser. */
+const CDN_HOSTS = ['cdn.jsdelivr.net', 'unpkg.com', 'cdn.quilljs.com', 'www.gstatic.com'];
+
 /** Static assets are content we hold; everything else goes to the network. */
 function isStatic(url) {
   return /\.(?:js|css|woff2?|ttf|otf|png|jpg|jpeg|svg|webp|ico|mp3|ogg|wav)$/i.test(url.pathname);
@@ -55,7 +62,21 @@ self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return; // let CDNs pass through
+  if (url.origin !== self.location.origin) {
+    if (!CDN_HOSTS.includes(url.hostname)) return;
+    // A plain <script src> is a no-cors request, so the response is opaque
+    // (status 0, ok false) -- still cacheable, and still runnable.
+    event.respondWith(
+      caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+        if (res && (res.ok || res.type === 'opaque')) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+        }
+        return res;
+      }))
+    );
+    return;
+  }
 
   /* Navigations: network-first. This is the request that carries a new release
      into the browser, so it is worth one round trip; the cached shell answers
