@@ -1121,6 +1121,18 @@ function codingStarterBannerTemplate() {
      exactly when that button would do something: when the shipped pack really
      has moved on from the installed one. Up to date, there is nothing to say
      and nothing is drawn. */
+  /* A first visit lands on an empty library, and the only way to the pack was
+     the third unlabelled icon in the tools menu. An empty library of your own
+     is exactly when the pack is worth pointing at. */
+  if (!codingLibraryIsStarter() && !(state.challenges || []).length) {
+    return '<div class="cs-banner" role="status">'
+         + '<i data-lucide="package-open"></i>'
+         + '<span><strong>Nothing here yet.</strong> The starter pack is a full course of C programs '
+         + 'with tests. Switch to it any time, and back again.</span>'
+         + '<button type="button" class="cs-update-btn" onclick="toggleCodingLibraryMode()">'
+         + '<i data-lucide="package-open"></i> Open starter pack</button>'
+         + '</div>';
+  }
   if (!codingLibraryIsStarter()) return '';
   const pending = codingStarterPendingCount();
   if (!pending) return '';
