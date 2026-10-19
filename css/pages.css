@@ -1167,7 +1167,12 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
 /* ======================== BROWSE MINI STATS ======================== */
 .browse-mini-stats {
   display: flex;
+  /* Four chips are ~376px; the pane is ~272px at 1024, and the fourth (the
+     progress %) was cut off. The Visualization header keeps its own nowrap
+     scroller (visualization.css), which outranks this. */
+  flex-wrap: wrap;
   gap: 0.5rem;
+  row-gap: 0.375rem;
   padding: 0.5rem 0 0;
   align-items: center;
 }
