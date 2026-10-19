@@ -162,6 +162,9 @@ function _ppRenderTabBody() {
   if (!body || !_ppCtx) return;
   body.innerHTML = _ppActiveTab === 'exec' ? _ppExecHtml() : _ppTestsHtml();
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: body });
+  // The rebuilt toggles take their :hover without a transition (see .pp-fresh).
+  setTimeout(() => body.querySelectorAll('.pp-row-toggle.pp-fresh')
+    .forEach(el => el.classList.remove('pp-fresh')), 300);
   // One paint only — a later re-render (a test run, a tab switch) must not
   // replay the roll-down on a panel that has been sitting open all along.
   _ppJustOpened = null;
@@ -277,7 +280,7 @@ function _ppTestsHtml() {
           <div class="pp-row ${state}">
             ${_ppReqIcon(state)}
             <span class="pp-row-label">${escapeHTML(t.name || ('Test case ' + (ti + 1)))}${t.hidden ? ' <em class="pp-hidden">(hidden)</em>' : ''}</span>
-            <button class="pp-row-toggle" onclick="ppToggleTestDetail(${ti})" aria-expanded="${open}"
+            <button class="pp-row-toggle pp-fresh${open && _ppJustOpened === ti ? ' pp-turn' : ''}" onclick="ppToggleTestDetail(${ti})" aria-expanded="${open}"
                     title="${open ? 'Hide' : 'Show'} this test's output">
               <i data-lucide="chevron-down" style="width:13px;height:13px;"></i>
             </button>
