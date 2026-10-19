@@ -2376,10 +2376,10 @@
   opacity: 0;
   transform: scale(0.5);
   transition: opacity 0.15s ease, transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
-  /* A hidden port must not eat the pointer. These were opacity:0 with
-     pointer-events:auto, so every node had four invisible targets around it
-     that swallowed clicks meant for the node or the canvas. */
-  pointer-events: none;
+  /* A hidden port is still live, so hovering the spot where it sits shows it
+     without going over the node first. Its hitbox (::before) is sized against
+     the port's own scale so it covers the same 26px in every state. */
+  pointer-events: auto;
 }
 
 /* The dot stays 10px; the thing you have to HIT is 26px. A 10px circle scaled
@@ -2390,10 +2390,21 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 26px;
-  height: 26px;
+  width: 52px;   /* x scale(0.5) = 26px */
+  height: 52px;
   transform: translate(-50%, -50%);
   border-radius: 50%;
+}
+.viz-node[data-near-side="top"] .viz-port[data-side="top"]::before,
+.viz-node[data-near-side="bottom"] .viz-port[data-side="bottom"]::before,
+.viz-node[data-near-side="left"] .viz-port[data-side="left"]::before,
+.viz-node[data-near-side="right"] .viz-port[data-side="right"]::before {
+  width: 26px;   /* x scale(1) */
+  height: 26px;
+}
+.viz-port:hover::before {
+  width: 20px;   /* x scale(1.3) */
+  height: 20px;
 }
 
 /* Position each port */
@@ -2464,6 +2475,7 @@
 
 /* Port hover glow */
 .viz-port:hover {
+  opacity: 1;
   background: #fff;
   box-shadow: 0 0 0 3px var(--color-primary), 0 0 12px var(--color-primary-glow);
   transform: translateX(-50%) scale(1.3) !important;
