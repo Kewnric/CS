@@ -122,8 +122,9 @@ function showMessage(title, message, isError = false) {
   lucide.createIcons({ root: modal });
 }
 
-/** @param {string} title @param {string} message @param {function} onConfirm */
-function showConfirm(title, message, onConfirm) {
+/** @param {string} title @param {string} message @param {function} onConfirm
+ *  @param {{tone?:'primary'|'danger', confirmLabel?:string}} [opts] */
+function showConfirm(title, message, onConfirm, opts) {
   const modal = document.getElementById('dialog-modal');
   if (!modal) { if (confirm(title + ': ' + message)) onConfirm(); return; }
   modal.setAttribute('role', 'alertdialog');
@@ -134,9 +135,13 @@ function showConfirm(title, message, onConfirm) {
   document.getElementById('dialog-icon').innerHTML = '<i data-lucide="help-circle" class="modal-icon-svg" style="color: var(--color-warning);"></i>';
 
   const btnContainer = document.getElementById('dialog-actions');
+  // A red "Confirm" is right for deleting and wrong for finishing an attempt or
+  // adding a pack. Callers doing something constructive pass
+  // { tone: 'primary', confirmLabel: 'Finish' }; everything else is unchanged.
+  const o = opts || {};
   btnContainer.innerHTML = `
     <button id="dlg-cancel" class="btn btn-secondary" style="flex:1;">Cancel</button>
-    <button id="dlg-confirm" class="btn btn-danger" style="flex:1;">Confirm</button>
+    <button id="dlg-confirm" class="btn ${o.tone === 'primary' ? 'btn-primary' : 'btn-danger'}" style="flex:1;">${escapeHTML(o.confirmLabel || 'Confirm')}</button>
   `;
 
   document.getElementById('dlg-cancel').onclick = () => closeModalSmooth(modal);

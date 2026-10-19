@@ -704,7 +704,8 @@ function confirmFinishAttempt() {
   const detail = fresh
     ? `Your last check scored ${chk.passed}/${chk.total} and still matches this code — it'll be used as your result.`
     : 'You haven\'t checked this code yet, so it will be graded on how closely it matches the reference solution.';
-  showConfirm('Finish attempt?', detail + ' This records the attempt and stops the timer.', () => submitCode());
+  showConfirm('Finish attempt?', detail + ' This records the attempt and stops the timer.', () => submitCode(),
+              { tone: 'primary', confirmLabel: 'Finish' });
 }
 
 /**

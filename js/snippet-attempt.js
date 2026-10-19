@@ -462,7 +462,8 @@ window.sqaFinish = function () {
     spaNavigate('snippets');
   };
   if (typeof showConfirm === 'function') {
-    showConfirm('Finish attempt?', detail + ' This records the attempt and stops the timer.', go);
+    showConfirm('Finish attempt?', detail + ' This records the attempt and stops the timer.', go,
+                { tone: 'primary', confirmLabel: 'Finish' });
   } else { go(); }
 };
 

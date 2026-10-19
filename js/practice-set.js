@@ -850,7 +850,7 @@ function psetSubmitAll() {
     ? `${unchecked} of ${_pset.problems.length} problems aren't fully green yet. Every problem will be graded as-is — submit anyway?`
     : 'All problems are green. Submit the attempt and record your scores?';
 
-  showConfirm('Submit Attempt', msg, () => { _psetDoSubmit(); });
+  showConfirm('Submit Attempt', msg, () => { _psetDoSubmit(); }, { tone: 'primary', confirmLabel: 'Submit' });
 }
 
 /** Stop the session clock + autosave loop. Called on submit and on teardown. */

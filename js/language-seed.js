@@ -391,5 +391,5 @@ function langLoadStarter() {
           : 'Everything in the pack was already there.',
           { type: added ? 'success' : 'info', duration: 6000 });
       }
-    });
+    }, { tone: 'primary', confirmLabel: 'Add pack' });
 }

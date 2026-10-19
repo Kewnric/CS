@@ -1544,13 +1544,13 @@ function npSubmitAttempt(force = false) {
     if (unanswered > 0) {
       showConfirm('Unanswered Questions', `You have ${unanswered} unanswered question${unanswered !== 1 ? 's' : ''}. Submit anyway?`, () => {
         processSubmission();
-      });
+      }, { tone: 'primary', confirmLabel: 'Submit' });
       return;
     }
 
     showConfirm('Submit Attempt', 'Are you sure you want to submit your answers?', () => {
       processSubmission();
-    });
+    }, { tone: 'primary', confirmLabel: 'Submit' });
     return;
   }
 
