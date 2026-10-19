@@ -427,7 +427,8 @@ function vizHoverFocus(nodeId) {
     el.classList.toggle('viz-hover-adj', id !== nodeId && adj.has(id));
   });
   if (svg) {
-    svg.querySelectorAll('.viz-link-group').forEach(g => {
+    // container, not svg: the arrowhead copies in #viz-heads-svg dim with their links
+    container.querySelectorAll('.viz-link-group').forEach(g => {
       const lid = g.dataset.linkId;
       const l = links.find(x => x.id === lid);
       g.classList.toggle('viz-link-adj', !!(l && (l.from === nodeId || l.to === nodeId)));

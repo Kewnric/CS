@@ -471,6 +471,17 @@
   pointer-events: stroke;
 }
 
+/* Arrowheads only (vizSyncHeads), above the nodes layer so a node's shadow
+   never covers the head arriving at it. The line itself stays underneath. */
+#viz-heads-svg { z-index: 6; }
+#viz-heads-svg,
+#viz-heads-svg * { pointer-events: none !important; }
+#viz-heads-svg .viz-link {
+  stroke: transparent !important;
+  animation: none !important;
+}
+.viz-canvas-container.brain-hide-links #viz-heads-svg { opacity: 0; }
+
 .viz-nodes-layer {
   position: absolute;
   top: 0;

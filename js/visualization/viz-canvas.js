@@ -266,6 +266,8 @@ function _vizResetRenderCache() {
   if (layer) layer.innerHTML = '';
   const svg = document.getElementById('viz-canvas-svg');
   if (svg) svg.innerHTML = '';
+  const heads = document.getElementById('viz-heads-svg');
+  if (heads) heads.innerHTML = '';
 }
 
 /** Is this node greyed out because its prerequisites are unmet? */
@@ -481,6 +483,8 @@ function vizRenderCanvas() {
 
   nodesLayer.style.transform = `translate(${viz.pan.x}px, ${viz.pan.y}px) scale(${viz.zoom})`;
   svg.style.transform = `translate(${viz.pan.x}px, ${viz.pan.y}px) scale(${viz.zoom})`;
+  const headsSvg = document.getElementById('viz-heads-svg');
+  if (headsSvg) headsSvg.style.transform = svg.style.transform;
   container.classList.toggle('viz-far', viz.zoom < VIZ_CULL_ZOOM);
   container.classList.toggle('viz-focus-mode', !!(viz.focusNodeId && viz.focusHops > 0));
 
@@ -641,6 +645,7 @@ function _vizRenderLinks(svg, nodesLayer, g, drawn) {
     const defs = svg.querySelector('defs');
     svg.innerHTML = out;
     if (defs) svg.insertBefore(defs, svg.firstChild);
+    vizSyncHeads();
 
     // Lock badges live in the node layer so they scale with it.
     nodesLayer.querySelectorAll('.viz-link-lock').forEach(el => el.remove());

@@ -902,6 +902,8 @@ function brainRenderCanvas() {
 
   nodesLayer.style.transform = `translate(${brain.pan.x}px, ${brain.pan.y}px) scale(${brain.zoom})`;
   if (svg) svg.style.transform = `translate(${brain.pan.x}px, ${brain.pan.y}px) scale(${brain.zoom})`;
+  const headsSvg = document.getElementById('viz-heads-svg');
+  if (headsSvg && svg) headsSvg.style.transform = svg.style.transform;
   nodesLayer.innerHTML = '';
   const renderedNodeMap = new Map();
 
@@ -1073,6 +1075,7 @@ function brainRenderCanvas() {
     // "None" while its real type, and the menu, said "Arrow".
     if (existingDefs && existingDefs.querySelector('marker')) svg.insertBefore(existingDefs, svg.firstChild);
     else if (typeof _vizBuildDefs === 'function') _vizBuildDefs(svg);
+    vizSyncHeads();
   }
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: container });
   brainUpdateZoomDisplay();

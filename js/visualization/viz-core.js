@@ -136,11 +136,41 @@ function vizGeomHold(g) {
   vizGeom.locks = new Map();
   svg.querySelectorAll('g.viz-link-group').forEach(el => vizGeom.groups.set(el.dataset.linkId, el));
   layer.querySelectorAll('.viz-link-lock').forEach(el => vizGeom.locks.set(el.dataset.lockLinkId, el));
+  vizGeom.heads = new Map();
+  const heads = document.getElementById('viz-heads-svg');
+  if (heads) heads.querySelectorAll('g.viz-link-group').forEach(el => vizGeom.heads.set(el.dataset.linkId, el));
   vizGeom.held = true;
 }
 
 function vizGeomRelease() {
-  vizGeom.sizes = null; vizGeom.groups = null; vizGeom.locks = null; vizGeom.graph = null; vizGeom.held = false;
+  vizGeom.sizes = null; vizGeom.groups = null; vizGeom.locks = null; vizGeom.heads = null; vizGeom.graph = null; vizGeom.held = false;
+}
+
+/* ── Arrowheads above the nodes ───────────────────────────────
+   Links are drawn under the node layer so a line never crosses a card, but that
+   also put every arrowhead under its target's shadow; Brain's slabs cast a hard
+   9px extrusion that swallowed any head arriving from the right or below.
+   #viz-heads-svg sits above the nodes and repeats only the heads: the same
+   groups and classes (so focus dimming, ghost links and stroke width still
+   apply), with the stroke made transparent and labels and hitboxes left out.
+   Call after the link groups are rebuilt; vizPaintLinks keeps them moving. */
+function vizSyncHeads() {
+  const svg = document.getElementById('viz-canvas-svg');
+  const heads = document.getElementById('viz-heads-svg');
+  if (!svg || !heads) return;
+  const frag = document.createDocumentFragment();
+  svg.querySelectorAll('g.viz-link-group').forEach(g => {
+    const path = g.querySelector('path.viz-link[marker-end], path.viz-link[marker-start]');
+    if (!path) return;
+    const hg = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    hg.setAttribute('class', g.getAttribute('class'));
+    hg.setAttribute('data-link-id', g.getAttribute('data-link-id'));
+    const hp = path.cloneNode(false);
+    hp.removeAttribute('id');     // the original's id is a textPath target
+    hg.appendChild(hp);
+    frag.appendChild(hg);
+  });
+  heads.replaceChildren(frag);
 }
 
 /** READ PASS. Nothing in here may write to the DOM. */
@@ -187,11 +217,15 @@ function vizPaintLinks(g) {
 
   // ── WRITE ─────────────────────────────────────────────────
   const groupOf = (id) => (vizGeom.groups ? vizGeom.groups.get(id) : svg.querySelector(`g[data-link-id="${id}"]`));
+  const heads = document.getElementById('viz-heads-svg');
+  const headOf = (id) => (vizGeom.heads ? vizGeom.heads.get(id) : heads && heads.querySelector(`g[data-link-id="${id}"]`));
   for (let i = 0; i < paths.length; i++) {
     const grp = groupOf(paths[i][0]);
     if (!grp) continue;
     const kids = grp.children;
     for (let k = 0; k < kids.length; k++) kids[k].setAttribute('d', paths[i][1]);
+    const head = headOf(paths[i][0]);
+    if (head && head.firstChild) head.firstChild.setAttribute('d', paths[i][1]);
   }
   const lockOf = (id) => (vizGeom.locks ? vizGeom.locks.get(id) : layer.querySelector(`[data-lock-link-id="${id}"]`));
   for (let i = 0; i < badges.length; i++) {
@@ -420,6 +454,8 @@ function vizApplyTransform() {
   const svg = document.getElementById('viz-canvas-svg');
   if (layer) layer.style.transform = tf;
   if (svg) svg.style.transform = tf;
+  const heads = document.getElementById('viz-heads-svg');
+  if (heads) heads.style.transform = tf;
   const c = document.getElementById('viz-canvas-container');
   if (c) c.classList.toggle('viz-far', cam.zoom < VIZ_CULL_ZOOM);
   if (isBrain) { if (typeof brainUpdateMinimap === 'function') brainUpdateMinimap(); }

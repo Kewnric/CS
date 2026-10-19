@@ -278,6 +278,7 @@ function vizTemplate() {
           <div class="viz-canvas-container" id="viz-canvas-container">
             <svg class="viz-canvas-svg" id="viz-canvas-svg" aria-hidden="true"></svg>
             <div class="viz-nodes-layer" id="viz-nodes-layer"></div>
+            <svg class="viz-canvas-svg viz-heads-svg" id="viz-heads-svg" aria-hidden="true"></svg>
             <div class="viz-canvas-empty" id="viz-canvas-empty">
               <i data-lucide="git-branch"></i>
               <h3>Your Mindmap Canvas</h3>
