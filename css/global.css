@@ -110,6 +110,13 @@
 }
 
 :root {
+  /* Aliases some components were written against but no theme defined:
+     --bg-base (walkthrough window, viz link labels and group titles) and
+     --bg-secondary (admin verify rows). Undefined, the walkthrough window was
+     transparent and the practice page read through it as ghost text. Declared
+     on the same element as [data-theme], so they follow the active theme. */
+  --bg-base: var(--bg-body);
+  --bg-secondary: var(--bg-surface-hover);
 
   /* Terminal / run-code panel — always dark regardless of app theme */
   --term-bg: #0d1117;
