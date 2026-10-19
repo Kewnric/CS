@@ -1308,13 +1308,14 @@ function brainCanvasMouseMove(e) {
     const container = document.getElementById('viz-canvas-container');
     if (tempLink && container) {
       const rect = container.getBoundingClientRect();
-      const mx = (e.clientX - rect.left - brain.pan.x) / brain.zoom;
-      const my = (e.clientY - rect.top - brain.pan.y) / brain.zoom;
+      const snap = brain._portDragging && brain._portSnap;
+      const mx = ((snap ? snap.x : e.clientX) - rect.left - brain.pan.x) / brain.zoom;
+      const my = ((snap ? snap.y : e.clientY) - rect.top - brain.pan.y) / brain.zoom;
       const d = tempLink.getAttribute('d') || '';
       const m = d.match(/M (\S+) (\S+)/);
       if (m) {
         const fx = parseFloat(m[1]), fy = parseFloat(m[2]);
-        const cp = vizTempLinkCP(fx, fy, mx, my, brain._portDragSide || null);
+        const cp = vizTempLinkCP(fx, fy, mx, my, brain._portDragSide || null, snap ? snap.side : null);
         tempLink.setAttribute('d', `M ${fx} ${fy} C ${cp.c1x} ${cp.c1y}, ${cp.c2x} ${cp.c2y}, ${mx} ${my}`);
       }
     }
@@ -1574,13 +1575,27 @@ function brainPortDragStart(e, nodeId, side) {
   if (typeof vizHoverClear === 'function') vizHoverClear();
   brainRenderCanvas();
 
+  // Near a port: it shows, and the link end jumps onto it until you pull away.
+  // Runs in the capture phase, so the snap is set before the canvas handler
+  // redraws the temp link from it.
+  function onMove(mv) {
+    if (!brain._portDragging) return;
+    const snap = brain._portSnap = vizNearestPort(mv.clientX, mv.clientY, nodeId);
+    if (snap) vizPaintLinkTarget(snap.el, snap.side); else vizClearLinkTarget();
+  }
+  document.addEventListener('pointermove', onMove, true);
+
   function onUp(upEvent) {
     document.removeEventListener('pointerup', onUp, true);
     document.removeEventListener('pointercancel', onUp, true);
+    document.removeEventListener('pointermove', onMove, true);
+    brain._portSnap = null;
+    vizClearLinkTarget();
     if (!brain.linkingFrom) return;
+    const snap = vizNearestPort(upEvent.clientX, upEvent.clientY, nodeId);
     const els = document.elementsFromPoint(upEvent.clientX, upEvent.clientY);
     const targetEl = els.find(el => el.dataset && el.dataset.nodeId && el.dataset.nodeId !== nodeId);
-    const targetNodeId = targetEl ? targetEl.dataset.nodeId : null;
+    const targetNodeId = snap ? snap.nodeId : (targetEl ? targetEl.dataset.nodeId : null);
     if (targetNodeId && brain.nodes.find(n => n.id === targetNodeId)) {
       // Avoid duplicate links
       const exists = brain.links.find(l =>
@@ -1602,7 +1617,9 @@ function brainPortDragStart(e, nodeId, side) {
           el.dataset.side
         );
 
-        if (portEl) {
+        if (snap) {
+          toSide = snap.side;
+        } else if (portEl) {
           toSide = portEl.dataset.side;
         } else if (toFEl) {
           const rect = toFEl.getBoundingClientRect();

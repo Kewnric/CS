@@ -3157,6 +3157,13 @@
   box-shadow: 0 0 0 3px var(--color-primary), 0 0 14px var(--color-primary);
 }
 
+/* The port the link has snapped onto grows to full size, so it reads as
+   "caught" rather than as one of four faint dots. */
+.viz-node.viz-link-target .viz-port-snap[data-side="top"],
+.viz-node.viz-link-target .viz-port-snap[data-side="bottom"] { transform: translateX(-50%) scale(1.3); }
+.viz-node.viz-link-target .viz-port-snap[data-side="left"],
+.viz-node.viz-link-target .viz-port-snap[data-side="right"] { transform: translateY(-50%) scale(1.3); }
+
 /* The edge itself lights up, so the target side is readable at any zoom. */
 .viz-node.viz-link-target[data-snap-side="top"] .viz-node-inner { border-top: 3px solid var(--color-primary) !important; }
 .viz-node.viz-link-target[data-snap-side="bottom"] .viz-node-inner { border-bottom: 3px solid var(--color-primary) !important; }

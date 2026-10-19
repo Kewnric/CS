@@ -95,6 +95,9 @@ function vizPortDragStart(e, nodeId, side) {
   // visible before you let go rather than after.
   function onPortDragMove(mv) {
     if (!viz.portDrag) return;
+    // Near a port: it shows, and the link end jumps onto it until you pull away.
+    const snap = viz.portDrag.snap = vizNearestPort(mv.clientX, mv.clientY, nodeId);
+    if (snap) { vizPaintLinkTarget(snap.el, snap.side); return; }
     const els = document.elementsFromPoint(mv.clientX, mv.clientY);
     const targetEl = els.find(el => el.classList && el.classList.contains('viz-node') && el.dataset.nodeId !== nodeId);
     if (!targetEl) { vizClearLinkTarget(); return; }
@@ -114,10 +117,11 @@ function vizPortDragStart(e, nodeId, side) {
     vizClearLinkTarget();
     if (!viz.portDrag) return;
 
-    // Find which node (if any) the cursor is over
+    // A snapped port wins; otherwise whichever node (if any) the cursor is over
+    const snap = vizNearestPort(upEvent.clientX, upEvent.clientY, nodeId);
     const els = document.elementsFromPoint(upEvent.clientX, upEvent.clientY);
     const targetEl = els.find(el => el.dataset && el.dataset.nodeId && el.dataset.nodeId !== nodeId);
-    const targetNodeId = targetEl ? targetEl.dataset.nodeId : null;
+    const targetNodeId = snap ? snap.nodeId : (targetEl ? targetEl.dataset.nodeId : null);
 
     if (targetNodeId) {
       vizPushUndo();
@@ -139,8 +143,8 @@ function vizPortDragStart(e, nodeId, side) {
         // dragging is what you get. This used to be a second, separate copy of
         // the geometry that only ran on release.
         const targetNodeEl = document.querySelector(`.viz-node[data-node-id="${targetNodeId}"]`);
-        link.toSide = portEl
-          ? portEl.dataset.side
+        link.toSide = snap ? snap.side
+          : portEl ? portEl.dataset.side
           : (targetNodeEl ? vizSnapSide(targetNodeEl, upEvent.clientX, upEvent.clientY, nodeId, targetNodeId) : 'left');
       }
     }
@@ -194,6 +198,33 @@ function vizPaintLinkTarget(nodeEl, side) {
 }
 
 function vizClearLinkTarget() { vizPaintLinkTarget(null); }
+
+/**
+ * The port nearest the pointer while a link is dragged, if one is within reach.
+ * Measured in screen pixels so it feels the same at every zoom. Ports sit on
+ * each edge's midpoint, which is where vizPortCenter draws a link to, so the
+ * snapped preview and the saved link land on the same spot.
+ */
+const VIZ_PORT_SNAP_PX = 28;
+function vizNearestPort(clientX, clientY, fromId) {
+  const layer = document.getElementById('viz-nodes-layer');
+  if (!layer) return null;
+  let best = null, bestD = VIZ_PORT_SNAP_PX;
+  layer.querySelectorAll('.viz-node[data-node-id]').forEach(el => {
+    const id = el.dataset.nodeId;
+    if (id === fromId || !el.querySelector('.viz-port')) return;
+    const r = el.getBoundingClientRect();
+    if (clientX < r.left - bestD || clientX > r.right + bestD ||
+        clientY < r.top - bestD || clientY > r.bottom + bestD) return;
+    const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    [['top', cx, r.top], ['bottom', cx, r.bottom], ['left', r.left, cy], ['right', r.right, cy]]
+      .forEach(([side, x, y]) => {
+        const d = Math.hypot(clientX - x, clientY - y);
+        if (d < bestD) { bestD = d; best = { el, nodeId: id, side, x, y }; }
+      });
+  });
+  return best;
+}
 
 function vizPortCenter(nx, ny, nw, nh, side) {
   if (side === 'top')    return { x: nx + nw / 2, y: ny };
@@ -989,14 +1020,15 @@ function vizCanvasMouseMove(e) {
     const container = document.getElementById('viz-canvas-container');
     if (tempLink && container) {
       const rect = container.getBoundingClientRect();
-      const mouseX = (e.clientX - rect.left - viz.pan.x) / viz.zoom;
-      const mouseY = (e.clientY - rect.top - viz.pan.y) / viz.zoom;
+      const snap = viz.portDrag && viz.portDrag.snap;
+      const mouseX = ((snap ? snap.x : e.clientX) - rect.left - viz.pan.x) / viz.zoom;
+      const mouseY = ((snap ? snap.y : e.clientY) - rect.top - viz.pan.y) / viz.zoom;
       const d = tempLink.getAttribute('d') || '';
       const mMatch = d.match(/M (\S+) (\S+)/);
       if (mMatch) {
         const fx = parseFloat(mMatch[1]), fy = parseFloat(mMatch[2]);
         const fromSide = viz.portDrag ? viz.portDrag.fromSide : null;
-        const cp = vizTempLinkCP(fx, fy, mouseX, mouseY, fromSide);
+        const cp = vizTempLinkCP(fx, fy, mouseX, mouseY, fromSide, snap ? snap.side : null);
         tempLink.setAttribute('d', `M ${fx} ${fy} C ${cp.c1x} ${cp.c1y}, ${cp.c2x} ${cp.c2y}, ${mouseX} ${mouseY}`);
       }
     }
@@ -1091,7 +1123,7 @@ function vizClearSelection() {
   vizUpdateSelectionChip();
 }
 
-function vizTempLinkCP(fx, fy, tx, ty, fromSide) {
+function vizTempLinkCP(fx, fy, tx, ty, fromSide, toSide) {
   const dist = Math.sqrt((tx - fx) ** 2 + (ty - fy) ** 2);
   const bend = Math.min(Math.max(dist * 0.45, 40), 200);
   let c1x = fx, c1y = fy;
@@ -1107,7 +1139,12 @@ function vizTempLinkCP(fx, fy, tx, ty, fromSide) {
   const dx2 = fx - tx, dy2 = fy - ty;
   const b2 = bend * 0.8;
   let c2x = tx, c2y = ty;
-  if (Math.abs(dx2) >= Math.abs(dy2)) { c2x = tx + (dx2 > 0 ? b2 : -b2); c2y = ty; }
+  // Snapped onto a port: the curve enters it square, the way the saved link will.
+  if (toSide === 'right') { c2x = tx + b2; }
+  else if (toSide === 'left') { c2x = tx - b2; }
+  else if (toSide === 'top') { c2y = ty - b2; }
+  else if (toSide === 'bottom') { c2y = ty + b2; }
+  else if (Math.abs(dx2) >= Math.abs(dy2)) { c2x = tx + (dx2 > 0 ? b2 : -b2); c2y = ty; }
   else { c2x = tx; c2y = ty + (dy2 > 0 ? b2 : -b2); }
   return { c1x, c1y, c2x, c2y };
 }
