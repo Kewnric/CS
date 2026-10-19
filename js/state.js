@@ -343,6 +343,16 @@ window.addEventListener('beforeunload', () => {
   if (_saveDataPending) { clearTimeout(saveTimeout); _flushSaveData(); }
 });
 
+/* beforeunload does not fire when a phone backgrounds the tab and later
+   discards it, which is how most mobile sessions end. Becoming hidden is the
+   last moment the page reliably runs, so flush there too. */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'hidden' || !_saveDataPending) return;
+  clearTimeout(saveTimeout);
+  _flushSaveData();
+  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+});
+
 function _flushSaveData() {
   _saveDataPending = false;
   /* Compact the record before it is written anywhere. Done here rather than
