@@ -358,7 +358,7 @@ function showResultModal(data) {
   const statsHTML = `
     <div class="result-stats-row">
       <div class="result-stat"><span class="result-stat-value">${typeof formatTimeDisplay === 'function' ? formatTimeDisplay(duration) : duration + 's'}</span><span class="result-stat-label">Time</span></div>
-      <div class="result-stat"><span class="result-stat-value">${linesMatched}/${linesTotal}</span><span class="result-stat-label">Lines</span></div>
+      <div class="result-stat" title="Lines matching the reference. A partly right line counts as part of one, so this is rounded."><span class="result-stat-value">${Math.round(linesMatched)}/${linesTotal}</span><span class="result-stat-label">Lines</span></div>
       <div class="result-stat"><span class="result-stat-value">#${attemptNumber}</span><span class="result-stat-label">Attempt</span></div>
       <div class="result-stat"><span class="result-stat-value">${deltaHTML}</span><span class="result-stat-label">Trend</span></div>
     </div>
