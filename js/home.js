@@ -502,7 +502,7 @@ function renderHomeContinue() {
         <div class="hc-title">${escapeHTML(u.title)}</div>
         <div class="hc-sub"><span class="hc-kind">${u.label}</span>${u.ts ? ' &middot; <span class="hc-when">left ' + _hcWhen(u.ts) + '</span>' : ' &middot; <span class="hc-when">in progress</span>'}</div>
       </div>
-      <button class="hc-go" onclick="homeResumeAttempt('${u.kind}','${u.itemId}')">
+      <button class="hc-go" aria-label="Continue" onclick="homeResumeAttempt('${u.kind}','${u.itemId}')">
         <i data-lucide="play"></i><span>Continue</span>
       </button>
       <button class="hc-dismiss" title="Discard this draft" aria-label="Discard this draft"

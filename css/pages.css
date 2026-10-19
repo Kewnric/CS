@@ -2373,6 +2373,22 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
 .home-continue-card:focus-within .hc-timer > span,
 .home-continue-card.is-held .hc-timer > span { animation-play-state: paused; }
 
+/* Nothing can hover on a touch screen, so nothing held the card: on a phone it
+   left five seconds after Home appeared, with no way back but the library.
+   Without hover there is no countdown -- it stays until dismissed. A hidden
+   timer bar never fires animationend, which is what removes the card. */
+@media (hover: none) {
+  .hc-timer { display: none; }
+}
+
+/* At phone width the cursor, the orb and a worded button left the title
+   ~40px ("The la..."). The button keeps its icon; the word goes. */
+@media (max-width: 480px) {
+  .hc-cursor { display: none; }
+  .hc-go span { display: none; }
+  .hc-go { padding-left: 0.55rem; padding-right: 0.55rem; }
+}
+
 .hc-more { border-top: 1px solid rgba(150, 194, 255, 0.16); }
 .hc-more > summary {
   display: flex; align-items: center; gap: 0.35rem;
