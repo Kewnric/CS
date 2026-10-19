@@ -531,6 +531,11 @@
   flex-shrink: 0;
 }
 
+/* The wings' forms wrap the icon in a span with this class, and lucide's svg
+   kept its own 24px inside the 14px box -- it spilled over the heading text
+   ("ESSENTIALS" with a pen through the E). */
+.af-section-icon > svg { width: 100%; height: 100%; display: block; }
+
 .af-section-action {
   margin-left: auto;
   font-size: 0.75rem;
