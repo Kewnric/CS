@@ -1041,13 +1041,17 @@ function brainRenderCanvas() {
       : `M ${fn.x + fw/2} ${fn.y + fh/2} L ${tn.x + tw/2} ${tn.y + th/2}`;
     const lc = link.color ? `stroke:${vizColorMap(link.color)};` : '';
     const arrowId = link.color ? `viz-arrowhead-col-${link.color}` : 'viz-arrowhead-custom';
+    // Older links have no arrowType; they were always drawn with one head.
+    const arrowType = link.arrowType || 'arrow';
+    const markerEnd = arrowType !== 'none' ? `marker-end="url(#${arrowId})"` : '';
+    const markerStart = arrowType === 'double-arrow' ? `marker-start="url(#${arrowId}-back)"` : '';
     const isBridgeGhost = link.isBridge && (brainBridgeGhostIds.has(link.from) || brainBridgeGhostIds.has(link.to));
     const isFocusGhost = brain._focusedParentId && (!brainFocusIds.has(link.from) || !brainFocusIds.has(link.to));
     const isGhostLink = isBridgeGhost || isFocusGhost;
     const ghostStyle = isGhostLink ? 'opacity:0.3;stroke-dasharray:6,4;' : '';
     svgContent += `<g class="viz-link-group${isGhostLink ? ' viz-bridge-ghost-link' : ''}" data-link-id="${link.id}" oncontextmenu="brainLinkCtx(event,'${link.id}')">
       <path class="viz-link-hitbox" d="${d}"/>
-      <path class="viz-link custom-link" d="${d}" style="${lc}${ghostStyle}" marker-end="url(#${arrowId})"/>
+      <path class="viz-link custom-link" d="${d}" style="${lc}${ghostStyle}" ${markerEnd} ${markerStart}/>
     </g>`;
   });
   if (brain.linkingFrom) {
@@ -1709,10 +1713,41 @@ function brainLinkCtx(e, linkId) {
   brain.contextLinkId = linkId;
   const menu = document.getElementById('brain-link-ctx');
   if (!menu) return;
+  // Opens collapsed, and before it is measured, so it is placed at its real size.
+  const sub = document.getElementById('brain-link-type-menu');
+  const toggle = document.getElementById('brain-link-type-toggle');
+  if (sub) sub.classList.add('hidden');
+  if (toggle) toggle.setAttribute('aria-expanded', 'false');
   if (typeof vizPositionMenu === 'function') vizPositionMenu(menu, e.clientX, e.clientY);
   else { menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px'; menu.classList.remove('hidden'); }
   const link = brain.links.find(l => l.id === linkId);
   menu.querySelectorAll('.viz-color-swatch').forEach(sw => { sw.classList.toggle('active', sw.dataset.color === (link?.color || '')); });
+  const type = (link && link.arrowType) || 'arrow';
+  menu.querySelectorAll('#brain-link-type-menu .viz-link-type-option').forEach(o => o.classList.toggle('active', o.dataset.type === type));
+}
+
+/** Connector Type: opens its options inside the link menu, below the row. */
+function brainToggleConnectorType(e) {
+  if (e) e.stopPropagation();
+  const menu = document.getElementById('brain-link-ctx');
+  const sub = document.getElementById('brain-link-type-menu');
+  const toggle = document.getElementById('brain-link-type-toggle');
+  if (!menu || !sub) return;
+  const open = !sub.classList.toggle('hidden');
+  if (toggle) toggle.setAttribute('aria-expanded', String(open));
+  // The menu just grew; opened near the bottom of the screen it would run off.
+  const r = menu.getBoundingClientRect();
+  const over = r.bottom - (window.innerHeight - 6);
+  if (over > 0) menu.style.top = Math.max(6, r.top - over) + 'px';
+}
+
+function brainCtxSetLinkArrow(type) {
+  const link = brain.contextLinkId && brain.links.find(l => l.id === brain.contextLinkId);
+  if (!link || (link.arrowType || 'arrow') === type) { brainHideAllMenus(); return; }
+  brainPushUndo();
+  link.arrowType = type;
+  brainRenderCanvas(); brainSaveCurrentVersion();
+  brainHideAllMenus();
 }
 
 function brainCtxAddComment() {

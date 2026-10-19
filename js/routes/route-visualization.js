@@ -415,6 +415,14 @@ function vizTemplate() {
     <div id="brain-link-ctx" class="viz-link-menu hidden" role="menu">
       <div class="viz-color-picker">${vizSwatchesHTML('brainCtxEditLinkColor')}</div>
       <div class="viz-ctx-divider"></div>
+      <!-- The same three heads as the toolbar's link-mode dropdown, for one link. -->
+      <button class="viz-ctx-item" id="brain-link-type-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleConnectorType(event)"><i data-lucide="spline"></i> Connector Type <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
+      <div class="viz-ctx-submenu hidden" id="brain-link-type-menu" role="menu">
+        <div class="viz-link-type-option" role="menuitem" data-type="arrow" onclick="brainCtxSetLinkArrow('arrow')"><i data-lucide="arrow-right"></i> Arrow</div>
+        <div class="viz-link-type-option" role="menuitem" data-type="double-arrow" onclick="brainCtxSetLinkArrow('double-arrow')"><i data-lucide="arrow-left-right"></i> Double</div>
+        <div class="viz-link-type-option" role="menuitem" data-type="none" onclick="brainCtxSetLinkArrow('none')"><i data-lucide="minus"></i> None</div>
+      </div>
+      <div class="viz-ctx-divider"></div>
       <button class="viz-ctx-item danger" onclick="brainCtxDeleteLink()"><i data-lucide="trash-2"></i> Delete Link</button>
     </div>
 
