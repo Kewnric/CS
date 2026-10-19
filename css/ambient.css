@@ -745,3 +745,17 @@ body.amb-theme-night .amb-cast {
   body.amb-theme-fire .amb-cast,
   body.amb-theme-night .amb-cast { animation: none; }
 }
+
+/* ── Pinned to the pane, not to its content ────────────────────
+   The pane is the scroller, so its inset:0 layers scrolled with the text and
+   the scene slid out of view. js/ambient.js (_ambPin) writes the pane's
+   scrollTop into --amb-scroll; moving top AND bottom by it keeps each layer
+   exactly the pane's size and exactly over the visible part, and its bottom
+   never passes the end of the content, so the scrollbars do not grow. */
+.amb-host::before,
+.amb-host::after,
+.amb-host > .amb-shards,
+.amb-host > .amb-scene {
+  top: var(--amb-scroll, 0px);
+  bottom: calc(0px - var(--amb-scroll, 0px));
+}

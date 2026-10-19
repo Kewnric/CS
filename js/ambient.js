@@ -150,8 +150,23 @@ const _ambRand = (lo, hi) => lo + Math.random() * (hi - lo);
  * would fire every shard at once, which is the one thing that would make them
  * look like a mechanism instead of weather.
  */
+/* Keep the background on the pane, not on its content. Every layer is
+   absolute inset:0 inside the pane, and the pane is the scroller -- so the
+   layers scrolled away with the description, and the scene slid up out of
+   view. The pane's scroll offset moves them back down by exactly as much
+   (ambient.css reads --amb-scroll into top/bottom), which keeps them inside
+   the scroll area, so the scrollbars do not grow. */
+function _ambPin(host) {
+  if (host._ambPinned) return;
+  host._ambPinned = true;
+  const pin = () => host.style.setProperty('--amb-scroll', host.scrollTop + 'px');
+  host.addEventListener('scroll', pin, { passive: true });
+  pin();
+}
+
 function _ambFill(host) {
   if (!host) return;
+  _ambPin(host);
   // Before the early return: a pane filled by an older build has shards but no
   // scene, and bailing out above would leave it without one for the session.
   _ambScene(host);
