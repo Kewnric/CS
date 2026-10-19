@@ -1558,7 +1558,7 @@ function _showThreeButtonDialog(title, message, actions, onChoice) {
       onChoice(a.action);
     };
   });
-  modal.classList.remove('hidden');
+  if (typeof _dlgOpen === 'function') _dlgOpen(modal); else modal.classList.remove('hidden');
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: modal });
 }
 

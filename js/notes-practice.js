@@ -748,7 +748,7 @@ function showWrongAnswerPopup(keyEntry, explanation, qType) {
     dialogActions.innerHTML = `<button onclick="closeWrongAnswerPopupAndNext()" class="btn btn-primary" style="width:100%;">Continue to Next Question</button>`;
   }
   const modal = document.getElementById('dialog-modal');
-  if (modal) { modal.classList.remove('hidden'); if (typeof lucide !== 'undefined') lucide.createIcons({ root: modal }); }
+  if (modal) { _dlgOpen(modal); if (typeof lucide !== 'undefined') lucide.createIcons({ root: modal }); }
 }
 
 function closeWrongAnswerPopupAndNext() {

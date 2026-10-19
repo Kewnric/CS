@@ -50,7 +50,10 @@ function closeModalSmooth(modalEl) {
     content.style.transform = 'scale(0.95)';
     content.style.opacity = '0';
   }
+  const seq = modalEl._dlgSeq = (modalEl._dlgSeq || 0) + 1;
   setTimeout(() => {
+    // Reopened since (see _dlgOpen): this close has been overtaken.
+    if (modalEl._dlgSeq !== seq) return;
     modalEl.classList.add('hidden');
     modalEl.style.opacity = '';
     modalEl.style.transition = '';
@@ -60,6 +63,34 @@ function closeModalSmooth(modalEl) {
       content.style.transition = '';
     }
   }, 200);
+}
+
+/**
+ * Show a modal, cancelling any close still fading it out.
+ *
+ * closeModalSmooth hides the modal 200ms after it is asked to. Every dialog
+ * here shares #dialog-modal, so a confirm whose callback opens the next dialog
+ * (Reset All Data's "Final Confirmation", Bulk Reset's "Progress Reset") had
+ * that dialog hidden by the timer the first one left behind. Bumping the
+ * sequence lets the timer see it has been overtaken.
+ *
+ * It also clears the layout classes showChoice and the icon picker add. Only
+ * their own buttons removed them, so one dismissed with Esc or a backdrop
+ * click left every later confirm laid out as a choice list.
+ */
+function _dlgOpen(modal, variant) {
+  modal._dlgSeq = (modal._dlgSeq || 0) + 1;
+  modal.classList.remove('dialog-choice', 'dialog-icons');
+  if (variant) modal.classList.add(variant);
+  modal.style.opacity = '';
+  modal.style.transition = '';
+  const content = modal.querySelector('.modal-content');
+  if (content) {
+    content.style.transform = '';
+    content.style.opacity = '';
+    content.style.transition = '';
+  }
+  modal.classList.remove('hidden');
 }
 
 /** @param {string} title @param {string} message @param {boolean} [isError] */
@@ -78,7 +109,7 @@ function showMessage(title, message, isError = false) {
   document.getElementById('dialog-actions').innerHTML = `
     <button onclick="closeModalSmooth(document.getElementById('dialog-modal'))" class="btn btn-secondary" style="flex:1;">OK</button>
   `;
-  modal.classList.remove('hidden');
+  _dlgOpen(modal);
   _trapFocus(modal);
   if (isError) {
     const content = modal.querySelector('.modal-content');
@@ -114,7 +145,7 @@ function showConfirm(title, message, onConfirm) {
     onConfirm();
   };
 
-  modal.classList.remove('hidden');
+  _dlgOpen(modal);
   _trapFocus(modal);
   lucide.createIcons({ root: modal });
 }
@@ -157,7 +188,6 @@ function showChoice(o) {
   modal.setAttribute('role', 'alertdialog');
   modal.setAttribute('aria-modal', 'true');
   modal.setAttribute('aria-label', o.title);
-  modal.classList.add('dialog-choice');
   document.getElementById('dialog-title').innerText = o.title;
   document.getElementById('dialog-msg').innerText = o.message || '';
   document.getElementById('dialog-icon').innerHTML =
@@ -188,7 +218,7 @@ function showChoice(o) {
   document.getElementById('dlg-second').onclick = () => { close(); if (o.onSecondary) o.onSecondary(); };
   document.getElementById('dlg-primary').onclick = () => { close(); if (o.onPrimary) o.onPrimary(); };
 
-  modal.classList.remove('hidden');
+  _dlgOpen(modal, 'dialog-choice');
   _trapFocus(modal);
   lucide.createIcons({ root: modal });
 }
@@ -220,7 +250,7 @@ function showUnsavedConfirm(onDiscard, onSave) {
     onSave();
   };
 
-  modal.classList.remove('hidden');
+  _dlgOpen(modal);
   lucide.createIcons({ root: modal });
 }
 
@@ -366,7 +396,7 @@ function showResultModal(data) {
     `;
   }
 
-  modal.classList.remove('hidden');
+  _dlgOpen(modal);
   lucide.createIcons({ root: modal });
 }
 
@@ -442,7 +472,6 @@ function showIconPicker(title, message, current, onConfirm) {
     if (v !== null) onConfirm(v.trim());
     return;
   }
-  modal.classList.add('dialog-icons');
   document.getElementById('dialog-title').innerText = title;
   document.getElementById('dialog-msg').innerText = message || '';
   document.getElementById('dialog-icon').innerHTML =
@@ -527,7 +556,7 @@ function showIconPicker(title, message, current, onConfirm) {
   });
 
   paint();
-  modal.classList.remove('hidden');
+  _dlgOpen(modal, 'dialog-icons');
   _trapFocus(modal);
   lucide.createIcons({ root: modal });
   setTimeout(() => q.focus(), 50);
@@ -572,7 +601,7 @@ function showInputDialog(title, message, placeholder, defaultValue, onConfirm) {
   document.getElementById('dlg-confirm').onclick = doConfirm;
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') doConfirm(); });
 
-  modal.classList.remove('hidden');
+  _dlgOpen(modal);
   lucide.createIcons({ root: modal });
   setTimeout(() => input.focus(), 80);
 }
@@ -630,7 +659,7 @@ function showListPickerDialog(title, message, options, onConfirm) {
     };
   });
 
-  modal.classList.remove('hidden');
+  _dlgOpen(modal);
   lucide.createIcons({ root: modal });
 }
 
