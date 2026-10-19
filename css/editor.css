@@ -1502,6 +1502,24 @@ mark.diff-hit.current {
   background: rgba(248, 81, 73, 0.12);
 }
 
+/* ── Floating terminal: dash / box, and the draggable header ── */
+.run-code-header-actions { display: flex; align-items: center; gap: 0.25rem; }
+.run-code-close-btn.run-code-min-btn:hover { color: #e6edf3; background: rgba(139, 148, 158, 0.16); }
+.run-code-header { cursor: grab; user-select: none; touch-action: none; }
+.run-code-header.is-dragging { cursor: grabbing; }
+.run-code-header button { cursor: pointer; }
+.run-code-overlay {
+  transition: background-color 0.2s ease, backdrop-filter 0.2s ease, -webkit-backdrop-filter 0.2s ease;
+}
+/* Unblurred: the page shows and takes clicks; only the window catches them. */
+.run-code-overlay.is-floating {
+  background: transparent;
+  backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
+  pointer-events: none;
+}
+.run-code-overlay.is-floating .run-code-window { pointer-events: auto; }
+
 .run-code-close-btn i,
 .run-code-close-btn svg {
   width: 18px;

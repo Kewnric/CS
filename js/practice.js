@@ -3022,6 +3022,59 @@ function _termClose(byUser) {
   if (byUser && overlay) bossLockOn();
 }
 
+/* ── The terminal as a floating window ─────────────────────────
+   The dash does not hide the terminal: it unblurs the page behind it and lets
+   clicks through, so you can read and edit your code while the program waits.
+   It becomes a box, which puts everything back -- blur on, window centred.
+   The header drags the window in either state. */
+function _termWireFloat(overlay) {
+  const win = overlay.querySelector('.run-code-window');
+  const head = overlay.querySelector('.run-code-header');
+  const btn = document.getElementById('run-code-min-btn');
+  if (!win || !head || !btn) return;
+  btn.onclick = () => _termSetFloating(overlay, !overlay.classList.contains('is-floating'));
+  let drag = null;
+  head.addEventListener('pointerdown', e => {
+    if (e.button !== 0 || e.target.closest('button')) return;
+    const [x, y] = (win.style.translate || '0px 0px').split(' ').map(parseFloat);
+    drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, x: x || 0, y: y || 0, r: win.getBoundingClientRect() };
+    head.setPointerCapture(e.pointerId);
+    head.classList.add('is-dragging');
+    e.preventDefault();
+  });
+  head.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const r = drag.r;
+    // Keep part of the header on screen, so the window can always be grabbed back.
+    const dx = Math.max(80 - r.right, Math.min(innerWidth - 80 - r.left, e.clientX - drag.sx));
+    const dy = Math.max(-r.top, Math.min(innerHeight - 48 - r.top, e.clientY - drag.sy));
+    win.style.translate = (drag.x + dx) + 'px ' + (drag.y + dy) + 'px';
+  });
+  const end = e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag = null;
+    head.classList.remove('is-dragging');
+  };
+  head.addEventListener('pointerup', end);
+  head.addEventListener('pointercancel', end);
+}
+
+function _termSetFloating(overlay, on) {
+  overlay.classList.toggle('is-floating', on);
+  const win = overlay.querySelector('.run-code-window');
+  if (!on && win) win.style.translate = '';   // back to the centre
+  const btn = document.getElementById('run-code-min-btn');
+  if (btn) {
+    btn.title = on ? 'Restore: blur the page and centre the terminal' : 'Unblur the page behind the terminal';
+    btn.setAttribute('aria-label', btn.title);
+    btn.innerHTML = '<i data-lucide="' + (on ? 'square' : 'minus') + '"></i>';
+    if (typeof lucide !== 'undefined') lucide.createIcons({ root: btn });
+  }
+  // Typing should still go to the program, not to the button just clicked.
+  const inp = document.getElementById('term-input');
+  if (inp) inp.focus({ preventScroll: true });
+}
+
 function runCodeWithPiston(seedStdin) {
   const textarea = document.getElementById('editor-textarea');
   if (!textarea) return;
@@ -3051,7 +3104,11 @@ function runCodeWithPiston(seedStdin) {
           <i data-lucide="terminal"></i>
           <span>Terminal</span>
         </div>
-        <button class="run-code-close-btn" id="run-code-close-btn"><i data-lucide="x"></i></button>
+        <div class="run-code-header-actions">
+          <button class="run-code-close-btn run-code-min-btn" id="run-code-min-btn"
+                  title="Unblur the page behind the terminal" aria-label="Unblur the page behind the terminal"><i data-lucide="minus"></i></button>
+          <button class="run-code-close-btn" id="run-code-close-btn" title="Close" aria-label="Close"><i data-lucide="x"></i></button>
+        </div>
       </div>
       <div class="run-code-body" style="flex-direction:column; padding:0;">
         <!-- One surface. You type INTO the transcript, right after the prompt —
@@ -3101,6 +3158,7 @@ function runCodeWithPiston(seedStdin) {
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: overlay });
 
   document.getElementById('run-code-close-btn').onclick = () => _termClose(true);
+  _termWireFloat(overlay);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) _termClose(true); });
 
   const freshSource = () => {
