@@ -2363,106 +2363,62 @@
    CONNECTION PORTS — 4-point hover dots for drag-linking
    ============================================================ */
 
+/* The port element is a fixed 26px hitbox centred on its edge's midpoint (the
+   spot vizPortCenter draws links to); the dot you see is its ::before. They
+   are kept apart so the target never changes size. When the dot's scale was
+   also the hitbox's scale, hovering a hidden port grew it, the transition
+   started from the small size, the target shrank out from under the pointer,
+   the hover dropped and it looped: the cursor flicked between crosshair and
+   hand, and the dot never got to show. */
 .viz-port {
   position: absolute;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  cursor: crosshair;
+  z-index: 300;
+  /* Live even while its dot is hidden, so hovering where a port sits shows it
+     without going over the node first. */
+  pointer-events: auto;
+}
+
+.viz-port::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
   width: 10px;
   height: 10px;
   border-radius: 50%;
   background: var(--color-primary);
   border: 2px solid var(--bg-elevated);
   box-shadow: 0 0 0 2px var(--color-primary-glow), 0 2px 6px rgba(0, 0, 0, 0.3);
-  cursor: crosshair;
-  z-index: 300;
   opacity: 0;
-  transform: scale(0.5);
+  transform: translate(-50%, -50%) scale(0.5);
   transition: opacity 0.15s ease, transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
-  /* A hidden port is still live, so hovering the spot where it sits shows it
-     without going over the node first. Its hitbox (::before) is sized against
-     the port's own scale so it covers the same 26px in every state. */
-  pointer-events: auto;
+  pointer-events: none;
 }
 
-/* The dot stays 10px; the thing you have to HIT is 26px. A 10px circle scaled
-   to 0.5 gave a 5px target, and the canvas scales that down again with zoom —
-   at 60% it was a 3px bullseye. */
-.viz-port::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 52px;   /* x scale(0.5) = 26px */
-  height: 52px;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-}
-.viz-node[data-near-side="top"] .viz-port[data-side="top"]::before,
-.viz-node[data-near-side="bottom"] .viz-port[data-side="bottom"]::before,
-.viz-node[data-near-side="left"] .viz-port[data-side="left"]::before,
-.viz-node[data-near-side="right"] .viz-port[data-side="right"]::before {
-  width: 26px;   /* x scale(1) */
-  height: 26px;
-}
-.viz-port:hover::before {
-  width: 20px;   /* x scale(1.3) */
-  height: 20px;
-}
-
-/* Position each port */
-.viz-port[data-side="top"] {
-  top: -6px;
-  left: 50%;
-  transform: translateX(-50%) scale(0.5);
-}
-
-.viz-port[data-side="bottom"] {
-  bottom: -6px;
-  left: 50%;
-  transform: translateX(-50%) scale(0.5);
-}
-
-.viz-port[data-side="left"] {
-  left: -6px;
-  top: 50%;
-  transform: translateY(-50%) scale(0.5);
-}
-
-.viz-port[data-side="right"] {
-  right: -6px;
-  top: 50%;
-  transform: translateY(-50%) scale(0.5);
-}
+/* Position each port, centred on its edge */
+.viz-port[data-side="top"]    { top: -13px;    left: 50%; transform: translateX(-50%); }
+.viz-port[data-side="bottom"] { bottom: -13px; left: 50%; transform: translateX(-50%); }
+.viz-port[data-side="left"]   { left: -13px;   top: 50%;  transform: translateY(-50%); }
+.viz-port[data-side="right"]  { right: -13px;  top: 50%;  transform: translateY(-50%); }
 
 /* All four ports appear on hover, so you can aim at the side you want instead
    of chasing the single one the pointer happened to be nearest to. The nearest
    is emphasised (below) and the rest sit back at low opacity. */
-.viz-node:hover .viz-port,
-.viz-node.viz-link-target .viz-port {
+.viz-node:hover .viz-port::before,
+.viz-node.viz-link-target .viz-port::before {
   opacity: 0.45;
-  pointer-events: auto;
 }
 
-.viz-node[data-near-side="top"] .viz-port[data-side="top"],
-.viz-node[data-near-side="bottom"] .viz-port[data-side="bottom"],
-.viz-node[data-near-side="left"] .viz-port[data-side="left"],
-.viz-node[data-near-side="right"] .viz-port[data-side="right"] {
+.viz-node[data-near-side="top"] .viz-port[data-side="top"]::before,
+.viz-node[data-near-side="bottom"] .viz-port[data-side="bottom"]::before,
+.viz-node[data-near-side="left"] .viz-port[data-side="left"]::before,
+.viz-node[data-near-side="right"] .viz-port[data-side="right"]::before {
   opacity: 1;
-  pointer-events: auto;
-}
-
-.viz-node[data-near-side="top"] .viz-port[data-side="top"] {
-  transform: translateX(-50%) scale(1);
-}
-
-.viz-node[data-near-side="bottom"] .viz-port[data-side="bottom"] {
-  transform: translateX(-50%) scale(1);
-}
-
-.viz-node[data-near-side="left"] .viz-port[data-side="left"] {
-  transform: translateY(-50%) scale(1);
-}
-
-.viz-node[data-near-side="right"] .viz-port[data-side="right"] {
-  transform: translateY(-50%) scale(1);
+  transform: translate(-50%, -50%) scale(1);
 }
 
 /* Hide ports while dragging a node or panning */
@@ -2474,16 +2430,11 @@
 }
 
 /* Port hover glow */
-.viz-port:hover {
+.viz-node .viz-port:hover::before {
   opacity: 1;
   background: #fff;
   box-shadow: 0 0 0 3px var(--color-primary), 0 0 12px var(--color-primary-glow);
-  transform: translateX(-50%) scale(1.3) !important;
-}
-
-.viz-port[data-side="left"]:hover,
-.viz-port[data-side="right"]:hover {
-  transform: translateY(-50%) scale(1.3) !important;
+  transform: translate(-50%, -50%) scale(1.3) !important;
 }
 
 /* === PANE SWAP === */
@@ -3163,18 +3114,14 @@
   box-shadow: 0 0 0 2px var(--color-primary-glow), 0 0 18px var(--color-primary-glow);
 }
 
-.viz-node.viz-link-target .viz-port[data-side].viz-port-snap {
+.viz-node.viz-link-target .viz-port[data-side].viz-port-snap::before {
   opacity: 1;
   background: #fff;
   box-shadow: 0 0 0 3px var(--color-primary), 0 0 14px var(--color-primary);
+  /* Grown past full size, so it reads as "caught" rather than as one of four
+     faint dots. */
+  transform: translate(-50%, -50%) scale(1.3) !important;
 }
-
-/* The port the link has snapped onto grows to full size, so it reads as
-   "caught" rather than as one of four faint dots. */
-.viz-node.viz-link-target .viz-port-snap[data-side="top"],
-.viz-node.viz-link-target .viz-port-snap[data-side="bottom"] { transform: translateX(-50%) scale(1.3); }
-.viz-node.viz-link-target .viz-port-snap[data-side="left"],
-.viz-node.viz-link-target .viz-port-snap[data-side="right"] { transform: translateY(-50%) scale(1.3); }
 
 /* The edge itself lights up, so the target side is readable at any zoom. */
 .viz-node.viz-link-target[data-snap-side="top"] .viz-node-inner { border-top: 3px solid var(--color-primary) !important; }
@@ -3715,7 +3662,12 @@ button.viz-link-type-option {
 
 /* Touch: the ports are 10px targets built for a mouse. */
 @media (pointer: coarse) {
-  .viz-port { width: 18px; height: 18px; }
+  .viz-port { width: 36px; height: 36px; }
+  .viz-port[data-side="top"]    { top: -18px; }
+  .viz-port[data-side="bottom"] { bottom: -18px; }
+  .viz-port[data-side="left"]   { left: -18px; }
+  .viz-port[data-side="right"]  { right: -18px; }
+  .viz-port::before { width: 18px; height: 18px; }
   .viz-canvas-container { touch-action: none; }
 }
 
