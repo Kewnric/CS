@@ -2811,10 +2811,23 @@ function toggleFullscreen() {
   try {
     Promise.resolve(req.call(el)).catch(() => {
       // Blocked (permissions policy, or not treated as a user gesture)
-      if (typeof toast === 'function') toast('The browser blocked full screen. Try F11 instead.', { type: 'warning' });
+      if (typeof toast === 'function') toast('The browser blocked full screen.', { type: 'warning' });
     });
   } catch (e) { /* ignore */ }
 }
+
+/* F11 opens PAGE full screen, not the browser's. Browser full screen (F11)
+   slides the tab strip and address bar back in whenever the pointer touches
+   the top edge, and no page can stop that. Page full screen (the Fullscreen
+   API, same as the topbar button) shows nothing but the app; Esc or F11
+   again leaves it. Capture phase, so the editor's own key handling never
+   swallows it. If a browser refuses the preventDefault, its own F11 still
+   runs as before. */
+document.addEventListener('keydown', function _appF11FullScreen(e) {
+  if (e.key !== 'F11' || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+  e.preventDefault();
+  toggleFullscreen();
+}, true);
 
 /** Keep the button's icon and pressed state in step, including F11/Esc exits
     that never go through our click handler. */
