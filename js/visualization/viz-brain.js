@@ -1463,6 +1463,15 @@ function brainOpenEditor(node) {
     </div>
   </div>`;
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: overlay });
+  // Ready to type the moment it opens, caret after any existing text. Deferred
+  // a tick so the click or double-click that opened it has finished.
+  const textarea = document.getElementById('viz-comment-editor-textarea');
+  setTimeout(() => {
+    if (!textarea.isConnected) return;
+    textarea.focus({ preventScroll: true });
+    const end = textarea.value.length;
+    textarea.setSelectionRange(end, end);
+  }, 0);
   document.getElementById('viz-comment-editor-save').onclick = () => {
     brainPushUndo();
     node.commentContent = document.getElementById('viz-comment-editor-textarea').value;
