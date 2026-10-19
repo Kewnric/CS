@@ -675,13 +675,15 @@ function _vizRenderLinks(svg, nodesLayer, g, drawn) {
    template string on every single render. */
 function _vizBuildDefs(svg) {
   const colors = { red: '#ef4444', orange: '#f97316', yellow: '#eab308', green: '#22c55e', blue: '#3b82f6', purple: '#a855f7', pink: '#ec4899', cyan: '#06b6d4' };
-  const fwd = (id, fill, op) => `<marker id="${id}" markerWidth="8" markerHeight="6" refX="6" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="${fill}" opacity="${op}"/></marker>`;
-  const back = (id, fill, op) => `<marker id="${id}-back" markerWidth="8" markerHeight="6" refX="2" refY="3" orient="auto"><polygon points="8 0, 0 3, 8 6" fill="${fill}" opacity="${op}"/></marker>`;
-  let html = fwd('viz-arrowhead', 'var(--text-tertiary)', 0.6) + back('viz-arrowhead', 'var(--text-tertiary)', 0.6)
-    + fwd('viz-arrowhead-locked', '#f59e0b', 0.8) + back('viz-arrowhead-locked', '#f59e0b', 0.8)
-    + fwd('viz-arrowhead-custom', '#f59e0b', 0.6) + back('viz-arrowhead-custom', '#f59e0b', 0.6);
+  // Heads are solid. The line runs on under the head to the port, and at
+  // 60–90% opacity its dashes showed through the arrow.
+  const fwd = (id, fill) => `<marker id="${id}" markerWidth="8" markerHeight="6" refX="6" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="${fill}"/></marker>`;
+  const back = (id, fill) => `<marker id="${id}-back" markerWidth="8" markerHeight="6" refX="2" refY="3" orient="auto"><polygon points="8 0, 0 3, 8 6" fill="${fill}"/></marker>`;
+  let html = fwd('viz-arrowhead', 'var(--text-tertiary)') + back('viz-arrowhead', 'var(--text-tertiary)')
+    + fwd('viz-arrowhead-locked', '#f59e0b') + back('viz-arrowhead-locked', '#f59e0b')
+    + fwd('viz-arrowhead-custom', '#f59e0b') + back('viz-arrowhead-custom', '#f59e0b');
   Object.keys(colors).forEach(name => {
-    html += fwd('viz-arrowhead-col-' + name, colors[name], 0.9) + back('viz-arrowhead-col-' + name, colors[name], 0.9);
+    html += fwd('viz-arrowhead-col-' + name, colors[name]) + back('viz-arrowhead-col-' + name, colors[name]);
   });
   const old = svg.querySelector('defs');
   if (old) old.remove();
