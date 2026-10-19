@@ -374,6 +374,7 @@ function vizStartLinking(nodeId) {
   viz.linkingFrom = nodeId;
   const container = document.getElementById('viz-canvas-container');
   if (container) container.classList.add('linking-mode');
+  if (typeof vizHoverClear === 'function') vizHoverClear();
   let hint = document.getElementById('viz-linking-hint');
   if (!hint) {
     hint = document.createElement('div');
@@ -392,6 +393,7 @@ function vizCancelLinking() {
   viz.portDrag = null;
   const container = document.getElementById('viz-canvas-container');
   if (container) container.classList.remove('linking-mode');
+  if (typeof vizHoverClear === 'function') vizHoverClear();
   const hint = document.getElementById('viz-linking-hint');
   if (hint) hint.classList.add('hidden');
   vizRenderCanvas();

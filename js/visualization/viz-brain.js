@@ -1476,6 +1476,7 @@ function brainStartLinking(nodeId) {
   brain.linkingFrom = nodeId;
   const container = document.getElementById('viz-canvas-container');
   if (container) container.classList.add('linking-mode');
+  if (typeof vizHoverClear === 'function') vizHoverClear();
   let hint = document.getElementById('viz-linking-hint');
   if (!hint) {
     hint = document.createElement('div'); hint.id = 'viz-linking-hint'; hint.className = 'viz-linking-hint';
@@ -1490,6 +1491,9 @@ function brainCancelLinking() {
   brain.linkingFrom = null;
   const container = document.getElementById('viz-canvas-container');
   if (container) container.classList.remove('linking-mode');
+  // The re-render below replaces the hovered node, so its mouseleave never
+  // fires; a link dropped on empty canvas left every node dimmed by hover focus.
+  if (typeof vizHoverClear === 'function') vizHoverClear();
   const hint = document.getElementById('viz-linking-hint');
   if (hint) hint.classList.add('hidden');
   brainRenderCanvas();
@@ -1567,6 +1571,7 @@ function brainPortDragStart(e, nodeId, side) {
   brain._portDragSide = side;
   const container = document.getElementById('viz-canvas-container');
   if (container) container.classList.add('linking-mode');
+  if (typeof vizHoverClear === 'function') vizHoverClear();
   brainRenderCanvas();
 
   function onUp(upEvent) {

@@ -88,6 +88,7 @@ function vizPortDragStart(e, nodeId, side) {
   viz.linkingFrom = nodeId;
   const container = document.getElementById('viz-canvas-container');
   if (container) container.classList.add('linking-mode');
+  if (typeof vizHoverClear === 'function') vizHoverClear();
   vizRenderCanvas();
 
   // Live preview of where the link would land, so the side it snaps to is
