@@ -264,6 +264,12 @@ const SpaRouter = (() => {
     window.cm_currentRawHash = rawHash;
   }
 
+  /** Re-render whatever is on screen from current state -- for when the data
+   *  changed underneath it (a history trim, a cloud load). */
+  function refresh() {
+    if (currentRoute) handleRoute();
+  }
+
   // --- Boot ---
   function init() {
     window.addEventListener('hashchange', handleRoute);
@@ -276,7 +282,7 @@ const SpaRouter = (() => {
     }
   }
 
-  return { register, navigate, init, getCurrentRoute: () => currentRoute };
+  return { register, navigate, init, refresh, getCurrentRoute: () => currentRoute };
 })();
 
 // Global shortcut

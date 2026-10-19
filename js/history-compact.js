@@ -293,8 +293,9 @@ function historyTrim(rule) {
   const ask = typeof showConfirm === 'function' ? showConfirm : null;
   const run = () => {
     softDeleteHistory(ids, () => {
-      if (typeof renderAnalyticsCharts === 'function') renderAnalyticsCharts();
-      else if (typeof handleRoute === 'function') handleRoute();
+      // Neither function this used to call exists, so the Storage card and the
+      // attempt counts kept showing the deleted entries until you navigated.
+      if (typeof SpaRouter !== 'undefined') SpaRouter.refresh();
       if (typeof toast === 'function') {
         toast('Deleted ' + _histPlural(ids.length, 'attempt') + ', freeing about ' + freed
               + 'KB. Undo is in the usual place.', { type: 'success', duration: 5000 });

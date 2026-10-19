@@ -862,17 +862,15 @@ function _rerenderActiveRoute() {
   if (typeof renderAdmin === 'function' && document.getElementById('admin-table-body-preview')) {
     try { renderAdmin(); } catch (e) {}
   }
-  if (typeof renderHome === 'function' && document.getElementById('home-greeting')) {
-    try { renderHome(); } catch (e) {}
-  }
   if (typeof renderBrowse === 'function' && document.getElementById('browse-category-list')) {
     try { renderBrowse(); } catch (e) {}
   }
-  if (typeof renderStudyHome === 'function' && document.getElementById('study-tree-list')) {
-    try { renderStudyHome(); } catch (e) {}
-  }
-  if (typeof renderQuestBoard === 'function' && document.getElementById('quest-board-root')) {
-    try { renderQuestBoard(); } catch (e) {}
+  // Home, the Notes Library and the Quest Board have no single function that
+  // repaints them -- renderHome / renderStudyHome / renderQuestBoard were never
+  // defined, so these refreshes silently did nothing. Re-enter the route.
+  const _r = document.body.dataset.route;
+  if ((_r === 'home' || _r === 'study' || _r === 'quests') && typeof SpaRouter !== 'undefined') {
+    try { SpaRouter.refresh(); } catch (e) {}
   }
 }
 
