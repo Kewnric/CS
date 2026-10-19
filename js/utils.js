@@ -477,6 +477,11 @@ function programExcerpt(c) {
   return text.replace(/\s+/g, ' ').trim();
 }
 
+/** "1 attempt", "3 attempts". The hub chips said "1 attempts". */
+function countNoun(n, noun) {
+  return n + ' ' + noun + (n === 1 ? '' : 's');
+}
+
 /** @param {Function} fn @param {number} wait ms @returns {Function} debounced wrapper */
 function debounce(fn, wait) {
   let timer;

@@ -97,9 +97,9 @@ function libraryInit() {
   const totals = document.getElementById('lib-hub-totals');
   if (totals) {
     totals.innerHTML = `
-      ${_libStatChip('file-code', `${challenges.length} programs`)}
-      ${_libStatChip('book-open', `${notebooks.length} notebooks`)}
-      ${_libStatChip('code', `${snippets.length} snippets`)}
+      ${_libStatChip('file-code', countNoun(challenges.length, 'program'))}
+      ${_libStatChip('book-open', countNoun(notebooks.length, 'notebook'))}
+      ${_libStatChip('code', countNoun(snippets.length, 'snippet'))}
       ${(() => {
         // They are not "more wings" now that they are in with everything else;
         // what is worth counting is what you have actually written in them.
@@ -149,15 +149,15 @@ function libraryInit() {
     active.innerHTML =
       card('browse', 'lib-card-coding', 'code-2', 'Coding Library',
         'Challenge programs — rebuild them from memory, run real tests, defeat the boss bar.',
-        _libStatChip('file-code', `${challenges.length} programs`) + _libStatChip('check-circle', `${completedPrograms} completed`) + dueChip('challenge', challenges),
+        _libStatChip('file-code', countNoun(challenges.length, 'program')) + _libStatChip('check-circle', `${completedPrograms} completed`) + dueChip('challenge', challenges),
         codingPct, `${completedPrograms}/${challenges.length} completed`) +
       card('study', 'lib-card-notes', 'book-open', 'Notes Library',
         'MCQ notebooks and quizzes — drill concepts until they stick.',
-        _libStatChip('book-open', `${notebooks.length} notebooks`) + _libStatChip('trophy', `${mastered} mastered`) + dueChip('notebook', notebooks),
+        _libStatChip('book-open', countNoun(notebooks.length, 'notebook')) + _libStatChip('trophy', `${mastered} mastered`) + dueChip('notebook', notebooks),
         notesPct, `${mastered}/${notebooks.length} mastered (80%+)`) +
       card('snippets', 'lib-card-snippets', 'code', 'Snippet Library',
         'Reference snippets with examples, Try-Coding drills and linked challenges.',
-        _libStatChip('code', `${snippets.length} snippets`) + _libStatChip('brain', `${snippetTracked} in rotation`) + dueChip('snippet', snippets),
+        _libStatChip('code', countNoun(snippets.length, 'snippet')) + _libStatChip('brain', `${snippetTracked} in rotation`) + dueChip('snippet', snippets),
         snipPct, `${snippetTracked}/${snippets.length} in your review rotation`) +
       // The Cheat Sheet Library belongs with the other collections, not in the
       // app's top-level sidebar - it is a library, not a section.

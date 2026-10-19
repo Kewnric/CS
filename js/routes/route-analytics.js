@@ -57,9 +57,9 @@ function analyticsInit() {
     const totalAttempts = codingHistory.length + notebookHistory.length + snippetHistory.length;
     const streakDays = calcStudyStreak();
     totals.innerHTML = `
-      ${_analyticsStatChip('target', `${totalAttempts} total attempts`)}
+      ${_analyticsStatChip('target', countNoun(totalAttempts, 'total attempt'))}
       ${_analyticsStatChip('flame', `${streakDays} day streak`)}
-      ${_analyticsStatChip('award', `${typeof badgeState === 'function' ? badgeState().filter(b => b.earned).length : 0} badges earned`)}
+      ${_analyticsStatChip('award', countNoun(typeof badgeState === 'function' ? badgeState().filter(b => b.earned).length : 0, 'badge') + ' earned')}
     `;
   }
 
@@ -85,15 +85,15 @@ function analyticsInit() {
     active.innerHTML =
       card('analytics-coding', 'lib-card-coding', 'code-2', 'Coding Analytics',
         'Detailed history, scores, and completion trends for coding programs and sets.',
-        _analyticsStatChip('file-code', `${codingHistory.length} attempts`) + _analyticsStatChip('check-circle', `${completedPrograms} completed`),
+        _analyticsStatChip('file-code', countNoun(codingHistory.length, 'attempt')) + _analyticsStatChip('check-circle', `${completedPrograms} completed`),
         codingPct, `${completedPrograms}/${challenges.length} completed`) +
       card('analytics-notes', 'lib-card-notes', 'book-open', 'Notes Analytics',
         'Concept mastery tracking, notebook accuracy, and quiz attempt charts.',
-        _analyticsStatChip('book-open', `${notebookHistory.length} attempts`) + _analyticsStatChip('trophy', `${mastered} mastered`),
+        _analyticsStatChip('book-open', countNoun(notebookHistory.length, 'attempt')) + _analyticsStatChip('trophy', `${mastered} mastered`),
         notesPct, `${mastered}/${notebooks.length} mastered (80%+)`) +
       card('analytics-snippets', 'lib-card-snippets', 'code', 'Snippet Analytics',
         'Snippet try-coding attempt logs, spaced-repetition schedules, and metrics.',
-        _analyticsStatChip('code', `${snippetHistory.length} attempts`) + _analyticsStatChip('brain', `${snippetTracked} in rotation`),
+        _analyticsStatChip('code', countNoun(snippetHistory.length, 'attempt')) + _analyticsStatChip('brain', `${snippetTracked} in rotation`),
         snipPct, `${snippetTracked}/${snippets.length} in rotation`);
   }
 

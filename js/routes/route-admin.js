@@ -488,9 +488,9 @@ function adminInit() {
   if (totals) {
     totals.innerHTML = `
       ${_libStatChip('sliders', `${4 + LIBRARY_WINGS.length} wings`)}
-      ${_libStatChip('file-code', `${challenges.length} programs`)}
-      ${_libStatChip('book-open', `${notebooks.length} notebooks`)}
-      ${_libStatChip('code', `${snippets.length} snippets`)}
+      ${_libStatChip('file-code', countNoun(challenges.length, 'program'))}
+      ${_libStatChip('book-open', countNoun(notebooks.length, 'notebook'))}
+      ${_libStatChip('code', countNoun(snippets.length, 'snippet'))}
     `;
   }
 
@@ -513,18 +513,18 @@ function adminInit() {
     active.innerHTML =
       card('admin-coding', 'lib-card-coding', 'code-2', 'Coding Library Admin',
         'Configure challenge programs, add variants/test cases, organize categories, and define prerequisite lock rules.',
-        _libStatChip('file-code', `${challenges.length} programs`) + _libStatChip('folder', `${codingFolders} folders`)) +
+        _libStatChip('file-code', countNoun(challenges.length, 'program')) + _libStatChip('folder', countNoun(codingFolders, 'folder'))) +
       card('admin-notes', 'lib-card-notes', 'book-open', 'Notes Library Admin',
         'Configure MCQ notebooks, set up questions/answers, and categorize quiz sets.',
-        _libStatChip('book-open', `${notebooks.length} notebooks`) + _libStatChip('folder', `${notebookFolders} folders`)) +
+        _libStatChip('book-open', countNoun(notebooks.length, 'notebook')) + _libStatChip('folder', countNoun(notebookFolders, 'folder'))) +
       card('admin-snippets', 'lib-card-snippets', 'code', 'Snippet Library Admin',
         'Manage reference snippets, pre-filled code, rich text comments, and link related challenges.',
-        _libStatChip('code', `${snippets.length} snippets`) + _libStatChip('folder', `${snippetFolders} folders`)) +
+        _libStatChip('code', countNoun(snippets.length, 'snippet')) + _libStatChip('folder', countNoun(snippetFolders, 'folder'))) +
       card('admin-language', 'lib-card-language', 'languages', 'Language Library Admin',
         'Write dictionary entries across four languages, build drill puzzles, and script scenario encounters.',
-        _libStatChip('book-a', `${(state.langWords || []).length} words`) +
-        _libStatChip('dumbbell', `${(state.langSets || []).length} sets`) +
-        _libStatChip('swords', `${(state.langScenarios || []).length} scenarios`)) +
+        _libStatChip('book-a', countNoun((state.langWords || []).length, 'word')) +
+        _libStatChip('dumbbell', countNoun((state.langSets || []).length, 'set')) +
+        _libStatChip('swords', countNoun((state.langScenarios || []).length, 'scenario'))) +
       /* The seven wings belong in this grid, not in a section of their own.
          Each is an individual library exactly as the four above are, and the
          Library hub already files them beside the others in Your collections
