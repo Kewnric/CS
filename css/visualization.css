@@ -4190,3 +4190,13 @@ body:not(.route-focused) .viz-page.hide-top .viz-workspace.panes-swapped:not(.hi
   .viz-topbar,
   .viz-workspace.hide-pane .viz-content-pane { transition: none; }
 }
+
+/* Restoring saved folds on arrival (vizRestoreUiState): no transitions, so a
+   pane that was already folded doesn't replay folding shut. */
+body.viz-no-anim .viz-page,
+body.viz-no-anim .viz-page *,
+body.viz-no-anim .viz-page *::before,
+body.viz-no-anim .viz-page *::after,
+body.viz-no-anim .app-sidebar {
+  transition: none !important;
+}

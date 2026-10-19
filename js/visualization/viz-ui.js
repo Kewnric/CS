@@ -168,6 +168,19 @@ function vizToggleZen(force) {
 
 /* --- Restore UI state after init --- */
 function vizRestoreUiState() {
+  // This runs after the page is already styled, so every fold restored here
+  // used to animate shut on arrival: the side pane, the topbar and the sidebar
+  // replayed their collapse each time you came to Visualize. Applied with
+  // transitions off, committed with one forced style pass, then switched back
+  // on — the values no longer change, so nothing plays.
+  document.body.classList.add('viz-no-anim');
+  try { _vizRestoreUiState(); } finally {
+    void document.body.offsetHeight;
+    document.body.classList.remove('viz-no-anim');
+  }
+}
+
+function _vizRestoreUiState() {
   if (viz.panesSwapped) {
     const workspace = document.querySelector('.viz-workspace');
     if (workspace) workspace.classList.add('panes-swapped');
