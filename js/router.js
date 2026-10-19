@@ -5,6 +5,9 @@
 const SpaRouter = (() => {
   let currentRoute = null;
   let routes = {};
+  // Bumped by every handleRoute. A transition's update callback compares it
+  // with the value it was created under, so only the newest one renders.
+  let navSeq = 0;
 
   // --- Route Registry ---
   function register(name, config) {
@@ -179,7 +182,14 @@ const SpaRouter = (() => {
     // The full render+init sequence runs as one unit so that, when wrapped in a
     // View Transition (whose update callback is async), initFn/icons/reveal all
     // execute against the NEW DOM — never the stale previous route.
+    const seq = ++navSeq;
     const renderAndInit = () => {
+      /* A newer navigation began before this one's View Transition ran its
+         update (hash changes a few ms apart, or an initFn that redirects).
+         The callbacks can land out of order, and painting this one now put
+         the previous page under the new URL and title. The newest call
+         renders; this one stands down. */
+      if (seq !== navSeq) return;
       // Chrome first, then content, both inside this one callback so the
       // browser paints them together.
       applyChrome();
