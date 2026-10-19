@@ -4131,6 +4131,15 @@ body.viz-zen.viz-zen-nosidebar .app-sidebar {
   width: 18px;
   cursor: default;
 }
+/* ...flush with the page edge. Left of it were the workspace's 8px padding and
+   two 4px flex gaps around the zero-width pane, 16px of nothing before the
+   rail. The pane's negative margin cancels its gap; the padding goes on the
+   side the pane folded from. */
+.viz-workspace { transition: padding 0.3s ease; }
+.viz-workspace.hide-pane:not(.panes-swapped) { padding-left: 0; }
+.viz-workspace.hide-pane:not(.panes-swapped) .viz-content-pane { margin-right: -0.25rem; }
+.viz-workspace.hide-pane.panes-swapped { padding-right: 0; }
+.viz-workspace.hide-pane.panes-swapped .viz-content-pane { margin-left: -0.25rem; }
 
 .viz-topbar {
   transition:
