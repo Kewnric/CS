@@ -9,7 +9,7 @@ Deployed to GitHub Pages from the repo root (`Kewnric/CS`, branch `main`), live
 at kewnric.github.io/CS. Editing a file and pushing is the deploy.
 
 **Run it locally:** `preview_start` with the `studysession` config in
-`.claude/launch.json` (python http.server on 8754). Do not open `index.html`
+`.claude/launch.json` (node http-server on 8754). Do not open `index.html`
 from disk — `file://` cannot fetch its own neighbours, which silently breaks
 audio and anything else that loads a file.
 
@@ -68,7 +68,7 @@ audio/                three short SFX (also embedded as base64) + ost/ music
 
 ## How a screen happens
 
-`js/router.js` — a hash router. `js/routes/register.js` registers **29 routes**,
+`js/router.js` — a hash router. `js/routes/register.js` registers **43 routes** (29 fixed, plus a library and an admin route for each of the 7 wings),
 each `{ templateFn, initFn, destroyFn }`. `handleRoute` wraps rendering in
 `Motion.withViewTransition`, sets `document.body.dataset.route`, and calls the
 previous route's `destroyFn` first.
@@ -143,7 +143,7 @@ Coding Library header swaps the whole library. Whatever is live is parked in
 always means "what is on screen". Only the challenge scope moves. Nothing can
 leak between the two because only one is ever loaded.
 
-The pack is 12 folders / 43 programs plus four exam practice sets. Every program has a reference solution in
+The pack is 33 folders / 159 programs plus 12 practice sets. Every program has a reference solution in
 `coding-starter-solutions.js` (or `-advanced-solutions.js`) that has been
 **compiled and run against its own tests** by `tools/verify-pack.js`, which also
 checks every minimum requirement against that same reference. Run it after any
@@ -239,8 +239,10 @@ buttons.
 
 1. `node --check` every touched JS file.
 2. Run the duplicate-globals scan above.
-3. Bump `CACHE` in `sw.js`.
-4. Exercise the change in the browser and *measure* the claim you intend to
+3. Run `python tools/check-css-vars.py` — any NO FALLBACK line is a variable no
+   theme defines.
+4. Bump `CACHE` in `sw.js`.
+5. Exercise the change in the browser and *measure* the claim you intend to
    make. Screenshots settle visual questions that computed styles will not.
-5. Clean up test fixtures — challenges, drafts, session keys — and confirm the
+6. Clean up test fixtures — challenges, drafts, session keys — and confirm the
    sandbox store is back to empty.
