@@ -19,6 +19,14 @@
 let _badgeCache = null;
 let _badgeCacheAt = 0;
 
+/* Content that came with a starter pack rather than being made by you. The
+   "Building the library" badges say Create / Build, and switching on the
+   coding pack alone used to award nine of them at once. Pack programs carry a
+   packFp; pack folders and sets have starter- ids. */
+function _badgeIsPack(x) {
+  return !!x && (!!x.packFp || /^starter-/.test(String(x.id || '')));
+}
+
 function badgeStats() {
   if (_badgeCache && Date.now() - _badgeCacheAt < 1000) return _badgeCache;
 
@@ -74,7 +82,7 @@ function badgeStats() {
     + nbHist.filter(h => { const x = hourOf(h); return x >= 4 && x < 7; }).length;
 
   // The folder tree.
-  const folders = (state.nodes || []).filter(n => n && n.type === 'folder');
+  const folders = (state.nodes || []).filter(n => n && n.type === 'folder' && !_badgeIsPack(n));
   const depthOf = (id, guard) => {
     let d = 1, cur = (state.nodes || []).find(n => n.id === id);
     const seen = guard || new Set();
@@ -119,9 +127,12 @@ function badgeStats() {
     comeback: Object.keys(bestC).filter(id => (bestC[id] - worstC[id]) >= 50).length,
     reviewCount: Object.keys(state.review || {}).length,
     lockedCats: Object.keys(state.categoryRequirements || {}).filter(k => (state.categoryRequirements || {})[k]).length,
-    sets: (state.codingSets || []).length,
-    setProblems: (state.codingSets || []).reduce((n, s) => n + ((s.problems || []).length), 0),
-    libTotal: (state.challenges || []).length + (state.notebooks || []).length + (state.snippets || []).length
+    sets: (state.codingSets || []).filter(s => !_badgeIsPack(s)).length,
+    setProblems: (state.codingSets || []).filter(s => !_badgeIsPack(s))
+      .reduce((n, s) => n + ((s.problems || []).length), 0),
+    ownChallenges: (state.challenges || []).filter(c => !_badgeIsPack(c)).length,
+    libTotal: (state.challenges || []).filter(c => !_badgeIsPack(c)).length
+      + (state.notebooks || []).length + (state.snippets || []).length
   };
   _badgeCacheAt = Date.now();
   return _badgeCache;
@@ -178,7 +189,7 @@ const BADGE_CATALOG = [
   { id: 'b_arch', icon: 'network', name: 'Architect', hint: 'Create ten folders', goal: 10, get: () => badgeStats().folders.length },
   { id: 'b_city', icon: 'building-2', name: 'City Planner', hint: 'Create 25 folders', goal: 25, get: () => badgeStats().folders.length },
   { id: 'b_nested', icon: 'folder-tree', name: 'Deep Filing', hint: 'Nest a folder three levels down', goal: 3, get: () => badgeStats().deepest },
-  { id: 'b_curator', icon: 'boxes', name: 'Curator', hint: 'Fifty programs in the library', goal: 50, get: () => (state.challenges || []).length },
+  { id: 'b_curator', icon: 'boxes', name: 'Curator', hint: 'Fifty programs in the library', goal: 50, get: () => badgeStats().ownChallenges },
   { id: 'b_grand', icon: 'landmark', name: 'Grand Library', hint: 'A hundred items across all libraries', goal: 100, get: () => badgeStats().libTotal },
   { id: 'b_set', icon: 'layout-grid', name: 'Set Builder', hint: 'Build a practice set', goal: 1, get: () => badgeStats().sets },
   { id: 'b_set5', icon: 'layers', name: 'Set Designer', hint: 'Build five practice sets', goal: 5, get: () => badgeStats().sets },

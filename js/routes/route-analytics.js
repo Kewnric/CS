@@ -59,7 +59,7 @@ function analyticsInit() {
     totals.innerHTML = `
       ${_analyticsStatChip('target', `${totalAttempts} total attempts`)}
       ${_analyticsStatChip('flame', `${streakDays} day streak`)}
-      ${_analyticsStatChip('award', `${state.badges ? state.badges.length : 0} badges mastered`)}
+      ${_analyticsStatChip('award', `${typeof badgeState === 'function' ? badgeState().filter(b => b.earned).length : 0} badges earned`)}
     `;
   }
 
