@@ -1129,6 +1129,29 @@
 .tree-node-row.drag-over-top::after { top: -1px; }
 .tree-node-row.drag-over-bottom::after { bottom: -1px; }
 
+/* The folder rail is also ::after, and its per-level rules in layout.css
+   (.tree-node[data-level="0"] > .tree-node-row::after, (0,3,1)) outranked the
+   line above (0,2,1): it came out as a 3x2px stub at the rail. Same selectors
+   with the level prefix win while a drag is over the row. */
+.tree-node[data-level] > .tree-node-row.drag-over-top::after,
+.tree-node[data-level] > .tree-node-row.drag-over-bottom::after {
+  left: 0.35rem;
+  right: 0.35rem;
+  width: auto;
+  height: 2px;
+  background: var(--color-primary);
+  background-image: none;
+  -webkit-mask-image: none;
+  mask-image: none;
+  animation: none;
+  border-radius: 2px;
+  box-shadow: 0 0 6px var(--color-primary-glow);
+  opacity: 1;
+  pointer-events: none;
+}
+.tree-node[data-level] > .tree-node-row.drag-over-top::after { top: -1px; bottom: auto; }
+.tree-node[data-level] > .tree-node-row.drag-over-bottom::after { bottom: -1px; top: auto; }
+
 /* Into: the folder itself is the target, so outline the whole row */
 .tree-node-row.drag-into {
   outline: 2px solid var(--color-primary);
