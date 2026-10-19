@@ -39,29 +39,29 @@ function browseTemplate() {
               <div class="browse-head-drop" id="browse-head-drop" role="group" aria-label="Library tools">
                 <div class="browse-head-drop-inner">
                   <div class="browse-head-drop-list" onclick="browseHeadMenuPicked(event)">
-                    <button class="tutorial-trigger-btn" id="browse-toggle-items-btn" onclick="toggleBrowseTreeItems()"
+                    <button class="tutorial-trigger-btn" id="browse-toggle-items-btn" onclick="toggleBrowseTreeItems()" data-label="Show / hide programs"
                             title="Toggle file visibility" aria-label="Toggle file visibility">
                       <i data-lucide="${localStorage.getItem('browseHideItems') === 'true' ? 'eye-off' : 'eye'}" id="browse-toggle-items-icon"></i>
                     </button>
                     <!-- Hidden programs: the same folders, viewed separately. Not the
                          eye above it, which hides every program row to show folders
                          only. See browseToggleHiddenView. -->
-                    <button class="tutorial-trigger-btn browse-hidden-btn" id="browse-hidden-btn" onclick="browseToggleHiddenView()"
+                    <button class="tutorial-trigger-btn browse-hidden-btn" id="browse-hidden-btn" onclick="browseToggleHiddenView()" data-label="Hidden programs"
                             aria-pressed="false" title="Show hidden programs" aria-label="Show hidden programs">
                       <i data-lucide="archive"></i>
                     </button>
                     ${typeof codingStarterButtonTemplate === 'function' ? codingStarterButtonTemplate() : ''}
                     <!-- Every walkthrough, browsable outside an attempt. -->
-                    <button class="tutorial-trigger-btn" onclick="demoOpenLibrary()"
+                    <button class="tutorial-trigger-btn" onclick="demoOpenLibrary()" data-label="Walkthroughs"
                             title="Walkthroughs — see an idea demonstrated" aria-label="Walkthroughs">
                       <i data-lucide="presentation"></i>
                     </button>
                     <!-- Reading and repairing, as opposed to writing. -->
-                    <button class="tutorial-trigger-btn" onclick="spaNavigate('drills')"
+                    <button class="tutorial-trigger-btn" onclick="spaNavigate('drills')" data-label="Drills"
                             title="Drills — predict the output, or find the bug" aria-label="Drills">
                       <i data-lucide="brain-circuit"></i>
                     </button>
-                    <button class="tutorial-trigger-btn" onclick="GuidedTutorial.start()"
+                    <button class="tutorial-trigger-btn" onclick="GuidedTutorial.start()" data-label="Page tour"
                             title="Show Page Tour" aria-label="Show Page Tour">
                       <i data-lucide="graduation-cap"></i>
                     </button>

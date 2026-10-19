@@ -1008,7 +1008,7 @@ function codingStarterButtonTemplate() {
   const on = codingLibraryIsStarter();
   const label = on ? 'Showing the starter pack — switch back to your programs'
                    : 'Showing your programs — switch to the starter pack';
-  return '<button class="tutorial-trigger-btn' + (on ? ' is-on' : '') + '" id="browse-starter-btn"'
+  return '<button class="tutorial-trigger-btn' + (on ? ' is-on' : '') + '" id="browse-starter-btn" data-label="Starter pack"'
        + ' onclick="toggleCodingLibraryMode()" title="' + label + '"'
        + ' aria-label="' + label + '" aria-pressed="' + on + '">'
        + '<i data-lucide="' + (on ? 'package-open' : 'package') + '"></i></button>';

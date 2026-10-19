@@ -2216,6 +2216,26 @@ body.tree-dragging [data-tree-ns]::-webkit-scrollbar { width: 0; height: 0; }
   transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Six bare icons in a column were a guessing game. Each says what it is; the
+   text comes from data-label, so the code that swaps the icons (the eye, the
+   starter switch) needs no change. The list grows leftwards (right: 0). */
+.browse-head-drop-list { align-items: stretch; }
+/* Absolutely placed under a 32px trigger, with an overflow:hidden child that
+   reports no minimum width, the drop shrank to 32px and clipped the labels. */
+.browse-head-drop { width: max-content; }
+.browse-head-drop-list .tutorial-trigger-btn[data-label] {
+  width: auto;
+  justify-content: flex-start;
+  gap: 0.55rem;
+  padding: 0 0.7rem 0 0.5rem;
+  white-space: nowrap;
+}
+.browse-head-drop-list .tutorial-trigger-btn[data-label]::after {
+  content: attr(data-label);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
 /* Open: tapped, or entered from the keyboard. */
 .browse-head-menu.is-open .browse-head-drop {
   grid-template-rows: 1fr;
