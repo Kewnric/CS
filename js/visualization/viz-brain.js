@@ -1065,7 +1065,15 @@ function brainRenderCanvas() {
     }
   }
   const existingDefs = svg ? svg.querySelector('defs') : null;
-  if (svg) { svg.innerHTML = svgContent; if (existingDefs) svg.insertBefore(existingDefs, svg.firstChild); }
+  if (svg) {
+    svg.innerHTML = svgContent;
+    // Brain draws with the main canvas's arrowhead markers, and switching
+    // modules wipes the SVG (_vizResetRenderCache). Arriving at Brain that way
+    // left no markers at all, so every link was drawn headless: it looked like
+    // "None" while its real type, and the menu, said "Arrow".
+    if (existingDefs && existingDefs.querySelector('marker')) svg.insertBefore(existingDefs, svg.firstChild);
+    else if (typeof _vizBuildDefs === 'function') _vizBuildDefs(svg);
+  }
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: container });
   brainUpdateZoomDisplay();
   brainUpdateMinimap();
