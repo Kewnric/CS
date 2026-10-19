@@ -64,16 +64,21 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) {
     if (!CDN_HOSTS.includes(url.hostname)) return;
-    // A plain <script src> is a no-cors request, so the response is opaque
-    // (status 0, ok false) -- still cacheable, and still runnable.
+    /* Fetched in CORS mode, not as the page's no-cors request: an opaque
+       response hides its status, so a one-off CDN error would be cached and
+       served for good -- online too -- until the next CACHE bump. All four
+       hosts send Access-Control-Allow-Origin: *. If one ever stops, the
+       request still goes through as the page made it, just uncached. */
     event.respondWith(
-      caches.match(req).then((hit) => hit || fetch(req).then((res) => {
-        if (res && (res.ok || res.type === 'opaque')) {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
-        }
-        return res;
-      }))
+      caches.match(req).then((hit) => hit || fetch(req.url, { mode: 'cors', credentials: 'omit' })
+        .then((res) => {
+          if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+          }
+          return res;
+        })
+        .catch(() => fetch(req)))
     );
     return;
   }
