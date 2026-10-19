@@ -4124,13 +4124,19 @@ body.viz-zen.viz-zen-nosidebar .app-sidebar {
   overflow: hidden;
   pointer-events: none;
   visibility: hidden;
-  transition: width 0.3s ease, opacity 0.2s ease, visibility 0s linear 0.3s;
+  transition: width 0.3s ease, margin 0.3s ease, opacity 0.2s ease, visibility 0s linear 0.3s;
 }
 /* Nothing left to drag: the seam is a narrow rail holding the arrow back. */
 .viz-workspace > .resizer-divider.collapsed {
   width: 18px;
   cursor: default;
 }
+/* Everything that changes when the pane folds moves on the same 0.3s, rather
+   than the rail and the gap snapping at the start while the width glides. */
+.viz-content-pane {
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s ease, margin 0.3s ease, opacity 0.25s ease;
+}
+.viz-workspace > .resizer-divider { transition: width 0.3s ease; }
 /* ...flush with the page edge. Left of it were the workspace's 8px padding and
    two 4px flex gaps around the zero-width pane, 16px of nothing before the
    rail. The pane's negative margin cancels its gap; the padding goes on the
@@ -4206,4 +4212,13 @@ body.viz-no-anim .app-sidebar {
    out frame by frame. */
 .viz-content-pane.viz-pane-sliding > * {
   min-width: var(--viz-pane-w);
+}
+/* ...and the pane itself animates one plain width, 0 to its measured open
+   width. Folded it had min-width 0; opening put the 320px minimum straight
+   back, so the pane jumped to 320px and then stood still until the animated
+   width caught up — the stop before it finished. */
+.viz-content-pane.viz-pane-sliding {
+  width: var(--viz-pane-w) !important;
+  min-width: 0 !important;
+  max-width: none !important;
 }
