@@ -3140,15 +3140,29 @@ mark.diff-hit.current {
    closed (there is more below, press to bring it down) and turns UP once it is
    open (press to put it away), which is the direction every other disclosure in
    the app uses and the opposite of what this one used to do.
-   Composed through variables so the hover scale and the open rotation do not
-   overwrite each other; transform still transitions, so ppToggleTestDetail
-   flipping aria-expanded before the re-render animates the turn. */
+   rotate and scale are separate properties so the hover scale and the open
+   rotation never share one transition.
+
+   NO OVERSHOOT. This was a spring curve (y up to 1.56), so the chevron swung
+   past its end angle and settled back -- the shake at the end of every turn.
+   And the row is rebuilt as it opens or closes: the rebuilt button gets its
+   :hover a moment later and re-grew the scale on the same spring. .pp-fresh
+   (put on by _ppRenderTabBody, taken off shortly after) lets that hover land
+   at once; .pp-turn plays the opening turn on the rebuilt button, since the
+   old one is gone before it could. */
 .pp-row-toggle svg {
-  transform: rotate(var(--pp-rot, 0deg)) scale(var(--pp-sc, 1));
-  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  rotate: var(--pp-rot, 0deg);
+  scale: var(--pp-sc, 1);
+  transition: rotate 0.2s cubic-bezier(0.4, 0, 0.2, 1), scale 0.15s ease;
 }
 .pp-row-toggle[aria-expanded="true"] svg { --pp-rot: 180deg; }
 .pp-row-toggle:hover svg { --pp-sc: 1.2; }
+.pp-row-toggle.pp-fresh svg { transition: none; }
+.pp-row-toggle.pp-turn svg { animation: ppTurnOpen 0.2s cubic-bezier(0.4, 0, 0.2, 1); }
+@keyframes ppTurnOpen {
+  from { rotate: 0deg; }
+  to   { rotate: 180deg; }
+}
 
 /* The output panel rolls down out of the row and back up into it. <details>-style
    height animation isn't available here (the element is created and destroyed by
