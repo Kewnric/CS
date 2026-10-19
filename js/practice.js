@@ -561,6 +561,64 @@ function initPracticePanes() {
   layout.classList.toggle('hide-left', localStorage.getItem('practicePane_left') === '1');
   layout.classList.toggle('hide-right', localStorage.getItem('practicePane_right') === '1');
   _syncPaneButtons();
+  _tbMountSeam(layout);
+  layout.classList.toggle('hide-top', localStorage.getItem('practicePane_top') === '1');
+  _syncTopbarButton();
+}
+
+/* ── The topbar folds away the same way the side panes do ──────
+   A seam under the topbar holds the same arrow the dividers carry, faded in on
+   hover. Built here rather than in each template, so every screen that calls
+   initPracticePanes (coding practice, practice sets) gets it. */
+function _tbMountSeam(layout) {
+  const bar = layout.querySelector(':scope > .practice-topbar:not(.hidden)');
+  if (!bar || layout.querySelector(':scope > .tb-seam')) return;
+  const seam = document.createElement('div');
+  seam.className = 'tb-seam';
+  seam.innerHTML = '<button class="rz-collapse tb-collapse" id="rz-top-btn" type="button"'
+    + ' onclick="togglePracticeTopbar()" tabindex="-1" aria-hidden="true">'
+    + '<i data-lucide="chevron-up"></i></button>';
+  bar.after(seam);
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: seam });
+}
+
+/* The bar has no fixed height (it wraps on narrow screens), and max-height
+   cannot animate from `none`. So it is pinned to its real height for the
+   length of the fold, in both directions, and let go afterwards. */
+function _tbPrepareFold(layout) {
+  const bar = layout && layout.querySelector(':scope > .practice-topbar:not(.hidden)');
+  if (!bar) return;
+  const folded = bar.offsetHeight < 4;
+  bar.style.maxHeight = (folded ? bar.scrollHeight + 25 : bar.offsetHeight) + 'px';
+  void bar.offsetHeight;
+  clearTimeout(bar._tbFoldTimer);
+  bar._tbFoldTimer = setTimeout(() => { bar.style.maxHeight = ''; }, 320);
+}
+
+function togglePracticeTopbar() {
+  const layout = document.querySelector('.practice-layout');
+  if (!layout) return;
+  _tbPrepareFold(layout);
+  const on = layout.classList.toggle('hide-top');
+  localStorage.setItem('practicePane_top', on ? '1' : '0');
+  _syncTopbarButton();
+  window.dispatchEvent(new Event('resize'));
+}
+
+function _syncTopbarButton() {
+  const layout = document.querySelector('.practice-layout');
+  const btn = document.getElementById('rz-top-btn');
+  if (!layout || !btn) return;
+  const hidden = layout.classList.contains('hide-top');
+  const dir = hidden ? 'down' : 'up';
+  btn.closest('.tb-seam').classList.toggle('collapsed', hidden);
+  btn.title = hidden ? 'Show the top bar' : 'Collapse the top bar';
+  btn.setAttribute('aria-label', btn.title);
+  if (btn.dataset.dir !== dir) {
+    btn.dataset.dir = dir;
+    btn.innerHTML = '<i data-lucide="chevron-' + dir + '"></i>';
+    if (typeof lucide !== 'undefined') lucide.createIcons({ root: btn });
+  }
 }
 
 /* ── Zen mode: collapse the description and results panels ── */
@@ -572,6 +630,8 @@ function isZenMode() {
 function toggleZenMode() {
   const layout = document.querySelector('.practice-layout');
   if (!layout) return;
+  // Zen folds the topbar too; pin its height so that fold animates.
+  _tbPrepareFold(layout);
   const on = layout.classList.toggle('zen');
   localStorage.setItem('practiceZen', on ? '1' : '0');
   const btn = document.getElementById('ed-zen-btn');

@@ -435,6 +435,82 @@
   .resizer-divider.collapsed:hover .rz-collapse { transform: translate(-50%, -50%); }
 }
 
+/* --- The topbar's seam ------------------------------------------------------
+   The same arrow as the side dividers, turned on its side, on a zero-height
+   strip under the topbar. ::before is the hover band that reveals it, 12px
+   straddling the edge, so it takes no room from the editor. */
+.tb-seam {
+  position: relative;
+  height: 0;
+  flex: 0 0 auto;
+  z-index: 30;
+}
+.tb-seam::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -6px;
+  height: 12px;
+}
+.tb-seam .tb-collapse {
+  top: 0;
+  width: 34px;
+  height: 18px;
+}
+.tb-seam:hover .tb-collapse,
+.tb-seam:focus-within .tb-collapse {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, -50%) scale(1);
+}
+/* Folded: a narrow rail across the top that holds only the arrow, faintly
+   visible, the way a folded side pane leaves one. */
+.tb-seam.collapsed {
+  height: 18px;
+  background: #0d1117;
+  border-bottom: 1px solid #21262d;
+}
+.tb-seam.collapsed::before { top: 0; height: 100%; }
+.tb-seam.collapsed .tb-collapse {
+  top: 50%;
+  opacity: 0.5;
+  pointer-events: auto;
+  transform: translate(-50%, -50%) scale(0.85);
+}
+.tb-seam.collapsed:hover .tb-collapse { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+@media (hover: none) {
+  .tb-seam .tb-collapse { width: 44px; height: 24px; }
+  .tb-seam.collapsed { height: 26px; }
+}
+
+.practice-topbar {
+  transition:
+    max-height 0.26s cubic-bezier(0.4, 0, 0.2, 1),
+    padding 0.26s cubic-bezier(0.4, 0, 0.2, 1),
+    border-width 0.26s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.16s ease,
+    visibility 0s;
+}
+.practice-layout.hide-top > .practice-topbar,
+.practice-layout.zen > .practice-topbar {
+  max-height: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  border-bottom-width: 0 !important;
+  overflow: hidden !important;
+  opacity: 0;
+  pointer-events: none;
+  /* Only leaves the accessibility tree once it has finished folding. */
+  visibility: hidden;
+  transition-delay: 0s, 0s, 0s, 0s, 0.26s;
+}
+/* Zen hides the seam with the dividers; leaving zen brings the bar back. */
+.practice-layout.zen > .tb-seam { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .practice-topbar { transition: none; }
+}
+
 /* Window 1: Smaller Left Pane (40%) */
 .messenger-pane-1 {
   width: 40%;
