@@ -1992,6 +1992,9 @@ function shareChallenge(challengeId) {
     title: challenge.title,
     tags: challenge.tags || [],
     coverDescription: challenge.coverDescription || '',
+    // The pack keeps the whole brief here, not on a variant -- without it a
+    // shared starter program arrived with no description at all.
+    description: challenge.description || '',
     level: challenge.level != null ? challenge.level : null,
     icon: challenge.icon || null,
     color: challenge.color || null,
@@ -2015,7 +2018,8 @@ function shareChallenge(challengeId) {
         name: f.name,
         ext: f.ext,
         code: f.code || '',
-        starterCode: f.starterCode || ''
+        starterCode: f.starterCode || '',
+        locked: !!f.locked
       }))
     }))
   };
@@ -2067,6 +2071,7 @@ function importSharedChallenge(shared) {
     title: '[Shared] ' + (shared.title || 'Challenge'),
     tags: shared.tags || [],
     coverDescription: shared.coverDescription || '',
+    description: shared.description || '',
     level: shared.level != null ? shared.level : null,
     icon: shared.icon || null,
     color: shared.color || null,
@@ -2087,7 +2092,7 @@ function importSharedChallenge(shared) {
       // editor always has something to open.
       files: (v.files && v.files.length)
         ? v.files.map(f => ({ id: generateId(), name: f.name || 'main', ext: f.ext || '.c',
-                              code: f.code || '', starterCode: f.starterCode || '' }))
+                              code: f.code || '', starterCode: f.starterCode || '', locked: !!f.locked }))
         : [{ id: generateId(), name: 'main', ext: '.c', code: v.code || '', starterCode: v.starterCode || '' }]
     }))
   };
