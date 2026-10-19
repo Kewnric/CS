@@ -567,19 +567,33 @@ function initPracticePanes() {
 }
 
 /* ── The topbar folds away the same way the side panes do ──────
-   A seam under the topbar holds the same arrow the dividers carry, faded in on
-   hover. Built here rather than in each template, so every screen that calls
-   initPracticePanes (coding practice, practice sets) gets it. */
+   Two arrows. Expanded, a seam under the topbar holds the same arrow the
+   dividers carry, faded in on hover. Folded, the arrow that brings it back
+   sits in the middle of the file-tab bar (.tb-dock), always visible and above
+   the tabs. Built here rather than in each template, so every screen that
+   calls initPracticePanes (coding practice, practice sets) gets both. */
 function _tbMountSeam(layout) {
   const bar = layout.querySelector(':scope > .practice-topbar:not(.hidden)');
-  if (!bar || layout.querySelector(':scope > .tb-seam')) return;
-  const seam = document.createElement('div');
-  seam.className = 'tb-seam';
-  seam.innerHTML = '<button class="rz-collapse tb-collapse" id="rz-top-btn" type="button"'
+  if (!bar) return;
+  const btn = (id, dir) => '<button class="rz-collapse tb-collapse" id="' + id + '" type="button"'
     + ' onclick="togglePracticeTopbar()" tabindex="-1" aria-hidden="true">'
-    + '<i data-lucide="chevron-up"></i></button>';
-  bar.after(seam);
-  if (typeof lucide !== 'undefined') lucide.createIcons({ root: seam });
+    + '<i data-lucide="chevron-' + dir + '"></i></button>';
+  if (!layout.querySelector(':scope > .tb-seam')) {
+    const seam = document.createElement('div');
+    seam.className = 'tb-seam';
+    seam.innerHTML = btn('rz-top-btn', 'up');
+    bar.after(seam);
+    if (typeof lucide !== 'undefined') lucide.createIcons({ root: seam });
+  }
+  const row = layout.querySelector('.editor-toolbar-row');
+  if (row && !row.querySelector(':scope > .tb-dock')) {
+    const dock = document.createElement('div');
+    dock.className = 'tb-dock';
+    dock.innerHTML = btn('rz-top-dock-btn', 'down');
+    row.appendChild(dock);
+    row.classList.add('has-tb-dock');
+    if (typeof lucide !== 'undefined') lucide.createIcons({ root: dock });
+  }
 }
 
 /* The bar has no fixed height (it wraps on narrow screens), and max-height
@@ -607,18 +621,21 @@ function togglePracticeTopbar() {
 
 function _syncTopbarButton() {
   const layout = document.querySelector('.practice-layout');
-  const btn = document.getElementById('rz-top-btn');
-  if (!layout || !btn) return;
+  if (!layout) return;
   const hidden = layout.classList.contains('hide-top');
-  const dir = hidden ? 'down' : 'up';
-  btn.closest('.tb-seam').classList.toggle('collapsed', hidden);
-  btn.title = hidden ? 'Show the top bar' : 'Collapse the top bar';
-  btn.setAttribute('aria-label', btn.title);
-  if (btn.dataset.dir !== dir) {
-    btn.dataset.dir = dir;
-    btn.innerHTML = '<i data-lucide="chevron-' + dir + '"></i>';
-    if (typeof lucide !== 'undefined') lucide.createIcons({ root: btn });
+  const seam = document.getElementById('rz-top-btn');
+  const dock = document.getElementById('rz-top-dock-btn');
+  if (seam) {
+    seam.title = 'Collapse the top bar';
+    seam.setAttribute('aria-label', seam.title);
   }
+  if (dock) {
+    dock.title = 'Show the top bar';
+    dock.setAttribute('aria-label', dock.title);
+  }
+  // The clicked arrow is about to vanish; drop its focus so nothing keeps it lit.
+  [seam, dock].forEach(b => { if (b && document.activeElement === b) b.blur(); });
+  layout.classList.toggle('tb-folded', hidden);
 }
 
 /* ── Zen mode: collapse the description and results panels ── */

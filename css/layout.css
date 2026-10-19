@@ -380,7 +380,7 @@
 .rz-collapse svg { width: 13px; height: 13px; }
 
 .resizer-divider:hover .rz-collapse,
-.resizer-divider:focus-within .rz-collapse {
+.resizer-divider:has(.rz-collapse:focus-visible) .rz-collapse {
   opacity: 1;
   pointer-events: auto;
   transform: translate(-50%, -50%) scale(1);
@@ -430,7 +430,7 @@
 @media (prefers-reduced-motion: reduce) {
   .rz-collapse { transition: opacity 0.16s ease; transform: translate(-50%, -50%); }
   .resizer-divider:hover .rz-collapse,
-  .resizer-divider:focus-within .rz-collapse,
+  .resizer-divider:has(.rz-collapse:focus-visible) .rz-collapse,
   .resizer-divider.collapsed .rz-collapse,
   .resizer-divider.collapsed:hover .rz-collapse { transform: translate(-50%, -50%); }
 }
@@ -459,29 +459,50 @@
   height: 18px;
 }
 .tb-seam:hover .tb-collapse,
-.tb-seam:focus-within .tb-collapse {
+.tb-seam:has(.tb-collapse:focus-visible) .tb-collapse {
   opacity: 1;
   pointer-events: auto;
   transform: translate(-50%, -50%) scale(1);
 }
-/* Folded: a narrow rail across the top that holds only the arrow, faintly
-   visible, the way a folded side pane leaves one. */
-.tb-seam.collapsed {
+/* Folded: the seam goes, and the arrow that brings the bar back lives in the
+   middle of the file-tab bar instead (.tb-dock). */
+.practice-layout.tb-folded > .tb-seam { display: none; }
+
+/* The dock shares the tab bar's grid cell, so it is centred on THAT box (not
+   on the row, which also holds the editor tools), stays put however the tabs
+   scroll, and paints over them. */
+.editor-toolbar-row.has-tb-dock {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.editor-toolbar-row.has-tb-dock > .file-tab-bar { grid-column: 1; grid-row: 1; }
+.editor-toolbar-row.has-tb-dock > .editor-tools { grid-column: 2; grid-row: 1; }
+.tb-dock {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: center;
+  align-self: center;
+  position: relative;
+  z-index: 50;
+  width: 34px;
   height: 18px;
-  background: #0d1117;
-  border-bottom: 1px solid #21262d;
+  display: none;
 }
-.tb-seam.collapsed::before { top: 0; height: 100%; }
-.tb-seam.collapsed .tb-collapse {
+.practice-layout.tb-folded:not(.zen) .tb-dock { display: block; }
+.tb-dock .tb-collapse {
   top: 50%;
-  opacity: 0.5;
+  width: 34px;
+  height: 18px;
+  opacity: 0.6;
   pointer-events: auto;
-  transform: translate(-50%, -50%) scale(0.85);
+  transform: translate(-50%, -50%) scale(1);
 }
-.tb-seam.collapsed:hover .tb-collapse { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+.tb-dock .tb-collapse:hover { opacity: 1; }
 @media (hover: none) {
   .tb-seam .tb-collapse { width: 44px; height: 24px; }
-  .tb-seam.collapsed { height: 26px; }
+  .tb-dock,
+  .tb-dock .tb-collapse { width: 44px; height: 24px; }
+  .tb-dock .tb-collapse { opacity: 0.85; }
 }
 
 .practice-topbar {
