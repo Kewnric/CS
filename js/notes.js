@@ -1385,7 +1385,8 @@ registerTreeHost('notes', {
     }
     const fav = !!(it && it.favorite);
     return [
-      { icon: 'play', label: 'Start quiz', fn: () => { if (typeof startNotebookPractice === 'function') startNotebookPractice(id); else notesSelectNotebook(id); } },
+      // startNotebookPractice never existed, so this only selected the notebook.
+      { icon: 'play', label: 'Start quiz', fn: () => { notesSelectNotebook(id); notesStartAttempt(); } },
       { icon: fav ? 'star-off' : 'star', label: fav ? 'Remove from favourites' : 'Add to favourites', fn: () => notesToggleFavorite(id) },
       { icon: 'palette', label: 'Highlight colour...', fn: () => { if (typeof browseSetColor === 'function') browseSetColor(id); } },
       { icon: 'image', label: 'Change icon...', fn: () => { if (typeof browseSetIcon === 'function') browseSetIcon(id); } },
