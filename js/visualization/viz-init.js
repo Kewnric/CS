@@ -86,6 +86,9 @@ function initVisualization() {
   const container2 = document.getElementById('viz-canvas-container');
   if (container2) container2.classList.toggle('globe-mode', !!viz.globeModeEnabled);
   if (typeof vizSyncDepthBtn === 'function') vizSyncDepthBtn();
+  // The first mount never goes through _vizEnterLibrary, so the toolbar kept
+  // the template's bare "Canvas" until a library tab was clicked.
+  if (typeof vizPaintCanvasLabel === 'function') vizPaintCanvasLabel();
   if (typeof vizApplyMinimapVisibility === 'function') vizApplyMinimapVisibility();
   if (typeof vizSyncMoreMenu === 'function') vizSyncMoreMenu();
   if (typeof vizSyncTintBtn === 'function') vizSyncTintBtn();

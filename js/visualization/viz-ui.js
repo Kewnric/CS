@@ -314,9 +314,14 @@ function _vizLeaveSurface() {
   if (clearBtn) clearBtn.classList.add('hidden');
 }
 
-function _vizEnterLibrary() {
+/** The canvas toolbar's title for whichever libraries are on screen. */
+function vizPaintCanvasLabel() {
   const labelEl = document.getElementById('viz-canvas-toolbar-label');
   if (labelEl) labelEl.textContent = vizSurfaceLabel() + ' Canvas';
+}
+
+function _vizEnterLibrary() {
+  vizPaintCanvasLabel();
   // Fill each selected library's own canvas on first sight. Selecting a second
   // library shows whatever that one has already placed; it never drags a whole
   // library on by itself — that was 80 nodes at 32% zoom.
