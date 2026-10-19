@@ -545,9 +545,10 @@ function _diffCount(s, ch) {
 
 /**
  * @param {object} row a diff row from computeDiffs
+ * @param {{bracesBalanced:boolean, userLines:string[]}} [ctx] the whole submission, whitespace-stripped
  * @returns {?{text:string, kind:string}} short explanation, or null
  */
-function explainDiffLine(row) {
+function explainDiffLine(row, ctx) {
   if (!row || row.status === 'perfect') return null;
   /* Read the names as written. On the renamed form the one rule that quotes
      identifiers could only ever say "the reference calls this v1, you wrote
@@ -560,8 +561,19 @@ function explainDiffLine(row) {
       const h = (e.match(/<([^>]+)>|"([^"]+)"/) || [])[0] || 'the header';
       return { kind: 'missing', text: `Missing \`#include ${h}\` — the library functions below need it declared.` };
     }
-    if (/^\s*}\s*$/.test(e)) return { kind: 'missing', text: 'A closing brace is missing — a block you opened is never closed.' };
+    if (/^\s*}\s*$/.test(e)) {
+      // Braces that balance mean the code is shaped differently (an if with no
+      // braces), not broken -- and it may well have passed every test.
+      if (ctx && ctx.bracesBalanced) {
+        return { kind: 'missing', text: 'The reference closes a block here. Your braces still balance, so your code is laid out differently rather than missing one.' };
+      }
+      return { kind: 'missing', text: 'A closing brace is missing — a block you opened is never closed.' };
+    }
     if (/\breturn\b/.test(e)) return { kind: 'missing', text: 'The reference returns a value here; your function ends without it.' };
+    const head = e.replace(/\s+/g, '').replace(/\{$/, '');
+    if (ctx && head.length >= 6 && (ctx.userLines || []).some(l => l.startsWith(head))) {
+      return { kind: 'missing', text: 'You have this line in another form — it starts the same way and continues differently, so it was paired with a different line.' };
+    }
     return { kind: 'missing', text: "This line isn't in your code at all." };
   }
   if (row.status === 'extra') {

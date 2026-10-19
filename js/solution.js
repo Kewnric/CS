@@ -590,6 +590,13 @@ function renderDiffPanels(diffs) {
   let unifiedHTML = '';
   _solRows = [];
 
+  // The whole submission, so a missing line can be explained against it rather
+  // than in isolation (see explainDiffLine).
+  const _userText = diffs.filter(d => d.status !== 'missing').map(d => _solText(d, 'actual'));
+  let _depth = 0;
+  _userText.forEach(l => { for (const ch of l) { if (ch === '{') _depth++; else if (ch === '}') _depth--; } });
+  const _explainCtx = { bracesBalanced: _depth === 0, userLines: _userText.map(l => l.replace(/\s+/g, '')) };
+
   // Build filtered/grouped list
   let items;
   if (_diffFilterActive) {
@@ -680,7 +687,7 @@ function renderDiffPanels(diffs) {
     // EXPLANATION — written into BOTH side-by-side panels so the rows stay
     // aligned; the copy on the right is hidden, not omitted (see the note at the
     // top of the file).
-    const why = _solOpts.explain && typeof explainDiffLine === 'function' ? explainDiffLine(line) : null;
+    const why = _solOpts.explain && typeof explainDiffLine === 'function' ? explainDiffLine(line, _explainCtx) : null;
     if (why) {
       const body = `<span class="diff-line-number"></span><span class="diff-explain-text"><i class="diff-explain-mark">!</i>${escapeHTML(why.text)}</span>`;
       actualHTML += `<div class="diff-explain ${why.kind}" data-row="${i}">${body}</div>`;
