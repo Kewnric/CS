@@ -4941,3 +4941,24 @@ body.is-resizing .practice-panel { transition: none; }
   background: color-mix(in srgb, var(--color-warning, #f59e0b) 14%, transparent);
   color: var(--color-warning, #f59e0b);
 }
+
+/* ── No scrollbars on the attempt panes ────────────────────────
+   The description, the editor and the results panel all still scroll (wheel,
+   trackpad, keys, touch); they just do not draw a bar. Covers the coding
+   attempt and the notebook attempt, which share .practice-layout. */
+.practice-layout .practice-sidebar,
+.practice-layout .practice-panel,
+.practice-layout .editor-textarea,
+.practice-layout .editor-pre,
+.practice-layout .np-question-pane {
+  scrollbar-width: none;
+}
+.practice-layout .practice-sidebar::-webkit-scrollbar,
+.practice-layout .practice-panel::-webkit-scrollbar,
+.practice-layout .editor-textarea::-webkit-scrollbar,
+.practice-layout .editor-pre::-webkit-scrollbar,
+.practice-layout .np-question-pane::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
