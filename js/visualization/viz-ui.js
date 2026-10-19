@@ -31,6 +31,15 @@ function vizTogglePane() {
   window.dispatchEvent(new Event('resize'));
 }
 
+/** Canvas only: the left rail's arrow folds the app sidebar away and back. */
+function vizToggleZenSidebar() {
+  if (!vizIsZen()) return;
+  const hidden = document.body.classList.toggle('viz-zen-nosidebar');
+  try { localStorage.setItem('ssp.vizZenSidebarHidden', hidden ? '1' : '0'); } catch (_) { /* private mode */ }
+  _vizSyncFoldButtons();
+  window.dispatchEvent(new Event('resize'));
+}
+
 function vizToggleTopbar() {
   const page = document.querySelector('.viz-page');
   const bar = page && page.querySelector(':scope > .viz-topbar');
@@ -83,8 +92,22 @@ function _vizSyncFoldButtons() {
       if (typeof lucide !== 'undefined') lucide.createIcons({ root: topBtn });
     }
   }
+  const sideBtn = document.getElementById('rz-viz-side-btn');
+  if (sideBtn) {
+    const hidden = document.body.classList.contains('viz-zen-nosidebar');
+    const dir = hidden ? 'right' : 'left';
+    const seam = sideBtn.closest('.resizer-divider');
+    if (seam) seam.classList.toggle('collapsed', hidden);
+    sideBtn.title = hidden ? 'Show the sidebar' : 'Collapse the sidebar';
+    sideBtn.setAttribute('aria-label', sideBtn.title);
+    if (sideBtn.dataset.dir !== dir) {
+      sideBtn.dataset.dir = dir;
+      sideBtn.innerHTML = '<i data-lucide="chevron-' + dir + '"></i>';
+      if (typeof lucide !== 'undefined') lucide.createIcons({ root: sideBtn });
+    }
+  }
   // The clicked arrow is moving or vanishing; drop its focus so it isn't left lit.
-  [paneBtn, topBtn].forEach(b => { if (b && document.activeElement === b) b.blur(); });
+  [paneBtn, topBtn, sideBtn].forEach(b => { if (b && document.activeElement === b) b.blur(); });
 }
 
 /* --- Collapsible Module Tabs --- */
@@ -120,6 +143,12 @@ function vizToggleZen(force) {
   const on = typeof force === 'boolean' ? force : !vizIsZen();
   document.body.classList.toggle('viz-zen', on);
   try { localStorage.setItem('ssp.vizZen', on ? '1' : '0'); } catch (_) { /* private mode */ }
+  // The sidebar stays in canvas only unless its rail arrow folded it, and that
+  // choice applies only while canvas only is on.
+  let sideHidden = false;
+  try { sideHidden = localStorage.getItem('ssp.vizZenSidebarHidden') === '1'; } catch (_) { /* private mode */ }
+  document.body.classList.toggle('viz-zen-nosidebar', on && sideHidden);
+  _vizSyncFoldButtons();
   const btn = document.getElementById('viz-zen-btn');
   if (btn) {
     btn.classList.toggle('is-active', on);

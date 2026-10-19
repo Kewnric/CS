@@ -4070,18 +4070,41 @@ button.viz-link-type-option {
 }
 
 /* ── Canvas only (vizToggleZen) ────────────────────────────────
-   The coding attempt's zen mode for the canvas: the app sidebar, this page's
-   topbar, the library pane and its divider go, and the canvas takes the
-   window. The corner agenda flag goes too — with the topbar gone the canvas
-   toolbar is the top row, and the flag sat on its last buttons. */
-body.viz-zen .app-sidebar,
-body.viz-zen #mobile-menu-btn,
-body.viz-zen .sidebar-backdrop,
+   The coding attempt's zen mode for the canvas: this page's topbar, the first
+   pane and its divider go, and the canvas takes the rest of the window. The
+   app sidebar stays, with its own fold arrow on the rail below. The corner
+   agenda flag goes — with the topbar gone the canvas toolbar is the top row,
+   and the flag sat on its last buttons. */
 body.viz-zen .ag-root,
 body.viz-zen .viz-topbar,
 body.viz-zen .viz-content-pane,
-body.viz-zen .viz-workspace > .resizer-divider {
+body.viz-zen .viz-workspace > .resizer-divider:not(.viz-side-seam) {
   display: none !important;
+}
+/* Only the canvas is left, so the swap order no longer matters, and keeping
+   it row-wise is what holds the sidebar rail on the left. */
+body.viz-zen .viz-workspace.panes-swapped { flex-direction: row; }
+
+/* The sidebar's rail: the attempt's divider arrow, folding the app sidebar.
+   It stands in for the workspace's left padding, so the canvas doesn't move. */
+.viz-side-seam { display: none; }
+body.viz-zen .viz-side-seam {
+  display: flex;
+  width: 0.5rem;
+  cursor: default;
+}
+body.viz-zen .viz-workspace { padding-left: 0; }
+.viz-side-seam::after { display: none; }
+body.viz-zen .viz-workspace > .viz-side-seam.collapsed { width: 18px; }
+
+/* Folded: width, not display, so the sidebar's own width transition animates
+   it; it leaves the tab order once it has finished closing. */
+body.viz-zen.viz-zen-nosidebar .app-sidebar {
+  width: 0 !important;
+  min-width: 0 !important;
+  border-right-width: 0 !important;
+  visibility: hidden;
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 0.3s;
 }
 #viz-zen-btn.is-active {
   color: var(--color-primary);
@@ -4138,6 +4161,9 @@ body.viz-zen .viz-workspace > .resizer-divider {
   border-radius: 0 0 6px 6px;
 }
 .viz-page.hide-top > .viz-tb-seam .tb-collapse:hover { opacity: 1; }
+/* Above the topbar (z-index 50), which otherwise covered the top half of the
+   arrow sitting on its bottom edge. */
+.viz-tb-seam { z-index: 60; }
 body.viz-zen .viz-tb-seam { display: none; }
 
 /* With the topbar folded, the agenda flag (fixed, top-right) hangs over the

@@ -255,7 +255,7 @@ function initVisualization() {
 function destroyVisualization() {
   // Canvas only hides the app sidebar; no other page should inherit that.
   // (The preference stays, so coming back restores it.)
-  document.body.classList.remove('viz-zen');
+  document.body.classList.remove('viz-zen', 'viz-zen-nosidebar');
   if (typeof vizForceStop === 'function') vizForceStop(true); // halt physics loop
   if (typeof vizHoverClear === 'function') vizHoverClear();
   if (typeof vizStopTween === 'function') vizStopTween();

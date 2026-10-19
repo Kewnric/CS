@@ -81,6 +81,10 @@ function vizTemplate() {
         <button class="rz-collapse tb-collapse" id="rz-viz-top-btn" type="button" onclick="vizToggleTopbar()" tabindex="-1" aria-hidden="true"><i data-lucide="chevron-up"></i></button>
       </div>
       <div class="viz-workspace">
+        <!-- Canvas only: folds the app sidebar (vizToggleZenSidebar). -->
+        <div class="resizer-divider viz-side-seam" id="viz-side-seam">
+          <button class="rz-collapse" id="rz-viz-side-btn" type="button" onclick="vizToggleZenSidebar()" tabindex="-1" aria-hidden="true"><i data-lucide="chevron-left"></i></button>
+        </div>
         <div class="viz-content-pane">
           <!-- Same header as every library pane (pane-1-header): identity tile,
                subtitle stats, the eye/tour actions, search, and the stat chips.
