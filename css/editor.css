@@ -4285,11 +4285,14 @@ body.is-resizing .practice-panel { transition: none; }
 }
 
 /* Zen and the collapse toggles deliberately hand the editor everything, and
-   below 1000px the side panes are gone anyway. */
+   below 900px the right pane is gone anyway. */
 .practice-layout.zen .practice-editor-area,
 .practice-layout.hide-left .practice-editor-area,
 .practice-layout.hide-right .practice-editor-area { min-width: 0; }
-@media (max-width: 1000px) { .practice-editor-area { min-width: 0; } }
+/* Not 1000px: the right panel only goes at 900px. Between the two both side
+   panes were still up at full width with nothing holding the editor open --
+   measured 193px of text area at 961px, and 414px with its 460px minimum kept. */
+@media (max-width: 900px) { .practice-editor-area { min-width: 0; } }
 
 /* ── Editing the description mid-attempt ────────────────────── */
 
