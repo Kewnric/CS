@@ -1933,6 +1933,80 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
 .lib-card-progress { display: flex; align-items: center; gap: 0.5rem; }
 .lib-card-soon { opacity: 0.82; }
 .lib-card-soon:hover { opacity: 1; transform: translateY(-2px); border-color: var(--border-color); box-shadow: 0 8px 20px rgba(0, 0, 0, 0.22); }
+
+/* ── Spatial collection cards (the Library hub) ──
+   The card is a wrapper with perspective; its inner layer tilts (set by
+   libSpatialBind) and keeps its children in 3D; the background is its own
+   layer at depth 0; everything on it is lifted to a different depth. The
+   wrapper must not clip -- overflow: hidden flattens 3D -- so the clipping
+   and the border live on the background layer instead. */
+.lib-card.is-spatial {
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  background: none;
+  border-radius: var(--radius-lg);
+  perspective: 1000px;
+  transition: none;
+}
+.lib-card.is-spatial:hover { transform: none; box-shadow: none; }
+.lib-card-inner {
+  position: relative;
+  height: 100%;
+  padding: 1.25rem;
+  border-radius: var(--radius-lg);
+  transform-style: preserve-3d;
+  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.lib-card-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  border-radius: inherit;
+  background: linear-gradient(145deg, var(--bg-surface), color-mix(in srgb, var(--lib-accent, var(--color-primary)) 7%, var(--bg-surface)));
+  box-shadow: 0 6px 16px -8px rgba(0, 0, 0, 0.35);
+  transform: translateZ(0);
+  transition: border-color 0.25s ease, box-shadow 0.35s ease;
+}
+/* The light that follows the pointer. */
+.lib-card-light {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 0%), rgba(255, 255, 255, 0.11), transparent 45%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.lib-card.is-spatial:hover .lib-card-bg {
+  border-color: var(--lib-accent, var(--color-primary));
+  box-shadow: 0 28px 56px -22px rgba(0, 0, 0, 0.65), 0 0 0 1px color-mix(in srgb, var(--lib-accent, var(--color-primary)) 30%, transparent);
+}
+.lib-card.is-spatial:hover .lib-card-light { opacity: 1; }
+.lib-card.is-spatial:hover .lib-card-glow { opacity: 0.28; }
+
+/* Depth: what matters most sits nearest. */
+.lib-card.is-spatial .lib-card-head { transform: translateZ(28px); transform-style: preserve-3d; }
+.lib-card.is-spatial .lib-card-icon { transform: translateZ(14px); transition: box-shadow 0.25s ease, transform 0.25s ease; }
+.lib-card.is-spatial .lib-card-name { transform: translateZ(44px); transition: text-shadow 0.25s ease; }
+.lib-card.is-spatial .lib-card-desc { transform: translateZ(22px); }
+.lib-card.is-spatial .lib-card-chips { transform: translateZ(36px); }
+.lib-card.is-spatial .lib-card-progress { transform: translateZ(18px); }
+.lib-card.is-spatial:hover .lib-card-icon {
+  transform: translateZ(22px);
+  box-shadow: 0 10px 22px -8px color-mix(in srgb, var(--lib-accent, var(--color-primary)) 70%, transparent);
+}
+.lib-card.is-spatial:hover .lib-card-name { text-shadow: 0 10px 22px rgba(0, 0, 0, 0.45); }
+/* No hover on a touch screen: a press is the feedback instead. */
+.lib-card.is-spatial:active .lib-card-inner { transform: scale(0.985); }
+.lib-card.is-spatial:focus-visible { outline: 2px solid var(--lib-accent, var(--color-primary)); outline-offset: 3px; }
+.lib-card-soon.is-spatial:hover { opacity: 1; }
+/* The placeholder keeps its dashed edge -- on the layer that draws the edge now. */
+.lib-card-placeholder.is-spatial .lib-card-bg { border-style: dashed; }
+@media (prefers-reduced-motion: reduce) {
+  .lib-card-inner, .lib-card-bg, .lib-card-light { transition: none; }
+}
+@media (max-width: 640px) { .lib-card-inner { padding: 0.9rem; } }
 .lib-soon-badge { font-size: 0.62rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-warning); background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); padding: 0.18rem 0.5rem; border-radius: 999px; white-space: nowrap; }
 
 /* Clutter fixes: .btn-practice is width:100% by default (card layouts) — force

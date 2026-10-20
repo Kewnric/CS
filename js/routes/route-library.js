@@ -115,22 +115,24 @@ function libraryInit() {
   const active = document.getElementById('lib-hub-active');
   if (active) {
     const card = (route, cls, icon, name, desc, chips, pct, pctLabel, accent) => `
-      <div class="lib-card ${cls}" onclick="spaNavigate('${route}')" role="link" tabindex="0"
+      <div class="lib-card is-spatial ${cls}" onclick="spaNavigate('${route}')" role="link" tabindex="0"
            ${accent ? `style="--lib-accent:${accent};"` : ''}
            onkeydown="if(event.key==='Enter')spaNavigate('${route}')">
-        <div class="lib-card-glow"></div>
-        <div class="lib-card-head">
-          <div class="lib-card-icon"><i data-lucide="${icon}"></i></div>
-          <i data-lucide="arrow-up-right" class="lib-card-arrow"></i>
+        <div class="lib-card-inner">
+          <div class="lib-card-bg"><div class="lib-card-glow"></div><div class="lib-card-light"></div></div>
+          <div class="lib-card-head">
+            <div class="lib-card-icon"><i data-lucide="${icon}"></i></div>
+            <i data-lucide="arrow-up-right" class="lib-card-arrow"></i>
+          </div>
+          <h3 class="lib-card-name">${name}</h3>
+          <p class="lib-card-desc">${desc}</p>
+          <div class="lib-card-chips">${chips}</div>
+          ${pct === null || pct === undefined ? '' : `
+          <div class="lib-card-progress" title="${pctLabel}">
+            <div class="folder-progress-bar"><div class="folder-progress-fill" style="width:${pct}%;"></div></div>
+            <span class="folder-progress-label">${pct}%</span>
+          </div>`}
         </div>
-        <h3 class="lib-card-name">${name}</h3>
-        <p class="lib-card-desc">${desc}</p>
-        <div class="lib-card-chips">${chips}</div>
-        ${pct === null || pct === undefined ? '' : `
-        <div class="lib-card-progress" title="${pctLabel}">
-          <div class="folder-progress-bar"><div class="folder-progress-fill" style="width:${pct}%;"></div></div>
-          <span class="folder-progress-label">${pct}%</span>
-        </div>`}
       </div>`;
 
     // Read straight from the cheat-sheet store; it is not part of `state`.
@@ -205,21 +207,74 @@ function libraryInit() {
   const soon = document.getElementById('lib-hub-soon');
   if (soon) {
     soon.innerHTML = `
-      <div class="lib-card lib-card-placeholder" role="note" tabindex="0"
+      <div class="lib-card is-spatial lib-card-placeholder" role="note" tabindex="0"
            onclick="libPlaceholderNote()" onkeydown="if(event.key==='Enter')libPlaceholderNote()">
-        <div class="lib-card-glow"></div>
-        <div class="lib-card-head">
-          <div class="lib-card-icon"><i data-lucide="package-plus"></i></div>
-          <i data-lucide="sparkles" class="lib-card-arrow"></i>
+        <div class="lib-card-inner">
+          <div class="lib-card-bg"><div class="lib-card-glow"></div><div class="lib-card-light"></div></div>
+          <div class="lib-card-head">
+            <div class="lib-card-icon"><i data-lucide="package-plus"></i></div>
+            <i data-lucide="sparkles" class="lib-card-arrow"></i>
+          </div>
+          <h3 class="lib-card-name">Placeholder Library</h3>
+          <p class="lib-card-desc">Room for the next wing. Nothing lives here yet.</p>
+          <div class="lib-card-chips">${_libStatChip('clock', 'Not built yet')}</div>
         </div>
-        <h3 class="lib-card-name">Placeholder Library</h3>
-        <p class="lib-card-desc">Room for the next wing. Nothing lives here yet.</p>
-        <div class="lib-card-chips">${_libStatChip('clock', 'Not built yet')}</div>
       </div>`;
   }
 
   const libRoot = document.querySelector('.lib-hub');
   if (typeof lucide !== 'undefined') lucide.createIcons(libRoot ? { root: libRoot } : undefined);
+  libSpatialBind(libRoot);
+}
+
+/* ── Spatial cards ────────────────────────────────────────────
+   The collection cards tilt toward the pointer, and what is on them sits at
+   different depths -- the icon and the title nearest, the description
+   furthest back -- so a card reads as a little object with layers rather
+   than a flat tile. A soft light follows the pointer across it. Mouse only:
+   on a touch screen there is no hover to tilt toward, and the card simply
+   presses in. With reduced motion it does not move at all. */
+const LIB_TILT = 12;   // degrees at the card's edge
+
+function libSpatialBind(root) {
+  if (!root) return;
+  const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  root.querySelectorAll('.lib-card.is-spatial').forEach(card => {
+    if (card._libSpatial) return;
+    card._libSpatial = true;
+    const inner = card.querySelector('.lib-card-inner');
+    if (!inner || still) return;
+    let raf = 0, px = 0, py = 0;
+    const apply = () => {
+      raf = 0;
+      const r = card.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      const x = Math.max(0, Math.min(r.width, px - r.left));
+      const y = Math.max(0, Math.min(r.height, py - r.top));
+      const rx = ((y - r.height / 2) / (r.height / 2)) * -LIB_TILT;
+      const ry = ((x - r.width / 2) / (r.width / 2)) * LIB_TILT;
+      inner.style.transform = 'rotateX(' + rx.toFixed(2) + 'deg) rotateY(' + ry.toFixed(2) + 'deg) translateZ(10px)';
+      card.style.setProperty('--mx', (x / r.width * 100).toFixed(1) + '%');
+      card.style.setProperty('--my', (y / r.height * 100).toFixed(1) + '%');
+    };
+    card.addEventListener('pointerenter', e => {
+      if (e.pointerType !== 'mouse') return;
+      inner.style.transition = 'transform 0.12s ease-out';
+      card.classList.add('is-tilting');
+    });
+    card.addEventListener('pointermove', e => {
+      if (e.pointerType !== 'mouse') return;
+      px = e.clientX; py = e.clientY;
+      if (!raf) raf = requestAnimationFrame(apply);
+    });
+    card.addEventListener('pointerleave', () => {
+      if (raf) { cancelAnimationFrame(raf); raf = 0; }
+      // Settle back slowly, with a little give, the way the reference does.
+      inner.style.transition = 'transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+      inner.style.transform = '';
+      card.classList.remove('is-tilting');
+    });
+  });
 }
 
 /* ── Due today, across every library ──────────────────────────
