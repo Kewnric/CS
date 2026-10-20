@@ -167,6 +167,18 @@ function vizTemplate() {
                     <div class="viz-link-type-option" role="menuitem" onclick="brainToggleLayoutMenu();brainAutoLayout('radial')"><i data-lucide="circle-dot" style="width:14px;height:14px;"></i> Radial</div>
                   </div>
                 </div>
+                <!-- Free-standing objects: arrows, lines, a timeline, shapes, text. -->
+                <div class="viz-toolbar-dropdown">
+                  <button class="viz-zoom-btn viz-toolbar-pill-btn" id="brain-insert-btn" onclick="brainToggleInsertMenu()" title="Insert an object" aria-label="Insert an object" aria-haspopup="true">
+                    <i data-lucide="shapes" style="width:12px;height:12px;"></i>
+                    <span class="viz-pill-chevron"><i data-lucide="chevron-down" style="width:10px;height:10px;"></i></span>
+                  </button>
+                  <div id="brain-insert-popup" class="viz-toolbar-popup hidden" role="menu" style="min-width:200px;">
+                    <div class="viz-popup-title">Insert</div>
+                    ${(typeof BRAIN_SHAPES !== 'undefined' ? BRAIN_SHAPES : []).map(([id, label, icon]) =>
+                      `<div class="viz-link-type-option" role="menuitem" onclick="brainInsertShape('${id}')"><i data-lucide="${icon}" style="width:14px;height:14px;"></i> ${label}</div>`).join('')}
+                  </div>
+                </div>
               </span>
 
               <!-- ── View: what the canvas shows and how it is coloured ── -->
@@ -470,6 +482,7 @@ function vizTemplate() {
           </div>
         </div>
       </div>
+      <button class="viz-ctx-item hidden" id="brain-node-rotate" onclick="brainCtxRotateShape()"><i data-lucide="rotate-cw"></i> Rotate 90°</button>
       <button class="viz-ctx-item" id="brain-node-align-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'align')"><i data-lucide="align-left"></i> Text Alignment <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
       <div class="viz-ctx-submenu hidden" id="brain-node-align-menu" role="menu">
         <div class="viz-link-type-option" role="menuitem" data-value="left" onclick="brainCtxSetNote('textAlign', 'left')"><i data-lucide="align-left"></i> Left</div>

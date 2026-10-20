@@ -965,6 +965,11 @@ function brainRenderCanvas() {
       el.style.setProperty('--note-case', node.fontFamily === 'comic' ? 'uppercase' : 'none');
     }
     if (node.border && !isGlobe) el.dataset.border = node.border;
+    if (node.shape && !isGlobe) {
+      el.dataset.shape = node.shape;
+      // An object's fill is the full Background colour, not a note's dark tint.
+      if (node.bg) el.style.setProperty('--shape-fill-c', vizColorMap(node.bg));
+    }
     if (node.border === 'manhua' && !isGlobe) {
       el.dataset.bubble = BRAIN_BUBBLE_IDS.has(node.bubble) ? node.bubble : 'speech';
       if (_brainBubbleRO) _brainBubbleRO.observe(el);
@@ -1006,13 +1011,24 @@ function brainRenderCanvas() {
         ${brainCollapseBadge}
       `;
     } else {
-      el.innerHTML = `${isElectric ? BRAIN_ELECTRIC_BACK : ''}<div class="viz-node-inner" style="${styleW}${styleH}">
+      // Objects draw under their label (the SVG comes first) and have no
+      // placeholder: an arrow with no label is just an arrow.
+      const objectLayer = node.shape ? '<svg class="shape-svg" aria-hidden="true"></svg>' : '';
+      const objectTop = node.shape === 'timeline'
+        ? '<div class="shape-tl-labels" aria-hidden="true"></div><button class="shape-tl-add" type="button" title="Extend the timeline" aria-label="Extend the timeline">+</button>' : '';
+      el.innerHTML = `${isElectric ? BRAIN_ELECTRIC_BACK : ''}${objectLayer}<div class="viz-node-inner" style="${styleW}${styleH}">
         <div class="viz-comment-body">
-          <div class="viz-comment-content">${brainNoteParagraphs(brainShownText(node) || 'Double-click or right-click to edit...')}</div>
+          <div class="viz-comment-content">${brainNoteParagraphs(brainShownText(node) || (node.shape ? '' : 'Double-click or right-click to edit...'))}</div>
         </div>
       </div>${isElectric ? BRAIN_ELECTRIC_FRONT : ''}${isMedieval ? BRAIN_MEDIEVAL_FRONT : ''}${node.border === 'manhua' ? '<div class="bb-resize" title="Resize" aria-hidden="true"></div>' : ''}${brainCollapseBadge}`;
       const grip = el.querySelector('.bb-resize');
       if (grip) grip.addEventListener('pointerdown', e => brainBubbleResizeStart(e, node.id, el));
+      if (objectTop) el.insertAdjacentHTML('beforeend', objectTop);
+      const extend = el.querySelector('.shape-tl-add');
+      if (extend) {
+        extend.addEventListener('pointerdown', e => e.stopPropagation());
+        extend.addEventListener('click', e => { e.stopPropagation(); brainExtendTimeline(node.id); });
+      }
     }
     setTimeout(() => {
       const inner = el.querySelector('.viz-node-inner');
@@ -1031,6 +1047,7 @@ function brainRenderCanvas() {
       if (brainFitBubble(el, inner) || grew) brainUpdateSVGLinks();
       else if (node.border === 'manhua') brainPaintBubbles();
       brainSizeElectric(el, inner);
+      if (node.shape) brainPaintShape(el, node);
       // ResizeObserver always fires once for the current size the moment it
       // starts observing. Treating that as a resize baked the first layout's
       // height into the note for good, and the text was then clipped as soon as
@@ -1043,6 +1060,7 @@ function brainRenderCanvas() {
           return;
         }
         brainSizeElectric(el, inner);
+        if (node.shape) brainPaintShape(el, node);
         if (brainFitBubble(el, inner)) brainUpdateSVGLinks();
         else if (node.border === 'manhua') brainPaintBubbles();
         // Typing in the open editor changes the size too; that is not a
@@ -1465,16 +1483,20 @@ function brainCanvasCtx(e) {
   else { menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px'; menu.classList.remove('hidden'); }
 }
 
+/** Make sure there is a version to add to (a first note or object makes one). */
+function _brainEnsureVersion() {
+  if (brain.activeVersionId) return;
+  const id = 'bv_' + generateId();
+  brain.versions.push({ id, name: 'Default Version', folderId: null, nodes: [], links: [], pan: { x: 0, y: 0 }, zoom: 1 });
+  brain.activeVersionId = id;
+  brainSave();
+  brainRenderSidebar();
+  brainUpdateCanvasToolbar();
+}
+
 function brainAddCommentNode(x, y) {
   brainPushUndo();
-  if (!brain.activeVersionId) {
-    const id = 'bv_' + generateId();
-    brain.versions.push({ id, name: 'Default Version', folderId: null, nodes: [], links: [], pan: { x: 0, y: 0 }, zoom: 1 });
-    brain.activeVersionId = id;
-    brainSave();
-    brainRenderSidebar();
-    brainUpdateCanvasToolbar();
-  }
+  _brainEnsureVersion();
 
   const cx = x !== undefined ? x : ((-brain.pan.x / brain.zoom) + 200);
   const cy = y !== undefined ? y : ((-brain.pan.y / brain.zoom) + 200);
@@ -1559,8 +1581,9 @@ function brainOpenEditor(node) {
     // Text-driven size changes are not a resize by hand (see the note's
     // ResizeObserver): mark them so the note's height is not frozen.
     el._liveEditAt = performance.now();
-    content.innerHTML = brainNoteParagraphs(textarea.value || 'Double-click or right-click to edit...');
+    content.innerHTML = brainNoteParagraphs(textarea.value || (el.dataset.shape ? '' : 'Double-click or right-click to edit...'));
     if (inner) { vizFitNoteHeight(inner); brainSizeElectric(el, inner); brainFitBubble(el, inner); }
+    if (el.dataset.shape) { const n = brain.nodes.find(x => x.id === nodeId); if (n) brainPaintShape(el, n); }
     brainUpdateSVGLinks();
   };
   textarea.addEventListener('input', applyLive);
@@ -2017,6 +2040,10 @@ function _brainMarkNodeMenu() {
   });
   mark('#brain-note-swatches .viz-color-swatch', 'color', node[BRAIN_COLOR_PROPS[target]] || '');
   mark('#brain-node-border-menu .viz-link-type-option', 'border', node?.border || '');
+  const borderRow = document.getElementById('brain-node-border-toggle');
+  if (borderRow) borderRow.classList.toggle('hidden', !!node.shape);
+  const rotateRow = document.getElementById('brain-node-rotate');
+  if (rotateRow) rotateRow.classList.toggle('hidden', !BRAIN_ROTATABLE.has(node.shape));
   // Manhua's dropdown (and Bubble Shape in it) only exists for a Manhua note:
   // any other border folds it away.
   if (node.border !== 'manhua') {
@@ -2039,6 +2066,149 @@ function _brainMarkNodeMenu() {
 function brainShownText(node) {
   const p = brain._livePreview;
   return p && p.id === node.id ? p.text : node.commentContent;
+}
+
+/* ── Objects ────────────────────────────────────────────────────
+   Free-standing things to put on the map: arrows and lines that join nothing,
+   a timeline, shapes and plain text. Each is a Brain note with a `shape`, so
+   it moves, links, deletes, undoes, saves and resizes like any note, its label
+   is the note's text (double-click to edit), and Personalize Color gives its
+   stroke (Border Edge), fill (Background) and label (Text). It is drawn into
+   an SVG sized to the note, repainted whenever the note changes size. */
+const BRAIN_SHAPES = [
+  ['arrow', 'Arrow', 'arrow-right', 200, 56], ['double', 'Double arrow', 'arrow-left-right', 200, 56],
+  ['line', 'Line', 'minus', 200, 56], ['timeline', 'Timeline', 'git-commit-horizontal', 380, 84],
+  ['rect', 'Rectangle', 'square', 160, 100], ['rounded', 'Rounded rectangle', 'rectangle-horizontal', 160, 100],
+  ['ellipse', 'Ellipse', 'circle', 160, 100], ['diamond', 'Diamond', 'diamond', 150, 110],
+  ['triangle', 'Triangle', 'triangle', 140, 110], ['star', 'Star', 'star', 130, 120],
+  ['text', 'Text', 'type', 150, 50]
+];
+const BRAIN_ROTATABLE = new Set(['arrow', 'double', 'line', 'triangle']);
+
+function brainToggleInsertMenu() { vizTogglePopup('brain-insert-popup'); }
+
+/** Drop an object in the middle of what is on screen. */
+function brainInsertShape(kind) {
+  const def = BRAIN_SHAPES.find(x => x[0] === kind);
+  if (!def) return;
+  vizClosePopups();
+  brainPushUndo();
+  _brainEnsureVersion();
+  const c = document.getElementById('viz-canvas-container');
+  const r = c ? c.getBoundingClientRect() : { width: 800, height: 600 };
+  const [, , , w, h] = def;
+  const node = {
+    id: 'bn_' + generateId(), color: null, shape: kind,
+    commentContent: kind === 'timeline' ? 'Step 1\nStep 2\nStep 3\nStep 4' : kind === 'text' ? 'Text' : '',
+    x: Math.round((r.width / 2 - brain.pan.x) / brain.zoom - w / 2),
+    y: Math.round((r.height / 2 - brain.pan.y) / brain.zoom - h / 2),
+    w, h, userSized: true
+  };
+  if (kind === 'timeline') node.segs = 3;
+  brain.nodes.push(node);
+  brain.selectedNodeId = node.id;
+  brainRenderCanvas(); brainSaveCurrentVersion();
+}
+
+/** Timeline +: one more segment, the timeline longer by one segment's length. */
+function brainExtendTimeline(nodeId) {
+  const node = brain.nodes.find(n => n.id === nodeId);
+  if (!node) return;
+  const inner = document.querySelector(`.viz-node[data-node-id="${nodeId}"] .viz-node-inner`);
+  const segs = node.segs || 3;
+  const w = (inner && inner.offsetWidth) || node.w || 380;
+  brainPushUndo();
+  node.segs = segs + 1;
+  node.w = Math.round(w + (w - 2 * BRAIN_TL_PAD) / segs);
+  if (inner) node.h = inner.offsetHeight;
+  node.userSized = true;
+  brainRenderCanvas(); brainSaveCurrentVersion();
+}
+
+/** Rotate an arrow, line or triangle a quarter turn; its box turns with it. */
+function brainCtxRotateShape() {
+  const node = brain.contextNodeId && brain.nodes.find(n => n.id === brain.contextNodeId);
+  if (!node || !BRAIN_ROTATABLE.has(node.shape)) return;
+  const inner = document.querySelector(`.viz-node[data-node-id="${node.id}"] .viz-node-inner`);
+  const w = (inner && inner.offsetWidth) || node.w || 200, h = (inner && inner.offsetHeight) || node.h || 56;
+  brainPushUndo();
+  node.rot = ((node.rot || 0) + 90) % 360;
+  node.w = h; node.h = w; node.userSized = true;
+  brainRenderCanvas(); brainSaveCurrentVersion();
+  brainHideAllMenus();
+}
+
+const BRAIN_TL_PAD = 18;   // the timeline's line starts and ends this far in
+
+/** Draw an object into its SVG at the note's current size. */
+function brainPaintShape(el, node) {
+  const svg = el && el.querySelector(':scope > .shape-svg');
+  if (!svg) return;
+  const w = el.offsetWidth, h = el.offsetHeight;
+  if (!w || !h) return;
+  svg.setAttribute('width', w);
+  svg.setAttribute('height', h);
+  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  const f = n => Math.round(n * 10) / 10;
+  const rot = (((node.rot || 0) % 360) + 360) % 360;
+  const kind = node.shape;
+  const head = (x1, y1, x2, y2) => {   // a filled arrowhead at (x2, y2)
+    const a = Math.atan2(y2 - y1, x2 - x1), L = 13, W = 6.5;
+    const bx = x2 - L * Math.cos(a), by = y2 - L * Math.sin(a);
+    return `<path class="shape-ink-fill" d="M${f(x2)} ${f(y2)}L${f(bx + W * Math.sin(a))} ${f(by - W * Math.cos(a))}L${f(bx - W * Math.sin(a))} ${f(by + W * Math.cos(a))}Z"/>`;
+  };
+  let out = '';
+  if (kind === 'arrow' || kind === 'double' || kind === 'line') {
+    // Horizontal ones run along the bottom with the label above; vertical ones
+    // run down the middle.
+    const p = 8, horiz = rot === 0 || rot === 180;
+    const y = h - 14, x = w / 2;
+    let [x1, y1, x2, y2] = horiz ? [p, y, w - p, y] : [x, p, x, h - p];
+    if (rot === 180 || rot === 270) [x1, y1, x2, y2] = [x2, y2, x1, y1];
+    // The shaft stops short of each head so it never pokes through its tip.
+    const trim = (ax, ay, bx2, by2, d) => { const L = Math.hypot(bx2 - ax, by2 - ay) || 1; return [bx2 - (bx2 - ax) / L * d, by2 - (by2 - ay) / L * d]; };
+    let [sx, sy] = [x1, y1], [ex, ey] = [x2, y2];
+    if (kind !== 'line') [ex, ey] = trim(x1, y1, x2, y2, 10);
+    if (kind === 'double') [sx, sy] = trim(x2, y2, x1, y1, 10);
+    out = `<path class="shape-stroke" d="M${f(sx)} ${f(sy)}L${f(ex)} ${f(ey)}"/>`;
+    if (kind !== 'line') out += head(x1, y1, x2, y2);
+    if (kind === 'double') out += head(x2, y2, x1, y1);
+  } else if (kind === 'timeline') {
+    const segs = Math.max(1, node.segs || 3), y = h * 0.38, p = BRAIN_TL_PAD;
+    const step = (w - 2 * p) / segs;
+    out = `<path class="shape-stroke" d="M${f(p)} ${f(y)}L${f(w - p)} ${f(y)}"/>`;
+    const labels = String(brainShownText(node) || '').split('\n');
+    let html = '';
+    for (let i = 0; i <= segs; i++) {
+      const cx = p + step * i;
+      out += `<circle class="shape-ink-fill" cx="${f(cx)}" cy="${f(y)}" r="5"/>`;
+      if (labels[i]) html += `<span class="shape-tl-label" style="left:${f(cx)}px;top:${f(y + 12)}px">${escapeHTML(labels[i])}</span>`;
+    }
+    const lab = el.querySelector(':scope > .shape-tl-labels');
+    if (lab) lab.innerHTML = html;
+  } else if (kind === 'rect' || kind === 'rounded') {
+    const r = kind === 'rounded' ? Math.min(16, h / 4) : 2;
+    out = `<rect class="shape-shape" x="1.25" y="1.25" width="${f(w - 2.5)}" height="${f(h - 2.5)}" rx="${f(r)}"/>`;
+  } else if (kind === 'ellipse') {
+    out = `<ellipse class="shape-shape" cx="${f(w / 2)}" cy="${f(h / 2)}" rx="${f(w / 2 - 1.25)}" ry="${f(h / 2 - 1.25)}"/>`;
+  } else if (kind === 'diamond') {
+    out = `<path class="shape-shape" d="M${f(w / 2)} 1.25L${f(w - 1.25)} ${f(h / 2)}L${f(w / 2)} ${f(h - 1.25)}L1.25 ${f(h / 2)}Z"/>`;
+  } else if (kind === 'triangle') {
+    const e = 1.25;
+    const pts = {
+      0: [[w / 2, e], [w - e, h - e], [e, h - e]], 90: [[w - e, h / 2], [e, h - e], [e, e]],
+      180: [[w / 2, h - e], [e, e], [w - e, e]], 270: [[e, h / 2], [w - e, e], [w - e, h - e]]
+    }[rot];
+    out = `<path class="shape-shape" d="M${pts.map(q => f(q[0]) + ' ' + f(q[1])).join('L')}Z"/>`;
+  } else if (kind === 'star') {
+    const cx = w / 2, cy = h / 2 + h * 0.04, rx = w / 2 - 1.5, ry = h / 2 - 1.5, pts = [];
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + i * Math.PI / 5, k = i % 2 ? 0.45 : 1;
+      pts.push(f(cx + rx * k * Math.cos(a)) + ' ' + f(cy + ry * k * Math.sin(a)));
+    }
+    out = `<path class="shape-shape" d="M${pts.join('L')}Z"/>`;
+  }
+  svg.innerHTML = out;
 }
 
 /* -- Note text ----------------------------------------------------

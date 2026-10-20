@@ -4840,3 +4840,87 @@ body.viz-no-anim .app-sidebar {
 .viz-sheet-sub-toggle .viz-ctx-sub-chev { width: 13px; height: 13px; opacity: 0.7; transition: transform 0.15s ease; }
 .viz-sheet-sub-toggle[aria-expanded="true"] .viz-ctx-sub-chev { transform: rotate(180deg); }
 .viz-sheet-sub-toggle[aria-expanded="true"] { color: var(--color-primary); }
+
+/* ── Objects (brainPaintShape) ──────────────────────────────────
+   An object is a note whose card is invisible: the drawing is an SVG under
+   its label. --shape-ink is its line colour (Border Edge, else an ink that
+   suits the sheet), --shape-fill its fill (Background, else none). */
+.viz-canvas-container { --canvas-ink: #e2e8f0; }
+.viz-canvas-container[data-sheet-color="white"],
+.viz-canvas-container[data-sheet-color="paper"],
+.viz-canvas-container[data-sheet-color="yellow"],
+.viz-canvas-container[data-sheet-color="kraft"] { --canvas-ink: #1f2937; }
+.viz-node[data-shape] {
+  --shape-ink: var(--viz-node-accent, var(--canvas-ink));
+  --shape-fill: var(--shape-fill-c, transparent);
+}
+.viz-node[data-type="comment"][data-shape] .viz-node-inner,
+.viz-node[data-type="comment"][data-shape]:hover .viz-node-inner,
+.viz-node[data-type="comment"][data-shape].selected .viz-node-inner,
+.viz-node[data-type="comment"][data-shape].dragging .viz-node-inner,
+.viz-node[data-type="comment"][data-shape] .viz-node-inner:active {
+  background: transparent !important;
+  border-color: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+/* Selected: a dashed box round the object, since it has no card to light up. */
+.viz-node[data-type="comment"][data-shape].selected .viz-node-inner {
+  outline: 1px dashed color-mix(in srgb, var(--color-primary) 75%, transparent);
+  outline-offset: 2px;
+}
+.viz-node[data-type="comment"][data-shape] .viz-comment-body { justify-content: center; }
+.viz-node[data-type="comment"][data-shape] .viz-comment-content {
+  flex: 0 0 auto;
+  color: var(--note-text, var(--shape-ink));
+  text-align: var(--note-align, center);
+  text-shadow: none;
+}
+/* A straight arrow or line carries its label above the shaft. */
+.viz-node[data-type="comment"][data-shape="arrow"] .viz-comment-body,
+.viz-node[data-type="comment"][data-shape="double"] .viz-comment-body,
+.viz-node[data-type="comment"][data-shape="line"] .viz-comment-body { justify-content: flex-start; }
+/* A timeline's text is its milestone labels, drawn under the dots. */
+.viz-node[data-type="comment"][data-shape="timeline"] .viz-comment-body { visibility: hidden; }
+
+.shape-svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.shape-svg .shape-stroke { fill: none; stroke: var(--shape-ink); stroke-width: 2.5; stroke-linecap: round; }
+.shape-svg .shape-ink-fill { fill: var(--shape-ink); }
+.shape-svg .shape-shape { fill: var(--shape-fill); stroke: var(--shape-ink); stroke-width: 2; stroke-linejoin: round; }
+
+.shape-tl-labels { position: absolute; inset: 0; pointer-events: none; }
+.shape-tl-label {
+  position: absolute;
+  transform: translateX(-50%);
+  font: 600 0.72rem var(--note-font, var(--font-sans));
+  color: var(--note-text, var(--shape-ink));
+  white-space: nowrap;
+}
+/* The + sits just past the end of the line, outside the ports, on hover. */
+.shape-tl-add {
+  position: absolute;
+  right: -32px;
+  top: calc(38% - 10px);
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--shape-ink);
+  background: var(--bg-elevated);
+  color: var(--shape-ink);
+  font: 700 14px/16px var(--font-sans);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 6;
+}
+.viz-node:hover .shape-tl-add { opacity: 1; }
+.shape-tl-add:hover { transform: scale(1.12); }
+.viz-canvas-container.brain-locked .shape-tl-add { display: none; }
