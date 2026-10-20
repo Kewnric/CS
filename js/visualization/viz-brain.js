@@ -2202,12 +2202,7 @@ function brainPaintBubbles() {
     const stroke = node.color ? vizColorMap(node.color) : (neg ? '#f8fafc' : '#111111');
     const dash = shape === 'whisper' ? ';stroke-dasharray:8 6' : '';
     const ghost = el.classList.contains('viz-bridge-ghost') ? ' opacity="0.25"' : '';
-    // Selected: a soft accent glow outside the outline, rather than recolouring
-    // it. Recoloured, selecting a bubble (right-clicking it does) hid its
-    // black edge.
-    if (node.id === brain.selectedNodeId) {
-      parts.forEach(d => { strokes += `<path class="bb-sel" d="${d}"${ghost}/>`; });
-    }
+    // Selection does not touch the bubble: no recoloured edge, no glow.
     parts.forEach(d => {
       strokes += `<path d="${d}" style="stroke:${stroke}${dash}"${ghost}/>`;
       fills += `<path d="${d}" style="fill:${fill}"${ghost}/>`;
