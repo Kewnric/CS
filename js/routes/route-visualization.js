@@ -453,6 +453,15 @@ function vizTemplate() {
         <div class="viz-link-type-option" role="menuitem" data-value="center" onclick="brainCtxSetNote('textAlign', 'center')"><i data-lucide="align-center"></i> Center</div>
         <div class="viz-link-type-option" role="menuitem" data-value="right" onclick="brainCtxSetNote('textAlign', 'right')"><i data-lucide="align-right"></i> Right</div>
       </div>
+      <!-- Default is the border's own font: the app's for every border but
+           Manhua, whose default is comic lettering. Each option shows itself. -->
+      <button class="viz-ctx-item" id="brain-node-font-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'font')"><i data-lucide="type"></i> Font Family <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
+      <div class="viz-ctx-submenu hidden" id="brain-node-font-menu" role="menu">
+        <div class="viz-link-type-option" role="menuitem" data-value="" onclick="brainCtxSetNote('fontFamily', null)">Default</div>
+        <div class="viz-link-type-option" role="menuitem" data-value="arial" style="font-family: Arial, Helvetica, sans-serif;" onclick="brainCtxSetNote('fontFamily', 'arial')">Arial</div>
+        <div class="viz-link-type-option" role="menuitem" data-value="sans" style="font-family: sans-serif;" onclick="brainCtxSetNote('fontFamily', 'sans')">Sans-serif</div>
+        <div class="viz-link-type-option" role="menuitem" data-value="comic" style="font-family: var(--font-comic); text-transform: uppercase;" onclick="brainCtxSetNote('fontFamily', 'comic')">Comic (Manga)</div>
+      </div>
       <button class="viz-ctx-item" id="brain-node-spacing-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'spacing')"><i data-lucide="unfold-vertical"></i> Spacing <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
       <div class="viz-ctx-submenu hidden" id="brain-node-spacing-menu" role="menu">
         <div class="viz-popup-title">Line Spacing</div>

@@ -956,6 +956,11 @@ function brainRenderCanvas() {
     if (node.textAlign) el.style.setProperty('--note-align', node.textAlign);
     if (node.lineSpacing) el.style.setProperty('--note-line', node.lineSpacing);
     if (node.paraSpacing) el.style.setProperty('--note-para', BRAIN_PARA_SPACING[node.paraSpacing] || '0');
+    if (BRAIN_FONTS[node.fontFamily]) {
+      el.style.setProperty('--note-font', BRAIN_FONTS[node.fontFamily]);
+      // Manga lettering is set in capitals; the other faces are not.
+      el.style.setProperty('--note-case', node.fontFamily === 'comic' ? 'uppercase' : 'none');
+    }
     if (node.border && !isGlobe) el.dataset.border = node.border;
     if (node.border === 'manhua' && !isGlobe) {
       el.dataset.bubble = BRAIN_BUBBLE_IDS.has(node.bubble) ? node.bubble : 'speech';
@@ -2017,6 +2022,7 @@ function _brainMarkNodeMenu() {
   }
   mark('#brain-node-bubble-menu .viz-link-type-option', 'bubble', BRAIN_BUBBLE_IDS.has(node.bubble) ? node.bubble : 'speech');
   mark('#brain-node-align-menu .viz-link-type-option', 'value', node?.textAlign || 'left');
+  mark('#brain-node-font-menu .viz-link-type-option', 'value', BRAIN_FONTS[node.fontFamily] ? node.fontFamily : '');
   mark('[data-prop="lineSpacing"] button', 'value', String(node?.lineSpacing || 1.5));
   mark('[data-prop="paraSpacing"] button', 'value', node?.paraSpacing || '');
 }
@@ -2031,12 +2037,15 @@ function brainShownText(node) {
    One <p> per line you typed, so each Enter starts a paragraph and paragraph
    spacing has something to space; an empty line keeps its height. */
 const BRAIN_PARA_SPACING = { s: '0.35em', m: '0.75em', l: '1.25em' };
+/* Font Family. Unset is the border's own default (CSS): the app's font, or
+   comic lettering on Manhua. --font-comic is the stack in visualization.css. */
+const BRAIN_FONTS = { arial: 'Arial, Helvetica, sans-serif', sans: 'sans-serif', comic: 'var(--font-comic)' };
 function brainNoteParagraphs(text) {
   return String(text).split('\n').map(l => '<p>' + (l ? escapeHTML(l) : '<br>') + '</p>').join('');
 }
 
 /* The node menu's dropdowns, one open at a time. */
-const BRAIN_NODE_SUBS = ['colors', 'border', 'manhua', 'bubble', 'align', 'spacing'];
+const BRAIN_NODE_SUBS = ['colors', 'border', 'manhua', 'bubble', 'align', 'font', 'spacing'];
 function _brainCloseNodeSubs(except) {
   BRAIN_NODE_SUBS.forEach(k => {
     if (k === except) return;

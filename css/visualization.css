@@ -2993,6 +2993,15 @@
 .viz-node[data-type="root"] .viz-node-inner,
 .viz-node[data-type="comment"] .viz-node-inner { border-left-width: 0; }
 
+/* Comic lettering for notes (Font Family > Comic, and Manhua's default).
+   Blambot's Anime Ace / CC Wild Words are licensed fonts that cannot ship
+   with the app, so they are used when installed; otherwise the stack falls
+   to faces most machines have. Nothing is fetched: the app works offline. */
+:root {
+  --font-comic: 'Anime Ace 2.0 BB', 'Anime Ace', 'CC Wild Words', 'Wild Words',
+    'Komika Text', 'Comic Neue', 'Comic Sans MS', 'Chalkboard SE', cursive;
+}
+
 .viz-scope-legend {
   position: absolute;
   left: 0.75rem;
@@ -3068,7 +3077,10 @@
 }
 
 .viz-node[data-type="comment"] .viz-comment-content {
-  /* Text Color, Text Alignment and Spacing from the node menu (--note-*). */
+  /* Text Color, Text Alignment, Font Family and Spacing from the node menu
+     (--note-*). Unset font is the border's own: the app's, here. */
+  font-family: var(--note-font, var(--font-sans));
+  text-transform: var(--note-case, none);
   color: var(--note-text, var(--text-primary));
   text-align: var(--note-align, left);
   line-height: var(--note-line, 1.5);
@@ -4651,8 +4663,11 @@ body.viz-no-anim .app-sidebar {
 .viz-node[data-type="comment"][data-border="manhua"][data-bubble="daydream"] .viz-node-inner { margin: 1.1rem 1.9rem; }
 .viz-node[data-type="comment"][data-border="manhua"][data-bubble="caption"] .viz-node-inner { margin: 0.35rem; }
 
-/* Lettering: dark and centred on a white balloon unless set otherwise. */
+/* Lettering: dark, centred, and comic capitals on a white balloon unless set
+   otherwise. Comic is Manhua's own default font; other borders keep theirs. */
 .viz-node[data-type="comment"][data-border="manhua"] .viz-comment-content {
+  font-family: var(--note-font, var(--font-comic));
+  text-transform: var(--note-case, uppercase);
   color: var(--note-text, #111111);
   text-align: var(--note-align, center);
   text-shadow: none;
