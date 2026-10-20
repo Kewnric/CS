@@ -4675,14 +4675,17 @@ body.viz-no-anim .app-sidebar {
    not the text area's own corner, which sat inside the balloon by the words. */
 .viz-node[data-type="comment"][data-border="manhua"] .viz-node-inner { resize: none !important; }
 /* Looks like every other note's resize corner (a small double stroke, always
-   shown) and sits inside the balloon like theirs: just in from the oval's
-   edge at its lower right (the 45-degree point, 85.36% of the box each way).
-   The box's own corner is outside the oval. On the balloon's fill it takes
-   a muted text colour, so it shows on white and on black alike. */
+   shown) and hugs the edge like theirs. Theirs is a box's corner, which is on
+   a rectangle's edge; a balloon's box corner is outside the oval, so this one
+   is placed on the curve: its own bottom-right corner on the ellipse's
+   45-degree point (85.36% of the box each way), 1px in. That point is the
+   inside edge of the visible outline, and the strokes sit in the grip's lower
+   right, so they run along the outline. On the balloon's fill it takes a
+   muted text colour, so it shows on white and on black alike. */
 .bb-resize {
   position: absolute;
-  left: calc(85.36% - 15px);
-  top: calc(85.36% - 15px);
+  left: calc(85.36% - 9px);
+  top: calc(85.36% - 9px);
   width: 8px;
   height: 8px;
   cursor: nwse-resize;
