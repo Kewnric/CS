@@ -2005,12 +2005,15 @@ function _brainMarkNodeMenu() {
   });
   mark('#brain-note-swatches .viz-color-swatch', 'color', node[BRAIN_COLOR_PROPS[target]] || '');
   mark('#brain-node-border-menu .viz-link-type-option', 'border', node?.border || '');
-  // Bubble Shape sits under Manhua Border, there only while the note is Manhua.
-  const bubbleRow = document.getElementById('brain-node-bubble-toggle');
-  if (bubbleRow) bubbleRow.classList.toggle('hidden', node.border !== 'manhua');
+  // Manhua's dropdown (and Bubble Shape in it) only exists for a Manhua note:
+  // any other border folds it away.
   if (node.border !== 'manhua') {
-    const sub = document.getElementById('brain-node-bubble-menu');
-    if (sub) sub.classList.add('hidden');
+    ['manhua', 'bubble'].forEach(k => {
+      const sub = document.getElementById('brain-node-' + k + '-menu');
+      const toggle = document.getElementById('brain-node-' + k + '-toggle');
+      if (sub) sub.classList.add('hidden');
+      if (toggle) toggle.setAttribute('aria-expanded', 'false');
+    });
   }
   mark('#brain-node-bubble-menu .viz-link-type-option', 'bubble', BRAIN_BUBBLE_IDS.has(node.bubble) ? node.bubble : 'speech');
   mark('#brain-node-align-menu .viz-link-type-option', 'value', node?.textAlign || 'left');
@@ -2033,7 +2036,7 @@ function brainNoteParagraphs(text) {
 }
 
 /* The node menu's dropdowns, one open at a time. */
-const BRAIN_NODE_SUBS = ['colors', 'border', 'bubble', 'align', 'spacing'];
+const BRAIN_NODE_SUBS = ['colors', 'border', 'manhua', 'bubble', 'align', 'spacing'];
 function _brainCloseNodeSubs(except) {
   BRAIN_NODE_SUBS.forEach(k => {
     if (k === except) return;
@@ -2043,10 +2046,25 @@ function _brainCloseNodeSubs(except) {
     if (toggle) toggle.setAttribute('aria-expanded', 'false');
   });
 }
-/* Bubble Shape is nested in Border Type, so it opens on its own, without the
-   one-at-a-time rule closing the dropdown it sits in. */
+/* Manhua Border and its Bubble Shape are nested inside Border Type, so they
+   open on their own, without the one-at-a-time rule closing what they sit in. */
 function brainToggleBubbleSub(e) {
   _brainToggleCtxSub(e, 'brain-node-ctx', 'brain-node-bubble-menu', 'brain-node-bubble-toggle');
+}
+
+/** Manhua Border: makes the note Manhua and opens its dropdown; on a note
+ *  that already is, it just folds the dropdown open or shut. */
+function brainCtxManhua(e) {
+  if (e) e.stopPropagation();
+  const node = brain.contextNodeId && brain.nodes.find(n => n.id === brain.contextNodeId);
+  if (!node) return;
+  const sub = document.getElementById('brain-node-manhua-menu');
+  if (node.border !== 'manhua') {
+    brainCtxSetBorder('manhua');
+    if (sub && sub.classList.contains('hidden')) _brainToggleCtxSub(null, 'brain-node-ctx', 'brain-node-manhua-menu', 'brain-node-manhua-toggle');
+    return;
+  }
+  _brainToggleCtxSub(null, 'brain-node-ctx', 'brain-node-manhua-menu', 'brain-node-manhua-toggle');
 }
 function brainToggleNodeSub(e, key) {
   _brainCloseNodeSubs(key);

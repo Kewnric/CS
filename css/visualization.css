@@ -4667,5 +4667,9 @@ body.viz-no-anim .app-sidebar {
   color: var(--note-text, #f8fafc);
 }
 
+/* Manhua Border is an option and a dropdown: its chevron turns when open. */
+.brain-manhua-opt .viz-ctx-sub-chev { width: 14px; height: 14px; margin-left: auto; opacity: 0.7; transition: transform 0.15s ease; }
+.brain-manhua-opt[aria-expanded="true"] .viz-ctx-sub-chev { transform: rotate(180deg); }
+
 /* Bubble Shape's list: twelve rows, so it scrolls past a screenful. */
 #brain-node-bubble-menu { max-height: 15rem; overflow-y: auto; scrollbar-width: thin; }
