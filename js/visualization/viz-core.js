@@ -445,6 +445,8 @@ function vizTweenView(pan, zoom, done) {
   _vizTweenRaf = requestAnimationFrame(step);
 }
 
+let _vizMovingTimer = null;
+
 /** Push the current pan/zoom onto the two transformed layers. */
 function vizApplyTransform() {
   const isBrain = typeof viz !== 'undefined' && viz.activeModule === 'brain';
@@ -458,6 +460,13 @@ function vizApplyTransform() {
   if (heads) heads.style.transform = tf;
   const c = document.getElementById('viz-canvas-container');
   if (c) c.classList.toggle('viz-far', cam.zoom < VIZ_CULL_ZOOM);
+  // will-change only for the length of a pan or zoom (see .viz-moving): kept
+  // on, the layers stayed a scaled bitmap and blurred when zoomed in.
+  if (c) {
+    c.classList.add('viz-moving');
+    clearTimeout(_vizMovingTimer);
+    _vizMovingTimer = setTimeout(() => c.classList.remove('viz-moving'), 180);
+  }
   if (isBrain) { if (typeof brainUpdateMinimap === 'function') brainUpdateMinimap(); }
   else if (typeof vizUpdateMinimap === 'function') vizUpdateMinimap();
 }

@@ -3374,8 +3374,13 @@
 .viz-node {
   contain: layout style;
 }
-.viz-nodes-layer,
-.viz-canvas-svg {
+/* Only while the camera moves (vizApplyTransform sets .viz-moving and clears
+   it once things settle). Left on permanently, Chrome rasterised each layer
+   once and then just scaled that bitmap: zoomed in, every node and link was
+   an enlarged blur, and only a node you hovered — repainted — came out sharp.
+   Dropping it after the move makes Chrome repaint at the final zoom. */
+.viz-canvas-container.viz-moving .viz-nodes-layer,
+.viz-canvas-container.viz-moving .viz-canvas-svg {
   will-change: transform;
 }
 .viz-canvas-container.panning .viz-node,
