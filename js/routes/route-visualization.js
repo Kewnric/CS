@@ -449,7 +449,7 @@ function vizTemplate() {
       </div>
       <button class="viz-ctx-item" id="brain-node-align-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'align')"><i data-lucide="align-left"></i> Text Alignment <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
       <div class="viz-ctx-submenu hidden" id="brain-node-align-menu" role="menu">
-        <div class="viz-link-type-option" role="menuitem" data-value="left" onclick="brainCtxSetNote('textAlign', null)"><i data-lucide="align-left"></i> Left</div>
+        <div class="viz-link-type-option" role="menuitem" data-value="left" onclick="brainCtxSetNote('textAlign', 'left')"><i data-lucide="align-left"></i> Left</div>
         <div class="viz-link-type-option" role="menuitem" data-value="center" onclick="brainCtxSetNote('textAlign', 'center')"><i data-lucide="align-center"></i> Center</div>
         <div class="viz-link-type-option" role="menuitem" data-value="right" onclick="brainCtxSetNote('textAlign', 'right')"><i data-lucide="align-right"></i> Right</div>
       </div>

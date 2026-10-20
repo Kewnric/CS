@@ -1022,7 +1022,8 @@ function brainRenderCanvas() {
       // that hides the rest (vizFitNoteHeight). Before observing, so the fit
       // is part of the size the observer starts from. Links were drawn to the
       // old edge during render, so repaint them if it grew.
-      if (vizFitNoteHeight(inner)) brainUpdateSVGLinks();
+      const grew = vizFitNoteHeight(inner);
+      if (brainFitBubble(el, inner) || grew) brainUpdateSVGLinks();
       else if (node.border === 'manhua') brainPaintBubbles();
       brainSizeElectric(el, inner);
       // ResizeObserver always fires once for the current size the moment it
@@ -1037,7 +1038,8 @@ function brainRenderCanvas() {
           return;
         }
         brainSizeElectric(el, inner);
-        if (node.border === 'manhua') brainPaintBubbles();
+        if (brainFitBubble(el, inner)) brainUpdateSVGLinks();
+        else if (node.border === 'manhua') brainPaintBubbles();
         // Typing in the open editor changes the size too; that is not a
         // resize by hand, and recording it would freeze the note's height.
         if (performance.now() - (el._liveEditAt || 0) < 250) return;
@@ -1553,7 +1555,7 @@ function brainOpenEditor(node) {
     // ResizeObserver): mark them so the note's height is not frozen.
     el._liveEditAt = performance.now();
     content.innerHTML = brainNoteParagraphs(textarea.value || 'Double-click or right-click to edit...');
-    if (inner) { vizFitNoteHeight(inner); brainSizeElectric(el, inner); }
+    if (inner) { vizFitNoteHeight(inner); brainSizeElectric(el, inner); brainFitBubble(el, inner); }
     brainUpdateSVGLinks();
   };
   textarea.addEventListener('input', applyLive);
@@ -2021,7 +2023,8 @@ function _brainMarkNodeMenu() {
     });
   }
   mark('#brain-node-bubble-menu .viz-link-type-option', 'bubble', BRAIN_BUBBLE_IDS.has(node.bubble) ? node.bubble : 'speech');
-  mark('#brain-node-align-menu .viz-link-type-option', 'value', node?.textAlign || 'left');
+  // Unset is the border's own: centred lettering on Manhua, left elsewhere.
+  mark('#brain-node-align-menu .viz-link-type-option', 'value', node?.textAlign || (node.border === 'manhua' ? 'center' : 'left'));
   mark('#brain-node-font-menu .viz-link-type-option', 'value', BRAIN_FONTS[node.fontFamily] ? node.fontFamily : '');
   mark('[data-prop="lineSpacing"] button', 'value', String(node?.lineSpacing || 1.5));
   mark('[data-prop="paraSpacing"] button', 'value', node?.paraSpacing || '');
@@ -2113,6 +2116,25 @@ const BRAIN_MEDIEVAL_FRONT = '<div class="viz-md" aria-hidden="true">'
   + ['is-top is-left', 'is-top is-right', 'is-bottom is-left', 'is-bottom is-right']
     .map(c => '<div class="viz-md-corner ' + c + '"></div>').join('')
   + '</div>';
+
+/* Manhua: the bubble is sized round the text, so the text always sits inside
+   it, however much is typed. An ellipse through a rectangle's corners is
+   sqrt(2) times the rectangle's half-size, so each side gets about 21% of the
+   text box; bursts letter inside their inner points, so they get more, and a
+   caption hugs its text. Set as the text area's margins, which is what makes
+   the note's box, and with it the bubble, that size. [x, y] per side. */
+const BRAIN_BUBBLE_ROOM = {
+  caption: [0, 0], yell: [0.33, 0.33], announce: [0.24, 0.24],
+  'two-part': [0.3, 0.3], 'off-panel': [0.3, 0.3], 'speech-v': [0.14, 0.42]
+};
+function brainFitBubble(el, inner) {
+  if (!el || el.dataset.border !== 'manhua') return false;
+  const [kx, ky] = BRAIN_BUBBLE_ROOM[el.dataset.bubble] || [0.21, 0.21];
+  const m = Math.round(inner.offsetHeight * ky + 6) + 'px ' + Math.round(inner.offsetWidth * kx + 8) + 'px';
+  if (inner.style.margin === m) return false;
+  inner.style.margin = m;
+  return true;
+}
 
 /** Electric's halo and sheen blur in proportion to the note (CSS --el-min). */
 function brainSizeElectric(el, inner) {
