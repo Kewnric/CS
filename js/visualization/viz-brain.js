@@ -600,10 +600,13 @@ registerTreeHost('brain', {
     { icon: 'chevrons-down-up', label: 'Collapse all folders', fn: () => brainCollapseAll(true) },
     { icon: 'chevrons-up-down', label: 'Expand all folders', fn: () => brainCollapseAll(false) }
   ]),
+  // A folder's menu opens with what you make in it: a canvas, then a folder.
+  leadActions: (id, kind) => kind !== 'folder' ? [] : [
+    { icon: 'plus', label: 'New Canvas', fn: () => brainCreateVersion(id) },
+    { icon: 'folder-plus', label: 'New subfolder', subfolder: true, fn: () => brainCreateFolder(id) }
+  ],
   extraActions: (id, kind) => {
-    if (kind === 'folder') {
-      return [{ icon: 'plus', label: 'New version here', fn: () => brainCreateVersion(id) }];
-    }
+    if (kind === 'folder') return [];
     const v = brain.versions.find(x => x.id === id);
     if (!v) return [];
     return [

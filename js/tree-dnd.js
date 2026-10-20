@@ -922,11 +922,15 @@ function treeContextMenu(e, id, ns) {
     return;
   }
 
+  // What a tree wants first, above Rename (Brain's folders lead with New Canvas
+  // and New subfolder). A lead item marked `subfolder` replaces the built-in one.
+  const lead = (host.leadActions && host.leadActions(id, found.kind)) || [];
+  if (lead.length) { lead.forEach(a => actions.push(a)); actions.push({ sep: true }); }
   if (host.onRename) actions.push({ icon: 'pencil', label: 'Rename', fn: () => host.onRename(id, found.kind) });
   actions.push({ icon: 'folder-input', label: 'Move to…', fn: () => treeMovePrompt(id, ns) });
   // Anything only this tree can offer (duplicate, share, pin, compare…).
   if (host.extraActions) (host.extraActions(id, found.kind) || []).forEach(a => actions.push(a));
-  if (isFolder && host.onNewSubfolder) {
+  if (isFolder && host.onNewSubfolder && !lead.some(a => a.subfolder)) {
     actions.push({ icon: 'folder-plus', label: 'New subfolder', fn: () => host.onNewSubfolder(id) });
   }
   if (treeParentOf(id, scope)) {
