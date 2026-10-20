@@ -4648,7 +4648,9 @@ body.viz-no-anim .app-sidebar {
   overflow: visible;
   pointer-events: none;
 }
-.brain-bubbles .bb-strokes path { fill: none; stroke-width: 5; stroke-linejoin: round; }
+/* Drawn at double width: the fill covers the inner half, so 3.4 shows as a
+   ~1.7px outline (5 read a little heavy). */
+.brain-bubbles .bb-strokes path { fill: none; stroke-width: 3.4; stroke-linejoin: round; }
 .brain-bubbles .bb-fills path { stroke: none; }
 
 .viz-node[data-type="comment"][data-border="manhua"] .viz-node-inner,
