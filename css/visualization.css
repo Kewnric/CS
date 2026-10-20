@@ -4531,3 +4531,7 @@ body.viz-no-anim .app-sidebar {
   pointer-events: none;
 }
 .viz-comment-editor-overlay.is-floating .viz-comment-editor-window { pointer-events: auto; }
+/* The Brain editor is placed by its top-left (_brainCenterEditorWindow), so
+   the resize corner grows it right and down and stays under the pointer. */
+.viz-comment-editor-overlay.is-anchored { display: block; }
+.viz-comment-editor-overlay.is-anchored .viz-comment-editor-window { position: absolute; }

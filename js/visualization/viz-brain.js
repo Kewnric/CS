@@ -1520,6 +1520,8 @@ function brainOpenEditor(node) {
     overlay.remove();
     if (typeof vizHoverClear === 'function') vizHoverClear();
   };
+  overlay.classList.add('is-anchored');
+  _brainCenterEditorWindow(overlay.querySelector('.viz-comment-editor-window'));
   _brainWireEditorFloat(overlay, textarea);
   if (carry) {
     if (carry.floating) _brainSetEditorFloating(overlay, true, textarea);
@@ -1566,10 +1568,19 @@ function _brainWireEditorFloat(overlay, textarea) {
   head.addEventListener('pointercancel', end);
 }
 
+/* Placed by its top-left, centred once. Centred by flexbox instead, a resize
+   from the corner grew the window on both sides at once, so the corner moved
+   half as far as the pointer and drifted off it. */
+function _brainCenterEditorWindow(win) {
+  if (!win) return;
+  win.style.left = Math.max(8, (innerWidth - win.offsetWidth) / 2) + 'px';
+  win.style.top = Math.max(8, (innerHeight - win.offsetHeight) / 2) + 'px';
+}
+
 function _brainSetEditorFloating(overlay, on, textarea) {
   overlay.classList.toggle('is-floating', on);
   const win = overlay.querySelector('.viz-comment-editor-window');
-  if (!on && win) win.style.translate = '';   // back to the centre
+  if (!on && win) { win.style.translate = ''; _brainCenterEditorWindow(win); }   // back to the centre, at its size now
   const btn = overlay.querySelector('#viz-comment-editor-min');
   if (btn) {
     btn.title = on ? 'Restore: blur the canvas and centre the note' : 'Unblur the canvas behind the note';
