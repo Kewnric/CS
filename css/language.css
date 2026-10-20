@@ -1318,8 +1318,10 @@ button.la-blank-slot { cursor: pointer; }
 /* ── No scrollbars in the Language Library ──
    Every pane, list and popover still scrolls by wheel, touch and keyboard;
    only the bars are gone. */
+.home-content:has(#lang-admin-root),
 #lang-lib-root, #lang-lib-root *, #lang-admin-root, #lang-admin-root *,
 .la-shell, .la-shell *, .lq-shell, .lq-shell *, .lpv-pop, .lpv-pop * { scrollbar-width: none; }
+.home-content:has(#lang-admin-root)::-webkit-scrollbar,
 #lang-lib-root::-webkit-scrollbar, #lang-lib-root *::-webkit-scrollbar,
 #lang-admin-root::-webkit-scrollbar, #lang-admin-root *::-webkit-scrollbar,
 .la-shell::-webkit-scrollbar, .la-shell *::-webkit-scrollbar,
@@ -1529,7 +1531,7 @@ button.la-blank-slot { cursor: pointer; }
 .lang-board-group-inner .lang-card-chip { position: absolute; top: 0.7rem; right: 0.7rem; }
 
 /* A sidebar dragged very narrow: one column rather than two cramped ones. */
-.lang-board { container-type: inline-size; }
+.lang-board { width: 100%; container-type: inline-size; }
 @container (max-width: 250px) {
   .lang-board-group-inner { grid-template-columns: 1fr; }
 }

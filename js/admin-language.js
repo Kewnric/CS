@@ -62,7 +62,7 @@ function adminLanguageTemplate() {
     : '<h1 class="lib-hub-title">Language Admin</h1>';
   return `
     <div class="home-content">
-      <div class="home-scroll" id="lang-admin-root" style="padding:1.5rem 2rem 4rem;">
+      <div class="home-scroll lpv-adm-scroll" id="lang-admin-root">
         <div class="lpv-page lpv-adm lpv-tone-primary">
           <div class="lpv-adm-nav">
             <button onclick="langAdmLeave('admin')" class="btn-back-dark" style="padding:0.25rem 0.5rem; font-size:0.75rem;">

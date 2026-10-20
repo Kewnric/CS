@@ -57,7 +57,12 @@
 
 /* ── The page ── */
 
+/* width: 100% is load-bearing. Containment (below) means the page cannot
+   take its width from its content -- so anywhere it is not stretched, such as
+   the admin's flex column where margin: auto switches stretching off, it
+   collapsed to a sliver. It always fills its parent, up to max-width. */
 .lpv-page {
+  width: 100%;
   max-width: 980px;
   margin: 0 auto;
   display: flex;
@@ -1394,6 +1399,8 @@ button.lpv-stat { cursor: pointer; }
    ============================================================ */
 
 .lpv-adm { max-width: 1240px; }
+.home-scroll.lpv-adm-scroll { padding: 1.5rem 2rem 4rem; }
+@media (max-width: 640px) { .home-scroll.lpv-adm-scroll { padding: 0.9rem 0.75rem 4rem; } }
 .lpv-adm-nav { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .lpv-adm-keys { font-size: 0.72rem; color: var(--text-tertiary); }
 .lpv-adm-keys kbd, .lpv-adm .lpv-wordlist-keys kbd {
@@ -1947,6 +1954,8 @@ button.lpv-stat { cursor: pointer; }
   .lpv-adm-side .lpv-adm-editor { max-height: none; }
 }
 @container (max-width: 640px) {
+  .lpv-adm-hero-actions { flex-direction: row; flex-wrap: wrap; width: 100%; min-width: 0; }
+  .lpv-adm-hero-actions > * { flex: 1 1 140px; }
   .lpv-adm-tabs { grid-template-columns: 1fr; }
   .lpv-adm-grid2, .lpv-adm-grid2.is-term { grid-template-columns: 1fr; }
   .lpv-q-status { display: none; }
