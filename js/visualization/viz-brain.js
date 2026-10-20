@@ -1752,15 +1752,25 @@ function brainEnsureElectricFilter() {
   // Four noise fields, scrolled in opposite directions and blended, displace the
   // border. Octaves past 6 are finer than a pixel at this base frequency, so 6
   // looks the same as 10 at a fraction of the cost.
-  const field = (seed, attr, from, to, out, animate) =>
+  //
+  // Each pair of fields is one noise scrolled by a period P and by P less, so
+  // together they cover the filter area — but only if P is no bigger than that
+  // area. The original scrolled 700px and 490px, exactly the area of its
+  // 350x500 card; on a ~330x70 note that left most of the area with no noise,
+  // and there the displacement map shifts the border a flat 15px instead of
+  // crackling it. P is now under the smallest note's area (min 100x50 note ->
+  // 140x90 here), and the loop is shortened to keep the original's speed
+  // (about 117px/s down, 82px/s across).
+  const PY = 80, PX = 120;
+  const field = (seed, attr, from, to, dur, out, animate) =>
     `<feTurbulence type="turbulence" baseFrequency="0.02" numOctaves="6" seed="${seed}"/>`
     + `<feOffset dx="0" dy="0" result="${out}">`
-    + (animate ? `<animate attributeName="${attr}" values="${from}; ${to}" dur="6s" repeatCount="indefinite" calcMode="linear"/>` : '')
+    + (animate ? `<animate attributeName="${attr}" values="${from}; ${to}" dur="${dur}s" repeatCount="indefinite" calcMode="linear"/>` : '')
     + '</feOffset>';
   const filter = (id, animate) =>
     `<filter id="${id}" color-interpolation-filters="sRGB" x="-20%" y="-40%" width="140%" height="180%">`
-    + field(1, 'dy', 700, 0, 'o1', animate) + field(1, 'dy', 0, -700, 'o2', animate)
-    + field(2, 'dx', 490, 0, 'o3', animate) + field(2, 'dx', 0, -490, 'o4', animate)
+    + field(1, 'dy', PY, 0, 0.68, 'o1', animate) + field(1, 'dy', 0, -PY, 0.68, 'o2', animate)
+    + field(2, 'dx', PX, 0, 1.46, 'o3', animate) + field(2, 'dx', 0, -PX, 1.46, 'o4', animate)
     + '<feComposite in="o1" in2="o2" result="p1"/><feComposite in="o3" in2="o4" result="p2"/>'
     + '<feBlend in="p1" in2="p2" mode="color-dodge" result="noise"/>'
     + '<feDisplacementMap in="SourceGraphic" in2="noise" scale="30" xChannelSelector="R" yChannelSelector="B"/>'

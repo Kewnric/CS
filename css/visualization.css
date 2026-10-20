@@ -4265,7 +4265,10 @@ body.viz-no-anim .app-sidebar {
 .viz-node[data-type="comment"][data-border="electric"].dragging .viz-node-inner,
 .viz-node[data-type="comment"][data-border="electric"] .viz-node-inner:active {
   border-radius: var(--el-radius) !important;
-  border: 2px solid color-mix(in srgb, var(--el-color) 50%, transparent) !important;
+  /* 1px, as the slab: a 2px card border narrowed the text area enough to
+     wrap a line, and the note clips what overflows. The crackling line is its
+     own layer, so the card's border can stay quiet. */
+  border: 1px solid color-mix(in srgb, var(--el-color) 50%, transparent) !important;
   background:
     linear-gradient(-30deg, var(--el-grad), transparent, var(--el-grad)),
     var(--bg-elevated) !important;
@@ -4312,7 +4315,7 @@ body.viz-no-anim .app-sidebar {
 .viz-electric-sheen {
   mix-blend-mode: overlay;
   filter: blur(16px);
-  opacity: 0.7;
+  opacity: 0.3;   /* stronger, it washed the card out pink-white */
   clip-path: inset(0 round var(--el-radius));
   background: linear-gradient(-30deg, #fff, transparent 30%, transparent 70%, #fff);
 }
