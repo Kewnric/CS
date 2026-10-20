@@ -782,10 +782,8 @@ function brainImportVersion() {
 }
 
 function brainUpdateCanvasToolbar() {
-  const el = document.getElementById('viz-canvas-toolbar-label');
-  if (!el) return;
   const v = brain.versions.find(v => v.id === brain.activeVersionId);
-  el.textContent = v ? 'Brain — ' + v.name : 'Brain Canvas';
+  vizSetCanvasTitle('Brain', v ? v.name : 'No version open', 'brain-circuit');
 }
 
 function brainPushUndo() {

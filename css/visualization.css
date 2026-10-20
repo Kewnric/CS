@@ -4971,3 +4971,119 @@ body.viz-no-anim .app-sidebar {
 .viz-node[data-shape].is-rotating .shape-rotate { cursor: grabbing; background: var(--color-primary); color: #fff; }
 .viz-node.dragging .shape-rotate,
 .viz-canvas-container.brain-locked .shape-rotate { display: none !important; }
+
+/* ── The canvas toolbar, one design ────────────────────────────
+   Every control has one quiet look and "on" has one accent. Active buttons
+   used to be solid indigo, amber, cyan, green or violet depending on which
+   button it was, plain, pill and zoom buttons each hovered in their own way,
+   and the title was a 12px grey line behind a loose icon. */
+.viz-canvas-toolbar {
+  min-height: 46px;
+  padding: 0.4rem 0.6rem 0.4rem 0.7rem;
+  gap: 0.75rem;
+  background: color-mix(in srgb, var(--bg-surface) 86%, var(--bg-body));
+  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 75%, transparent);
+}
+
+/* The title: a tinted icon tile, the surface as an eyebrow, the name in full. */
+.viz-canvas-toolbar-left {
+  gap: 0.55rem;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+.vct-icon {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary) 28%, transparent);
+}
+.vct-icon svg { width: 15px; height: 15px; }
+.vct-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.15;
+}
+.vct-eyebrow {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.vct-name {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: 0.005em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 26ch;
+}
+
+/* Buttons: quiet at rest, a soft neutral hover, one accent when on. */
+.viz-canvas-toolbar .viz-zoom-btn,
+.viz-canvas-toolbar .viz-toolbar-pill-btn {
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  box-shadow: none;
+  transform: none;
+}
+.viz-canvas-toolbar .viz-toolbar-pill-btn { padding: 0 0.5rem; }
+.viz-canvas-toolbar .viz-zoom-btn:not(.viz-toolbar-pill-btn) { width: 30px; }
+.viz-canvas-toolbar .viz-zoom-btn:hover,
+.viz-canvas-toolbar .viz-toolbar-pill-btn:hover {
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  color: var(--text-primary);
+  border-color: transparent;
+  box-shadow: none;
+  transform: none;
+}
+.viz-canvas-toolbar .viz-zoom-btn:active { transform: scale(0.95); }
+.viz-canvas-toolbar .viz-toolbar-pill-btn.is-active,
+.viz-canvas-toolbar .viz-toolbar-pill-btn.is-active.viz-state-fog,
+.viz-canvas-toolbar .viz-toolbar-pill-btn.is-active.viz-state-flow,
+.viz-canvas-toolbar .viz-toolbar-pill-btn.is-active.viz-state-color,
+.viz-canvas-toolbar .viz-toolbar-pill-btn.is-active.viz-state-globe,
+.viz-canvas-toolbar .viz-zoom-btn.viz-toolbar-pill-btn.active,
+.viz-canvas-toolbar .viz-zoom-btn.is-active {
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  border-color: color-mix(in srgb, var(--color-primary) 45%, transparent);
+  box-shadow: none;
+}
+.viz-canvas-toolbar .viz-toolbar-pill-btn.is-active i,
+.viz-canvas-toolbar .viz-toolbar-pill-btn.is-active svg {
+  color: var(--color-primary) !important;
+  transform: none;
+}
+.viz-canvas-toolbar .viz-pill-chevron {
+  border-left-color: color-mix(in srgb, var(--border-color) 70%, transparent);
+}
+
+/* Zoom: one segment holding minus, the level, plus and fit. */
+.viz-canvas-toolbar .viz-zoom-controls {
+  gap: 0.1rem;
+  padding: 2px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-color) 80%, transparent);
+}
+.viz-canvas-toolbar .viz-zoom-controls .viz-zoom-btn { width: 26px; height: 26px; border-radius: 7px; }
+.viz-canvas-toolbar .viz-zoom-level { color: var(--text-secondary); font-variant-numeric: tabular-nums; min-width: 40px; }
+
+.viz-canvas-toolbar .viz-toolbar-sep {
+  height: 18px;
+  background: color-mix(in srgb, var(--border-color) 70%, transparent);
+}

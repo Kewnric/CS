@@ -138,8 +138,8 @@ function vizTemplate() {
                tools already had. -->
           <div class="viz-canvas-toolbar" id="viz-canvas-toolbar" role="toolbar" aria-label="Canvas tools">
             <div class="viz-canvas-toolbar-left">
-              <i data-lucide="move" style="width:13px;height:13px;color:var(--color-primary);"></i>
-              <span id="viz-canvas-toolbar-label">Canvas</span>
+              <span class="vct-icon" id="viz-canvas-toolbar-icon" aria-hidden="true"><i data-lucide="git-branch"></i></span>
+              <span class="vct-text" id="viz-canvas-toolbar-label"><span class="vct-eyebrow">Canvas</span><span class="vct-name">Canvas</span></span>
             </div>
             <div style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
               <span class="brain-saved-chip" id="brain-saved-chip" aria-live="polite"></span>

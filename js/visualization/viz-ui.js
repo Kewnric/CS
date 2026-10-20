@@ -437,8 +437,22 @@ function _vizLeaveSurface() {
 
 /** The canvas toolbar's title for whichever libraries are on screen. */
 function vizPaintCanvasLabel() {
-  const labelEl = document.getElementById('viz-canvas-toolbar-label');
-  if (labelEl) labelEl.textContent = vizSurfaceLabel() + ' Canvas';
+  vizSetCanvasTitle('Canvas', vizSurfaceLabel(), 'git-branch');
+}
+
+/** The toolbar's heading: an icon tile, a small eyebrow, then the name. */
+function vizSetCanvasTitle(eyebrow, name, icon) {
+  const el = document.getElementById('viz-canvas-toolbar-label');
+  if (el) {
+    el.innerHTML = '<span class="vct-eyebrow">' + escapeHTML(eyebrow) + '</span><span class="vct-name">' + escapeHTML(name) + '</span>';
+    el.title = eyebrow + ': ' + name;
+  }
+  const tile = document.getElementById('viz-canvas-toolbar-icon');
+  if (tile && icon && tile.dataset.icon !== icon) {
+    tile.dataset.icon = icon;
+    tile.innerHTML = '<i data-lucide="' + icon + '"></i>';
+    if (typeof lucide !== 'undefined') lucide.createIcons({ root: tile });
+  }
 }
 
 function _vizEnterLibrary() {
