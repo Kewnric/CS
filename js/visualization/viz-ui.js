@@ -196,32 +196,47 @@ function vizApplySheet() {
   document.querySelectorAll('#viz-sheet-popup [data-sheet]').forEach(o => {
     if (o.classList.contains('viz-link-type-option')) o.classList.toggle('active', o.dataset.sheet === sheet);
   });
-  document.querySelectorAll('#viz-sheet-color-popup [data-sheet-color]').forEach(o => o.classList.toggle('active', o.dataset.sheetColor === color));
+  document.querySelectorAll('#viz-sheet-color-list [data-sheet-color]').forEach(o => o.classList.toggle('active', o.dataset.sheetColor === color));
+  const patternName = (VIZ_SHEETS.find(x => x[0] === sheet) || [, 'Dotted'])[1];
+  const colorName = (VIZ_SHEET_COLORS.find(x => x[0] === color) || [, 'Default'])[1];
+  const pCur = document.getElementById('viz-sheet-pattern-current');
+  const cCur = document.getElementById('viz-sheet-color-current');
+  if (pCur) pCur.textContent = patternName;
+  if (cCur) cCur.textContent = colorName;
   const sBtn = document.getElementById('viz-sheet-btn');
   if (sBtn) {
-    sBtn.title = 'Sheet: ' + ((VIZ_SHEETS.find(x => x[0] === sheet) || [, 'Dotted'])[1]);
-    sBtn.classList.toggle('is-active', sheet !== 'dotted');
-  }
-  const cBtn = document.getElementById('viz-sheet-color-btn');
-  if (cBtn) {
-    cBtn.title = 'Sheet colour: ' + ((VIZ_SHEET_COLORS.find(x => x[0] === color) || [, 'Default'])[1]);
-    cBtn.classList.toggle('is-active', !!color);
+    sBtn.title = 'Sheet: ' + patternName + ', ' + colorName;
+    sBtn.classList.toggle('is-active', sheet !== 'dotted' || !!color);
   }
 }
 
-function vizToggleSheetMenu() { vizTogglePopup('viz-sheet-popup'); }
-function vizToggleSheetColorMenu() { vizTogglePopup('viz-sheet-color-popup'); }
+/* One Sheet dropdown; Pattern and Colour are its children and open one at a
+   time inside it. It opens with both folded, and picking keeps it open, so
+   both can be set in one go; a click outside closes it. */
+function vizToggleSheetMenu() {
+  vizTogglePopup('viz-sheet-popup', () => { _vizShowSheetSub('pattern', false); _vizShowSheetSub('color', false); });
+}
+function vizToggleSheetSub(which) {
+  const list = document.getElementById('viz-sheet-' + which + '-list');
+  const open = !!list && list.classList.contains('hidden');
+  _vizShowSheetSub(which === 'pattern' ? 'color' : 'pattern', false);
+  _vizShowSheetSub(which, open);
+}
+function _vizShowSheetSub(which, open) {
+  const list = document.getElementById('viz-sheet-' + which + '-list');
+  const toggle = document.getElementById('viz-sheet-' + which + '-toggle');
+  if (list) list.classList.toggle('hidden', !open);
+  if (toggle) toggle.setAttribute('aria-expanded', String(open));
+}
 
 function vizSetSheet(id) {
   try { localStorage.setItem('ssp.vizSheet', id); } catch (_) { /* private mode */ }
   vizApplySheet();
-  vizClosePopups();
 }
 
 function vizSetSheetColor(id) {
   try { localStorage.setItem('ssp.vizSheetColor', id); } catch (_) { /* private mode */ }
   vizApplySheet();
-  vizClosePopups();
 }
 
 /* ── Canvas only ───────────────────────────────────────────────

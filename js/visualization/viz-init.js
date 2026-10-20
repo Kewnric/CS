@@ -142,18 +142,12 @@ function initVisualization() {
       e.target.closest('#brain-canvas-ctx') || e.target.closest('#brain-node-ctx') ||
       e.target.closest('#brain-link-ctx') || e.target.closest('#brain-version-ctx');
     if (!inMenu) vizHideAllMenus();
-    if (!e.target.closest('.viz-toolbar-dropdown')) {
-      document.getElementById('viz-link-type-popup')?.classList.add('hidden');
-      if (!viz.colorModeEnabled) document.getElementById('viz-color-mode-popup')?.classList.add('hidden');
-      // Brain's arrange menu was left out, so once opened it stayed open over
-      // the canvas until you happened to press its button again.
-      document.getElementById('brain-layout-popup')?.classList.add('hidden');
-      document.getElementById('viz-depth-popup')?.classList.add('hidden');
-      document.getElementById('viz-tint-popup')?.classList.add('hidden');
-      document.getElementById('viz-focus-popup')?.classList.add('hidden');
-      document.getElementById('viz-views-popup')?.classList.add('hidden');
-      document.getElementById('viz-more-popup')?.classList.add('hidden');
-    }
+    // A click outside every toolbar dropdown closes them all. This kept its
+    // own list of popup ids, and each new dropdown that was not added to it
+    // (Brain's arrange menu, then Sheet) stayed open over the canvas. The one
+    // list, VIZ_POPUPS, now does it; paint mode's palette still stays while
+    // the mode is on (see vizClosePopups).
+    if (!e.target.closest('.viz-toolbar-dropdown')) vizClosePopups();
     if (viz.activeModule === 'brain') {
       if (brain.linkingFrom && !e.target.closest('.viz-node') && !inMenu) brainCancelLinking();
     } else {

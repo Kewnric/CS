@@ -4823,3 +4823,18 @@ body.viz-no-anim .app-sidebar {
   background-image: repeating-linear-gradient(45deg, var(--text-tertiary) 0 1px, transparent 1px 4px), repeating-linear-gradient(-45deg, var(--text-tertiary) 0 1px, transparent 1px 4px);
 }
 .viz-sheet-chip[data-sheet="grain"] { background-image: radial-gradient(circle at 30% 40%, var(--text-tertiary) 0.5px, transparent 1px), radial-gradient(circle at 70% 70%, var(--text-tertiary) 0.5px, transparent 1px); background-size: 4px 4px, 5px 5px; }
+
+/* The Sheet dropdown's two children: a row each, the current value beside
+   the label, and a chevron that turns when open. */
+.viz-sheet-sub-toggle { width: 100%; background: none; border: none; text-align: left; }
+.viz-sheet-sub-toggle i:first-child,
+.viz-sheet-sub-toggle svg:first-child { width: 14px; height: 14px; }
+.viz-sheet-current {
+  margin-left: auto;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-tertiary);
+}
+.viz-sheet-sub-toggle .viz-ctx-sub-chev { width: 13px; height: 13px; opacity: 0.7; transition: transform 0.15s ease; }
+.viz-sheet-sub-toggle[aria-expanded="true"] .viz-ctx-sub-chev { transform: rotate(180deg); }
+.viz-sheet-sub-toggle[aria-expanded="true"] { color: var(--color-primary); }

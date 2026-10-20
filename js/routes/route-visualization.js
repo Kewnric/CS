@@ -253,27 +253,25 @@ function vizTemplate() {
 
               <div class="viz-toolbar-sep"></div>
 
-              <!-- ── The sheet the canvas is drawn on: its pattern and its colour ── -->
+              <!-- ── The sheet the canvas is drawn on: one dropdown, with its
+                   pattern and its colour as two child dropdowns ── -->
               <div class="viz-toolbar-dropdown">
-                <button class="viz-zoom-btn viz-toolbar-pill-btn" id="viz-sheet-btn" onclick="vizToggleSheetMenu()" title="Sheet pattern" aria-label="Sheet pattern" aria-haspopup="true">
+                <button class="viz-zoom-btn viz-toolbar-pill-btn" id="viz-sheet-btn" onclick="vizToggleSheetMenu()" title="Sheet" aria-label="Sheet: pattern and colour" aria-haspopup="true">
                   <i data-lucide="grid-2x2" style="width:12px;height:12px;"></i>
                   <span class="viz-pill-chevron"><i data-lucide="chevron-down" style="width:10px;height:10px;"></i></span>
                 </button>
-                <div id="viz-sheet-popup" class="viz-toolbar-popup hidden" role="menu">
+                <div id="viz-sheet-popup" class="viz-toolbar-popup hidden" role="menu" style="min-width:220px;">
                   <div class="viz-popup-title">Sheet</div>
-                  ${(typeof VIZ_SHEETS !== 'undefined' ? VIZ_SHEETS : []).map(([id, label]) =>
-                    `<div class="viz-link-type-option" role="menuitem" data-sheet="${id}" onclick="vizSetSheet('${id}')"><span class="viz-sheet-chip" data-sheet="${id}"></span>${label}</div>`).join('')}
-                </div>
-              </div>
-              <div class="viz-toolbar-dropdown">
-                <button class="viz-zoom-btn viz-toolbar-pill-btn" id="viz-sheet-color-btn" onclick="vizToggleSheetColorMenu()" title="Sheet colour" aria-label="Sheet colour" aria-haspopup="true">
-                  <i data-lucide="paint-bucket" style="width:12px;height:12px;"></i>
-                  <span class="viz-pill-chevron"><i data-lucide="chevron-down" style="width:10px;height:10px;"></i></span>
-                </button>
-                <div id="viz-sheet-color-popup" class="viz-toolbar-popup hidden" role="menu">
-                  <div class="viz-popup-title">Sheet colour</div>
-                  ${(typeof VIZ_SHEET_COLORS !== 'undefined' ? VIZ_SHEET_COLORS : []).map(([id, label, swatch]) =>
-                    `<div class="viz-link-type-option" role="menuitem" data-sheet-color="${id}" onclick="vizSetSheetColor('${id}')"><span class="viz-sheet-swatch" style="background:${swatch};"></span>${label}</div>`).join('')}
+                  <button type="button" class="viz-link-type-option viz-sheet-sub-toggle" id="viz-sheet-pattern-toggle" aria-haspopup="menu" aria-expanded="false" onclick="vizToggleSheetSub('pattern')"><i data-lucide="grid-2x2"></i> Pattern <span class="viz-sheet-current" id="viz-sheet-pattern-current"></span><i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
+                  <div class="viz-ctx-submenu hidden" id="viz-sheet-pattern-list" role="menu">
+                    ${(typeof VIZ_SHEETS !== 'undefined' ? VIZ_SHEETS : []).map(([id, label]) =>
+                      `<div class="viz-link-type-option" role="menuitem" data-sheet="${id}" onclick="vizSetSheet('${id}')"><span class="viz-sheet-chip" data-sheet="${id}"></span>${label}</div>`).join('')}
+                  </div>
+                  <button type="button" class="viz-link-type-option viz-sheet-sub-toggle" id="viz-sheet-color-toggle" aria-haspopup="menu" aria-expanded="false" onclick="vizToggleSheetSub('color')"><i data-lucide="paint-bucket"></i> Colour <span class="viz-sheet-current" id="viz-sheet-color-current"></span><i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
+                  <div class="viz-ctx-submenu hidden" id="viz-sheet-color-list" role="menu">
+                    ${(typeof VIZ_SHEET_COLORS !== 'undefined' ? VIZ_SHEET_COLORS : []).map(([id, label, swatch]) =>
+                      `<div class="viz-link-type-option" role="menuitem" data-sheet-color="${id}" onclick="vizSetSheetColor('${id}')"><span class="viz-sheet-swatch" style="background:${swatch};"></span>${label}</div>`).join('')}
+                  </div>
                 </div>
               </div>
               <div class="viz-toolbar-sep"></div>
