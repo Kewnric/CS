@@ -799,7 +799,7 @@ const LANG_TYPE_RULES = {
   arrange: {
     how: ['You are given a sentence to say in the language you are learning.',
           'Tap the word tiles in the right order to build it.',
-          'Tap a tile you have already placed to take it back.'],
+          'Tap a tile you have already placed to take it back, or press Backspace.'],
     wins: 'The words in the correct order. Punctuation and capitals are ignored.'
   },
   blank: {
@@ -810,7 +810,7 @@ const LANG_TYPE_RULES = {
   },
   choice: {
     how: ['A prompt appears with up to four answers.',
-          'Tap the one that is right.',
+          'Tap the one that is right, or press its number.',
           'The answers are shuffled on every run.'],
     wins: 'The correct option.'
   },
@@ -822,9 +822,9 @@ const LANG_TYPE_RULES = {
   },
   match: {
     how: ['Two columns of terms appear.',
-          'Tap one on the left, then its partner on the right.',
-          'Tap a completed pair again to undo it.'],
-    wins: 'Every pair matched correctly — it is all or nothing.'
+          'Tap a term, then its partner in the other column. A right pair locks in.',
+          'A wrong pair flashes red and lets go, so you can try again.'],
+    wins: 'Every pair found without a wrong guess — one mix-up and the question counts as missed.'
   }
 };
 

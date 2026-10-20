@@ -773,6 +773,9 @@ function langDrillTypeHTML(type) {
           <p>${escapeHTML(rules.wins)}</p>
           <h3 style="margin-top:0.85rem;"><i data-lucide="heart"></i> Hearts</h3>
           <p>Three. A wrong answer or a skip costs one; at zero the run ends there.</p>
+          <h3 style="margin-top:0.85rem;"><i data-lucide="keyboard"></i> Keys</h3>
+          <p><kbd>1</kbd>–<kbd>9</kbd> pick a tile or answer, <kbd>Backspace</kbd> takes the last word back,
+             <kbd>Enter</kbd> checks and continues, <kbd>Esc</kbd> leaves.</p>
         </div>
       </div>
 

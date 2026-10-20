@@ -364,32 +364,120 @@
 
 /* ── The drill runner ─────────────────────────────────────── */
 
-/* One question at a time is the right idea, and it was being shown at laptop
-   size on whatever screen you had: a 620px column pinned to the top of a
-   1080px-tall pane, with two thirds of the display empty below it and the
-   Check button stranded at the far bottom edge. Everything below scales from
-   these four tokens, so the drill grows with the window instead of sitting
-   in the corner of it. The lower bound of each clamp is exactly what the
-   size used to be, so a small window is unchanged. */
+/* A lesson, not a game. The pixel skin this used to borrow from the run made
+   every drill look like a level of the adventure, and Pixelify Sans blurred
+   exactly the letters a learner has to copy. The pixel look now belongs to
+   the adventure alone (.lq-shell); this is the friendly shape language apps
+   have settled on -- big rounded tiles that press down into a lip, a thick
+   progress bar, hearts, and a footer that turns green or red with the verdict
+   -- dressed in the app's own tokens, so it follows light, dark and the
+   coloured themes the way the Notebook and Typing attempts do.
+
+   Everything scales from the tokens on the shell, so the drill grows with the
+   window instead of sitting in one corner of it. */
 .la-shell {
+  --la-measure: clamp(560px, 50vw, 880px);
+  --la-prompt: clamp(1.4rem, 0.95rem + 1.3vw, 2.25rem);
+  --la-answer: clamp(1rem, 0.85rem + 0.4vw, 1.3rem);
+  --la-pad: clamp(0.75rem, 0.55rem + 0.55vw, 1.2rem);
+  --la-lip: 4px;
+  --la-edge: var(--border-color);
+  --la-ok: var(--color-success);
+  --la-bad: var(--color-danger);
+  --la-ok-dark: color-mix(in srgb, var(--color-success) 72%, #000);
+  --la-bad-dark: color-mix(in srgb, var(--color-danger) 72%, #000);
+  --la-primary-dark: color-mix(in srgb, var(--color-primary) 72%, #000);
+  --la-ok-wash: color-mix(in srgb, var(--color-success) 16%, var(--bg-surface));
+  --la-bad-wash: color-mix(in srgb, var(--color-danger) 14%, var(--bg-surface));
+
   display: flex;
   flex-direction: column;
   height: 100%;
   background: var(--bg-body);
-  --la-measure: clamp(620px, 56vw, 1000px);
-  --la-prompt: clamp(1.45rem, 0.95rem + 1.5vw, 2.6rem);
-  --la-answer: clamp(0.95rem, 0.75rem + 0.55vw, 1.4rem);
-  --la-pad: clamp(0.85rem, 0.55rem + 0.75vw, 1.5rem);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
 }
 
-.la-top { display: flex; align-items: center; gap: 1rem; padding: 0.85rem 1.25rem; border-bottom: 1px solid var(--border-color); }
+/* ── Top bar: leave, progress, clock, hearts ── */
 
-.la-progress { flex: 1; height: clamp(10px, 0.6vw, 16px); border-radius: 999px; background: var(--bg-surface-hover); overflow: hidden; }
-.la-progress-fill { height: 100%; border-radius: 999px; background: var(--color-success); transition: width 0.3s ease; }
+.la-top {
+  display: flex;
+  align-items: center;
+  gap: clamp(0.75rem, 1.5vw, 1.25rem);
+  width: 100%;
+  max-width: calc(var(--la-measure) + 8rem);
+  margin: 0 auto;
+  padding: clamp(0.9rem, 2.2vh, 1.6rem) 1.25rem 0.5rem;
+}
 
-.la-hearts { display: flex; gap: 0.3rem; color: var(--color-danger); }
-.la-heart { width: clamp(18px, 1.3vw, 26px); height: clamp(18px, 1.3vw, 26px); }
-.la-heart.is-lost { opacity: 0.25; }
+.la-exit {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.la-exit:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
+.la-exit:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.la-exit svg { width: 24px; height: 24px; stroke-width: 2.5; }
+
+.la-progress {
+  position: relative;
+  flex: 1;
+  height: clamp(14px, 1vw, 18px);
+  border-radius: var(--radius-full);
+  background: var(--bg-surface-hover);
+  overflow: hidden;
+}
+.la-progress-fill {
+  position: relative;
+  height: 100%;
+  width: 0;
+  border-radius: inherit;
+  background: var(--la-ok);
+  transition: width 0.45s var(--ease-expo-out, ease);
+}
+/* The glint along the top of the fill -- it is what makes a flat bar read as
+   something filling up rather than a stripe of colour. */
+.la-progress-fill::after {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 22%;
+  height: 26%;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.32);
+}
+
+.la-clock {
+  flex-shrink: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+.la-clock:empty { display: none; }
+.la-clock.is-low { color: var(--la-bad); }
+
+.la-hearts { display: flex; gap: 0.2rem; flex-shrink: 0; color: var(--la-bad); }
+.la-heart {
+  width: clamp(20px, 1.4vw, 26px);
+  height: clamp(20px, 1.4vw, 26px);
+  fill: currentColor;
+  transition: opacity 0.2s ease, color 0.2s ease;
+}
+.la-heart.is-lost { color: var(--text-tertiary); fill: none; opacity: 0.45; }
+
+/* ── The question ── */
 
 /* `safe center` puts the question in the middle of the screen, where the eye
    already is, and falls back to the top edge the moment the content is taller
@@ -401,197 +489,536 @@
   display: flex;
   justify-content: center;
   align-items: safe center;
-  padding: clamp(2rem, 4vh, 4rem) 1.25rem;
+  padding: clamp(1.5rem, 4vh, 3.5rem) 1.25rem;
 }
-.la-card { width: 100%; max-width: var(--la-measure); }
+.la-card { width: 100%; max-width: var(--la-measure); animation: laRise 0.28s var(--ease-expo-out, ease) both; }
 
 .la-kind {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  font-size: 0.66rem;
+  gap: 0.4rem;
+  font-size: 0.72rem;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   color: var(--color-primary);
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.6rem;
 }
-.la-kind i, .la-kind svg { width: 13px; height: 13px; }
+.la-kind i, .la-kind svg { width: 15px; height: 15px; }
 
 .la-prompt {
   font-size: var(--la-prompt);
   font-weight: 800;
-  color: var(--text-primary);
-  margin: 0 0 clamp(1.25rem, 2.2vh, 2.25rem);
+  letter-spacing: -0.015em;
   line-height: 1.25;
+  color: var(--text-primary);
+  margin: 0 0 clamp(1.25rem, 3vh, 2.5rem);
   text-wrap: balance;
 }
 
-.la-blank-line {
-  font-size: calc(var(--la-prompt) * 0.62);
-  color: var(--text-primary);
-  margin-bottom: 1rem;
-  line-height: 1.9;
-}
-.la-blank-slot {
-  display: inline-block;
-  min-width: 90px;
-  text-align: center;
-  border-bottom: 2px solid var(--color-primary);
-  padding: 0 0.4rem;
-  font-weight: 700;
-  color: var(--color-primary);
-}
-
-.la-lane {
-  min-height: 58px;
-  border-bottom: 2px dashed var(--border-color);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.4rem;
-  align-content: flex-start;
-  padding-bottom: 0.6rem;
-  margin-bottom: 1.25rem;
-}
-.la-lane-hint { color: var(--text-tertiary); font-size: 0.8rem; align-self: center; }
-
-.la-pool { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-
-.la-tile {
-  padding: calc(var(--la-pad) * 0.6) var(--la-pad);
-  border: 1px solid var(--border-color);
-  border-bottom-width: 3px;
+/* The speaker beside the prompt is a real button here, so it gets the lip. */
+.la-card .la-speak {
+  width: 40px;
+  height: 40px;
+  margin-left: 0.5rem;
+  border: 2px solid var(--la-edge);
   border-radius: var(--radius-md);
   background: var(--bg-surface);
-  color: var(--text-primary);
-  font-size: var(--la-answer);
-  font-weight: 650;
-  cursor: pointer;
-  font-family: var(--font-sans);
-  transition: transform 0.1s ease, border-color 0.15s ease;
+  box-shadow: 0 3px 0 var(--la-edge);
+  color: var(--color-primary);
+  vertical-align: middle;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, background-color 0.15s ease, border-color 0.15s ease;
 }
-.la-tile:hover { border-color: var(--color-primary); }
-.la-tile:active { transform: translateY(1px); }
-.la-tile.is-placed { border-color: var(--color-primary); background: var(--color-primary-subtle); }
+.la-card .la-speak:hover { background: var(--color-primary-subtle); border-color: var(--color-primary); box-shadow: 0 3px 0 var(--color-primary); }
+.la-card .la-speak:active { transform: translateY(3px); box-shadow: none; }
+.la-card .la-speak svg { width: 19px; height: 19px; }
 
-.la-options { display: flex; flex-direction: column; gap: clamp(0.5rem, 1vh, 0.9rem); }
+/* Fill in the blank: the sentence IS the prompt, with the gap drawn into it. */
+.la-blank-line {
+  font-size: calc(var(--la-prompt) * 0.85);
+  font-weight: 700;
+  line-height: 1.9;
+  color: var(--text-primary);
+  margin: 0 0 clamp(1.25rem, 3vh, 2.5rem);
+}
+.la-blank-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.5em;
+  margin: 0 0.25em;
+  padding: 0 0.5em;
+  vertical-align: middle;
+  border: 0;
+  border-bottom: 3px solid var(--la-edge);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  background: transparent;
+  color: var(--color-primary);
+  font: inherit;
+  line-height: 1.45;
+}
+button.la-blank-slot { cursor: pointer; }
+.la-blank-slot.is-filled {
+  border: 2px solid var(--la-edge);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 var(--la-lip) 0 var(--la-edge);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+.la-blank-slot.is-ok { color: var(--la-ok); border-bottom-color: var(--la-ok); background: var(--la-ok-wash); }
+.la-blank-slot.is-bad { color: var(--la-bad); border-bottom-color: var(--la-bad); background: var(--la-bad-wash); }
+
+/* The answer area: ruled above and below, like a line on a page. */
+.la-lane {
+  min-height: calc(var(--la-answer) * 1.3 + var(--la-pad) * 1.1 + 1.6rem);
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 0.6rem 0.5rem;
+  padding: 0.6rem 0 calc(0.6rem + var(--la-lip));
+  border-top: 2px solid var(--la-edge);
+  border-bottom: 2px solid var(--la-edge);
+  margin-bottom: clamp(1.25rem, 3.5vh, 2.75rem);
+}
+.la-lane-hint { align-self: center; color: var(--text-tertiary); font-size: 0.9rem; }
+
+.la-pool { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem 0.5rem; padding-bottom: var(--la-lip); }
+
+/* ── Tiles, options and match cards: one pressable shape ── */
+
+.la-tile,
+.la-match-btn,
+.la-option {
+  position: relative;
+  border: 2px solid var(--la-edge);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  box-shadow: 0 var(--la-lip) 0 var(--la-edge);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--la-answer);
+  font-weight: 600;
+  line-height: 1.3;
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, background-color 0.15s ease,
+              border-color 0.15s ease, color 0.15s ease, opacity 0.2s ease;
+}
+
+.la-tile,
+.la-match-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  min-height: 48px;
+  padding: calc(var(--la-pad) * 0.55) var(--la-pad);
+}
+
+.la-tile:hover:not(:disabled),
+.la-match-btn:hover:not(:disabled),
+.la-option:hover:not(:disabled) { background: var(--bg-surface-hover); }
+
+.la-tile:active:not(:disabled),
+.la-match-btn:active:not(:disabled),
+.la-option:active:not(:disabled) { transform: translateY(var(--la-lip)); box-shadow: 0 0 0 var(--la-edge); }
+
+.la-tile:focus-visible,
+.la-match-btn:focus-visible,
+.la-option:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+.la-tile:disabled,
+.la-match-btn:disabled,
+.la-option:disabled { cursor: default; }
+
+/* The footprint a placed word leaves in the pool: same size, no text, flat. */
+.la-tile.is-used { background: var(--bg-surface-hover); border-color: var(--bg-surface-hover); box-shadow: none; }
+.la-tile.is-used > * { visibility: hidden; }
+.la-chip-ph { display: inline-block; width: 22px; height: 22px; flex-shrink: 0; }
+.la-tile .lang-speak-chip,
+.la-match-btn .lang-speak-chip { margin-left: 0; color: inherit; }
+
+.la-card.is-checked .la-pool .la-tile:not(.is-used) { opacity: 0.55; }
+
+/* Which number key reaches the tile. Only where there is a keyboard to press. */
+.la-key {
+  position: absolute;
+  top: 3px;
+  left: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: 700 0.62rem/1 var(--font-sans);
+  color: var(--text-tertiary);
+}
+
+/* Chosen, before Check: the primary colour, lip and all. */
+.la-option.is-picked,
+.la-match-btn.is-picked {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  box-shadow: 0 var(--la-lip) 0 var(--color-primary);
+}
+.la-option.is-picked:hover:not(:disabled),
+.la-match-btn.is-picked:hover:not(:disabled) { background: var(--color-primary-subtle); }
+
+/* After Check: right is green, wrong is red, and the colour is the lip too. */
+.la-tile.is-ok, .la-option.is-ok {
+  border-color: var(--la-ok);
+  background: var(--la-ok-wash);
+  color: var(--la-ok);
+  box-shadow: 0 var(--la-lip) 0 var(--la-ok);
+}
+.la-tile.is-bad, .la-option.is-bad {
+  border-color: var(--la-bad);
+  background: var(--la-bad-wash);
+  color: var(--la-bad);
+  box-shadow: 0 var(--la-lip) 0 var(--la-bad);
+}
+.la-option.is-faded { opacity: 0.5; }
+
+/* Multiple choice: full-width cards, numbered for the keyboard. */
+.la-options { display: flex; flex-direction: column; gap: 0.75rem; padding-bottom: var(--la-lip); }
 .la-option {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: var(--la-pad) calc(var(--la-pad) * 1.2);
-  border: 1px solid var(--border-color);
-  border-bottom-width: 3px;
-  border-radius: var(--radius-md);
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  font-size: var(--la-answer);
-  cursor: pointer;
+  gap: 0.9rem;
+  width: 100%;
+  padding: var(--la-pad) calc(var(--la-pad) * 1.1);
   text-align: left;
-  font-family: var(--font-sans);
 }
-.la-option:hover { border-color: var(--color-primary); }
-.la-option.is-picked { border-color: var(--color-primary); background: var(--color-primary-subtle); }
+.la-option-text { flex: 1; min-width: 0; }
 .la-option-key {
-  width: calc(var(--la-answer) * 1.7); height: calc(var(--la-answer) * 1.7);
+  width: 1.9em;
+  height: 1.9em;
   flex-shrink: 0;
-  border: 1px solid var(--border-color);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--la-edge);
   border-radius: var(--radius-sm);
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: calc(var(--la-answer) * 0.72); font-weight: 800; color: var(--text-tertiary);
+  font-size: 0.75em;
+  font-weight: 800;
+  color: var(--text-tertiary);
 }
+.la-option.is-picked .la-option-key,
+.la-option.is-ok .la-option-key,
+.la-option.is-bad .la-option-key { border-color: currentColor; color: inherit; }
 
-.la-typed .form-input {
-  font-size: calc(var(--la-answer) * 1.1);
-  padding: var(--la-pad) calc(var(--la-pad) * 1.2);
-}
-
-.la-match { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(0.75rem, 1.5vw, 1.5rem); }
-.la-match-col { display: flex; flex-direction: column; gap: clamp(0.4rem, 0.9vh, 0.75rem); }
-.la-match-btn {
-  padding: calc(var(--la-pad) * 0.75) var(--la-pad);
-  font-size: var(--la-answer);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  background: var(--bg-surface);
+/* Type the translation. */
+.la-typed { display: flex; align-items: center; gap: 0.6rem; }
+.la-input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  padding: var(--la-pad) calc(var(--la-pad) * 1.1);
+  border: 2px solid var(--la-edge);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface-hover);
   color: var(--text-primary);
-  cursor: pointer;
-  font-family: var(--font-sans);
-  font-size: 0.88rem;
+  font: inherit;
+  font-size: calc(var(--la-answer) * 1.1);
+  font-weight: 600;
+  outline: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
-.la-match-btn.is-picked { border-color: var(--color-primary); background: var(--color-primary-subtle); }
-.la-match-btn.is-done { opacity: 0.45; }
+.la-input::placeholder { color: var(--text-tertiary); font-weight: 500; }
+.la-input:focus { border-color: var(--color-primary); background: var(--bg-surface); }
+.la-typed.is-ok .la-input { border-color: var(--la-ok); background: var(--la-ok-wash); color: var(--la-ok); }
+.la-typed.is-bad .la-input { border-color: var(--la-bad); background: var(--la-bad-wash); color: var(--la-bad); }
+.la-card .la-speak-input { margin-left: 0; flex: 0 0 auto; width: 48px; height: 48px; }
 
-.la-feedback { margin-top: clamp(1.25rem, 2vh, 2rem); padding: var(--la-pad) calc(var(--la-pad) * 1.2); border-radius: var(--radius-md); }
-.la-feedback.is-right { background: var(--color-success-bg); }
-.la-feedback.is-wrong { background: var(--color-danger-bg); }
-.la-correct { font-size: 0.95rem; color: var(--text-primary); font-weight: 700; }
-.la-correct em { font-style: normal; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-tertiary); display: block; }
-.la-note { margin-top: 0.5rem; display: flex; gap: 0.4rem; align-items: flex-start; font-size: 0.82rem; color: var(--text-secondary); }
-.la-note i, .la-note svg { width: 14px; height: 14px; flex-shrink: 0; margin-top: 2px; }
+/* Matching: two columns of cards. A found pair goes flat and grey. */
+.la-match { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(0.75rem, 2vw, 1.5rem); padding-bottom: var(--la-lip); }
+.la-match-col { display: flex; flex-direction: column; gap: 0.75rem; }
+.la-match-btn { width: 100%; min-height: 56px; }
+.la-match-btn.is-done {
+  background: var(--bg-surface-hover);
+  border-color: var(--bg-surface-hover);
+  color: var(--text-tertiary);
+  box-shadow: none;
+  transform: translateY(var(--la-lip));
+  opacity: 0.6;
+}
+/* The moment a pair is tried: green and a bump, or red and a shake. After
+   is-done in the file, so a pair that has just locked in still shows green. */
+.la-match-btn.is-flash-ok {
+  border-color: var(--la-ok);
+  background: var(--la-ok-wash);
+  color: var(--la-ok);
+  box-shadow: 0 var(--la-lip) 0 var(--la-ok);
+  transform: none;
+  opacity: 1;
+  animation: laPop 0.3s ease;
+}
+.la-match-btn.is-flash-bad {
+  border-color: var(--la-bad);
+  background: var(--la-bad-wash);
+  color: var(--la-bad);
+  box-shadow: 0 var(--la-lip) 0 var(--la-bad);
+  animation: laShake 0.35s ease;
+}
 
-.la-foot { border-top: 1px solid var(--border-color); }
-/* Tracks the card, so Check sits under the last answer rather than in a
-   620px strip inside a 1900px bar. */
+/* ── The footer: Skip and Check, then the verdict ── */
+
+.la-foot {
+  flex-shrink: 0;
+  border-top: 2px solid var(--la-edge);
+  background: var(--bg-body);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+.la-foot.is-empty { display: none; }
+.la-foot.is-right { background: var(--la-ok-wash); border-top-color: transparent; }
+.la-foot.is-wrong { background: var(--la-bad-wash); border-top-color: transparent; }
+
+/* Tracks the question's width, so Check sits under the answers rather than
+   at the far edge of a 1900px bar. */
 .la-foot-inner {
-  max-width: var(--la-measure);
+  max-width: calc(var(--la-measure) + 8rem);
   margin: 0 auto;
-  padding: clamp(1rem, 1.6vh, 1.6rem) 1.25rem;
+  padding: clamp(1rem, 2.6vh, 1.75rem) 1.25rem;
+  padding-bottom: max(clamp(1rem, 2.6vh, 1.75rem), env(safe-area-inset-bottom));
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
 }
-.la-foot-inner.is-right { background: var(--color-success-bg); }
-.la-foot-inner.is-wrong { background: var(--color-danger-bg); }
-.la-verdict { display: flex; align-items: center; gap: 0.5rem; font-weight: 800; }
-.la-foot-inner.is-right .la-verdict { color: var(--color-success); }
-.la-foot-inner.is-wrong .la-verdict { color: var(--color-danger); }
-.la-verdict i, .la-verdict svg { width: 20px; height: 20px; }
+.la-foot-hint { color: var(--text-tertiary); font-size: 0.85rem; text-align: center; }
 
-.la-summary { max-width: min(var(--la-measure), 760px); margin: 0 auto; text-align: center; }
+.la-fb { flex: 1; min-width: 0; display: flex; align-items: flex-start; gap: 1rem; animation: laRise 0.25s var(--ease-expo-out, ease) both; }
+.la-fb-badge {
+  width: clamp(44px, 4vw, 60px);
+  height: clamp(44px, 4vw, 60px);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--bg-surface);
+}
+.la-fb-badge svg { width: 56%; height: 56%; stroke-width: 3.5; }
+.la-fb-text { min-width: 0; display: flex; flex-direction: column; gap: 0.2rem; }
+.la-foot.is-right .la-fb-badge, .la-foot.is-right .la-fb-text { color: var(--la-ok); }
+.la-foot.is-wrong .la-fb-badge, .la-foot.is-wrong .la-fb-text { color: var(--la-bad); }
+
+.la-verdict {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  font-size: clamp(1.15rem, 0.95rem + 0.6vw, 1.55rem);
+  font-weight: 800;
+}
+.la-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-full);
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.la-streak svg { width: 13px; height: 13px; }
+
+.la-fb-label { margin-top: 0.15rem; font-size: 0.95rem; font-weight: 800; }
+.la-fb-answer { font-size: var(--la-answer); font-weight: 600; line-height: 1.45; overflow-wrap: anywhere; }
+.la-fb-answer .lang-speak-chip { color: inherit; }
+/* The words of the answer you left out or put elsewhere. */
+.la-w-miss { font-weight: 800; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }
+.la-fb-yours { font-size: 0.9rem; color: var(--text-secondary); overflow-wrap: anywhere; }
+.la-fb-yours > span:first-child { font-weight: 700; }
+/* The words of yours that are not in it. */
+.la-w-extra { color: var(--la-bad); text-decoration: line-through; text-decoration-thickness: 2px; }
+.la-fb-pairs { margin: 0.1rem 0 0; padding-left: 1.1rem; font-weight: 600; line-height: 1.5; }
+.la-fb-note {
+  display: flex;
+  gap: 0.4rem;
+  align-items: flex-start;
+  margin-top: 0.35rem;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+.la-fb-note svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 2px; }
+
+/* ── Buttons: big, uppercase, and they press down ── */
+
+.la-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-width: clamp(140px, 12vw, 200px);
+  min-height: 50px;
+  padding: 0.75rem 1.5rem;
+  border: 2px solid transparent;
+  border-radius: var(--radius-lg);
+  font: inherit;
+  font-size: clamp(0.9rem, 0.82rem + 0.2vw, 1.05rem);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.15s ease,
+              background-color 0.15s ease, color 0.15s ease;
+}
+.la-btn svg { width: 18px; height: 18px; }
+.la-btn:active:not(:disabled) { transform: translateY(var(--la-lip)); box-shadow: none; }
+.la-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+
+.la-btn-primary { background: var(--color-primary); color: var(--text-on-primary); box-shadow: 0 var(--la-lip) 0 var(--la-primary-dark); }
+.la-btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
+.la-btn-primary:disabled { background: var(--bg-surface-hover); color: var(--text-tertiary); box-shadow: none; cursor: not-allowed; }
+
+.la-btn-ok { background: var(--la-ok); color: #fff; box-shadow: 0 var(--la-lip) 0 var(--la-ok-dark); }
+.la-btn-bad { background: var(--la-bad); color: #fff; box-shadow: 0 var(--la-lip) 0 var(--la-bad-dark); }
+.la-btn-ok:hover, .la-btn-bad:hover { filter: brightness(1.06); }
+
+.la-btn-ghost {
+  background: var(--bg-surface);
+  border-color: var(--la-edge);
+  color: var(--text-secondary);
+  box-shadow: 0 var(--la-lip) 0 var(--la-edge);
+}
+.la-btn-ghost:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+.la-btn-accent { color: var(--color-primary); }
+.la-btn-accent:hover { color: var(--color-primary); }
+
+/* ── The end of a run ── */
+
+.la-summary {
+  width: 100%;
+  max-width: min(var(--la-measure), 720px);
+  margin: 0 auto;
+  text-align: center;
+  animation: laRise 0.35s var(--ease-expo-out, ease) both;
+}
 .la-summary-icon {
-  width: clamp(72px, 6vw, 110px); height: clamp(72px, 6vw, 110px);
-  margin: 0 auto 1rem; border-radius: 50%;
-  display: flex; align-items: center; justify-content: center;
+  width: clamp(72px, 6vw, 104px);
+  height: clamp(72px, 6vw, 104px);
+  margin: 0 auto 1rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: var(--bg-surface-hover);
 }
 .la-summary-icon i, .la-summary-icon svg { width: 46%; height: 46%; }
 .la-summary-icon.score-perfect { color: var(--color-success); background: var(--color-success-bg); }
 .la-summary-icon.score-partial { color: var(--color-warning); background: var(--color-warning-bg); }
 .la-summary-icon.score-low { color: var(--color-danger); background: var(--color-danger-bg); }
-.la-summary h2 { font-size: 1.6rem; font-weight: 800; color: var(--text-primary); margin: 0 0 0.35rem; }
-.la-summary-score { font-size: 2.6rem; font-weight: 900; }
-.la-summary-score.score-perfect { color: var(--color-success); }
-.la-summary-score.score-partial { color: var(--color-warning); }
-.la-summary-score.score-low { color: var(--color-danger); }
-.la-summary p { color: var(--text-secondary); }
+.la-summary h2 { font-size: clamp(1.5rem, 1.1rem + 1.2vw, 2.2rem); font-weight: 800; color: var(--text-primary); margin: 0 0 0.35rem; }
+.la-summary-sub { color: var(--text-secondary); margin: 0 0 1.5rem; }
 
-.la-review { text-align: left; margin: 1.5rem 0; }
-.la-review h3 { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-tertiary); margin-bottom: 0.5rem; }
-.la-review-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 0.6rem; border-radius: var(--radius-sm); background: var(--bg-surface); margin-bottom: 0.3rem; font-size: 0.85rem; }
-.la-review-row i, .la-review-row svg { width: 14px; height: 14px; color: var(--text-tertiary); flex-shrink: 0; }
-.la-review-given { color: var(--color-danger); text-decoration: line-through; }
-.la-review-expected { color: var(--color-success); font-weight: 700; }
+/* Four stat cards, each with its colour as a header band. */
+.la-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 1.75rem; }
+.la-stat {
+  --la-stat: var(--color-primary);
+  border: 2px solid var(--la-stat);
+  border-radius: var(--radius-lg);
+  background: var(--la-stat);
+  overflow: hidden;
+}
+.la-stat-label {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+}
+.la-stat-value {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.75rem 0.5rem;
+  border-radius: calc(var(--radius-lg) - 4px);
+  background: var(--bg-surface);
+  color: var(--la-stat);
+  font-size: clamp(1.1rem, 0.9rem + 0.6vw, 1.5rem);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.la-stat-value svg { width: 0.85em; height: 0.85em; }
+.la-stat-score.score-perfect { --la-stat: var(--color-success); }
+.la-stat-score.score-partial { --la-stat: var(--color-warning); }
+.la-stat-score.score-low { --la-stat: var(--color-danger); }
+.la-stat-time { --la-stat: var(--color-accent); }
+.la-stat-streak { --la-stat: var(--color-warning); }
 
-.la-summary-actions { display: flex; gap: 0.75rem; justify-content: center; margin-top: 1.5rem; }
+.la-review { text-align: left; margin: 0 0 1.75rem; }
+.la-review h3 {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin: 0 0 0.6rem;
+}
+.la-review-row {
+  padding: 0.65rem 0.85rem;
+  margin-bottom: 0.5rem;
+  border: 2px solid var(--la-edge);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+.la-review-prompt { font-size: 0.78rem; color: var(--text-tertiary); margin-bottom: 0.2rem; }
+.la-review-pair { display: flex; align-items: center; flex-wrap: wrap; gap: 0.35rem 0.6rem; font-size: 0.95rem; }
+.la-review-pair i, .la-review-pair svg { width: 15px; height: 15px; color: var(--text-tertiary); flex-shrink: 0; }
+.la-review-given { color: var(--la-bad); text-decoration: line-through; }
+.la-review-expected { color: var(--la-ok); font-weight: 700; }
 
-/* ── The scenario battle ──────────────────────────────────── */
+.la-summary-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; justify-content: center; }
 
+/* ── Motion ── */
 
+@keyframes laRise { from { opacity: 0; translate: 0 8px; } to { opacity: 1; translate: 0 0; } }
+@keyframes laPop { 50% { scale: 1.05; } }
+@keyframes laShake {
+  20% { translate: -6px 0; }
+  40% { translate: 6px 0; }
+  60% { translate: -4px 0; }
+  80% { translate: 4px 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .la-card, .la-fb, .la-summary, .la-match-btn { animation: none !important; }
+  .la-progress-fill { transition: none; }
+}
 
+/* ── Touch and small screens ── */
 
-
-
-
-
-
-
-
-
-
+/* No keyboard, no key numbers. */
+@media (hover: none), (pointer: coarse) {
+  .la-key, .la-hint-keys { display: none; }
+}
 
 @media (max-width: 640px) {
+  .la-shell { --la-measure: 100%; }
+  .la-top { padding: 0.75rem 0.9rem 0.25rem; gap: 0.6rem; }
+  /* Top-aligned on a phone: the on-screen keyboard takes the lower half, and
+     a centred question would sit underneath it. */
+  .la-body { align-items: flex-start; padding: 1.25rem 1rem 1.5rem; }
+  .la-match { gap: 0.6rem; }
+  .la-foot-inner { flex-wrap: wrap; gap: 0.75rem; padding: 0.9rem 1rem max(0.9rem, env(safe-area-inset-bottom)); }
+  .la-foot-inner > .la-btn { flex: 1 1 0; min-width: 0; }
+  .la-foot-hint { display: none; }
+  .la-fb { flex: 1 1 100%; gap: 0.75rem; }
+  .la-foot-inner > .la-btn-go { flex: 1 1 100%; }
+  .la-stats { grid-template-columns: 1fr 1fr; }
+  .la-summary-actions .la-btn { flex: 1 1 100%; }
+}
+
+@media (max-width: 360px) {
   .la-match { grid-template-columns: 1fr; }
 }
 
@@ -883,23 +1310,23 @@
 .lang-rules-block ol, .lang-rules-block ul { margin: 0 0 0 1.1rem; padding: 0; }
 .lang-rules-block li { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.6; }
 .lang-rules-block p { margin: 0; font-size: 0.82rem; color: var(--text-secondary); line-height: 1.55; }
+.lang-rules-block kbd {
+  display: inline-block;
+  min-width: 1.5em;
+  padding: 0 0.35em;
+  border: 1px solid var(--border-color);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+  font: 700 0.72rem/1.5 var(--font-sans);
+  text-align: center;
+}
 
 .lang-powerlist { list-style: none; margin: 0.4rem 0 0 !important; }
 .lang-powerlist li { display: flex; align-items: center; gap: 0.4rem; padding: 0.2rem 0; }
 .lang-powerlist i, .lang-powerlist svg { width: 14px; height: 14px; color: var(--color-accent); flex-shrink: 0; }
 .lang-powerlist span { font-weight: 800; color: var(--color-accent); }
-
-/* ── The drill clock ──────────────────────────────────────── */
-
-.la-clock {
-  font-family: var(--font-mono, monospace);
-  font-size: 0.9rem;
-  font-weight: 800;
-  color: var(--text-secondary);
-  min-width: 46px;
-  text-align: right;
-}
-.la-clock.is-low { color: var(--color-danger); }
 
 /* ── The battlefield ──────────────────────────────────────── */
 
@@ -1499,208 +1926,6 @@
   font-size: 0.8em;
   color: #1a1524;
   background: var(--lqGold);
-}
-
-/* ============================================================
-   THE DRILL, IN THE SAME WORLD AS THE RUN
-   ------------------------------------------------------------
-   The drill runner was wearing the app's chrome — its tokens, its sans face,
-   its rounded surfaces — while the run next door is a pixel game. Two visual
-   languages inside one library, reached from two cards on the same board.
-
-   It borrows the run's palette and its two faces here, scoped under .la-shell
-   so nothing leaks. Structure is untouched: this is a re-skin, not a rebuild,
-   because the drill's layout already works and only its clothes were wrong.
-   ============================================================ */
-
-.la-shell {
-  --lqInk: #efeaf5;
-  --lqDim: #9b93ad;
-  --lqPanel: #2a2536;
-  --lqPanelHi: #3d3650;
-  --lqEdge: #15111e;
-  --lqLine: #574d6b;
-  --lqHot: #ff5f6d;
-  --lqGold: #ffd166;
-  --lqCyan: #7ee8e0;
-
-  background: #0d0a14;
-  background-image:
-    repeating-linear-gradient(180deg, rgba(255,255,255,0.035) 0 26px, transparent 26px 60px),
-    repeating-linear-gradient(180deg, rgba(255,255,255,0.035) 0 26px, transparent 26px 60px);
-  background-size: 62px 60px, 62px 60px;
-  background-position: 14px 0, calc(100% - 14px) 0;
-  background-repeat: repeat-y, repeat-y;
-  color: var(--lqInk);
-  font-family: 'Pixelify Sans', 'Courier New', monospace;
-  image-rendering: pixelated;
-}
-
-.la-top {
-  border-bottom: 2px solid var(--lqEdge);
-  background: rgba(20, 16, 30, 0.75);
-}
-
-.la-progress {
-  height: 12px;
-  border-radius: 0;
-  background: rgba(0, 0, 0, 0.55);
-  border: 2px solid var(--lqEdge);
-}
-.la-progress-fill { border-radius: 0; background: var(--lqCyan); }
-
-.la-heart { color: var(--lqHot); }
-.la-clock { font-family: 'Press Start 2P', monospace; font-size: 0.8rem; color: var(--lqInk); }
-.la-clock.is-low { color: var(--lqHot); }
-
-/* The skin sets its own sizes, so it has to scale from the same tokens the
-   layout does -- otherwise the card grew and everything printed on it stayed
-   the size it was on a laptop. Pixelify Sans runs small for its point size,
-   hence the multipliers above 1. */
-.la-kind {
-  font-family: 'Press Start 2P', monospace;
-  font-size: clamp(0.62rem, 0.5rem + 0.35vw, 0.95rem);
-  letter-spacing: 0.08em;
-  color: var(--lqCyan);
-}
-
-/* THE QUESTION IS NOT CHROME. Everything the skin dresses up -- the labels,
-   the buttons, the verdict -- is furniture, and a pixel face suits furniture.
-   The question is the one thing on screen that has to be read exactly, often
-   in a language you do not know yet, and Pixelify Sans blurs precisely the
-   distinctions that matter there: quotation marks, the difference between
-   "unsa" and "unsaon", a word you are being asked to reproduce letter for
-   letter. Content gets the app's own text face; the game keeps its clothes.
-
-   Inter sets larger than Pixelify at the same px, so the 1.3 multiplier that
-   compensated for the pixel face comes back off. */
-.la-prompt {
-  font-family: var(--font-sans);
-  font-size: var(--la-prompt);
-  font-weight: 750;
-  letter-spacing: -0.015em;
-  color: var(--lqInk);
-}
-
-.la-blank-line {
-  font-family: var(--font-sans);
-  color: var(--lqInk);
-  font-size: calc(var(--la-prompt) * 0.62);
-  font-weight: 500;
-}
-.la-blank-slot { border-bottom-color: var(--lqCyan); color: var(--lqCyan); }
-
-.la-lane { border-bottom: 2px dashed var(--lqLine); }
-.la-lane-hint { color: var(--lqDim); font-family: var(--font-sans); }
-
-/* Word tiles as chunky keys, the way the run's commands are. */
-.la-tile,
-.la-option,
-.la-match-btn {
-  border-radius: 0;
-  background: rgba(58, 51, 74, 0.95);
-  border: 2px solid var(--lqEdge);
-  border-bottom-width: 4px;
-  color: var(--lqInk);
-  font-family: 'Pixelify Sans', monospace;
-  font-size: calc(var(--la-answer) * 1.22);
-  transition: background 0.1s steps(2), border-color 0.1s steps(2);
-}
-
-.la-tile:hover,
-.la-option:hover,
-.la-match-btn:hover { background: rgba(120, 108, 150, 0.96); border-color: var(--lqEdge); }
-
-.la-tile.is-placed,
-.la-option.is-picked,
-.la-match-btn.is-picked {
-  background: rgba(126, 232, 224, 0.2);
-  border-color: var(--lqCyan);
-}
-
-.la-match-btn.is-done { opacity: 0.4; }
-
-.la-option-key {
-  border-radius: 0;
-  border: 2px solid var(--lqLine);
-  color: var(--lqDim);
-  font-family: 'Press Start 2P', monospace;
-  font-size: calc(var(--la-answer) * 0.62);
-}
-
-.la-typed .form-input {
-  border-radius: 0;
-  background: #191426;
-  border: 2px solid var(--lqEdge);
-  color: var(--lqInk);
-  font-family: var(--font-sans);
-  font-size: calc(var(--la-answer) * 1.05);
-  font-weight: 600;
-}
-
-.la-feedback { border-radius: 0; border: 2px solid var(--lqEdge); }
-.la-feedback.is-right { background: rgba(126, 232, 224, 0.14); }
-.la-feedback.is-wrong { background: rgba(255, 95, 109, 0.14); }
-.la-correct { color: var(--lqInk); font-size: calc(var(--la-answer) * 1.05); font-family: var(--font-sans); font-weight: 650; }
-.la-correct em { color: var(--lqDim); font-family: 'Press Start 2P', monospace; font-size: calc(var(--la-answer) * 0.58); }
-.la-note { color: var(--lqDim); font-size: calc(var(--la-answer) * 0.8); font-family: var(--font-sans); line-height: 1.5; }
-
-.la-foot { border-top: 2px solid var(--lqEdge); background: rgba(20, 16, 30, 0.75); }
-.la-foot-inner.is-right { background: rgba(126, 232, 224, 0.12); }
-.la-foot-inner.is-wrong { background: rgba(255, 95, 109, 0.12); }
-.la-verdict { font-family: 'Press Start 2P', monospace; font-size: clamp(0.72rem, 0.58rem + 0.4vw, 1.05rem); }
-.la-foot-inner.is-right .la-verdict { color: var(--lqCyan); }
-.la-foot-inner.is-wrong .la-verdict { color: var(--lqHot); }
-
-/* The footer buttons are the run's menu items, so they read as one game. */
-.la-foot .btn {
-  border-radius: 0;
-  border: 2px solid var(--lqEdge);
-  border-bottom-width: 4px;
-  background: rgba(58, 51, 74, 0.95);
-  color: var(--lqInk);
-  font-family: 'Press Start 2P', monospace;
-  font-size: clamp(0.72rem, 0.58rem + 0.4vw, 1.05rem);
-  padding: clamp(0.6rem, 0.4rem + 0.5vw, 1.05rem) clamp(1rem, 0.7rem + 0.9vw, 2rem);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-.la-foot .btn:hover:not(:disabled) { background: rgba(120, 108, 150, 0.96); color: #fff; }
-.la-foot .btn:disabled { opacity: 0.35; }
-.la-foot .btn-ghost { background: transparent; border-color: var(--lqLine); color: var(--lqDim); }
-
-.la-summary h2 { font-family: 'Press Start 2P', monospace; font-size: clamp(1.1rem, 0.85rem + 0.75vw, 1.9rem); color: var(--lqGold); }
-.la-summary p { color: var(--lqDim); font-family: var(--font-sans); }
-.la-summary-icon { border-radius: 0; border: 2px solid var(--lqEdge); background: rgba(58, 51, 74, 0.9); }
-.la-summary-score { font-family: 'Press Start 2P', monospace; font-size: clamp(2rem, 1.4rem + 1.8vw, 3.6rem); }
-.la-summary-score.score-perfect { color: var(--lqCyan); }
-.la-summary-score.score-partial { color: var(--lqGold); }
-.la-summary-score.score-low { color: var(--lqHot); }
-
-.la-review h3 { font-family: 'Press Start 2P', monospace; font-size: 0.6rem; color: var(--lqDim); }
-.la-review-row { border-radius: 0; background: #191426; border: 2px solid var(--lqEdge); font-size: calc(var(--la-answer) * 0.9); font-family: var(--font-sans); }
-.la-review-given { color: var(--lqHot); }
-.la-review-expected { color: var(--lqCyan); }
-
-.la-summary-actions .btn {
-  border-radius: 0;
-  border: 2px solid var(--lqEdge);
-  border-bottom-width: 4px;
-  background: rgba(58, 51, 74, 0.95);
-  color: var(--lqInk);
-  font-family: 'Press Start 2P', monospace;
-  font-size: 0.72rem;
-}
-.la-summary-actions .btn:hover { background: rgba(120, 108, 150, 0.96); }
-
-/* The back control, matching the run's. */
-.la-top .btn-back-dark {
-  border-radius: 0;
-  border: 2px solid var(--lqEdge);
-  background: var(--lqPanel);
-  color: var(--lqInk);
-  font-family: 'Press Start 2P', monospace;
-  font-size: 0.6rem;
 }
 
 /* Two packs on offer where there used to be one, so they need to sit as a pair
