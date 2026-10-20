@@ -1574,7 +1574,7 @@ function brainOpenEditor(node) {
     </div>
     <div class="viz-comment-editor-footer">
       <button class="btn btn-secondary btn-sm" id="viz-comment-editor-reset" title="Put back the note's saved text"><i data-lucide="rotate-ccw" style="width:14px;height:14px;"></i> Reset</button>
-      <button class="btn btn-primary btn-sm" id="viz-comment-editor-save"><i data-lucide="check" style="width:14px;height:14px;"></i> Save &amp; Close</button>
+      <button class="btn btn-primary btn-sm" id="viz-comment-editor-save" title="Save &amp; Close (Ctrl+S)"><i data-lucide="check" style="width:14px;height:14px;"></i> Save &amp; Close</button>
     </div>
   </div>`;
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: overlay });
@@ -1726,6 +1726,15 @@ function brainOpenEditor(node) {
     if (typeof vizHoverClear === 'function') vizHoverClear();
   };
   document.getElementById('viz-comment-editor-save').onclick = () => finish(true);
+  // Ctrl+S (Cmd+S on a Mac) anywhere in the window is Save & Close, instead
+  // of the browser's Save Page dialog.
+  overlay.addEventListener('keydown', e => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || (e.key !== 's' && e.key !== 'S' && e.code !== 'KeyS')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.repeat || !overlay.isConnected) return;
+    finish(true);
+  });
   document.getElementById('viz-comment-editor-x').onclick = () => finish(false);
   overlay.classList.add('is-anchored');
   _brainCenterEditorWindow(overlay.querySelector('.viz-comment-editor-window'));
