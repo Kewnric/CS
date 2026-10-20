@@ -5106,3 +5106,22 @@ body.viz-no-anim .app-sidebar {
 .viz-node[data-shape] { --grip: color-mix(in srgb, var(--shape-ink) 60%, transparent); }
 .bb-resize { opacity: 0; transition: opacity 0.15s ease; }
 .viz-node:hover .bb-resize { opacity: 1; }
+
+/* The angle readout while an object turns; it lingers, then fades out. */
+.brain-angle-tip {
+  position: absolute;
+  z-index: 40;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 55%, transparent);
+  color: #f1f5f9;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+.brain-angle-tip.is-fading { opacity: 0; transition: opacity 1s ease 0.5s; }

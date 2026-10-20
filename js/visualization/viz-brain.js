@@ -2194,6 +2194,36 @@ const BRAIN_TL_PAD = 18;   // the timeline's line starts and ends this far in
    with Shift snapping to 15-degree steps, and is stored on the object
    (node.angle) and applied as a CSS rotate, so the drawing and its label turn
    together. One undo step per turn. */
+/* The angle readout: a small tag beside the pointer while an object turns,
+   showing its angle in whole degrees, that fades away a moment after you let
+   go. It lives in the canvas container, so it stays upright and on top. */
+let _brainAngleTip = null, _brainAngleTipTimer = 0;
+function _brainShowAngle(ev, angle) {
+  const container = document.getElementById('viz-canvas-container');
+  if (!container) return;
+  if (!_brainAngleTip || !_brainAngleTip.isConnected) {
+    _brainAngleTip = document.createElement('div');
+    _brainAngleTip.className = 'brain-angle-tip';
+    container.appendChild(_brainAngleTip);
+  }
+  clearTimeout(_brainAngleTipTimer);
+  _brainAngleTip.classList.remove('is-fading');
+  const r = container.getBoundingClientRect();
+  _brainAngleTip.style.left = (ev.clientX - r.left + 16) + 'px';
+  _brainAngleTip.style.top = (ev.clientY - r.top + 16) + 'px';
+  _brainAngleTip.textContent = (Math.round(angle) % 360) + '°';
+}
+function _brainFadeAngle() {
+  const tip = _brainAngleTip;
+  if (!tip) return;
+  tip.classList.add('is-fading');
+  clearTimeout(_brainAngleTipTimer);
+  _brainAngleTipTimer = setTimeout(() => {
+    if (tip === _brainAngleTip) _brainAngleTip = null;
+    tip.remove();
+  }, 1600);
+}
+
 function brainShapeRotateStart(e, nodeId, el) {
   if ((e.pointerType === 'mouse' && e.button !== 0) || brainIsLocked()) return;
   e.stopPropagation();
@@ -2209,18 +2239,21 @@ function brainShapeRotateStart(e, nodeId, el) {
   let turned = false, angle = base;
   handle.setPointerCapture(e.pointerId);
   el.classList.add('is-rotating');
+  _brainShowAngle(e, base);
   const move = ev => {
     if (!turned) { brainPushUndo(); turned = true; }
     angle = base + (angleAt(ev) - from);
     if (ev.shiftKey) angle = Math.round(angle / 15) * 15;
     angle = ((angle % 360) + 360) % 360;
     el.style.rotate = angle + 'deg';
+    _brainShowAngle(ev, angle);
   };
   const up = () => {
     handle.removeEventListener('pointermove', move);
     handle.removeEventListener('pointerup', up);
     handle.removeEventListener('pointercancel', up);
     el.classList.remove('is-rotating');
+    _brainFadeAngle();
     if (!turned) return;
     const target = brain.nodes.find(n => n.id === nodeId);
     if (target) { if (Math.round(angle) % 360) target.angle = Math.round(angle * 10) / 10; else delete target.angle; }
