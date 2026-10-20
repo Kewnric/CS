@@ -1009,6 +1009,9 @@ function brainRenderCanvas() {
         if (initial) { initial = false; return; }
         if (vizFitNoteHeight(inner)) return;   // grew; the next callback records it
         brainSizeElectric(el, inner);
+        // Typing in the open editor changes the size too; that is not a
+        // resize by hand, and recording it would freeze the note's height.
+        if (performance.now() - (el._liveEditAt || 0) < 250) return;
         if (inner.offsetWidth > 0) { node.w = inner.offsetWidth; node.h = inner.offsetHeight; node.userSized = true; }
       });
       obs.observe(inner);
@@ -1478,7 +1481,7 @@ function brainOpenEditor(node) {
       <i data-lucide="brain-circuit"></i>
       <span>Brain Note</span>
       <button class="viz-comment-editor-close viz-comment-editor-min" id="viz-comment-editor-min" title="Unblur the canvas behind the note" aria-label="Unblur the canvas behind the note"><i data-lucide="minus"></i></button>
-      <button class="viz-comment-editor-close" title="Close" aria-label="Close" onclick="document.getElementById('viz-comment-editor-overlay').remove(); if(typeof vizHoverClear==='function')vizHoverClear();"><i data-lucide="x"></i></button>
+      <button class="viz-comment-editor-close" id="viz-comment-editor-x" title="Close" aria-label="Close"><i data-lucide="x"></i></button>
     </div>
     <div class="viz-comment-editor-body">
       <textarea id="viz-comment-editor-textarea" class="viz-comment-editor-textarea" spellcheck="false" placeholder="Enter your idea...">${escapeHTML(node.commentContent || '')}</textarea>
@@ -1498,28 +1501,65 @@ function brainOpenEditor(node) {
     const end = textarea.value.length;
     textarea.setSelectionRange(end, end);
   }, 0);
-  // Reset: back to the text the note had when this editor opened.
+  const nodeId = node.id;
   const savedText = node.commentContent || '';
+
+  /* Live: the note on the canvas takes each keystroke, so with the editor
+     unblurred you watch it change as you type. The text is written to the
+     note as you go (looked up by id: an undo replaces the node objects); the
+     first change of this editing session records one undo step, so Ctrl+Z
+     takes the whole session back at once, and saving to storage waits for a
+     pause in typing. Only the one note's text is redrawn, not the canvas, so
+     the editor keeps its focus and nothing flickers. */
+  let undoPushed = false, saveTimer = null;
+  const flushSave = () => {
+    if (!saveTimer) return;
+    clearTimeout(saveTimer); saveTimer = null;
+    brainSaveCurrentVersion();
+  };
+  const applyLive = () => {
+    const target = brain.nodes.find(n => n.id === nodeId);
+    if (!target || (target.commentContent || '') === textarea.value) return;
+    if (!undoPushed) { brainPushUndo(); undoPushed = true; }
+    target.commentContent = textarea.value;
+    const el = document.querySelector(`.viz-node[data-node-id="${nodeId}"]`);
+    const inner = el && el.querySelector('.viz-node-inner');
+    const content = el && el.querySelector('.viz-comment-content');
+    if (content) {
+      // Text-driven size changes are not a resize by hand (see the note's
+      // ResizeObserver): mark them so the note's height is not frozen.
+      el._liveEditAt = performance.now();
+      content.innerHTML = brainNoteParagraphs(textarea.value || 'Double-click or right-click to edit...');
+      if (inner) { vizFitNoteHeight(inner); brainSizeElectric(el, inner); }
+      brainUpdateSVGLinks();
+    }
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => { saveTimer = null; brainSaveCurrentVersion(); }, 400);
+  };
+  textarea.addEventListener('input', applyLive);
+  textarea.addEventListener('keydown', e => _brainEditorTabKey(e, textarea));
+
+  // Reset: back to the text the note had when this editor opened, live too.
   document.getElementById('viz-comment-editor-reset').onclick = () => {
     textarea.value = savedText;
+    applyLive();
     textarea.focus({ preventScroll: true });
     textarea.setSelectionRange(savedText.length, savedText.length);
   };
-  // Write the text back if it changed. Looked up by id: an undo replaces the
-  // node objects, and the one this editor opened with may be stale by then.
-  const nodeId = node.id;
+  // Make sure the latest text is in the note and saved (used on close, and
+  // when another note's editor replaces this one).
   overlay._commit = () => {
-    const target = brain.nodes.find(n => n.id === nodeId);
-    if (!target || target.commentContent === textarea.value) return;
-    brainPushUndo();
-    target.commentContent = textarea.value;
-    brainRenderCanvas(); brainSaveCurrentVersion();
+    applyLive();
+    flushSave();
+    if (undoPushed) brainRenderCanvas();   // settle the note through a full render
   };
-  document.getElementById('viz-comment-editor-save').onclick = () => {
+  const close = () => {
     overlay._commit();
     overlay.remove();
     if (typeof vizHoverClear === 'function') vizHoverClear();
   };
+  document.getElementById('viz-comment-editor-save').onclick = close;
+  document.getElementById('viz-comment-editor-x').onclick = close;
   overlay.classList.add('is-anchored');
   _brainCenterEditorWindow(overlay.querySelector('.viz-comment-editor-window'));
   _brainWireEditorFloat(overlay, textarea);
@@ -1566,6 +1606,44 @@ function _brainWireEditorFloat(overlay, textarea) {
   };
   head.addEventListener('pointerup', end);
   head.addEventListener('pointercancel', end);
+}
+
+/* Tab in the note editor indents instead of moving focus to the Reset
+   button. A caret gets a tab; a selection over several lines indents every
+   line; Shift+Tab takes one tab (or up to four spaces) off the start of each
+   line touched. insertText keeps the textarea's own undo, and fires the
+   input event the live preview listens for. */
+function _brainEditorTabKey(e, ta) {
+  if (e.key !== 'Tab' || e.ctrlKey || e.altKey || e.metaKey) return;
+  e.preventDefault();
+  const insert = (text) => {
+    if (!document.execCommand('insertText', false, text)) {
+      ta.setRangeText(text, ta.selectionStart, ta.selectionEnd, 'end');
+      ta.dispatchEvent(new Event('input'));
+    }
+  };
+  const v = ta.value, s = ta.selectionStart, end = ta.selectionEnd;
+  if (!e.shiftKey && !v.slice(s, end).includes('\n')) { insert('\t'); return; }
+  const from = v.lastIndexOf('\n', s - 1) + 1;
+  const nl = v.indexOf('\n', end);
+  const to = (s === end || end === 0 || v[end - 1] !== '\n') ? (nl === -1 ? v.length : nl) : end - 1;
+  const lines = v.slice(from, to).split('\n');
+  let firstShift = 0;
+  const out = lines.map((l, i) => {
+    if (!e.shiftKey) { if (i === 0) firstShift = 1; return '\t' + l; }
+    const m = l.match(/^(\t| {1,4})/);
+    if (i === 0) firstShift = m ? -m[0].length : 0;
+    return m ? l.slice(m[0].length) : l;
+  }).join('\n');
+  if (out === v.slice(from, to)) return;
+  ta.setSelectionRange(from, to);
+  insert(out);
+  if (s === end) {
+    const caret = Math.max(from, s + firstShift);
+    ta.setSelectionRange(caret, caret);
+  } else {
+    ta.setSelectionRange(from, from + out.length);
+  }
 }
 
 /* Placed by its top-left, centred once. Centred by flexbox instead, a resize
