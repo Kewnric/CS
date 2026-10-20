@@ -1790,8 +1790,13 @@ function _brainMarkNodeMenu() {
   if (!node) return;
   const mark = (sel, attr, value) => menu.querySelectorAll(sel).forEach(o => o.classList.toggle('active', o.dataset[attr] === value));
   const target = brain._colorTarget || 'edge';
+  // The label says the current value too. Default text is near-white, so a
+  // note can look white while its setting is Default; spelling it out stops
+  // that reading as the menu getting it wrong.
+  const current = node[BRAIN_COLOR_PROPS[target]];
   const label = document.getElementById('brain-color-target-label');
-  if (label) label.textContent = BRAIN_COLOR_TARGET_LABELS[target];
+  if (label) label.textContent = BRAIN_COLOR_TARGET_LABELS[target] + ' · '
+    + (current ? current.charAt(0).toUpperCase() + current.slice(1) : 'Default');
   menu.querySelectorAll('#brain-color-target-list [data-target]').forEach(o => {
     const on = o.dataset.target === target;
     o.classList.toggle('active', on);
