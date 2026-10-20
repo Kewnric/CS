@@ -138,7 +138,7 @@ function renderNotebookTreeRecursive(parentId, depth, query, itemsOnly, rootList
   let html = '';
 
   // See browse.js: rootList is the pseudo-folder's contents.
-  const entries = rootList ? rootList.map(n => ({ kind: 'item', node: n })) : treeChildren(parentId, 'notebook');
+  const entries = rootList ? rootList.map(n => ({ kind: 'item', node: n })) : treeChildren(parentId, 'notebook', 'notes');
 
   entries.forEach(entry => {
     const node = entry.node;

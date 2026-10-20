@@ -83,8 +83,15 @@ function treeScope(ns) { return (TREE_HOSTS[ns] || {}).scope; }
    `ns` is threaded through everything below purely so these can be found. */
 let _treeNs = null;                     // whose data we are looking at right now
 
-function _treeData(ns) {
+function _treeData(ns, scope) {
   const h = TREE_HOSTS[ns || _treeNs] || {};
+  /* _treeNs is set by drag, drop, right-click and Move to, and deliberately
+     left set (a drag spans several events), so it outlives the tree that set
+     it. Falling back to it for a caller of ANOTHER library let one store answer
+     for another: after a right-click in Brain's version list, the Coding
+     library drew its tree from Brain's accessors -- Brain's folders, with no
+     programs in them. A fallback whose scope is not the caller's is refused. */
+  if (!ns && scope && h.scope && h.scope !== scope) return null;
   return h.data || null;
 }
 
@@ -104,7 +111,7 @@ function treeFind(id, scope, ns) {
   if (id === TREE_ROOT_ID) {
     return { kind: 'folder', node: { id: TREE_ROOT_ID, name: 'Uncategorized', parentId: null }, pseudo: true };
   }
-  const data = _treeData(ns);
+  const data = _treeData(ns, scope);
   if (data) return data.find(id);
   const node = (state.nodes || []).find(n => n.id === id);
   if (node) return { kind: 'folder', node };
@@ -144,7 +151,7 @@ function treeIsAncestor(maybeAncestor, id, scope) {
  */
 function treeChildren(parentId, scope, ns) {
   const p = parentId || null;
-  const data = _treeData(ns);
+  const data = _treeData(ns, scope);
   if (data) {
     return data.folders(p).map(n => ({ kind: 'folder', node: n }))
       .concat(data.items(p).map(n => ({ kind: 'item', node: n })))
@@ -263,7 +270,7 @@ function treeLabelOf(id, scope) {
 }
 
 function _treeSetOrder(ns, parentId, scope, ids) {
-  const data = _treeData(ns);
+  const data = _treeData(ns, scope);
   if (data) { data.setOrder(parentId, ids); return; }
   updateTreeOrder(parentId, scope, ids);
 }

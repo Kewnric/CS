@@ -428,7 +428,7 @@ function renderTreeRecursive(parentId, scope, depth, query, activeId, itemsOnly,
   // items from all over the tree rather than the children of one parent.
   const entries = rootList
     ? rootList.map(n => ({ kind: (state.codingSets || []).some(s => s.id === n.id) ? 'set' : 'item', node: n }))
-    : treeChildren(parentId, scope);
+    : treeChildren(parentId, scope, 'browse');   // its own tree, never a leftover binding
 
   entries.forEach(entry => {
     const node = entry.node;
