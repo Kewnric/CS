@@ -2140,11 +2140,11 @@ function brainFitBubble(el, inner) {
 
 /* Manhua's resize grip. The text area's own resize corner sat inside the
    balloon beside the words once the balloon was sized round the text, so a
-   Manhua note hides it and carries this grip in the bottom-right corner of
-   the note's box instead, where every other note's corner is. Dragging
-   resizes the text box and the balloon grows round it; the pointer is divided
-   by how far the corner moves per pixel of text box (1 + both margins) and by
-   the zoom, so the grip stays under it. */
+   Manhua note hides it and carries this grip just inside the balloon's edge
+   at its lower right (a caption's in its corner). Dragging resizes the text
+   box and the balloon grows round it; the pointer is divided by how far the
+   grip moves per pixel of text box (its place in the box times 1 + both
+   margins) and by the zoom, so the grip stays under it. */
 function brainBubbleResizeStart(e, nodeId, el) {
   if (e.button !== 0 || brainIsLocked()) return;
   e.stopPropagation();
@@ -2153,14 +2153,15 @@ function brainBubbleResizeStart(e, nodeId, el) {
   const grip = e.currentTarget;
   if (!inner || !grip) return;
   const [kx, ky] = BRAIN_BUBBLE_ROOM[el.dataset.bubble] || [0.21, 0.21];
+  const at = el.dataset.bubble === 'caption' ? 1 : 0.8536;
   const z = brain.zoom || 1;
   const sx = e.clientX, sy = e.clientY, sw = inner.offsetWidth, sh = inner.offsetHeight;
   let moved = false;
   grip.setPointerCapture(e.pointerId);
   const move = ev => {
     if (!moved) { brainPushUndo(); moved = true; }
-    inner.style.width = Math.max(100, sw + (ev.clientX - sx) / z / (1 + 2 * kx)) + 'px';
-    inner.style.height = Math.max(50, sh + (ev.clientY - sy) / z / (1 + 2 * ky)) + 'px';
+    inner.style.width = Math.max(100, sw + (ev.clientX - sx) / z / (at * (1 + 2 * kx))) + 'px';
+    inner.style.height = Math.max(50, sh + (ev.clientY - sy) / z / (at * (1 + 2 * ky))) + 'px';
   };
   const up = () => {
     grip.removeEventListener('pointermove', move);

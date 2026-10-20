@@ -4674,25 +4674,31 @@ body.viz-no-anim .app-sidebar {
 /* Resizing is by the grip in the note box's corner (brainBubbleResizeStart),
    not the text area's own corner, which sat inside the balloon by the words. */
 .viz-node[data-type="comment"][data-border="manhua"] .viz-node-inner { resize: none !important; }
-/* Looks and sits like every other note's resize corner: a small light double
-   stroke in the bottom-right corner of the note's box (just outside the
-   oval), always shown. */
+/* Looks like every other note's resize corner (a small double stroke, always
+   shown) and sits inside the balloon like theirs: just in from the oval's
+   edge at its lower right (the 45-degree point, 85.36% of the box each way).
+   The box's own corner is outside the oval. On the balloon's fill it takes
+   a muted text colour, so it shows on white and on black alike. */
 .bb-resize {
   position: absolute;
-  right: 2px;
-  bottom: 2px;
+  left: calc(85.36% - 15px);
+  top: calc(85.36% - 15px);
   width: 8px;
   height: 8px;
   cursor: nwse-resize;
   touch-action: none;
   z-index: 5;
-  color: rgba(230, 237, 243, 0.7);
+  color: color-mix(in srgb, var(--note-text, #111111) 55%, transparent);
   /* thin strokes at the normal corner's size; 10px with thick strokes read big */
   background: linear-gradient(135deg, transparent 50%, currentColor 50% 57%, transparent 57% 76%, currentColor 76% 83%, transparent 83%);
 }
 /* A bigger target than it looks, so it is still easy to catch. */
 .bb-resize::before { content: ''; position: absolute; inset: -5px; }
-.bb-resize:hover { color: #e6edf3; }
+.bb-resize:hover { color: var(--note-text, #111111); }
+.viz-node[data-bubble="negative"] .bb-resize { color: color-mix(in srgb, var(--note-text, #f8fafc) 55%, transparent); }
+.viz-node[data-bubble="negative"] .bb-resize:hover { color: var(--note-text, #f8fafc); }
+/* A caption is a box: its grip goes in the corner, inside it. */
+.viz-node[data-bubble="caption"] .bb-resize { left: auto; top: auto; right: 4px; bottom: 4px; }
 .viz-node.dragging .bb-resize,
 .viz-canvas-container.brain-locked .bb-resize { display: none; }
 
