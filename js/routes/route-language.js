@@ -145,29 +145,50 @@ function languageDestroy() {
 
 /* ── The language pair ────────────────────────────────────── */
 
+/* Two dropdowns rather than two rows of every language at once. Eight pills,
+   four of them greyed out on any given screen, was a lot of furniture for a
+   choice made once and then left alone. The dropdowns are the app's shared
+   custom select, so they open the way every other picker does. */
 function langPairBarHTML() {
-  const study = langStudy(), ref = langRef();
-  const pill = (code, active, onclick, dim) => `
-    <button class="lang-pill${active ? ' is-active' : ''}${dim ? ' is-dim' : ''}" type="button"
-            onclick="${onclick}" title="${escapeHTML(langName(code))}">${escapeHTML(langShort(code))}</button>`;
   return `
     <div class="lang-pair-bar">
       <div class="lang-pair-side">
         <span class="lang-pair-label">Learning</span>
-        <div class="lang-pill-row">
-          ${LANGS.map(l => pill(l.code, l.code === study, `langSetStudy('${l.code}')`, l.code === ref)).join('')}
-        </div>
+        <div id="lang-study-select" class="lang-pair-select"></div>
       </div>
-      <button class="lang-swap-btn" type="button" onclick="langSwapPair()" title="Swap the two languages">
+      <button class="lang-swap-btn" type="button" onclick="langSwapPair()" title="Swap the two languages" aria-label="Swap the two languages">
         <i data-lucide="arrow-left-right"></i>
       </button>
       <div class="lang-pair-side">
         <span class="lang-pair-label">Compare to</span>
-        <div class="lang-pill-row">
-          ${LANGS.map(l => pill(l.code, l.code === ref, `langSetRef('${l.code}')`, l.code === study)).join('')}
-        </div>
+        <div id="lang-ref-select" class="lang-pair-select"></div>
       </div>
     </div>`;
+}
+
+/** Fill the two dropdowns the pair bar left room for. */
+function langPaintPairSelects() {
+  const study = langStudy(), ref = langRef();
+  const opts = (other) => LANGS.map(l => ({
+    value: l.code,
+    label: l.name,
+    // The other side's language is still on the list: picking it swaps the
+    // pair, which is what someone choosing it almost always means.
+    badge: l.code === other ? 'swap' : l.short
+  }));
+  if (typeof renderCustomSelect !== 'function') return;
+  renderCustomSelect('lang-study-select', opts(ref), study, langPickStudy, 'Language', { searchable: false });
+  renderCustomSelect('lang-ref-select', opts(study), ref, langPickRef, 'Language', { searchable: false });
+}
+
+function langPickStudy(code) {
+  if (code === langStudy()) return;
+  if (code === langRef()) langSwapPair(); else langSetStudy(code);
+}
+
+function langPickRef(code) {
+  if (code === langRef()) return;
+  if (code === langStudy()) langSwapPair(); else langSetRef(code);
 }
 
 function langSwapPair() {
@@ -220,7 +241,7 @@ function langOpen(view, arg) {
 
 function renderLangLibrary() {
   const bar = document.getElementById('lang-pair-bar');
-  if (bar) bar.innerHTML = langPairBarHTML();
+  if (bar) { bar.innerHTML = langPairBarHTML(); langPaintPairSelects(); }
   renderLangBoard();
   renderLangDetail();
   const stats = document.getElementById('lang-header-stats');
@@ -236,13 +257,10 @@ function langBoardCard(view, arg, icon, name, desc, chip, cls) {
   const active = langView === view && String(langViewArg || '') === String(arg || '');
   return `
     <button class="lang-card${active ? ' is-active' : ''}${cls ? ' ' + cls : ''}" type="button"
-            onclick="langOpen('${view}'${arg ? `, '${arg}'` : ''})">
+            onclick="langOpen('${view}'${arg ? `, '${arg}'` : ''})" title="${escapeHTML(desc)}">
       <span class="lang-card-icon"><i data-lucide="${icon}"></i></span>
-      <span class="lang-card-body">
-        <span class="lang-card-name">${escapeHTML(name)}</span>
-        <span class="lang-card-desc">${escapeHTML(desc)}</span>
-      </span>
       ${chip ? `<span class="lang-card-chip">${chip}</span>` : ''}
+      <span class="lang-card-name">${escapeHTML(name)}</span>
     </button>`;
 }
 
@@ -255,12 +273,15 @@ function langBoardCard(view, arg, icon, name, desc, chip, cls) {
  */
 function langBoardSection(key, icon, label, cards) {
   const open = !!langBoardOpen[key];
+  const n = (cards.match(/class="lang-card[ "]/g) || []).length;
   return `
     <button class="lang-board-title" type="button" data-section="${key}"
             aria-expanded="${open ? 'true' : 'false'}"
             onclick="langToggleBoardSection('${key}')">
+      <span class="lang-board-ico"><i data-lucide="${icon}"></i></span>
+      <span class="lang-board-label">${escapeHTML(label)}</span>
+      <span class="lang-board-count">${n}</span>
       <i data-lucide="chevron-right" class="lang-board-caret${open ? ' expanded' : ''}"></i>
-      <i data-lucide="${icon}"></i> ${escapeHTML(label)}
     </button>
     <div class="lang-board-group${open ? '' : ' collapsed'}" data-section="${key}" role="group">
       <div class="lang-board-group-inner">${cards}</div>

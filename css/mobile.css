@@ -614,16 +614,14 @@
   .btn-back-dark,
   .hero-verse-btn,
   .hc-go,
-  .activity-action,
-  .lang-pill {
+  .activity-action {
     min-height: 34px;
     padding-top: 0.4rem;
     padding-bottom: 0.4rem;
   }
   .hc-dismiss,
   .lang-swap-btn,
-  .hero-verse-btn,
-  .lang-pill { min-width: 34px; min-height: 34px; }
+  .hero-verse-btn { min-width: 34px; min-height: 34px; }
 
   /* ── TEXT FLOORS ────────────────────────────────────────────
      Anything under 11px measured across the routes, lifted to a size that
@@ -631,7 +629,6 @@
   .stat-goal-txt,
   .hc-sub,
   .lang-pair-label,
-  .lang-pill,
   .lang-board-hint,
   .prog-stat-body em { font-size: 0.72rem; }
 

@@ -6,56 +6,32 @@
 
 .lang-pair-bar {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 0.5rem;
   width: 100%;
-  padding: 0.5rem 0.1rem 0;
+  padding: 0.6rem 0.1rem 0;
 }
 
 .lang-pair-side { flex: 1; min-width: 0; }
 
 .lang-pair-label {
   display: block;
-  font-size: 0.6rem;
-  font-weight: 800;
-  letter-spacing: 0.07em;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--text-tertiary);
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.3rem;
 }
 
-.lang-pill-row { display: flex; gap: 0.2rem; }
-
-.lang-pill {
-  flex: 1;
-  padding: 0.25rem 0.1rem;
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--text-tertiary);
-  font-size: 0.66rem;
-  font-weight: 800;
-  cursor: pointer;
-  font-family: var(--font-sans);
-  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
-}
-
-.lang-pill:hover { color: var(--text-primary); border-color: var(--color-primary); }
-
-.lang-pill.is-active {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-  color: var(--text-on-primary);
-}
-
-/* The other side's language, so it is visibly not available here. */
-.lang-pill.is-dim { opacity: 0.35; }
+/* The shared custom select, a touch more compact for a header. */
+.lang-pair-select .cs-trigger { min-height: 36px; padding: 0.4rem 0.65rem; }
 
 .lang-swap-btn {
   flex-shrink: 0;
-  width: 30px;
-  height: 30px;
-  margin-top: 0.85rem;
+  width: 32px;
+  height: 32px;
+  margin-bottom: 2px;
   border: 1px solid var(--border-color);
   border-radius: 50%;
   background: var(--bg-surface);
@@ -67,6 +43,8 @@
 }
 
 .lang-swap-btn:hover { color: var(--color-primary); border-color: var(--color-primary); }
+.lang-swap-btn svg { transition: transform 0.3s var(--ease-spring, ease); }
+.lang-swap-btn:hover svg { transform: rotate(180deg); }
 .lang-swap-btn i, .lang-swap-btn svg { width: 15px; height: 15px; }
 
 /* ── Tabs, list, rows ─────────────────────────────────────── */
@@ -1113,19 +1091,49 @@ button.la-blank-slot { cursor: pointer; }
 
 .lang-board { padding: 0.75rem 0.6rem 0; display: flex; flex-direction: column; gap: 0.4rem; }
 
+/* A section heading you read, not a label you squint at: medium weight at a
+   normal size, with its own coloured icon tile, how many cards it holds, and
+   the caret at the end of the row where a disclosure usually lives. */
 .lang-board-title {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  font-size: 0.66rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  color: var(--text-tertiary);
-  margin: 0.85rem 0 0.15rem;
+  gap: 0.6rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--text-primary);
+  margin: 0.3rem 0 0;
+  padding: 0.5rem 0.55rem;
+  border-radius: var(--radius-md);
+  transition: background-color 0.15s ease;
 }
 .lang-board-title:first-child { margin-top: 0; }
-.lang-board-title i, .lang-board-title svg { width: 13px; height: 13px; }
+
+.lang-board-ico {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+}
+.lang-board-ico svg { width: 16px; height: 16px; }
+.lang-board-title[data-section="drills"] .lang-board-ico { background: var(--color-success-bg); color: var(--color-success); }
+.lang-board-title[data-section="adventure"] .lang-board-ico { background: var(--color-warning-bg); color: var(--color-warning); }
+
+.lang-board-label { flex: 1; min-width: 0; }
+.lang-board-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  background: var(--bg-surface-hover);
+  border-radius: var(--radius-full);
+  padding: 0.05rem 0.5rem;
+}
+.lang-board-caret { width: 16px; height: 16px; flex-shrink: 0; color: var(--text-tertiary); }
 
 /* --- Collapsible sections ---
    The heading became a button, so it needs every one of the UA's button
@@ -1141,7 +1149,8 @@ button.la-blank-slot { cursor: pointer; }
   text-align: left;
   cursor: pointer;
 }
-.lang-board-title:hover { color: var(--text-secondary); }
+.lang-board-title:hover { background: var(--bg-surface-hover); }
+.lang-board-title[aria-expanded="true"] .lang-board-caret { color: var(--color-primary); }
 .lang-board-title:focus-visible {
   outline: 2px solid var(--accent-primary, var(--text-secondary));
   outline-offset: 3px;
@@ -1170,10 +1179,13 @@ button.la-blank-slot { cursor: pointer; }
      as two headings used to. */
   margin-bottom: -0.4rem;
 }
+/* Two columns of cards. The padding is room for a card's focus ring and
+   lifted shadow, which overflow: hidden would otherwise shave off. */
 .lang-board-group-inner {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;            /* the gap .lang-board used to give these cards */
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  padding: 0.35rem 2px 0.4rem;
   overflow: hidden;
   opacity: 1;
   transition: opacity 0.7s ease 0.08s;
@@ -1248,6 +1260,39 @@ button.la-blank-slot { cursor: pointer; }
   background: var(--bg-surface-hover);
   border-radius: var(--radius-full);
   padding: 0.1rem 0.42rem;
+}
+
+/* ── The Language board's cards: two-column tiles ──
+   Scoped to the board's sections because .lang-card is shared -- the
+   Memorization Typing library lays out the same class as full-width rows with
+   a description, and those stay exactly as they were. Here a card is a tile:
+   icon, name, count, and the description only as its tooltip. */
+.lang-board-group-inner .lang-card {
+  position: relative;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.7rem;
+  min-height: 92px;
+  padding: 0.75rem 0.8rem;
+  border-bottom-width: 3px;
+  border-radius: var(--radius-lg);
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+}
+.lang-board-group-inner .lang-card:hover { transform: none; background: var(--bg-surface-hover); }
+.lang-board-group-inner .lang-card:active { transform: translateY(2px); }
+.lang-board-group-inner .lang-card:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+.lang-board-group-inner .lang-card.is-active { box-shadow: 0 0 0 1px var(--color-primary) inset; }
+.lang-board-group-inner .lang-card-icon { width: 36px; height: 36px; border-radius: 10px; }
+.lang-board-group-inner .lang-card-icon svg { width: 18px; height: 18px; }
+.lang-board-group-inner .lang-card.is-active .lang-card-icon { background: var(--color-primary); color: var(--text-on-primary); }
+.lang-board-group-inner .lang-card-name { font-size: 0.86rem; line-height: 1.25; }
+.lang-board-group-inner .lang-card-chip { position: absolute; top: 0.7rem; right: 0.7rem; }
+
+/* A sidebar dragged very narrow: one column rather than two cramped ones. */
+.lang-board { container-type: inline-size; }
+@container (max-width: 250px) {
+  .lang-board-group-inner { grid-template-columns: 1fr; }
 }
 
 /* The button that stood here moved to the header, so this is one line of
