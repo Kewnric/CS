@@ -5304,3 +5304,7 @@ body.viz-no-anim .app-sidebar {
   font-size: 0.6875rem;
   color: var(--text-tertiary);
 }
+
+/* Pin and lock beside a canvas that has an icon of its own: the star's size,
+   quieter, so the star still reads as the one that matters. */
+.tree-node-star.brain-tree-mark { color: var(--text-tertiary); fill: none; }

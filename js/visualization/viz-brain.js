@@ -265,13 +265,37 @@ function brainToggleFolder(id, e) {
     f.collapsed = !f.collapsed;
     open = !f.collapsed;
   }
+  // Opening a folder closes the ones beside it, as in the Coding Library.
+  let repaint = false;
+  if (open) _brainCloseSiblings(id).forEach(sib => { if (!brainSetFolderOpen(sib, false)) repaint = true; });
   brainSave();
   // Flip the classes on the rows that are already there. Re-rendering the pane
   // threw the .tree-children element away in the same frame, so the
   // grid-template-rows transition never got to run and the header's stat chips
   // were rebuilt on every toggle — a visible blink. This is what the library
   // trees do (see toggleBrowseExpand).
-  if (!brainSetFolderOpen(id, open)) brainRenderSidebar();
+  if (!brainSetFolderOpen(id, open) || repaint) brainRenderSidebar();
+}
+
+/**
+ * Close the folders beside one: same parent, and at the top level the
+ * Uncategorized pseudo-folder too (the library's accordion, setNodeExpanded).
+ * Ancestors are never siblings, so the open path stays open. A closed folder
+ * keeps what is open inside it. Returns the ids it closed.
+ */
+function _brainCloseSiblings(id, keep) {
+  const parent = id === '__root__' ? null : ((brain.folders.find(f => f.id === id) || {}).parentId || null);
+  const closed = [];
+  brain.folders.forEach(f => {
+    if (f.id === id || (keep && keep.has(f.id)) || (f.parentId || null) !== parent || f.collapsed) return;
+    f.collapsed = true;
+    closed.push(f.id);
+  });
+  if (!parent && id !== '__root__' && brain.rootOpen !== false && !(keep && keep.has('__root__'))) {
+    brain.rootOpen = false;
+    closed.push('__root__');
+  }
+  return closed;
 }
 
 /**
@@ -344,9 +368,15 @@ function brainRenderSidebar() {
     const isActive = v.id === brain.activeVersionId;
     const nodes = (v.nodes || []).length;
     const links = (v.links || []).length;
-    const icon = v.locked ? 'lock' : (v.pinned ? 'pin' : 'file-text');
+    // Your own icon if you gave it one; otherwise lock, pin or a page.
+    const icon = v.icon || (v.locked ? 'lock' : (v.pinned ? 'pin' : 'file-text'));
+    const acc = (typeof treeAccentAttrs === 'function') ? treeAccentAttrs(v) : { cls: '', style: '' };
+    // With an icon of its own, pin and lock still show, as small marks.
+    const marks = (v.icon && v.pinned ? '<i data-lucide="pin" class="tree-node-star brain-tree-mark"></i>' : '')
+      + (v.icon && v.locked ? '<i data-lucide="lock" class="tree-node-star brain-tree-mark"></i>' : '')
+      + (v.favorite ? '<i data-lucide="star" class="tree-node-star"></i>' : '');
     return `
-      <div class="tree-node tree-item-node" data-level="${depth}" data-node-id="${v.id}">
+      <div class="tree-node tree-item-node${acc.cls}" data-level="${depth}" data-node-id="${v.id}"${acc.style}>
         <div class="tree-node-row ${isActive ? 'active' : ''}"
              ${treeRowAttrs({ ns: 'brain', id: v.id, kind: 'item', level: depth, selected: isActive })}
              style="padding-left: calc(0.75rem + ${TREE_ITEM_INSET}rem)"
@@ -354,8 +384,9 @@ function brainRenderSidebar() {
              title="${escapeHTML(brainVersionTooltip(v))}"
              onclick="brainSwitchVersion('${v.id}')">
           <i class="tree-node-chevron invisible"></i>
-          <i data-lucide="${icon}" class="tree-node-icon item-icon-color" style="width:14px;height:14px;"></i>
+          <i data-lucide="${escapeHTML(icon)}" class="tree-node-icon item-icon-color" style="width:14px;height:14px;"></i>
           <span class="tree-node-label" style="font-weight:400; font-size:0.875rem;">${escapeHTML(v.name)}</span>
+          ${marks}
           <span class="brain-version-size" title="${nodes} node${nodes !== 1 ? 's' : ''}, ${links} link${links !== 1 ? 's' : ''}">${nodes}·${links}</span>
           ${isActive ? '<span class="brain-active-dot"></span>' : ''}
         </div>
@@ -374,8 +405,9 @@ function brainRenderSidebar() {
         // folder of folders read "0" here and non-zero there.
         const count = brainFolderCount(n.id);
         const hasKids = count > 0 || brain.folders.some(f => (f.parentId || null) === n.id);
+        const acc = (typeof treeAccentAttrs === 'function') ? treeAccentAttrs(n) : { cls: '', style: '' };
         html += `
-          <div class="tree-node" data-level="${depth}" data-node-id="${n.id}">
+          <div class="tree-node${acc.cls}" data-level="${depth}" data-node-id="${n.id}"${acc.style}>
             <div class="tree-node-row"
                  ${treeRowAttrs({ ns: 'brain', id: n.id, kind: 'folder', level: depth, expanded: open })}
                  style="padding-left: calc(0.75rem + 0rem)"
@@ -383,7 +415,7 @@ function brainRenderSidebar() {
                  onclick="brainToggleFolder('${n.id}')">
               <i data-lucide="chevron-right" class="tree-node-chevron ${hasKids ? (open ? 'expanded' : '') : 'invisible'}"
                  onclick="brainToggleFolder('${n.id}', event)"></i>
-              <i data-lucide="folder" class="tree-node-icon folder-icon-color"></i>
+              <i data-lucide="${escapeHTML(n.icon || 'folder')}" class="tree-node-icon folder-icon-color"></i>
               <span class="tree-node-label" ondblclick="event.stopPropagation();brainRenameFolder('${n.id}')">${escapeHTML(n.name)}</span>
               <span class="tree-node-badge">${count}</span>
             </div>
@@ -468,8 +500,23 @@ function brainRenderSidebar() {
 function brainRevealFolder(id) {
   const f = brain.folders.find(x => x.id === id);
   if (!f) return;
-  if (f.collapsed) { f.collapsed = false; brainSave(); }
-  if (!brainSetFolderOpen(id, true)) brainRenderSidebar();
+  // Every folder from the top down to this one opens; the ones beside each
+  // step close (the library's expandNodePath).
+  const path = [];
+  for (let cur = f, guard = 0; cur && guard < 60; guard++) {
+    path.push(cur.id);
+    cur = cur.parentId ? brain.folders.find(x => x.id === cur.parentId) : null;
+  }
+  const onPath = new Set(path);
+  let painted = true;
+  path.forEach(pid => {
+    const pf = brain.folders.find(x => x.id === pid);
+    if (pf) pf.collapsed = false;
+    _brainCloseSiblings(pid, onPath).forEach(sib => { if (!brainSetFolderOpen(sib, false)) painted = false; });
+    if (!brainSetFolderOpen(pid, true)) painted = false;
+  });
+  brainSave();
+  if (!painted) brainRenderSidebar();
   const row = document.querySelector('#viz-content-body .tree-node[data-node-id="' + id + '"] .tree-node-row');
   if (row) {
     row.scrollIntoView({ block: 'nearest', behavior: vizPrefersReducedMotion() ? 'auto' : 'smooth' });
@@ -605,11 +652,20 @@ registerTreeHost('brain', {
     { icon: 'plus', label: 'New Canvas', fn: () => brainCreateVersion(id) },
     { icon: 'folder-plus', label: 'New subfolder', subfolder: true, fn: () => brainCreateFolder(id) }
   ],
+  // Uncategorized: a canvas made here is loose, at the top level.
+  pseudoActions: (id) => id === '__root__' ? [{ icon: 'plus', label: 'New Canvas', fn: () => brainCreateVersion(null) }] : [],
   extraActions: (id, kind) => {
-    if (kind === 'folder') return [];
+    if (kind === 'folder') {
+      return [
+        { icon: 'image', label: 'Change icon...', fn: () => brainTreeSetIcon([id]) },
+        { icon: 'palette', label: 'Highlight colour...', fn: () => brainTreeSetColor([id]) }
+      ];
+    }
     const v = brain.versions.find(x => x.id === id);
     if (!v) return [];
     return [
+      { icon: 'image', label: 'Change icon...', fn: () => brainTreeSetIcon([id]) },
+      { icon: 'palette', label: 'Highlight colour...', fn: () => brainTreeSetColor([id]) },
       { icon: 'copy', label: 'Duplicate', fn: () => brainDuplicateVersion(id) },
       { icon: v.pinned ? 'pin-off' : 'pin', label: v.pinned ? 'Unpin' : 'Pin to top', fn: () => brainTogglePin(id) },
       { icon: v.favorite ? 'star-off' : 'star', label: v.favorite ? 'Remove star' : 'Star', fn: () => brainToggleStar(id) },
@@ -617,8 +673,124 @@ registerTreeHost('brain', {
       { icon: 'git-compare', label: 'Compare with open version', fn: () => brainCompareVersions(id) },
       { icon: 'share-2', label: 'Share', fn: () => { brain._ctxVersionId = id; brainCtxVersionShare(); } }
     ];
-  }
+  },
+  /* Several ticked rows at once: what the one-row menu offers, minus what
+     only means something for one (rename, duplicate, compare, share). */
+  batchActions: (ids) => ([
+    { icon: 'image', label: 'Change icon for all…', fn: () => brainTreeSetIcon(ids) },
+    { icon: 'palette', label: 'Highlight colour for all…', fn: () => brainTreeSetColor(ids) },
+    { icon: 'star', label: 'Star all', fn: () => brainTreeBatchFlag(ids, 'favorite', true, 'Starred') },
+    { icon: 'star-off', label: 'Unstar all', fn: () => brainTreeBatchFlag(ids, 'favorite', false, 'Unstarred') },
+    { icon: 'pin', label: 'Pin all', fn: () => brainTreeBatchFlag(ids, 'pinned', true, 'Pinned') },
+    { icon: 'pin-off', label: 'Unpin all', fn: () => brainTreeBatchFlag(ids, 'pinned', false, 'Unpinned') },
+    { icon: 'lock', label: 'Lock all', fn: () => brainTreeBatchFlag(ids, 'locked', true, 'Locked') },
+    { icon: 'unlock', label: 'Unlock all', fn: () => brainTreeBatchFlag(ids, 'locked', false, 'Unlocked') }
+  ]),
+  onBatchDelete: (ids) => brainTreeBatchDelete(ids)
 });
+
+/* ── Icons, colours and batches for the Brain tree ────────────────
+   The Coding Library tree's row tools, over Brain's own store: a Lucide icon
+   per folder or canvas (showIconPicker), the highlight colour dialog
+   (treeColorDialog: label and left bar, and the right rail), and the edits
+   that apply to several ticked rows at once. Each takes a list of ids, so the
+   single-row menu and the batch menu share one writer. */
+function _brainTreeRecs(ids) {
+  return (ids || []).map(id => brain.folders.find(f => f.id === id) || brain.versions.find(v => v.id === id)).filter(Boolean);
+}
+
+function _brainTreeDone(n, what) {
+  brainSave(); brainRenderSidebar();
+  if (n > 1 && typeof toast === 'function') toast(what + ' for ' + n + ' items.', { type: 'success' });
+}
+
+function brainTreeSetIcon(ids) {
+  const recs = _brainTreeRecs(ids);
+  if (!recs.length) return;
+  const apply = (v) => {
+    const name = (v || '').trim();
+    recs.forEach(r => { if (name) r.icon = name; else delete r.icon; });
+    _brainTreeDone(recs.length, name ? 'Icon set' : 'Icon cleared');
+  };
+  const title = recs.length > 1 ? 'Change icon for ' + recs.length : 'Change icon';
+  const current = recs.length === 1 ? (recs[0].icon || '') : '';
+  if (typeof showIconPicker === 'function') showIconPicker(title, 'Search and pick one, or clear it.', current, apply);
+  else showInputDialog(title, 'A Lucide icon name, for example "rocket".', 'Icon', current, apply);
+}
+
+function brainTreeSetColor(ids) {
+  const recs = _brainTreeRecs(ids);
+  if (!recs.length || typeof treeColorDialog !== 'function') return;
+  treeColorDialog({
+    title: recs.length > 1 ? 'Highlight colour for ' + recs.length : 'Highlight colour',
+    current: recs.length === 1 ? { text: recs[0].color || '', rail: recs[0].railColor || '' } : null,
+    apply: (target, colorId) => {
+      recs.forEach(r => _treeWriteColor(r, target, colorId));
+      brainSave(); brainRenderSidebar();
+    }
+  });
+}
+
+/** Star, pin or lock every ticked canvas (folders have none of the three). */
+function brainTreeBatchFlag(ids, key, on, what) {
+  const vs = (ids || []).map(id => brain.versions.find(v => v.id === id)).filter(Boolean);
+  if (!vs.length) {
+    if (typeof toast === 'function') toast('That applies to canvases, and none are selected.', { type: 'info' });
+    return;
+  }
+  vs.forEach(v => { if (on) v[key] = true; else delete v[key]; });
+  _brainTreeDone(vs.length, what);
+  if (key === 'locked' && vs.some(v => v.id === brain.activeVersionId)) brainApplyOpts();
+}
+
+/**
+ * Delete every ticked folder and canvas behind one confirmation and one Undo.
+ * A deleted folder's contents move up to its parent, as a single delete does;
+ * the open canvas, if deleted, is closed.
+ */
+function brainTreeBatchDelete(ids) {
+  const vIds = new Set((ids || []).filter(id => brain.versions.some(v => v.id === id)));
+  const fIds = new Set((ids || []).filter(id => brain.folders.some(f => f.id === id)));
+  if (!vIds.size && !fIds.size) return;
+  const parts = [];
+  if (vIds.size) parts.push(vIds.size + ' canvas' + (vIds.size === 1 ? '' : 'es'));
+  if (fIds.size) parts.push(fIds.size + ' folder' + (fIds.size === 1 ? '' : 's'));
+  const go = () => {
+    const before = { folders: JSON.parse(JSON.stringify(brain.folders)), versions: JSON.parse(JSON.stringify(brain.versions)) };
+    const wasActive = brain.activeVersionId;
+    const closesActive = vIds.has(wasActive);
+    // A deleted folder's children go to its nearest surviving ancestor.
+    const parentOf = id => (brain.folders.find(f => f.id === id) || {}).parentId || null;
+    const survivor = id => { let p = id, guard = 0; while (p && fIds.has(p) && guard++ < 60) p = parentOf(p); return p || null; };
+    const newParent = new Map([...fIds].map(id => [id, survivor(parentOf(id))]));
+    brain.folders.forEach(f => { if (fIds.has(f.parentId)) f.parentId = newParent.get(f.parentId); });
+    brain.versions.forEach(v => { if (fIds.has(v.folderId)) v.folderId = newParent.get(v.folderId); });
+    brain.folders = brain.folders.filter(f => !fIds.has(f.id));
+    brain.versions = brain.versions.filter(v => !vIds.has(v.id));
+    if (closesActive) {
+      brain.activeVersionId = null;
+      brain.nodes = []; brain.links = [];
+      brain.pan = { x: 0, y: 0 }; brain.zoom = 1;
+    }
+    brainSave(); brainRenderSidebar();
+    if (closesActive) { brainRenderCanvas(); brainUpdateCanvasToolbar(); }
+    if (typeof toast === 'function') {
+      toast('Deleted ' + parts.join(' and ') + '.', {
+        type: 'info', duration: 8000,
+        action: { label: 'Undo', onClick: () => {
+          brain.folders = before.folders;
+          brain.versions = before.versions;
+          brainSave();
+          if (closesActive) brainSwitchVersion(wasActive); else brainRenderSidebar();
+        } }
+      });
+    }
+  };
+  if (typeof showConfirm === 'function') {
+    showConfirm('Delete ' + parts.join(' and ') + '?',
+      'What is inside a deleted folder moves up a level. You can undo this from the toast that follows.', go);
+  } else { go(); }
+}
 
 /** Filter the version list (see brainRenderSidebar). */
 function brainSearchSidebar(q) {
