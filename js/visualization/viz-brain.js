@@ -2205,11 +2205,12 @@ function _brainBubbleShape(shape, x, y, w, h, rnd) {
     `M${f(cx - rx)} ${f(cy)}A${f(rx)} ${f(ry)} 0 1 1 ${f(cx + rx)} ${f(cy)}A${f(rx)} ${f(ry)} 0 1 1 ${f(cx - rx)} ${f(cy)}Z`;
   const deg = a => a * Math.PI / 180;
   const on = (cx, cy, rx, ry, a, k = 1) => [cx + rx * k * Math.cos(deg(a)), cy + ry * k * Math.sin(deg(a))];
-  // The bubble sits a margin outside the note's box so the text stays inside it.
-  const box = (mxK, myK) => {
-    const mx = Math.max(10, w * mxK), my = Math.max(8, h * myK);
-    return { cx: x + w / 2, cy: y + h / 2, rx: w / 2 + mx, ry: h / 2 + my };
-  };
+  // The bubble fills the note's own box: the text area has a margin round it
+  // (CSS, per shape), so the box is already bubble-sized. An ellipse fitted to
+  // a box meets it at the middle of each side, which is where the ports sit
+  // and where links end, so both land on the bubble's edge. Drawn outside the
+  // box instead, they all sat inside the balloon.
+  const box = () => ({ cx: x + w / 2, cy: y + h / 2, rx: w / 2, ry: h / 2 });
   const tail = (b, a1 = 52, a2 = 74, tip = [0.66, 1.42]) =>
     poly([on(b.cx, b.cy, b.rx, b.ry, a1, 0.8), [b.cx + b.rx * tip[0], b.cy + b.ry * tip[1]], on(b.cx, b.cy, b.rx, b.ry, a2, 0.8)]);
   const perim = (rx, ry) => Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)));
@@ -2286,7 +2287,7 @@ function _brainBubbleShape(shape, x, y, w, h, rnd) {
         circle(b.cx + b.rx * 1.06, b.cy + b.ry * 1.52, r * 0.42)];
     }
     case 'caption': {
-      const X = x - 6, Y = y - 6, W = w + 12, H = h + 12, r = 8;
+      const X = x, Y = y, W = w, H = h, r = 8;
       return [`M${f(X + r)} ${f(Y)}H${f(X + W - r)}A${r} ${r} 0 0 1 ${f(X + W)} ${f(Y + r)}V${f(Y + H - r)}`
         + `A${r} ${r} 0 0 1 ${f(X + W - r)} ${f(Y + H)}H${f(X + r)}A${r} ${r} 0 0 1 ${f(X)} ${f(Y + H - r)}`
         + `V${f(Y + r)}A${r} ${r} 0 0 1 ${f(X + r)} ${f(Y)}Z`];

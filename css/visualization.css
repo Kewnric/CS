@@ -4645,6 +4645,18 @@ body.viz-no-anim .app-sidebar {
   box-shadow: none !important;
   transform: none !important;
 }
+/* The text area keeps a margin from the balloon's edge, which makes the note's
+   own box the balloon's box (see _brainBubbleShape): ports and link ends on
+   the box's edges land on the balloon's. Spiky and tall shapes need more. */
+.viz-node[data-type="comment"][data-border="manhua"] .viz-node-inner { margin: 0.9rem 1.6rem; }
+.viz-node[data-type="comment"][data-border="manhua"][data-bubble="speech-v"] .viz-node-inner { margin: 1.5rem 0.9rem; }
+.viz-node[data-type="comment"][data-border="manhua"][data-bubble="two-part"] .viz-node-inner { margin: 1.1rem 1.9rem; }
+.viz-node[data-type="comment"][data-border="manhua"][data-bubble="yell"] .viz-node-inner,
+.viz-node[data-type="comment"][data-border="manhua"][data-bubble="announce"] .viz-node-inner { margin: 1.4rem 2.2rem; }
+.viz-node[data-type="comment"][data-border="manhua"][data-bubble="weak"] .viz-node-inner,
+.viz-node[data-type="comment"][data-border="manhua"][data-bubble="daydream"] .viz-node-inner { margin: 1.1rem 1.9rem; }
+.viz-node[data-type="comment"][data-border="manhua"][data-bubble="caption"] .viz-node-inner { margin: 0.35rem; }
+
 /* Lettering: dark and centred on a white balloon unless set otherwise. */
 .viz-node[data-type="comment"][data-border="manhua"] .viz-comment-content {
   color: var(--note-text, #111111);
