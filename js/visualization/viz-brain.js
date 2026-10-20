@@ -2161,12 +2161,17 @@ function brainPaintBubbles() {
     const parts = _brainBubbleShape(shape, node.x, node.y, el.offsetWidth, el.offsetHeight, _brainBubbleRand(node.id));
     const neg = shape === 'negative';
     const fill = node.bg ? vizColorMap(node.bg) : (neg ? '#0a0a0a' : '#ffffff');
-    // No edge colour picked: the amber every note's Default edge is. Black, the
-    // print-comic outline, all but vanished against the dark canvas.
-    const stroke = node.id === brain.selectedNodeId ? 'var(--color-primary)'
-      : node.color ? vizColorMap(node.color) : '#f59e0b';
+    // Manhua's own default edge is the comic outline: black (light on the black
+    // Negative balloon). Every border type keeps its own default.
+    const stroke = node.color ? vizColorMap(node.color) : (neg ? '#f8fafc' : '#111111');
     const dash = shape === 'whisper' ? ';stroke-dasharray:8 6' : '';
     const ghost = el.classList.contains('viz-bridge-ghost') ? ' opacity="0.25"' : '';
+    // Selected: a soft accent glow outside the outline, rather than recolouring
+    // it. Recoloured, selecting a bubble (right-clicking it does) hid its
+    // black edge.
+    if (node.id === brain.selectedNodeId) {
+      parts.forEach(d => { strokes += `<path class="bb-sel" d="${d}"${ghost}/>`; });
+    }
     parts.forEach(d => {
       strokes += `<path d="${d}" style="stroke:${stroke}${dash}"${ghost}/>`;
       fills += `<path d="${d}" style="fill:${fill}"${ghost}/>`;
