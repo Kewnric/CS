@@ -963,6 +963,8 @@ function brainRenderCanvas() {
       el.style.setProperty('--note-case', node.fontFamily === 'comic' ? 'uppercase' : 'none');
     }
     if (node.border && !isGlobe) el.dataset.border = node.border;
+    const codeLang = isGlobe ? null : brainShownLang(node);
+    if (codeLang) el.dataset.code = codeLang;   // a code note: brainNoteBodyHTML
     if (node.shape && !isGlobe) {
       el.dataset.shape = node.shape;
       if (node.rot) el.dataset.rot = node.rot;   // text and the timeline's + follow it in CSS
@@ -987,7 +989,7 @@ function brainRenderCanvas() {
     // Only a size you actually dragged is honoured. The observer below used to
     // write w/h on its very first callback — the initial layout pass — so every
     // note silently froze at whatever its first render produced.
-    const styleW = (node.userSized && node.w) ? `width:${node.w}px;` : 'width:250px;';
+    const styleW = (node.userSized && node.w) ? `width:${node.w}px;` : (codeLang ? 'width:360px;' : 'width:250px;');
     const styleH = (node.userSized && node.h) ? `height:${node.h}px;` : '';
     let brainCollapseBadge = '';
     if (node.collapsed) {
@@ -1018,7 +1020,7 @@ function brainRenderCanvas() {
         ? '<div class="shape-tl-labels" aria-hidden="true"></div><button class="shape-tl-add" type="button" title="Extend the timeline" aria-label="Extend the timeline">+</button>' : '';
       el.innerHTML = `${isElectric ? BRAIN_ELECTRIC_BACK : ''}${objectLayer}<div class="viz-node-inner" style="${styleW}${styleH}">
         <div class="viz-comment-body">
-          <div class="viz-comment-content">${brainNoteParagraphs(brainShownText(node) || (node.shape ? '' : 'Double-click or right-click to edit...'))}</div>
+          <div class="viz-comment-content">${brainNoteBodyHTML(node, brainShownText(node))}</div>
         </div>
       </div>${isElectric ? BRAIN_ELECTRIC_FRONT : ''}${isMedieval ? BRAIN_MEDIEVAL_FRONT : ''}${node.border === 'manhua' ? '<div class="bb-resize" title="Resize" aria-hidden="true"></div>' : ''}${brainCollapseBadge}`;
       const grip = el.querySelector('.bb-resize');
@@ -1554,10 +1556,20 @@ function brainOpenEditor(node) {
     <div class="viz-comment-editor-header">
       <i data-lucide="brain-circuit"></i>
       <span>Brain Note</span>
+      ${node.shape ? '' : `<div class="viz-ce-tools">
+        <button class="viz-ce-code-btn" id="viz-ce-code" type="button" aria-pressed="false" title="Write code: highlighted, auto-indented, brackets closed for you"><i data-lucide="code-xml"></i><span>Code</span></button>
+        <div class="viz-ce-lang">
+          <button class="viz-ce-lang-btn" id="viz-ce-lang" type="button" aria-haspopup="listbox" aria-expanded="false" title="Language"><span id="viz-ce-lang-name">C</span><i data-lucide="chevron-down"></i></button>
+          <div class="viz-ce-lang-menu hidden" id="viz-ce-lang-menu" role="listbox" aria-label="Language">
+            ${BRAIN_CODE_LANGS.map(([k, n]) => `<button type="button" role="option" data-lang="${k}">${n}</button>`).join('')}
+          </div>
+        </div>
+      </div>`}
       <button class="viz-comment-editor-close viz-comment-editor-min" id="viz-comment-editor-min" title="Unblur the canvas behind the note" aria-label="Unblur the canvas behind the note"><i data-lucide="minus"></i></button>
       <button class="viz-comment-editor-close" id="viz-comment-editor-x" title="Close" aria-label="Close"><i data-lucide="x"></i></button>
     </div>
     <div class="viz-comment-editor-body">
+      <pre class="viz-ce-hl" id="viz-ce-hl" aria-hidden="true"><code id="viz-ce-hl-code"></code></pre>
       <textarea id="viz-comment-editor-textarea" class="viz-comment-editor-textarea" spellcheck="false" placeholder="Enter your idea...">${escapeHTML(node.commentContent || '')}</textarea>
     </div>
     <div class="viz-comment-editor-footer">
@@ -1578,6 +1590,36 @@ function brainOpenEditor(node) {
   const nodeId = node.id;
   const savedText = node.commentContent || '';
 
+  /* Code: the Code switch turns the box into a code editor for the language
+     picked beside it, and the note into a code block. Like the text, it is
+     only a preview until Save & Close. */
+  const savedLang = node.shape ? null : (BRAIN_CODE_LANGS.some(l => l[0] === node.codeLang) ? node.codeLang : null);
+  let codeLang = savedLang;
+  let pickLang = savedLang || _brainLastCodeLang();
+  const hl = document.getElementById('viz-ce-hl');
+  const hlCode = document.getElementById('viz-ce-hl-code');
+  const codeBtn = document.getElementById('viz-ce-code');
+  const langBtn = document.getElementById('viz-ce-lang');
+  const langMenu = document.getElementById('viz-ce-lang-menu');
+  const syncHl = () => { hl.scrollTop = textarea.scrollTop; hl.scrollLeft = textarea.scrollLeft; };
+  const paintHl = () => {
+    if (!codeLang) { hlCode.innerHTML = ''; return; }
+    hl.classList.toggle('tk-on', codeLang !== 'c');
+    hlCode.innerHTML = brainCodeHTML(textarea.value, codeLang) + '<br/>';
+    syncHl();
+  };
+  const paintCode = () => {
+    overlay.classList.toggle('is-code', !!codeLang);
+    textarea.wrap = codeLang ? 'off' : 'soft';
+    textarea.placeholder = codeLang ? 'Write ' + _brainCodeLangName(codeLang) + '...' : 'Enter your idea...';
+    if (codeBtn) codeBtn.setAttribute('aria-pressed', codeLang ? 'true' : 'false');
+    const name = document.getElementById('viz-ce-lang-name');
+    if (name) name.textContent = _brainCodeLangName(pickLang);
+    if (langMenu) langMenu.querySelectorAll('[data-lang]').forEach(b => b.setAttribute('aria-selected', b.dataset.lang === pickLang ? 'true' : 'false'));
+    paintHl();
+  };
+  textarea.addEventListener('scroll', syncHl);
+
   /* Live preview: the note on the canvas shows each keystroke, so with the
      editor unblurred you watch it change as you type. It is only a preview
      (brain._livePreview, which rendering reads): nothing is written to the
@@ -1586,7 +1628,7 @@ function brainOpenEditor(node) {
      text again. Only the one note's text is redrawn, so the editor keeps its
      focus and nothing flickers. */
   const applyLive = () => {
-    brain._livePreview = { id: nodeId, text: textarea.value };
+    brain._livePreview = { id: nodeId, text: textarea.value, lang: codeLang };
     const el = document.querySelector(`.viz-node[data-node-id="${nodeId}"]`);
     const inner = el && el.querySelector('.viz-node-inner');
     const content = el && el.querySelector('.viz-comment-content');
@@ -1594,17 +1636,65 @@ function brainOpenEditor(node) {
     // Text-driven size changes are not a resize by hand (see the note's
     // ResizeObserver): mark them so the note's height is not frozen.
     el._liveEditAt = performance.now();
-    content.innerHTML = brainNoteParagraphs(textarea.value || (el.dataset.shape ? '' : 'Double-click or right-click to edit...'));
+    const live = brain.nodes.find(x => x.id === nodeId);
+    if (codeLang && !el.dataset.shape) el.dataset.code = codeLang; else delete el.dataset.code;
+    // A code note starts wider, as it renders; a size you dragged stays.
+    if (inner && live && !live.userSized && !el.dataset.shape) inner.style.width = (codeLang ? 360 : 250) + 'px';
+    content.innerHTML = live ? brainNoteBodyHTML(live, textarea.value)
+      : brainNoteParagraphs(textarea.value || (el.dataset.shape ? '' : 'Double-click or right-click to edit...'));
     if (inner) { vizFitNoteHeight(inner); brainSizeElectric(el, inner); brainFitBubble(el, inner); }
     if (el.dataset.shape) { const n = brain.nodes.find(x => x.id === nodeId); if (n) brainPaintShape(el, n); }
     brainUpdateSVGLinks();
   };
-  textarea.addEventListener('input', applyLive);
-  textarea.addEventListener('keydown', e => _brainEditorTabKey(e, textarea));
+  textarea.addEventListener('input', () => { paintHl(); applyLive(); });
+  // Code gets the code editor's keys; prose keeps Tab-to-indent.
+  textarea.addEventListener('keydown', e => codeLang ? _brainCodeKey(e, textarea, codeLang) : _brainEditorTabKey(e, textarea));
+  // Phone keyboards say nothing in keydown; beforeinput carries the character
+  // (as in the Coding Library's editor, editor.js).
+  textarea.addEventListener('beforeinput', e => {
+    if (!codeLang) return;
+    let key = null;
+    if (e.inputType === 'insertLineBreak' || e.inputType === 'insertParagraph') key = 'Enter';
+    else if (e.inputType === 'insertText' && e.data && e.data.length === 1) key = e.data;
+    if (key && _brainCodeEntry(textarea, key, false, codeLang)) e.preventDefault();
+  });
 
-  // Reset: back to the text the note had when this editor opened.
+  const closeLangMenu = () => {
+    if (!langMenu || langMenu.classList.contains('hidden')) return;
+    langMenu.classList.add('hidden');
+    langBtn.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('pointerdown', outsideLang, true);
+  };
+  const outsideLang = ev => { if (!ev.target.closest || !ev.target.closest('.viz-ce-lang')) closeLangMenu(); };
+  if (codeBtn) codeBtn.onclick = () => {
+    codeLang = codeLang ? null : pickLang;
+    paintCode(); applyLive();
+    textarea.focus({ preventScroll: true });
+  };
+  if (langBtn) langBtn.onclick = () => {
+    if (!langMenu.classList.contains('hidden')) { closeLangMenu(); return; }
+    langMenu.classList.remove('hidden');
+    langBtn.setAttribute('aria-expanded', 'true');
+    document.addEventListener('pointerdown', outsideLang, true);
+  };
+  if (langMenu) {
+    langMenu.addEventListener('pointerdown', ev => ev.stopPropagation());   // not a header drag
+    langMenu.querySelectorAll('[data-lang]').forEach(b => b.onclick = () => {
+      pickLang = codeLang = b.dataset.lang;
+      try { localStorage.setItem('ssp.brainCodeLang', pickLang); } catch (_) { /* private mode */ }
+      closeLangMenu();
+      paintCode(); applyLive();
+      textarea.focus({ preventScroll: true });
+    });
+  }
+  paintCode();
+
+  // Reset: back to the text (and code setting) the note had when this editor opened.
   document.getElementById('viz-comment-editor-reset').onclick = () => {
     textarea.value = savedText;
+    codeLang = savedLang;
+    if (savedLang) pickLang = savedLang;
+    paintCode();
     applyLive();
     textarea.focus({ preventScroll: true });
     textarea.setSelectionRange(savedText.length, savedText.length);
@@ -1621,15 +1711,17 @@ function brainOpenEditor(node) {
       // Looked up by id: an undo replaces the node objects, and the one this
       // editor opened with may be stale by then.
       const target = brain.nodes.find(n => n.id === nodeId);
-      if (target && (target.commentContent || '') !== textarea.value) {
+      if (target && ((target.commentContent || '') !== textarea.value || (target.codeLang || null) !== (codeLang || null))) {
         brainPushUndo();
         target.commentContent = textarea.value;
+        if (codeLang) target.codeLang = codeLang; else delete target.codeLang;
         brainSaveCurrentVersion();
       }
       brainRenderCanvas();
     } else {
       overlay._discard();
     }
+    closeLangMenu();
     overlay.remove();
     if (typeof vizHoverClear === 'function') vizHoverClear();
   };
@@ -2373,6 +2465,106 @@ const BRAIN_PARA_SPACING = { s: '0.35em', m: '0.75em', l: '1.25em' };
 /* Font Family. Unset is the border's own default (CSS): the app's font, or
    comic lettering on Manhua. --font-comic is the stack in visualization.css. */
 const BRAIN_FONTS = { arial: 'Arial, Helvetica, sans-serif', sans: 'sans-serif', comic: 'var(--font-comic)' };
+/* ── Code notes ─────────────────────────────────────────────────
+   A note can hold code instead of prose: the Code switch in the note window,
+   with its language beside it. C is coloured and typed as in the Coding
+   Library's editor (syntaxHighlight, edTextEntry); HTML, CSS and JavaScript
+   as in Memorization Typing (mtHighlightHTML), brackets coloured in pairs by
+   depth. Either way the editor auto-indents, closes brackets and quotes,
+   steps over a closer already there, and HTML closes the tag you open. On the
+   canvas a code note is a dark code block (Dark+ colours need a dark ground,
+   whatever colour the note is). */
+const BRAIN_CODE_LANGS = [['c', 'C'], ['html', 'HTML'], ['css', 'CSS'], ['js', 'JavaScript']];
+
+function _brainCodeLangName(lang) {
+  const hit = BRAIN_CODE_LANGS.find(l => l[0] === lang);
+  return hit ? hit[1] : 'C';
+}
+function _brainLastCodeLang() {
+  let lang = null;
+  try { lang = localStorage.getItem('ssp.brainCodeLang'); } catch (_) { /* private mode */ }
+  return BRAIN_CODE_LANGS.some(l => l[0] === lang) ? lang : 'c';
+}
+
+/** The language a note is shown in: the open editor's preview, or its own. Objects are never code. */
+function brainShownLang(node) {
+  const p = brain._livePreview;
+  const lang = p && p.id === node.id && 'lang' in p ? p.lang : node.codeLang;
+  return !node.shape && BRAIN_CODE_LANGS.some(l => l[0] === lang) ? lang : null;
+}
+
+/** Highlighted, escaped HTML for code in one of BRAIN_CODE_LANGS. */
+function brainCodeHTML(text, lang) {
+  const src = String(text || '');
+  if (lang === 'c') return typeof syntaxHighlight === 'function' ? syntaxHighlight(src) : escapeHTML(src);
+  return typeof mtHighlightHTML === 'function' ? mtHighlightHTML(src, lang) : escapeHTML(src);
+}
+
+/** A note's body: a code block for a code note with something in it, paragraphs otherwise. */
+function brainNoteBodyHTML(node, text) {
+  const lang = brainShownLang(node);
+  if (lang && text) {
+    return `<pre class="brain-code${lang === 'c' ? '' : ' tk-on'}" data-lang="${_brainCodeLangName(lang)}"><code>${brainCodeHTML(text, lang)}</code></pre>`;
+  }
+  return brainNoteParagraphs(text || (node.shape ? '' : 'Double-click or right-click to edit...'));
+}
+
+/* The code editor's keys: the Coding Library's line commands (Ctrl+/ comment,
+   Ctrl+D duplicate, Alt+Up/Down move), then text entry. */
+function _brainCodeKey(e, ta, lang) {
+  const mod = e.ctrlKey || e.metaKey;
+  if (mod && (e.key === '/' || e.code === 'Slash')) {
+    e.preventDefault();
+    if (lang === 'css') _brainBlockComment(ta, '/*', '*/');
+    else if (lang === 'html') _brainBlockComment(ta, '<!--', '-->');
+    else edToggleComment(ta);
+    return;
+  }
+  if (mod && !e.shiftKey && (e.key === 'd' || e.key === 'D')) { e.preventDefault(); edDuplicateLines(ta); return; }
+  if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); edMoveLines(ta, e.key === 'ArrowUp' ? -1 : 1); return; }
+  if (mod || e.altKey) return;
+  if (_brainCodeEntry(ta, e.key, e.shiftKey, lang)) e.preventDefault();
+}
+
+/** One character typed into code: true when it was handled here. */
+function _brainCodeEntry(ta, key, shiftKey, lang) {
+  const v = ta.value, s = ta.selectionStart, end = ta.selectionEnd;
+  // A closer already next to the caret (one auto-closed earlier) is stepped over.
+  if (s === end && /^[)\]}"'`]$/.test(key) && v[s] === key) { ta.setSelectionRange(s + 1, s + 1); return true; }
+  // An apostrophe in a word (don't, it's) is not the start of a string.
+  if ((key === "'" || key === '`') && s === end && /\w/.test(v[s - 1] || '')) return false;
+  if (lang === 'html' && s === end) {
+    const before = v.slice(0, s);
+    // Finishing an opening tag writes its closing tag after the caret.
+    if (key === '>') {
+      const m = before.match(/<([A-Za-z][\w:-]*)(?:\s[^<>]*)?$/);
+      if (m && !before.endsWith('/') && !(typeof MT_HTML_VOID !== 'undefined' && MT_HTML_VOID.has(m[1].toLowerCase()))) {
+        edReplaceRange(ta, s, end, '></' + m[1] + '>', s + 1);
+        return true;
+      }
+    }
+    // Enter between <tag> and </tag> opens an indented line between them.
+    if (key === 'Enter' && /<[A-Za-z][^<>]*>$/.test(before) && /^<\/[A-Za-z]/.test(v.slice(s))) {
+      const indent = before.slice(before.lastIndexOf('\n') + 1).match(/^\s*/)[0];
+      edReplaceRange(ta, s, end, '\n' + indent + ED_INDENT + '\n' + indent, s + 1 + indent.length + ED_INDENT.length);
+      return true;
+    }
+  }
+  return edTextEntry(ta, key, shiftKey);
+}
+
+/** Ctrl+/ for CSS and HTML: wrap the lines in a block comment, or unwrap them. */
+function _brainBlockComment(ta, open, close) {
+  const span = edLineSpan(ta);
+  const body = span.text.trim();
+  if (!body) return;
+  const lead = span.text.match(/^\s*/)[0];
+  const out = body.startsWith(open) && body.endsWith(close)
+    ? lead + body.slice(open.length, body.length - close.length).trim()
+    : lead + open + ' ' + body + ' ' + close;
+  edReplaceRange(ta, span.start, span.end, out, [span.start, span.start + out.length]);
+}
+
 function brainNoteParagraphs(text) {
   return String(text).split('\n').map(l => '<p>' + (l ? escapeHTML(l) : '<br>') + '</p>').join('');
 }

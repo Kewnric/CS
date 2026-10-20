@@ -5125,3 +5125,118 @@ body.viz-no-anim .app-sidebar {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
 }
 .brain-angle-tip.is-fading { opacity: 0; transition: opacity 1s ease 0.5s; }
+
+/* ── Code in the note window ──────────────────────────────────
+   The Code switch and its language sit in the header. Turned on, the box is
+   a code editor: the highlighted copy (.viz-ce-hl) lies under a textarea
+   whose own text is transparent, so you type into one and read the other,
+   the Coding Library editor's arrangement. The copy carries extra room
+   bottom and right so it can scroll as far as the textarea with its bars. */
+.viz-ce-tools { display: flex; align-items: center; gap: 6px; }
+.viz-comment-editor-header .viz-ce-tools span { flex: none; }
+.viz-ce-code-btn,
+.viz-ce-lang-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 9px;
+  border-radius: 6px;
+  border: 1px solid #30363d;
+  background: transparent;
+  color: #8b949e;
+  font: 600 0.75rem/1 'Consolas', 'Courier New', monospace;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+.viz-ce-code-btn svg,
+.viz-ce-lang-btn svg { width: 14px; height: 14px; }
+.viz-ce-code-btn:hover,
+.viz-ce-lang-btn:hover { color: #e6edf3; background: rgba(139, 148, 158, 0.16); }
+.viz-ce-code-btn[aria-pressed="true"] { color: #06b6d4; border-color: rgba(6, 182, 212, 0.55); background: rgba(6, 182, 212, 0.12); }
+.viz-ce-lang { position: relative; display: none; }
+.viz-comment-editor-overlay.is-code .viz-ce-lang { display: inline-flex; }
+.viz-ce-lang-btn { color: #e6edf3; }
+.viz-ce-lang-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
+.viz-ce-lang-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 140px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+  z-index: 10;
+  cursor: default;
+}
+.viz-ce-lang-menu.hidden { display: none; }
+.viz-ce-lang-menu button {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: #c9d1d9;
+  font: 600 0.78rem/1.2 'Consolas', 'Courier New', monospace;
+  text-align: left;
+  cursor: pointer;
+}
+.viz-ce-lang-menu button:hover { background: rgba(139, 148, 158, 0.16); color: #e6edf3; }
+.viz-ce-lang-menu button[aria-selected="true"] { color: #06b6d4; background: rgba(6, 182, 212, 0.1); }
+
+.viz-comment-editor-body { position: relative; }
+.viz-ce-hl { display: none; }
+.viz-comment-editor-overlay.is-code .viz-ce-hl {
+  display: block;
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 1rem calc(1.25rem + 24px) calc(1rem + 24px) 1.25rem;
+  background: #000;
+  color: #d4d4d4;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  tab-size: 4;
+  white-space: pre;
+  overflow: hidden;
+  pointer-events: none;
+}
+.viz-ce-hl code { font: inherit; color: inherit; background: none; padding: 0; border: 0; }
+.viz-comment-editor-overlay.is-code .viz-comment-editor-textarea {
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  color: transparent;
+  caret-color: #e6edf3;
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow: auto;
+}
+.viz-comment-editor-overlay.is-code .viz-comment-editor-textarea::selection { background: rgba(56, 139, 253, 0.4); color: transparent; }
+.viz-comment-editor-overlay.is-code .viz-comment-editor-textarea::placeholder { color: #6e7681; }
+
+/* A code note on the canvas: a dark block in the note, in the editor's mono
+   face, whatever the note's colours, font or alignment. Long lines wrap. */
+.viz-node[data-type="comment"] .viz-comment-content .brain-code {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(1, 4, 9, 0.9);
+  border: 1px solid rgba(240, 246, 252, 0.08);
+  color: #d4d4d4;
+  font-family: 'Consolas', 'Courier New', monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: left;
+  text-transform: none;
+  text-shadow: none;
+  tab-size: 4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  hyphens: none;
+}
+.viz-node[data-type="comment"] .brain-code code { font: inherit; color: inherit; background: none; padding: 0; border: 0; }
