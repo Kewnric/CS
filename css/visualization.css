@@ -4897,8 +4897,7 @@ body.viz-no-anim .app-sidebar {
 
 .shape-tl-labels { position: absolute; inset: 0; pointer-events: none; }
 .shape-tl-label {
-  position: absolute;
-  transform: translateX(-50%);
+  position: absolute;   /* placed and aligned per direction by brainPaintShape */
   font: 600 0.72rem var(--note-font, var(--font-sans));
   color: var(--note-text, var(--shape-ink));
   white-space: nowrap;
@@ -4922,5 +4921,14 @@ body.viz-no-anim .app-sidebar {
   z-index: 6;
 }
 .viz-node:hover .shape-tl-add { opacity: 1; }
+/* The + stays just past the line's far end, whichever way it was turned. */
+.viz-node[data-rot="90"] .shape-tl-add { right: auto; top: auto; bottom: -32px; left: 18px; }
+.viz-node[data-rot="180"] .shape-tl-add { right: auto; left: -32px; top: calc(62% - 10px); }
+.viz-node[data-rot="270"] .shape-tl-add { right: 18px; top: -32px; }
+
+/* Text turns with its object; shapes' labels stay upright to be read. */
+.viz-node[data-shape="text"][data-rot="90"] .viz-comment-content { writing-mode: vertical-rl; }
+.viz-node[data-shape="text"][data-rot="180"] .viz-comment-content { transform: rotate(180deg); }
+.viz-node[data-shape="text"][data-rot="270"] .viz-comment-content { writing-mode: vertical-rl; transform: rotate(180deg); }
 .shape-tl-add:hover { transform: scale(1.12); }
 .viz-canvas-container.brain-locked .shape-tl-add { display: none; }

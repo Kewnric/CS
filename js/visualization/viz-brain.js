@@ -967,6 +967,7 @@ function brainRenderCanvas() {
     if (node.border && !isGlobe) el.dataset.border = node.border;
     if (node.shape && !isGlobe) {
       el.dataset.shape = node.shape;
+      if (node.rot) el.dataset.rot = node.rot;   // text and the timeline's + follow it in CSS
       // An object's fill is the full Background colour, not a note's dark tint.
       if (node.bg) el.style.setProperty('--shape-fill-c', vizColorMap(node.bg));
     }
@@ -1078,7 +1079,8 @@ function brainRenderCanvas() {
       el.addEventListener('mouseenter', () => { if (typeof vizHoverFocus === 'function') vizHoverFocus(node.id); });
       el.addEventListener('mouseleave', () => { if (typeof vizHoverClear === 'function') vizHoverClear(); });
       el.addEventListener('dblclick', (e) => { e.stopPropagation(); brainHideAllMenus(); brainOpenEditor(node); });
-      ['top','right','bottom','left'].forEach(side => {
+      // Arrows, lines and timelines are drawings, not things to connect: no ports.
+      if (!BRAIN_PORTLESS.has(node.shape)) ['top','right','bottom','left'].forEach(side => {
         const port = document.createElement('div');
         port.className = 'viz-port';
         port.dataset.side = side;
@@ -1436,6 +1438,12 @@ function brainCanvasMouseUp(e) {
   if (container) container.classList.remove('panning');
   const moved = brain.pan.x !== brain.panStartOffset.x || brain.pan.y !== brain.panStartOffset.y;
   if (moved) { vizApplyTransform(); brainSaveCurrentVersion(); }
+  // A click on empty canvas (a press that did not pan) deselects. Nothing did,
+  // so a note's highlight or an object's dashed box stayed after clicking away.
+  else if (brain.selectedNodeId) {
+    brain.selectedNodeId = null;
+    document.querySelectorAll('#viz-nodes-layer .viz-node.selected').forEach(n => n.classList.remove('selected'));
+  }
 }
 
 let _brainWheelSaveTimer = null;
@@ -2043,7 +2051,7 @@ function _brainMarkNodeMenu() {
   const borderRow = document.getElementById('brain-node-border-toggle');
   if (borderRow) borderRow.classList.toggle('hidden', !!node.shape);
   const rotateRow = document.getElementById('brain-node-rotate');
-  if (rotateRow) rotateRow.classList.toggle('hidden', !BRAIN_ROTATABLE.has(node.shape));
+  if (rotateRow) rotateRow.classList.toggle('hidden', !node.shape);   // every object turns
   // Manhua's dropdown (and Bubble Shape in it) only exists for a Manhua note:
   // any other border folds it away.
   if (node.border !== 'manhua') {
@@ -2083,7 +2091,7 @@ const BRAIN_SHAPES = [
   ['triangle', 'Triangle', 'triangle', 140, 110], ['star', 'Star', 'star', 130, 120],
   ['text', 'Text', 'type', 150, 50]
 ];
-const BRAIN_ROTATABLE = new Set(['arrow', 'double', 'line', 'triangle']);
+const BRAIN_PORTLESS = new Set(['arrow', 'double', 'line', 'timeline']);
 
 function brainToggleInsertMenu() { vizTogglePopup('brain-insert-popup'); }
 
@@ -2117,18 +2125,20 @@ function brainExtendTimeline(nodeId) {
   const inner = document.querySelector(`.viz-node[data-node-id="${nodeId}"] .viz-node-inner`);
   const segs = node.segs || 3;
   const w = (inner && inner.offsetWidth) || node.w || 380;
+  const h = (inner && inner.offsetHeight) || node.h || 84;
+  const vertical = (node.rot || 0) % 180 !== 0;   // turned, it grows downwards (or up)
   brainPushUndo();
   node.segs = segs + 1;
-  node.w = Math.round(w + (w - 2 * BRAIN_TL_PAD) / segs);
-  if (inner) node.h = inner.offsetHeight;
+  if (vertical) { node.w = w; node.h = Math.round(h + (h - 2 * BRAIN_TL_PAD) / segs); }
+  else { node.h = h; node.w = Math.round(w + (w - 2 * BRAIN_TL_PAD) / segs); }
   node.userSized = true;
   brainRenderCanvas(); brainSaveCurrentVersion();
 }
 
-/** Rotate an arrow, line or triangle a quarter turn; its box turns with it. */
+/** Rotate an object a quarter turn; its box turns with it. */
 function brainCtxRotateShape() {
   const node = brain.contextNodeId && brain.nodes.find(n => n.id === brain.contextNodeId);
-  if (!node || !BRAIN_ROTATABLE.has(node.shape)) return;
+  if (!node || !node.shape) return;
   const inner = document.querySelector(`.viz-node[data-node-id="${node.id}"] .viz-node-inner`);
   const w = (inner && inner.offsetWidth) || node.w || 200, h = (inner && inner.offsetHeight) || node.h || 56;
   brainPushUndo();
@@ -2174,15 +2184,26 @@ function brainPaintShape(el, node) {
     if (kind !== 'line') out += head(x1, y1, x2, y2);
     if (kind === 'double') out += head(x2, y2, x1, y1);
   } else if (kind === 'timeline') {
-    const segs = Math.max(1, node.segs || 3), y = h * 0.38, p = BRAIN_TL_PAD;
-    const step = (w - 2 * p) / segs;
-    out = `<path class="shape-stroke" d="M${f(p)} ${f(y)}L${f(w - p)} ${f(y)}"/>`;
+    // Runs left to right; turned, top to bottom, right to left, bottom to top.
+    // The labels sit below, beside, above or beside the dots to match.
+    const segs = Math.max(1, node.segs || 3), p = BRAIN_TL_PAD;
+    const vertical = rot === 90 || rot === 270;
+    const len = vertical ? h : w, step = (len - 2 * p) / segs;
+    const across = { 0: h * 0.38, 90: 28, 180: h * 0.62, 270: w - 28 }[rot];
+    const at = i => {   // the i-th milestone's point
+      const t = (rot === 180 || rot === 270) ? len - p - step * i : p + step * i;
+      return vertical ? [across, t] : [t, across];
+    };
+    const [ax, ay] = at(0), [bx, by] = at(segs);
+    out = `<path class="shape-stroke" d="M${f(ax)} ${f(ay)}L${f(bx)} ${f(by)}"/>`;
     const labels = String(brainShownText(node) || '').split('\n');
+    const place = { 0: [0, 12, 'translateX(-50%)'], 180: [0, -12, 'translate(-50%, -100%)'],
+      90: [14, 0, 'translateY(-50%)'], 270: [-14, 0, 'translate(-100%, -50%)'] }[rot];
     let html = '';
     for (let i = 0; i <= segs; i++) {
-      const cx = p + step * i;
-      out += `<circle class="shape-ink-fill" cx="${f(cx)}" cy="${f(y)}" r="5"/>`;
-      if (labels[i]) html += `<span class="shape-tl-label" style="left:${f(cx)}px;top:${f(y + 12)}px">${escapeHTML(labels[i])}</span>`;
+      const [cx, cy] = at(i);
+      out += `<circle class="shape-ink-fill" cx="${f(cx)}" cy="${f(cy)}" r="5"/>`;
+      if (labels[i]) html += `<span class="shape-tl-label" style="left:${f(cx + place[0])}px;top:${f(cy + place[1])}px;transform:${place[2]}">${escapeHTML(labels[i])}</span>`;
     }
     const lab = el.querySelector(':scope > .shape-tl-labels');
     if (lab) lab.innerHTML = html;
@@ -2203,7 +2224,7 @@ function brainPaintShape(el, node) {
   } else if (kind === 'star') {
     const cx = w / 2, cy = h / 2 + h * 0.04, rx = w / 2 - 1.5, ry = h / 2 - 1.5, pts = [];
     for (let i = 0; i < 10; i++) {
-      const a = -Math.PI / 2 + i * Math.PI / 5, k = i % 2 ? 0.45 : 1;
+      const a = -Math.PI / 2 + rot * Math.PI / 180 + i * Math.PI / 5, k = i % 2 ? 0.45 : 1;
       pts.push(f(cx + rx * k * Math.cos(a)) + ' ' + f(cy + ry * k * Math.sin(a)));
     }
     out = `<path class="shape-shape" d="M${pts.join('L')}Z"/>`;
