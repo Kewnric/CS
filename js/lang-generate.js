@@ -159,7 +159,11 @@ function langGenItem(type, w, pool, study, ref) {
     if (it.answer !== target) it.prompt = it.prompt.replace('___', '___' + target.slice(target.indexOf(it.answer) + it.answer.length));
     /* One-word tiles for a one-word gap: a phrase is ruled out by its length
        before anyone has to know what it means. */
-    it.distractors = langGenDistractors(w, pool, study, ref, 24).filter(d => !/\s/.test(String(d).trim())).slice(0, 3);
+    const single = d => !/\s/.test(String(d).trim());
+    it.distractors = langGenDistractors(w, pool, study, ref, 24).filter(single).slice(0, 3);
+    // A topic made of phrases (greetings) has few single words near the top;
+    // look through the whole dictionary before settling for phrases.
+    if (it.distractors.length < 2) it.distractors = langGenDistractors(w, pool, study, ref, pool.length).filter(single).slice(0, 3);
     if (it.distractors.length < 2) it.distractors = langGenDistractors(w, pool, study, ref, 3);
     // What the sentence means, shown under it -- without it "___ ko." is a guess.
     it.hint = ex.gloss || '';
