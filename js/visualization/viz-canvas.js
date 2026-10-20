@@ -698,7 +698,7 @@ function _vizRenderLinks(svg, nodesLayer, g, drawn) {
 /* Eighteen arrowhead markers that never change were being rebuilt from a
    template string on every single render. */
 function _vizBuildDefs(svg) {
-  const colors = { red: '#ef4444', orange: '#f97316', yellow: '#eab308', green: '#22c55e', blue: '#3b82f6', purple: '#a855f7', pink: '#ec4899', cyan: '#06b6d4' };
+  const colors = { red: '#ef4444', orange: '#f97316', copper: '#dd8448', yellow: '#eab308', green: '#22c55e', blue: '#3b82f6', purple: '#a855f7', pink: '#ec4899', cyan: '#06b6d4' };
   // Heads are solid. The line runs on under the head to the port, and at
   // 60–90% opacity its dashes showed through the arrow.
   // refX puts the TIP on the path's end, which is the node's edge. It was 6

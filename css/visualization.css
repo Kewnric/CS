@@ -807,6 +807,7 @@
 .viz-node[data-color="purple"] { --viz-node-accent: #a855f7; --viz-node-accent-strong: #a855f7; }
 .viz-node[data-color="pink"]   { --viz-node-accent: #ec4899; --viz-node-accent-strong: #ec4899; }
 .viz-node[data-color="cyan"]   { --viz-node-accent: #06b6d4; --viz-node-accent-strong: #06b6d4; }
+.viz-node[data-color="copper"] { --viz-node-accent: #dd8448; --viz-node-accent-strong: #dd8448; }
 
 .viz-node[data-color="red"] .viz-node-inner {
   border-color: #ef4444 !important;
@@ -838,6 +839,10 @@
 
 .viz-node[data-color="cyan"] .viz-node-inner {
   border-color: #06b6d4 !important;
+}
+
+.viz-node[data-color="copper"] .viz-node-inner {
+  border-color: #dd8448 !important;
 }
 
 /* --- Link/Connection Lines --- */
@@ -2385,6 +2390,11 @@
 .viz-globe-node[data-color="cyan"] .viz-globe-circle {
   border-color: #06b6d4 !important;
   background: rgba(6, 182, 212, 0.08);
+}
+
+.viz-globe-node[data-color="copper"] .viz-globe-circle {
+  border-color: #dd8448 !important;
+  background: rgba(221, 132, 72, 0.08);
 }
 
 /* Globe fog variant */
@@ -4256,8 +4266,17 @@ body.viz-no-anim .app-sidebar {
 .viz-node[data-border="electric"] {
   --el-color: var(--slab-hue, #f59e0b);
   --el-light: color-mix(in srgb, var(--el-color) 65%, #fff);
-  --el-grad: color-mix(in oklab, var(--el-color) 35%, rgb(0 0 0 / 0.4));
+  /* The card's diagonal tint. Mixing the hue at 35% into translucent black
+     came out far brighter than the original and washed a big note yellow;
+     this fallback is dark, and browsers with relative colour get the
+     original's exact formula below. */
+  --el-grad: color-mix(in oklab, var(--el-color) 14%, rgb(0 0 0 / 0.4));
   --el-radius: 14px;
+}
+@supports (color: oklch(from red l c h)) {
+  .viz-node[data-border="electric"] {
+    --el-grad: oklch(from var(--el-color) 0.3 calc(c / 2) h / 0.4);
+  }
 }
 .viz-node[data-type="comment"][data-border="electric"] .viz-node-inner,
 .viz-node[data-type="comment"][data-border="electric"]:hover .viz-node-inner,
@@ -4277,18 +4296,23 @@ body.viz-no-anim .app-sidebar {
 }
 
 .viz-electric,
+.viz-electric-back,
 .viz-electric-bg {
   position: absolute;
   inset: 0;
   border-radius: var(--el-radius);
   pointer-events: none;
 }
-/* Over the card's edge; the halo under it (.viz-node is a stacking context). */
-.viz-electric { z-index: 1; }
+/* Over the card's edge; the halo under it (.viz-node is a stacking context).
+   Both are size containers so the blurs can scale with the note: the
+   original's 32px halo and 16px sheen are tuned for a 350x500 card, and
+   around a 70px-tall note they covered the whole card in glow. 9.14cqmin is
+   32px at 350px, so a card that size looks exactly like the original. */
+.viz-electric { z-index: 1; container-type: size; }
+.viz-electric-back { z-index: -1; container-type: size; }
 .viz-electric-bg {
-  z-index: -1;
   transform: scale(1.1);
-  filter: blur(32px);
+  filter: blur(clamp(6px, 9.14cqmin, 32px));
   opacity: 0.3;
   background: linear-gradient(-30deg, var(--el-light), transparent, var(--el-color));
   transition: opacity 0.2s ease;
@@ -4321,7 +4345,7 @@ body.viz-no-anim .app-sidebar {
    empty canvas would just paint white haze past the corners. */
 .viz-electric-sheen {
   mix-blend-mode: overlay;
-  filter: blur(16px);
+  filter: blur(clamp(3px, 4.57cqmin, 16px));   /* 16px at 350px, as the halo */
   opacity: 0.3;   /* stronger, it washed the card out pink-white */
   clip-path: inset(0 round var(--el-radius));
   background: linear-gradient(-30deg, #fff, transparent 30%, transparent 70%, #fff);
@@ -4332,7 +4356,7 @@ body.viz-no-anim .app-sidebar {
 
 /* Zoomed far out the line is a few pixels long; skip the filter work there. */
 .viz-canvas-container.viz-far .viz-electric,
-.viz-canvas-container.viz-far .viz-electric-bg { display: none; }
+.viz-canvas-container.viz-far .viz-electric-back { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .viz-electric-line { filter: url(#viz-electric-still); }

@@ -43,7 +43,8 @@ function vizStripKey(e) {
 
 /** One colour swatch row, used by every context menu that offers colours. */
 function vizSwatchesHTML(fn) {
-  const colors = [['red', '#ef4444'], ['orange', '#f97316'], ['yellow', '#eab308'], ['green', '#22c55e'],
+  // copper is the Electric Border's original colour (#dd8448).
+  const colors = [['red', '#ef4444'], ['orange', '#f97316'], ['copper', '#dd8448'], ['yellow', '#eab308'], ['green', '#22c55e'],
     ['blue', '#3b82f6'], ['purple', '#a855f7'], ['pink', '#ec4899'], ['cyan', '#06b6d4']];
   return colors.map(([name, hex]) =>
     `<div class="viz-color-swatch" data-color="${name}" style="background:${hex};" role="button" tabindex="0"

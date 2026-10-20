@@ -1748,7 +1748,7 @@ function brainNodeCtx(e, nodeId) {
    displacement filter), with two blurred copies for glow, an overlay sheen and
    a soft halo behind. The filter lives once in the page; each note only draws
    the layers. */
-const BRAIN_ELECTRIC_BACK = '<div class="viz-electric-bg" aria-hidden="true"></div>';
+const BRAIN_ELECTRIC_BACK = '<div class="viz-electric-back" aria-hidden="true"><div class="viz-electric-bg"></div></div>';
 const BRAIN_ELECTRIC_FRONT = '<div class="viz-electric" aria-hidden="true">'
   + '<div class="viz-electric-glow-1"></div><div class="viz-electric-glow-2"></div>'
   + '<div class="viz-electric-line"></div><div class="viz-electric-sheen"></div></div>';
