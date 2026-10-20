@@ -416,17 +416,18 @@ function vizTemplate() {
 
     <!-- Brain Node Context Menu -->
     <div id="brain-node-ctx" class="viz-context-menu hidden" role="menu">
-      <!-- Every colour lives in Personalize Color. Text, fill and edge are three
-           separate settings (node.textColor, node.bg, node.color) that never read
-           each other. Charcoal is the original Electric Border card's fill. -->
+      <!-- Every colour lives in Personalize Color: one swatch row, and a toggle for
+           what it paints. Text, fill and edge are three separate settings
+           (node.textColor, node.bg, node.color) that never read each other.
+           Charcoal is the original Electric Border card's fill. -->
       <button class="viz-ctx-item" id="brain-node-colors-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'colors')"><i data-lucide="palette"></i> Personalize Color <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
       <div class="viz-ctx-submenu hidden" id="brain-node-colors-menu" role="menu">
-        <div class="viz-popup-title">Text Color</div>
-        <div class="viz-color-picker" id="brain-note-text-swatches">${vizSwatchesHTML('brainCtxEditText')}</div>
-        <div class="viz-popup-title">Background Color</div>
-        <div class="viz-color-picker" id="brain-note-bg-swatches">${vizSwatchesHTML('brainCtxEditBg', [['charcoal', 'oklch(0.185 0 0)', 'charcoal (Electric Border original)']])}</div>
-        <div class="viz-popup-title">Border Edge Color</div>
-        <div class="viz-color-picker" id="brain-note-edge-swatches">${vizSwatchesHTML('brainCtxEditColor')}</div>
+        <div class="brain-color-targets" role="radiogroup" aria-label="What the colour applies to">
+          <button type="button" role="radio" data-target="text" onclick="brainSetColorTarget('text')">Text Color</button>
+          <button type="button" role="radio" data-target="bg" onclick="brainSetColorTarget('bg')">Background Color</button>
+          <button type="button" role="radio" data-target="edge" onclick="brainSetColorTarget('edge')">Border Edge Color</button>
+        </div>
+        <div class="viz-color-picker" id="brain-note-swatches">${vizSwatchesHTML('brainCtxPickColor', [['white', '#ffffff'], ['black', '#000000'], ['charcoal', 'oklch(0.185 0 0)', 'charcoal (Electric Border original)']])}</div>
       </div>
       <button class="viz-ctx-item" id="brain-node-border-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'border')"><i data-lucide="frame"></i> Border Type <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
       <div class="viz-ctx-submenu hidden" id="brain-node-border-menu" role="menu">

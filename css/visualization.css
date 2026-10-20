@@ -808,6 +808,9 @@
 .viz-node[data-color="pink"]   { --viz-node-accent: #ec4899; --viz-node-accent-strong: #ec4899; }
 .viz-node[data-color="cyan"]   { --viz-node-accent: #06b6d4; --viz-node-accent-strong: #06b6d4; }
 .viz-node[data-color="copper"] { --viz-node-accent: #dd8448; --viz-node-accent-strong: #dd8448; }
+.viz-node[data-color="white"]  { --viz-node-accent: #ffffff; --viz-node-accent-strong: #ffffff; }
+.viz-node[data-color="black"]  { --viz-node-accent: #000000; --viz-node-accent-strong: #000000; }
+.viz-node[data-color="charcoal"] { --viz-node-accent: #131313; --viz-node-accent-strong: #131313; }
 
 .viz-node[data-color="red"] .viz-node-inner {
   border-color: #ef4444 !important;
@@ -844,6 +847,10 @@
 .viz-node[data-color="copper"] .viz-node-inner {
   border-color: #dd8448 !important;
 }
+
+.viz-node[data-color="white"] .viz-node-inner { border-color: #ffffff !important; }
+.viz-node[data-color="black"] .viz-node-inner { border-color: #000000 !important; }
+.viz-node[data-color="charcoal"] .viz-node-inner { border-color: #131313 !important; }
 
 /* --- Link/Connection Lines --- */
 .viz-link-group {
@@ -4387,7 +4394,7 @@ body.viz-no-anim .app-sidebar {
   .viz-electric-line { filter: url(#viz-electric-still); }
 }
 
-/* ── Note background colour (brainCtxEditBg) ───────────────────
+/* ── Note background colour (brainCtxPickColor, Background) ───
    Separate from the border colour: data-bg sets the card's fill, data-color
    its edge, and neither reads the other. A colour is a dark tint of its hue so
    the light text stays readable; charcoal is the original Electric Border
@@ -4404,8 +4411,39 @@ body.viz-no-anim .app-sidebar {
 /* Charcoal has no hue of its own, so it leaves the Electric card's diagonal
    tint to the border colour, exactly the original's charcoal-and-copper card. */
 .viz-node[data-bg="charcoal"]  { --viz-node-bg: oklch(0.185 0 0); }
-/* Charcoal is nearly the menu's own colour; a faint ring makes it findable. */
-.viz-color-swatch[data-color="charcoal"] { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28); }
+/* Charcoal and black are nearly the menu's own colour; a faint ring makes
+   them findable. */
+.viz-color-swatch[data-color="charcoal"],
+.viz-color-swatch[data-color="black"] { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28); }
+
+/* White and black as card fills are themselves, not tints; like charcoal they
+   have no hue, so an Electric card's diagonal tint stays the border's. */
+.viz-node[data-bg="white"] { --viz-node-bg: #ffffff; }
+.viz-node[data-bg="black"] { --viz-node-bg: #000000; }
+
+/* Personalize Color's target toggle: exactly one is on, and it stays on. */
+.brain-color-targets {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.15rem 0.5rem 0.35rem;
+}
+.brain-color-targets button {
+  flex: 1;
+  padding: 0.35rem 0.3rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font: 600 0.68rem/1.2 var(--font-sans);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+.brain-color-targets button:hover { color: var(--color-primary); border-color: var(--color-primary); }
+.brain-color-targets button.active {
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+  border-color: var(--color-primary);
+}
 
 /* Spacing choices in the node menu: one compact row of options each. */
 .brain-spacing-row {

@@ -1741,11 +1741,44 @@ function brainNodeCtx(e, nodeId) {
   _brainCloseNodeSubs(null);
   if (typeof vizPositionMenu === 'function') vizPositionMenu(menu, e.clientX, e.clientY);
   else { menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px'; menu.classList.remove('hidden'); }
-  // Each control marks only its own setting.
+  _brainMarkNodeMenu();
+}
+
+/* Personalize Color: one swatch row paints whichever of text / background /
+   border edge is toggled on. The toggle stays where you left it. */
+const BRAIN_COLOR_PROPS = { text: 'textColor', bg: 'bg', edge: 'color' };
+
+function brainSetColorTarget(target) {
+  brain._colorTarget = target;
+  _brainMarkNodeMenu();
+}
+
+/** Applies to the toggled target and keeps the menu open, so you can switch
+ *  target and pick again. */
+function brainCtxPickColor(color) {
+  const node = brain.contextNodeId && brain.nodes.find(n => n.id === brain.contextNodeId);
+  if (!node) return;
+  const prop = BRAIN_COLOR_PROPS[brain._colorTarget || 'edge'];
+  if ((node[prop] || null) === (color || null)) return;
+  brainPushUndo();
+  if (color) node[prop] = color; else delete node[prop];
+  brainRenderCanvas(); brainSaveCurrentVersion();
+  _brainMarkNodeMenu();
+}
+
+/** Mark each control in the node menu with the context note's current value. */
+function _brainMarkNodeMenu() {
+  const menu = document.getElementById('brain-node-ctx');
+  const node = menu && brain.contextNodeId && brain.nodes.find(n => n.id === brain.contextNodeId);
+  if (!node) return;
   const mark = (sel, attr, value) => menu.querySelectorAll(sel).forEach(o => o.classList.toggle('active', o.dataset[attr] === value));
-  mark('#brain-note-text-swatches .viz-color-swatch', 'color', node?.textColor || '');
-  mark('#brain-note-bg-swatches .viz-color-swatch', 'color', node?.bg || '');
-  mark('#brain-note-edge-swatches .viz-color-swatch', 'color', node?.color || '');
+  const target = brain._colorTarget || 'edge';
+  menu.querySelectorAll('.brain-color-targets [data-target]').forEach(b => {
+    const on = b.dataset.target === target;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-checked', String(on));
+  });
+  mark('#brain-note-swatches .viz-color-swatch', 'color', node[BRAIN_COLOR_PROPS[target]] || '');
   mark('#brain-node-border-menu .viz-link-type-option', 'border', node?.border || '');
   mark('#brain-node-align-menu .viz-link-type-option', 'value', node?.textAlign || 'left');
   mark('[data-prop="lineSpacing"] button', 'value', String(node?.lineSpacing || 1.5));
@@ -1786,7 +1819,6 @@ function brainCtxSetNote(prop, value) {
   brainRenderCanvas(); brainSaveCurrentVersion();
   brainHideAllMenus();
 }
-function brainCtxEditText(color) { brainCtxSetNote('textColor', color); }
 
 /* -- Border types ----------------------------------------------
    Default is the extruded slab. Electric is a crackling line in the note's own
@@ -1845,15 +1877,6 @@ function brainEnsureElectricFilter() {
   document.body.appendChild(holder.firstElementChild);
 }
 
-/** The note's background, kept apart from its border colour (node.color). */
-function brainCtxEditBg(color) {
-  const node = brain.contextNodeId && brain.nodes.find(n => n.id === brain.contextNodeId);
-  if (!node || (node.bg || null) === (color || null)) { brainHideAllMenus(); return; }
-  brainPushUndo();
-  if (color) node.bg = color; else delete node.bg;
-  brainRenderCanvas(); brainSaveCurrentVersion();
-  brainHideAllMenus();
-}
 
 function brainCtxSetBorder(type) {
   const node = brain.contextNodeId && brain.nodes.find(n => n.id === brain.contextNodeId);
@@ -1929,16 +1952,6 @@ function brainCtxDeleteNode() {
   brainHideAllMenus();
 }
 
-function brainCtxEditColor(color) {
-  // The guard has to come first: pushing undo and then bailing left an entry
-  // on the stack representing no change, so the next Ctrl+Z did nothing.
-  if (!brain.contextNodeId) { brainHideAllMenus(); return; }
-  const node = brain.nodes.find(n => n.id === brain.contextNodeId);
-  if (!node) { brainHideAllMenus(); return; }
-  brainPushUndo();
-  if (node) { node.color = color; brainRenderCanvas(); brainSaveCurrentVersion(); }
-  brainHideAllMenus();
-}
 
 function brainCtxDeleteLink() {
   if (brain.contextLinkId) brainDeleteLink(brain.contextLinkId);
