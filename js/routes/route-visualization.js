@@ -41,14 +41,15 @@ function vizStripKey(e) {
   if (next) next.focus();
 }
 
-/** One colour swatch row, used by every context menu that offers colours. */
-function vizSwatchesHTML(fn) {
+/** One colour swatch row, used by every context menu that offers colours.
+ *  `extra` adds [name, css, label] swatches before Default. */
+function vizSwatchesHTML(fn, extra) {
   // copper is the Electric Border's original colour (#dd8448).
   const colors = [['red', '#ef4444'], ['orange', '#f97316'], ['copper', '#dd8448'], ['yellow', '#eab308'], ['green', '#22c55e'],
     ['blue', '#3b82f6'], ['purple', '#a855f7'], ['pink', '#ec4899'], ['cyan', '#06b6d4']];
-  return colors.map(([name, hex]) =>
+  return colors.concat(extra || []).map(([name, hex, label]) =>
     `<div class="viz-color-swatch" data-color="${name}" style="background:${hex};" role="button" tabindex="0"
-       aria-label="${name}" title="${name}" onclick="${fn}('${name}')"></div>`).join('')
+       aria-label="${label || name}" title="${label || name}" onclick="${fn}('${name}')"></div>`).join('')
     + `<div class="viz-color-swatch" data-color="" style="background:var(--border-color);" role="button" tabindex="0"
        aria-label="Default colour" onclick="${fn}(null)" title="Default"></div>`;
 }
@@ -415,8 +416,14 @@ function vizTemplate() {
 
     <!-- Brain Node Context Menu -->
     <div id="brain-node-ctx" class="viz-context-menu hidden" role="menu">
-      <div class="viz-color-picker">${vizSwatchesHTML('brainCtxEditColor')}</div>
+      <div class="viz-color-picker brain-border-swatches" title="Border colour">${vizSwatchesHTML('brainCtxEditColor')}</div>
       <div class="viz-ctx-divider"></div>
+      <!-- Its own colour, never mixed with the border's (node.bg vs node.color).
+           Charcoal is the original Electric Border card's background. -->
+      <button class="viz-ctx-item" id="brain-node-bg-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleBgMenu(event)"><i data-lucide="paint-bucket"></i> Background Color <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
+      <div class="viz-ctx-submenu hidden" id="brain-node-bg-menu" role="menu">
+        <div class="viz-color-picker">${vizSwatchesHTML('brainCtxEditBg', [['charcoal', 'oklch(0.185 0 0)', 'charcoal (Electric Border original)']])}</div>
+      </div>
       <button class="viz-ctx-item" id="brain-node-border-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleBorderType(event)"><i data-lucide="frame"></i> Border Type <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
       <div class="viz-ctx-submenu hidden" id="brain-node-border-menu" role="menu">
         <div class="viz-link-type-option" role="menuitem" data-border="" onclick="brainCtxSetBorder(null)"><i data-lucide="square"></i> Default</div>

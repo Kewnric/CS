@@ -3013,7 +3013,7 @@
       rgba(255, 255, 255, 0.055) 0%,
       rgba(255, 255, 255, 0.012) 42%,
       rgba(0, 0, 0, 0.16) 100%),
-    var(--bg-elevated) !important;
+    var(--viz-node-bg, var(--bg-elevated)) !important;
   box-shadow:
     /* bevel: light catches the top-left, the bottom-right falls away */
     inset 0 1px 0 rgba(255, 255, 255, 0.16),
@@ -4266,16 +4266,20 @@ body.viz-no-anim .app-sidebar {
 .viz-node[data-border="electric"] {
   --el-color: var(--slab-hue, #f59e0b);
   --el-light: color-mix(in srgb, var(--el-color) 65%, #fff);
+  /* The diagonal tint is the border's hue, as in the original, until a
+     background is picked; then it is the background's, so the two colours
+     never blend. */
+  --el-grad-hue: var(--viz-node-bg-hue, var(--el-color));
   /* The card's diagonal tint. Mixing the hue at 35% into translucent black
      came out far brighter than the original and washed a big note yellow;
      this fallback is dark, and browsers with relative colour get the
      original's exact formula below. */
-  --el-grad: color-mix(in oklab, var(--el-color) 14%, rgb(0 0 0 / 0.4));
+  --el-grad: color-mix(in oklab, var(--el-grad-hue) 14%, rgb(0 0 0 / 0.4));
   --el-radius: 14px;
 }
 @supports (color: oklch(from red l c h)) {
   .viz-node[data-border="electric"] {
-    --el-grad: oklch(from var(--el-color) 0.3 calc(c / 2) h / 0.4);
+    --el-grad: oklch(from var(--el-grad-hue) 0.3 calc(c / 2) h / 0.4);
   }
 }
 .viz-node[data-type="comment"][data-border="electric"] .viz-node-inner,
@@ -4290,7 +4294,7 @@ body.viz-no-anim .app-sidebar {
   border: 1px solid color-mix(in srgb, var(--el-color) 50%, transparent) !important;
   background:
     linear-gradient(-30deg, var(--el-grad), transparent, var(--el-grad)),
-    var(--bg-elevated) !important;
+    var(--viz-node-bg, var(--bg-elevated)) !important;
   box-shadow: none !important;
   transform: none !important;
 }
@@ -4361,3 +4365,21 @@ body.viz-no-anim .app-sidebar {
 @media (prefers-reduced-motion: reduce) {
   .viz-electric-line { filter: url(#viz-electric-still); }
 }
+
+/* ── Note background colour (brainCtxEditBg) ───────────────────
+   Separate from the border colour: data-bg sets the card's fill, data-color
+   its edge, and neither reads the other. A colour is a dark tint of its hue so
+   the light text stays readable; charcoal is the original Electric Border
+   card's own background, oklch(0.185 0 0). */
+.viz-node[data-bg="red"]     { --viz-node-bg-hue: #ef4444; --viz-node-bg: color-mix(in oklab, #ef4444 24%, var(--bg-elevated)); }
+.viz-node[data-bg="orange"]  { --viz-node-bg-hue: #f97316; --viz-node-bg: color-mix(in oklab, #f97316 24%, var(--bg-elevated)); }
+.viz-node[data-bg="copper"]  { --viz-node-bg-hue: #dd8448; --viz-node-bg: color-mix(in oklab, #dd8448 24%, var(--bg-elevated)); }
+.viz-node[data-bg="yellow"]  { --viz-node-bg-hue: #eab308; --viz-node-bg: color-mix(in oklab, #eab308 24%, var(--bg-elevated)); }
+.viz-node[data-bg="green"]   { --viz-node-bg-hue: #22c55e; --viz-node-bg: color-mix(in oklab, #22c55e 24%, var(--bg-elevated)); }
+.viz-node[data-bg="blue"]    { --viz-node-bg-hue: #3b82f6; --viz-node-bg: color-mix(in oklab, #3b82f6 24%, var(--bg-elevated)); }
+.viz-node[data-bg="purple"]  { --viz-node-bg-hue: #a855f7; --viz-node-bg: color-mix(in oklab, #a855f7 24%, var(--bg-elevated)); }
+.viz-node[data-bg="pink"]    { --viz-node-bg-hue: #ec4899; --viz-node-bg: color-mix(in oklab, #ec4899 24%, var(--bg-elevated)); }
+.viz-node[data-bg="cyan"]    { --viz-node-bg-hue: #06b6d4; --viz-node-bg: color-mix(in oklab, #06b6d4 24%, var(--bg-elevated)); }
+.viz-node[data-bg="charcoal"]  { --viz-node-bg-hue: oklch(0.185 0 0); --viz-node-bg: oklch(0.185 0 0); }
+/* Charcoal is nearly the menu's own colour; a faint ring makes it findable. */
+.viz-color-swatch[data-color="charcoal"] { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28); }

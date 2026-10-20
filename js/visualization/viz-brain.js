@@ -937,6 +937,7 @@ function brainRenderCanvas() {
     el.className = `viz-node ${node.id === brain.selectedNodeId ? 'selected' : ''}${isGlobe ? ' viz-globe-node' : ''}${isGhost ? ' viz-bridge-ghost' : ''}`;
     el.dataset.type = 'comment';
     if (node.color) el.dataset.color = node.color;
+    if (node.bg) el.dataset.bg = node.bg;
     const isElectric = node.border === 'electric' && !isGlobe;
     if (isElectric) { el.dataset.border = 'electric'; brainEnsureElectricFilter(); }
     el.style.left = node.x + 'px';
@@ -1728,15 +1729,22 @@ function brainNodeCtx(e, nodeId) {
       expandBtn.style.display = 'none';
     }
   }
-  // Opens collapsed, and before it is measured, so it is placed at its real size.
-  const sub = document.getElementById('brain-node-border-menu');
-  const toggle = document.getElementById('brain-node-border-toggle');
-  if (sub) sub.classList.add('hidden');
-  if (toggle) toggle.setAttribute('aria-expanded', 'false');
+  // Both dropdowns open collapsed, and before the menu is measured, so it is
+  // placed at its real size.
+  [['brain-node-border-menu', 'brain-node-border-toggle'], ['brain-node-bg-menu', 'brain-node-bg-toggle']].forEach(([subId, toggleId]) => {
+    const sub = document.getElementById(subId);
+    const toggle = document.getElementById(toggleId);
+    if (sub) sub.classList.add('hidden');
+    if (toggle) toggle.setAttribute('aria-expanded', 'false');
+  });
   if (typeof vizPositionMenu === 'function') vizPositionMenu(menu, e.clientX, e.clientY);
   else { menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px'; menu.classList.remove('hidden'); }
-  menu.querySelectorAll('.viz-color-swatch').forEach(sw => {
+  // Two swatch rows now; each marks its own setting.
+  menu.querySelectorAll('.brain-border-swatches .viz-color-swatch').forEach(sw => {
     sw.classList.toggle('active', sw.dataset.color === (node?.color || ''));
+  });
+  menu.querySelectorAll('#brain-node-bg-menu .viz-color-swatch').forEach(sw => {
+    sw.classList.toggle('active', sw.dataset.color === (node?.bg || ''));
   });
   const border = (node && node.border) || '';
   menu.querySelectorAll('#brain-node-border-menu .viz-link-type-option').forEach(o => o.classList.toggle('active', o.dataset.border === border));
@@ -1788,6 +1796,20 @@ function brainEnsureElectricFilter() {
     + filter('viz-electric-still', false)   // reduced motion: jagged, but still
     + '</defs></svg>';
   document.body.appendChild(holder.firstElementChild);
+}
+
+function brainToggleBgMenu(e) {
+  _brainToggleCtxSub(e, 'brain-node-ctx', 'brain-node-bg-menu', 'brain-node-bg-toggle');
+}
+
+/** The note's background, kept apart from its border colour (node.color). */
+function brainCtxEditBg(color) {
+  const node = brain.contextNodeId && brain.nodes.find(n => n.id === brain.contextNodeId);
+  if (!node || (node.bg || null) === (color || null)) { brainHideAllMenus(); return; }
+  brainPushUndo();
+  if (color) node.bg = color; else delete node.bg;
+  brainRenderCanvas(); brainSaveCurrentVersion();
+  brainHideAllMenus();
 }
 
 function brainToggleBorderType(e) {
