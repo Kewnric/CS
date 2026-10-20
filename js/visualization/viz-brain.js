@@ -912,6 +912,12 @@ function brainRenderCanvas() {
   bubbleSvg.setAttribute('class', 'brain-bubbles');
   bubbleSvg.setAttribute('aria-hidden', 'true');
   nodesLayer.appendChild(bubbleSvg);
+  // Its own watcher: any size change of a Manhua note's box repaints the
+  // bubbles. The note observer below returns early whenever it grows a note to
+  // fit its text, and during a corner drag that meant the bubble was skipped
+  // and left at its old size, wider or narrower than the note.
+  if (_brainBubbleRO) _brainBubbleRO.disconnect();
+  _brainBubbleRO = typeof ResizeObserver === 'function' ? new ResizeObserver(() => brainPaintBubbles()) : null;
   const renderedNodeMap = new Map();
 
   const brainHiddenByCollapse = new Set();
@@ -951,7 +957,10 @@ function brainRenderCanvas() {
     if (node.lineSpacing) el.style.setProperty('--note-line', node.lineSpacing);
     if (node.paraSpacing) el.style.setProperty('--note-para', BRAIN_PARA_SPACING[node.paraSpacing] || '0');
     if (node.border && !isGlobe) el.dataset.border = node.border;
-    if (node.border === 'manhua' && !isGlobe) el.dataset.bubble = BRAIN_BUBBLE_IDS.has(node.bubble) ? node.bubble : 'speech';
+    if (node.border === 'manhua' && !isGlobe) {
+      el.dataset.bubble = BRAIN_BUBBLE_IDS.has(node.bubble) ? node.bubble : 'speech';
+      if (_brainBubbleRO) _brainBubbleRO.observe(el);
+    }
     const isElectric = node.border === 'electric' && !isGlobe;
     const isMedieval = node.border === 'medieval' && !isGlobe;
     if (isElectric) brainEnsureElectricFilter();
@@ -1018,7 +1027,10 @@ function brainRenderCanvas() {
       let initial = true;
       const obs = new ResizeObserver(() => {
         if (initial) { initial = false; return; }
-        if (vizFitNoteHeight(inner)) return;   // grew; the next callback records it
+        if (vizFitNoteHeight(inner)) {   // grew; the next callback records it
+          if (node.border === 'manhua') brainPaintBubbles();
+          return;
+        }
         brainSizeElectric(el, inner);
         if (node.border === 'manhua') brainPaintBubbles();
         // Typing in the open editor changes the size too; that is not a
@@ -2143,6 +2155,7 @@ const BRAIN_BUBBLES = [
   ['daydream', 'Daydreaming'], ['caption', 'Caption or Narration'], ['negative', 'Negative Emotions']
 ];
 const BRAIN_BUBBLE_IDS = new Set(BRAIN_BUBBLES.map(b => b[0]));
+let _brainBubbleRO = null;   // see brainRenderCanvas
 
 function brainCtxSetBubble(id) {
   const node = brain.contextNodeId && brain.nodes.find(n => n.id === brain.contextNodeId);
