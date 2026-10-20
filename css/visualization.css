@@ -4099,6 +4099,10 @@ button.viz-link-type-option {
    name is the row; the badges are annotations on it, so they go first — and by
    container width, because this pane is resizable. */
 .viz-content-body { container-type: inline-size; container-name: vizpane; }
+/* No visible scrollbar on the first pane's list; it still scrolls by wheel,
+   trackpad, touch and keyboard, as the stat chips above it already do. */
+.viz-content-body { scrollbar-width: none; }
+.viz-content-body::-webkit-scrollbar { display: none; }
 .viz-content-body .tree-node-label { min-width: 4ch; }
 
 @container vizpane (max-width: 300px) {
