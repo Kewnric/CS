@@ -981,7 +981,7 @@ function brainRenderCanvas() {
     } else {
       el.innerHTML = `${isElectric ? BRAIN_ELECTRIC_BACK : ''}<div class="viz-node-inner" style="${styleW}${styleH}">
         <div class="viz-comment-body">
-          <div class="viz-comment-content">${brainNoteParagraphs(node.commentContent || 'Double-click or right-click to edit...')}</div>
+          <div class="viz-comment-content">${brainNoteParagraphs(brainShownText(node) || 'Double-click or right-click to edit...')}</div>
         </div>
       </div>${isElectric ? BRAIN_ELECTRIC_FRONT : ''}${brainCollapseBadge}`;
     }
@@ -1464,10 +1464,11 @@ function brainOpenEditor(node) {
   if (typeof vizHoverClear === 'function') vizHoverClear();
   let overlay = document.getElementById('viz-comment-editor-overlay');
   // Unblurred, the canvas behind takes clicks, so another note can be opened
-  // while this one is: keep what was typed, and keep the window where it was.
+  // while this one is. Only Save & Close keeps typing, so that note goes back
+  // to its saved text; the window keeps its place and state.
   let carry = null;
   if (overlay) {
-    if (typeof overlay._commit === 'function') overlay._commit();
+    if (typeof overlay._discard === 'function') overlay._discard();
     const prevWin = overlay.querySelector('.viz-comment-editor-window');
     carry = { floating: overlay.classList.contains('is-floating'), at: prevWin ? prevWin.style.translate : '' };
     overlay.remove();
@@ -1504,62 +1505,62 @@ function brainOpenEditor(node) {
   const nodeId = node.id;
   const savedText = node.commentContent || '';
 
-  /* Live: the note on the canvas takes each keystroke, so with the editor
-     unblurred you watch it change as you type. The text is written to the
-     note as you go (looked up by id: an undo replaces the node objects); the
-     first change of this editing session records one undo step, so Ctrl+Z
-     takes the whole session back at once, and saving to storage waits for a
-     pause in typing. Only the one note's text is redrawn, not the canvas, so
-     the editor keeps its focus and nothing flickers. */
-  let undoPushed = false, saveTimer = null;
-  const flushSave = () => {
-    if (!saveTimer) return;
-    clearTimeout(saveTimer); saveTimer = null;
-    brainSaveCurrentVersion();
-  };
+  /* Live preview: the note on the canvas shows each keystroke, so with the
+     editor unblurred you watch it change as you type. It is only a preview
+     (brain._livePreview, which rendering reads): nothing is written to the
+     note, the undo history or storage until Save & Close. Close, opening
+     another note, or leaving Visualize drops it and the note shows its saved
+     text again. Only the one note's text is redrawn, so the editor keeps its
+     focus and nothing flickers. */
   const applyLive = () => {
-    const target = brain.nodes.find(n => n.id === nodeId);
-    if (!target || (target.commentContent || '') === textarea.value) return;
-    if (!undoPushed) { brainPushUndo(); undoPushed = true; }
-    target.commentContent = textarea.value;
+    brain._livePreview = { id: nodeId, text: textarea.value };
     const el = document.querySelector(`.viz-node[data-node-id="${nodeId}"]`);
     const inner = el && el.querySelector('.viz-node-inner');
     const content = el && el.querySelector('.viz-comment-content');
-    if (content) {
-      // Text-driven size changes are not a resize by hand (see the note's
-      // ResizeObserver): mark them so the note's height is not frozen.
-      el._liveEditAt = performance.now();
-      content.innerHTML = brainNoteParagraphs(textarea.value || 'Double-click or right-click to edit...');
-      if (inner) { vizFitNoteHeight(inner); brainSizeElectric(el, inner); }
-      brainUpdateSVGLinks();
-    }
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => { saveTimer = null; brainSaveCurrentVersion(); }, 400);
+    if (!content) return;
+    // Text-driven size changes are not a resize by hand (see the note's
+    // ResizeObserver): mark them so the note's height is not frozen.
+    el._liveEditAt = performance.now();
+    content.innerHTML = brainNoteParagraphs(textarea.value || 'Double-click or right-click to edit...');
+    if (inner) { vizFitNoteHeight(inner); brainSizeElectric(el, inner); }
+    brainUpdateSVGLinks();
   };
   textarea.addEventListener('input', applyLive);
   textarea.addEventListener('keydown', e => _brainEditorTabKey(e, textarea));
 
-  // Reset: back to the text the note had when this editor opened, live too.
+  // Reset: back to the text the note had when this editor opened.
   document.getElementById('viz-comment-editor-reset').onclick = () => {
     textarea.value = savedText;
     applyLive();
     textarea.focus({ preventScroll: true });
     textarea.setSelectionRange(savedText.length, savedText.length);
   };
-  // Make sure the latest text is in the note and saved (used on close, and
-  // when another note's editor replaces this one).
-  overlay._commit = () => {
-    applyLive();
-    flushSave();
-    if (undoPushed) brainRenderCanvas();   // settle the note through a full render
+  // Not saved: drop the preview and redraw the note with its saved text.
+  overlay._discard = () => {
+    if (!brain._livePreview || brain._livePreview.id !== nodeId) return;
+    brain._livePreview = null;
+    brainRenderCanvas();
   };
-  const close = () => {
-    overlay._commit();
+  const finish = (keep) => {
+    if (keep) {
+      brain._livePreview = null;
+      // Looked up by id: an undo replaces the node objects, and the one this
+      // editor opened with may be stale by then.
+      const target = brain.nodes.find(n => n.id === nodeId);
+      if (target && (target.commentContent || '') !== textarea.value) {
+        brainPushUndo();
+        target.commentContent = textarea.value;
+        brainSaveCurrentVersion();
+      }
+      brainRenderCanvas();
+    } else {
+      overlay._discard();
+    }
     overlay.remove();
     if (typeof vizHoverClear === 'function') vizHoverClear();
   };
-  document.getElementById('viz-comment-editor-save').onclick = close;
-  document.getElementById('viz-comment-editor-x').onclick = close;
+  document.getElementById('viz-comment-editor-save').onclick = () => finish(true);
+  document.getElementById('viz-comment-editor-x').onclick = () => finish(false);
   overlay.classList.add('is-anchored');
   _brainCenterEditorWindow(overlay.querySelector('.viz-comment-editor-window'));
   _brainWireEditorFloat(overlay, textarea);
@@ -1981,6 +1982,12 @@ function _brainMarkNodeMenu() {
   mark('#brain-node-align-menu .viz-link-type-option', 'value', node?.textAlign || 'left');
   mark('[data-prop="lineSpacing"] button', 'value', String(node?.lineSpacing || 1.5));
   mark('[data-prop="paraSpacing"] button', 'value', node?.paraSpacing || '');
+}
+
+/** What a note shows: the open editor's unsaved preview, or its saved text. */
+function brainShownText(node) {
+  const p = brain._livePreview;
+  return p && p.id === node.id ? p.text : node.commentContent;
 }
 
 /* -- Note text ----------------------------------------------------

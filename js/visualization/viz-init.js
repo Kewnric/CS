@@ -259,6 +259,14 @@ function destroyVisualization() {
   // Canvas only hides the app sidebar; no other page should inherit that.
   // (The preference stays, so coming back restores it.)
   document.body.classList.remove('viz-zen', 'viz-zen-nosidebar');
+  // An open note editor lives on <body>; leaving Visualize is not Save &
+  // Close, so its unsaved text is dropped along with it.
+  const noteEditor = document.getElementById('viz-comment-editor-overlay');
+  if (noteEditor) {
+    if (typeof noteEditor._discard === 'function') noteEditor._discard();
+    noteEditor.remove();
+  }
+  if (typeof brain !== 'undefined') brain._livePreview = null;
   if (typeof vizForceStop === 'function') vizForceStop(true); // halt physics loop
   if (typeof vizHoverClear === 'function') vizHoverClear();
   if (typeof vizStopTween === 'function') vizStopTween();
