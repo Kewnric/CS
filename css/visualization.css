@@ -4265,7 +4265,9 @@ body.viz-no-anim .app-sidebar {
    card does not also sit on a block. */
 .viz-node[data-border="electric"] {
   --el-color: var(--slab-hue, #f59e0b);
-  --el-light: color-mix(in srgb, var(--el-color) 65%, #fff);
+  /* The original's light colour is oklch(from <border> l c h): the border
+     colour itself. Mixed with white the glow came out pale instead of warm. */
+  --el-light: var(--el-color);
   /* The diagonal tint is the border's hue, as in the original, until a
      background is picked; then it is the background's, so the two colours
      never blend. */
@@ -4275,7 +4277,7 @@ body.viz-no-anim .app-sidebar {
      this fallback is dark, and browsers with relative colour get the
      original's exact formula below. */
   --el-grad: color-mix(in oklab, var(--el-grad-hue) 14%, rgb(0 0 0 / 0.4));
-  --el-radius: 14px;
+  --el-radius: 24px;   /* the original's */
 }
 @supports (color: oklch(from red l c h)) {
   .viz-node[data-border="electric"] {
@@ -4299,24 +4301,28 @@ body.viz-no-anim .app-sidebar {
   transform: none !important;
 }
 
+/* Layer order inside the node (.viz-node is the stacking context):
+     halo (z -1) > card > glows + line > sheens
+   None of the layers above the card is a stacking context of its own, so the
+   sheens' overlay blend reaches the card, the line and the glow under them,
+   as the original's overlays do. Inside an isolated wrapper they blended
+   with nothing and showed as a flat grey-white haze.
+
+   The halo and sheen blurs (32px, 16px) are tuned for a 350x500 card and
+   swamp a 70px note, so they scale with the note's smaller side, --el-min,
+   set by brainSizeElectric: exactly the original at 350px and up. */
 .viz-electric,
-.viz-electric-back,
-.viz-electric-bg {
+.viz-electric-bg,
+.viz-electric-sheens {
   position: absolute;
   inset: 0;
   border-radius: var(--el-radius);
   pointer-events: none;
 }
-/* Over the card's edge; the halo under it (.viz-node is a stacking context).
-   Both are size containers so the blurs can scale with the note: the
-   original's 32px halo and 16px sheen are tuned for a 350x500 card, and
-   around a 70px-tall note they covered the whole card in glow. 9.14cqmin is
-   32px at 350px, so a card that size looks exactly like the original. */
-.viz-electric { z-index: 1; container-type: size; }
-.viz-electric-back { z-index: -1; container-type: size; }
 .viz-electric-bg {
+  z-index: -1;
   transform: scale(1.1);
-  filter: blur(clamp(6px, 9.14cqmin, 32px));
+  filter: blur(clamp(6px, calc(var(--el-min, 350px) * 0.0914), 32px));
   opacity: 0.3;
   background: linear-gradient(-30deg, var(--el-light), transparent, var(--el-color));
   transition: opacity 0.2s ease;
@@ -4345,22 +4351,32 @@ body.viz-no-anim .app-sidebar {
   border: 2px solid var(--el-light);
   filter: blur(4px);
 }
-/* Clipped to the card: inside the node's isolated group an overlay blend over
-   empty canvas would just paint white haze past the corners. */
+/* The original's two overlays, at full and half strength. The wrapper only
+   clips them to the card and its edge: past that the node has nothing behind
+   them to blend with, and an overlay over nothing paints plain white haze. */
+.viz-electric-sheens {
+  inset: -4px;
+  border-radius: calc(var(--el-radius) + 4px);
+  overflow: hidden;
+}
 .viz-electric-sheen {
+  position: absolute;
+  inset: 4px;
+  border-radius: var(--el-radius);
   mix-blend-mode: overlay;
-  filter: blur(clamp(3px, 4.57cqmin, 16px));   /* 16px at 350px, as the halo */
-  opacity: 0.3;   /* stronger, it washed the card out pink-white */
-  clip-path: inset(0 round var(--el-radius));
+  transform: scale(1.1);
+  filter: blur(clamp(3px, calc(var(--el-min, 350px) * 0.0457), 16px));
   background: linear-gradient(-30deg, #fff, transparent 30%, transparent 70%, #fff);
 }
+.viz-electric-sheen + .viz-electric-sheen { opacity: 0.5; }
 .viz-node[data-border="electric"]:hover .viz-electric-bg,
 .viz-node[data-border="electric"].selected .viz-electric-bg { opacity: 0.5; }
 .viz-node[data-border="electric"].selected .viz-electric-glow-2 { filter: blur(6px); }
 
 /* Zoomed far out the line is a few pixels long; skip the filter work there. */
 .viz-canvas-container.viz-far .viz-electric,
-.viz-canvas-container.viz-far .viz-electric-back { display: none; }
+.viz-canvas-container.viz-far .viz-electric-bg,
+.viz-canvas-container.viz-far .viz-electric-sheens { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
   .viz-electric-line { filter: url(#viz-electric-still); }
@@ -4380,6 +4396,8 @@ body.viz-no-anim .app-sidebar {
 .viz-node[data-bg="purple"]  { --viz-node-bg-hue: #a855f7; --viz-node-bg: color-mix(in oklab, #a855f7 24%, var(--bg-elevated)); }
 .viz-node[data-bg="pink"]    { --viz-node-bg-hue: #ec4899; --viz-node-bg: color-mix(in oklab, #ec4899 24%, var(--bg-elevated)); }
 .viz-node[data-bg="cyan"]    { --viz-node-bg-hue: #06b6d4; --viz-node-bg: color-mix(in oklab, #06b6d4 24%, var(--bg-elevated)); }
-.viz-node[data-bg="charcoal"]  { --viz-node-bg-hue: oklch(0.185 0 0); --viz-node-bg: oklch(0.185 0 0); }
+/* Charcoal has no hue of its own, so it leaves the Electric card's diagonal
+   tint to the border colour, exactly the original's charcoal-and-copper card. */
+.viz-node[data-bg="charcoal"]  { --viz-node-bg: oklch(0.185 0 0); }
 /* Charcoal is nearly the menu's own colour; a faint ring makes it findable. */
 .viz-color-swatch[data-color="charcoal"] { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28); }

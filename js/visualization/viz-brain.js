@@ -994,6 +994,7 @@ function brainRenderCanvas() {
       // is part of the size the observer starts from. Links were drawn to the
       // old edge during render, so repaint them if it grew.
       if (vizFitNoteHeight(inner)) brainUpdateSVGLinks();
+      brainSizeElectric(el, inner);
       // ResizeObserver always fires once for the current size the moment it
       // starts observing. Treating that as a resize baked the first layout's
       // height into the note for good, and the text was then clipped as soon as
@@ -1002,6 +1003,7 @@ function brainRenderCanvas() {
       const obs = new ResizeObserver(() => {
         if (initial) { initial = false; return; }
         if (vizFitNoteHeight(inner)) return;   // grew; the next callback records it
+        brainSizeElectric(el, inner);
         if (inner.offsetWidth > 0) { node.w = inner.offsetWidth; node.h = inner.offsetHeight; node.userSized = true; }
       });
       obs.observe(inner);
@@ -1756,10 +1758,19 @@ function brainNodeCtx(e, nodeId) {
    displacement filter), with two blurred copies for glow, an overlay sheen and
    a soft halo behind. The filter lives once in the page; each note only draws
    the layers. */
-const BRAIN_ELECTRIC_BACK = '<div class="viz-electric-back" aria-hidden="true"><div class="viz-electric-bg"></div></div>';
+const BRAIN_ELECTRIC_BACK = '<div class="viz-electric-bg" aria-hidden="true"></div>';
 const BRAIN_ELECTRIC_FRONT = '<div class="viz-electric" aria-hidden="true">'
   + '<div class="viz-electric-glow-1"></div><div class="viz-electric-glow-2"></div>'
-  + '<div class="viz-electric-line"></div><div class="viz-electric-sheen"></div></div>';
+  + '<div class="viz-electric-line"></div></div>'
+  // Siblings of the card, not inside .viz-electric, so their blend reaches it.
+  + '<div class="viz-electric-sheens" aria-hidden="true">'
+  + '<div class="viz-electric-sheen"></div><div class="viz-electric-sheen"></div></div>';
+
+/** Electric's halo and sheen blur in proportion to the note (CSS --el-min). */
+function brainSizeElectric(el, inner) {
+  if (el.dataset.border !== 'electric') return;
+  el.style.setProperty('--el-min', Math.min(inner.offsetWidth, inner.offsetHeight) + 'px');
+}
 
 function brainEnsureElectricFilter() {
   if (document.getElementById('viz-electric-defs')) return;
