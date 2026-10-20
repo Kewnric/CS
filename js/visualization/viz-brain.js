@@ -276,6 +276,7 @@ function brainToggleFolder(id, e) {
   // were rebuilt on every toggle — a visible blink. This is what the library
   // trees do (see toggleBrowseExpand).
   if (!brainSetFolderOpen(id, open) || repaint) brainRenderSidebar();
+  else brainRenderSidebar({ recordOnly: true });   // the DOM changed by hand
 }
 
 /**
@@ -330,18 +331,30 @@ function brainSetFolderOpen(id, open) {
    Creating things lives in the right-click menu and one compact header button,
    not in three full-width buttons stacked above the list. */
 
-function brainRenderSidebar() {
-  if (typeof vizSyncModuleTools === 'function') vizSyncModuleTools();
+/* The tree is committed the way the library trees are (tree-dnd.js
+   treeCommit), which is what gives it their animations. Its markup carries
+   structure only: which canvas is open is a class put on afterwards, and the
+   numbers that change while you work (a canvas's node and link count, when it
+   was last opened) are painted after too. So opening another canvas leaves
+   the rows in place and the highlight slides from one to the other, instead
+   of every row being thrown away and drawn again already highlighted; a real
+   change (adding, renaming, moving, deleting) rebuilds, and the rows fan in
+   top to bottom. `recordOnly` re-records the markup without writing it, for
+   the folder toggles that animate open and shut in place. */
+function brainRenderSidebar(opts) {
+  const recordOnly = !!(opts && opts.recordOnly);
+  if (!recordOnly && typeof vizSyncModuleTools === 'function') vizSyncModuleTools();
   if (_brainSettleOrder()) brainSave();   // every canvas in a fixed place
   const body = document.getElementById('viz-content-body');
-  const titleEl = document.getElementById('viz-content-scope-label');
-  const breadcrumbEl = document.getElementById('viz-content-breadcrumb');
+  const titleEl = recordOnly ? null : document.getElementById('viz-content-scope-label');
+  const breadcrumbEl = recordOnly ? null : document.getElementById('viz-content-breadcrumb');
   if (!body) return;
+  if (recordOnly && body.dataset.treeNs !== 'brain') return;
 
   const active = brain.versions.find(v => v.id === brain.activeVersionId);
   const nodeCount = active ? (active.nodes || []).length : 0;
   const linkCount = active ? (active.links || []).length : 0;
-  if (typeof vizPaintHeader === 'function') {
+  if (recordOnly) { /* header untouched */ } else if (typeof vizPaintHeader === 'function') {
     vizPaintHeader({
       label: 'Brain',
       icon: 'brain-circuit',
@@ -367,9 +380,6 @@ function brainRenderSidebar() {
     brain.folders.filter(f => f.parentId === fid).some(c => folderHasMatch(c.id));
 
   function versionRow(v, depth) {
-    const isActive = v.id === brain.activeVersionId;
-    const nodes = (v.nodes || []).length;
-    const links = (v.links || []).length;
     // Your own icon if you gave it one; otherwise lock, pin or a page.
     const icon = v.icon || (v.locked ? 'lock' : (v.pinned ? 'pin' : 'file-text'));
     const acc = (typeof treeAccentAttrs === 'function') ? treeAccentAttrs(v) : { cls: '', style: '' };
@@ -379,18 +389,18 @@ function brainRenderSidebar() {
       + (v.favorite ? '<i data-lucide="star" class="tree-node-star"></i>' : '');
     return `
       <div class="tree-node tree-item-node${acc.cls}" data-level="${depth}" data-node-id="${v.id}"${acc.style}>
-        <div class="tree-node-row ${isActive ? 'active' : ''}"
-             ${treeRowAttrs({ ns: 'brain', id: v.id, kind: 'item', level: depth, selected: isActive })}
+        <div class="tree-node-row"
+             ${treeRowAttrs({ ns: 'brain', id: v.id, kind: 'item', level: depth })}
              style="padding-left: calc(0.75rem + ${TREE_ITEM_INSET}rem)"
              oncontextmenu="treeContextMenu(event, '${v.id}', 'brain')"
-             title="${escapeHTML(brainVersionTooltip(v))}"
+             onmouseenter="brainVersionTip(this, '${v.id}')"
              onclick="brainSwitchVersion('${v.id}')">
           <i class="tree-node-chevron invisible"></i>
           <i data-lucide="${escapeHTML(icon)}" class="tree-node-icon item-icon-color" style="width:14px;height:14px;"></i>
           <span class="tree-node-label" style="font-weight:400; font-size:0.875rem;">${escapeHTML(v.name)}</span>
           ${marks}
-          <span class="brain-version-size" title="${nodes} node${nodes !== 1 ? 's' : ''}, ${links} link${links !== 1 ? 's' : ''}">${nodes}·${links}</span>
-          ${isActive ? '<span class="brain-active-dot"></span>' : ''}
+          <span class="brain-version-size" data-size-of="${v.id}"></span>
+          <span class="brain-active-dot" aria-hidden="true"></span>
         </div>
       </div>`;
   }
@@ -489,13 +499,34 @@ function brainRenderSidebar() {
   body.setAttribute('aria-label', 'Brain versions');
   body.classList.toggle('hide-tree-items', localStorage.getItem('vizHideItems') === 'true');
   body.setAttribute('oncontextmenu', "treePaneContextMenu(event, 'brain')");
-  body.innerHTML = html;
-  /* This writes the container directly rather than through treeCommit, so the
-     shared markup cache has to be told — otherwise the library pane's next
-     render matches a cached string, skips its write, and Brain's list stays on
-     screen under the library's own header. */
-  if (typeof treeSyncMarkup === 'function') treeSyncMarkup(body, html);
-  if (typeof lucide !== 'undefined') lucide.createIcons({ root: body });
+  if (recordOnly) {
+    if (typeof treeSyncMarkup === 'function') treeSyncMarkup(body, html);
+    return;
+  }
+  // Written only when the structure changed, then the open canvas marked.
+  let rebuilt = true;
+  if (typeof treeCommit === 'function') rebuilt = treeCommit(body, html, brain.activeVersionId);
+  else body.innerHTML = html;
+  if (rebuilt && typeof lucide !== 'undefined') lucide.createIcons({ root: body });
+  _brainPaintVersionSizes(body);
+}
+
+/** Each canvas's node·link count, painted on the rows already there. */
+function _brainPaintVersionSizes(body) {
+  body.querySelectorAll('.brain-version-size[data-size-of]').forEach(el => {
+    const v = brain.versions.find(x => x.id === el.dataset.sizeOf);
+    if (!v) return;
+    const nodes = (v.nodes || []).length, links = (v.links || []).length;
+    const text = nodes + '·' + links;
+    if (el.textContent !== text) el.textContent = text;
+    el.title = nodes + ' node' + (nodes !== 1 ? 's' : '') + ', ' + links + ' link' + (links !== 1 ? 's' : '');
+  });
+}
+
+/** A canvas row's tooltip, written when the pointer arrives (it holds the time last opened). */
+function brainVersionTip(row, id) {
+  const v = brain.versions.find(x => x.id === id);
+  if (v) row.title = brainVersionTooltip(v);
 }
 
 /** Open a brain folder and scroll its row into view. */
@@ -518,7 +549,7 @@ function brainRevealFolder(id) {
     if (!brainSetFolderOpen(pid, true)) painted = false;
   });
   brainSave();
-  if (!painted) brainRenderSidebar();
+  if (!painted) brainRenderSidebar(); else brainRenderSidebar({ recordOnly: true });
   const row = document.querySelector('#viz-content-body .tree-node[data-node-id="' + id + '"] .tree-node-row');
   if (row) {
     row.scrollIntoView({ block: 'nearest', behavior: vizPrefersReducedMotion() ? 'auto' : 'smooth' });
@@ -648,11 +679,11 @@ registerTreeHost('brain', {
     // In place: this fires mid-drag, and re-rendering the tree under the
     // pointer replaces the rows the drag is tracking.
     if (id === '__root__') {
-      if (brain.rootOpen === false) { brain.rootOpen = true; brainSave(); if (!brainSetFolderOpen(id, true)) brainRenderSidebar(); }
+      if (brain.rootOpen === false) { brain.rootOpen = true; brainSave(); if (!brainSetFolderOpen(id, true)) brainRenderSidebar(); else brainRenderSidebar({ recordOnly: true }); }
       return;
     }
     const f = brain.folders.find(x => x.id === id);
-    if (f && f.collapsed) { f.collapsed = false; brainSave(); if (!brainSetFolderOpen(id, true)) brainRenderSidebar(); }
+    if (f && f.collapsed) { f.collapsed = false; brainSave(); if (!brainSetFolderOpen(id, true)) brainRenderSidebar(); else brainRenderSidebar({ recordOnly: true }); }
   },
   isExpanded: (id) => {
     if (id === '__root__') return brain.rootOpen !== false;
@@ -835,7 +866,7 @@ function brainCollapseAll(collapsed) {
   let painted = true;
   brain.folders.forEach(f => { if (!brainSetFolderOpen(f.id, !collapsed)) painted = false; });
   if (!brainSetFolderOpen('__root__', !collapsed)) painted = false;
-  if (!painted) brainRenderSidebar();
+  if (!painted) brainRenderSidebar(); else brainRenderSidebar({ recordOnly: true });
 }
 
 function brainTogglePin(id) {

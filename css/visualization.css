@@ -1871,7 +1871,20 @@
   background: var(--color-primary);
   flex-shrink: 0;
   box-shadow: 0 0 6px var(--color-primary-glow);
-  animation: glowPulse 2s ease-in-out infinite;
+  /* On every canvas row, shown on the open one, so it can fade across with
+     the highlight when another canvas is opened (see brainRenderSidebar). */
+  opacity: 0;
+  transform: scale(0.2);
+  transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.tree-node-row.active .brain-active-dot {
+  opacity: 1;
+  transform: scale(1);
+  animation: glowPulse 2s ease-in-out 0.28s infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .brain-active-dot { transition: none; }
+  .tree-node-row.active .brain-active-dot { animation: none; }
 }
 
 /* Folder items */
