@@ -1739,6 +1739,7 @@ function brainNodeCtx(e, nodeId) {
   // Every dropdown opens collapsed, and before the menu is measured, so it is
   // placed at its real size.
   _brainCloseNodeSubs(null);
+  _brainShowColorTargetList(false);
   if (typeof vizPositionMenu === 'function') vizPositionMenu(menu, e.clientX, e.clientY);
   else { menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px'; menu.classList.remove('hidden'); }
   _brainMarkNodeMenu();
@@ -1748,9 +1749,25 @@ function brainNodeCtx(e, nodeId) {
    border edge is toggled on. The toggle stays where you left it. */
 const BRAIN_COLOR_PROPS = { text: 'textColor', bg: 'bg', edge: 'color' };
 
+const BRAIN_COLOR_TARGET_LABELS = { text: 'Text Color', bg: 'Background Color', edge: 'Border Edge Color' };
+
 function brainSetColorTarget(target) {
   brain._colorTarget = target;
+  _brainShowColorTargetList(false);
   _brainMarkNodeMenu();
+}
+
+/** The target dropdown: which part of the note the swatches paint. */
+function brainToggleColorTargetList(e) {
+  if (e) e.stopPropagation();
+  const list = document.getElementById('brain-color-target-list');
+  _brainShowColorTargetList(!!list && list.classList.contains('hidden'));
+}
+function _brainShowColorTargetList(open) {
+  const list = document.getElementById('brain-color-target-list');
+  const btn = document.getElementById('brain-color-target-btn');
+  if (list) list.classList.toggle('hidden', !open);
+  if (btn) btn.setAttribute('aria-expanded', String(open));
 }
 
 /** Applies to the toggled target and keeps the menu open, so you can switch
@@ -1773,10 +1790,12 @@ function _brainMarkNodeMenu() {
   if (!node) return;
   const mark = (sel, attr, value) => menu.querySelectorAll(sel).forEach(o => o.classList.toggle('active', o.dataset[attr] === value));
   const target = brain._colorTarget || 'edge';
-  menu.querySelectorAll('.brain-color-targets [data-target]').forEach(b => {
-    const on = b.dataset.target === target;
-    b.classList.toggle('active', on);
-    b.setAttribute('aria-checked', String(on));
+  const label = document.getElementById('brain-color-target-label');
+  if (label) label.textContent = BRAIN_COLOR_TARGET_LABELS[target];
+  menu.querySelectorAll('#brain-color-target-list [data-target]').forEach(o => {
+    const on = o.dataset.target === target;
+    o.classList.toggle('active', on);
+    o.setAttribute('aria-selected', String(on));
   });
   mark('#brain-note-swatches .viz-color-swatch', 'color', node[BRAIN_COLOR_PROPS[target]] || '');
   mark('#brain-node-border-menu .viz-link-type-option', 'border', node?.border || '');

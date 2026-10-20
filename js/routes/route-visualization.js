@@ -422,10 +422,11 @@ function vizTemplate() {
            Charcoal is the original Electric Border card's fill. -->
       <button class="viz-ctx-item" id="brain-node-colors-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'colors')"><i data-lucide="palette"></i> Personalize Color <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
       <div class="viz-ctx-submenu hidden" id="brain-node-colors-menu" role="menu">
-        <div class="brain-color-targets" role="radiogroup" aria-label="What the colour applies to">
-          <button type="button" role="radio" data-target="text" onclick="brainSetColorTarget('text')">Text Color</button>
-          <button type="button" role="radio" data-target="bg" onclick="brainSetColorTarget('bg')">Background Color</button>
-          <button type="button" role="radio" data-target="edge" onclick="brainSetColorTarget('edge')">Border Edge Color</button>
+        <button type="button" class="brain-color-target-btn" id="brain-color-target-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="What the colour applies to" onclick="brainToggleColorTargetList(event)"><span id="brain-color-target-label">Border Edge Color</span><i data-lucide="chevron-down"></i></button>
+        <div class="brain-color-target-list hidden" id="brain-color-target-list" role="listbox">
+          <div class="viz-link-type-option" role="option" data-target="text" onclick="brainSetColorTarget('text')"><i data-lucide="type"></i> Text Color</div>
+          <div class="viz-link-type-option" role="option" data-target="bg" onclick="brainSetColorTarget('bg')"><i data-lucide="paint-bucket"></i> Background Color</div>
+          <div class="viz-link-type-option" role="option" data-target="edge" onclick="brainSetColorTarget('edge')"><i data-lucide="square"></i> Border Edge Color</div>
         </div>
         <div class="viz-color-picker" id="brain-note-swatches">${vizSwatchesHTML('brainCtxPickColor', [['white', '#ffffff'], ['black', '#000000'], ['charcoal', 'oklch(0.185 0 0)', 'charcoal (Electric Border original)']])}</div>
       </div>

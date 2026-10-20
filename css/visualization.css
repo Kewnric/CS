@@ -4425,28 +4425,41 @@ body.viz-no-anim .app-sidebar {
 .viz-node[data-bg="white"] { --viz-node-bg: #ffffff; }
 .viz-node[data-bg="black"] { --viz-node-bg: #000000; }
 
-/* Personalize Color's target toggle: exactly one is on, and it stays on. */
-.brain-color-targets {
+/* Personalize Color: a dropdown picks what the swatches paint (it stays on
+   that choice), and the swatches sit in two rows of seven. In one row of
+   thirteen, with three wide toggle buttons above, the menu grew too wide. */
+.brain-color-target-btn {
   display: flex;
-  gap: 0.25rem;
-  padding: 0.15rem 0.5rem 0.35rem;
-}
-.brain-color-targets button {
-  flex: 1;
-  padding: 0.35rem 0.3rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  width: calc(100% - 1rem);
+  margin: 0.15rem 0.5rem 0.35rem;
+  padding: 0.35rem 0.55rem;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--text-secondary);
-  font: 600 0.68rem/1.2 var(--font-sans);
+  color: var(--text-primary);
+  font: 600 0.74rem var(--font-sans);
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+  transition: color 0.15s ease, border-color 0.15s ease;
 }
-.brain-color-targets button:hover { color: var(--color-primary); border-color: var(--color-primary); }
-.brain-color-targets button.active {
-  color: var(--color-primary);
-  background: var(--color-primary-subtle);
-  border-color: var(--color-primary);
+.brain-color-target-btn:hover,
+.brain-color-target-btn[aria-expanded="true"] { color: var(--color-primary); border-color: var(--color-primary); }
+.brain-color-target-btn svg { width: 12px; height: 12px; flex-shrink: 0; transition: transform 0.15s ease; }
+.brain-color-target-btn[aria-expanded="true"] svg { transform: rotate(180deg); }
+.brain-color-target-list {
+  margin: 0 0.5rem 0.35rem;
+  padding: 0.2rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+}
+#brain-note-swatches {
+  display: grid;
+  grid-template-columns: repeat(7, 20px);
+  justify-content: start;
+  gap: 0.375rem;
 }
 
 /* Spacing choices in the node menu: one compact row of options each. */

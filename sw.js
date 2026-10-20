@@ -24,7 +24,7 @@
    Navigations stay network-first, so a new index.html — and with it a new
    worker — is noticed as soon as the network allows, with the cached shell as
    the offline fallback. */
-const CACHE = 'ssp-v359';
+const CACHE = 'ssp-v360';
 const SHELL = ['./index.html', './manifest.json'];
 
 /* Third-party libraries the page loads. Every URL in index.html pins an exact
