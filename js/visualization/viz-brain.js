@@ -1007,7 +1007,9 @@ function brainRenderCanvas() {
         <div class="viz-comment-body">
           <div class="viz-comment-content">${brainNoteParagraphs(brainShownText(node) || 'Double-click or right-click to edit...')}</div>
         </div>
-      </div>${isElectric ? BRAIN_ELECTRIC_FRONT : ''}${isMedieval ? BRAIN_MEDIEVAL_FRONT : ''}${brainCollapseBadge}`;
+      </div>${isElectric ? BRAIN_ELECTRIC_FRONT : ''}${isMedieval ? BRAIN_MEDIEVAL_FRONT : ''}${node.border === 'manhua' ? '<div class="bb-resize" title="Resize" aria-hidden="true"></div>' : ''}${brainCollapseBadge}`;
+      const grip = el.querySelector('.bb-resize');
+      if (grip) grip.addEventListener('pointerdown', e => brainBubbleResizeStart(e, node.id, el));
     }
     setTimeout(() => {
       const inner = el.querySelector('.viz-node-inner');
@@ -2134,6 +2136,47 @@ function brainFitBubble(el, inner) {
   if (inner.style.margin === m) return false;
   inner.style.margin = m;
   return true;
+}
+
+/* Manhua's resize grip. The text area's own resize corner sat inside the
+   balloon beside the words once the balloon was sized round the text, so a
+   Manhua note hides it and carries this grip on the balloon's edge instead:
+   the ellipse's 45-degree point, (50% + 35.36%) of the box each way, or the
+   corner for a caption. Dragging resizes the text box and the balloon grows
+   round it; the pointer is divided by how far the grip moves per pixel of
+   text box (the shape's margins) and by the zoom, so it stays under it. */
+function brainBubbleResizeStart(e, nodeId, el) {
+  if (e.button !== 0 || brainIsLocked()) return;
+  e.stopPropagation();
+  e.preventDefault();
+  const inner = el.querySelector('.viz-node-inner');
+  const grip = e.currentTarget;
+  if (!inner || !grip) return;
+  const [kx, ky] = BRAIN_BUBBLE_ROOM[el.dataset.bubble] || [0.21, 0.21];
+  const at = el.dataset.bubble === 'caption' ? 1 : 0.8536;
+  const z = brain.zoom || 1;
+  const sx = e.clientX, sy = e.clientY, sw = inner.offsetWidth, sh = inner.offsetHeight;
+  let moved = false;
+  grip.setPointerCapture(e.pointerId);
+  const move = ev => {
+    if (!moved) { brainPushUndo(); moved = true; }
+    inner.style.width = Math.max(100, sw + (ev.clientX - sx) / z / (at * (1 + 2 * kx))) + 'px';
+    inner.style.height = Math.max(50, sh + (ev.clientY - sy) / z / (at * (1 + 2 * ky))) + 'px';
+  };
+  const up = () => {
+    grip.removeEventListener('pointermove', move);
+    grip.removeEventListener('pointerup', up);
+    grip.removeEventListener('pointercancel', up);
+    // The note's observer records the size; this keeps it.
+    if (moved) {
+      const node = brain.nodes.find(n => n.id === nodeId);
+      if (node) { node.w = inner.offsetWidth; node.h = inner.offsetHeight; node.userSized = true; }
+      brainSaveCurrentVersion();
+    }
+  };
+  grip.addEventListener('pointermove', move);
+  grip.addEventListener('pointerup', up);
+  grip.addEventListener('pointercancel', up);
 }
 
 /** Electric's halo and sheen blur in proportion to the note (CSS --el-min). */
