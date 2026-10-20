@@ -4679,16 +4679,19 @@ body.viz-no-anim .app-sidebar {
    oval), always shown. */
 .bb-resize {
   position: absolute;
-  right: 1px;
-  bottom: 1px;
-  width: 10px;
-  height: 10px;
+  right: 2px;
+  bottom: 2px;
+  width: 8px;
+  height: 8px;
   cursor: nwse-resize;
   touch-action: none;
   z-index: 5;
   color: rgba(230, 237, 243, 0.7);
-  background: linear-gradient(135deg, transparent 45%, currentColor 45% 53%, transparent 53% 70%, currentColor 70% 78%, transparent 78%);
+  /* thin strokes at the normal corner's size; 10px with thick strokes read big */
+  background: linear-gradient(135deg, transparent 50%, currentColor 50% 57%, transparent 57% 76%, currentColor 76% 83%, transparent 83%);
 }
+/* A bigger target than it looks, so it is still easy to catch. */
+.bb-resize::before { content: ''; position: absolute; inset: -5px; }
 .bb-resize:hover { color: #e6edf3; }
 .viz-node.dragging .bb-resize,
 .viz-canvas-container.brain-locked .bb-resize { display: none; }
