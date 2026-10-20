@@ -1993,7 +1993,7 @@ function _brainMarkNodeMenu() {
   });
   mark('#brain-note-swatches .viz-color-swatch', 'color', node[BRAIN_COLOR_PROPS[target]] || '');
   mark('#brain-node-border-menu .viz-link-type-option', 'border', node?.border || '');
-  // Bubble Shape is a row of its own, there only while the note is Manhua.
+  // Bubble Shape sits under Manhua Border, there only while the note is Manhua.
   const bubbleRow = document.getElementById('brain-node-bubble-toggle');
   if (bubbleRow) bubbleRow.classList.toggle('hidden', node.border !== 'manhua');
   if (node.border !== 'manhua') {
@@ -2030,6 +2030,11 @@ function _brainCloseNodeSubs(except) {
     if (sub) sub.classList.add('hidden');
     if (toggle) toggle.setAttribute('aria-expanded', 'false');
   });
+}
+/* Bubble Shape is nested in Border Type, so it opens on its own, without the
+   one-at-a-time rule closing the dropdown it sits in. */
+function brainToggleBubbleSub(e) {
+  _brainToggleCtxSub(e, 'brain-node-ctx', 'brain-node-bubble-menu', 'brain-node-bubble-toggle');
 }
 function brainToggleNodeSub(e, key) {
   _brainCloseNodeSubs(key);
