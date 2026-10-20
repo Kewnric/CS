@@ -435,6 +435,16 @@ function vizTemplate() {
         <div class="viz-link-type-option" role="menuitem" data-border="" onclick="brainCtxSetBorder(null)"><i data-lucide="square"></i> Default</div>
         <div class="viz-link-type-option" role="menuitem" data-border="electric" onclick="brainCtxSetBorder('electric')"><i data-lucide="zap"></i> Electric Border</div>
         <div class="viz-link-type-option" role="menuitem" data-border="medieval" onclick="brainCtxSetBorder('medieval')"><i data-lucide="castle"></i> Medieval Border</div>
+        <div class="viz-link-type-option" role="menuitem" data-border="manhua" onclick="brainCtxSetBorder('manhua')"><i data-lucide="message-circle"></i> Manhua Border</div>
+        <!-- Only while the note's border is Manhua: which speech bubble it is. -->
+        <div class="brain-bubble-pick hidden" id="brain-bubble-pick">
+          <div class="viz-popup-title">Bubble</div>
+          <button type="button" class="brain-color-target-btn" id="brain-bubble-btn" aria-haspopup="listbox" aria-expanded="false" onclick="brainToggleBubbleList(event)"><span id="brain-bubble-label">Normal Speech</span><i data-lucide="chevron-down"></i></button>
+          <div class="brain-color-target-list hidden" id="brain-bubble-list" role="listbox">
+            ${(typeof BRAIN_BUBBLES !== 'undefined' ? BRAIN_BUBBLES : []).map(([id, label]) =>
+              `<div class="viz-link-type-option" role="option" data-bubble="${id}" onclick="brainCtxSetBubble('${id}')">${label}</div>`).join('')}
+          </div>
+        </div>
       </div>
       <button class="viz-ctx-item" id="brain-node-align-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'align')"><i data-lucide="align-left"></i> Text Alignment <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
       <div class="viz-ctx-submenu hidden" id="brain-node-align-menu" role="menu">

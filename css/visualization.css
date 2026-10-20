@@ -4610,3 +4610,45 @@ body.viz-no-anim .app-sidebar {
 .viz-md-corner.is-bottom { bottom: -0.5rem; }
 .viz-md-corner.is-bottom::after { bottom: -1px; border-bottom: 1px solid var(--md-color); }
 .viz-md-corner.is-bottom::before { bottom: calc(-2px + 1rem); border-bottom: 1px solid var(--md-color); }
+
+/* ── Border type: Manhua (brainPaintBubbles) ───────────────────
+   The bubble is drawn in #brain-bubbles under every note; the note itself is
+   just its text. Outlines go first at double width and fills on top, so each
+   fill trims its own outline to the outside half and erases any outline of an
+   overlapping bubble: overlapping bubbles merge into one. */
+.brain-bubbles {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+}
+.brain-bubbles .bb-strokes path { fill: none; stroke-width: 5; stroke-linejoin: round; }
+.brain-bubbles .bb-fills path { stroke: none; }
+
+.viz-node[data-type="comment"][data-border="manhua"] .viz-node-inner,
+.viz-node[data-type="comment"][data-border="manhua"]:hover .viz-node-inner,
+.viz-node[data-type="comment"][data-border="manhua"].selected .viz-node-inner,
+.viz-node[data-type="comment"][data-border="manhua"].dragging .viz-node-inner,
+.viz-node[data-type="comment"][data-border="manhua"] .viz-node-inner:active {
+  background: transparent !important;
+  border-color: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+/* Lettering: dark and centred on a white balloon unless set otherwise. */
+.viz-node[data-type="comment"][data-border="manhua"] .viz-comment-content {
+  color: var(--note-text, #111111);
+  text-align: var(--note-align, center);
+  text-shadow: none;
+}
+.viz-node[data-type="comment"][data-border="manhua"][data-bubble="negative"] .viz-comment-content {
+  color: var(--note-text, #f8fafc);
+}
+
+/* The Bubble dropdown inside Border Type. */
+.brain-bubble-pick { padding-top: 0.2rem; }
+#brain-bubble-list { max-height: 15rem; overflow-y: auto; scrollbar-width: thin; }

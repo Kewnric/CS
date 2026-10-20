@@ -905,6 +905,13 @@ function brainRenderCanvas() {
   const headsSvg = document.getElementById('viz-heads-svg');
   if (headsSvg && svg) headsSvg.style.transform = svg.style.transform;
   nodesLayer.innerHTML = '';
+  // Manhua bubbles share one SVG under every note, so overlapping bubbles can
+  // merge (brainPaintBubbles).
+  const bubbleSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  bubbleSvg.id = 'brain-bubbles';
+  bubbleSvg.setAttribute('class', 'brain-bubbles');
+  bubbleSvg.setAttribute('aria-hidden', 'true');
+  nodesLayer.appendChild(bubbleSvg);
   const renderedNodeMap = new Map();
 
   const brainHiddenByCollapse = new Set();
@@ -944,6 +951,7 @@ function brainRenderCanvas() {
     if (node.lineSpacing) el.style.setProperty('--note-line', node.lineSpacing);
     if (node.paraSpacing) el.style.setProperty('--note-para', BRAIN_PARA_SPACING[node.paraSpacing] || '0');
     if (node.border && !isGlobe) el.dataset.border = node.border;
+    if (node.border === 'manhua' && !isGlobe) el.dataset.bubble = BRAIN_BUBBLE_IDS.has(node.bubble) ? node.bubble : 'speech';
     const isElectric = node.border === 'electric' && !isGlobe;
     const isMedieval = node.border === 'medieval' && !isGlobe;
     if (isElectric) brainEnsureElectricFilter();
@@ -1001,6 +1009,7 @@ function brainRenderCanvas() {
       // is part of the size the observer starts from. Links were drawn to the
       // old edge during render, so repaint them if it grew.
       if (vizFitNoteHeight(inner)) brainUpdateSVGLinks();
+      else if (node.border === 'manhua') brainPaintBubbles();
       brainSizeElectric(el, inner);
       // ResizeObserver always fires once for the current size the moment it
       // starts observing. Treating that as a resize baked the first layout's
@@ -1011,6 +1020,7 @@ function brainRenderCanvas() {
         if (initial) { initial = false; return; }
         if (vizFitNoteHeight(inner)) return;   // grew; the next callback records it
         brainSizeElectric(el, inner);
+        if (node.border === 'manhua') brainPaintBubbles();
         // Typing in the open editor changes the size too; that is not a
         // resize by hand, and recording it would freeze the note's height.
         if (performance.now() - (el._liveEditAt || 0) < 250) return;
@@ -1099,6 +1109,7 @@ function brainRenderCanvas() {
     vizSyncHeads();
   }
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: container });
+  brainPaintBubbles();
   brainUpdateZoomDisplay();
   brainUpdateMinimap();
   if (typeof vizForce !== 'undefined' && vizForce.enabled) vizForceWake();
@@ -1268,6 +1279,7 @@ function brainFlowDragConnected(nodeId, dx, dy, visited) {
 /** The shared painter: one read pass, one write pass. */
 function brainUpdateSVGLinks() {
   vizPaintLinks(vizGeom.held && vizGeom.graph ? vizGeom.graph : null);
+  brainPaintBubbles();   // bubbles follow their notes wherever links do
 }
 
 function brainNodeDragEnd() {
@@ -1917,6 +1929,7 @@ function brainNodeCtx(e, nodeId) {
   // placed at its real size.
   _brainCloseNodeSubs(null);
   _brainShowColorTargetList(false);
+  _brainShowBubbleList(false);
   if (typeof vizPositionMenu === 'function') vizPositionMenu(menu, e.clientX, e.clientY);
   else { menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px'; menu.classList.remove('hidden'); }
   _brainMarkNodeMenu();
@@ -1981,6 +1994,12 @@ function _brainMarkNodeMenu() {
   });
   mark('#brain-note-swatches .viz-color-swatch', 'color', node[BRAIN_COLOR_PROPS[target]] || '');
   mark('#brain-node-border-menu .viz-link-type-option', 'border', node?.border || '');
+  const pick = document.getElementById('brain-bubble-pick');
+  if (pick) pick.classList.toggle('hidden', node.border !== 'manhua');
+  const bubble = BRAIN_BUBBLE_IDS.has(node.bubble) ? node.bubble : 'speech';
+  const bubbleLabel = document.getElementById('brain-bubble-label');
+  if (bubbleLabel) bubbleLabel.textContent = (BRAIN_BUBBLES.find(b => b[0] === bubble) || [, 'Normal Speech'])[1];
+  mark('#brain-bubble-list .viz-link-type-option', 'bubble', bubble);
   mark('#brain-node-align-menu .viz-link-type-option', 'value', node?.textAlign || 'left');
   mark('[data-prop="lineSpacing"] button', 'value', String(node?.lineSpacing || 1.5));
   mark('[data-prop="paraSpacing"] button', 'value', node?.paraSpacing || '');
@@ -2096,11 +2115,191 @@ function brainEnsureElectricFilter() {
 
 function brainCtxSetBorder(type) {
   const node = brain.contextNodeId && brain.nodes.find(n => n.id === brain.contextNodeId);
-  if (!node || (node.border || null) === (type || null)) { brainHideAllMenus(); return; }
+  if (!node || (node.border || null) === (type || null)) return;
   brainPushUndo();
   if (type) node.border = type; else delete node.border;
   brainRenderCanvas(); brainSaveCurrentVersion();
-  brainHideAllMenus();
+  // The menu stays open: picking Manhua reveals its Bubble dropdown here.
+  _brainMarkNodeMenu();
+}
+
+/* ── Manhua bubbles ─────────────────────────────────────────────
+   The speech-bubble shapes of a comic page. Every Manhua note's bubble is
+   drawn into one SVG under all the notes, in two passes: first every outline
+   at double width, then every fill on top. A fill hides the inner half of its
+   own outline and any part of another bubble's outline inside it, so where
+   bubbles overlap only the outside edge of the union is left: they merge, the
+   way lettered balloons do. */
+const BRAIN_BUBBLES = [
+  ['speech', 'Normal Speech'], ['speech-v', 'Speech (Vertical)'], ['two-part', 'Speech in Two Parts'],
+  ['off-panel', 'Off-Panel Speech'], ['yell', 'Yelling'], ['weak', 'Weak or Fading'],
+  ['whisper', 'Whispering'], ['announce', 'Announcement'], ['think', 'Thinking'],
+  ['daydream', 'Daydreaming'], ['caption', 'Caption or Narration'], ['negative', 'Negative Emotions']
+];
+const BRAIN_BUBBLE_IDS = new Set(BRAIN_BUBBLES.map(b => b[0]));
+
+function brainCtxSetBubble(id) {
+  const node = brain.contextNodeId && brain.nodes.find(n => n.id === brain.contextNodeId);
+  _brainShowBubbleList(false);
+  if (!node || (node.bubble || 'speech') === id) return;
+  brainPushUndo();
+  if (id === 'speech') delete node.bubble; else node.bubble = id;
+  brainRenderCanvas(); brainSaveCurrentVersion();
+  _brainMarkNodeMenu();
+}
+function brainToggleBubbleList(e) {
+  if (e) e.stopPropagation();
+  const list = document.getElementById('brain-bubble-list');
+  _brainShowBubbleList(!!list && list.classList.contains('hidden'));
+}
+function _brainShowBubbleList(open) {
+  const list = document.getElementById('brain-bubble-list');
+  const btn = document.getElementById('brain-bubble-btn');
+  if (list) list.classList.toggle('hidden', !open);
+  if (btn) btn.setAttribute('aria-expanded', String(open));
+}
+
+/** Repaint every Manhua bubble (cheap: only Manhua notes are measured). */
+function brainPaintBubbles() {
+  const svg = document.getElementById('brain-bubbles');
+  if (!svg) return;
+  let strokes = '', fills = '';
+  brain.nodes.forEach(node => {
+    if (node.border !== 'manhua') return;
+    const el = svg.parentNode.querySelector(`.viz-node[data-node-id="${node.id}"]`);
+    if (!el || el.classList.contains('viz-globe-node')) return;
+    const shape = BRAIN_BUBBLE_IDS.has(node.bubble) ? node.bubble : 'speech';
+    const parts = _brainBubbleShape(shape, node.x, node.y, el.offsetWidth, el.offsetHeight, _brainBubbleRand(node.id));
+    const neg = shape === 'negative';
+    const fill = node.bg ? vizColorMap(node.bg) : (neg ? '#0a0a0a' : '#ffffff');
+    const stroke = node.id === brain.selectedNodeId ? 'var(--color-primary)'
+      : node.color ? vizColorMap(node.color) : (neg ? '#f8fafc' : '#111111');
+    const dash = shape === 'whisper' ? ';stroke-dasharray:8 6' : '';
+    const ghost = el.classList.contains('viz-bridge-ghost') ? ' opacity="0.25"' : '';
+    parts.forEach(d => {
+      strokes += `<path d="${d}" style="stroke:${stroke}${dash}"${ghost}/>`;
+      fills += `<path d="${d}" style="fill:${fill}"${ghost}/>`;
+    });
+  });
+  svg.innerHTML = `<g class="bb-strokes">${strokes}</g><g class="bb-fills">${fills}</g>`;
+}
+
+/* Seeded per note, so a yell's spikes or a cloud's puffs keep their shape
+   from one render to the next. */
+function _brainBubbleRand(seed) {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) { h ^= seed.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return () => {
+    h += 0x6D2B79F5;
+    let t = h;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** A bubble around a note's box, as separate closed paths (each filled on its
+ *  own, so overlapping pieces never cancel out). Angles are clockwise from +x,
+ *  screen y down; tails point down and to the right. */
+function _brainBubbleShape(shape, x, y, w, h, rnd) {
+  const f = n => Math.round(n * 10) / 10;
+  const pt = p => f(p[0]) + ' ' + f(p[1]);
+  const poly = pts => 'M' + pts.map(pt).join('L') + 'Z';
+  const ellipse = (cx, cy, rx, ry) =>
+    `M${f(cx - rx)} ${f(cy)}A${f(rx)} ${f(ry)} 0 1 1 ${f(cx + rx)} ${f(cy)}A${f(rx)} ${f(ry)} 0 1 1 ${f(cx - rx)} ${f(cy)}Z`;
+  const deg = a => a * Math.PI / 180;
+  const on = (cx, cy, rx, ry, a, k = 1) => [cx + rx * k * Math.cos(deg(a)), cy + ry * k * Math.sin(deg(a))];
+  // The bubble sits a margin outside the note's box so the text stays inside it.
+  const box = (mxK, myK) => {
+    const mx = Math.max(10, w * mxK), my = Math.max(8, h * myK);
+    return { cx: x + w / 2, cy: y + h / 2, rx: w / 2 + mx, ry: h / 2 + my };
+  };
+  const tail = (b, a1 = 52, a2 = 74, tip = [0.66, 1.42]) =>
+    poly([on(b.cx, b.cy, b.rx, b.ry, a1, 0.8), [b.cx + b.rx * tip[0], b.cy + b.ry * tip[1]], on(b.cx, b.cy, b.rx, b.ry, a2, 0.8)]);
+  const perim = (rx, ry) => Math.PI * (3 * (rx + ry) - Math.sqrt((3 * rx + ry) * (rx + 3 * ry)));
+  // Puffs: arcs bulging outward between points round the ellipse.
+  const cloud = (b, size, jitter) => {
+    const n = Math.max(8, Math.min(40, Math.round(perim(b.rx, b.ry) / size)));
+    const pts = [];
+    for (let i = 0; i < n; i++) pts.push(on(b.cx, b.cy, b.rx, b.ry, (360 / n) * (i + (jitter ? (rnd() - 0.5) * 0.4 : 0))));
+    let d = 'M' + pt(pts[0]);
+    for (let i = 1; i <= n; i++) {
+      const a = pts[i - 1], c = pts[i % n];
+      const r = Math.hypot(c[0] - a[0], c[1] - a[1]) * (jitter ? 0.55 + rnd() * 0.25 : 0.62);
+      d += `A${f(r)} ${f(r)} 0 0 1 ${pt(c)}`;
+    }
+    return d + 'Z';
+  };
+  // Spikes: alternating outer and inner points round the ellipse.
+  const burst = (b, n, outer, inner, jitter) => {
+    const pts = [];
+    for (let i = 0; i < n * 2; i++) {
+      const a = (180 / n) * i + (jitter ? (rnd() - 0.5) * (120 / n) : 0);
+      const k = i % 2 === 0 ? outer + (jitter ? rnd() * 0.3 : 0) : inner + (jitter ? rnd() * 0.06 : 0);
+      pts.push(on(b.cx, b.cy, b.rx, b.ry, a, k));
+    }
+    return poly(pts);
+  };
+  const circle = (cx, cy, r) => `M${f(cx - r)} ${f(cy)}a${f(r)} ${f(r)} 0 1 0 ${f(2 * r)} 0a${f(r)} ${f(r)} 0 1 0 ${f(-2 * r)} 0Z`;
+
+  switch (shape) {
+    case 'speech-v': {
+      const b = box(0.06, 0.38);
+      return [ellipse(b.cx, b.cy, b.rx, b.ry), tail(b)];
+    }
+    case 'two-part': {
+      const b = box(0.1, 0.2);
+      const X = b.cx - b.rx, Y = b.cy - b.ry, W = b.rx * 2, H = b.ry * 2;
+      const B = { cx: X + W * 0.66, cy: Y + H * 0.6, rx: W * 0.36, ry: H * 0.45 };
+      return [ellipse(X + W * 0.34, Y + H * 0.4, W * 0.36, H * 0.45), ellipse(B.cx, B.cy, B.rx, B.ry), tail(B)];
+    }
+    case 'off-panel': {
+      // A notch cut into the edge instead of a tail: the speaker is off-panel.
+      const b = box(0.1, 0.2);
+      const g1 = on(b.cx, b.cy, b.rx, b.ry, 36), g2 = on(b.cx, b.cy, b.rx, b.ry, 54);
+      const notch = on(b.cx, b.cy, b.rx, b.ry, 45, 0.74);
+      return [`M${pt(g2)}A${f(b.rx)} ${f(b.ry)} 0 1 1 ${pt(g1)}L${pt(notch)}Z`];
+    }
+    case 'yell':
+      return [burst(box(0.14, 0.26), 13, 1.12, 0.86, true)];
+    case 'announce':
+      return [burst(box(0.14, 0.26), 24, 1.2, 0.97, false)];
+    case 'weak': {
+      const b = box(0.1, 0.22);
+      // A thin tail with a wobble in it, like the voice trailing off.
+      const b1 = on(b.cx, b.cy, b.rx, b.ry, 58, 0.85), b2 = on(b.cx, b.cy, b.rx, b.ry, 66, 0.85);
+      const tip = [b.cx + b.rx * 0.5, b.cy + b.ry * 1.6];
+      const c1 = [b.cx + b.rx * 0.78, b.cy + b.ry * 1.18], c2 = [b.cx + b.rx * 0.68, b.cy + b.ry * 1.22];
+      return [cloud(b, 26, true), `M${pt(b1)}Q${pt(c1)} ${pt(tip)}Q${pt(c2)} ${pt(b2)}Z`];
+    }
+    case 'whisper': {
+      const b = box(0.1, 0.2);
+      return [ellipse(b.cx, b.cy, b.rx, b.ry), tail(b, 56, 70, [0.6, 1.32])];
+    }
+    case 'think':
+    case 'negative': {
+      const b = box(0.1, 0.2);
+      return [ellipse(b.cx, b.cy, b.rx, b.ry)];
+    }
+    case 'daydream': {
+      const b = box(0.1, 0.22);
+      const r = Math.min(b.rx, b.ry) * 0.17 + 3;
+      return [cloud(b, 38, false),
+        circle(b.cx + b.rx * 0.72, b.cy + b.ry * 1.14, r),
+        circle(b.cx + b.rx * 0.92, b.cy + b.ry * 1.36, r * 0.66),
+        circle(b.cx + b.rx * 1.06, b.cy + b.ry * 1.52, r * 0.42)];
+    }
+    case 'caption': {
+      const X = x - 6, Y = y - 6, W = w + 12, H = h + 12, r = 8;
+      return [`M${f(X + r)} ${f(Y)}H${f(X + W - r)}A${r} ${r} 0 0 1 ${f(X + W)} ${f(Y + r)}V${f(Y + H - r)}`
+        + `A${r} ${r} 0 0 1 ${f(X + W - r)} ${f(Y + H)}H${f(X + r)}A${r} ${r} 0 0 1 ${f(X)} ${f(Y + H - r)}`
+        + `V${f(Y + r)}A${r} ${r} 0 0 1 ${f(X + r)} ${f(Y)}Z`];
+    }
+    default: {   // speech
+      const b = box(0.1, 0.2);
+      return [ellipse(b.cx, b.cy, b.rx, b.ry), tail(b)];
+    }
+  }
 }
 
 function brainLinkCtx(e, linkId) {
