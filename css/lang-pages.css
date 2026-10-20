@@ -1723,7 +1723,7 @@ button.lpv-stat { cursor: pointer; }
 .lpv-adm-qhead h3 { flex: 1; display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: 1.05rem; color: var(--text-primary); }
 .lpv-adm-qcount { padding: 0 0.5rem; border-radius: var(--radius-full); background: var(--lpv); color: var(--lpv-ink); font-size: 0.75rem; font-weight: 800; }
 .lpv-adm-qlist { display: flex; flex-direction: column; gap: 0.6rem; }
-.lpv-q {
+.lpv-qc {
   border: 1px solid var(--border-color);
   border-left: 4px solid var(--lpv);
   border-radius: var(--radius-lg);
@@ -1732,8 +1732,8 @@ button.lpv-stat { cursor: pointer; }
   animation: lpvIn 0.35s ease both;
   animation-delay: calc(var(--k, 0) * 35ms);
 }
-.lpv-q:hover { border-color: var(--lpv-line); border-left-color: var(--lpv); }
-.lpv-q.is-open { box-shadow: 0 12px 28px -22px var(--lpv); }
+.lpv-qc:hover { border-color: var(--lpv-line); border-left-color: var(--lpv); }
+.lpv-qc.is-open { box-shadow: 0 12px 28px -22px var(--lpv); }
 .lpv-q-head { display: flex; align-items: center; gap: 0.65rem; padding: 0.65rem 0.8rem; cursor: pointer; user-select: none; }
 .lpv-q-num {
   width: 24px;
@@ -1765,16 +1765,16 @@ button.lpv-stat { cursor: pointer; }
   color: var(--color-success);
 }
 .lpv-q-status svg { width: 15px; height: 15px; flex-shrink: 0; }
-.lpv-q.has-problem .lpv-q-status { color: var(--color-warning); }
+.lpv-qc.has-problem .lpv-q-status { color: var(--color-warning); }
 .lpv-q-tools { display: flex; gap: 1px; opacity: 0.5; transition: opacity 0.15s ease; }
-.lpv-q-head:hover .lpv-q-tools, .lpv-q.is-open .lpv-q-tools { opacity: 1; }
+.lpv-q-head:hover .lpv-q-tools, .lpv-qc.is-open .lpv-q-tools { opacity: 1; }
 .lpv-q-caret { display: inline-flex; color: var(--text-tertiary); transition: transform 0.25s ease; }
 .lpv-q-caret svg { width: 17px; height: 17px; }
-.lpv-q.is-open .lpv-q-caret { transform: rotate(180deg); }
+.lpv-qc.is-open .lpv-q-caret { transform: rotate(180deg); }
 .lpv-q-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.3s var(--ease-expo-out, ease); }
-.lpv-q.is-open .lpv-q-body { grid-template-rows: 1fr; }
+.lpv-qc.is-open .lpv-q-body { grid-template-rows: 1fr; }
 .lpv-q-inner { display: flex; flex-direction: column; gap: 0.75rem; padding: 0 0.9rem; overflow: hidden; }
-.lpv-q.is-open .lpv-q-inner { padding-top: 0.2rem; padding-bottom: 0.9rem; }
+.lpv-qc.is-open .lpv-q-inner { padding-top: 0.2rem; padding-bottom: 0.9rem; }
 
 .lpv-adm-addq { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.8rem; border: 2px dashed var(--border-color); border-radius: var(--radius-lg); }
 .lpv-adm-addq > span { margin-right: 0.25rem; font-size: 0.74rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-tertiary); }
@@ -1875,17 +1875,43 @@ button.lpv-stat { cursor: pointer; }
 
 /* ── The scenario editor: who, where ── */
 .lpv-adm-scenehead { display: flex; align-items: stretch; gap: 1rem; }
-.lpv-adm-who {
-  width: 110px;
-  flex-shrink: 0;
+.lpv-adm-who { position: relative; width: 110px; flex-shrink: 0; }
+/* The portrait is a button: it opens the cast to choose from. */
+.lpv-adm-who-btn {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 150px;
   display: flex;
   align-items: flex-end;
   justify-content: center;
+  padding: 0;
   overflow: hidden;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: radial-gradient(ellipse at 50% 100%, color-mix(in srgb, var(--lpv) 28%, transparent), transparent 70%), var(--bg-surface);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
+.lpv-adm-who-btn:hover { border-color: var(--lpv); box-shadow: 0 0 0 3px var(--lpv-soft); }
+.lpv-adm-who-btn:focus-visible { outline: 2px solid var(--lpv); outline-offset: 2px; }
+.lpv-adm-who-tag {
+  position: absolute;
+  top: 0.4rem;
+  left: 50%;
+  translate: -50% 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.12rem 0.5rem;
+  border-radius: var(--radius-full);
+  background: rgba(0, 0, 0, 0.58);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.lpv-adm-who-tag svg { width: 11px; height: 11px; }
 .lpv-adm-face {
   width: 84px;
   height: 112px;
@@ -1965,12 +1991,13 @@ button.lpv-stat { cursor: pointer; }
   .lpv-opt.is-reply { grid-template-columns: auto minmax(0, 1fr) auto auto; }
   .lpv-opt.is-reply .lpv-opt-note { grid-column: 2 / 4; }
   .lpv-adm-scenehead { flex-direction: column; }
-  .lpv-adm-who { width: 100%; height: 120px; }
+  .lpv-adm-who { width: 100%; }
+  .lpv-adm-who-btn { min-height: 130px; }
   .lpv-adm-keys { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .lpv-adm-tab-ico, .lpv-adm-bulk, .lpv-adm .is-flash, .lpv-adm-editor, .lpv-adm-langpane, .lpv-ex-row, .lpv-pair-row,
-  .lpv-opt, .lpv-chip-x, .lpv-q, .lpv-bw, .lpv-adm-card, .lpv-adm-face, .lpv-loc::after, .lpv-opt-right span { animation: none !important; }
+  .lpv-opt, .lpv-chip-x, .lpv-qc, .lpv-bw, .lpv-adm-card, .lpv-adm-face, .lpv-loc::after, .lpv-opt-right span { animation: none !important; }
   .lpv-q-body { transition: none; }
 }
 
@@ -1988,9 +2015,9 @@ button.lpv-stat { cursor: pointer; }
 .lpv-stats.is-compact .lpv-stat-body em { font-size: 0.72rem; }
 
 /* A redraw of what was already on screen does not replay its entrance. */
-.lpv-quiet .lpv-adm-editor, .lpv-quiet .lpv-q, .lpv-quiet .lpv-adm-card, .lpv-quiet .lpv-scene,
+.lpv-quiet .lpv-adm-editor, .lpv-quiet .lpv-qc, .lpv-quiet .lpv-adm-card, .lpv-quiet .lpv-scene,
 .lpv-quiet .lpv-ex-row, .lpv-quiet .lpv-pair-row, .lpv-quiet .lpv-opt, .lpv-quiet .lpv-chip-x { animation: none; }
-.lpv-quiet .lpv-q.is-new { animation: lpvIn 0.35s ease both; }
+.lpv-quiet .lpv-qc.is-new { animation: lpvIn 0.35s ease both; }
 /* Switching from one word to the next is a quick cross-fade, not an entrance. */
 .lpv-adm-side .lpv-adm-editor { animation: lpvFadeSwap 0.18s ease both; }
 @keyframes lpvFadeSwap { from { opacity: 0.4; } to { opacity: 1; } }
@@ -2097,6 +2124,72 @@ button.lpv-stat { cursor: pointer; }
 
 @media (prefers-reduced-motion: reduce) {
   .lpv-adm-more svg, .lpv-say.is-on, .lpv-adm-tick, .lpv-adm-side .lpv-adm-editor { animation: none !important; }
+}
+
+
+/* The admin body: its toolbar, cards and bar spaced out, not touching. */
+.lpv-adm-body { display: flex; flex-direction: column; gap: 1rem; }
+
+/* The list's main action, pinned to the bottom of the screen like the
+   Coding admin's form footer, so it is in reach however far you scroll. */
+.lpv-adm-dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 0.1rem 0.7rem;
+  border-top: 1px solid var(--border-color);
+  background: linear-gradient(to bottom, transparent, var(--bg-body) 30%, var(--bg-body));
+}
+.lpv-adm-dock-hint { font-size: 0.8rem; font-weight: 700; color: var(--text-tertiary); }
+.lpv-adm-dock .lpv-go { width: auto; padding-left: 1.2rem; padding-right: 1.3rem; }
+
+/* Choosing who they look like. */
+.lpv-adm-face.is-swap { animation: lpvFaceIn 0.35s var(--ease-spring, ease) both, lpvBob 3s 0.35s ease-in-out infinite; }
+@keyframes lpvFaceIn { from { opacity: 0; translate: 0 14px; scale: 0.9; } to { opacity: 1; translate: 0 0; scale: 1; } }
+.lpv-adm-who-btn:hover .lpv-adm-face { scale: 1.05; }
+.lpv-face-pick {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 20;
+  width: min(380px, 82vw);
+  padding: 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.35);
+  animation: lpvPopIn 0.2s var(--ease-spring, ease) both;
+}
+.lpv-face-pick[hidden] { display: none; }
+.lpv-face-pick-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
+.lpv-face-pick-head b { font-size: 0.86rem; color: var(--text-primary); }
+.lpv-face-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 0.45rem; }
+.lpv-face-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.45rem 0.3rem 0.4rem;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: radial-gradient(ellipse at 50% 80%, color-mix(in srgb, var(--lpv) 18%, transparent), transparent 70%), var(--bg-surface);
+  font: inherit;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.lpv-face-opt:hover { transform: translateY(-2px); border-color: var(--lpv-line); }
+.lpv-face-opt:focus-visible { outline: 2px solid var(--lpv); outline-offset: 2px; }
+.lpv-face-opt.is-on { border-color: var(--lpv); box-shadow: 0 0 0 3px var(--lpv-soft); }
+.lpv-face-img { width: 48px; height: 64px; background-position: bottom center; background-repeat: no-repeat; background-size: contain; image-rendering: pixelated; }
+.lpv-face-opt:hover .lpv-face-img { animation: lpvBob 1s ease-in-out infinite; }
+.lpv-face-opt b { font-size: 0.74rem; color: var(--text-primary); }
+.lpv-face-opt em { font-size: 0.62rem; font-style: normal; color: var(--text-tertiary); }
+@media (prefers-reduced-motion: reduce) {
+  .lpv-adm-face.is-swap, .lpv-face-pick, .lpv-face-opt:hover .lpv-face-img { animation: none !important; }
 }
 
 /* ── Narrow panes ── */

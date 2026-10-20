@@ -128,6 +128,7 @@ function adminLanguageDestroy() {
   langWordDraft = null; langSetDraft = null; langScenarioDraft = null;
   langAdmDirty = false;
   document.removeEventListener('keydown', langAdmKeys);
+  document.removeEventListener('mousedown', langAdmFacePickOutside, true);
 }
 
 /* ── Guards, keys, tabs ───────────────────────────────────── */
@@ -153,6 +154,9 @@ function langAdmKeys(e) {
     if (!langAdmHasDraft()) return;
     e.preventDefault();
     langAdmSave();
+  } else if (e.key === 'Escape' && langAdmFacePickOpen()) {
+    e.preventDefault();
+    langAdmToggleFacePick(false);
   } else if (e.key === 'Escape' && langAdmHasDraft()) {
     e.preventDefault();
     langCancelDraft();
@@ -269,7 +273,7 @@ function langAdmEdited(e) {
   langAdmDirty = true;
   const t = e && e.target;
   if (!t || !t.closest) return;
-  const q = t.closest('.lpv-q');
+  const q = t.closest('.lpv-qc');
   if (q) langAdmQLive(q);
   const enc = t.closest('.lpv-enc');
   if (enc) langAdmEncLive(enc);
@@ -348,7 +352,7 @@ function langAdmChipRemove(e) {
 }
 
 function langAdmChipChanged(box) {
-  const q = box && box.closest('.lpv-q');
+  const q = box && box.closest('.lpv-qc');
   if (q) langAdmQLive(q);
 }
 
@@ -367,7 +371,7 @@ function langAdmRemoveRow(btn, min) {
   setTimeout(() => {
     row.remove();
     langAdmDirty = true;
-    const q = list.closest('.lpv-q');
+    const q = list.closest('.lpv-qc');
     if (q) langAdmQLive(q);
     const enc = list.closest('.lpv-enc');
     if (enc) langAdmEncLive(enc);
@@ -376,7 +380,7 @@ function langAdmRemoveRow(btn, min) {
 
 /** Append a row to a list, up to `max`, and focus its first input. */
 function langAdmAddRow(btn, listSel, html, max) {
-  const scope = btn.closest('.lpv-q, .lpv-enc, .lpv-adm-langpane');
+  const scope = btn.closest('.lpv-qc, .lpv-enc, .lpv-adm-langpane');
   const list = scope && scope.querySelector(listSel);
   if (!list) return null;
   if (max && list.querySelectorAll('[data-row]').length >= max) {
@@ -389,7 +393,7 @@ function langAdmAddRow(btn, listSel, html, max) {
   const first = row.querySelector('input[type="text"], input:not([type])');
   if (first) first.focus();
   langAdmDirty = true;
-  if (scope.classList.contains('lpv-q')) langAdmQLive(scope);
+  if (scope.classList.contains('lpv-qc')) langAdmQLive(scope);
   if (scope.classList.contains('lpv-enc')) langAdmEncLive(scope);
   return row;
 }
@@ -1050,9 +1054,21 @@ function langSetListHTML() {
           <button type="button" role="radio" class="${langAdmSetFilter === k ? 'is-on' : ''}" aria-checked="${langAdmSetFilter === k ? 'true' : 'false'}"
                   onclick="langAdmSetFilterTo('${k}')">${l} <em>${n}</em></button>`).join('')}
       </span>
-      <button class="lpv-go is-small lpv-adm-new" type="button" onclick="langNewSetDraft()"><i data-lucide="plus"></i><span>New set</span></button>
     </div>
-    <div class="lpv-grid lpv-adm-grid" id="lang-adm-setgrid">${langAdmSetCardsHTML()}</div>`;
+    <div class="lpv-grid lpv-adm-grid" id="lang-adm-setgrid">${langAdmSetCardsHTML()}</div>
+    ${langAdmDockHTML(`${all.length} set${all.length !== 1 ? 's' : ''} · ${ready} ready`,
+      `<button class="lpv-go is-small lpv-adm-new" type="button" onclick="langNewSetDraft()"><i data-lucide="plus"></i><span>New set</span></button>`)}`;
+}
+
+/* The list's main action lives in a bar pinned to the bottom of the screen,
+   the way the Coding admin's form footer is -- in reach however far down
+   the cards you have scrolled. */
+function langAdmDockHTML(hint, action) {
+  return `
+    <div class="lpv-adm-dock">
+      <span class="lpv-adm-dock-hint">${hint}</span>
+      ${action}
+    </div>`;
 }
 
 function langAdmSetCardsHTML() {
@@ -1264,7 +1280,7 @@ function langAdmBlankWordsHTML(sentence, at) {
 }
 
 function langAdmBlankSync(input) {
-  const card = input.closest('.lpv-q');
+  const card = input.closest('.lpv-qc');
   const pick = card && card.querySelector('.lpv-blank-pick');
   if (!pick) return;
   const n = input.value.trim().split(/\s+/).filter(Boolean).length;
@@ -1279,7 +1295,7 @@ function langAdmBlankPick(btn, i) {
   pick.dataset.at = String(i);
   pick.querySelectorAll('.lpv-bw').forEach((b, k) => b.classList.toggle('is-on', k === i));
   langAdmDirty = true;
-  langAdmQLive(btn.closest('.lpv-q'));
+  langAdmQLive(btn.closest('.lpv-qc'));
 }
 
 function langAdmOptRowHTML(qid, text, checked) {
@@ -1376,7 +1392,7 @@ function langItemFormHTML(it, i, total) {
   body += field('note', 'Note after answering', it.note, 'Why this is the answer', 'optional');
 
   return `
-    <div class="lpv-q lpv-tone-${LANG_ADM_TYPE_TONE[it.type] || 'primary'}${open ? ' is-open' : ''}${problems.length ? ' has-problem' : ''}${it.id === langAdmNewId ? ' is-new' : ''}"
+    <div class="lpv-qc lpv-tone-${LANG_ADM_TYPE_TONE[it.type] || 'primary'}${open ? ' is-open' : ''}${problems.length ? ' has-problem' : ''}${it.id === langAdmNewId ? ' is-new' : ''}"
          data-qid="${it.id}" data-type="${it.type}" style="--k:${i}">
       <div class="lpv-q-head" onclick="langAdmToggleQ('${it.id}')">
         <span class="lpv-q-num">${i + 1}</span>
@@ -1443,7 +1459,7 @@ function langAdmQLive(card) {
 }
 
 function langAdmToggleQ(id) {
-  const card = document.querySelector('.lpv-q[data-qid="' + id + '"]');
+  const card = document.querySelector('.lpv-qc[data-qid="' + id + '"]');
   if (!card) return;
   const open = !card.classList.contains('is-open');
   card.classList.toggle('is-open', open);
@@ -1451,7 +1467,7 @@ function langAdmToggleQ(id) {
 }
 
 function langAdmFoldAll(open) {
-  document.querySelectorAll('.lpv-q').forEach(c => { c.classList.toggle('is-open', open); langAdmOpen[c.dataset.qid] = open; });
+  document.querySelectorAll('.lpv-qc').forEach(c => { c.classList.toggle('is-open', open); langAdmOpen[c.dataset.qid] = open; });
 }
 
 /** Reads the open set editor back into the draft, question by question id. */
@@ -1464,7 +1480,7 @@ function langCollectSetForm() {
   if (g('lang-s-desc')) s.description = g('lang-s-desc').value;
   if (g('lang-s-lang')) s.lang = g('lang-s-lang').value;
   if (g('lang-s-ref')) s.refLang = g('lang-s-ref').value;
-  ed.querySelectorAll('.lpv-q[data-qid]').forEach(card => {
+  ed.querySelectorAll('.lpv-qc[data-qid]').forEach(card => {
     const it = (s.items || []).find(x => x.id === card.dataset.qid);
     if (it) langAdmReadItem(card, it);
   });
@@ -1488,7 +1504,7 @@ function langAddItem(type) {
   langAdmNewId = it.id;
   langAdmDirty = true;
   renderLangAdmin();
-  langAdmScrollTo('.lpv-q[data-qid="' + it.id + '"]');
+  langAdmScrollTo('.lpv-qc[data-qid="' + it.id + '"]');
 }
 
 function langRemoveItem(id) {
@@ -1521,7 +1537,7 @@ function langAdmDuplicateItem(id) {
   langAdmNewId = copy.id;
   langAdmDirty = true;
   renderLangAdmin();
-  langAdmScrollTo('.lpv-q[data-qid="' + copy.id + '"]');
+  langAdmScrollTo('.lpv-qc[data-qid="' + copy.id + '"]');
 }
 
 /** Words from the dictionary in the set's language, none already used. */
@@ -1541,7 +1557,7 @@ function langAdmPickWords(n, avoid, singleWord) {
 }
 
 function langAdmSuggestTiles(btn) {
-  const card = btn.closest('.lpv-q');
+  const card = btn.closest('.lpv-qc');
   const box = card && card.querySelector('[data-chips="distractors"]');
   if (!box) return;
   const it = langAdmReadItem(card, { type: card.dataset.type });
@@ -1553,7 +1569,7 @@ function langAdmSuggestTiles(btn) {
 }
 
 function langAdmSuggestOptions(btn) {
-  const card = btn.closest('.lpv-q');
+  const card = btn.closest('.lpv-qc');
   if (!card) return;
   const inputs = Array.from(card.querySelectorAll('.lpv-opt')).filter(r => !r.querySelector('input[type="radio"]').checked)
     .map(r => r.querySelector('[data-opt]')).filter(inp => !inp.value.trim());
@@ -1623,12 +1639,9 @@ function langAdmEncProblems(e) {
 
 function langScenarioListHTML() {
   const list = langScenarios();
+  const readyN = list.filter(s => !langAdmScenarioProblems(s).length).length;
   return `
-    <div class="lpv-adm-tools is-wide lpv-in" style="--i:3">
-      <span class="lpv-adm-count">${list.length} scenario${list.length !== 1 ? 's' : ''}</span>
-      <button class="lpv-go is-small lpv-adm-new" type="button" onclick="langNewScenarioDraft()"><i data-lucide="plus"></i><span>New scenario</span></button>
-    </div>
-    <div class="lpv-grid lpv-adm-grid">
+    <div class="lpv-grid lpv-adm-grid lpv-in" style="--i:3">
       ${list.map((s, i) => {
         const loc = langLocation(s.location);
         const problems = langAdmScenarioProblems(s);
@@ -1638,7 +1651,7 @@ function langScenarioListHTML() {
              onclick="langEditScenarioDraft('${s.id}')" onkeydown="if (event.key === 'Enter') langEditScenarioDraft('${s.id}')">
           <div class="lpv-scene-art lpv-bg-${escapeHTML(loc.key)}">
             <span class="lpv-scene-loc"><i data-lucide="${loc.icon}"></i> ${escapeHTML(loc.name)}</span>
-            <span class="lpv-scene-face lpv-face-${escapeHTML(typeof lpvFaceKey === 'function' ? lpvFaceKey(s.npc) : '')}"></span>
+            <span class="lpv-scene-face lpv-face-${escapeHTML(typeof lpvFaceKey === 'function' ? lpvFaceKey(s.npc, s.face) : '')}"></span>
           </div>
           <div class="lpv-scene-body">
             <b>${escapeHTML(s.title || 'Untitled')}</b>
@@ -1657,7 +1670,9 @@ function langScenarioListHTML() {
         </div>`;
       }).join('') || langAdmEmptyHTML('map', 'No scenarios yet', 'A scenario is somebody you meet, what they say, and the replies you could give.',
         `<button class="lpv-go is-small" type="button" onclick="langNewScenarioDraft()"><i data-lucide="plus"></i> New scenario</button>`)}
-    </div>`;
+    </div>
+    ${langAdmDockHTML(`${list.length} scenario${list.length !== 1 ? 's' : ''} · ${readyN} ready`,
+      `<button class="lpv-go is-small lpv-adm-new" type="button" onclick="langNewScenarioDraft()"><i data-lucide="plus"></i><span>New scenario</span></button>`)}`;
 }
 
 function langNewScenarioDraft() {
@@ -1710,7 +1725,7 @@ function langAdminDeleteScenario(id) {
 function langScenarioFormHTML() {
   const s = langScenarioDraft;
   const isNew = !langFindScenario(s.id);
-  const face = typeof lpvFaceKey === 'function' ? lpvFaceKey(s.npc) : '';
+  const face = typeof lpvFaceKey === 'function' ? lpvFaceKey(s.npc, s.face) : '';
   const num = (id, label, value, min, max, icon) => `
     <div class="lpv-adm-field lpv-adm-num">
       <label class="form-label" for="${id}">${langIcon(icon)} ${label}</label>
@@ -1734,7 +1749,13 @@ function langScenarioFormHTML() {
 
       <div class="lpv-adm-panel lpv-adm-scenehead">
         <div class="lpv-adm-who">
-          <span class="lpv-adm-face lpv-face-${escapeHTML(face)}" id="lang-sc-face"></span>
+          <input type="hidden" id="lang-sc-facekey" value="${escapeHTML(s.face || '')}" />
+          <button class="lpv-adm-who-btn" type="button" onclick="langAdmToggleFacePick()" aria-haspopup="true"
+                  aria-expanded="false" title="Choose who they look like">
+            <span class="lpv-adm-face lpv-face-${escapeHTML(face)}" id="lang-sc-face"></span>
+            <span class="lpv-adm-who-tag" id="lang-sc-facetag">${langIcon('repeat')} ${escapeHTML(s.face ? langAdmFaceName(s.face) : 'Auto')}</span>
+          </button>
+          <div class="lpv-face-pick" id="lang-sc-facepick" hidden>${langAdmFacePickHTML(s.face || '', s.npc)}</div>
         </div>
         <div class="lpv-adm-who-fields">
           <div class="lpv-adm-grid2">
@@ -1806,7 +1827,7 @@ function langEncounterFormHTML(e, i, total) {
   const open = !!langAdmOpen[e.id];
   const opts = (e.options && e.options.length ? e.options : [{ text: '', correct: true }, { text: '', correct: false }]);
   return `
-    <div class="lpv-q lpv-enc lpv-tone-warning${open ? ' is-open' : ''}${problems.length ? ' has-problem' : ''}${e.id === langAdmNewId ? ' is-new' : ''}" data-eid="${e.id}" style="--k:${i}">
+    <div class="lpv-qc lpv-enc lpv-tone-warning${open ? ' is-open' : ''}${problems.length ? ' has-problem' : ''}${e.id === langAdmNewId ? ' is-new' : ''}" data-eid="${e.id}" style="--k:${i}">
       <div class="lpv-q-head" onclick="langAdmToggleEnc('${e.id}')">
         <span class="lpv-q-num">${i + 1}</span>
         <span class="lpv-type"><i data-lucide="message-circle"></i></span>
@@ -1896,8 +1917,88 @@ function langAdmFoldAllEnc(open) {
 }
 
 function langAdmNpcLive(input) {
+  const chosen = document.getElementById('lang-sc-facekey');
+  if (chosen && chosen.value) return;   // a picked face stays put
   const face = document.getElementById('lang-sc-face');
   if (face && typeof lpvFaceKey === 'function') face.className = 'lpv-adm-face lpv-face-' + lpvFaceKey(input.value);
+  const pick = document.getElementById('lang-sc-facepick');
+  if (pick) pick.innerHTML = langAdmFacePickHTML('', input.value);
+}
+
+/* ── Choosing who they look like ──────────────────────────────
+   The portrait used to be whatever the name hashed to -- Ate Marites is
+   always the same person, but you could not choose which. Clicking it
+   opens the cast; "Auto" goes back to the name's choice. */
+
+function langAdmFaceKeys() {
+  return typeof LANG_PORTRAITS !== 'undefined' ? Object.keys(LANG_PORTRAITS).sort() : [];
+}
+
+function langAdmFaceName(key) {
+  const k = String(key || '');
+  return k.charAt(0).toUpperCase() + k.slice(1);
+}
+
+function langAdmFacePickHTML(current, npc) {
+  const auto = typeof lpvFaceKey === 'function' ? lpvFaceKey(npc || '') : '';
+  return `
+    <div class="lpv-face-pick-head"><b>Who do they look like?</b>
+      <button class="ag-icon-btn" type="button" onclick="langAdmToggleFacePick(false)" aria-label="Close">${langIcon('x')}</button>
+    </div>
+    <div class="lpv-face-grid">
+      <button class="lpv-face-opt${!current ? ' is-on' : ''}" type="button" onclick="langAdmPickFace('')" title="Chosen from their name">
+        <span class="lpv-face-img lpv-face-${escapeHTML(auto)}"></span><b>Auto</b><em>from the name</em>
+      </button>
+      ${langAdmFaceKeys().map(k => `
+        <button class="lpv-face-opt${current === k ? ' is-on' : ''}" type="button" onclick="langAdmPickFace('${k}')">
+          <span class="lpv-face-img lpv-face-${k}"></span><b>${escapeHTML(langAdmFaceName(k))}</b>
+        </button>`).join('')}
+    </div>`;
+}
+
+function langAdmToggleFacePick(open) {
+  const pick = document.getElementById('lang-sc-facepick');
+  const btn = document.querySelector('.lpv-adm-who-btn');
+  if (!pick) return;
+  const show = open == null ? pick.hidden : !!open;
+  pick.hidden = !show;
+  if (btn) btn.setAttribute('aria-expanded', show ? 'true' : 'false');
+  document.removeEventListener('mousedown', langAdmFacePickOutside, true);
+  if (show) {
+    const on = pick.querySelector('.lpv-face-opt.is-on') || pick.querySelector('.lpv-face-opt');
+    if (on) on.focus({ preventScroll: true });
+    setTimeout(() => document.addEventListener('mousedown', langAdmFacePickOutside, true), 0);
+  }
+}
+
+function langAdmFacePickOutside(e) {
+  const who = document.querySelector('.lpv-adm-who');
+  if (!who || !who.contains(e.target)) langAdmToggleFacePick(false);
+}
+
+function langAdmFacePickOpen() {
+  const pick = document.getElementById('lang-sc-facepick');
+  return !!(pick && !pick.hidden);
+}
+
+function langAdmPickFace(key) {
+  const hidden = document.getElementById('lang-sc-facekey');
+  if (hidden) hidden.value = key || '';
+  const npc = document.getElementById('lang-sc-npc');
+  const shown = key || (typeof lpvFaceKey === 'function' ? lpvFaceKey(npc ? npc.value : '') : '');
+  const face = document.getElementById('lang-sc-face');
+  if (face) {
+    face.className = 'lpv-adm-face lpv-face-' + shown;
+    face.classList.remove('is-swap'); void face.offsetWidth; face.classList.add('is-swap');
+  }
+  const tag = document.getElementById('lang-sc-facetag');
+  if (tag) tag.innerHTML = langIcon('repeat') + ' ' + escapeHTML(key ? langAdmFaceName(key) : 'Auto');
+  const pick = document.getElementById('lang-sc-facepick');
+  if (pick) pick.innerHTML = langAdmFacePickHTML(key || '', npc ? npc.value : '');
+  langAdmDirty = true;
+  langAdmToggleFacePick(false);
+  const btn = document.querySelector('.lpv-adm-who-btn');
+  if (btn) btn.focus({ preventScroll: true });
 }
 
 function langAdmPickLoc(key) {
@@ -1915,6 +2016,7 @@ function langCollectScenarioForm() {
   if (g('lang-sc-title')) s.title = g('lang-sc-title').value;
   if (g('lang-sc-loc')) s.location = g('lang-sc-loc').value;
   if (g('lang-sc-npc')) s.npc = g('lang-sc-npc').value;
+  if (g('lang-sc-facekey')) s.face = g('lang-sc-facekey').value || '';
   if (g('lang-sc-hp')) s.playerHp = Math.max(20, parseInt(g('lang-sc-hp').value, 10) || 100);
   if (g('lang-sc-mp')) s.playerMana = Math.max(0, parseInt(g('lang-sc-mp').value, 10) || 0);
   if (g('lang-sc-nhp')) s.npcHp = Math.max(20, parseInt(g('lang-sc-nhp').value, 10) || 100);

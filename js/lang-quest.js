@@ -89,7 +89,7 @@ function langQuestInit() {
     _lq.banked = false;
     _lq.power = sc.playerMana || 0;
     _lq.enemy = {
-      name: sc.npc || 'Stranger', location: _lq.location,
+      name: sc.npc || 'Stranger', face: sc.face || '', location: _lq.location,
       hp: sc.npcHp || 100, hpMax: sc.npcHp || 100,
       turns: (sc.encounters || []).filter(ready).map(e => ({
         situation: e.situation || '', line: e.line,
@@ -217,6 +217,8 @@ function lqSceneArt(loc) {
  */
 function lqPortraitFor(enemy) {
   if (typeof LANG_PORTRAITS === 'undefined') return '';
+  // A face picked in Admin wins over the one the name would hash to.
+  if (enemy && enemy.face && LANG_PORTRAITS[enemy.face]) return LANG_PORTRAITS[enemy.face];
   const keys = Object.keys(LANG_PORTRAITS).sort();
   if (!keys.length) return '';
   const raw = String((enemy && enemy.name) || '').toLowerCase().trim();

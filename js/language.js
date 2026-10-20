@@ -1028,6 +1028,7 @@ function _langScenarioEnemy(sc) {
   return {
     id: sc.id,
     name: sc.npc || 'Stranger',
+    face: sc.face || '',
     location: sc.location || 'street',
     hp: sc.npcHp || 100,
     hpMax: sc.npcHp || 100,

@@ -90,6 +90,7 @@ function lpvQuestSamples(onlyId) {
     out.push({
       loc: s.location || 'street',
       npc: s.npc || 'Someone',
+      face: s.face || '',
       line: String(enc.line).slice(0, 70),
       options: lpvShuffle([right].concat(wrong)).map(o => ({ text: o.text, correct: !!o.correct }))
     });
@@ -119,9 +120,11 @@ function lpvArtStyles() {
   document.head.appendChild(st);
 }
 
-/** Which of the six faces a character wears -- the same rule lqPortraitFor uses. */
-function lpvFaceKey(name) {
+/** Which of the six faces a character wears -- the same rule lqPortraitFor
+    uses: the face picked in Admin if there is one, else the name's. */
+function lpvFaceKey(name, face) {
   if (typeof LANG_PORTRAITS === 'undefined') return '';
+  if (face && LANG_PORTRAITS[face]) return face;
   const keys = Object.keys(LANG_PORTRAITS).sort();
   if (!keys.length) return '';
   const raw = String(name || '').toLowerCase().trim();
@@ -457,7 +460,7 @@ const LPV_SCRIPTS = {
     const list = (samples && samples.length) ? samples : LPV_QUEST_FALLBACK;
     const s = list[n % list.length];
     const art = (typeof LANG_SCENE_ART !== 'undefined') ? (LANG_SCENE_ART[s.loc] || LANG_SCENE_ART.street || '') : '';
-    const face = typeof lqPortraitFor === 'function' ? lqPortraitFor({ name: s.npc }) : '';
+    const face = typeof lqPortraitFor === 'function' ? lqPortraitFor({ name: s.npc, face: s.face }) : '';
     const loc = typeof langLocation === 'function' ? langLocation(s.loc) : { name: s.loc };
     stage.innerHTML = `
       <div class="lpv-qs">

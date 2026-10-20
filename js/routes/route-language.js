@@ -1395,7 +1395,7 @@ function langScenariosHTML() {
           <div class="lpv-scene${ok ? '' : ' is-unready'}" style="--k:${i}">
             <div class="lpv-scene-art lpv-bg-${escapeHTML(loc.key)}">
               <span class="lpv-scene-loc"><i data-lucide="${loc.icon}"></i> ${escapeHTML(loc.name)}</span>
-              <span class="lpv-scene-face lpv-face-${escapeHTML(lpvFaceKey(s.npc))}"></span>
+              <span class="lpv-scene-face lpv-face-${escapeHTML(lpvFaceKey(s.npc, s.face))}"></span>
             </div>
             <div class="lpv-scene-body">
               <b>${escapeHTML(s.title || 'Untitled')}</b>
