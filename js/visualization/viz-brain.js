@@ -943,8 +943,10 @@ function brainRenderCanvas() {
     if (node.textAlign) el.style.setProperty('--note-align', node.textAlign);
     if (node.lineSpacing) el.style.setProperty('--note-line', node.lineSpacing);
     if (node.paraSpacing) el.style.setProperty('--note-para', BRAIN_PARA_SPACING[node.paraSpacing] || '0');
+    if (node.border && !isGlobe) el.dataset.border = node.border;
     const isElectric = node.border === 'electric' && !isGlobe;
-    if (isElectric) { el.dataset.border = 'electric'; brainEnsureElectricFilter(); }
+    const isMedieval = node.border === 'medieval' && !isGlobe;
+    if (isElectric) brainEnsureElectricFilter();
     el.style.left = node.x + 'px';
     el.style.top = node.y + 'px';
     el.dataset.nodeId = node.id;
@@ -983,7 +985,7 @@ function brainRenderCanvas() {
         <div class="viz-comment-body">
           <div class="viz-comment-content">${brainNoteParagraphs(brainShownText(node) || 'Double-click or right-click to edit...')}</div>
         </div>
-      </div>${isElectric ? BRAIN_ELECTRIC_FRONT : ''}${brainCollapseBadge}`;
+      </div>${isElectric ? BRAIN_ELECTRIC_FRONT : ''}${isMedieval ? BRAIN_MEDIEVAL_FRONT : ''}${brainCollapseBadge}`;
     }
     setTimeout(() => {
       const inner = el.querySelector('.viz-node-inner');
@@ -2038,6 +2040,15 @@ const BRAIN_ELECTRIC_FRONT = '<div class="viz-electric" aria-hidden="true">'
   // Siblings of the card, not inside .viz-electric, so their blend reaches it.
   + '<div class="viz-electric-sheens" aria-hidden="true">'
   + '<div class="viz-electric-sheen"></div><div class="viz-electric-sheen"></div></div>';
+
+/* Medieval: the Art Deco card's corner ornaments, one per corner. Each is a
+   small square just outside the corner with two brackets running along the
+   edges from it (::before and ::after). Outside the card's clipped box, so
+   they are siblings of it. */
+const BRAIN_MEDIEVAL_FRONT = '<div class="viz-md" aria-hidden="true">'
+  + ['is-top is-left', 'is-top is-right', 'is-bottom is-left', 'is-bottom is-right']
+    .map(c => '<div class="viz-md-corner ' + c + '"></div>').join('')
+  + '</div>';
 
 /** Electric's halo and sheen blur in proportion to the note (CSS --el-min). */
 function brainSizeElectric(el, inner) {

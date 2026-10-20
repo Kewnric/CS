@@ -434,6 +434,7 @@ function vizTemplate() {
       <div class="viz-ctx-submenu hidden" id="brain-node-border-menu" role="menu">
         <div class="viz-link-type-option" role="menuitem" data-border="" onclick="brainCtxSetBorder(null)"><i data-lucide="square"></i> Default</div>
         <div class="viz-link-type-option" role="menuitem" data-border="electric" onclick="brainCtxSetBorder('electric')"><i data-lucide="zap"></i> Electric Border</div>
+        <div class="viz-link-type-option" role="menuitem" data-border="medieval" onclick="brainCtxSetBorder('medieval')"><i data-lucide="castle"></i> Medieval Border</div>
       </div>
       <button class="viz-ctx-item" id="brain-node-align-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'align')"><i data-lucide="align-left"></i> Text Alignment <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
       <div class="viz-ctx-submenu hidden" id="brain-node-align-menu" role="menu">

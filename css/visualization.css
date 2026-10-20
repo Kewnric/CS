@@ -4537,3 +4537,73 @@ body.viz-no-anim .app-sidebar {
    the resize corner grows it right and down and stays under the pointer. */
 .viz-comment-editor-overlay.is-anchored { display: block; }
 .viz-comment-editor-overlay.is-anchored .viz-comment-editor-window { position: absolute; }
+
+/* ── Border type: Medieval (brainCtxSetBorder) ─────────────────
+   The Art Deco card: a 1px border with an ornament at each corner, gold-cream
+   on dark purple. Its colours are the defaults; a picked edge, background or
+   text colour takes over each one. The card is flat: no extrusion, lift or
+   press. The original's two display fonts are left out on purpose, an
+   external font would break the app offline. */
+.viz-node[data-border="medieval"] {
+  --md-color: var(--viz-node-accent, hsl(40 65% 80%));
+}
+.viz-node[data-type="comment"][data-border="medieval"] .viz-node-inner,
+.viz-node[data-type="comment"][data-border="medieval"]:hover .viz-node-inner,
+.viz-node[data-type="comment"][data-border="medieval"].selected .viz-node-inner,
+.viz-node[data-type="comment"][data-border="medieval"].dragging .viz-node-inner,
+.viz-node[data-type="comment"][data-border="medieval"] .viz-node-inner:active {
+  border-radius: 0 !important;
+  border: 1px solid var(--md-color) !important;
+  background:
+    radial-gradient(circle at 100% 0%, hsl(280 25% 12%), transparent 70%),
+    hsl(270 20% 8%) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+/* A picked background is used as it is, without the purple glow. */
+.viz-node[data-type="comment"][data-border="medieval"][data-bg] .viz-node-inner {
+  background: var(--viz-node-bg) !important;
+}
+.viz-node[data-type="comment"][data-border="medieval"].selected .viz-node-inner {
+  box-shadow: 0 0 14px color-mix(in srgb, var(--md-color) 35%, transparent) !important;
+}
+.viz-node[data-type="comment"][data-border="medieval"] .viz-comment-content {
+  color: var(--note-text, hsl(40 70% 85%));
+}
+
+/* Inset 1px: the original measures its corners from inside the card's
+   border (they are positioned in its padding box). */
+.viz-md {
+  position: absolute;
+  inset: 1px;
+  pointer-events: none;
+}
+.viz-md-corner {
+  position: absolute;
+  width: 0.5rem;
+  height: 0.5rem;
+  border: 1px solid var(--md-color);
+}
+.viz-md-corner::before,
+.viz-md-corner::after {
+  content: '';
+  position: absolute;
+}
+.viz-md-corner::after { width: 2rem; height: calc(1rem - 1px); }
+.viz-md-corner::before { width: calc(1rem - 1px); height: 2rem; }
+
+.viz-md-corner.is-left { left: -0.5rem; }
+.viz-md-corner.is-left::after { left: calc(-2px + 1rem); border-left: 1px solid var(--md-color); }
+.viz-md-corner.is-left::before { left: -1px; border-left: 1px solid var(--md-color); }
+
+.viz-md-corner.is-right { right: -0.5rem; }
+.viz-md-corner.is-right::after { right: calc(-2px + 1rem); border-right: 1px solid var(--md-color); }
+.viz-md-corner.is-right::before { right: -1px; border-right: 1px solid var(--md-color); }
+
+.viz-md-corner.is-top { top: -0.5rem; }
+.viz-md-corner.is-top::after { top: -1px; border-top: 1px solid var(--md-color); }
+.viz-md-corner.is-top::before { top: calc(-2px + 1rem); border-top: 1px solid var(--md-color); }
+
+.viz-md-corner.is-bottom { bottom: -0.5rem; }
+.viz-md-corner.is-bottom::after { bottom: -1px; border-bottom: 1px solid var(--md-color); }
+.viz-md-corner.is-bottom::before { bottom: calc(-2px + 1rem); border-bottom: 1px solid var(--md-color); }
