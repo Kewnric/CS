@@ -428,7 +428,7 @@ function vizTemplate() {
           <div class="viz-link-type-option" role="option" data-target="bg" onclick="brainSetColorTarget('bg')"><i data-lucide="paint-bucket"></i> Background Color</div>
           <div class="viz-link-type-option" role="option" data-target="edge" onclick="brainSetColorTarget('edge')"><i data-lucide="square"></i> Border Edge Color</div>
         </div>
-        <div class="viz-color-picker" id="brain-note-swatches">${vizSwatchesHTML('brainCtxPickColor', [['white', '#ffffff'], ['black', '#000000'], ['charcoal', 'oklch(0.185 0 0)', 'charcoal (Electric Border original)']])}</div>
+        <div class="viz-color-picker" id="brain-note-swatches">${vizSwatchesHTML('brainCtxPickColor', [['white', '#ffffff'], ['softwhite', '#e2e8f0', 'soft white (the default note text)'], ['black', '#000000'], ['charcoal', 'oklch(0.185 0 0)', 'charcoal (Electric Border original)']])}</div>
       </div>
       <button class="viz-ctx-item" id="brain-node-border-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'border')"><i data-lucide="frame"></i> Border Type <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
       <div class="viz-ctx-submenu hidden" id="brain-node-border-menu" role="menu">

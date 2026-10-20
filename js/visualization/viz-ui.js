@@ -2305,7 +2305,7 @@ function vizSetPaintColor(color) {
   document.querySelectorAll('#viz-color-mode-popup .viz-color-swatch').forEach(sw => {
     sw.classList.toggle('active', sw.dataset.color === (color || ''));
   });
-  const colorMap = { red: '#ef4444', orange: '#f97316', copper: '#dd8448', yellow: '#eab308', green: '#22c55e', blue: '#3b82f6', purple: '#a855f7', pink: '#ec4899', cyan: '#06b6d4', white: '#ffffff', black: '#000000', charcoal: '#131313' };
+  const colorMap = { red: '#ef4444', orange: '#f97316', copper: '#dd8448', yellow: '#eab308', green: '#22c55e', blue: '#3b82f6', purple: '#a855f7', pink: '#ec4899', cyan: '#06b6d4', white: '#ffffff', softwhite: '#e2e8f0', black: '#000000', charcoal: '#131313' };
   const hex = color ? (colorMap[color] || '') : '';
   // Tint both the color button and the link button with the selected paint color
   const colorBtn = document.getElementById('viz-color-toggle-btn');

@@ -348,6 +348,6 @@ function vizToggleLinkMode() {
 }
 
 function vizColorMap(color) {
-  const map = { red: '#ef4444', orange: '#f97316', copper: '#dd8448', yellow: '#eab308', green: '#22c55e', blue: '#3b82f6', purple: '#a855f7', pink: '#ec4899', cyan: '#06b6d4', white: '#ffffff', black: '#000000', charcoal: '#131313' };
+  const map = { red: '#ef4444', orange: '#f97316', copper: '#dd8448', yellow: '#eab308', green: '#22c55e', blue: '#3b82f6', purple: '#a855f7', pink: '#ec4899', cyan: '#06b6d4', white: '#ffffff', softwhite: '#e2e8f0', black: '#000000', charcoal: '#131313' };
   return map[color] || 'var(--text-tertiary)';
 }

@@ -826,6 +826,7 @@
 .viz-node[data-color="cyan"]   { --viz-node-accent: #06b6d4; --viz-node-accent-strong: #06b6d4; }
 .viz-node[data-color="copper"] { --viz-node-accent: #dd8448; --viz-node-accent-strong: #dd8448; }
 .viz-node[data-color="white"]  { --viz-node-accent: #ffffff; --viz-node-accent-strong: #ffffff; }
+.viz-node[data-color="softwhite"] { --viz-node-accent: #e2e8f0; --viz-node-accent-strong: #e2e8f0; }
 .viz-node[data-color="black"]  { --viz-node-accent: #000000; --viz-node-accent-strong: #000000; }
 .viz-node[data-color="charcoal"] { --viz-node-accent: #131313; --viz-node-accent-strong: #131313; }
 
@@ -866,6 +867,7 @@
 }
 
 .viz-node[data-color="white"] .viz-node-inner { border-color: #ffffff !important; }
+.viz-node[data-color="softwhite"] .viz-node-inner { border-color: #e2e8f0 !important; }
 .viz-node[data-color="black"] .viz-node-inner { border-color: #000000 !important; }
 .viz-node[data-color="charcoal"] .viz-node-inner { border-color: #131313 !important; }
 
@@ -4453,6 +4455,7 @@ body.viz-no-anim .app-sidebar {
 /* White and black as card fills are themselves, not tints; like charcoal they
    have no hue, so an Electric card's diagonal tint stays the border's. */
 .viz-node[data-bg="white"] { --viz-node-bg: #ffffff; }
+.viz-node[data-bg="softwhite"] { --viz-node-bg: #e2e8f0; }
 .viz-node[data-bg="black"] { --viz-node-bg: #000000; }
 
 /* Personalize Color: a dropdown picks what the swatches paint (it stays on
@@ -4487,7 +4490,7 @@ body.viz-no-anim .app-sidebar {
 }
 #brain-note-swatches {
   display: grid;
-  grid-template-columns: repeat(7, 20px);
+  grid-template-columns: repeat(8, 20px);   /* 15 swatches, two rows */
   justify-content: start;
   gap: 0.5rem;   /* room for the active ring */
 }
