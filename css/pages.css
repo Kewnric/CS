@@ -1946,7 +1946,7 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
   border: 0;
   background: none;
   border-radius: var(--radius-lg);
-  perspective: 1000px;
+  perspective: 1200px;
   transition: none;
 }
 .lib-card.is-spatial:hover { transform: none; box-shadow: none; }
@@ -1985,15 +1985,26 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
 .lib-card.is-spatial:hover .lib-card-light { opacity: 1; }
 .lib-card.is-spatial:hover .lib-card-glow { opacity: 0.28; }
 
-/* Depth: what matters most sits nearest. */
-.lib-card.is-spatial .lib-card-head { transform: translateZ(28px); transform-style: preserve-3d; }
-.lib-card.is-spatial .lib-card-icon { transform: translateZ(14px); transition: box-shadow 0.25s ease, transform 0.25s ease; }
-.lib-card.is-spatial .lib-card-name { transform: translateZ(44px); transition: text-shadow 0.25s ease; }
-.lib-card.is-spatial .lib-card-desc { transform: translateZ(22px); }
-.lib-card.is-spatial .lib-card-chips { transform: translateZ(36px); }
-.lib-card.is-spatial .lib-card-progress { transform: translateZ(18px); }
+/* DEPTH ONLY WHILE HOVERED. Anything lifted towards the viewer is drawn a
+   little larger and pushed out from the centre, so with the layers lifted
+   all the time the text and chips sat visibly nearer the card's edges than
+   they used to, tilt or no tilt. At rest everything is flat -- the card
+   looks exactly as it did -- and the layers rise only as the tilt begins. */
+.lib-card.is-spatial .lib-card-head { transform-style: preserve-3d; }
+.lib-card.is-spatial .lib-card-head,
+.lib-card.is-spatial .lib-card-name,
+.lib-card.is-spatial .lib-card-desc,
+.lib-card.is-spatial .lib-card-chips,
+.lib-card.is-spatial .lib-card-progress { transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), text-shadow 0.25s ease; }
+.lib-card.is-spatial .lib-card-icon { transition: box-shadow 0.25s ease, transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
+/* What matters most rises nearest. */
+.lib-card.is-spatial:hover .lib-card-head { transform: translateZ(16px); }
+.lib-card.is-spatial:hover .lib-card-name { transform: translateZ(26px); }
+.lib-card.is-spatial:hover .lib-card-desc { transform: translateZ(10px); }
+.lib-card.is-spatial:hover .lib-card-chips { transform: translateZ(20px); }
+.lib-card.is-spatial:hover .lib-card-progress { transform: translateZ(8px); }
 .lib-card.is-spatial:hover .lib-card-icon {
-  transform: translateZ(22px);
+  transform: translateZ(12px);
   box-shadow: 0 10px 22px -8px color-mix(in srgb, var(--lib-accent, var(--color-primary)) 70%, transparent);
 }
 .lib-card.is-spatial:hover .lib-card-name { text-shadow: 0 10px 22px rgba(0, 0, 0, 0.45); }
@@ -2005,6 +2016,8 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
 .lib-card-placeholder.is-spatial .lib-card-bg { border-style: dashed; }
 @media (prefers-reduced-motion: reduce) {
   .lib-card-inner, .lib-card-bg, .lib-card-light { transition: none; }
+  .lib-card.is-spatial:hover .lib-card-head, .lib-card.is-spatial:hover .lib-card-name, .lib-card.is-spatial:hover .lib-card-desc,
+  .lib-card.is-spatial:hover .lib-card-chips, .lib-card.is-spatial:hover .lib-card-progress, .lib-card.is-spatial:hover .lib-card-icon { transform: none; }
 }
 @media (max-width: 640px) { .lib-card-inner { padding: 0.9rem; } }
 .lib-soon-badge { font-size: 0.62rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: var(--color-warning); background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); padding: 0.18rem 0.5rem; border-radius: 999px; white-space: nowrap; }
