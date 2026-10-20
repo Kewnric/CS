@@ -461,6 +461,9 @@ function _vizEnterLibrary() {
 /** Push viz.scopes and the surface onto the strip. */
 function _vizPaintStrip() {
   const isBrain = viz.activeModule === 'brain';
+  // Every switch of surface comes through here (never page load), so this is
+  // where the choice is remembered for the next visit (see initVisualization).
+  try { localStorage.setItem('ssp.vizSurface', isBrain ? 'brain' : 'library'); } catch (_) { /* private mode */ }
   document.querySelectorAll('.viz-module-tab[data-scope]').forEach(t => {
     const on = !isBrain && viz.scopes.includes(t.dataset.scope);
     t.classList.toggle('active', on);

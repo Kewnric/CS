@@ -44,11 +44,17 @@ function initVisualization() {
   // A canvas filled for the first time gets one arrangement pass before you
   // ever see it (see vizAutoPopulate), so the first impression is a map rather
   // than a 13,000px column.
+  // Library-only, and both run after a delay: by then a restored Brain may be
+  // on screen (see the end of this function), and these would recentre, or
+  // even lay out, Brain's notes instead. A skipped layout waits for the first
+  // time the library is opened.
   if (viz._needsLayout) {
     viz._needsLayout = false;
-    setTimeout(() => { vizAutoLayout('silent'); }, 30);
+    setTimeout(() => {
+      if (viz.activeModule === 'library') vizAutoLayout('silent'); else viz._needsLayout = true;
+    }, 30);
   } else {
-    setTimeout(() => vizCenterCanvas(true), 50);
+    setTimeout(() => { if (viz.activeModule === 'library') vizCenterCanvas(true); }, 50);
   }
 
   // Sync stateful toolbar buttons with the loaded viz state
@@ -245,6 +251,13 @@ function initVisualization() {
 
   // Restore collapsible/swap UI state
   if (typeof vizRestoreUiState === 'function') vizRestoreUiState();
+
+  // Back to Brain if that is where you were: a refresh used to land on Programs
+  // every time. It starts on the libraries above so the pane, the toolbar label
+  // and the strip are set up together, then switches the ordinary way.
+  let surface = 'library';
+  try { surface = localStorage.getItem('ssp.vizSurface') || 'library'; } catch (_) { /* private mode */ }
+  if (surface === 'brain' && typeof vizSetSurface === 'function') vizSetSurface('brain');
 }
 
 /** Remove all document-level listeners added by initVisualization so they
