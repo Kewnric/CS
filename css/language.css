@@ -398,6 +398,41 @@
   font-family: var(--font-sans);
 }
 
+/* ── The strip: what kind of question, and the sound switches ──
+   Pinned to the page's top-left corner, well away from the question. Sitting
+   right above the prompt it read as the first line of it. */
+
+.la-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 1.25rem 0;
+}
+.la-strip .la-kind { margin: 0; min-width: 0; }
+
+.la-toggles { display: flex; gap: 0.4rem; flex-shrink: 0; }
+.la-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.65rem;
+  border: 2px solid var(--la-edge);
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-tertiary);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease, transform 0.08s ease;
+}
+.la-toggle svg { width: 14px; height: 14px; }
+.la-toggle:hover { color: var(--text-primary); }
+.la-toggle:active { transform: scale(0.94); }
+.la-toggle:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.la-toggle.is-on { color: var(--color-primary); border-color: var(--color-primary); background: var(--color-primary-subtle); }
+
 /* ── Top bar: leave, progress, clock, hearts ── */
 
 .la-top {
@@ -407,7 +442,7 @@
   width: 100%;
   max-width: calc(var(--la-measure) + 8rem);
   margin: 0 auto;
-  padding: clamp(0.9rem, 2.2vh, 1.6rem) 1.25rem 0.5rem;
+  padding: clamp(0.5rem, 1.4vh, 1rem) 1.25rem 0.5rem;
 }
 
 .la-exit {
@@ -476,6 +511,21 @@
   transition: opacity 0.2s ease, color 0.2s ease;
 }
 .la-heart.is-lost { color: var(--text-tertiary); fill: none; opacity: 0.45; }
+/* The heart you just lost: it flashes red, swells, and drops away grey. */
+.la-heart.is-breaking { animation: laHeartBreak 0.7s ease both; }
+@keyframes laHeartBreak {
+  0%   { color: var(--la-bad); fill: var(--la-bad); opacity: 1; transform: scale(1); }
+  30%  { color: var(--la-bad); fill: var(--la-bad); opacity: 1; transform: scale(1.35) rotate(-8deg); }
+  55%  { transform: scale(0.85) rotate(10deg); }
+  100% { transform: scale(1) rotate(0); }
+}
+
+/* A right answer lights the bar for a moment as it grows. */
+.la-progress.is-boost .la-progress-fill { animation: laBoost 0.8s ease; }
+@keyframes laBoost {
+  0%, 100% { filter: none; box-shadow: none; }
+  35% { filter: brightness(1.25); box-shadow: 0 0 14px var(--la-ok); }
+}
 
 /* ── The question ── */
 
@@ -491,7 +541,8 @@
   align-items: safe center;
   padding: clamp(1.5rem, 4vh, 3.5rem) 1.25rem;
 }
-.la-card { width: 100%; max-width: var(--la-measure); animation: laRise 0.28s var(--ease-expo-out, ease) both; }
+.la-card { width: 100%; max-width: var(--la-measure); }
+.la-card.is-new { animation: laRise 0.32s var(--ease-expo-out, ease) both; }
 
 .la-kind {
   display: inline-flex;
@@ -762,6 +813,21 @@ button.la-blank-slot { cursor: pointer; }
   animation: laShake 0.35s ease;
 }
 
+/* ── The moment of Check ──
+   Right: the answer hops, word by word. Wrong: the wrong words shake. Every
+   answer type says it the same way, so the verdict is felt before it is read. */
+.la-card.is-checked .la-tile.is-placed.is-ok,
+.la-card.is-checked .la-option.is-ok,
+.la-card.is-checked .la-blank-slot.is-ok {
+  animation: laHop 0.45s var(--ease-spring, ease) both;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+.la-card.is-checked .la-tile.is-placed.is-bad,
+.la-card.is-checked .la-option.is-bad,
+.la-card.is-checked .la-blank-slot.is-bad,
+.la-card.is-checked .la-typed.is-bad .la-input { animation: laShake 0.42s ease both; }
+.la-card.is-checked .la-typed.is-ok .la-input { animation: laPop 0.35s ease; }
+
 /* ── The footer: Skip and Check, then the verdict ── */
 
 .la-foot {
@@ -800,6 +866,18 @@ button.la-blank-slot { cursor: pointer; }
   background: var(--bg-surface);
 }
 .la-fb-badge svg { width: 56%; height: 56%; stroke-width: 3.5; }
+.la-foot.is-right .la-foot-inner,
+.la-foot.is-wrong .la-foot-inner { animation: laSlideUp 0.32s var(--ease-expo-out, ease) both; }
+.la-foot.is-right .la-fb-badge { animation: laBadgeIn 0.45s var(--ease-spring, ease) both; }
+.la-foot.is-wrong .la-fb-badge { animation: laBadgeIn 0.45s var(--ease-spring, ease) both, laShake 0.4s 0.4s ease; }
+/* The tick or the cross is drawn on, stroke by stroke, like a teacher's pen. */
+.la-foot.is-right .la-fb-badge svg *,
+.la-foot.is-wrong .la-fb-badge svg * {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: laDraw 0.32s 0.18s ease-out forwards;
+}
+.la-foot.is-wrong .la-fb-badge svg *:nth-child(2) { animation-delay: 0.32s; }
 .la-fb-text { min-width: 0; display: flex; flex-direction: column; gap: 0.2rem; }
 .la-foot.is-right .la-fb-badge, .la-foot.is-right .la-fb-text { color: var(--la-ok); }
 .la-foot.is-wrong .la-fb-badge, .la-foot.is-wrong .la-fb-text { color: var(--la-bad); }
@@ -984,6 +1062,10 @@ button.la-blank-slot { cursor: pointer; }
 
 @keyframes laRise { from { opacity: 0; translate: 0 8px; } to { opacity: 1; translate: 0 0; } }
 @keyframes laPop { 50% { scale: 1.05; } }
+@keyframes laHop { 0%, 100% { translate: 0 0; } 40% { translate: 0 -9px; scale: 1.06; } 70% { translate: 0 1px; } }
+@keyframes laSlideUp { from { opacity: 0; translate: 0 24px; } to { opacity: 1; translate: 0 0; } }
+@keyframes laBadgeIn { 0% { scale: 0; rotate: -30deg; } 70% { scale: 1.18; rotate: 6deg; } 100% { scale: 1; rotate: 0deg; } }
+@keyframes laDraw { to { stroke-dashoffset: 0; } }
 @keyframes laShake {
   20% { translate: -6px 0; }
   40% { translate: 6px 0; }
@@ -991,7 +1073,9 @@ button.la-blank-slot { cursor: pointer; }
   80% { translate: 4px 0; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .la-card, .la-fb, .la-summary, .la-match-btn { animation: none !important; }
+  .la-card, .la-fb, .la-summary, .la-match-btn, .la-tile, .la-option, .la-blank-slot, .la-input,
+  .la-foot-inner, .la-fb-badge, .la-fb-badge svg *, .la-heart, .la-progress-fill { animation: none !important; }
+  .la-fb-badge svg * { stroke-dashoffset: 0 !important; }
   .la-progress-fill { transition: none; }
 }
 
@@ -1004,7 +1088,10 @@ button.la-blank-slot { cursor: pointer; }
 
 @media (max-width: 640px) {
   .la-shell { --la-measure: 100%; }
-  .la-top { padding: 0.75rem 0.9rem 0.25rem; gap: 0.6rem; }
+  .la-strip { padding: 0.6rem 0.9rem 0; }
+  .la-toggle span { display: none; }
+  .la-toggle { padding: 0.35rem; }
+  .la-top { padding: 0.5rem 0.9rem 0.25rem; gap: 0.6rem; }
   /* Top-aligned on a phone: the on-screen keyboard takes the lower half, and
      a centred question would sit underneath it. */
   .la-body { align-items: flex-start; padding: 1.25rem 1rem 1.5rem; }

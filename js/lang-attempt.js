@@ -20,6 +20,15 @@ let _la = null;   // the run in progress
 function langAttemptTemplate() {
   return `
     <div class="la-shell" id="la-shell">
+      <!-- What kind of question this is, up in the corner of the page rather
+           than over the question, where it read as part of the prompt. -->
+      <div class="la-strip">
+        <div class="la-kind" id="la-kind"></div>
+        <div class="la-toggles">
+          <button class="la-toggle" id="la-tg-sfx" type="button" onclick="laToggleSfx()"></button>
+          <button class="la-toggle" id="la-tg-say" type="button" onclick="laToggleSay()"></button>
+        </div>
+      </div>
       <header class="la-top">
         <button class="la-exit" type="button" onclick="laExit()" title="Leave the drill (Esc)" aria-label="Leave the drill">
           <i data-lucide="x"></i>
@@ -95,6 +104,7 @@ function langAttemptInit() {
   _la = laNewRun(set, queue, limit, false);
   document.removeEventListener('keydown', laOnKey);
   document.addEventListener('keydown', laOnKey);
+  laPaintToggles();
   laStartTimer();
   laLoadQuestion();
 }
@@ -102,7 +112,163 @@ function langAttemptInit() {
 function langAttemptDestroy() {
   laStopTimer();
   document.removeEventListener('keydown', laOnKey);
+  // Nothing should still be falling after you leave the page.
+  if (typeof ppClearFx === 'function') ppClearFx();
   _la = null;
+}
+
+/* ── Sound, speech and effects ────────────────────────────── */
+
+/* Read each word aloud as it lands in the sentence, and the whole answer once
+   it is checked. On by default -- hearing the word is half of learning it --
+   and remembered per device. */
+const LA_SAY_KEY = 'ssp.langAutoSpeak';
+
+function laSayOn() {
+  try { return localStorage.getItem(LA_SAY_KEY) !== '0'; } catch (e) { return true; }
+}
+
+/* The effects ride the app's one sound switch (the practice page's speaker),
+   so muting in either place mutes both. */
+function laSfxOn() { return typeof sfxEnabled !== 'function' || sfxEnabled(); }
+
+function laToggleSfx() {
+  try { localStorage.setItem(typeof SFX_KEY !== 'undefined' ? SFX_KEY : 'ssp.typingSfx', laSfxOn() ? '0' : '1'); } catch (e) {}
+  laPaintToggles();
+  laSfx('tap');
+}
+
+function laToggleSay() {
+  const on = !laSayOn();
+  try { localStorage.setItem(LA_SAY_KEY, on ? '1' : '0'); } catch (e) {}
+  if (!on && window.speechSynthesis) window.speechSynthesis.cancel();
+  laPaintToggles();
+}
+
+function laPaintToggles() {
+  const paint = (id, on, icon, offIcon, label, tip) => {
+    const b = document.getElementById(id);
+    if (!b) return;
+    b.classList.toggle('is-on', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+    b.title = tip + (on ? ' — on' : ' — off');
+    b.innerHTML = `<i data-lucide="${on ? icon : offIcon}"></i><span>${label}</span>`;
+  };
+  paint('la-tg-sfx', laSfxOn(), 'volume-2', 'volume-x', 'Sounds', 'Sound effects');
+  paint('la-tg-say', laSayOn(), 'audio-lines', 'audio-lines', 'Read aloud', 'Read each word aloud as it lands');
+  laIcons();
+}
+
+/** Short synthesised cues, on the practice page's cue bus. */
+function laSfx(kind) {
+  if (!laSfxOn() || typeof psfxTone !== 'function') return;
+  if (kind === 'tap') {
+    psfxTone({ freq: 620, to: 900, type: 'sine', dur: 0.07, gain: 0.07 });
+  } else if (kind === 'back') {
+    psfxTone({ freq: 760, to: 430, type: 'sine', dur: 0.08, gain: 0.06 });
+  } else if (kind === 'right') {
+    // A bright rising triad with a sparkle on top: unmistakably "yes".
+    [[784, 0], [988, 0.08], [1319, 0.16]].forEach(([f, at]) =>
+      psfxTone({ freq: f, type: 'triangle', dur: 0.24, gain: 0.12, at }));
+    psfxTone({ freq: 2637, type: 'sine', dur: 0.4, gain: 0.035, at: 0.2 });
+  } else if (kind === 'wrong') {
+    if (typeof psfxFail === 'function') psfxFail();
+  } else if (kind === 'pair') {
+    psfxTone({ freq: 880, to: 1175, type: 'triangle', dur: 0.1, gain: 0.09 });
+  } else if (kind === 'miss') {
+    psfxTone({ freq: 233, to: 165, type: 'square', dur: 0.14, gain: 0.05, lowpass: 900 });
+  } else if (kind === 'skip') {
+    psfxTone({ freq: 392, to: 294, type: 'triangle', dur: 0.16, gain: 0.08 });
+  } else if (kind === 'low') {
+    [[523, 0], [440, 0.12], [392, 0.24]].forEach(([f, at]) =>
+      psfxTone({ freq: f, type: 'triangle', dur: 0.26, gain: 0.08, at }));
+  }
+}
+
+function laReduceMotion() {
+  return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+
+/** Where the answer is on screen -- the place the confetti or crosses come out of. */
+function laAnswerRect() {
+  const el = document.querySelector('#la-body .la-lane, #la-body .la-blank-slot, #la-body .la-option.is-bad, '
+    + '#la-body .la-option.is-ok, #la-body .la-typed, #la-body .la-match');
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
+  return r.width > 0 ? r : null;
+}
+
+/**
+ * The verdict, thrown at you: confetti out of the answer when it is right, a
+ * shower of crosses when it is not -- the coding library's test-case effects,
+ * so a right answer feels the same everywhere in the app. The sound plays even
+ * with reduced motion; asking not to see animation is not asking not to hear.
+ */
+function laCelebrate(ok) {
+  laSfx(ok ? 'right' : 'wrong');
+  const bar = document.getElementById('la-progress');
+  if (ok && bar) {
+    bar.classList.remove('is-boost');
+    void bar.offsetWidth;
+    bar.classList.add('is-boost');
+  }
+  if (laReduceMotion()) return;
+  const r = laAnswerRect();
+  if (ok) {
+    if (typeof _ppConfettiBurst !== 'function') return;
+    if (r) _ppConfettiBurst(r);
+    const badge = document.querySelector('.la-fb-badge');
+    if (badge) setTimeout(() => _ppConfettiBurst(badge.getBoundingClientRect()), 120);
+  } else if (r && typeof _ppCrossRain === 'function') {
+    _ppCrossRain(r);
+  }
+}
+
+/** The end of the run: stars for a perfect one, a fanfare for a good one. */
+function laCelebrateRun(score) {
+  if (score === 100 && typeof ppStarfall === 'function') ppStarfall();
+  else if (score >= 80 && laSfxOn() && typeof psfxPowerUp === 'function') psfxPowerUp();
+  else if (score < 50) laSfx('low');
+  if (score < 80 || laReduceMotion() || typeof _ppConfettiBurst !== 'function') return;
+  const icon = document.querySelector('.la-summary-icon');
+  if (icon) _ppConfettiBurst(icon.getBoundingClientRect());
+}
+
+/* ── Tiles in flight ──────────────────────────────────────────
+   The screen is redrawn on every tap, so a tile does not move -- it vanishes
+   from one place and appears in another. FLIP puts the motion back: measure
+   every tile before the redraw, measure again after, and play each one from
+   where it was to where it is. The tile you tapped arcs up and lands with a
+   little overshoot; the ones that shuffle along to close a gap just slide. */
+
+function laSnapTiles() {
+  const m = {};
+  document.querySelectorAll('#la-body [data-tid]').forEach(el => { m[el.dataset.tid] = el.getBoundingClientRect(); });
+  return m;
+}
+
+function laFlip(before, movedId) {
+  if (laReduceMotion() || !before) return;
+  document.querySelectorAll('#la-body [data-tid]').forEach(el => {
+    const a = before[el.dataset.tid];
+    if (!a || typeof el.animate !== 'function') return;
+    const b = el.getBoundingClientRect();
+    const dx = a.left - b.left, dy = a.top - b.top;
+    if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+    if (el.dataset.tid === movedId) {
+      el.style.zIndex = '5';
+      const lift = Math.min(28, 10 + Math.abs(dy) * 0.12);
+      const anim = el.animate([
+        { transform: `translate(${dx}px, ${dy}px) scale(1)` },
+        { transform: `translate(${dx * 0.4}px, ${dy * 0.4 - lift}px) scale(1.08)`, offset: 0.45 },
+        { transform: 'translate(0, 0) scale(1)' }
+      ], { duration: 360, easing: 'cubic-bezier(0.3, 0.7, 0.4, 1.12)' });
+      anim.onfinish = anim.oncancel = () => { el.style.zIndex = ''; };
+    } else {
+      el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }],
+        { duration: 220, easing: 'cubic-bezier(0.2, 0.8, 0.3, 1)' });
+    }
+  });
 }
 
 /* ── The optional time limit ──────────────────────────────── */
@@ -201,6 +367,8 @@ function laLoadQuestion() {
   _la.matchDone = [];
   _la.matchMiss = [];
   _la.matchFlash = null;
+  // The card slides in once per question, not on every tap inside it.
+  _la.fresh = true;
   if (it && (it.type === 'arrange' || it.type === 'blank')) {
     _la.pool = langShuffle(langTokensFor(it)).map((t, i) => ({ id: 'tk' + i, text: t }));
   } else {
@@ -245,12 +413,18 @@ function laRender() {
   if (hearts) {
     hearts.title = _la.hearts + (_la.hearts === 1 ? ' heart' : ' hearts') + ' left';
     hearts.setAttribute('aria-label', hearts.title);
+    // The heart that was just lost breaks rather than simply going grey.
+    const shown = _la.heartsShown == null ? _la.hearts : _la.heartsShown;
     hearts.innerHTML = [0, 1, 2].map(i =>
-      `<i data-lucide="heart" class="la-heart${i < _la.hearts ? '' : ' is-lost'}"></i>`).join('');
+      `<i data-lucide="heart" class="la-heart${i < _la.hearts ? '' : ' is-lost'}${i >= _la.hearts && i < shown ? ' is-breaking' : ''}"></i>`).join('');
+    _la.heartsShown = _la.hearts;
   }
   laPaintClock();
 
+  const kind = document.getElementById('la-kind');
+
   if (_la.state === 'over') {
+    if (kind) kind.innerHTML = `<i data-lucide="flag"></i> ${escapeHTML(_la.set.title || 'Results')}`;
     body.innerHTML = laSummaryHTML();
     foot.innerHTML = '';
     foot.className = 'la-foot is-empty';
@@ -262,10 +436,12 @@ function laRender() {
   if (!it) { laFinish(); return; }
   const meta = langPuzzleMeta(it.type);
   const last = _la.state === 'checked' ? laLast() : null;
+  if (kind) kind.innerHTML = `<i data-lucide="${meta.icon}"></i> ${escapeHTML(meta.name)}`;
+  const fresh = _la.fresh;
+  _la.fresh = false;
 
   body.innerHTML = `
-    <div class="la-card${_la.state === 'checked' ? ' is-checked' : ''}">
-      <div class="la-kind"><i data-lucide="${meta.icon}"></i> ${escapeHTML(meta.name)}</div>
+    <div class="la-card${fresh ? ' is-new' : ''}${last ? (last.ok ? ' is-checked is-right' : ' is-checked is-wrong') : ''}">
       ${it.prompt && it.type !== 'blank' ? `<h2 class="la-prompt">${escapeHTML(it.prompt)}
         <button type="button" class="la-speak" onclick="laSpeak(this.dataset.say)"
                 data-say="${escapeHTML(it.prompt)}"
@@ -315,8 +491,8 @@ function laQuestionHTML(it, last) {
       <div class="la-lane" id="la-lane">
         ${_la.picked.map((t, k) => {
           const cls = !checked ? '' : (last && last.ok) || (marks && marks[k]) ? ' is-ok' : ' is-bad';
-          return `<button class="la-tile is-placed${cls}" type="button" onclick="laUnpick('${t.id}')"
-                    title="Tap to take back"><span class="la-tile-text">${escapeHTML(t.text)}</span></button>`;
+          return `<button class="la-tile is-placed${cls}" type="button" data-tid="${t.id}" style="--i:${k}"
+                    onclick="laUnpick('${t.id}')" title="Tap to take back"><span class="la-tile-text">${escapeHTML(t.text)}</span></button>`;
         }).join('')
           || `<span class="la-lane-hint">Tap the words in order<span class="la-hint-keys"> · or press 1–${Math.min(_la.pool.length, 9)}, Backspace to undo</span></span>`}
       </div>` : '';
@@ -332,7 +508,7 @@ function laQuestionHTML(it, last) {
           const used = _la.picked.some(p => p.id === t.id);
           return used
             ? `<button class="la-tile is-used" type="button" tabindex="-1" aria-hidden="true" disabled>${laKeyHTML(k + 1)}<span class="la-tile-text">${escapeHTML(t.text)}</span><span class="la-chip-ph"></span></button>`
-            : `<button class="la-tile" type="button" onclick="laPick('${t.id}')" ${checked ? 'disabled' : ''}>${laKeyHTML(k + 1)}<span class="la-tile-text">${escapeHTML(t.text)}</span>${langSpeakChip(t.text, _laStudyCode())}</button>`;
+            : `<button class="la-tile" type="button" data-tid="${t.id}" onclick="laPick('${t.id}')" ${checked ? 'disabled' : ''}>${laKeyHTML(k + 1)}<span class="la-tile-text">${escapeHTML(t.text)}</span>${langSpeakChip(t.text, _laStudyCode())}</button>`;
         }).join('')}
       </div>`;
   }
@@ -397,7 +573,7 @@ function laBlankLineHTML(it, last) {
   const cls = last ? (last.ok ? ' is-ok' : ' is-bad') : _la.picked.length ? ' is-filled' : '';
   // Tapping the filled blank gives the word back, the same as tapping a placed tile.
   const slot = _la.picked.length && _la.state === 'answering'
-    ? `<button type="button" class="la-blank-slot${cls}" onclick="laUnpick('${_la.picked[0].id}')" title="Tap to take back">${filled}</button>`
+    ? `<button type="button" class="la-blank-slot${cls}" data-tid="${_la.picked[0].id}" onclick="laUnpick('${_la.picked[0].id}')" title="Tap to take back">${filled}</button>`
     : `<span class="la-blank-slot${cls}">${filled}</span>`;
   return escapeHTML(parts[0]) + slot + escapeHTML(parts.slice(1).join(' '));
 }
@@ -498,24 +674,30 @@ function laPick(id) {
   const t = _la.pool.find(x => x.id === id);
   if (!t) return;
   const it = laCurrent();
+  const before = laSnapTiles();
   // A blank takes exactly one word: tapping a second replaces the first
   // rather than silently doing nothing.
   if (it.type === 'blank') _la.picked = [t];
   else if (!_la.picked.some(p => p.id === id)) _la.picked.push(t);
   laRender();
+  laFlip(before, id);
+  laSfx('tap');
+  if (laSayOn()) laSpeak(t.text);
 }
 
 function laUnpick(id) {
   if (!_la || _la.state !== 'answering') return;
+  const before = laSnapTiles();
   _la.picked = _la.picked.filter(p => p.id !== id);
   laRender();
+  laFlip(before, id);
+  laSfx('back');
 }
 
 /** Backspace: the last word laid down goes back. */
 function laUndo() {
   if (!_la || _la.state !== 'answering' || !_la.picked.length) return false;
-  _la.picked.pop();
-  laRender();
+  laUnpick(_la.picked[_la.picked.length - 1].id);
   return true;
 }
 
@@ -523,6 +705,7 @@ function laChoose(i) {
   if (!_la || _la.state !== 'answering') return;
   _la.choice = i;
   laRender();
+  laSfx('tap');
 }
 
 function laTyped(v) {
@@ -565,13 +748,22 @@ function laMatchTry() {
     || norm(list[l].left) === norm(list[r].left);
   if (ok) _la.matchDone.push({ l, r });
   else _la.matchMiss.push({ l, r });
+  const last = _la.matchDone.length === list.length;
+  if (!last) laSfx(ok ? 'pair' : 'miss');   // the final pair gets the verdict's sound instead
   const seq = ++_laFlashSeq;
   _la.matchFlash = { l, r, ok, seq };
   setTimeout(() => {
     if (_la && _la.matchFlash && _la.matchFlash.seq === seq) { _la.matchFlash = null; laRender(); }
   }, 550);
-  if (_la.matchDone.length === list.length) { laPrimary(); return; }
+  if (last) { laPrimary(); return; }
   laRender();
+}
+
+/** The answer as one sentence, for reading aloud after Check. */
+function laSayableAnswer(it) {
+  if (it.type === 'blank') return String(it.prompt || '').replace(/_{2,}|\{\}/, it.answer || '');
+  if (it.type === 'arrange' || it.type === 'translate') return it.answer || '';
+  return '';
 }
 
 function laHasAnswer(it) {
@@ -648,6 +840,14 @@ function laRecord(it, res) {
   if (it.wordId && typeof langRecallGrade === 'function') langRecallGrade(it.wordId, !!res.ok);
   _la.state = 'checked';
   laRender();
+  if (res.skipped) laSfx('skip');
+  else laCelebrate(!!res.ok);
+  // Then the right answer, read out -- after the cue, so the two do not collide.
+  const say = laSayableAnswer(it);
+  if (say && laSayOn()) {
+    const idx = _la.idx;
+    setTimeout(() => { if (_la && _la.idx === idx && _la.state === 'checked') laSpeak(say); }, 450);
+  }
 }
 
 function laExpectedOf(it) {
@@ -690,6 +890,7 @@ function laFinish(reason) {
     });
   }
   laRender();
+  laCelebrateRun(score);
 }
 
 function laSummaryHTML() {
