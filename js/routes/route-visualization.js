@@ -416,6 +416,12 @@ function vizTemplate() {
     <div id="brain-node-ctx" class="viz-context-menu hidden" role="menu">
       <div class="viz-color-picker">${vizSwatchesHTML('brainCtxEditColor')}</div>
       <div class="viz-ctx-divider"></div>
+      <button class="viz-ctx-item" id="brain-node-border-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleBorderType(event)"><i data-lucide="frame"></i> Border Type <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
+      <div class="viz-ctx-submenu hidden" id="brain-node-border-menu" role="menu">
+        <div class="viz-link-type-option" role="menuitem" data-border="" onclick="brainCtxSetBorder(null)"><i data-lucide="square"></i> Default</div>
+        <div class="viz-link-type-option" role="menuitem" data-border="electric" onclick="brainCtxSetBorder('electric')"><i data-lucide="zap"></i> Electric Border</div>
+      </div>
+      <div class="viz-ctx-divider"></div>
       <button class="viz-ctx-item" onclick="brainCtxEditComment()"><i data-lucide="edit-2"></i> Edit Comment</button>
       <button class="viz-ctx-item" onclick="brainCtxStartLink()"><i data-lucide="link"></i> Add Link</button>
       <div class="viz-ctx-divider"></div>

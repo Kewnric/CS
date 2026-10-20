@@ -937,6 +937,8 @@ function brainRenderCanvas() {
     el.className = `viz-node ${node.id === brain.selectedNodeId ? 'selected' : ''}${isGlobe ? ' viz-globe-node' : ''}${isGhost ? ' viz-bridge-ghost' : ''}`;
     el.dataset.type = 'comment';
     if (node.color) el.dataset.color = node.color;
+    const isElectric = node.border === 'electric' && !isGlobe;
+    if (isElectric) { el.dataset.border = 'electric'; brainEnsureElectricFilter(); }
     el.style.left = node.x + 'px';
     el.style.top = node.y + 'px';
     el.dataset.nodeId = node.id;
@@ -971,11 +973,11 @@ function brainRenderCanvas() {
         ${brainCollapseBadge}
       `;
     } else {
-      el.innerHTML = `<div class="viz-node-inner" style="${styleW}${styleH}">
+      el.innerHTML = `${isElectric ? BRAIN_ELECTRIC_BACK : ''}<div class="viz-node-inner" style="${styleW}${styleH}">
         <div class="viz-comment-body">
           <div class="viz-comment-content">${escapeHTML(node.commentContent || 'Double-click or right-click to edit...')}</div>
         </div>
-      </div>${brainCollapseBadge}`;
+      </div>${isElectric ? BRAIN_ELECTRIC_FRONT : ''}${brainCollapseBadge}`;
     }
     setTimeout(() => {
       const inner = el.querySelector('.viz-node-inner');
@@ -1720,11 +1722,69 @@ function brainNodeCtx(e, nodeId) {
       expandBtn.style.display = 'none';
     }
   }
+  // Opens collapsed, and before it is measured, so it is placed at its real size.
+  const sub = document.getElementById('brain-node-border-menu');
+  const toggle = document.getElementById('brain-node-border-toggle');
+  if (sub) sub.classList.add('hidden');
+  if (toggle) toggle.setAttribute('aria-expanded', 'false');
   if (typeof vizPositionMenu === 'function') vizPositionMenu(menu, e.clientX, e.clientY);
   else { menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px'; menu.classList.remove('hidden'); }
   menu.querySelectorAll('.viz-color-swatch').forEach(sw => {
     sw.classList.toggle('active', sw.dataset.color === (node?.color || ''));
   });
+  const border = (node && node.border) || '';
+  menu.querySelectorAll('#brain-node-border-menu .viz-link-type-option').forEach(o => o.classList.toggle('active', o.dataset.border === border));
+}
+
+/* -- Border types ----------------------------------------------
+   Default is the extruded slab. Electric is a crackling line in the note's own
+   colour: the border is pushed around by animated turbulence noise (an SVG
+   displacement filter), with two blurred copies for glow, an overlay sheen and
+   a soft halo behind. The filter lives once in the page; each note only draws
+   the layers. */
+const BRAIN_ELECTRIC_BACK = '<div class="viz-electric-bg" aria-hidden="true"></div>';
+const BRAIN_ELECTRIC_FRONT = '<div class="viz-electric" aria-hidden="true">'
+  + '<div class="viz-electric-glow-1"></div><div class="viz-electric-glow-2"></div>'
+  + '<div class="viz-electric-line"></div><div class="viz-electric-sheen"></div></div>';
+
+function brainEnsureElectricFilter() {
+  if (document.getElementById('viz-electric-defs')) return;
+  // Four noise fields, scrolled in opposite directions and blended, displace the
+  // border. Octaves past 6 are finer than a pixel at this base frequency, so 6
+  // looks the same as 10 at a fraction of the cost.
+  const field = (seed, attr, from, to, out, animate) =>
+    `<feTurbulence type="turbulence" baseFrequency="0.02" numOctaves="6" seed="${seed}"/>`
+    + `<feOffset dx="0" dy="0" result="${out}">`
+    + (animate ? `<animate attributeName="${attr}" values="${from}; ${to}" dur="6s" repeatCount="indefinite" calcMode="linear"/>` : '')
+    + '</feOffset>';
+  const filter = (id, animate) =>
+    `<filter id="${id}" color-interpolation-filters="sRGB" x="-20%" y="-40%" width="140%" height="180%">`
+    + field(1, 'dy', 700, 0, 'o1', animate) + field(1, 'dy', 0, -700, 'o2', animate)
+    + field(2, 'dx', 490, 0, 'o3', animate) + field(2, 'dx', 0, -490, 'o4', animate)
+    + '<feComposite in="o1" in2="o2" result="p1"/><feComposite in="o3" in2="o4" result="p2"/>'
+    + '<feBlend in="p1" in2="p2" mode="color-dodge" result="noise"/>'
+    + '<feDisplacementMap in="SourceGraphic" in2="noise" scale="30" xChannelSelector="R" yChannelSelector="B"/>'
+    + '</filter>';
+  const holder = document.createElement('div');
+  holder.innerHTML = '<svg id="viz-electric-defs" aria-hidden="true" focusable="false" width="0" height="0"'
+    + ' style="position:absolute;width:0;height:0;overflow:hidden"><defs>'
+    + filter('viz-electric-displace', true)
+    + filter('viz-electric-still', false)   // reduced motion: jagged, but still
+    + '</defs></svg>';
+  document.body.appendChild(holder.firstElementChild);
+}
+
+function brainToggleBorderType(e) {
+  _brainToggleCtxSub(e, 'brain-node-ctx', 'brain-node-border-menu', 'brain-node-border-toggle');
+}
+
+function brainCtxSetBorder(type) {
+  const node = brain.contextNodeId && brain.nodes.find(n => n.id === brain.contextNodeId);
+  if (!node || (node.border || null) === (type || null)) { brainHideAllMenus(); return; }
+  brainPushUndo();
+  if (type) node.border = type; else delete node.border;
+  brainRenderCanvas(); brainSaveCurrentVersion();
+  brainHideAllMenus();
 }
 
 function brainLinkCtx(e, linkId) {
@@ -1748,10 +1808,15 @@ function brainLinkCtx(e, linkId) {
 
 /** Connector Type: opens its options inside the link menu, below the row. */
 function brainToggleConnectorType(e) {
+  _brainToggleCtxSub(e, 'brain-link-ctx', 'brain-link-type-menu', 'brain-link-type-toggle');
+}
+
+/** A dropdown that opens inside a context menu, below its own row. */
+function _brainToggleCtxSub(e, menuId, subId, toggleId) {
   if (e) e.stopPropagation();
-  const menu = document.getElementById('brain-link-ctx');
-  const sub = document.getElementById('brain-link-type-menu');
-  const toggle = document.getElementById('brain-link-type-toggle');
+  const menu = document.getElementById(menuId);
+  const sub = document.getElementById(subId);
+  const toggle = document.getElementById(toggleId);
   if (!menu || !sub) return;
   const open = !sub.classList.toggle('hidden');
   if (toggle) toggle.setAttribute('aria-expanded', String(open));

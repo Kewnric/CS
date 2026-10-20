@@ -4245,3 +4245,85 @@ body.viz-no-anim .app-sidebar {
   min-width: 0 !important;
   max-width: none !important;
 }
+
+/* ── Border type: Electric (brainCtxSetBorder) ─────────────────
+   A crackling line in the note's own colour. The line is a 2px border run
+   through #viz-electric-displace (animated turbulence → displacement map,
+   built once by brainEnsureElectricFilter); two blurred copies glow behind
+   it, an overlay sheen catches the corners and a soft halo sits under the
+   card. The slab's extrusion, hover lift and press are dropped: a glowing
+   card does not also sit on a block. */
+.viz-node[data-border="electric"] {
+  --el-color: var(--slab-hue, #f59e0b);
+  --el-light: color-mix(in srgb, var(--el-color) 65%, #fff);
+  --el-grad: color-mix(in oklab, var(--el-color) 35%, rgb(0 0 0 / 0.4));
+  --el-radius: 14px;
+}
+.viz-node[data-type="comment"][data-border="electric"] .viz-node-inner,
+.viz-node[data-type="comment"][data-border="electric"]:hover .viz-node-inner,
+.viz-node[data-type="comment"][data-border="electric"].selected .viz-node-inner,
+.viz-node[data-type="comment"][data-border="electric"].dragging .viz-node-inner,
+.viz-node[data-type="comment"][data-border="electric"] .viz-node-inner:active {
+  border-radius: var(--el-radius) !important;
+  border: 2px solid color-mix(in srgb, var(--el-color) 50%, transparent) !important;
+  background:
+    linear-gradient(-30deg, var(--el-grad), transparent, var(--el-grad)),
+    var(--bg-elevated) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.viz-electric,
+.viz-electric-bg {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--el-radius);
+  pointer-events: none;
+}
+/* Over the card's edge; the halo under it (.viz-node is a stacking context). */
+.viz-electric { z-index: 1; }
+.viz-electric-bg {
+  z-index: -1;
+  transform: scale(1.1);
+  filter: blur(32px);
+  opacity: 0.3;
+  background: linear-gradient(-30deg, var(--el-light), transparent, var(--el-color));
+  transition: opacity 0.2s ease;
+}
+.viz-electric > div {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.viz-electric-line {
+  border: 2px solid var(--el-color);
+  filter: url(#viz-electric-displace);
+}
+.viz-electric-glow-1 {
+  border: 2px solid color-mix(in srgb, var(--el-color) 60%, transparent);
+  filter: blur(1px);
+}
+.viz-electric-glow-2 {
+  border: 2px solid var(--el-light);
+  filter: blur(4px);
+}
+/* Clipped to the card: inside the node's isolated group an overlay blend over
+   empty canvas would just paint white haze past the corners. */
+.viz-electric-sheen {
+  mix-blend-mode: overlay;
+  filter: blur(16px);
+  opacity: 0.7;
+  clip-path: inset(0 round var(--el-radius));
+  background: linear-gradient(-30deg, #fff, transparent 30%, transparent 70%, #fff);
+}
+.viz-node[data-border="electric"]:hover .viz-electric-bg,
+.viz-node[data-border="electric"].selected .viz-electric-bg { opacity: 0.5; }
+.viz-node[data-border="electric"].selected .viz-electric-glow-2 { filter: blur(6px); }
+
+/* Zoomed far out the line is a few pixels long; skip the filter work there. */
+.viz-canvas-container.viz-far .viz-electric,
+.viz-canvas-container.viz-far .viz-electric-bg { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .viz-electric-line { filter: url(#viz-electric-still); }
+}
