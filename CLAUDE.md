@@ -70,7 +70,7 @@ fonts/                bundled OFL fonts (Comic Neue Bold for comic notes) +
 
 ## How a screen happens
 
-`js/router.js` — a hash router. `js/routes/register.js` registers **43 routes** (29 fixed, plus a library and an admin route for each of the 7 wings),
+`js/router.js` — a hash router. `js/routes/register.js` registers **46 routes** (32 fixed, plus a library and an admin route for each of the 7 wings),
 each `{ templateFn, initFn, destroyFn }`. `handleRoute` wraps rendering in
 `Motion.withViewTransition`, sets `document.body.dataset.route`, and calls the
 previous route's `destroyFn` first.
@@ -137,6 +137,12 @@ against the *whole* file so a folded partner is not mismatched), `editor-fx.js`
 
 - **Coding Library** (`js/browse.js`, route `browse`) — `state.challenges`.
 - **Snippets**, **Notebooks** — their own routes and state arrays.
+- **Memorization Typing** (`typing`, `admin-typing`, `typing-attempt`) — a typing test over
+  your own entries (`state.typeItems`, results in `state.typeHistory`). Text or code; code is
+  C, HTML, CSS or JS with per-character highlighting from `typing-syntax.js` (not
+  `syntaxHighlight`, which returns HTML for C only). The rules live in `typing-engine.js`, which
+  has no DOM, so the replay re-runs it over the recorded keys. Screen preferences are per
+  device in `ssp.typeConfig`.
 - **Wings** (`js/wings/`) — newer libraries sharing a schema-driven core.
 
 **Starter-pack switch** (`js/coding-starter*.js`): the package button in the

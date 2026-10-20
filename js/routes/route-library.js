@@ -159,6 +159,17 @@ function libraryInit() {
         'Reference snippets with examples, Try-Coding drills and linked challenges.',
         _libStatChip('code', countNoun(snippets.length, 'snippet')) + _libStatChip('brain', `${snippetTracked} in rotation`) + dueChip('snippet', snippets),
         snipPct, `${snippetTracked}/${snippets.length} in your review rotation`) +
+      (() => {
+        const items = state.typeItems || [];
+        const code = items.filter(it => it.kind === 'code').length;
+        const tests = (state.typeHistory || []).length;
+        return card('typing', 'lib-card-typing', 'keyboard', 'Memorization Typing Library',
+          'Type your own text and code over its ghost until it is in your fingers — speed, accuracy and a chart of every run.',
+          _libStatChip('file-text', `${items.length} entr${items.length === 1 ? 'y' : 'ies'}`) +
+          _libStatChip('code-2', `${code} code`) +
+          _libStatChip('gauge', `${tests} test${tests === 1 ? '' : 's'}`),
+          null, `${items.length} entr${items.length === 1 ? 'y' : 'ies'}`, '#e2b714');
+      })() +
       // The Cheat Sheet Library belongs with the other collections, not in the
       // app's top-level sidebar - it is a library, not a section.
       card('cheatsheet', 'lib-card-cheat', 'book-marked', 'Cheat Sheet Library',
@@ -287,6 +298,8 @@ function libHubSearch() {
     (it) => `setSessionParam('activeNotebook','${it.id}'); spaNavigate('study')`);
   push(state.snippets, 'snippet', 'snippets', 'code',
     (it) => `setSessionParam('activeSnippetId','${it.id}'); spaNavigate('snippets')`);
+  push(state.typeItems, 'typing', 'typing', 'keyboard',
+    (it) => `mtlRun('${it.id}')`);
   if (typeof wingAllItems === 'function') {
     wingAllItems().forEach(({ key, item }) => {
       if (hits.length >= 40) return;
@@ -297,7 +310,7 @@ function libHubSearch() {
     });
   }
 
-  const label = { challenge: 'Coding', notebook: 'Notes', snippet: 'Snippet', wing: 'Wing' };
+  const label = { challenge: 'Coding', notebook: 'Notes', snippet: 'Snippet', typing: 'Typing', wing: 'Wing' };
   host.classList.add('open');
   host.innerHTML = hits.length
     ? hits.slice(0, 20).map(h => `

@@ -30,6 +30,8 @@ function handleDataExport() {
     langSets: state.langSets || [],
     langScenarios: state.langScenarios || [],
     langHistory: state.langHistory || [],
+    typeItems: state.typeItems || [],
+    typeHistory: state.typeHistory || [],
     wings: state.wings || {},
     /* THE PARKED LIBRARY AND THE MISTAKE LOG. Both are saved and both are
        synced, and neither was in a backup. codingStash is whatever the
@@ -146,6 +148,9 @@ function handleDataImport(e) {
         state.langSets = parsed.langSets || [];
         state.langScenarios = parsed.langScenarios || [];
         state.langHistory = parsed.langHistory || [];
+        // Kept when the backup predates the typing library, by the rule below.
+        state.typeItems = Array.isArray(parsed.typeItems) ? parsed.typeItems : (state.typeItems || []);
+        state.typeHistory = Array.isArray(parsed.typeHistory) ? parsed.typeHistory : (state.typeHistory || []);
         state.wings = (parsed.wings && typeof parsed.wings === 'object') ? parsed.wings : {};
         /* Kept rather than cleared when the backup predates the field. An
            import replaces your data, but a file written before the parked
@@ -251,6 +256,8 @@ function handleDataReset() {
         langSets: [],
         langScenarios: [],
         langHistory: [],
+        typeItems: [],
+        typeHistory: [],
         wings: {},
         // Named rather than left out, so a reset states what it clears.
         codingPackLayout: 0,

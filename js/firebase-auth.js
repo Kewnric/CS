@@ -681,6 +681,7 @@ async function _loadV2Domains(uid) {
     state.langWords = d.langWords || [];
     state.langSets = d.langSets || [];
     state.langScenarios = d.langScenarios || [];
+    state.typeItems = Array.isArray(d.typeItems) ? d.typeItems : [];
     state.wings = (d.wings && typeof d.wings === 'object') ? d.wings : {};
     _restoreCheatSheets(d.cheatsheets);
     state.mistakes = Array.isArray(d.mistakes) ? d.mistakes : (state.mistakes || []);
@@ -693,6 +694,7 @@ async function _loadV2Domains(uid) {
     state.notebookHistory = d.notebookHistory || [];
     state.snippetHistory = d.snippetHistory || [];
     state.langHistory = d.langHistory || [];
+    state.typeHistory = Array.isArray(d.typeHistory) ? d.typeHistory : [];
   }
 
   // Viz
@@ -772,6 +774,8 @@ function _restoreV1Data(data) {
   state.langSets = parsed.langSets || [];
   state.langScenarios = parsed.langScenarios || [];
   state.langHistory = parsed.langHistory || [];
+  state.typeItems = Array.isArray(parsed.typeItems) ? parsed.typeItems : [];
+  state.typeHistory = Array.isArray(parsed.typeHistory) ? parsed.typeHistory : [];
   state.wings = (parsed.wings && typeof parsed.wings === 'object') ? parsed.wings : {};
   _restoreCheatSheets(parsed.cheatsheets);
   state.codingPackLayout = parsed.codingPackLayout || state.codingPackLayout || 0;
@@ -1119,6 +1123,7 @@ async function saveToFirestore(uid) {
       langWords: state.langWords || [],
       langSets: state.langSets || [],
       langScenarios: state.langScenarios || [],
+      typeItems: state.typeItems || [],
       wings: state.wings || {},
       // The cheat sheets live in their own localStorage key rather than in
       // `state`. csSave() has always asked for a cloud save; nothing carried
@@ -1160,7 +1165,8 @@ async function saveToFirestore(uid) {
       history: state.history,
       notebookHistory: state.notebookHistory,
       snippetHistory: state.snippetHistory || [],
-      langHistory: state.langHistory || []
+      langHistory: state.langHistory || [],
+      typeHistory: state.typeHistory || []
     }) || {};
 
     // Viz domain

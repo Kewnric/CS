@@ -101,6 +101,8 @@ function libSearchText(item, kind) {
       parts.push(v.name, v.description);
       (v.files || []).forEach(f => parts.push(f.name + (f.ext || '')));
     });
+  } else if (kind === 'typing') {
+    parts.push(item.content, item.notes);
   }
   return parts.filter(Boolean);
 }

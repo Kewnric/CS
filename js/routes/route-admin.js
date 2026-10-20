@@ -487,7 +487,7 @@ function adminInit() {
   const totals = document.getElementById('admin-hub-totals');
   if (totals) {
     totals.innerHTML = `
-      ${_libStatChip('sliders', `${4 + LIBRARY_WINGS.length} wings`)}
+      ${_libStatChip('sliders', `${5 + LIBRARY_WINGS.length} wings`)}
       ${_libStatChip('file-code', countNoun(challenges.length, 'program'))}
       ${_libStatChip('book-open', countNoun(notebooks.length, 'notebook'))}
       ${_libStatChip('code', countNoun(snippets.length, 'snippet'))}
@@ -520,6 +520,10 @@ function adminInit() {
       card('admin-snippets', 'lib-card-snippets', 'code', 'Snippet Library Admin',
         'Manage reference snippets, pre-filled code, rich text comments, and link related challenges.',
         _libStatChip('code', countNoun(snippets.length, 'snippet')) + _libStatChip('folder', countNoun(snippetFolders, 'folder'))) +
+      card('admin-typing', 'lib-card-typing', 'keyboard', 'Memorization Typing Admin',
+        'Paste the text or code you want to memorise — prose, or C, HTML, CSS and JavaScript with their own highlighting.',
+        _libStatChip('file-text', `${(state.typeItems || []).length} entr${(state.typeItems || []).length === 1 ? 'y' : 'ies'}`) +
+        _libStatChip('code-2', `${(state.typeItems || []).filter(it => it.kind === 'code').length} code`), '#e2b714') +
       card('admin-language', 'lib-card-language', 'languages', 'Language Library Admin',
         'Write dictionary entries across four languages, build drill puzzles, and script scenario encounters.',
         _libStatChip('book-a', countNoun((state.langWords || []).length, 'word')) +

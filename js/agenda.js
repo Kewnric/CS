@@ -357,6 +357,10 @@ function agItemTitle(type, id) {
     const s = (state.langSets || []).find(x => x.id === id);
     return s ? (s.title || 'Untitled set') : null;
   }
+  if (type === 'typing') {
+    const t = (state.typeItems || []).find(x => x.id === id);
+    return t ? (t.title || 'Untitled') : null;
+  }
   const list = type === 'challenge' ? state.challenges
     : type === 'snippet' ? state.snippets
     : type === 'notebook' ? state.notebooks : null;
@@ -529,6 +533,9 @@ function agRefresh() {
   }
   if (typeof renderLangLibrary === 'function' && document.getElementById('lang-lib-root')) {
     renderLangLibrary();
+  }
+  if (typeof renderTypingLibrary === 'function' && document.getElementById('mtl-root')) {
+    renderTypingLibrary();
   }
 }
 
@@ -843,6 +850,10 @@ function agGoToEntry(key) {
   } else if (e.sourceType === 'langword' || e.sourceType === 'langset') {
     setSessionParam('langView', e.sourceType === 'langset' ? 'sets' : 'dictionary');
     agNavigateEvenIfHere('language', () => spaNavigate('language'));
+  } else if (e.sourceType === 'typing') {
+    const t = (state.typeItems || []).find(x => x.id === e.sourceId);
+    setSessionParam('mtlView', t ? (t.kind === 'code' ? t.lang : 'text') : 'all');
+    agNavigateEvenIfHere('typing', () => spaNavigate('typing'));
   }
 }
 

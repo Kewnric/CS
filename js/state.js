@@ -40,6 +40,8 @@ let state = {
   langSets: [],          // Language drill sets
   langScenarios: [],     // Language scenario encounters
   langHistory: [],       // Language drill / scenario runs
+  typeItems: [],         // Memorization Typing entries (see typing-store.js)
+  typeHistory: [],       // Memorization Typing results
   activeChallenge: null,
   activeVariant: null,
   userCode: '',
@@ -185,6 +187,8 @@ function loadData() {
       state.langSets = parsed.langSets || [];
       state.langScenarios = parsed.langScenarios || [];
       state.langHistory = parsed.langHistory || [];
+      state.typeItems = Array.isArray(parsed.typeItems) ? parsed.typeItems : [];
+      state.typeHistory = Array.isArray(parsed.typeHistory) ? parsed.typeHistory : [];
       state.wings = (parsed.wings && typeof parsed.wings === 'object') ? parsed.wings : {};
       state.codingPackLayout = parsed.codingPackLayout || 0;
       state.langRun = parsed.langRun || null;
@@ -387,6 +391,8 @@ function _flushSaveData() {
     langSets: state.langSets || [],
     langScenarios: state.langScenarios || [],
     langHistory: state.langHistory || [],
+    typeItems: state.typeItems || [],
+    typeHistory: state.typeHistory || [],
     wings: state.wings || {},
     /* THE PARKED LIBRARY. The starter-pack switch moves whatever is live into
        codingStash and puts the other set on screen. It was never written down,
