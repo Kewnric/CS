@@ -1946,7 +1946,7 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
   border: 0;
   background: none;
   border-radius: var(--radius-lg);
-  perspective: 1200px;
+  perspective: 1000px;
   transition: none;
 }
 .lib-card.is-spatial:hover { transform: none; box-shadow: none; }
@@ -2008,14 +2008,15 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
 .lib-card.is-spatial .lib-card-chips,
 .lib-card.is-spatial .lib-card-progress { transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), text-shadow 0.25s ease; }
 .lib-card.is-spatial .lib-card-icon { transition: box-shadow 0.25s ease, transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
-/* What matters most rises nearest. */
-.lib-card.is-spatial:hover .lib-card-head { transform: translateZ(16px); }
-.lib-card.is-spatial:hover .lib-card-name { transform: translateZ(26px); }
-.lib-card.is-spatial:hover .lib-card-desc { transform: translateZ(10px); }
-.lib-card.is-spatial:hover .lib-card-chips { transform: translateZ(20px); }
-.lib-card.is-spatial:hover .lib-card-progress { transform: translateZ(8px); }
+/* What matters most rises nearest -- the full depth of the first version,
+   so a tilted card really comes apart in layers, out towards its edges. */
+.lib-card.is-spatial:hover .lib-card-head { transform: translateZ(28px); }
+.lib-card.is-spatial:hover .lib-card-name { transform: translateZ(44px); }
+.lib-card.is-spatial:hover .lib-card-desc { transform: translateZ(22px); }
+.lib-card.is-spatial:hover .lib-card-chips { transform: translateZ(36px); }
+.lib-card.is-spatial:hover .lib-card-progress { transform: translateZ(18px); }
 .lib-card.is-spatial:hover .lib-card-icon {
-  transform: translateZ(12px);
+  transform: translateZ(22px);
   box-shadow: 0 10px 22px -8px color-mix(in srgb, var(--lib-accent, var(--color-primary)) 70%, transparent);
 }
 .lib-card.is-spatial:hover .lib-card-name { text-shadow: 0 10px 22px rgba(0, 0, 0, 0.45); }
