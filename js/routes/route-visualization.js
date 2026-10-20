@@ -416,18 +416,35 @@ function vizTemplate() {
 
     <!-- Brain Node Context Menu -->
     <div id="brain-node-ctx" class="viz-context-menu hidden" role="menu">
-      <div class="viz-color-picker brain-border-swatches" title="Border colour">${vizSwatchesHTML('brainCtxEditColor')}</div>
-      <div class="viz-ctx-divider"></div>
-      <!-- Its own colour, never mixed with the border's (node.bg vs node.color).
-           Charcoal is the original Electric Border card's background. -->
-      <button class="viz-ctx-item" id="brain-node-bg-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleBgMenu(event)"><i data-lucide="paint-bucket"></i> Background Color <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
-      <div class="viz-ctx-submenu hidden" id="brain-node-bg-menu" role="menu">
-        <div class="viz-color-picker">${vizSwatchesHTML('brainCtxEditBg', [['charcoal', 'oklch(0.185 0 0)', 'charcoal (Electric Border original)']])}</div>
+      <!-- Every colour lives in Personalize Color. Text, fill and edge are three
+           separate settings (node.textColor, node.bg, node.color) that never read
+           each other. Charcoal is the original Electric Border card's fill. -->
+      <button class="viz-ctx-item" id="brain-node-colors-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'colors')"><i data-lucide="palette"></i> Personalize Color <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
+      <div class="viz-ctx-submenu hidden" id="brain-node-colors-menu" role="menu">
+        <div class="viz-popup-title">Text Color</div>
+        <div class="viz-color-picker" id="brain-note-text-swatches">${vizSwatchesHTML('brainCtxEditText')}</div>
+        <div class="viz-popup-title">Background Color</div>
+        <div class="viz-color-picker" id="brain-note-bg-swatches">${vizSwatchesHTML('brainCtxEditBg', [['charcoal', 'oklch(0.185 0 0)', 'charcoal (Electric Border original)']])}</div>
+        <div class="viz-popup-title">Border Edge Color</div>
+        <div class="viz-color-picker" id="brain-note-edge-swatches">${vizSwatchesHTML('brainCtxEditColor')}</div>
       </div>
-      <button class="viz-ctx-item" id="brain-node-border-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleBorderType(event)"><i data-lucide="frame"></i> Border Type <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
+      <button class="viz-ctx-item" id="brain-node-border-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'border')"><i data-lucide="frame"></i> Border Type <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
       <div class="viz-ctx-submenu hidden" id="brain-node-border-menu" role="menu">
         <div class="viz-link-type-option" role="menuitem" data-border="" onclick="brainCtxSetBorder(null)"><i data-lucide="square"></i> Default</div>
         <div class="viz-link-type-option" role="menuitem" data-border="electric" onclick="brainCtxSetBorder('electric')"><i data-lucide="zap"></i> Electric Border</div>
+      </div>
+      <button class="viz-ctx-item" id="brain-node-align-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'align')"><i data-lucide="align-left"></i> Text Alignment <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
+      <div class="viz-ctx-submenu hidden" id="brain-node-align-menu" role="menu">
+        <div class="viz-link-type-option" role="menuitem" data-value="left" onclick="brainCtxSetNote('textAlign', null)"><i data-lucide="align-left"></i> Left</div>
+        <div class="viz-link-type-option" role="menuitem" data-value="center" onclick="brainCtxSetNote('textAlign', 'center')"><i data-lucide="align-center"></i> Center</div>
+        <div class="viz-link-type-option" role="menuitem" data-value="right" onclick="brainCtxSetNote('textAlign', 'right')"><i data-lucide="align-right"></i> Right</div>
+      </div>
+      <button class="viz-ctx-item" id="brain-node-spacing-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'spacing')"><i data-lucide="unfold-vertical"></i> Spacing <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
+      <div class="viz-ctx-submenu hidden" id="brain-node-spacing-menu" role="menu">
+        <div class="viz-popup-title">Line Spacing</div>
+        <div class="brain-spacing-row" data-prop="lineSpacing"><button type="button" data-value="1" onclick="brainCtxSetNote('lineSpacing', 1)">1.0</button><button type="button" data-value="1.15" onclick="brainCtxSetNote('lineSpacing', 1.15)">1.15</button><button type="button" data-value="1.5" onclick="brainCtxSetNote('lineSpacing', null)">1.5</button><button type="button" data-value="2" onclick="brainCtxSetNote('lineSpacing', 2)">2.0</button></div>
+        <div class="viz-popup-title">Paragraph Spacing</div>
+        <div class="brain-spacing-row" data-prop="paraSpacing"><button type="button" data-value="" onclick="brainCtxSetNote('paraSpacing', null)">None</button><button type="button" data-value="s" onclick="brainCtxSetNote('paraSpacing', 's')">Small</button><button type="button" data-value="m" onclick="brainCtxSetNote('paraSpacing', 'm')">Medium</button><button type="button" data-value="l" onclick="brainCtxSetNote('paraSpacing', 'l')">Large</button></div>
       </div>
       <div class="viz-ctx-divider"></div>
       <button class="viz-ctx-item" onclick="brainCtxEditComment()"><i data-lucide="edit-2"></i> Edit Comment</button>

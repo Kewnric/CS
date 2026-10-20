@@ -938,6 +938,11 @@ function brainRenderCanvas() {
     el.dataset.type = 'comment';
     if (node.color) el.dataset.color = node.color;
     if (node.bg) el.dataset.bg = node.bg;
+    // Text settings ride on custom properties the note's text reads.
+    if (node.textColor) el.style.setProperty('--note-text', vizColorMap(node.textColor));
+    if (node.textAlign) el.style.setProperty('--note-align', node.textAlign);
+    if (node.lineSpacing) el.style.setProperty('--note-line', node.lineSpacing);
+    if (node.paraSpacing) el.style.setProperty('--note-para', BRAIN_PARA_SPACING[node.paraSpacing] || '0');
     const isElectric = node.border === 'electric' && !isGlobe;
     if (isElectric) { el.dataset.border = 'electric'; brainEnsureElectricFilter(); }
     el.style.left = node.x + 'px';
@@ -976,7 +981,7 @@ function brainRenderCanvas() {
     } else {
       el.innerHTML = `${isElectric ? BRAIN_ELECTRIC_BACK : ''}<div class="viz-node-inner" style="${styleW}${styleH}">
         <div class="viz-comment-body">
-          <div class="viz-comment-content">${escapeHTML(node.commentContent || 'Double-click or right-click to edit...')}</div>
+          <div class="viz-comment-content">${brainNoteParagraphs(node.commentContent || 'Double-click or right-click to edit...')}</div>
         </div>
       </div>${isElectric ? BRAIN_ELECTRIC_FRONT : ''}${brainCollapseBadge}`;
     }
@@ -1731,26 +1736,57 @@ function brainNodeCtx(e, nodeId) {
       expandBtn.style.display = 'none';
     }
   }
-  // Both dropdowns open collapsed, and before the menu is measured, so it is
+  // Every dropdown opens collapsed, and before the menu is measured, so it is
   // placed at its real size.
-  [['brain-node-border-menu', 'brain-node-border-toggle'], ['brain-node-bg-menu', 'brain-node-bg-toggle']].forEach(([subId, toggleId]) => {
-    const sub = document.getElementById(subId);
-    const toggle = document.getElementById(toggleId);
+  _brainCloseNodeSubs(null);
+  if (typeof vizPositionMenu === 'function') vizPositionMenu(menu, e.clientX, e.clientY);
+  else { menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px'; menu.classList.remove('hidden'); }
+  // Each control marks only its own setting.
+  const mark = (sel, attr, value) => menu.querySelectorAll(sel).forEach(o => o.classList.toggle('active', o.dataset[attr] === value));
+  mark('#brain-note-text-swatches .viz-color-swatch', 'color', node?.textColor || '');
+  mark('#brain-note-bg-swatches .viz-color-swatch', 'color', node?.bg || '');
+  mark('#brain-note-edge-swatches .viz-color-swatch', 'color', node?.color || '');
+  mark('#brain-node-border-menu .viz-link-type-option', 'border', node?.border || '');
+  mark('#brain-node-align-menu .viz-link-type-option', 'value', node?.textAlign || 'left');
+  mark('[data-prop="lineSpacing"] button', 'value', String(node?.lineSpacing || 1.5));
+  mark('[data-prop="paraSpacing"] button', 'value', node?.paraSpacing || '');
+}
+
+/* -- Note text ----------------------------------------------------
+   One <p> per line you typed, so each Enter starts a paragraph and paragraph
+   spacing has something to space; an empty line keeps its height. */
+const BRAIN_PARA_SPACING = { s: '0.35em', m: '0.75em', l: '1.25em' };
+function brainNoteParagraphs(text) {
+  return String(text).split('\n').map(l => '<p>' + (l ? escapeHTML(l) : '<br>') + '</p>').join('');
+}
+
+/* The node menu's dropdowns, one open at a time. */
+const BRAIN_NODE_SUBS = ['colors', 'border', 'align', 'spacing'];
+function _brainCloseNodeSubs(except) {
+  BRAIN_NODE_SUBS.forEach(k => {
+    if (k === except) return;
+    const sub = document.getElementById('brain-node-' + k + '-menu');
+    const toggle = document.getElementById('brain-node-' + k + '-toggle');
     if (sub) sub.classList.add('hidden');
     if (toggle) toggle.setAttribute('aria-expanded', 'false');
   });
-  if (typeof vizPositionMenu === 'function') vizPositionMenu(menu, e.clientX, e.clientY);
-  else { menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px'; menu.classList.remove('hidden'); }
-  // Two swatch rows now; each marks its own setting.
-  menu.querySelectorAll('.brain-border-swatches .viz-color-swatch').forEach(sw => {
-    sw.classList.toggle('active', sw.dataset.color === (node?.color || ''));
-  });
-  menu.querySelectorAll('#brain-node-bg-menu .viz-color-swatch').forEach(sw => {
-    sw.classList.toggle('active', sw.dataset.color === (node?.bg || ''));
-  });
-  const border = (node && node.border) || '';
-  menu.querySelectorAll('#brain-node-border-menu .viz-link-type-option').forEach(o => o.classList.toggle('active', o.dataset.border === border));
 }
+function brainToggleNodeSub(e, key) {
+  _brainCloseNodeSubs(key);
+  _brainToggleCtxSub(e, 'brain-node-ctx', 'brain-node-' + key + '-menu', 'brain-node-' + key + '-toggle');
+}
+
+/** Set (or with null, clear back to default) one of the context note's settings. */
+function brainCtxSetNote(prop, value) {
+  const node = brain.contextNodeId && brain.nodes.find(n => n.id === brain.contextNodeId);
+  if (!node) { brainHideAllMenus(); return; }
+  if ((node[prop] == null ? null : node[prop]) === (value == null ? null : value)) { brainHideAllMenus(); return; }
+  brainPushUndo();
+  if (value == null) delete node[prop]; else node[prop] = value;
+  brainRenderCanvas(); brainSaveCurrentVersion();
+  brainHideAllMenus();
+}
+function brainCtxEditText(color) { brainCtxSetNote('textColor', color); }
 
 /* -- Border types ----------------------------------------------
    Default is the extruded slab. Electric is a crackling line in the note's own
@@ -1809,10 +1845,6 @@ function brainEnsureElectricFilter() {
   document.body.appendChild(holder.firstElementChild);
 }
 
-function brainToggleBgMenu(e) {
-  _brainToggleCtxSub(e, 'brain-node-ctx', 'brain-node-bg-menu', 'brain-node-bg-toggle');
-}
-
 /** The note's background, kept apart from its border colour (node.color). */
 function brainCtxEditBg(color) {
   const node = brain.contextNodeId && brain.nodes.find(n => n.id === brain.contextNodeId);
@@ -1821,10 +1853,6 @@ function brainCtxEditBg(color) {
   if (color) node.bg = color; else delete node.bg;
   brainRenderCanvas(); brainSaveCurrentVersion();
   brainHideAllMenus();
-}
-
-function brainToggleBorderType(e) {
-  _brainToggleCtxSub(e, 'brain-node-ctx', 'brain-node-border-menu', 'brain-node-border-toggle');
 }
 
 function brainCtxSetBorder(type) {

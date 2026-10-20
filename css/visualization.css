@@ -3030,9 +3030,14 @@
 }
 
 .viz-node[data-type="comment"] .viz-comment-content {
-  color: var(--text-primary);
+  /* Text Color, Text Alignment and Spacing from the node menu (--note-*). */
+  color: var(--note-text, var(--text-primary));
+  text-align: var(--note-align, left);
+  line-height: var(--note-line, 1.5);
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
 }
+.viz-node[data-type="comment"] .viz-comment-content p { margin: 0; }
+.viz-node[data-type="comment"] .viz-comment-content p + p { margin-top: var(--note-para, 0); }
 
 /* Raised further on hover — the slab lifts and its shadow lengthens. */
 .viz-node[data-type="comment"]:hover .viz-node-inner {
@@ -4401,3 +4406,27 @@ body.viz-no-anim .app-sidebar {
 .viz-node[data-bg="charcoal"]  { --viz-node-bg: oklch(0.185 0 0); }
 /* Charcoal is nearly the menu's own colour; a faint ring makes it findable. */
 .viz-color-swatch[data-color="charcoal"] { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28); }
+
+/* Spacing choices in the node menu: one compact row of options each. */
+.brain-spacing-row {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0 0.5rem 0.45rem;
+}
+.brain-spacing-row button {
+  flex: 1;
+  padding: 0.3rem 0.35rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font: 600 0.72rem var(--font-sans);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+.brain-spacing-row button:hover { color: var(--color-primary); border-color: var(--color-primary); }
+.brain-spacing-row button.active {
+  color: var(--color-primary);
+  background: var(--color-primary-subtle);
+  border-color: var(--color-primary);
+}
