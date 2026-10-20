@@ -1484,7 +1484,8 @@ function brainOpenEditor(node) {
       <textarea id="viz-comment-editor-textarea" class="viz-comment-editor-textarea" spellcheck="false" placeholder="Enter your idea...">${escapeHTML(node.commentContent || '')}</textarea>
     </div>
     <div class="viz-comment-editor-footer">
-      <button class="btn btn-primary" id="viz-comment-editor-save">Save &amp; Close</button>
+      <button class="btn btn-secondary btn-sm" id="viz-comment-editor-reset" title="Put back the note's saved text"><i data-lucide="rotate-ccw" style="width:14px;height:14px;"></i> Reset</button>
+      <button class="btn btn-primary btn-sm" id="viz-comment-editor-save"><i data-lucide="check" style="width:14px;height:14px;"></i> Save &amp; Close</button>
     </div>
   </div>`;
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: overlay });
@@ -1497,6 +1498,13 @@ function brainOpenEditor(node) {
     const end = textarea.value.length;
     textarea.setSelectionRange(end, end);
   }, 0);
+  // Reset: back to the text the note had when this editor opened.
+  const savedText = node.commentContent || '';
+  document.getElementById('viz-comment-editor-reset').onclick = () => {
+    textarea.value = savedText;
+    textarea.focus({ preventScroll: true });
+    textarea.setSelectionRange(savedText.length, savedText.length);
+  };
   // Write the text back if it changed. Looked up by id: an undo replaces the
   // node objects, and the one this editor opened with may be stale by then.
   const nodeId = node.id;
