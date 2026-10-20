@@ -57,9 +57,13 @@ function langGenDistractors(w, pool, study, ref, n) {
   const usable = pool.filter(ok);
   const same = usable.filter(x => (x.tags || []).some(t => mine.includes(t)));
   const rest = usable.filter(x => same.indexOf(x) === -1);
-  const picked = langShuffle(same).slice(0, want);
-  if (picked.length < want) picked.push(...langShuffle(rest).slice(0, want - picked.length));
-  return picked.map(x => langForm(x, study).term).filter(Boolean);
+  /* Same topic AND same part of speech first. Four body parts is a real
+     question; a verb offered among three nouns is answered by grammar alone. */
+  const pos = langForm(w, study).pos || '';
+  const samePos = x => !!pos && langForm(x, study).pos === pos;
+  const ranked = langShuffle(same.filter(samePos))
+    .concat(langShuffle(same.filter(x => !samePos(x))), langShuffle(rest.filter(samePos)), langShuffle(rest.filter(x => !samePos(x))));
+  return ranked.slice(0, want).map(x => langForm(x, study).term).filter(Boolean);
 }
 
 /**
@@ -153,7 +157,12 @@ function langGenItem(type, w, pool, study, ref) {
        full stop that happened to follow it in the sentence. */
     it.answer = target.replace(/^[^\wÀ-ÿ]+|[^\wÀ-ÿ]+$/g, '') || target;
     if (it.answer !== target) it.prompt = it.prompt.replace('___', '___' + target.slice(target.indexOf(it.answer) + it.answer.length));
-    it.distractors = langGenDistractors(w, pool, study, ref, 3);
+    /* One-word tiles for a one-word gap: a phrase is ruled out by its length
+       before anyone has to know what it means. */
+    it.distractors = langGenDistractors(w, pool, study, ref, 24).filter(d => !/\s/.test(String(d).trim())).slice(0, 3);
+    if (it.distractors.length < 2) it.distractors = langGenDistractors(w, pool, study, ref, 3);
+    // What the sentence means, shown under it -- without it "___ ko." is a guess.
+    it.hint = ex.gloss || '';
     it.note = ex.gloss ? '"' + sentence + '" — ' + ex.gloss : '';
     return it;
   }

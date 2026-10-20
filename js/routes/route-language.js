@@ -1217,6 +1217,9 @@ function langDrillTypeHTML(type) {
             </div>`).join('')}
         </div>
 
+        <h3 class="lpv-h lpv-in" style="--i:4"><i data-lucide="sliders-horizontal"></i> Run settings <span class="lpv-h-note">saved on this device, used by every drill</span></h3>
+        <div class="lpv-in" style="--i:4">${typeof laSettingsHTML === 'function' ? laSettingsHTML('page') : ''}</div>
+
         <div class="lpv-from lpv-in" style="--i:4">
           <span class="lpv-from-label"><i data-lucide="layers"></i> From ${fromSets.length} set${fromSets.length !== 1 ? 's' : ''}</span>
           ${fromSets.slice(0, 6).map(t => `<span class="lpv-chip">${escapeHTML(t)}</span>`).join('')}
@@ -1249,6 +1252,10 @@ function langSetsHTML() {
         ${langStatHTML('list-checks', questions, 'Questions')}
         ${langStatHTML('flag', ran, 'Run at least once')}
       </div>
+      <details class="lpv-settings-fold lpv-in" style="--i:2">
+        <summary><i data-lucide="sliders-horizontal"></i> Run settings <span class="lpv-h-note">questions, hearts, hints, typos</span><i data-lucide="chevron-down" class="lpv-fold-caret"></i></summary>
+        ${typeof laSettingsHTML === 'function' ? laSettingsHTML('page') : ''}
+      </details>
       <div class="lpv-grid lpv-in" style="--i:2">
         ${sets.map((s, i) => {
           const problems = langSetProblems(s);

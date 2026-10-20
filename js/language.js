@@ -803,10 +803,10 @@ const LANG_TYPE_RULES = {
     wins: 'The words in the correct order. Punctuation and capitals are ignored.'
   },
   blank: {
-    how: ['A sentence appears with one word missing.',
+    how: ['A sentence appears with one word missing, and what it means underneath.',
           'Tap the tile that belongs in the gap.',
-          'Tapping a different tile replaces your choice.'],
-    wins: 'The one missing word, exactly.'
+          'Stuck? A hint rules out a wrong tile.'],
+    wins: 'The one missing word.'
   },
   choice: {
     how: ['A prompt appears with up to four answers.',
@@ -817,14 +817,14 @@ const LANG_TYPE_RULES = {
   translate: {
     how: ['A prompt appears in one language.',
           'Type the translation yourself — there are no tiles to lean on.',
-          'Press Enter to check.'],
-    wins: 'The right words. Case, spacing and punctuation are forgiven; spelling is not.'
+          'Press Enter to check. A hint gives the next letter.'],
+    wins: 'The right words. Case, punctuation and accents are forgiven, and so is one wrong letter (two in long words) unless you switch that off.'
   },
   match: {
     how: ['Two columns of terms appear.',
           'Tap a term, then its partner in the other column. A right pair locks in.',
           'A wrong pair flashes red and lets go, so you can try again.'],
-    wins: 'Every pair found without a wrong guess — one mix-up and the question counts as missed.'
+    wins: 'Every pair found. In a grid of three or more, one slip is forgiven.'
   }
 };
 

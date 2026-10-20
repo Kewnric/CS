@@ -27,6 +27,9 @@ function langAttemptTemplate() {
         <div class="la-toggles">
           <button class="la-toggle" id="la-tg-sfx" type="button" onclick="laToggleSfx()"></button>
           <button class="la-toggle" id="la-tg-say" type="button" onclick="laToggleSay()"></button>
+          <button class="la-toggle" id="la-tg-set" type="button" onclick="laOpenSettings()" title="Run settings">
+            <i data-lucide="settings-2"></i><span>Settings</span>
+          </button>
         </div>
       </div>
       <header class="la-top">
@@ -36,24 +39,29 @@ function langAttemptTemplate() {
         <div class="la-progress" id="la-progress" role="progressbar" aria-label="Progress" aria-valuemin="0" aria-valuemax="100">
           <div class="la-progress-fill" id="la-progress-fill"></div>
         </div>
+        <span class="la-count" id="la-count"></span>
         <span class="la-clock" id="la-clock"></span>
         <div class="la-hearts" id="la-hearts"></div>
       </header>
       <main class="la-body" id="la-body"></main>
       <footer class="la-foot" id="la-foot" aria-live="polite"></footer>
+      <div class="la-sheet" id="la-sheet" hidden></div>
     </div>`;
 }
 
 /** A fresh run over a queue. `review` marks a mistakes-only rerun, which is
     practice on top of a run already recorded and so is not recorded again. */
 function laNewRun(set, queue, limit, review) {
+  const prefs = typeof laPrefs === 'function' ? laPrefs() : { hearts: 3 };
+  const lives = prefs.hearts > 0 ? prefs.hearts : 0;   // 0 = unlimited
   return {
     set,
     limit,
     remaining: limit,
     queue,
     idx: 0,
-    hearts: 3,
+    hearts: lives || Infinity,
+    maxHearts: lives,
     correct: 0,
     streak: 0,
     bestStreak: 0,
@@ -100,6 +108,9 @@ function langAttemptInit() {
     if (!set || langSetProblems(set).length) { spaNavigate('language'); return; }
     queue = langShuffle((set.items || []).slice());
   }
+  // A run is a sitting, not the whole pool: ten by default, as many as you like.
+  const len = typeof laPrefs === 'function' ? laPrefs().length : 0;
+  if (len > 0) queue = queue.slice(0, len);
 
   _la = laNewRun(set, queue, limit, false);
   document.removeEventListener('keydown', laOnKey);
@@ -369,8 +380,12 @@ function laLoadQuestion() {
   _la.matchFlash = null;
   // The card slides in once per question, not on every tap inside it.
   _la.fresh = true;
+  _la.help = 0;            // hints used on this question
+  _la.gone = [];           // tiles / options a hint has cleared
+  _la.revealed = 0;        // translate: letters a hint has given
+  _la.showMeaning = false; // blank: a hint can show the meaning when it is switched off
   if (it && (it.type === 'arrange' || it.type === 'blank')) {
-    _la.pool = langShuffle(langTokensFor(it)).map((t, i) => ({ id: 'tk' + i, text: t }));
+    _la.pool = langShuffle(laFairTokens(it)).map((t, i) => ({ id: 'tk' + i, text: t }));
   } else {
     _la.pool = [];
   }
@@ -411,13 +426,26 @@ function laRender() {
   if (fill) fill.style.width = pct + '%';
   if (bar) bar.setAttribute('aria-valuenow', String(pct));
   if (hearts) {
-    hearts.title = _la.hearts + (_la.hearts === 1 ? ' heart' : ' hearts') + ' left';
+    if (!_la.maxHearts) {
+      hearts.title = 'Unlimited hearts — practice mode';
+      hearts.innerHTML = '<i data-lucide="heart" class="la-heart"></i><span class="la-heart-inf">∞</span>';
+    } else {
+      hearts.title = _la.hearts + (_la.hearts === 1 ? ' heart' : ' hearts') + ' left';
+      // The heart that was just lost breaks rather than simply going grey.
+      const shown = _la.heartsShown == null ? _la.hearts : _la.heartsShown;
+      hearts.innerHTML = Array.from({ length: _la.maxHearts }, (_, i) =>
+        `<i data-lucide="heart" class="la-heart${i < _la.hearts ? '' : ' is-lost'}${i >= _la.hearts && i < shown ? ' is-breaking' : ''}"></i>`).join('');
+      _la.heartsShown = _la.hearts;
+    }
     hearts.setAttribute('aria-label', hearts.title);
-    // The heart that was just lost breaks rather than simply going grey.
-    const shown = _la.heartsShown == null ? _la.hearts : _la.heartsShown;
-    hearts.innerHTML = [0, 1, 2].map(i =>
-      `<i data-lucide="heart" class="la-heart${i < _la.hearts ? '' : ' is-lost'}${i >= _la.hearts && i < shown ? ' is-breaking' : ''}"></i>`).join('');
-    _la.heartsShown = _la.hearts;
+  }
+  const count = document.getElementById('la-count');
+  if (count) count.textContent = _la.state === 'over' ? '' : Math.min(_la.idx + 1, _la.queue.length) + ' / ' + _la.queue.length;
+  const shell = document.getElementById('la-shell');
+  if (shell && typeof laPrefs === 'function') {
+    const pr = laPrefs();
+    shell.classList.toggle('la-no-keys', !pr.keys);
+    shell.classList.toggle('la-no-speakers', !pr.speakers);
   }
   laPaintClock();
 
@@ -483,7 +511,8 @@ function laQuestionHTML(it, last) {
            <button type="button" class="la-speak" onclick="laSpeak(this.dataset.say)"
                    data-say="${escapeHTML(String(it.prompt || '').replace(/_{2,}|\{\}/g, '…'))}"
                    title="Hear this" aria-label="Hear this"><i data-lucide="volume-2"></i></button>
-         </div>`
+         </div>
+         ${laMeaningLineHTML(it)}`
       : '';
     // Which of the placed words were wrong -- only meaningful once checked.
     const marks = checked && last && last.diff ? last.diff.gOk : null;
@@ -507,8 +536,10 @@ function laQuestionHTML(it, last) {
         ${_la.pool.map((t, k) => {
           const used = _la.picked.some(p => p.id === t.id);
           return used
-            ? `<button class="la-tile is-used" type="button" tabindex="-1" aria-hidden="true" disabled>${laKeyHTML(k + 1)}<span class="la-tile-text">${escapeHTML(t.text)}</span><span class="la-chip-ph"></span></button>`
-            : `<button class="la-tile" type="button" data-tid="${t.id}" onclick="laPick('${t.id}')" ${checked ? 'disabled' : ''}>${laKeyHTML(k + 1)}<span class="la-tile-text">${escapeHTML(t.text)}</span>${langSpeakChip(t.text, _laStudyCode())}</button>`;
+            ? `<button class="la-tile is-used" type="button" tabindex="-1" aria-hidden="true" disabled style="--d:${k}">${laKeyHTML(k + 1)}<span class="la-tile-text">${escapeHTML(t.text)}</span><span class="la-chip-ph"></span></button>`
+            : _la.gone.indexOf(t.id) > -1
+            ? `<button class="la-tile is-gone" type="button" tabindex="-1" disabled title="A hint ruled this one out" style="--d:${k}">${laKeyHTML(k + 1)}<span class="la-tile-text">${escapeHTML(t.text)}</span><span class="la-chip-ph"></span></button>`
+            : `<button class="la-tile" type="button" data-tid="${t.id}" onclick="laPick('${t.id}')" ${checked ? 'disabled' : ''} style="--d:${k}">${laKeyHTML(k + 1)}<span class="la-tile-text">${escapeHTML(t.text)}</span>${langSpeakChip(t.text, _laStudyCode())}</button>`;
         }).join('')}
       </div>`;
   }
@@ -516,12 +547,16 @@ function laQuestionHTML(it, last) {
   if (it.type === 'choice') {
     return `<div class="la-options">
       ${(_la.shuffledOptions || []).map((o, i) => {
-        let cls = _la.choice === i ? ' is-picked' : '';
+        const gone = _la.gone.indexOf(i) > -1;
+        let cls = _la.choice === i ? ' is-picked' : gone ? ' is-gone' : '';
         if (checked) cls = o.correct ? ' is-ok' : _la.choice === i ? ' is-bad' : ' is-faded';
+        // Afterwards every option says what it means -- the wrong ones are
+        // vocabulary too, and this is the moment you are looking at them.
+        const gloss = checked && typeof laWordGloss === 'function' ? laWordGloss(o.text) : '';
         return `
-        <button class="la-option${cls}" type="button" onclick="laChoose(${i})" ${checked ? 'disabled' : ''}>
+        <button class="la-option${cls}" type="button" onclick="laChoose(${i})" ${checked || gone ? 'disabled' : ''} style="--d:${i}">
           <span class="la-option-key">${i + 1}</span>
-          <span class="la-option-text">${escapeHTML(o.text)}</span>
+          <span class="la-option-text">${escapeHTML(o.text)}${gloss ? `<small class="la-option-gloss">${escapeHTML(gloss)}</small>` : ''}</span>
           ${langSpeakChip(o.text, _laStudyCode())}
         </button>`;
       }).join('')}
@@ -538,7 +573,8 @@ function laQuestionHTML(it, last) {
            language you are learning, so this reads the BOX, not the answer. -->
       <button type="button" class="la-speak la-speak-input" onclick="laSpeakTyped()"
               title="Hear what you typed" aria-label="Hear what you typed"><i data-lucide="volume-2"></i></button>
-    </div>`;
+    </div>
+    ${_la.revealed && !checked ? laRevealHTML(it.answer) : ''}`;
   }
 
   if (it.type === 'match') {
@@ -551,14 +587,14 @@ function laQuestionHTML(it, last) {
       <div class="la-match-col">
         ${a.map((x, k) => `
           <button class="la-match-btn${_la.matchLeft === x.i ? ' is-picked' : ''}${leftDone(x.i) ? ' is-done' : ''}${flash('l', x.i)}"
-                  type="button" onclick="laMatchLeft(${x.i})" ${leftDone(x.i) ? 'disabled' : ''}>
-            ${laKeyHTML(k + 1)}<span class="la-tile-text">${escapeHTML(x.text)}</span>${langSpeakChip(x.text, _laStudyCode())}</button>`).join('')}
+                  type="button" onclick="laMatchLeft(${x.i})" ${leftDone(x.i) ? 'disabled' : ''} style="--d:${k}">
+            ${laKeyHTML(k + 1)}${leftDone(x.i) ? '<i data-lucide="check" class="la-done-ico"></i>' : ''}<span class="la-tile-text">${escapeHTML(x.text)}</span>${langSpeakChip(x.text, _laStudyCode())}</button>`).join('')}
       </div>
       <div class="la-match-col">
         ${b.map((x, k) => `
           <button class="la-match-btn${_la.matchRight === x.i ? ' is-picked' : ''}${rightDone(x.i) ? ' is-done' : ''}${flash('r', x.i)}"
-                  type="button" onclick="laMatchRight(${x.i})" ${rightDone(x.i) ? 'disabled' : ''}>
-            ${laKeyHTML(a.length + k + 1)}<span class="la-tile-text">${escapeHTML(x.text)}</span>${langSpeakChip(x.text, _laStudyCode())}</button>`).join('')}
+                  type="button" onclick="laMatchRight(${x.i})" ${rightDone(x.i) ? 'disabled' : ''} style="--d:${k + a.length}">
+            ${laKeyHTML(a.length + k + 1)}${rightDone(x.i) ? '<i data-lucide="check" class="la-done-ico"></i>' : ''}<span class="la-tile-text">${escapeHTML(x.text)}</span>${langSpeakChip(x.text, _laStudyCode())}</button>`).join('')}
       </div>
     </div>`;
   }
@@ -591,8 +627,9 @@ function laFootHTML(it, last) {
         <div class="la-fb">
           <div class="la-fb-badge"><i data-lucide="${last.ok ? 'check' : 'x'}"></i></div>
           <div class="la-fb-text">
-            <div class="la-verdict">${last.ok ? LA_PRAISE[_la.idx % LA_PRAISE.length] : last.skipped ? 'Skipped' : 'Incorrect'}${streak}</div>
-            ${last.ok ? '' : laCorrectionHTML(it, last)}
+            <div class="la-verdict">${laVerdictText(last)}${streak}</div>
+            ${last.ok ? laOkExtraHTML(it, last) : laCorrectionHTML(it, last)}
+            ${it.type === 'blank' ? laAfterMeaningHTML(it) : ''}
             ${note}
           </div>
         </div>
@@ -600,13 +637,19 @@ function laFootHTML(it, last) {
       </div>`;
   }
   const ready = laHasAnswer(it);
-  const hint = it.type === 'match'
-    ? '<span class="la-foot-hint">Tap a word, then its partner</span>' : '';
+  const tip = it.type === 'match'
+    ? '<span class="la-foot-hint">Tap a word, then its partner</span>' : '<span class="la-foot-hint"></span>';
+  const showHint = typeof laPrefs === 'function' && laPrefs().hints;
   return `
     <div class="la-foot-inner">
       <button class="la-btn la-btn-ghost" type="button" onclick="laSkip()">Skip</button>
-      ${hint}
-      <button class="la-btn la-btn-primary" id="la-check" type="button" onclick="laPrimary()" ${ready ? '' : 'disabled'}>Check</button>
+      ${tip}
+      <div class="la-foot-right">
+        ${showHint ? `<button class="la-btn la-btn-hint" type="button" onclick="laHint()" ${laHintAvailable(it) ? '' : 'disabled'}
+                title="A hint (H). Costs no heart.">
+          <i data-lucide="lightbulb"></i><span>Hint</span>${_la.help ? `<b>${_la.help}</b>` : ''}</button>` : ''}
+        <button class="la-btn la-btn-primary" id="la-check" type="button" onclick="laPrimary()" ${ready ? '' : 'disabled'}>Check</button>
+      </div>
     </div>`;
 }
 
@@ -783,7 +826,7 @@ function laPrimary() {
   const it = laCurrent();
   if (!it || !laHasAnswer(it)) return;
 
-  let given = '', expected = '', ok = false, diff = null;
+  let given = '', expected = '', ok = false, diff = null, close = '', slip = false;
   if (it.type === 'arrange') {
     const words = _la.picked.map(t => t.text);
     given = words.join(' ');
@@ -802,18 +845,26 @@ function laPrimary() {
   } else if (it.type === 'translate') {
     given = _la.typed;
     expected = it.answer;
-    ok = langAnswersMatch(given, expected);
+    const how = typeof laTypoMatch === 'function' && laPrefs().typos
+      ? laTypoMatch(given, expected)
+      : (langAnswersMatch(given, expected) ? 'exact' : '');
+    ok = !!how;
+    if (how === 'typo' || how === 'accents') close = how;
     diff = laWordDiff(laWords(given), expected);
   } else if (it.type === 'match') {
     const list = _la.matchList || [];
-    ok = _la.matchMiss.length === 0;
+    /* One slip is forgiven in a grid of three or more. Failing a five-pair
+       grid for one mis-tap taught nothing the flash had not already shown. */
+    const free = list.length >= 3 ? 1 : 0;
+    ok = _la.matchMiss.length <= free;
+    slip = ok && _la.matchMiss.length > 0;
     const missed = [];
     _la.matchMiss.forEach(m => { if (missed.indexOf(m.l) < 0) missed.push(m.l); });
     given = ok ? 'all matched' : _la.matchMiss.map(m => list[m.l].left + ' → ' + list[m.r].right).join('; ');
     expected = missed.map(l => list[l].left + ' → ' + list[l].right).join('; ');
   }
 
-  laRecord(it, { ok, given, expected, diff });
+  laRecord(it, { ok, given, expected, diff, close, slip, help: _la.help });
 }
 
 function laSkip() {
@@ -837,9 +888,15 @@ function laRecord(it, res) {
      A question generated from the dictionary carries the word it came from,
      which is what turns a drill into a review schedule rather than a score.
      A skip is not knowing it, so it schedules like a miss. */
-  if (it.wordId && typeof langRecallGrade === 'function') langRecallGrade(it.wordId, !!res.ok);
+  // Right with a hint, a typo or a slip is right -- but not easy, so it comes back sooner.
+  const hard = !!(res.help || res.close || res.slip);
+  if (it.wordId && typeof langRecallGrade === 'function') langRecallGrade(it.wordId, !!res.ok, hard);
   _la.state = 'checked';
   laRender();
+  if (res.ok && typeof laPrefs === 'function' && laPrefs().autoNext) {
+    const at = _la.idx;
+    setTimeout(() => { if (_la && _la.idx === at && _la.state === 'checked') laAdvance(); }, it.note || hard ? 2400 : 1300);
+  }
   if (res.skipped) laSfx('skip');
   else laCelebrate(!!res.ok);
   // Then the right answer, read out -- after the cue, so the two do not collide.
@@ -968,6 +1025,10 @@ function laRetryMistakes() {
 function laOnKey(e) {
   if (!_la || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
   if (document.querySelector('.modal-overlay:not(.hidden)')) return;
+  if (laSettingsOpen()) {
+    if (e.key === 'Escape') { e.preventDefault(); laCloseSettings(); }
+    return;
+  }
   const t = e.target;
   const tag = t && t.tagName;
   const typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || !!(t && t.isContentEditable);
@@ -983,6 +1044,7 @@ function laOnKey(e) {
   }
   if (typing || _la.state !== 'answering') return;
   if (e.key === 'Backspace') { if (laUndo()) e.preventDefault(); return; }
+  if ((e.key === 'h' || e.key === 'H') && laPrefs().hints) { e.preventDefault(); laHint(); return; }
   if (/^[0-9]$/.test(e.key) && laPickByKey(e.key === '0' ? 10 : Number(e.key))) e.preventDefault();
 }
 
@@ -1011,4 +1073,201 @@ function laPickByKey(n) {
     return true;
   }
   return false;
+}
+
+/* ── Fair questions ───────────────────────────────────────── */
+
+/**
+ * The tiles for a question, minus the ones that make it unfair.
+ *
+ * A one-word gap was offered whole phrases -- "maayong buntag" for "___ ko."
+ * -- which can be ruled out by their length alone and so teach nothing; they
+ * stay only if dropping them would leave fewer than two wrong tiles. And a
+ * distractor that IS one of the answer's words makes two right answers when
+ * only one is accepted, so it goes, as does a distractor offered twice.
+ */
+function laFairTokens(it) {
+  const tokens = langTokensFor(it);
+  const nAns = it.type === 'blank' ? 1 : laWords(it.answer).length;
+  const answer = tokens.slice(0, nAns);
+  const inAnswer = answer.map(langNormalizeAnswer);
+  let extra = tokens.slice(nAns).filter(t => inAnswer.indexOf(langNormalizeAnswer(t)) < 0);
+  extra = extra.filter((t, i) => extra.findIndex(x => langNormalizeAnswer(x) === langNormalizeAnswer(t)) === i);
+  if (it.type === 'blank') {
+    const n = laWords(it.answer).length;
+    const sameShape = extra.filter(t => laWords(t).length === n);
+    if (sameShape.length >= 2) extra = sameShape;
+  }
+  return answer.concat(extra);
+}
+
+/** Under a fill-in-the-blank sentence: what the whole sentence means. */
+function laMeaningLineHTML(it) {
+  const m = typeof laSentenceMeaning === 'function' ? laSentenceMeaning(it) : '';
+  if (!m || (!laPrefs().meanings && !_la.showMeaning)) return '';
+  return `<div class="la-meaning"><i data-lucide="languages"></i><span>${escapeHTML(m)}</span></div>`;
+}
+
+/** With meanings switched off, the verdict still says what the sentence meant. */
+function laAfterMeaningHTML(it) {
+  const m = typeof laSentenceMeaning === 'function' ? laSentenceMeaning(it) : '';
+  if (!m || laPrefs().meanings || _la.showMeaning) return '';
+  return `<div class="la-fb-note"><i data-lucide="languages"></i><span>Means: ${escapeHTML(m)}</span></div>`;
+}
+
+/** The answer's shape with the letters a hint has given filled in. */
+function laRevealHTML(answer) {
+  const a = Array.from(String(answer || ''));
+  return `<div class="la-reveal" aria-label="Hint: the answer starts ${escapeHTML(a.slice(0, _la.revealed).join(''))}">
+    ${a.map((ch, i) => /\s/.test(ch)
+      ? '<span class="la-reveal-gap"></span>'
+      : `<span class="la-reveal-cell${i < _la.revealed ? ' is-on' : ''}">${i < _la.revealed ? escapeHTML(ch) : ''}</span>`).join('')}
+  </div>`;
+}
+
+function laVerdictText(last) {
+  if (!last.ok) return last.skipped ? 'Skipped' : 'Incorrect';
+  if (last.close === 'typo') return 'Almost — mind the spelling';
+  if (last.close === 'accents') return 'Correct — mind the accents';
+  if (last.slip) return 'Done — one slip forgiven';
+  if (last.help) return 'Correct, with a hint';
+  return LA_PRAISE[_la.idx % LA_PRAISE.length];
+}
+
+/** A right answer that was not quite clean says what to keep an eye on. */
+function laOkExtraHTML(it, last) {
+  if (last.close) {
+    return `<div class="la-fb-label">It is spelled</div>
+            <div class="la-fb-answer">${escapeHTML(last.expected)}${langSpeakChip(last.expected, _laStudyCode())}</div>
+            <div class="la-fb-yours"><span>You wrote:</span> ${escapeHTML(last.given)}</div>`;
+  }
+  if (last.slip && last.expected) return `<div class="la-fb-yours"><span>Remember:</span> ${escapeHTML(last.expected)}</div>`;
+  return '';
+}
+
+/* ── Hints ────────────────────────────────────────────────────
+   One button, a different kind of help per drill, and never the whole
+   answer: arrange places the next right word (taking back any wrong ones
+   first); fill-in-the-blank clears a wrong tile (or, with meanings switched
+   off, shows the meaning first); multiple choice clears a wrong option;
+   translate gives the next letter; matching makes one pair for you. A hint
+   costs no heart, but a right answer with one is graded as hard, so the
+   word comes back sooner. */
+
+function laWrongTiles(it) {
+  const ans = langNormalizeAnswer(it.answer);
+  return _la.pool.filter(t => langNormalizeAnswer(t.text) !== ans && _la.gone.indexOf(t.id) < 0);
+}
+
+/** For arrange: which of your words to keep, and which to lay down next. */
+function laArrangeHintPlan(it) {
+  const want = laWords(it.answer).map(langNormalizeAnswer);
+  let k = 0;
+  while (k < _la.picked.length && k < want.length && langNormalizeAnswer(_la.picked[k].text) === want[k]) k++;
+  const keep = _la.picked.slice(0, k);
+  if (k >= want.length) return _la.picked.length > k ? { keep, tile: null } : null;
+  const tile = _la.pool.find(t => keep.indexOf(t) < 0 && langNormalizeAnswer(t.text) === want[k]);
+  return tile ? { keep, tile } : null;
+}
+
+function laHintAvailable(it) {
+  if (!_la || _la.state !== 'answering' || !it) return false;
+  if (it.type === 'arrange') return !!laArrangeHintPlan(it);
+  if (it.type === 'blank') {
+    return laWrongTiles(it).length > 1
+      || (!laPrefs().meanings && !_la.showMeaning && !!laSentenceMeaning(it));
+  }
+  if (it.type === 'choice') return (_la.shuffledOptions || []).filter((o, i) => !o.correct && _la.gone.indexOf(i) < 0).length > 1;
+  if (it.type === 'translate') return _la.revealed < String(it.answer || '').length - 1;
+  if (it.type === 'match') return (_la.matchList || []).length - _la.matchDone.length > 1;
+  return false;
+}
+
+function laHint() {
+  if (!_la) return;
+  const it = laCurrent();
+  if (!laHintAvailable(it)) return;
+  _la.help++;
+  laSfx('pair');
+  if (it.type === 'arrange') {
+    const plan = laArrangeHintPlan(it);
+    const before = laSnapTiles();
+    _la.picked = plan.keep.slice();
+    if (plan.tile) _la.picked.push(plan.tile);
+    laRender();
+    laFlip(before, plan.tile ? plan.tile.id : '');
+    if (plan.tile && laSayOn()) laSpeak(plan.tile.text);
+    return;
+  }
+  if (it.type === 'blank') {
+    if (!laPrefs().meanings && !_la.showMeaning && laSentenceMeaning(it)) {
+      _la.showMeaning = true;
+    } else {
+      const wrong = laWrongTiles(it);
+      const t = wrong[Math.floor(Math.random() * wrong.length)];
+      _la.gone.push(t.id);
+      _la.picked = _la.picked.filter(p => p.id !== t.id);
+    }
+  } else if (it.type === 'choice') {
+    const left = [];
+    (_la.shuffledOptions || []).forEach((o, i) => { if (!o.correct && _la.gone.indexOf(i) < 0) left.push(i); });
+    const i = left[Math.floor(Math.random() * left.length)];
+    _la.gone.push(i);
+    if (_la.choice === i) _la.choice = -1;
+  } else if (it.type === 'translate') {
+    const a = String(it.answer || '');
+    _la.revealed = Math.min(a.length - 1, _la.revealed + 1);
+    // A space is not a letter; each hint should give one.
+    if (/\s/.test(a[_la.revealed - 1] || '') && _la.revealed < a.length - 1) _la.revealed++;
+    _la.typed = a.slice(0, _la.revealed);
+  } else if (it.type === 'match') {
+    const i = (_la.matchA || []).map(x => x.i).find(x => !_la.matchDone.some(d => d.l === x || d.r === x));
+    if (i == null) return;
+    _la.matchLeft = _la.matchRight = null;
+    _la.matchDone.push({ l: i, r: i });
+    const seq = ++_laFlashSeq;
+    _la.matchFlash = { l: i, r: i, ok: true, seq };
+    setTimeout(() => {
+      if (_la && _la.matchFlash && _la.matchFlash.seq === seq) { _la.matchFlash = null; laRender(); }
+    }, 550);
+  }
+  laRender();
+}
+
+/* ── Run settings, from inside a run ──────────────────────── */
+
+function laOpenSettings() {
+  const sheet = document.getElementById('la-sheet');
+  if (!sheet || typeof laSettingsHTML !== 'function') return;
+  sheet.innerHTML = `
+    <div class="la-sheet-backdrop" onclick="laCloseSettings()"></div>
+    <div class="la-sheet-panel" role="dialog" aria-modal="true" aria-label="Run settings">
+      <div class="la-sheet-head">
+        <b><i data-lucide="settings-2"></i> Run settings</b>
+        <button class="la-exit" type="button" onclick="laCloseSettings()" aria-label="Close settings"><i data-lucide="x"></i></button>
+      </div>
+      ${laSettingsHTML('run')}
+    </div>`;
+  sheet.hidden = false;
+  laIcons();
+  const first = sheet.querySelector('button.la-switch, .la-seg button');
+  if (first) first.focus({ preventScroll: true });
+}
+
+function laCloseSettings() {
+  const sheet = document.getElementById('la-sheet');
+  if (!sheet) return;
+  sheet.hidden = true;
+  sheet.innerHTML = '';
+}
+
+function laSettingsOpen() {
+  const sheet = document.getElementById('la-sheet');
+  return !!(sheet && !sheet.hidden);
+}
+
+/** A setting changed while a run is on screen: redraw what it affects. */
+function laPrefsChanged(key) {
+  if (!_la || _la.state === 'over' || !document.getElementById('la-shell')) return;
+  if (['meanings', 'hints', 'speakers', 'keys'].indexOf(key) > -1) laRender();
 }

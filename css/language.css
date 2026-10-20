@@ -1087,6 +1087,245 @@ button.la-blank-slot { cursor: pointer; }
   .la-match { grid-template-columns: 1fr; }
 }
 
+/* ============================================================
+   DRILLS, ROUND TWO — help, settings, and a livelier screen
+   ============================================================ */
+
+.la-shell { position: relative; }
+
+.la-count {
+  flex-shrink: 0;
+  font-size: 0.82rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-tertiary);
+}
+.la-heart-inf { margin-left: 0.15rem; font-size: 1.25rem; font-weight: 800; line-height: 1; color: var(--la-bad); }
+
+/* The bar has a slow sheen running through it, so it reads as filling. */
+.la-progress-fill {
+  background: linear-gradient(90deg, var(--la-ok), color-mix(in srgb, var(--la-ok) 65%, #fff), var(--la-ok));
+  background-size: 200% 100%;
+  animation: laFlow 3.5s linear infinite;
+}
+@keyframes laFlow { from { background-position: 100% 0; } to { background-position: -100% 0; } }
+
+/* Tiles, options and cards arrive one after another when a question loads. */
+.la-card.is-new .la-pool .la-tile,
+.la-card.is-new .la-option,
+.la-card.is-new .la-match-btn {
+  animation: laTileIn 0.42s var(--ease-spring, ease) both;
+  animation-delay: calc(var(--d, 0) * 45ms + 120ms);
+}
+@keyframes laTileIn { from { opacity: 0; translate: 0 14px; scale: 0.9; } to { opacity: 1; translate: 0 0; scale: 1; } }
+
+/* What a fill-in-the-blank sentence means, under it. */
+.la-meaning {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: -0.5rem 0 clamp(1.1rem, 3vh, 2rem);
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--color-accent) 12%, var(--bg-surface));
+  color: var(--text-secondary);
+  font-size: calc(var(--la-answer) * 0.95);
+  font-style: italic;
+  font-weight: 600;
+  animation: laRise 0.35s 0.1s var(--ease-expo-out, ease) both;
+}
+.la-meaning svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--color-accent); }
+
+/* The empty gap breathes, so the eye knows where the word goes. */
+.la-blank-slot:not(.is-filled):not(.is-ok):not(.is-bad) {
+  min-height: 1.5em;
+  border: 2px dashed color-mix(in srgb, var(--color-primary) 55%, var(--border-color));
+  border-radius: var(--radius-md);
+  background: var(--color-primary-subtle);
+  animation: laSlotPulse 2s ease-in-out infinite;
+}
+@keyframes laSlotPulse { 50% { border-color: var(--color-primary); box-shadow: 0 0 0 4px var(--color-primary-subtle); } }
+
+/* Ruled out by a hint. */
+.la-tile.is-gone, .la-option.is-gone {
+  opacity: 0.32;
+  box-shadow: none;
+  transform: translateY(var(--la-lip));
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+
+/* After Check, every option says what it means. */
+.la-option-gloss { display: block; margin-top: 0.15rem; font-size: 0.78em; font-weight: 500; color: var(--text-tertiary); }
+.la-option.is-ok .la-option-gloss, .la-option.is-bad .la-option-gloss { color: inherit; opacity: 0.8; }
+
+/* Translate: the letters a hint has given, as boxes on a line. */
+.la-reveal { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.85rem; animation: laRise 0.3s both; }
+.la-reveal-cell {
+  width: 1.55em;
+  height: 1.9em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-bottom: 3px solid var(--border-color);
+  font-size: var(--la-answer);
+  font-weight: 800;
+  color: var(--text-tertiary);
+}
+.la-reveal-cell.is-on { border-color: var(--color-warning); color: var(--color-warning); }
+.la-reveal-gap { width: 0.8em; }
+
+/* A matched pair keeps a tick. */
+.la-done-ico { width: 16px; height: 16px; flex-shrink: 0; color: var(--la-ok); }
+
+/* What the settings switch off. */
+.la-no-keys .la-key { display: none; }
+.la-no-speakers .la-tile .lang-speak-chip,
+.la-no-speakers .la-option .lang-speak-chip,
+.la-no-speakers .la-match-btn .lang-speak-chip,
+.la-no-speakers .la-chip-ph { display: none; }
+
+/* ── The footer's right-hand pair: Hint and Check ── */
+
+.la-foot-hint { flex: 1; text-align: center; }
+.la-foot-right { display: flex; align-items: center; gap: 0.6rem; }
+.la-btn-hint {
+  min-width: 0;
+  padding: 0.75rem 1.1rem;
+  border-color: color-mix(in srgb, var(--color-warning) 45%, var(--border-color));
+  background: color-mix(in srgb, var(--color-warning) 13%, var(--bg-surface));
+  box-shadow: 0 var(--la-lip) 0 color-mix(in srgb, var(--color-warning) 45%, var(--border-color));
+  color: var(--color-warning);
+}
+.la-btn-hint b {
+  min-width: 1.3rem;
+  height: 1.3rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--color-warning);
+  color: #2a1a00;
+  font-size: 0.72rem;
+}
+.la-btn-hint:hover:not(:disabled) { background: color-mix(in srgb, var(--color-warning) 22%, var(--bg-surface)); }
+.la-btn-hint:hover:not(:disabled) svg { animation: laWiggle 0.5s ease; }
+.la-btn-hint:disabled { opacity: 0.4; box-shadow: none; cursor: not-allowed; }
+@keyframes laWiggle { 25% { rotate: -14deg; } 75% { rotate: 14deg; } }
+
+/* Check glows gently once there is something to check. */
+.la-btn-primary:not(:disabled) { animation: laReady 2.2s ease-in-out infinite; }
+@keyframes laReady { 0%, 100% { filter: none; } 50% { filter: brightness(1.14); } }
+
+.la-streak svg { animation: laFlame 0.7s ease-in-out infinite alternate; }
+@keyframes laFlame { from { scale: 1; rotate: -6deg; } to { scale: 1.2; rotate: 6deg; } }
+
+/* ── Run settings: on the drill page and in a sheet during a run ── */
+
+.la-settings {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+.la-set-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.7rem 0.95rem; }
+.la-set-row + .la-set-row { border-top: 1px solid var(--border-color); }
+.la-set-label { display: flex; align-items: center; gap: 0.65rem; min-width: 0; font-size: 0.86rem; font-weight: 600; color: var(--text-primary); }
+.la-set-label > svg { width: 17px; height: 17px; flex-shrink: 0; color: var(--color-primary); }
+.la-set-label small { display: block; margin-top: 1px; font-size: 0.72rem; font-weight: 500; color: var(--text-tertiary); }
+.la-seg { display: inline-flex; flex-shrink: 0; gap: 2px; padding: 3px; border-radius: var(--radius-full); background: var(--bg-surface-hover); }
+.la-seg button {
+  min-width: 2.4rem;
+  padding: 0.3rem 0.65rem;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.la-seg button:hover { color: var(--text-primary); }
+.la-seg button.is-on {
+  background: var(--color-primary);
+  color: var(--text-on-primary);
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--color-primary) 65%, #000);
+}
+.la-switch {
+  position: relative;
+  width: 44px;
+  height: 26px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--bg-surface-hover);
+  box-shadow: inset 0 0 0 1px var(--border-color);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.la-switch i {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  transition: transform 0.25s var(--ease-spring, ease);
+}
+.la-switch.is-on { background: var(--color-success); box-shadow: none; }
+.la-switch.is-on i { transform: translateX(18px); }
+.la-switch:focus-visible, .la-seg button:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+
+.la-sheet { position: absolute; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.la-sheet[hidden] { display: none; }
+.la-sheet-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.45); backdrop-filter: blur(2px); animation: laFade 0.2s ease both; }
+.la-sheet-panel {
+  position: relative;
+  width: min(480px, 100%);
+  max-height: calc(100% - 2rem);
+  padding: 0.9rem;
+  overflow-y: auto;
+  border-radius: var(--radius-xl);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-xl);
+  animation: laSheetIn 0.32s var(--ease-spring, ease) both;
+}
+.la-sheet-head { display: flex; align-items: center; justify-content: space-between; margin: 0 0.2rem 0.7rem; }
+.la-sheet-head b { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 1.05rem; color: var(--text-primary); }
+.la-sheet-head b svg { width: 18px; height: 18px; color: var(--color-primary); }
+@keyframes laFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes laSheetIn { from { opacity: 0; translate: 0 18px; scale: 0.97; } to { opacity: 1; translate: 0 0; scale: 1; } }
+
+@media (max-width: 640px) {
+  .la-sheet { align-items: flex-end; padding: 0; }
+  .la-sheet-panel { width: 100%; border-radius: 20px 20px 0 0; }
+  .la-foot-right { flex: 1 1 100%; }
+  .la-foot-right .la-btn-primary { flex: 1; }
+  .la-count { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .la-progress-fill, .la-card.is-new .la-pool .la-tile, .la-card.is-new .la-option, .la-card.is-new .la-match-btn,
+  .la-meaning, .la-blank-slot, .la-reveal, .la-btn-primary, .la-streak svg, .la-sheet-backdrop, .la-sheet-panel { animation: none !important; }
+}
+
+/* ── No scrollbars in the Language Library ──
+   Every pane, list and popover still scrolls by wheel, touch and keyboard;
+   only the bars are gone. */
+#lang-lib-root, #lang-lib-root *, #lang-admin-root, #lang-admin-root *,
+.la-shell, .la-shell *, .lq-shell, .lq-shell *, .lpv-pop, .lpv-pop * { scrollbar-width: none; }
+#lang-lib-root::-webkit-scrollbar, #lang-lib-root *::-webkit-scrollbar,
+#lang-admin-root::-webkit-scrollbar, #lang-admin-root *::-webkit-scrollbar,
+.la-shell::-webkit-scrollbar, .la-shell *::-webkit-scrollbar,
+.lq-shell::-webkit-scrollbar, .lq-shell *::-webkit-scrollbar,
+.lpv-pop::-webkit-scrollbar, .lpv-pop *::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
 /* ── The card board (pane 1) ──────────────────────────────── */
 
 .lang-board { padding: 0.75rem 0.6rem 0; display: flex; flex-direction: column; gap: 0.4rem; }
