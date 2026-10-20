@@ -1399,8 +1399,10 @@ button.lpv-stat { cursor: pointer; }
    ============================================================ */
 
 .lpv-adm { max-width: 1240px; }
-.home-scroll.lpv-adm-scroll { padding: 1.5rem 2rem 4rem; }
-@media (max-width: 640px) { .home-scroll.lpv-adm-scroll { padding: 0.9rem 0.75rem 4rem; } }
+.home-scroll.lpv-adm-scroll { padding: 1.5rem 2rem 2rem; }
+@media (max-width: 640px) { .home-scroll.lpv-adm-scroll { padding: 0.9rem 0.75rem 2rem; } }
+/* The list's bar is the end of the page: nothing to scroll past it. */
+.home-scroll.lpv-adm-scroll:has(.lpv-adm-dock) { padding-bottom: 0; }
 .lpv-adm-nav { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .lpv-adm-keys { font-size: 0.72rem; color: var(--text-tertiary); }
 .lpv-adm-keys kbd, .lpv-adm .lpv-wordlist-keys kbd {
@@ -1587,8 +1589,10 @@ button.lpv-stat { cursor: pointer; }
   margin: 0 -1.4rem -1.2rem;
   padding: 0.85rem 1.4rem;
   border-top: 0;
-  background: var(--bg-surface);
-  box-shadow: 0 -16px 22px -18px rgba(0, 0, 0, 0.6);
+  background: color-mix(in srgb, var(--bg-surface) 78%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 -12px 28px -16px rgba(0, 0, 0, 0.55);
 }
 .lpv-adm-ed-foot .btn svg { width: 15px; height: 15px; }
 .lpv-adm-err { margin-right: auto; font-size: 0.8rem; font-weight: 700; color: var(--color-danger); }
@@ -2137,10 +2141,12 @@ button.lpv-stat { cursor: pointer; }
 
 /* The list's main action, pinned to the bottom of the screen like the
    Coding admin's form footer, so it is in reach however far you scroll. */
-/* SOLID, AND FLUSH TO THE BOTTOM. The bar faded in from transparent, so the
-   cards showed through behind its count, and its top border read as a line
-   floating over them. It is opaque now, edged with a shadow rather than a
-   rule, and widened past the cards so nothing peeks round its ends. */
+/* FROSTED GLASS, FLUSH TO THE BOTTOM. See-through, so the cards are still
+   felt moving behind it -- but blurred, so nothing behind it is legible, and
+   with no top border to read as a line floating over them. A short fade
+   above the bar eases the cards into it instead of cutting them off.
+   Nothing is hung below it: anything absolutely placed past the bar counts
+   as scrollable, and the page scrolled on into empty space. */
 .lpv-adm-dock {
   position: sticky;
   bottom: 0;
@@ -2151,19 +2157,19 @@ button.lpv-stat { cursor: pointer; }
   gap: 0.75rem;
   margin: 0 -0.75rem;
   padding: 0.75rem;
-  background: var(--bg-body);
-  box-shadow: 0 -16px 22px -18px rgba(0, 0, 0, 0.6);
+  background: color-mix(in srgb, var(--bg-body) 74%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 -12px 28px -16px rgba(0, 0, 0, 0.55);
 }
-/* Belt and braces for the strip under the bar: if anything still sits
-   between it and the edge, this paints over it. */
-.lpv-adm-dock::after, .lpv-adm-ed-foot.is-sticky::after {
+.lpv-adm-dock::before {
   content: '';
   position: absolute;
   left: 0;
   right: 0;
-  top: 100%;
-  height: 2rem;
-  background: inherit;
+  bottom: 100%;
+  height: 1.5rem;
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--bg-body) 55%, transparent));
   pointer-events: none;
 }
 .lpv-adm-dock-hint { font-size: 0.8rem; font-weight: 700; color: var(--text-tertiary); }
