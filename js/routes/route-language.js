@@ -128,6 +128,8 @@ function languageInit() {
   langTagFilters = [];
   langPosFilter = null;
   langTagsExpanded = false;
+  langCmpGaps = false;
+  langCmpShown = LANG_CMP_PAGE;
   langView = getSessionParam('langView') || 'dictionary';
   langViewArg = getSessionParam('langViewArg') || null;
   const target = getSessionParam('langActiveWord');
@@ -141,6 +143,7 @@ function languageDestroy() {
   // Same reason as the other two attempt routes: the utterance queue lives on
   // window, so a word left mid-sentence would follow you off the screen.
   if (typeof speechStop === 'function') speechStop();
+  langCloseTagPicker();
 }
 
 /* ── The language pair ────────────────────────────────────── */
@@ -342,6 +345,8 @@ function renderLangBoard() {
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: host });
 }
 
+let _langLastView = '';
+
 function renderLangDetail() {
   const host = document.getElementById('lang-detail');
   if (!host) return;
@@ -353,10 +358,17 @@ function renderLangDetail() {
   else if (langView === 'run') html = langRunHTML();
   else if (langView === 'scenarios') html = langScenariosHTML();
   if (typeof lpvArtStyles === 'function') lpvArtStyles();
+  /* A filter click redraws the same page. Playing the whole entrance again
+     on every tick read as the page reloading; only a new page slides in. */
+  const key = langView + ':' + (langViewArg || '');
+  host.classList.toggle('lpv-quiet', key === _langLastView);
+  _langLastView = key;
   host.innerHTML = html;
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: host });
   // The previews play by themselves and stop when this pane is redrawn.
   if (typeof lpvBoot === 'function') lpvBoot(host);
+  const activeWord = host.querySelector('.lpv-word.is-active');
+  if (activeWord) langCmpReveal(activeWord);
 }
 
 /* ── Dictionary ───────────────────────────────────────────── */
@@ -522,6 +534,8 @@ function langFilterBarHTML() {
     const p = langForm(w, study).pos;
     if (p && posUsed.indexOf(p) === -1) posUsed.push(p);
   });
+  const nTags = langTagFilters.length;
+  const busy = langQuery || nTags || langPosFilter || (langView === 'compare' && langCmpGaps);
   return `
     <div class="lang-filterbar">
       <div class="search-container" style="flex:1; min-width:200px;">
@@ -529,12 +543,20 @@ function langFilterBarHTML() {
         <input type="text" class="search-input" id="lang-q" placeholder="Search every language…"
                autocomplete="off" value="${escapeHTML(langQuery)}" oninput="langSetQuery(this.value)" />
       </div>
-      ${posUsed.length ? `
-        <select class="form-select lang-filter-select" onchange="langSetPos(this.value)">
+      ${tags.length ? `
+        <button class="lpv-filter-btn${nTags ? ' is-on' : ''}" type="button" onclick="langOpenTagPicker(this)"
+                aria-haspopup="dialog" title="Filter by topic">
+          <i data-lucide="tags"></i> Topics ${nTags ? `<b>${nTags}</b>` : `<em>${tags.length}</em>`}
+          <i data-lucide="chevron-down"></i>
+        </button>` : ''}
+      ${/* Part of speech only narrows the Dictionary -- Compare never applied
+           it, so on that page the dropdown did nothing at all. */ ''}
+      ${posUsed.length && langView === 'dictionary' ? `
+        <select class="form-select lang-filter-select lpv-select${langPosFilter ? ' is-on' : ''}" onchange="langSetPos(this.value)" aria-label="Part of speech">
           <option value="">Any part of speech</option>
           ${posUsed.sort().map(p => `<option value="${p}"${langPosFilter === p ? ' selected' : ''}>${p}</option>`).join('')}
         </select>` : ''}
-      ${(langQuery || langTagFilters.length || langPosFilter) ? `
+      ${busy ? `
         <button class="btn btn-ghost btn-sm" onclick="langClearFilters()">
           <i data-lucide="filter-x" style="width:14px;height:14px;"></i> Clear
         </button>` : ''}
@@ -542,37 +564,184 @@ function langFilterBarHTML() {
     ${langTagbarHTML(tags)}`;
 }
 
-/* The chip cloud was 83 chips at pack size, unconditionally, taking a third
-   of the pane before a single word. Selected tags first, then the rest up to
-   a dozen, then a button for the tail. */
-const LANG_TAGS_SHOWN = 12;
+/* Topics, in two sizes. The chips were 83 of them at pack size in an 11px
+   face -- hard to read and a wall to scan. Now a handful of the most used sit
+   under the search as proper buttons, the ones you have chosen always first,
+   and every topic is one click away in a searchable picker with counts. */
+const LANG_QUICK_TAGS = 8;
 
 function langTagbarHTML(tags) {
   if (!tags.length) return '';
   const chosen = tags.filter(t => langTagFilters.includes(t.tag));
-  const rest = tags.filter(t => !langTagFilters.includes(t.tag));
-  const shown = langTagsExpanded ? rest : rest.slice(0, Math.max(0, LANG_TAGS_SHOWN - chosen.length));
-  const hidden = rest.length - shown.length;
+  const top = tags.filter(t => !langTagFilters.includes(t.tag))
+    .sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
+    .slice(0, Math.max(0, LANG_QUICK_TAGS - chosen.length));
   /* THE BUG THIS REPLACES: the handler was built with JSON.stringify inside a
      double-quoted attribute, so it emitted onclick="langSetTag("food")" and
      the attribute ended at the first quote it wrote. Every one of the 83
      chips threw "Unexpected end of input" on click and filtered nothing --
      silently, because an inline handler only fails when you press it. A data
      attribute cannot be broken by its own contents. */
-  const chip = t => `
-    <button class="lang-tag-chip${langTagFilters.includes(t.tag) ? ' is-active' : ''}" type="button"
-            data-lang-tag="${escapeHTML(t.tag)}"
-            aria-pressed="${langTagFilters.includes(t.tag) ? 'true' : 'false'}"
-            >${escapeHTML(t.tag)} <span>${t.count}</span></button>`;
+  const chip = t => {
+    const on = langTagFilters.includes(t.tag);
+    return `
+    <button class="lang-tag-chip${on ? ' is-active' : ''}" type="button"
+            data-lang-tag="${escapeHTML(t.tag)}" data-tc="${langTagTone(t.tag)}"
+            aria-pressed="${on ? 'true' : 'false'}" title="${on ? 'Remove this filter' : 'Show only ' + escapeHTML(t.tag)}"
+            >${on ? '<i data-lucide="x"></i>' : '<i data-lucide="hash"></i>'}${escapeHTML(t.tag)} <span>${t.count}</span></button>`;
+  };
   return `
     <div class="lang-tagbar" onclick="langTagbarClick(event)">
+      <span class="lang-tagbar-label">${chosen.length ? 'Filtering by' : 'Popular'}</span>
       ${chosen.map(chip).join('')}
-      ${shown.map(chip).join('')}
-      ${hidden > 0 || langTagsExpanded ? `
-        <button class="lang-tag-more" type="button" onclick="langToggleTags(event)">
-          ${langTagsExpanded ? 'Show fewer' : '+' + hidden + ' more'}
+      ${top.map(chip).join('')}
+      ${tags.length > chosen.length + top.length ? `
+        <button class="lang-tag-more" type="button" onclick="langOpenTagPicker(this)">
+          <i data-lucide="layout-grid"></i> All ${tags.length} topics
         </button>` : ''}
     </div>`;
+}
+
+/** A stable colour for a topic, so "food" is the same colour everywhere. */
+function langTagTone(tag) {
+  let h = 0;
+  for (let i = 0; i < tag.length; i++) h = (h * 31 + tag.charCodeAt(i)) >>> 0;
+  return h % 5;
+}
+
+/* ── The topic picker ─────────────────────────────────────────
+   A popover with a search box and a checkbox per topic. Choices are held
+   until "Show N words" -- applying each tick at once would redraw the page
+   under the popover on every click -- and the button counts what the choice
+   would leave, so an empty combination is visible before it is applied. */
+let _langTagPending = null;
+
+function langOpenTagPicker(btn) {
+  langCloseTagPicker();
+  const tags = langAllTags().slice().sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag));
+  _langTagPending = langTagFilters.slice();
+  const pop = document.createElement('div');
+  pop.id = 'lang-tag-pop';
+  pop.className = 'lpv-pop';
+  pop.setAttribute('role', 'dialog');
+  pop.setAttribute('aria-label', 'Filter by topic');
+  pop.innerHTML = `
+    <div class="lpv-pop-head">
+      <div class="search-container">
+        <i data-lucide="search"></i>
+        <input type="text" class="search-input" id="lang-tag-q" placeholder="Find a topic…" autocomplete="off"
+               oninput="langTagPickFind(this.value)" />
+      </div>
+    </div>
+    <div class="lpv-pop-list" onchange="langTagPickToggle(event)">
+      ${tags.map(t => `
+        <label class="lpv-pop-row" data-tag-name="${escapeHTML(t.tag.toLowerCase())}">
+          <input type="checkbox" value="${escapeHTML(t.tag)}"${_langTagPending.includes(t.tag) ? ' checked' : ''} />
+          <span class="lpv-pop-dot" data-tc="${langTagTone(t.tag)}"></span>
+          <span class="lpv-pop-name">${escapeHTML(t.tag)}</span>
+          <em>${t.count}</em>
+        </label>`).join('')}
+      <div class="lpv-pop-none" hidden>No topic by that name.</div>
+    </div>
+    <div class="lpv-pop-foot">
+      <button class="btn btn-ghost btn-sm" type="button" onclick="langTagPickClear()">Clear</button>
+      <button class="btn btn-primary btn-sm" type="button" id="lang-tag-apply" onclick="langTagPickApply()"></button>
+    </div>`;
+  document.body.appendChild(pop);
+  // Under the button, or above it when there is more room there.
+  const r = btn.getBoundingClientRect();
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const width = Math.min(340, vw - 24);
+  pop.style.width = width + 'px';
+  pop.style.left = Math.max(12, Math.min(r.left, vw - width - 12)) + 'px';
+  const below = vh - r.bottom, above = r.top;
+  if (below < 340 && above > below) {
+    pop.style.bottom = (vh - r.top + 6) + 'px';
+    pop.style.maxHeight = Math.max(220, above - 18) + 'px';
+  } else {
+    pop.style.top = (r.bottom + 6) + 'px';
+    pop.style.maxHeight = Math.max(220, below - 18) + 'px';
+  }
+  langTagPickCount();
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: pop });
+  const q = document.getElementById('lang-tag-q');
+  if (q) q.focus();
+  // Next tick, so the click that opened it is not also the click that closes it.
+  setTimeout(() => {
+    if (!document.getElementById('lang-tag-pop')) return;
+    document.addEventListener('mousedown', langTagPickOutside, true);
+    document.addEventListener('keydown', langTagPickKeys, true);
+    document.addEventListener('scroll', langTagPickOutside, true);
+  }, 0);
+}
+
+function langCloseTagPicker() {
+  const pop = document.getElementById('lang-tag-pop');
+  if (pop) pop.remove();
+  document.removeEventListener('mousedown', langTagPickOutside, true);
+  document.removeEventListener('keydown', langTagPickKeys, true);
+  document.removeEventListener('scroll', langTagPickOutside, true);
+  _langTagPending = null;
+}
+
+function langTagPickOutside(e) {
+  const pop = document.getElementById('lang-tag-pop');
+  if (pop && !pop.contains(e.target)) langCloseTagPicker();
+}
+
+function langTagPickKeys(e) {
+  const pop = document.getElementById('lang-tag-pop');
+  if (!pop) return;
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); langCloseTagPicker(); }
+  else if (e.key === 'Enter' && e.target && e.target.id === 'lang-tag-q') { e.preventDefault(); langTagPickApply(); }
+}
+
+function langTagPickToggle(e) {
+  const cb = e.target;
+  if (!cb || cb.type !== 'checkbox' || !_langTagPending) return;
+  const i = _langTagPending.indexOf(cb.value);
+  if (cb.checked && i < 0) _langTagPending.push(cb.value);
+  if (!cb.checked && i > -1) _langTagPending.splice(i, 1);
+  langTagPickCount();
+}
+
+function langTagPickFind(q) {
+  const needle = String(q || '').trim().toLowerCase();
+  let any = false;
+  document.querySelectorAll('#lang-tag-pop .lpv-pop-row').forEach(row => {
+    const hit = !needle || row.dataset.tagName.indexOf(needle) > -1;
+    row.hidden = !hit;
+    if (hit) any = true;
+  });
+  const none = document.querySelector('#lang-tag-pop .lpv-pop-none');
+  if (none) none.hidden = any;
+}
+
+/** How many words the ticked topics would leave, on the apply button. */
+function langTagPickCount() {
+  const btn = document.getElementById('lang-tag-apply');
+  if (!btn || !_langTagPending) return;
+  const keep = langTagFilters;
+  langTagFilters = _langTagPending;
+  const n = (langView === 'compare' ? langCmpList(langStudy(), langRef()) : langFilteredWords(langStudy(), true)).length;
+  langTagFilters = keep;
+  btn.textContent = 'Show ' + n + (n === 1 ? ' word' : ' words');
+}
+
+function langTagPickClear() {
+  if (!_langTagPending) return;
+  _langTagPending = [];
+  document.querySelectorAll('#lang-tag-pop input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+  langTagPickCount();
+}
+
+function langTagPickApply() {
+  if (!_langTagPending) return;
+  langTagFilters = _langTagPending.slice();
+  langShownCount = LANG_PAGE;
+  langCmpShown = LANG_CMP_PAGE;
+  langCloseTagPicker();
+  renderLangDetail();
 }
 
 /** One listener for the whole cloud, so a chip's own text cannot break it. */
@@ -582,17 +751,17 @@ function langTagbarClick(e) {
   langSetTag(chip.getAttribute('data-lang-tag'));
 }
 
-function langToggleTags(e) {
-  if (e) e.stopPropagation();
-  langTagsExpanded = !langTagsExpanded;
-  renderLangDetail();
-}
-
 /* The query is kept out of the re-render: replacing the input while it has
    focus would drop the caret to the end on every keystroke. */
 function langSetQuery(v) {
   langQuery = (v || '').trim();
   langShownCount = LANG_PAGE;   // a new query starts a new list
+  langCmpShown = LANG_CMP_PAGE;
+  langSwapResults();
+}
+
+/** Repaint the results under the filter bar, leaving the search box alone. */
+function langSwapResults() {
   /* Compare has its results in .lang-compare-results, not .lang-entries.
      Looking only for the Dictionary's list sent every keystroke in Compare
      down the full re-render below -- which replaced the box being typed in
@@ -628,12 +797,14 @@ function langSetTag(tag) {
   if (i > -1) langTagFilters.splice(i, 1);
   else langTagFilters.push(tag);
   langShownCount = LANG_PAGE;
+  langCmpShown = LANG_CMP_PAGE;
   renderLangDetail();
 }
 function langSetPos(p) { langPosFilter = p || null; langShownCount = LANG_PAGE; renderLangDetail(); }
 function langClearFilters() {
   langQuery = ''; langTagFilters = []; langPosFilter = null;
   langTagsExpanded = false; langShownCount = LANG_PAGE;
+  langCmpGaps = false; langCmpShown = LANG_CMP_PAGE;
   renderLangDetail();
 }
 
@@ -701,10 +872,25 @@ function langPopup(title, icon, bodyHtml) {
 
 /* ── Search & compare ─────────────────────────────────────── */
 
+/* A list, not a cloud. The word picker was a row of chips -- forty of them,
+   cut off silently, out of a thousand -- so the word you wanted was usually
+   not on screen and there was no way to reach it but typing. Now every match
+   is in a scrolling list beside the comparison, eighty at a time with more on
+   request, and arrow keys walk it. */
+const LANG_CMP_PAGE = 80;
+let langCmpShown = LANG_CMP_PAGE;
+let langCmpGaps = false;      // only words still missing the reference language
+
+/** Every word the filters let through, plus the gaps-only switch. */
+function langCmpList(study, ref) {
+  let list = langFilteredWords(study);
+  if (langCmpGaps) list = list.filter(x => !String(langForm(x, ref).term || '').trim());
+  return list;
+}
+
 function langCompareHTML() {
   const study = langStudy(), ref = langRef();
-  const list = langFilteredWords(study);
-  const w = langActiveWordId ? langFindWord(langActiveWordId) : (list[0] || null);
+  const list = langCmpList(study, ref);
   // How much of the library is readable both ways -- and what to fill in.
   let both = 0;
   langWords().forEach(x => {
@@ -713,13 +899,15 @@ function langCompareHTML() {
   const gaps = langWords().length - both;
 
   return `
-    <div class="lpv-page lpv-tone-accent lpv-cmp">
+    <div class="lpv-page lpv-tone-primary lpv-cmp" data-a="${escapeHTML(study)}" data-b="${escapeHTML(ref)}">
       ${langHeroHTML('columns-2', 'Words', 'Search & compare',
         'Read a word in ' + langName(study) + ' and ' + langName(ref) + ', side by side.', `
-        <div class="lpv-pair" aria-hidden="true">
-          <span class="lpv-pair-lang is-study"><b>${escapeHTML(langShort(study))}</b><em>${escapeHTML(langName(study))}</em></span>
-          <span class="lpv-pair-arrows"><i data-lucide="arrow-right"></i><i data-lucide="arrow-left"></i></span>
-          <span class="lpv-pair-lang"><b>${escapeHTML(langShort(ref))}</b><em>${escapeHTML(langName(ref))}</em></span>
+        <div class="lpv-pair">
+          <span class="lpv-pair-lang is-study" data-lc="${escapeHTML(study)}"><b>${escapeHTML(langShort(study))}</b><em>${escapeHTML(langName(study))}</em></span>
+          <button class="lpv-pair-arrows" type="button" onclick="langSwapPair()" title="Swap the two languages" aria-label="Swap the two languages">
+            <i data-lucide="arrow-right"></i><i data-lucide="arrow-left"></i>
+          </button>
+          <span class="lpv-pair-lang" data-lc="${escapeHTML(ref)}"><b>${escapeHTML(langShort(ref))}</b><em>${escapeHTML(langName(ref))}</em></span>
         </div>`)}
       <div class="lpv-stats lpv-in" style="--i:1">
         <div class="lpv-stat">
@@ -727,31 +915,171 @@ function langCompareHTML() {
           <span class="lpv-stat-body"><b id="lang-showing">${list.length}</b><em>Matching</em></span>
         </div>
         ${langStatHTML('link', both, 'In both languages')}
-        ${langStatHTML('circle-dashed', gaps, 'Missing a translation')}
+        <button class="lpv-stat is-toggle${langCmpGaps ? ' is-on' : ''}" type="button" onclick="langCmpToggleGaps()"
+                aria-pressed="${langCmpGaps ? 'true' : 'false'}"
+                title="${langCmpGaps ? 'Show every word again' : 'Show only the words still missing ' + escapeHTML(langName(ref))}">
+          <span class="lpv-stat-ico"><i data-lucide="circle-dashed"></i></span>
+          <span class="lpv-stat-body"><b>${gaps}</b><em>${langCmpGaps ? 'Showing only these' : 'Missing a translation'}</em></span>
+        </button>
       </div>
       <div class="lpv-in" style="--i:2">${langFilterBarHTML()}</div>
-      <div class="lang-compare-results">
-        <div class="lang-pickrow">
-          ${list.slice(0, 40).map(x => `
-            <button class="lang-pick${w && w.id === x.id ? ' is-active' : ''}" type="button"
-                    onclick="langActiveWordId='${x.id}'; renderLangDetail();">${escapeHTML(langHeadword(x, study))}</button>`).join('')
-            || '<span class="lang-empty">No matches.</span>'}
-        </div>
-        ${w ? `
-          <div class="lang-compare">
-            ${langFormColumnHTML(w, study, true)}
-            ${langFormColumnHTML(w, ref, false)}
-          </div>
-          ${langOtherLangsHTML(w, [study, ref])}` : ''}
-      </div>
+      <div class="lang-compare-results lpv-in" style="--i:3">${langCmpResultsHTML(list, study, ref)}</div>
     </div>`;
+}
+
+/** The list and the comparison -- the part search swaps without a redraw. */
+function langCmpResultsHTML(list, study, ref) {
+  if (!list.length) {
+    return `
+      <div class="lpv-empty">
+        <span class="lpv-empty-ico"><i data-lucide="search-x"></i></span>
+        <b>No words match</b>
+        <p>${langCmpGaps ? 'Every word here has its ' + escapeHTML(langName(ref)) + ' — nothing missing.' : 'Try fewer topics, or another spelling.'}</p>
+        ${langQuery || langTagFilters.length || langCmpGaps ? `<button class="lpv-alt" type="button" onclick="langClearFilters()"><i data-lucide="filter-x"></i> Clear filters</button>` : ''}
+      </div>`;
+  }
+  const active = langActiveWordId ? langFindWord(langActiveWordId) : null;
+  const w = (active && list.indexOf(active) > -1) ? active : list[0];
+  const at = list.indexOf(w);
+  // The word on show is always in the painted part of the list.
+  const shown = Math.max(langCmpShown, at + 1);
+  const rows = list.slice(0, shown).map((x, i) => {
+    const t = langHeadword(x, study);
+    const g = String(langForm(x, ref).term || '').trim();
+    return `
+      <button class="lpv-word${x === w ? ' is-active' : ''}" type="button" role="option"
+              aria-selected="${x === w ? 'true' : 'false'}" data-id="${x.id}" data-i="${i}"
+              onclick="langPickWord('${x.id}')">
+        <b>${escapeHTML(t)}</b>
+        ${g ? `<span>${escapeHTML(g)}</span>` : `<span class="is-gap"><i data-lucide="circle-dashed"></i> no ${escapeHTML(langShort(ref))}</span>`}
+      </button>`;
+  }).join('');
+  return `
+    <div class="lpv-cmp-layout">
+      <div class="lpv-wordlist">
+        <div class="lpv-wordlist-head">
+          <span>${list.length} word${list.length !== 1 ? 's' : ''}</span>
+          <span class="lpv-wordlist-keys"><kbd>↑</kbd><kbd>↓</kbd> to move</span>
+        </div>
+        <div class="lpv-wordlist-rows" role="listbox" aria-label="Words" tabindex="0" onkeydown="langCmpKey(event)">${rows}
+          ${list.length > shown ? `
+            <button class="lpv-wordlist-more" type="button" onclick="langCmpMore()">
+              <i data-lucide="chevron-down"></i> ${Math.min(LANG_CMP_PAGE, list.length - shown)} more of ${list.length - shown}
+            </button>` : ''}
+        </div>
+      </div>
+      <div class="lpv-cmp-main" id="lang-cmp-main">${langCmpMainHTML(w, study, ref, at, list.length)}</div>
+    </div>`;
+}
+
+/** The two columns for one word, with a way to step to its neighbours. */
+function langCmpMainHTML(w, study, ref, at, total) {
+  return `
+    <div class="lpv-cmp-nav">
+      <button class="ag-icon-btn" type="button" onclick="langCmpStep(-1)" ${at <= 0 ? 'disabled' : ''} title="Previous word" aria-label="Previous word">
+        <i data-lucide="chevron-left"></i></button>
+      <span><b>${at + 1}</b> of ${total}</span>
+      <button class="ag-icon-btn" type="button" onclick="langCmpStep(1)" ${at >= total - 1 ? 'disabled' : ''} title="Next word" aria-label="Next word">
+        <i data-lucide="chevron-right"></i></button>
+    </div>
+    <div class="lang-compare">
+      ${langFormColumnHTML(w, study, true)}
+      ${langFormColumnHTML(w, ref, false)}
+    </div>
+    ${langOtherLangsHTML(w, [study, ref])}`;
+}
+
+/* Choosing a word repaints only the comparison and moves the highlight, so
+   the list keeps its scroll position and nothing replays its entrance. */
+function langPickWord(id, focusRow) {
+  const study = langStudy(), ref = langRef();
+  const list = langCmpList(study, ref);
+  const w = langFindWord(id);
+  const at = list.indexOf(w);
+  if (!w || at < 0) return;
+  langActiveWordId = id;
+  const main = document.getElementById('lang-cmp-main');
+  if (!main) { renderLangDetail(); return; }
+  main.innerHTML = langCmpMainHTML(w, study, ref, at, list.length);
+  main.classList.add('is-swap');
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: main });
+  let row = null;
+  document.querySelectorAll('.lpv-word').forEach(r => {
+    const on = r.dataset.id === id;
+    r.classList.toggle('is-active', on);
+    r.setAttribute('aria-selected', on ? 'true' : 'false');
+    if (on) row = r;
+  });
+  if (!row) { langCmpRedraw(focusRow); return; }   // stepped past the painted rows
+  langCmpReveal(row);
+  if (focusRow) row.focus({ preventScroll: true });
+}
+
+/** Keep a row in view inside the list, without scrolling the whole pane. */
+function langCmpReveal(row) {
+  const box = row && row.closest('.lpv-wordlist-rows');
+  if (!box) return;
+  const top = row.offsetTop - box.offsetTop;
+  if (top < box.scrollTop) box.scrollTop = top - 8;
+  else if (top + row.offsetHeight > box.scrollTop + box.clientHeight) box.scrollTop = top + row.offsetHeight - box.clientHeight + 8;
+}
+
+function langCmpStep(d) {
+  const list = langCmpList(langStudy(), langRef());
+  const cur = list.findIndex(x => x.id === langActiveWordId);
+  const next = list[Math.max(0, Math.min(list.length - 1, (cur < 0 ? 0 : cur) + d))];
+  if (!next) return;
+  // Stepping off the end of the painted page paints the next page first.
+  if (list.indexOf(next) >= langCmpShown) langCmpShown += LANG_CMP_PAGE;
+  const inList = !!(document.activeElement && document.activeElement.closest && document.activeElement.closest('.lpv-wordlist-rows'));
+  if (!document.querySelector('.lpv-word[data-id="' + next.id + '"]')) { langActiveWordId = next.id; langCmpRedraw(inList); return; }
+  langPickWord(next.id, inList);
+}
+
+function langCmpKey(e) {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    langCmpStep(e.key === 'ArrowDown' ? 1 : -1);
+  } else if (e.key === 'Home' || e.key === 'End') {
+    e.preventDefault();
+    const list = langCmpList(langStudy(), langRef());
+    const target = e.key === 'Home' ? list[0] : list[list.length - 1];
+    if (!target) return;
+    if (e.key === 'End') langCmpShown = Math.max(langCmpShown, list.length);
+    langActiveWordId = target.id;
+    langCmpRedraw(true);
+  }
+}
+
+/** Redraw the list and comparison, and keep the keyboard in the list. */
+function langCmpRedraw(focusRow) {
+  langSwapResults();
+  const row = document.querySelector('.lpv-word.is-active');
+  if (!row) return;
+  langCmpReveal(row);
+  if (focusRow) row.focus({ preventScroll: true });
+}
+
+function langCmpMore() {
+  const box = document.querySelector('.lpv-wordlist-rows');
+  const keep = box ? box.scrollTop : 0;
+  langCmpShown += LANG_CMP_PAGE;
+  langSwapResults();
+  const again = document.querySelector('.lpv-wordlist-rows');
+  if (again) again.scrollTop = keep;
+}
+
+function langCmpToggleGaps() {
+  langCmpGaps = !langCmpGaps;
+  langCmpShown = LANG_CMP_PAGE;
+  renderLangDetail();
 }
 
 function langFormColumnHTML(w, code, isStudy) {
   const f = langForm(w, code);
   const empty = !(f.term || '').trim();
   return `
-    <div class="lang-col${isStudy ? ' is-study' : ''}${empty ? ' is-empty' : ''}">
+    <div class="lang-col${isStudy ? ' is-study' : ''}${empty ? ' is-empty' : ''}" data-lc="${escapeHTML(code)}">
       <div class="lang-col-head">
         <span class="lang-col-code">${escapeHTML(langShort(code))}</span>
         <span class="lang-col-name">${escapeHTML(langName(code))}</span>
@@ -789,7 +1117,7 @@ function langOtherLangsHTML(w, shown) {
     <h2 class="prog-detail-section-title" style="margin-top:1.5rem;"><i data-lucide="languages"></i> Also recorded</h2>
     <div class="lang-other-row">
       ${filled.map(c => `
-        <button class="lang-other" type="button" onclick="langSetStudy('${c}')" title="Switch to ${escapeHTML(langName(c))}">
+        <button class="lang-other" type="button" data-lc="${c}" onclick="langSetStudy('${c}')" title="Switch to ${escapeHTML(langName(c))}">
           <span class="lang-col-code">${escapeHTML(langShort(c))}</span>
           <span class="lang-other-term">${escapeHTML(langForm(w, c).term)}</span>
         </button>`).join('')}
