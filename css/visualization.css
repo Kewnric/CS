@@ -2978,11 +2978,12 @@
    canvas full of short text notes read as a scatter of blobs. A note is a slab
    now: square corners, a lit top edge, a shaded bottom edge, and a hard offset
    below it so it sits ABOVE the grid rather than being printed on it. */
-/* One hue drives the whole slab: the side face, the shadows it casts and the
-   selected highlight. They were hard-coded amber, so a blue or green note
-   still sat on an amber side face with a brownish shadow. Uncoloured notes
-   keep amber. The side face is opaque (a dark shade of the hue mixed into the
-   canvas tone), so the grid no longer shows through the "solid" edge. */
+/* One hue drives the slab's side face and its selected highlight. They were
+   hard-coded amber, so a blue or green note still sat on an amber edge.
+   Uncoloured notes keep amber. The side face is opaque (a dark shade of the
+   hue mixed into the canvas tone), so the grid no longer shows through the
+   "solid" edge. The shadows it casts stay plain black: tinted with the hue
+   they read as a glow, not a shadow. */
 .viz-node[data-type="comment"] {
   --slab-hue: var(--viz-node-accent, #f59e0b);
   --slab-base: #0b0f1a;
@@ -3013,8 +3014,8 @@
        still read at the ~60% zoom the canvas is usually worked at, since the
        whole layer is scaled down with it. */
     4px 4px 0 color-mix(in srgb, var(--slab-hue) 26%, var(--slab-base)),
-    9px 9px 0 color-mix(in srgb, var(--slab-hue) 8%, rgb(0 0 0 / 0.45)),
-    14px 18px 26px color-mix(in srgb, var(--slab-hue) 14%, rgb(0 0 0 / 0.5)) !important;
+    9px 9px 0 rgba(0, 0, 0, 0.42),
+    14px 18px 26px rgba(0, 0, 0, 0.5) !important;
   transition: box-shadow 0.16s ease, transform 0.16s ease, border-color 0.16s ease !important;
 }
 
@@ -3033,8 +3034,8 @@
     inset 0 -1px 0 rgba(0, 0, 0, 0.55),
     inset -1px 0 0 rgba(0, 0, 0, 0.4),
     5px 5px 0 color-mix(in srgb, var(--slab-hue) 34%, var(--slab-base)),
-    8px 8px 0 color-mix(in srgb, var(--slab-hue) 10%, rgb(0 0 0 / 0.4)),
-    14px 18px 28px color-mix(in srgb, var(--slab-hue) 20%, rgb(0 0 0 / 0.5)) !important;
+    8px 8px 0 rgba(0, 0, 0, 0.36),
+    14px 18px 28px rgba(0, 0, 0, 0.5) !important;
 }
 
 /* Pressed while dragging: the slab sinks onto the board. */
@@ -3045,8 +3046,8 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.08),
     inset 0 -1px 0 rgba(0, 0, 0, 0.5),
     1px 1px 0 color-mix(in srgb, var(--slab-hue) 26%, var(--slab-base)),
-    2px 2px 0 color-mix(in srgb, var(--slab-hue) 8%, rgb(0 0 0 / 0.32)),
-    4px 5px 10px color-mix(in srgb, var(--slab-hue) 12%, rgb(0 0 0 / 0.4)) !important;
+    2px 2px 0 rgba(0, 0, 0, 0.3),
+    4px 5px 10px rgba(0, 0, 0, 0.4) !important;
 }
 
 /* Selected: the lit edge picks up the accent instead of plain white. */
@@ -3059,8 +3060,8 @@
     inset 0 -1px 0 rgba(0, 0, 0, 0.55),
     inset -1px 0 0 rgba(0, 0, 0, 0.4),
     4px 4px 0 color-mix(in srgb, var(--slab-hue) 42%, var(--slab-base)),
-    7px 7px 0 color-mix(in srgb, var(--slab-hue) 10%, rgb(0 0 0 / 0.38)),
-    12px 16px 26px color-mix(in srgb, var(--slab-hue) 24%, rgb(0 0 0 / 0.5)) !important;
+    7px 7px 0 rgba(0, 0, 0, 0.34),
+    12px 16px 26px rgba(0, 0, 0, 0.5) !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
