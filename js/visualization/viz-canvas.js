@@ -396,18 +396,37 @@ function _vizAddPorts(el, nodeId) {
   });
 }
 
+/**
+ * Grow a note to fit its text. A height you dragged is the note's size while
+ * the text fits in it, never a cap: notes are overflow-hidden (so the corner
+ * handle works), and text that outgrew a dragged height was simply cut off
+ * until the corner was dragged out again. Run after render and on every
+ * resize, so the handle can't drag a note smaller than its text either.
+ * Grows by exactly the overflow, so it works whatever the box-sizing.
+ */
+function vizFitNoteHeight(inner) {
+  const over = inner.scrollHeight - inner.clientHeight;
+  if (over <= 1) return false;
+  inner.style.height = (parseFloat(getComputedStyle(inner).height) + over) + 'px';
+  return true;
+}
+
 /** Honour a size the user actually dragged, and only that. */
 function _vizWatchCommentSize(el, node) {
   setTimeout(() => {
     const inner = el.querySelector('.viz-node-inner');
     if (!inner) return;
     if (node._resizeObserver) node._resizeObserver.disconnect();
+    // Before observing, so the fit is part of the size the observer starts from.
+    // Links were drawn to the old edge during render; repaint if it grew.
+    if (vizFitNoteHeight(inner)) vizUpdateSVGLinks();
     // ResizeObserver fires once for the current size the moment it starts
     // observing. Treating that as a resize baked the first layout's height into
     // the note, which then clipped its own text as soon as it grew.
     let initial = true;
     const observer = new ResizeObserver(() => {
       if (initial) { initial = false; return; }
+      if (vizFitNoteHeight(inner)) return;   // grew; the next callback records it
       if (inner.offsetWidth > 0) { node.w = inner.offsetWidth; node.h = inner.offsetHeight; node.userSized = true; }
     });
     observer.observe(inner);

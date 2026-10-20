@@ -988,6 +988,11 @@ function brainRenderCanvas() {
       // next render then called .disconnect() on a plain object and threw.
       const prev = _brainObservers.get(node.id);
       if (prev) prev.disconnect();                  // no per-render leak
+      // A dragged height is the note's size while its text fits, never a cap
+      // that hides the rest (vizFitNoteHeight). Before observing, so the fit
+      // is part of the size the observer starts from. Links were drawn to the
+      // old edge during render, so repaint them if it grew.
+      if (vizFitNoteHeight(inner)) brainUpdateSVGLinks();
       // ResizeObserver always fires once for the current size the moment it
       // starts observing. Treating that as a resize baked the first layout's
       // height into the note for good, and the text was then clipped as soon as
@@ -995,6 +1000,7 @@ function brainRenderCanvas() {
       let initial = true;
       const obs = new ResizeObserver(() => {
         if (initial) { initial = false; return; }
+        if (vizFitNoteHeight(inner)) return;   // grew; the next callback records it
         if (inner.offsetWidth > 0) { node.w = inner.offsetWidth; node.h = inner.offsetHeight; node.userSized = true; }
       });
       obs.observe(inner);
