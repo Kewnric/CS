@@ -2994,12 +2994,20 @@
 .viz-node[data-type="comment"] .viz-node-inner { border-left-width: 0; }
 
 /* Comic lettering for notes (Font Family > Comic, and Manhua's default).
-   Blambot's Anime Ace / CC Wild Words are licensed fonts that cannot ship
-   with the app, so they are used when installed; otherwise the stack falls
-   to faces most machines have. Nothing is fetched: the app works offline. */
+   Bundled so it looks the same on every device: Comic Neue Bold, SIL Open
+   Font License 1.1 (fonts/comic-neue-ofl.txt). Blambot's Anime Ace is
+   licensed and cannot ship with the app. Served from our own origin and
+   precached by sw.js, so it works offline. One weight covers every weight:
+   lettering is set heavy. */
+@font-face {
+  font-family: 'Manga Lettering';
+  src: url('../fonts/comic-neue-bold.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
 :root {
-  --font-comic: 'Anime Ace 2.0 BB', 'Anime Ace', 'CC Wild Words', 'Wild Words',
-    'Komika Text', 'Comic Neue', 'Comic Sans MS', 'Chalkboard SE', cursive;
+  --font-comic: 'Manga Lettering', 'Comic Neue', 'Comic Sans MS', 'Chalkboard SE', cursive;
 }
 
 .viz-scope-legend {

@@ -62,6 +62,8 @@ js/                   ~108 files, ~60k lines
 design-system/        snapshot exported by Claude Design; see the
                       studysession-pro-design skill. A SPEC, not code to import
 audio/                three short SFX (also embedded as base64) + ost/ music
+fonts/                bundled OFL fonts (Comic Neue Bold for comic notes) +
+                      their licence files
 ```
 
 ---

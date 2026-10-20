@@ -24,8 +24,10 @@
    Navigations stay network-first, so a new index.html — and with it a new
    worker — is noticed as soon as the network allows, with the cached shell as
    the offline fallback. */
-const CACHE = 'ssp-v378';
-const SHELL = ['./index.html', './manifest.json'];
+const CACHE = 'ssp-v379';
+// The bundled comic font too, so comic notes letter correctly offline even
+// before one has been shown online.
+const SHELL = ['./index.html', './manifest.json', './fonts/comic-neue-bold.woff2'];
 
 /* Third-party libraries the page loads. Every URL in index.html pins an exact
    version, so a cached copy never goes stale and cache-first is safe. Without
