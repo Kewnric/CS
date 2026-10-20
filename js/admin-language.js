@@ -1753,7 +1753,7 @@ function langScenarioFormHTML() {
           <button class="lpv-adm-who-btn" type="button" onclick="langAdmToggleFacePick()" aria-haspopup="true"
                   aria-expanded="false" title="Choose who they look like">
             <span class="lpv-adm-face lpv-face-${escapeHTML(face)}" id="lang-sc-face"></span>
-            <span class="lpv-adm-who-tag" id="lang-sc-facetag">${langIcon('repeat')} ${escapeHTML(s.face ? langAdmFaceName(s.face) : 'Auto')}</span>
+            <span class="lpv-adm-who-hint" aria-hidden="true">${langIcon('repeat')}</span>
           </button>
           <div class="lpv-face-pick" id="lang-sc-facepick" hidden>${langAdmFacePickHTML(s.face || '', s.npc)}</div>
         </div>
@@ -1991,8 +1991,6 @@ function langAdmPickFace(key) {
     face.className = 'lpv-adm-face lpv-face-' + shown;
     face.classList.remove('is-swap'); void face.offsetWidth; face.classList.add('is-swap');
   }
-  const tag = document.getElementById('lang-sc-facetag');
-  if (tag) tag.innerHTML = langIcon('repeat') + ' ' + escapeHTML(key ? langAdmFaceName(key) : 'Auto');
   const pick = document.getElementById('lang-sc-facepick');
   if (pick) pick.innerHTML = langAdmFacePickHTML(key || '', npc ? npc.value : '');
   langAdmDirty = true;

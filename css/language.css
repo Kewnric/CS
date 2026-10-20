@@ -1315,6 +1315,11 @@ button.la-blank-slot { cursor: pointer; }
   .la-meaning, .la-blank-slot, .la-reveal, .la-btn-primary, .la-streak svg, .la-sheet-backdrop, .la-sheet-panel { animation: none !important; }
 }
 
+/* The admin scrolls inside .home-content, whose bottom padding is a strip
+   that sticky bars stop above -- content scrolled through underneath them.
+   The admin's own scroll area carries its bottom space instead. */
+.home-content:has(#lang-admin-root) { padding-bottom: 0; }
+
 /* ── No scrollbars in the Language Library ──
    Every pane, list and popover still scrolls by wheel, touch and keyboard;
    only the bars are gone. */
