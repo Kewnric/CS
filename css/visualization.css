@@ -4934,3 +4934,40 @@ body.viz-no-anim .app-sidebar {
 .viz-node[data-shape="text"][data-rot="270"] .viz-comment-content { writing-mode: vertical-rl; transform: rotate(180deg); }
 .shape-tl-add:hover { transform: scale(1.12); }
 .viz-canvas-container.brain-locked .shape-tl-add { display: none; }
+
+/* The rotation handle: a round grip above a selected object, on a short stem,
+   turning with it. */
+.shape-rotate {
+  position: absolute;
+  left: 50%;
+  top: -34px;
+  width: 22px;
+  height: 22px;
+  margin-left: -11px;
+  padding: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-primary);
+  background: var(--bg-elevated);
+  color: var(--color-primary);
+  cursor: grab;
+  touch-action: none;
+  z-index: 7;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+.shape-rotate svg { width: 12px; height: 12px; }
+.shape-rotate::after {   /* the stem down to the object */
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 1px;
+  height: 12px;
+  background: color-mix(in srgb, var(--color-primary) 70%, transparent);
+}
+.viz-node[data-shape].selected .shape-rotate { display: flex; }
+.viz-node[data-shape].is-rotating .shape-rotate { cursor: grabbing; background: var(--color-primary); color: #fff; }
+.viz-node.dragging .shape-rotate,
+.viz-canvas-container.brain-locked .shape-rotate { display: none !important; }

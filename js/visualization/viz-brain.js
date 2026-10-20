@@ -968,6 +968,7 @@ function brainRenderCanvas() {
     if (node.shape && !isGlobe) {
       el.dataset.shape = node.shape;
       if (node.rot) el.dataset.rot = node.rot;   // text and the timeline's + follow it in CSS
+      if (node.angle) el.style.rotate = node.angle + 'deg';   // turned by its handle
       // An object's fill is the full Background colour, not a note's dark tint.
       if (node.bg) el.style.setProperty('--shape-fill-c', vizColorMap(node.bg));
     }
@@ -1025,6 +1026,10 @@ function brainRenderCanvas() {
       const grip = el.querySelector('.bb-resize');
       if (grip) grip.addEventListener('pointerdown', e => brainBubbleResizeStart(e, node.id, el));
       if (objectTop) el.insertAdjacentHTML('beforeend', objectTop);
+      if (node.shape) {
+        el.insertAdjacentHTML('beforeend', '<button class="shape-rotate" type="button" title="Drag to rotate (Shift: 15° steps)" aria-label="Rotate"><i data-lucide="rotate-cw"></i></button>');
+        el.querySelector(':scope > .shape-rotate').addEventListener('pointerdown', ev => brainShapeRotateStart(ev, node.id, el));
+      }
       const extend = el.querySelector('.shape-tl-add');
       if (extend) {
         extend.addEventListener('pointerdown', e => e.stopPropagation());
@@ -2100,8 +2105,6 @@ function _brainMarkNodeMenu() {
   mark('#brain-node-border-menu .viz-link-type-option', 'border', node?.border || '');
   const borderRow = document.getElementById('brain-node-border-toggle');
   if (borderRow) borderRow.classList.toggle('hidden', !!node.shape);
-  const rotateRow = document.getElementById('brain-node-rotate');
-  if (rotateRow) rotateRow.classList.toggle('hidden', !node.shape);   // every object turns
   // Manhua's dropdown (and Bubble Shape in it) only exists for a Manhua note:
   // any other border folds it away.
   if (node.border !== 'manhua') {
@@ -2185,20 +2188,50 @@ function brainExtendTimeline(nodeId) {
   brainRenderCanvas(); brainSaveCurrentVersion();
 }
 
-/** Rotate an object a quarter turn; its box turns with it. */
-function brainCtxRotateShape() {
-  const node = brain.contextNodeId && brain.nodes.find(n => n.id === brain.contextNodeId);
-  if (!node || !node.shape) return;
-  const inner = document.querySelector(`.viz-node[data-node-id="${node.id}"] .viz-node-inner`);
-  const w = (inner && inner.offsetWidth) || node.w || 200, h = (inner && inner.offsetHeight) || node.h || 56;
-  brainPushUndo();
-  node.rot = ((node.rot || 0) + 90) % 360;
-  node.w = h; node.h = w; node.userSized = true;
-  brainRenderCanvas(); brainSaveCurrentVersion();
-  brainHideAllMenus();
-}
 
 const BRAIN_TL_PAD = 18;   // the timeline's line starts and ends this far in
+
+/* Rotating an object: drag the round handle above a selected object, as in a
+   drawing program. The angle follows the pointer round the object's centre,
+   with Shift snapping to 15-degree steps, and is stored on the object
+   (node.angle) and applied as a CSS rotate, so the drawing and its label turn
+   together. One undo step per turn. */
+function brainShapeRotateStart(e, nodeId, el) {
+  if ((e.pointerType === 'mouse' && e.button !== 0) || brainIsLocked()) return;
+  e.stopPropagation();
+  e.preventDefault();
+  const node = brain.nodes.find(n => n.id === nodeId);
+  const handle = e.currentTarget;
+  if (!node || !handle) return;
+  // The centre does not move while turning, so measure it once.
+  const r = el.getBoundingClientRect();
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  const angleAt = ev => Math.atan2(ev.clientY - cy, ev.clientX - cx) * 180 / Math.PI;
+  const from = angleAt(e), base = node.angle || 0;
+  let turned = false, angle = base;
+  handle.setPointerCapture(e.pointerId);
+  el.classList.add('is-rotating');
+  const move = ev => {
+    if (!turned) { brainPushUndo(); turned = true; }
+    angle = base + (angleAt(ev) - from);
+    if (ev.shiftKey) angle = Math.round(angle / 15) * 15;
+    angle = ((angle % 360) + 360) % 360;
+    el.style.rotate = angle + 'deg';
+  };
+  const up = () => {
+    handle.removeEventListener('pointermove', move);
+    handle.removeEventListener('pointerup', up);
+    handle.removeEventListener('pointercancel', up);
+    el.classList.remove('is-rotating');
+    if (!turned) return;
+    const target = brain.nodes.find(n => n.id === nodeId);
+    if (target) { if (Math.round(angle) % 360) target.angle = Math.round(angle * 10) / 10; else delete target.angle; }
+    brainSaveCurrentVersion();
+  };
+  handle.addEventListener('pointermove', move);
+  handle.addEventListener('pointerup', up);
+  handle.addEventListener('pointercancel', up);
+}
 
 /** Draw an object into its SVG at the note's current size. */
 function brainPaintShape(el, node) {
