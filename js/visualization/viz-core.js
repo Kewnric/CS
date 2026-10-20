@@ -482,7 +482,8 @@ function vizApplyTransform() {
 
 const VIZ_POPUPS = [
   'viz-depth-popup', 'viz-tint-popup', 'viz-focus-popup', 'viz-views-popup',
-  'viz-more-popup', 'viz-link-type-popup', 'viz-color-mode-popup', 'brain-layout-popup'
+  'viz-more-popup', 'viz-link-type-popup', 'viz-color-mode-popup', 'brain-layout-popup',
+  'viz-sheet-popup', 'viz-sheet-color-popup'
 ];
 
 /** Close every toolbar popup, optionally sparing one. */

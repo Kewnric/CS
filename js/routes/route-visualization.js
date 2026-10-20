@@ -252,6 +252,31 @@ function vizTemplate() {
               </button>
 
               <div class="viz-toolbar-sep"></div>
+
+              <!-- ── The sheet the canvas is drawn on: its pattern and its colour ── -->
+              <div class="viz-toolbar-dropdown">
+                <button class="viz-zoom-btn viz-toolbar-pill-btn" id="viz-sheet-btn" onclick="vizToggleSheetMenu()" title="Sheet pattern" aria-label="Sheet pattern" aria-haspopup="true">
+                  <i data-lucide="grid-2x2" style="width:12px;height:12px;"></i>
+                  <span class="viz-pill-chevron"><i data-lucide="chevron-down" style="width:10px;height:10px;"></i></span>
+                </button>
+                <div id="viz-sheet-popup" class="viz-toolbar-popup hidden" role="menu">
+                  <div class="viz-popup-title">Sheet</div>
+                  ${(typeof VIZ_SHEETS !== 'undefined' ? VIZ_SHEETS : []).map(([id, label]) =>
+                    `<div class="viz-link-type-option" role="menuitem" data-sheet="${id}" onclick="vizSetSheet('${id}')"><span class="viz-sheet-chip" data-sheet="${id}"></span>${label}</div>`).join('')}
+                </div>
+              </div>
+              <div class="viz-toolbar-dropdown">
+                <button class="viz-zoom-btn viz-toolbar-pill-btn" id="viz-sheet-color-btn" onclick="vizToggleSheetColorMenu()" title="Sheet colour" aria-label="Sheet colour" aria-haspopup="true">
+                  <i data-lucide="paint-bucket" style="width:12px;height:12px;"></i>
+                  <span class="viz-pill-chevron"><i data-lucide="chevron-down" style="width:10px;height:10px;"></i></span>
+                </button>
+                <div id="viz-sheet-color-popup" class="viz-toolbar-popup hidden" role="menu">
+                  <div class="viz-popup-title">Sheet colour</div>
+                  ${(typeof VIZ_SHEET_COLORS !== 'undefined' ? VIZ_SHEET_COLORS : []).map(([id, label, swatch]) =>
+                    `<div class="viz-link-type-option" role="menuitem" data-sheet-color="${id}" onclick="vizSetSheetColor('${id}')"><span class="viz-sheet-swatch" style="background:${swatch};"></span>${label}</div>`).join('')}
+                </div>
+              </div>
+              <div class="viz-toolbar-sep"></div>
               <div class="viz-zoom-controls">
                 <button class="viz-zoom-btn" onclick="vizZoomOut()" title="Zoom out (-)" aria-label="Zoom out"><i data-lucide="minus"></i></button>
                 <span class="viz-zoom-level" id="viz-zoom-level" aria-live="polite">100%</span>

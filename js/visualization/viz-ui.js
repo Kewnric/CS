@@ -163,6 +163,67 @@ function vizToggleCanvasToolbar() {
   vizSave();
 }
 
+/* ── The sheet ─────────────────────────────────────────────────
+   What the canvas is drawn on: a pattern (dotted, as it always was, or clear,
+   grid, graph paper, ruled, isometric, cross-hatch, paper grain) and a colour
+   (the dark default, or a white, paper, yellow pad, blueprint, wood,
+   chalkboard, kraft or black sheet). Two attributes on the canvas; the CSS
+   draws the pattern in an ink that suits the colour, so it shows on light
+   sheets and dark. Remembered for every canvas, library and Brain alike. */
+const VIZ_SHEETS = [
+  ['dotted', 'Dotted'], ['clear', 'Clear'], ['grid', 'Grid'], ['graph', 'Graph paper'],
+  ['ruled', 'Ruled lines'], ['iso', 'Isometric'], ['hatch', 'Cross-hatch'], ['grain', 'Paper grain']
+];
+const VIZ_SHEET_COLORS = [
+  ['', 'Default', 'var(--bg-body)'], ['white', 'White', '#ffffff'], ['paper', 'Paper', '#f3ede1'],
+  ['yellow', 'Yellow pad', '#fcf5b8'], ['blueprint', 'Blueprint', '#1d4e89'], ['wood', 'Wood', '#8a5a33'],
+  ['chalk', 'Chalkboard', '#2f4a3a'], ['kraft', 'Kraft', '#c8a47a'], ['black', 'Black', '#0a0a0a']
+];
+
+function _vizSheetPref(key, fallback) {
+  try { return localStorage.getItem(key) || fallback; } catch (_) { return fallback; }
+}
+
+/** Put the saved sheet on the canvas and mark both menus. */
+function vizApplySheet() {
+  const sheet = _vizSheetPref('ssp.vizSheet', 'dotted');
+  const color = _vizSheetPref('ssp.vizSheetColor', '');
+  const c = document.getElementById('viz-canvas-container');
+  if (c) {
+    c.dataset.sheet = sheet;
+    if (color) c.dataset.sheetColor = color; else delete c.dataset.sheetColor;
+  }
+  document.querySelectorAll('#viz-sheet-popup [data-sheet]').forEach(o => {
+    if (o.classList.contains('viz-link-type-option')) o.classList.toggle('active', o.dataset.sheet === sheet);
+  });
+  document.querySelectorAll('#viz-sheet-color-popup [data-sheet-color]').forEach(o => o.classList.toggle('active', o.dataset.sheetColor === color));
+  const sBtn = document.getElementById('viz-sheet-btn');
+  if (sBtn) {
+    sBtn.title = 'Sheet: ' + ((VIZ_SHEETS.find(x => x[0] === sheet) || [, 'Dotted'])[1]);
+    sBtn.classList.toggle('is-active', sheet !== 'dotted');
+  }
+  const cBtn = document.getElementById('viz-sheet-color-btn');
+  if (cBtn) {
+    cBtn.title = 'Sheet colour: ' + ((VIZ_SHEET_COLORS.find(x => x[0] === color) || [, 'Default'])[1]);
+    cBtn.classList.toggle('is-active', !!color);
+  }
+}
+
+function vizToggleSheetMenu() { vizTogglePopup('viz-sheet-popup'); }
+function vizToggleSheetColorMenu() { vizTogglePopup('viz-sheet-color-popup'); }
+
+function vizSetSheet(id) {
+  try { localStorage.setItem('ssp.vizSheet', id); } catch (_) { /* private mode */ }
+  vizApplySheet();
+  vizClosePopups();
+}
+
+function vizSetSheetColor(id) {
+  try { localStorage.setItem('ssp.vizSheetColor', id); } catch (_) { /* private mode */ }
+  vizApplySheet();
+  vizClosePopups();
+}
+
 /* ── Canvas only ───────────────────────────────────────────────
    The coding attempt's zen mode, for the canvas: the app sidebar, this page's
    topbar and the library pane all go, and the canvas takes the window. The
@@ -241,6 +302,7 @@ function _vizRestoreUiState() {
   const page = document.querySelector('.viz-page');
   if (page) page.classList.toggle('hide-top', topHidden);
   _vizSyncFoldButtons();
+  vizApplySheet();
   if (zen) vizToggleZen(true);
 }
 

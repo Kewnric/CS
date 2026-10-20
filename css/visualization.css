@@ -423,9 +423,12 @@
   position: relative;
   overflow: hidden;
   cursor: grab;
-  background-color: var(--bg-body);
+  /* The sheet (vizApplySheet): --sheet-bg is its colour, --sheet-ink the
+     colour its pattern is drawn in. Dotted on the dark default is the canvas
+     as it always was. */
+  background-color: var(--sheet-bg, var(--bg-body));
   background-image:
-    radial-gradient(circle, var(--border-color) 1px, transparent 1px);
+    radial-gradient(circle, var(--sheet-ink, var(--border-color)) 1px, transparent 1px);
   background-size: 24px 24px;
   transition: background-color 0.2s ease;
 }
@@ -4729,3 +4732,94 @@ body.viz-no-anim .app-sidebar {
 
 /* Bubble Shape's list: twelve rows, so it scrolls past a screenful. */
 #brain-node-bubble-menu { max-height: 15rem; overflow-y: auto; scrollbar-width: thin; }
+
+/* ── The sheet: pattern ─────────────────────────────────────────
+   Every pattern is drawn in --sheet-ink, so it follows the sheet's colour. */
+.viz-canvas-container[data-sheet="clear"] { background-image: none; }
+.viz-canvas-container[data-sheet="grid"] {
+  background-image:
+    linear-gradient(var(--sheet-ink, var(--border-color)) 1px, transparent 1px),
+    linear-gradient(90deg, var(--sheet-ink, var(--border-color)) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+/* Graph paper: a fine 12px grid with a heavier line every 60px. */
+.viz-canvas-container[data-sheet="graph"] {
+  background-image:
+    linear-gradient(var(--sheet-ink, var(--border-color)) 1px, transparent 1px),
+    linear-gradient(90deg, var(--sheet-ink, var(--border-color)) 1px, transparent 1px),
+    linear-gradient(color-mix(in srgb, var(--sheet-ink, var(--border-color)) 45%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--sheet-ink, var(--border-color)) 45%, transparent) 1px, transparent 1px);
+  background-size: 60px 60px, 60px 60px, 12px 12px, 12px 12px;
+}
+/* Ruled: a line every 28px and a red margin, like a notepad. */
+.viz-canvas-container[data-sheet="ruled"] {
+  background-image:
+    linear-gradient(90deg, transparent 63px, rgba(220, 38, 38, 0.4) 63px, rgba(220, 38, 38, 0.4) 65px, transparent 65px),
+    linear-gradient(transparent 27px, var(--sheet-ink, var(--border-color)) 27px);
+  background-size: 100% 100%, 100% 28px;
+  background-repeat: no-repeat, repeat;
+}
+/* Isometric: lines at 30, 90 and 150 degrees. */
+.viz-canvas-container[data-sheet="iso"] {
+  background-image:
+    repeating-linear-gradient(30deg, var(--sheet-ink, var(--border-color)) 0 1px, transparent 1px 24px),
+    repeating-linear-gradient(150deg, var(--sheet-ink, var(--border-color)) 0 1px, transparent 1px 24px),
+    repeating-linear-gradient(90deg, var(--sheet-ink, var(--border-color)) 0 1px, transparent 1px 27.7px);
+  background-size: auto;
+}
+.viz-canvas-container[data-sheet="hatch"] {
+  background-image:
+    repeating-linear-gradient(45deg, var(--sheet-ink, var(--border-color)) 0 1px, transparent 1px 14px),
+    repeating-linear-gradient(-45deg, var(--sheet-ink, var(--border-color)) 0 1px, transparent 1px 14px);
+  background-size: auto;
+}
+/* Paper grain: fine noise, mid-grey so it shows on any colour. */
+.viz-canvas-container[data-sheet="grain"] {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5  0 0 0 0 0.5  0 0 0 0 0.5  0.32 0 0 0 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+  background-size: 180px 180px;
+}
+
+/* ── The sheet: colour ──────────────────────────────────────────
+   Each sheet sets its paper and an ink its pattern reads on: dark ink on the
+   light sheets, light ink on the dark ones. */
+.viz-canvas-container[data-sheet-color="white"]     { --sheet-bg: #ffffff; --sheet-ink: rgba(15, 23, 42, 0.12); }
+.viz-canvas-container[data-sheet-color="paper"]     { --sheet-bg: #f3ede1; --sheet-ink: rgba(110, 85, 50, 0.2); }
+.viz-canvas-container[data-sheet-color="yellow"]    { --sheet-bg: #fcf5b8; --sheet-ink: rgba(37, 99, 235, 0.3); }
+.viz-canvas-container[data-sheet-color="blueprint"] { --sheet-bg: #1d4e89; --sheet-ink: rgba(255, 255, 255, 0.24); }
+.viz-canvas-container[data-sheet-color="wood"]      { --sheet-bg: #8a5a33; --sheet-ink: rgba(255, 236, 210, 0.18); }
+.viz-canvas-container[data-sheet-color="chalk"]     { --sheet-bg: #2f4a3a; --sheet-ink: rgba(255, 255, 255, 0.15); }
+.viz-canvas-container[data-sheet-color="kraft"]     { --sheet-bg: #c8a47a; --sheet-ink: rgba(80, 55, 30, 0.24); }
+.viz-canvas-container[data-sheet-color="black"]     { --sheet-bg: #0a0a0a; --sheet-ink: rgba(255, 255, 255, 0.12); }
+/* Wood has a grain of its own under whatever pattern is chosen. */
+.viz-canvas-container[data-sheet-color="wood"]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.07) 0 2px, transparent 2px 11px),
+    repeating-linear-gradient(90deg, rgba(255, 230, 200, 0.05) 0 1px, transparent 1px 37px);
+}
+
+/* The menus: a small preview of each pattern and colour. */
+.viz-sheet-chip,
+.viz-sheet-swatch {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 3px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-body);
+}
+.viz-sheet-chip[data-sheet="dotted"] { background-image: radial-gradient(circle, var(--text-tertiary) 1px, transparent 1px); background-size: 5px 5px; }
+.viz-sheet-chip[data-sheet="grid"],
+.viz-sheet-chip[data-sheet="graph"] {
+  background-image: linear-gradient(var(--text-tertiary) 1px, transparent 1px), linear-gradient(90deg, var(--text-tertiary) 1px, transparent 1px);
+  background-size: 5px 5px;
+}
+.viz-sheet-chip[data-sheet="ruled"] { background-image: linear-gradient(transparent 3px, var(--text-tertiary) 3px); background-size: 100% 4px; }
+.viz-sheet-chip[data-sheet="iso"],
+.viz-sheet-chip[data-sheet="hatch"] {
+  background-image: repeating-linear-gradient(45deg, var(--text-tertiary) 0 1px, transparent 1px 4px), repeating-linear-gradient(-45deg, var(--text-tertiary) 0 1px, transparent 1px 4px);
+}
+.viz-sheet-chip[data-sheet="grain"] { background-image: radial-gradient(circle at 30% 40%, var(--text-tertiary) 0.5px, transparent 1px), radial-gradient(circle at 70% 70%, var(--text-tertiary) 0.5px, transparent 1px); background-size: 4px 4px, 5px 5px; }
