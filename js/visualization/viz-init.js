@@ -255,14 +255,24 @@ function initVisualization() {
   // Back to Brain if that is where you were: a refresh used to land on Programs
   // every time. It starts on the libraries above so the pane, the toolbar label
   // and the strip are set up together, then switches the ordinary way.
-  let surface = 'library';
-  try { surface = localStorage.getItem('ssp.vizSurface') || 'library'; } catch (_) { /* private mode */ }
+  // Brain is the default: with nothing saved, or once for everyone when it
+  // became the default (ssp.vizBrainDefault), Visualize opens on Brain; after
+  // that it opens wherever you last were.
+  let surface = 'brain';
+  try {
+    if (!localStorage.getItem('ssp.vizBrainDefault')) localStorage.setItem('ssp.vizBrainDefault', '1');
+    else surface = localStorage.getItem('ssp.vizSurface') || 'brain';
+  } catch (_) { /* private mode */ }
   if (surface === 'brain' && typeof vizSetSurface === 'function') vizSetSurface('brain');
+  // The strip was drawn before the saved libraries were loaded.
+  if (typeof _vizPaintStripView === 'function') _vizPaintStripView();
 }
 
 /** Remove all document-level listeners added by initVisualization so they
  *  don't stack across SPA navigations. */
 function destroyVisualization() {
+  // The Build Mode menu lives on <body>.
+  if (typeof vizCloseBuildMenu === 'function') vizCloseBuildMenu();
   // Canvas only hides the app sidebar; no other page should inherit that.
   // (The preference stays, so coming back restores it.)
   document.body.classList.remove('viz-zen', 'viz-zen-nosidebar');

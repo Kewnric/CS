@@ -5240,3 +5240,67 @@ body.viz-no-anim .app-sidebar {
   hyphens: none;
 }
 .viz-node[data-type="comment"] .brain-code code { font: inherit; color: inherit; background: none; padding: 0; border: 0; }
+
+/* ── Brain | Build Mode ────────────────────────────────────────
+   The strip's two switches. Build Mode names the libraries it shows and opens
+   a menu of them; the menu sits on <body> (the strip clips its overflow). */
+.viz-tab-build .viz-build-sub {
+  font-weight: 500;
+  opacity: 0.75;
+  padding-left: 0.4rem;
+  margin-left: 0.1rem;
+  border-left: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+}
+.viz-tab-build .viz-build-chev { width: 13px; height: 13px; margin-left: -0.1rem; transition: transform 0.18s ease; }
+.viz-tab-build.is-open .viz-build-chev { transform: rotate(180deg); }
+.viz-build-menu {
+  position: fixed;
+  z-index: 3000;
+  min-width: 200px;
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  animation: scaleIn 0.14s ease-out;
+  transform-origin: top left;
+}
+.viz-build-menu-head {
+  padding: 0.35rem 0.6rem 0.3rem;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.viz-build-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.5rem 0.6rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: 600 0.8125rem/1.2 var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+.viz-build-item span { flex: 1; }
+.viz-build-item > svg { width: 15px; height: 15px; flex-shrink: 0; }
+.viz-build-item:hover,
+.viz-build-item:focus-visible { background: color-mix(in srgb, var(--text-primary) 8%, transparent); color: var(--text-primary); outline: none; }
+.viz-build-item .viz-build-tick { opacity: 0; color: var(--color-primary); }
+.viz-build-item.active { color: var(--color-primary); background: var(--color-primary-subtle); }
+.viz-build-item.active .viz-build-tick { opacity: 1; }
+.viz-build-menu-hint {
+  margin-top: 0.15rem;
+  padding: 0.4rem 0.6rem 0.2rem;
+  border-top: 1px solid color-mix(in srgb, var(--border-color) 70%, transparent);
+  font-size: 0.6875rem;
+  color: var(--text-tertiary);
+}

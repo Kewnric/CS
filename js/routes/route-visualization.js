@@ -1,30 +1,20 @@
 /* Route: visualization */
 
 /* ── The strip ─────────────────────────────────────────────────
-   Five buttons used to mix two unrelated questions: which LIBRARY you were
-   looking at (Programs / Snippets / Notebooks), the union of all three
-   ("General"), and a completely different surface that shares only the chrome
-   (Brain). It is two controls now — a multi-select of libraries, and a switch
-   to Brain — which is why General no longer needs to exist as a thing.
-
-   They are toggle buttons rather than a tablist, because more than one can be
-   on at once; a plain click selects just that library, shift-click adds. */
+   Two switches: Brain, your own versioned maps, and Build Mode, the library
+   map. Build Mode is a dropdown holding the libraries (Programs, Snippets,
+   Notebooks): a plain click shows just that one, shift-click adds or removes
+   one, so any combination can still be on at once. The button names what is
+   selected. Brain comes first and is where Visualize opens. */
 function vizScopeChipsHTML() {
-  return VIZ_LIBRARY_SCOPES.map((sc, i) => {
-    const m = VIZ_SCOPE_META[sc];
-    const on = i === 0;
-    return `<button class="viz-module-tab${on ? ' active' : ''}" data-scope="${sc}"
-        id="viz-scope-${sc}" aria-pressed="${on}"
-        title="Show ${m.label} — shift-click to add a library"
-        onclick="vizScopeClick(event, '${sc}')" onkeydown="vizStripKey(event)">
-        <i data-lucide="${m.icon}"></i> ${m.label}</button>`;
-  }).join('')
-    + '<span class="viz-scope-count hidden" id="viz-scope-count" aria-live="polite"></span>'
-    + '<span class="viz-strip-sep" aria-hidden="true"></span>'
-    + `<button class="viz-module-tab viz-tab-brain" data-surface="brain" aria-pressed="false"
-        title="Brain — your own versioned maps, not a library"
+  return `<button class="viz-module-tab viz-tab-brain" data-surface="brain" aria-pressed="false"
+        title="Brain: your own versioned maps"
         onclick="vizSetSurface('brain')" onkeydown="vizStripKey(event)">
-        <i data-lucide="brain-circuit"></i> Brain</button>`;
+        <i data-lucide="brain-circuit"></i> Brain</button>`
+    + `<button class="viz-module-tab viz-tab-build active" id="viz-build-btn" data-surface="library" aria-pressed="true"
+        aria-haspopup="menu" aria-expanded="false" title="Build Mode: Programs, Snippets and Notebooks"
+        onclick="vizToggleBuildMenu(event)" onkeydown="vizStripKey(event)">
+        <i data-lucide="hammer"></i> Build Mode<span class="viz-build-sub" id="viz-build-sub"></span><i data-lucide="chevron-down" class="viz-build-chev"></i></button>`;
 }
 
 /** Left/Right move along the strip, the way a group of buttons should. */

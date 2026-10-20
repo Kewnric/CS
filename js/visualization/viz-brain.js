@@ -1225,7 +1225,7 @@ function brainNodeClick(e, nodeId) {
         const bridgeSrc = isBridge ? (fromNode && fromNode.collapsed ? fromId : nodeId) : null;
         brain.links.push({
           id: 'bl_' + generateId(), from: fromId, to: nodeId,
-          color: null, fromSide, toSide,
+          color: null, ..._brainLastLinkStyle(), fromSide, toSide,
           isBridge: isBridge || false, bridgeSourceId: bridgeSrc
         });
         brainRenderCanvas(); brainSaveCurrentVersion();
@@ -1853,7 +1853,7 @@ function brainAddLink(fromId, toId) {
   const toNode = brain.nodes.find(n => n.id === toId);
   const isBridge = (fromNode && fromNode.collapsed) || (toNode && toNode.collapsed);
   const bridgeSourceId = isBridge ? (fromNode && fromNode.collapsed ? fromId : toId) : null;
-  brain.links.push({ id: 'bl_' + generateId(), from: fromId, to: toId, color: null, isBridge: isBridge || false, bridgeSourceId });
+  brain.links.push({ id: 'bl_' + generateId(), from: fromId, to: toId, color: null, ..._brainLastLinkStyle(), isBridge: isBridge || false, bridgeSourceId });
   brainRenderCanvas(); brainSaveCurrentVersion();
 }
 
@@ -1941,7 +1941,7 @@ function brainPortDragStart(e, nodeId, side, opts) {
           const bridgeSrc = isBridge ? (fromNode && fromNode.collapsed ? fromId : nodeId) : null;
           brain.links.push({
             id: 'bl_' + generateId(), from: fromId, to: nodeId,
-            color: null, fromSide, toSide: side,
+            color: null, ..._brainLastLinkStyle(), fromSide, toSide: side,
             isBridge: isBridge || false, bridgeSourceId: bridgeSrc
           });
           brainRenderCanvas(); brainSaveCurrentVersion();
@@ -2050,9 +2050,11 @@ function brainPortDragStart(e, nodeId, side, opts) {
         const isBridge = (fromNode && fromNode.collapsed) || (toNode && toNode.collapsed);
         const bridgeSourceId = isBridge ? (fromNode && fromNode.collapsed ? nodeId : targetNodeId) : null;
         const made = { id: 'bl_' + generateId(), from: nodeId, to: targetNodeId, color: null, fromSide: side, toSide, isBridge: isBridge || false, bridgeSourceId };
-        // A link end grabbed and dropped here keeps the link's look, and its
-        // direction when it was the start that moved (brainLinkGrab).
+        // A new link takes the look you last gave one; a link end grabbed and
+        // dropped here keeps its own look, and its direction when it was the
+        // start that moved (brainLinkGrab).
         if (opts && opts.carry) Object.assign(made, opts.carry);
+        else Object.assign(made, _brainLastLinkStyle());
         if (opts && opts.reverse) {
           [made.from, made.to] = [made.to, made.from];
           [made.fromSide, made.toSide] = [made.toSide, made.fromSide];
@@ -2976,11 +2978,30 @@ function _brainToggleCtxSub(e, menuId, subId, toggleId) {
   if (over > 0) menu.style.top = Math.max(6, r.top - over) + 'px';
 }
 
+/* ── The last look you gave a link ──────────────────────────────
+   Changing a link's colour or connector type remembers both, and every link
+   you draw after that starts with them, so a run of red double arrows does
+   not need setting up one link at a time. Per device, like the note style. */
+function _brainRememberLinkStyle(link) {
+  if (!link) return;
+  const style = { color: link.color || null, arrowType: link.arrowType || null };
+  try { localStorage.setItem('ssp.brainLinkStyle', JSON.stringify(style)); } catch (_) { /* private mode */ }
+}
+function _brainLastLinkStyle() {
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem('ssp.brainLinkStyle') || '{}') || {}; } catch (_) { saved = {}; }
+  const style = {};
+  if (typeof saved.color === 'string' && saved.color) style.color = saved.color;
+  if (typeof saved.arrowType === 'string' && saved.arrowType && saved.arrowType !== 'arrow') style.arrowType = saved.arrowType;
+  return style;
+}
+
 function brainCtxSetLinkArrow(type) {
   const link = brain.contextLinkId && brain.links.find(l => l.id === brain.contextLinkId);
   if (!link || (link.arrowType || 'arrow') === type) { brainHideAllMenus(); return; }
   brainPushUndo();
   link.arrowType = type;
+  _brainRememberLinkStyle(link);
   brainRenderCanvas(); brainSaveCurrentVersion();
   brainHideAllMenus();
 }
@@ -3013,7 +3034,7 @@ function brainCtxEditLinkColor(color) {
   const link = brain.links.find(l => l.id === brain.contextLinkId);
   if (!link) { brainHideAllMenus(); return; }
   brainPushUndo();
-  if (link) { link.color = color; brainRenderCanvas(); brainSaveCurrentVersion(); }
+  if (link) { link.color = color; _brainRememberLinkStyle(link); brainRenderCanvas(); brainSaveCurrentVersion(); }
   brainHideAllMenus();
 }
 

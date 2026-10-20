@@ -478,22 +478,114 @@ function _vizPaintStrip() {
   // Every switch of surface comes through here (never page load), so this is
   // where the choice is remembered for the next visit (see initVisualization).
   try { localStorage.setItem('ssp.vizSurface', isBrain ? 'brain' : 'library'); } catch (_) { /* private mode */ }
-  document.querySelectorAll('.viz-module-tab[data-scope]').forEach(t => {
-    const on = !isBrain && viz.scopes.includes(t.dataset.scope);
-    t.classList.toggle('active', on);
-    t.setAttribute('aria-pressed', String(on));
-  });
+  _vizPaintStripView();
+}
+
+/** Paint the two switches and the Build Mode menu; stores nothing. */
+function _vizPaintStripView() {
+  const isBrain = viz.activeModule === 'brain';
   const brainBtn = document.querySelector('.viz-module-tab[data-surface="brain"]');
   if (brainBtn) {
     brainBtn.classList.toggle('active', isBrain);
     brainBtn.setAttribute('aria-pressed', String(isBrain));
   }
-  const count = document.getElementById('viz-scope-count');
-  if (count) {
-    const n = viz.scopes.length;
-    count.textContent = (!isBrain && n > 1) ? n + ' libraries' : '';
-    count.classList.toggle('hidden', isBrain || n < 2);
+  const buildBtn = document.getElementById('viz-build-btn');
+  if (buildBtn) {
+    buildBtn.classList.toggle('active', !isBrain);
+    buildBtn.setAttribute('aria-pressed', String(!isBrain));
   }
+  // The button names the libraries Build Mode shows: one by name, else a count.
+  const sub = document.getElementById('viz-build-sub');
+  if (sub) {
+    const n = viz.scopes.length;
+    sub.textContent = n === 1 ? vizModuleMeta(viz.scopes[0]).label
+      : n === VIZ_LIBRARY_SCOPES.length ? 'All' : n + ' libraries';
+  }
+  document.querySelectorAll('#viz-build-menu [data-scope]').forEach(t => {
+    const on = !isBrain && viz.scopes.includes(t.dataset.scope);
+    t.classList.toggle('active', on);
+    t.setAttribute('aria-checked', String(on));
+  });
+}
+
+/* ── The Build Mode dropdown ──────────────────────────────────────
+   Built on <body> when opened and removed when closed: the strip clips what
+   overflows it (it folds away by width), so a menu inside it would be cut
+   off. Placed under the button; closes on a click outside, Escape, a resize,
+   leaving Visualize, or after a plain click picks a library. */
+function vizToggleBuildMenu(e) {
+  if (e) e.stopPropagation();
+  if (document.getElementById('viz-build-menu')) { vizCloseBuildMenu(); return; }
+  const btn = document.getElementById('viz-build-btn');
+  if (!btn) return;
+  const menu = document.createElement('div');
+  menu.id = 'viz-build-menu';
+  menu.className = 'viz-build-menu';
+  menu.setAttribute('role', 'menu');
+  menu.setAttribute('aria-label', 'Build Mode libraries');
+  menu.innerHTML = '<div class="viz-build-menu-head">Build Mode</div>'
+    + VIZ_LIBRARY_SCOPES.map(sc => {
+      const m = VIZ_SCOPE_META[sc];
+      return `<button type="button" class="viz-build-item" role="menuitemcheckbox" data-scope="${sc}" aria-checked="false">
+        <i data-lucide="${m.icon}"></i><span>${m.label}</span><i data-lucide="check" class="viz-build-tick"></i></button>`;
+    }).join('')
+    + '<div class="viz-build-menu-hint">Shift-click to show several</div>';
+  document.body.appendChild(menu);
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: menu });
+  menu.querySelectorAll('.viz-build-item').forEach(item => {
+    item.onclick = ev => {
+      const several = ev.shiftKey || ev.ctrlKey || ev.metaKey;
+      // From Brain, any pick (shift or not) opens Build Mode on that library.
+      if (several && viz.activeModule !== 'brain') vizToggleScope(item.dataset.scope);
+      else vizSetScopes([item.dataset.scope]);
+      if (!several) vizCloseBuildMenu();
+      else _vizPaintStripView();
+    };
+  });
+  const r = btn.getBoundingClientRect();
+  menu.style.left = Math.max(8, Math.min(r.left, innerWidth - menu.offsetWidth - 8)) + 'px';
+  menu.style.top = (r.bottom + 6) + 'px';
+  btn.setAttribute('aria-expanded', 'true');
+  btn.classList.add('is-open');
+  _vizPaintStripView();
+  document.addEventListener('pointerdown', _vizBuildOutside, true);
+  document.addEventListener('keydown', _vizBuildKey, true);
+  window.addEventListener('resize', vizCloseBuildMenu);
+  const first = menu.querySelector('.viz-build-item.active') || menu.querySelector('.viz-build-item');
+  if (first && e && e.detail === 0) first.focus();   // opened from the keyboard
+}
+
+function vizCloseBuildMenu() {
+  const menu = document.getElementById('viz-build-menu');
+  if (menu) menu.remove();
+  const btn = document.getElementById('viz-build-btn');
+  if (btn) { btn.setAttribute('aria-expanded', 'false'); btn.classList.remove('is-open'); }
+  document.removeEventListener('pointerdown', _vizBuildOutside, true);
+  document.removeEventListener('keydown', _vizBuildKey, true);
+  window.removeEventListener('resize', vizCloseBuildMenu);
+}
+
+function _vizBuildOutside(e) {
+  if (e.target.closest && (e.target.closest('#viz-build-menu') || e.target.closest('#viz-build-btn'))) return;
+  vizCloseBuildMenu();
+}
+
+/** Escape closes; Up/Down move between the libraries. */
+function _vizBuildKey(e) {
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    vizCloseBuildMenu();
+    const btn = document.getElementById('viz-build-btn');
+    if (btn) btn.focus();
+    return;
+  }
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  const items = [...document.querySelectorAll('#viz-build-menu .viz-build-item')];
+  if (!items.length) return;
+  e.preventDefault();
+  const i = items.indexOf(document.activeElement);
+  const next = i < 0 ? 0 : (i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+  items[next].focus();
 }
 
 /* ── Local graph ───────────────────────────────────────────────
