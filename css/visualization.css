@@ -4967,7 +4967,12 @@ body.viz-no-anim .app-sidebar {
   height: 12px;
   background: color-mix(in srgb, var(--color-primary) 70%, transparent);
 }
-.viz-node[data-shape].selected .shape-rotate { display: flex; }
+/* Only while hovered (or mid-turn), not whenever selected. */
+.viz-node[data-shape]:hover .shape-rotate,
+.viz-node[data-shape].is-rotating .shape-rotate { display: flex; }
+/* An invisible bridge over the gap down to the object, so moving up to the
+   handle does not leave the hover that shows it. */
+.shape-rotate::before { content: ''; position: absolute; left: -8px; right: -8px; top: 100%; height: 14px; }
 .viz-node[data-shape].is-rotating .shape-rotate { cursor: grabbing; background: var(--color-primary); color: #fff; }
 .viz-node.dragging .shape-rotate,
 .viz-canvas-container.brain-locked .shape-rotate { display: none !important; }
@@ -5087,3 +5092,17 @@ body.viz-no-anim .app-sidebar {
   height: 18px;
   background: color-mix(in srgb, var(--border-color) 70%, transparent);
 }
+
+/* ── Resize grips only while hovered ───────────────────────────
+   The text area's resize corner was always drawn, on every note and object.
+   It now stays invisible (still working) until the pointer is over the note,
+   then shows as a light double stroke; objects draw it in their line colour
+   so it reads on any sheet. Manhua's own grip fades in the same way. */
+.viz-node[data-type="comment"] .viz-node-inner::-webkit-resizer { background: transparent; }
+.viz-node[data-type="comment"]:hover .viz-node-inner::-webkit-resizer {
+  background: linear-gradient(135deg, transparent 50%, var(--grip, rgba(230, 237, 243, 0.55)) 50% 58%,
+    transparent 58% 74%, var(--grip, rgba(230, 237, 243, 0.55)) 74% 82%, transparent 82%);
+}
+.viz-node[data-shape] { --grip: color-mix(in srgb, var(--shape-ink) 60%, transparent); }
+.bb-resize { opacity: 0; transition: opacity 0.15s ease; }
+.viz-node:hover .bb-resize { opacity: 1; }
