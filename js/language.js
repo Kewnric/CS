@@ -342,6 +342,27 @@ const LANG_SPEECH_TAG = { en: 'en-US', fil: 'fil-PH', ceb: 'ceb-PH', war: 'war-P
 
 function langSpeechTag(code) { return LANG_SPEECH_TAG[code] || undefined; }
 
+/* ── Lists that load as you scroll ────────────────────────────
+   A capped list used to end in a "60 more" button, so reaching the words
+   under Z meant pressing it fourteen times. The button stays (it is the
+   fallback, and says how many are left), but it presses itself once it
+   comes within reach of the bottom of whatever is scrolling it. One observer
+   per list, keyed, so a redrawn list does not leave old observers firing. */
+const _langAutoMoreIO = {};
+
+function langAutoMore(btn, key) {
+  if (_langAutoMoreIO[key]) { _langAutoMoreIO[key].disconnect(); _langAutoMoreIO[key] = null; }
+  if (!btn || typeof IntersectionObserver === 'undefined') return;
+  const io = new IntersectionObserver(entries => {
+    if (!entries.some(e => e.isIntersecting) || !btn.isConnected) return;
+    io.disconnect();
+    if (_langAutoMoreIO[key] === io) _langAutoMoreIO[key] = null;
+    btn.click();
+  }, { rootMargin: '0px 0px 320px 0px' });
+  _langAutoMoreIO[key] = io;
+  io.observe(btn);
+}
+
 /**
  * Whether this device actually has a voice for a language.
  *

@@ -32,6 +32,9 @@ let langAdmSetQuery = '';
 let langAdmSetFilter = 'all';    // all | ready | todo
 let langAdmOpen = {};            // question / encounter ids unfolded in an editor
 let langAdmCopyOf = '';          // a draft that started as a duplicate says so
+let langAdmSelecting = false;    // the word list shows ticks for a bulk delete
+let langAdmNewId = '';           // a question / encounter just added (it may animate in)
+let _langAdmLastKey = '';        // what the body showed last, so a redraw of it stays still
 
 /* Admin had no search at all. With the starter pack that is 1,008 rows,
    19,223 DOM nodes and 2,022 icons, rebuilt in full after every single edit
@@ -71,7 +74,7 @@ function adminLanguageTemplate() {
             <span class="lpv-adm-keys"><kbd>Ctrl</kbd>+<kbd>S</kbd> saves · <kbd>Esc</kbd> closes an editor</span>
           </div>
           ${hero}
-          <div class="lpv-stats lpv-in" style="--i:1" id="lang-adm-stats"></div>
+          <div class="lpv-stats is-compact lpv-in" style="--i:1" id="lang-adm-stats"></div>
           <div class="lpv-adm-tabs lpv-in" style="--i:2" id="lang-admin-tabs" role="tablist"></div>
           <div id="lang-admin-body"></div>
         </div>
@@ -94,6 +97,9 @@ function adminLanguageInit() {
   langAdmDirty = false;
   langAdmFlash = '';
   langAdmCopyOf = '';
+  langAdmSelecting = false;
+  langAdmNewId = '';
+  _langAdmLastKey = '';
   langAdminTab = getSessionParam('langAdminTab') || 'words';
   const editId = getSessionParam('langAdminEdit');
   const wordId = getSessionParam('langAdminWord');
@@ -184,22 +190,21 @@ function langCancelDraft() {
 function renderLangAdmin() {
   const tabs = document.getElementById('lang-admin-tabs');
   const body = document.getElementById('lang-admin-body');
-  const stats = document.getElementById('lang-adm-stats');
   if (!tabs || !body) return;
   // Whatever is typed into an open editor survives the redraw.
   langAdmSyncDrafts();
   if (typeof lpvArtStyles === 'function') lpvArtStyles();
-  if (stats) stats.innerHTML = langAdmStatsHTML();
-  tabs.innerHTML = LANG_ADM_TABS.map(t => {
-    const n = t.key === 'words' ? langWords().length : t.key === 'sets' ? langSets().length : langScenarios().length;
-    return `
-      <button class="lpv-adm-tab lpv-tone-${t.tone}${langAdminTab === t.key ? ' is-active' : ''}" type="button" role="tab"
-              aria-selected="${langAdminTab === t.key ? 'true' : 'false'}" onclick="langAdminSetTab('${t.key}')">
-        <span class="lpv-adm-tab-ico"><i data-lucide="${t.icon}"></i></span>
-        <span class="lpv-adm-tab-body"><b>${t.label}</b><em>${t.sub}</em></span>
-        <span class="lpv-adm-tab-n">${n}</span>
-      </button>`;
-  }).join('');
+  langAdmPaintChrome();
+
+  // The words view is repainted in place: the list keeps its scroll and
+  // nothing replays its entrance because something else changed.
+  if (langAdminTab === 'words' && body.querySelector('.lpv-adm-split')) {
+    langAdmPaintWords(true);
+    return;
+  }
+  const key = langAdminTab + ':' + (langSetDraft ? 'set:' + langSetDraft.id : langScenarioDraft ? 'sc:' + langScenarioDraft.id : 'list');
+  body.classList.toggle('lpv-quiet', key === _langAdmLastKey);
+  _langAdmLastKey = key;
 
   const tone = (LANG_ADM_TABS.find(t => t.key === langAdminTab) || LANG_ADM_TABS[0]).tone;
   let html;
@@ -207,10 +212,33 @@ function renderLangAdmin() {
   else if (langAdminTab === 'scenarios') html = langScenarioDraft ? langScenarioFormHTML() : langScenarioListHTML();
   else html = langWordsPaneHTML();
   body.innerHTML = `<div class="lpv-adm-body lpv-tone-${tone}">${html}</div>`;
-
-  const root = document.getElementById('lang-admin-root');
-  if (typeof lucide !== 'undefined' && root) lucide.createIcons({ root });
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: body });
+  if (langAdminTab === 'words') langAdmAfterRows();
   langAdmFlash = '';
+  langAdmNewId = '';
+}
+
+/** The stat pills and the tab counts, which follow every change. */
+function langAdmPaintChrome() {
+  const tabs = document.getElementById('lang-admin-tabs');
+  const stats = document.getElementById('lang-adm-stats');
+  if (stats) stats.innerHTML = langAdmStatsHTML();
+  if (tabs) {
+    tabs.innerHTML = LANG_ADM_TABS.map(t => {
+      const n = t.key === 'words' ? langWords().length : t.key === 'sets' ? langSets().length : langScenarios().length;
+      return `
+        <button class="lpv-adm-tab lpv-tone-${t.tone}${langAdminTab === t.key ? ' is-active' : ''}" type="button" role="tab"
+                aria-selected="${langAdminTab === t.key ? 'true' : 'false'}" onclick="langAdminSetTab('${t.key}')">
+          <span class="lpv-adm-tab-ico"><i data-lucide="${t.icon}"></i></span>
+          <span class="lpv-adm-tab-body"><b>${t.label}</b><em>${t.sub}</em></span>
+          <span class="lpv-adm-tab-n">${n}</span>
+        </button>`;
+    }).join('');
+  }
+  if (typeof lucide !== 'undefined') {
+    if (stats) lucide.createIcons({ root: stats });
+    if (tabs) lucide.createIcons({ root: tabs });
+  }
 }
 
 function langAdmStatsHTML() {
@@ -368,17 +396,50 @@ function langAdmAddRow(btn, listSel, html, max) {
 
 /* ============================================================
    WORDS
+   ------------------------------------------------------------
+   THE LIST IS NEVER REDRAWN UNDER YOU. Opening a word only moves the
+   highlight; saving or deleting repaints the rows but puts the scroll back
+   where it was; more rows are appended as you near the bottom rather than
+   rebuilding the box (rebuilding it is what threw you back to the top); and
+   the A-Z rail jumps to a letter, loading as far as it needs to.
    ============================================================ */
 
 function langWordsPaneHTML() {
   return `
     <div class="lpv-adm-split${langWordDraft ? ' has-editor' : ''}">
       <section class="lpv-adm-list lpv-in" style="--i:3">${langWordListHTML()}</section>
-      <section class="lpv-adm-side">${langWordDraft ? langWordFormHTML() : langAdmEmptyHTML('mouse-pointer-click',
-        'Pick a word to edit',
-        'Or start a new one. Every language is optional — fill in the ones you know.',
-        `<button class="lpv-go is-small" type="button" onclick="langNewWordDraft()"><i data-lucide="plus"></i> New word</button>`)}</section>
+      <section class="lpv-adm-side">${langWordDraft ? langWordFormHTML() : langAdmEmptySideHTML()}</section>
     </div>`;
+}
+
+function langAdmEmptySideHTML() {
+  return langAdmEmptyHTML('mouse-pointer-click', 'Pick a word to edit',
+    'Or start a new one. Every language is optional — fill in the ones you know.',
+    `<button class="lpv-go is-small" type="button" onclick="langNewWordDraft()"><i data-lucide="plus"></i> New word</button>`);
+}
+
+/** Paint the words view in place: the editor if it changed, the rows if asked. */
+function langAdmPaintWords(rows) {
+  const split = document.querySelector('.lpv-adm-split');
+  if (!split) { renderLangAdmin(); return; }
+  split.classList.toggle('has-editor', !!langWordDraft);
+  const side = split.querySelector('.lpv-adm-side');
+  const ed = side.querySelector('.lpv-adm-editor');
+  const want = langWordDraft ? langWordDraft.id : '';
+  // The editor is rebuilt only when it is a different word -- a refresh
+  // from elsewhere must not take the caret out of what you are typing.
+  if (want ? !ed || ed.dataset.draftId !== want : !!ed || !side.querySelector('.lpv-empty')) {
+    side.innerHTML = langWordDraft ? langWordFormHTML() : langAdmEmptySideHTML();
+    if (typeof lucide !== 'undefined') lucide.createIcons({ root: side });
+  }
+  if (rows) {
+    const tagbox = document.getElementById('lang-adm-tagbox');
+    if (tagbox && !tagbox.contains(document.activeElement)) tagbox.innerHTML = langAdmTagSelectHTML();
+    langAdmSwapWords({ keepScroll: true, reveal: langAdmFlash });
+  } else {
+    document.querySelectorAll('.lpv-adm-row').forEach(r => r.classList.toggle('is-active', r.dataset.id === want));
+  }
+  langAdmFlash = '';
 }
 
 function langAdmFilteredWords() {
@@ -391,8 +452,28 @@ function langAdmFilteredWords() {
     .map(x => x.w);
 }
 
-function langWordListHTML() {
+/** The letter a word files under on the A-Z rail. */
+function langAdmLetter(w) {
+  const head = String(langHeadword(w, langStudy()) || '');
+  const c = head.replace(/^[^A-Za-zÀ-ÿ]+/, '').charAt(0).normalize('NFD').charAt(0).toUpperCase();
+  return /[A-Z]/.test(c) ? c : '#';
+}
+
+/** The topic filter. Repainted with the rows, so topics that arrive later (a
+    starter pack, a newly tagged word) appear without leaving the page. */
+function langAdmTagSelectHTML() {
   const tags = typeof langAllTags === 'function' ? langAllTags() : [];
+  if (langAdmTag && !tags.some(t => t.tag === langAdmTag)) langAdmTag = '';
+  if (!tags.length) return '';
+  return `
+      <select class="form-select lpv-select lpv-adm-tagsel${langAdmTag ? ' is-on' : ''}" aria-label="Topic" onchange="langAdmSetTag(this.value)">
+        <option value="">All topics</option>
+        ${tags.slice().sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
+          .map(t => `<option value="${escapeHTML(t.tag)}"${langAdmTag === t.tag ? ' selected' : ''}>${escapeHTML(t.tag)} (${t.count})</option>`).join('')}
+      </select>`;
+}
+
+function langWordListHTML() {
   return `
     <div class="lpv-adm-tools">
       <div class="search-container">
@@ -401,78 +482,162 @@ function langWordListHTML() {
                autocomplete="off" aria-label="Search words"
                value="${escapeHTML(langAdminQuery)}" oninput="langAdminSetQuery(this.value)" />
       </div>
+      <button class="lpv-adm-selbtn${langAdmSelecting ? ' is-on' : ''}" type="button" onclick="langAdmToggleSelecting()"
+              aria-pressed="${langAdmSelecting ? 'true' : 'false'}" title="${langAdmSelecting ? 'Stop selecting' : 'Select several words'}">
+        ${langIcon(langAdmSelecting ? 'x' : 'list-checks')}<span>${langAdmSelecting ? 'Done' : 'Select'}</span>
+      </button>
       <button class="lpv-go is-small lpv-adm-new" type="button" onclick="langAdmGuard(langNewWordDraft)" title="New word">
         <i data-lucide="plus"></i><span>New</span>
       </button>
     </div>
-    ${tags.length ? `
-      <select class="form-select lpv-select lpv-adm-tagsel${langAdmTag ? ' is-on' : ''}" aria-label="Topic" onchange="langAdmSetTag(this.value)">
-        <option value="">All topics</option>
-        ${tags.slice().sort((a, b) => b.count - a.count || a.tag.localeCompare(b.tag))
-          .map(t => `<option value="${escapeHTML(t.tag)}"${langAdmTag === t.tag ? ' selected' : ''}>${escapeHTML(t.tag)} (${t.count})</option>`).join('')}
-      </select>` : ''}
+    <div id="lang-adm-tagbox">${langAdmTagSelectHTML()}</div>
+    <div id="lang-adm-bulk">${langAdmBulkHTML()}</div>
     <div id="lang-adm-words">${langWordRowsHTML()}</div>`;
 }
 
-function langWordRowsHTML() {
+function langAdmRowHTML(w) {
   const study = langStudy(), ref = langRef();
+  const head = langHeadword(w, study);
+  const gloss = String(langForm(w, ref).term || '').trim();
+  const active = langWordDraft && langWordDraft.id === w.id;
+  const on = langAdmSel.indexOf(w.id) > -1;
+  return `
+    <div class="lpv-adm-row${active ? ' is-active' : ''}${on ? ' is-selected' : ''}${langAdmFlash === w.id ? ' is-flash' : ''}"
+         ${langAdmSelecting ? `role="checkbox" aria-checked="${on ? 'true' : 'false'}"` : 'role="button"'} tabindex="0"
+         data-id="${w.id}" data-l="${langAdmLetter(w)}"
+         onclick="langAdmRowClick('${w.id}')" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); langAdmRowClick('${w.id}'); }">
+      ${langAdmSelecting ? '<span class="lpv-adm-tick" aria-hidden="true"></span>' : ''}
+      <span class="lpv-adm-row-main">
+        <b>${escapeHTML(head)}${langSpeakChip(head, study)}</b>
+        <span>${gloss ? escapeHTML(gloss) : '<em>no ' + escapeHTML(langShort(ref)) + '</em>'}</span>
+      </span>
+      <span class="lpv-adm-langs">${LANG_CODES.map(c => `<i class="lpv-adm-dot${String(langForm(w, c).term || '').trim() ? ' is-on' : ''}" data-lc="${c}" title="${escapeHTML(langName(c))}"></i>`).join('')}</span>
+      ${langAdmSelecting ? '' : `
+      <span class="lpv-adm-row-tools">
+        <button class="ag-icon-btn" type="button" onclick="event.stopPropagation(); langAdmDuplicateWord('${w.id}')" title="Duplicate"
+                aria-label="Duplicate ${escapeHTML(head)}">${langIcon('copy')}</button>
+        <button class="ag-icon-btn lpv-adm-danger" type="button" onclick="event.stopPropagation(); langAdminDeleteWord('${w.id}')" title="Delete"
+                aria-label="Delete ${escapeHTML(head)}">${langIcon('trash-2')}</button>
+      </span>`}
+    </div>`;
+}
+
+function langAdmMoreHTML(left) {
+  return `<button class="lpv-wordlist-more lpv-adm-more" type="button" onclick="langAdminShowMore()">
+      ${langIcon('loader')} ${Math.min(left, LANG_ADMIN_PAGE)} more of ${left}</button>`;
+}
+
+function langWordRowsHTML() {
   const sorted = langAdmFilteredWords();
   const shown = sorted.slice(0, langAdminShown);
   const hidden = sorted.length - shown.length;
   const total = langWords().length;
-  const allOn = shown.length && shown.every(w => langAdmSel.indexOf(w.id) > -1);
-  const rows = shown.map(w => {
-    const head = langHeadword(w, study);
-    const gloss = String(langForm(w, ref).term || '').trim();
-    const active = langWordDraft && langWordDraft.id === w.id;
-    const on = langAdmSel.indexOf(w.id) > -1;
-    return `
-      <div class="lpv-adm-row${active ? ' is-active' : ''}${on ? ' is-selected' : ''}${langAdmFlash === w.id ? ' is-flash' : ''}"
-           role="button" tabindex="0" data-id="${w.id}"
-           onclick="langAdmRowClick('${w.id}')" onkeydown="if (event.key === 'Enter') langAdmRowClick('${w.id}')">
-        <label class="lpv-adm-check" onclick="event.stopPropagation()" title="Select">
-          <input type="checkbox" ${on ? 'checked' : ''} onchange="langAdmToggleSel('${w.id}', this.checked)" aria-label="Select ${escapeHTML(head)}" />
-        </label>
-        <span class="lpv-adm-row-main">
-          <b>${escapeHTML(head)}</b>
-          <span>${gloss ? escapeHTML(gloss) : '<em>no ' + escapeHTML(langShort(ref)) + '</em>'}</span>
-        </span>
-        <span class="lpv-adm-langs">${LANG_CODES.map(c => `<i class="lpv-adm-dot${String(langForm(w, c).term || '').trim() ? ' is-on' : ''}" data-lc="${c}" title="${escapeHTML(langName(c))}"></i>`).join('')}</span>
-        <span class="lpv-adm-row-tools">
-          <button class="ag-icon-btn" type="button" onclick="event.stopPropagation(); langAdmDuplicateWord('${w.id}')" title="Duplicate"
-                  aria-label="Duplicate ${escapeHTML(head)}">${langIcon('copy')}</button>
-          <button class="ag-icon-btn lpv-adm-danger" type="button" onclick="event.stopPropagation(); langAdminDeleteWord('${w.id}')" title="Delete"
-                  aria-label="Delete ${escapeHTML(head)}">${langIcon('trash-2')}</button>
-        </span>
-      </div>`;
-  }).join('');
-
+  const letters = [];
+  sorted.forEach(w => { const l = langAdmLetter(w); if (letters.indexOf(l) < 0) letters.push(l); });
   return `
     <div class="lpv-adm-count">
-      ${shown.length ? `<label class="lpv-adm-check" title="Select all shown">
-        <input type="checkbox" ${allOn ? 'checked' : ''} onchange="langAdmSelectShown(this.checked)" aria-label="Select all shown" /></label>` : ''}
       <span>${langAdminQuery || langAdmTag ? sorted.length + ' of ' + total : total} word${total !== 1 ? 's' : ''}</span>
     </div>
-    ${langAdmSel.length ? `
-      <div class="lpv-adm-bulk">
-        <b>${langAdmSel.length} selected</b>
-        <button class="btn btn-ghost btn-sm" type="button" onclick="langAdmClearSel()">Clear</button>
-        <button class="btn btn-danger btn-sm" type="button" onclick="langAdmBulkDelete()">${langIcon('trash-2')} Delete</button>
+    ${sorted.length > 30 && letters.length > 2 ? `
+      <div class="lpv-adm-az" role="navigation" aria-label="Jump to a letter">
+        ${letters.map(l => `<button type="button" data-az="${l}" onclick="langAdmJump('${l}')">${l}</button>`).join('')}
       </div>` : ''}
-    <div class="lpv-adm-rows">${rows || langAdmEmptyHTML('search-x',
-      langAdminQuery || langAdmTag ? 'No words match' : 'No words yet',
-      langAdminQuery || langAdmTag ? 'Try another spelling or topic.' : 'Add one, or load the starter pack.')}</div>
-    ${hidden > 0 ? `
-      <button class="lpv-wordlist-more" type="button" onclick="langAdminShowMore()">
-        ${langIcon('chevron-down')} ${Math.min(hidden, LANG_ADMIN_PAGE)} more of ${hidden}
-      </button>` : ''}`;
+    <div class="lpv-adm-rows${langAdmSelecting ? ' is-selecting' : ''}" onscroll="langAdmAzSync()">
+      ${shown.map(langAdmRowHTML).join('') || langAdmEmptyHTML('search-x',
+        langAdminQuery || langAdmTag ? 'No words match' : 'No words yet',
+        langAdminQuery || langAdmTag ? 'Try another spelling or topic.' : 'Add one, or load the starter pack.')}
+      ${hidden > 0 ? langAdmMoreHTML(hidden) : ''}
+    </div>`;
 }
 
-/** Repaint just the rows, so the search box keeps its caret. */
-function langAdmSwapWords() {
+/** After rows are painted: icons, the self-pressing "more", the A-Z marker. */
+function langAdmAfterRows() {
+  const host = document.getElementById('lang-adm-words');
+  if (!host) return;
+  if (typeof lucide !== 'undefined' && host.querySelector('[data-lucide]')) lucide.createIcons({ root: host });
+  if (typeof langAutoMore === 'function') langAutoMore(host.querySelector('.lpv-adm-more'), 'adm-words');
+  langAdmAzSync();
+}
+
+/** Repaint the rows. Keeps the scroll if asked, and shows `reveal` if given. */
+function langAdmSwapWords(opts) {
+  opts = opts || {};
   const host = document.getElementById('lang-adm-words');
   if (!host) { renderLangAdmin(); return; }
+  if (opts.reveal) {
+    const at = langAdmFilteredWords().findIndex(w => w.id === opts.reveal);
+    if (at >= langAdminShown) langAdminShown = at + 1;
+  }
+  const old = host.querySelector('.lpv-adm-rows');
+  const keep = opts.keepScroll && old ? old.scrollTop : 0;
   host.innerHTML = langWordRowsHTML();
+  const rows = host.querySelector('.lpv-adm-rows');
+  if (rows) rows.scrollTop = keep;
+  if (opts.reveal) langAdmRevealRow(opts.reveal);
+  langAdmAfterRows();
+}
+
+function langAdmRevealRow(id) {
+  const rows = document.querySelector('#lang-adm-words .lpv-adm-rows');
+  const row = rows && rows.querySelector('.lpv-adm-row[data-id="' + id + '"]');
+  if (!row) return;
+  if (row.offsetTop < rows.scrollTop || row.offsetTop + row.offsetHeight > rows.scrollTop + rows.clientHeight) {
+    rows.scrollTop = Math.max(0, row.offsetTop - rows.clientHeight / 3);
+  }
+}
+
+/** Append the next page under the rows already there -- the scroll stays put. */
+function langAdminShowMore() {
+  const rows = document.querySelector('#lang-adm-words .lpv-adm-rows');
+  const sorted = langAdmFilteredWords();
+  const from = langAdminShown;
+  langAdminShown = Math.min(sorted.length, langAdminShown + LANG_ADMIN_PAGE);
+  if (!rows) { langAdmSwapWords({ keepScroll: true }); return; }
+  const more = rows.querySelector('.lpv-adm-more');
+  const html = sorted.slice(from, langAdminShown).map(langAdmRowHTML).join('');
+  if (more) more.insertAdjacentHTML('beforebegin', html);
+  else rows.insertAdjacentHTML('beforeend', html);
+  const left = sorted.length - langAdminShown;
+  if (more) {
+    if (left > 0) more.outerHTML = langAdmMoreHTML(left);
+    else more.remove();
+  }
+  langAdmAfterRows();
+}
+
+/** Jump to the first word under a letter, loading as far as that needs. */
+function langAdmJump(letter) {
+  const sorted = langAdmFilteredWords();
+  const at = sorted.findIndex(w => langAdmLetter(w) === letter);
+  if (at < 0) return;
+  if (at >= langAdminShown) {
+    langAdminShown = Math.min(sorted.length, at + LANG_ADMIN_PAGE);
+    langAdmSwapWords({ keepScroll: true });
+  }
+  const rows = document.querySelector('#lang-adm-words .lpv-adm-rows');
+  const row = rows && rows.querySelector('.lpv-adm-row[data-id="' + sorted[at].id + '"]');
+  if (row) rows.scrollTop = row.offsetTop;
+  langAdmAzMark(letter);
+}
+
+function langAdmAzMark(letter) {
+  document.querySelectorAll('.lpv-adm-az [data-az]').forEach(b => b.classList.toggle('is-on', b.dataset.az === letter));
+}
+
+let _langAdmAzRaf = 0;
+
+/** As the list scrolls, the rail lights the letter at the top of it. */
+function langAdmAzSync() {
+  if (_langAdmAzRaf) return;
+  const go = () => {
+    _langAdmAzRaf = 0;
+    const rows = document.querySelector('#lang-adm-words .lpv-adm-rows');
+    if (!rows || !document.querySelector('.lpv-adm-az')) return;
+    const top = rows.scrollTop;
+    const first = Array.from(rows.querySelectorAll('.lpv-adm-row')).find(r => r.offsetTop + r.offsetHeight > top);
+    if (first) langAdmAzMark(first.dataset.l);
+  };
+  _langAdmAzRaf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame(go) : (go(), 0);
 }
 
 function langAdminSetQuery(v) {
@@ -489,18 +654,60 @@ function langAdmSetTag(tag) {
   langAdmSwapWords();
 }
 
-function langAdminShowMore() { langAdminShown += LANG_ADMIN_PAGE; langAdmSwapWords(); }
+/* ── Selecting several ─────────────────────────────────────────
+   Off by default: the ticks are for the rare bulk delete, not for every
+   visit. While selecting, a tap on a row ticks it instead of opening it. */
+
+function langAdmToggleSelecting() {
+  langAdmSelecting = !langAdmSelecting;
+  if (!langAdmSelecting) langAdmSel = [];
+  const btn = document.querySelector('.lpv-adm-selbtn');
+  if (btn) {
+    btn.classList.toggle('is-on', langAdmSelecting);
+    btn.setAttribute('aria-pressed', langAdmSelecting ? 'true' : 'false');
+    btn.innerHTML = langIcon(langAdmSelecting ? 'x' : 'list-checks') + '<span>' + (langAdmSelecting ? 'Done' : 'Select') + '</span>';
+  }
+  langAdmPaintBulk();
+  langAdmSwapWords({ keepScroll: true });
+}
+
+function langAdmBulkHTML() {
+  if (!langAdmSelecting) return '';
+  const n = langAdmSel.length;
+  return `
+    <div class="lpv-adm-bulk">
+      <b>${n ? n + ' selected' : 'Tap words to select them'}</b>
+      <button class="btn btn-ghost btn-sm" type="button" onclick="langAdmSelectShown(true)">All shown</button>
+      ${n ? `<button class="btn btn-ghost btn-sm" type="button" onclick="langAdmClearSel()">Clear</button>` : ''}
+      <button class="btn btn-danger btn-sm" type="button" onclick="langAdmBulkDelete()" ${n ? '' : 'disabled'}>${langIcon('trash-2')} Delete</button>
+    </div>`;
+}
+
+function langAdmPaintBulk() {
+  const host = document.getElementById('lang-adm-bulk');
+  if (host) host.innerHTML = langAdmBulkHTML();
+}
 
 function langAdmRowClick(id) {
+  if (langAdmSelecting) {
+    langAdmToggleSel(id, langAdmSel.indexOf(id) < 0);
+    return;
+  }
   if (langWordDraft && langWordDraft.id === id) return;
   langAdmGuard(() => langEditWordDraft(id));
 }
 
+/** Tick or untick one row, in place -- nothing else is redrawn. */
 function langAdmToggleSel(id, on) {
   const i = langAdmSel.indexOf(id);
   if (on && i < 0) langAdmSel.push(id);
   if (!on && i > -1) langAdmSel.splice(i, 1);
-  langAdmSwapWords();
+  const row = document.querySelector('.lpv-adm-row[data-id="' + id + '"]');
+  if (row) {
+    row.classList.toggle('is-selected', !!on);
+    row.setAttribute('aria-checked', on ? 'true' : 'false');
+  }
+  langAdmPaintBulk();
 }
 
 function langAdmSelectShown(on) {
@@ -509,10 +716,15 @@ function langAdmSelectShown(on) {
     if (on && i < 0) langAdmSel.push(w.id);
     if (!on && i > -1) langAdmSel.splice(i, 1);
   });
-  langAdmSwapWords();
+  document.querySelectorAll('.lpv-adm-row').forEach(r => {
+    const sel = langAdmSel.indexOf(r.dataset.id) > -1;
+    r.classList.toggle('is-selected', sel);
+    r.setAttribute('aria-checked', sel ? 'true' : 'false');
+  });
+  langAdmPaintBulk();
 }
 
-function langAdmClearSel() { langAdmSel = []; langAdmSwapWords(); }
+function langAdmClearSel() { langAdmSelectShown(false); langAdmSel = []; langAdmPaintBulk(); }
 
 /** Delete every ticked word, with one Undo that brings them all back. */
 function langAdmBulkDelete() {
@@ -534,9 +746,13 @@ function langAdmBulkDelete() {
         removed.push({ rec, i, deadline, recall });
       });
       langAdmSel = [];
+      langAdmSelecting = false;
       if (langWordDraft && ids.indexOf(langWordDraft.id) > -1) { langWordDraft = null; langAdmDirty = false; }
       saveData();
       langRefreshViews();
+      const btn = document.querySelector('.lpv-adm-selbtn');
+      if (btn) { btn.classList.remove('is-on'); btn.innerHTML = langIcon('list-checks') + '<span>Select</span>'; }
+      langAdmPaintBulk();
       if (typeof pushUndo === 'function') {
         pushUndo('Deleted ' + removed.length + ' word' + (removed.length !== 1 ? 's' : ''), () => {
           langStore();
@@ -559,7 +775,8 @@ function langNewWordDraft() {
   langAdmWordLang = langStudy();
   langAdmCopyOf = '';
   langAdmDirty = false;
-  renderLangAdmin();
+  if (document.querySelector('.lpv-adm-split')) langAdmPaintWords(!!langAdmFlash);
+  else renderLangAdmin();
   langAdmFocusFirst();
 }
 
@@ -570,7 +787,8 @@ function langEditWordDraft(id) {
   langAdmWordLang = '';
   langAdmCopyOf = '';
   langAdmDirty = false;
-  renderLangAdmin();
+  if (document.querySelector('.lpv-adm-split')) langAdmPaintWords(false);
+  else renderLangAdmin();
 }
 
 /** A copy opens in the editor unsaved, so you change what differs and save. */
@@ -584,7 +802,7 @@ function langAdmDuplicateWord(id) {
     langWordDraft = copy;
     langAdmCopyOf = langHeadword(w);
     langAdmDirty = true;
-    renderLangAdmin();
+    langAdmPaintWords(false);
   });
 }
 
@@ -593,13 +811,36 @@ function langAdminDeleteWord(id) {
   if (!langFindWord(id)) return;
   if (langWordDraft && langWordDraft.id === id) { langWordDraft = null; langAdmDirty = false; }
   langAdmSel = langAdmSel.filter(x => x !== id);
-  langDeleteWord(id);
+  langDeleteWord(id);   // refreshes the views, which repaints the rows in place
   renderLangAdmin();
 }
 
 function langAdmFocusFirst() {
   const el = document.querySelector('.lpv-adm-editor .lpv-adm-langpane.is-on input, .lpv-adm-editor input.form-input');
   if (el) el.focus({ preventScroll: true });
+}
+
+/* ── Hearing it ──────────────────────────────────────────────
+   Every field you type a phrase into has a speaker beside it that reads
+   what is in the field now, in that field's language. */
+
+function langAdmSayHTML(code) {
+  return `<button class="lpv-say" type="button" onclick="langAdmSay(this${code ? ", '" + code + "'" : ''})" title="Hear it" aria-label="Hear it">${langIcon('volume-2')}</button>`;
+}
+
+function langAdmSay(btn, code) {
+  const scope = btn.closest('.lpv-say-wrap, [data-row]');
+  // The text box -- not the "right answer" radio that leads an answer row.
+  const input = scope && scope.querySelector('input:not([type="radio"]):not([type="checkbox"]):not([type="hidden"]):not([type="number"]), textarea');
+  const text = input ? input.value.trim() : '';
+  if (!text) {
+    if (typeof toast === 'function') toast('Type something first.', { type: 'info', duration: 1800 });
+    return;
+  }
+  const setLang = document.getElementById('lang-s-lang');
+  const c = code || (setLang && setLang.value) || (langScenarioDraft && langScenarioDraft.lang) || langStudy();
+  if (typeof speak === 'function') speak(text, { lang: langSpeechTag(c), langCode: c });
+  btn.classList.remove('is-on'); void btn.offsetWidth; btn.classList.add('is-on');
 }
 
 function langWordFormHTML() {
@@ -658,6 +899,7 @@ function langAdmExampleRowHTML(code, e) {
   return `
     <div class="lpv-ex-row" data-row data-ex="${code}">
       <input class="form-input" data-ex-text value="${escapeHTML(e ? e.text : '')}" placeholder="Kinsa ka?" />
+      ${langAdmSayHTML(code)}
       <span class="lpv-ex-eq">=</span>
       <input class="form-input" data-ex-gloss value="${escapeHTML(e ? e.gloss : '')}" placeholder="Who are you?" />
       <button class="ag-icon-btn" type="button" onclick="langAdmRemoveRow(this, 0)" title="Remove">${langIcon('x')}</button>
@@ -670,7 +912,10 @@ function langFormFieldsHTML(code, f) {
     <div class="lpv-adm-grid2 is-term">
       <div class="lpv-adm-field">
         <label class="form-label">Term in ${escapeHTML(langName(code))}</label>
-        <input class="form-input lpv-adm-term" data-lang-field="${code}.term" value="${escapeHTML(f.term)}" placeholder="the word itself" />
+        <div class="lpv-say-wrap">
+          <input class="form-input lpv-adm-term" data-lang-field="${code}.term" value="${escapeHTML(f.term)}" placeholder="the word itself" />
+          ${langAdmSayHTML(code)}
+        </div>
       </div>
       <div class="lpv-adm-field">
         <label class="form-label">Part of speech</label>
@@ -1044,6 +1289,7 @@ function langAdmOptRowHTML(qid, text, checked) {
         <input type="radio" name="lang-c-${qid}" ${checked ? 'checked' : ''} /><span>${langIcon('check')}</span>
       </label>
       <input class="form-input" data-opt value="${escapeHTML(text || '')}" placeholder="An answer" />
+      ${langAdmSayHTML()}
       <button class="ag-icon-btn" type="button" onclick="langAdmRemoveRow(this, 2)" title="Remove">${langIcon('x')}</button>
     </div>`;
 }
@@ -1052,6 +1298,7 @@ function langAdmPairRowHTML(p) {
   return `
     <div class="lpv-pair-row" data-row>
       <input class="form-input" data-l value="${escapeHTML(p ? p.left : '')}" placeholder="Word" />
+      ${langAdmSayHTML()}
       <span class="lpv-pair-link">${langIcon('arrow-right')}</span>
       <input class="form-input" data-r value="${escapeHTML(p ? p.right : '')}" placeholder="Its meaning" />
       <button class="ag-icon-btn" type="button" onclick="langAdmRemoveRow(this, 2)" title="Remove">${langIcon('x')}</button>
@@ -1062,11 +1309,14 @@ function langItemFormHTML(it, i, total) {
   const meta = langPuzzleMeta(it.type);
   const problems = langItemProblems(it);
   const open = !!langAdmOpen[it.id];
-  const field = (key, label, value, placeholder, hint) => `
+  const field = (key, label, value, placeholder, hint, say) => {
+    const input = `<input class="form-input" data-f="${key}" value="${escapeHTML(value || '')}" placeholder="${escapeHTML(placeholder)}" />`;
+    return `
     <div class="lpv-adm-field">
       <label class="form-label">${label}${hint ? ` <span class="af-label-hint">${hint}</span>` : ''}</label>
-      <input class="form-input" data-f="${key}" value="${escapeHTML(value || '')}" placeholder="${escapeHTML(placeholder)}" />
+      ${say ? `<div class="lpv-say-wrap">${input}${langAdmSayHTML()}</div>` : input}
     </div>`;
+  };
   const tiles = (single) => `
     <div class="lpv-adm-field">
       <label class="form-label">Extra tiles <span class="af-label-hint">wrong ${single ? 'words' : 'words to mix in'} — Enter adds one</span></label>
@@ -1079,15 +1329,18 @@ function langItemFormHTML(it, i, total) {
   let body = '';
   if (it.type === 'arrange') {
     body = field('prompt', 'What to say', it.prompt, 'Say: Where are you going?', 'the meaning, in the language you read')
-      + field('answer', 'The sentence', it.answer, 'Asa ka padulong?', 'in order — this is what gets built')
+      + field('answer', 'The sentence', it.answer, 'Asa ka padulong?', 'in order — this is what gets built', true)
       + tiles(false);
   } else if (it.type === 'blank') {
     const parts = langAdmBlankParts(it);
     body = `
       <div class="lpv-adm-field">
         <label class="form-label">The full sentence</label>
-        <input class="form-input" data-f="sentence" value="${escapeHTML(parts.sentence)}" placeholder="Maayong buntag sa imo!"
-               oninput="langAdmBlankSync(this)" />
+        <div class="lpv-say-wrap">
+          <input class="form-input" data-f="sentence" value="${escapeHTML(parts.sentence)}" placeholder="Maayong buntag sa imo!"
+                 oninput="langAdmBlankSync(this)" />
+          ${langAdmSayHTML()}
+        </div>
       </div>
       <div class="lpv-adm-field">
         <label class="form-label">Tap the word to hide</label>
@@ -1109,7 +1362,7 @@ function langItemFormHTML(it, i, total) {
       </div>`;
   } else if (it.type === 'translate') {
     body = field('prompt', 'Prompt', it.prompt, 'Type "thank you" in Cebuano')
-      + field('answer', 'Answer', it.answer, 'Salamat', 'small typos are forgiven when playing');
+      + field('answer', 'Answer', it.answer, 'Salamat', 'small typos are forgiven when playing', true);
   } else if (it.type === 'match') {
     const pairs = (it.pairs && it.pairs.length ? it.pairs : [{ left: '', right: '' }, { left: '', right: '' }, { left: '', right: '' }]);
     body = field('prompt', 'Instruction', it.prompt, 'Match each one to its meaning')
@@ -1123,7 +1376,7 @@ function langItemFormHTML(it, i, total) {
   body += field('note', 'Note after answering', it.note, 'Why this is the answer', 'optional');
 
   return `
-    <div class="lpv-q lpv-tone-${LANG_ADM_TYPE_TONE[it.type] || 'primary'}${open ? ' is-open' : ''}${problems.length ? ' has-problem' : ''}"
+    <div class="lpv-q lpv-tone-${LANG_ADM_TYPE_TONE[it.type] || 'primary'}${open ? ' is-open' : ''}${problems.length ? ' has-problem' : ''}${it.id === langAdmNewId ? ' is-new' : ''}"
          data-qid="${it.id}" data-type="${it.type}" style="--k:${i}">
       <div class="lpv-q-head" onclick="langAdmToggleQ('${it.id}')">
         <span class="lpv-q-num">${i + 1}</span>
@@ -1232,6 +1485,7 @@ function langAddItem(type) {
   if (type === 'match') it.prompt = 'Match each one to its meaning';
   langSetDraft.items.push(it);
   langAdmOpen[it.id] = true;
+  langAdmNewId = it.id;
   langAdmDirty = true;
   renderLangAdmin();
   langAdmScrollTo('.lpv-q[data-qid="' + it.id + '"]');
@@ -1264,6 +1518,7 @@ function langAdmDuplicateItem(id) {
   copy.id = generateId();
   items.splice(i + 1, 0, copy);
   langAdmOpen[copy.id] = true;
+  langAdmNewId = copy.id;
   langAdmDirty = true;
   renderLangAdmin();
   langAdmScrollTo('.lpv-q[data-qid="' + copy.id + '"]');
@@ -1540,6 +1795,7 @@ function langAdmReplyRowHTML(eid, o) {
         <input type="radio" name="lang-r-${eid}" ${o && o.correct ? 'checked' : ''} /><span>${langIcon('check')}</span>
       </label>
       <input class="form-input" data-reply value="${escapeHTML(o ? o.text : '')}" placeholder="A reply" />
+      ${langAdmSayHTML()}
       <input class="form-input lpv-opt-note" data-why value="${escapeHTML(o ? o.note || '' : '')}" placeholder="Why (optional)" />
       <button class="ag-icon-btn" type="button" onclick="langAdmRemoveRow(this, 2)" title="Remove">${langIcon('x')}</button>
     </div>`;
@@ -1550,7 +1806,7 @@ function langEncounterFormHTML(e, i, total) {
   const open = !!langAdmOpen[e.id];
   const opts = (e.options && e.options.length ? e.options : [{ text: '', correct: true }, { text: '', correct: false }]);
   return `
-    <div class="lpv-q lpv-enc lpv-tone-warning${open ? ' is-open' : ''}${problems.length ? ' has-problem' : ''}" data-eid="${e.id}" style="--k:${i}">
+    <div class="lpv-q lpv-enc lpv-tone-warning${open ? ' is-open' : ''}${problems.length ? ' has-problem' : ''}${e.id === langAdmNewId ? ' is-new' : ''}" data-eid="${e.id}" style="--k:${i}">
       <div class="lpv-q-head" onclick="langAdmToggleEnc('${e.id}')">
         <span class="lpv-q-num">${i + 1}</span>
         <span class="lpv-type"><i data-lucide="message-circle"></i></span>
@@ -1572,7 +1828,10 @@ function langEncounterFormHTML(e, i, total) {
           </div>
           <div class="lpv-adm-field">
             <label class="form-label">What they say</label>
-            <input class="form-input" data-f="line" value="${escapeHTML(e.line)}" placeholder="Kinsa ka?" />
+            <div class="lpv-say-wrap">
+              <input class="form-input" data-f="line" value="${escapeHTML(e.line)}" placeholder="Kinsa ka?" />
+              ${langAdmSayHTML()}
+            </div>
           </div>
         </div>
         <div class="lpv-adm-field">
@@ -1671,6 +1930,7 @@ function langAddEncounter() {
   const e = langBlankEncounter();
   langScenarioDraft.encounters.push(e);
   langAdmOpen[e.id] = true;
+  langAdmNewId = e.id;
   langAdmDirty = true;
   renderLangAdmin();
   langAdmScrollTo('.lpv-enc[data-eid="' + e.id + '"]');
@@ -1703,6 +1963,7 @@ function langAdmDuplicateEnc(id) {
   copy.id = generateId();
   list.splice(i + 1, 0, copy);
   langAdmOpen[copy.id] = true;
+  langAdmNewId = copy.id;
   langAdmDirty = true;
   renderLangAdmin();
   langAdmScrollTo('.lpv-enc[data-eid="' + copy.id + '"]');

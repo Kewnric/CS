@@ -369,6 +369,14 @@ function renderLangDetail() {
   if (typeof lpvBoot === 'function') lpvBoot(host);
   const activeWord = host.querySelector('.lpv-word.is-active');
   if (activeWord) langCmpReveal(activeWord);
+  langArmAutoMore();
+}
+
+/** Long lists in this pane load their next page by themselves as you reach it. */
+function langArmAutoMore() {
+  if (typeof langAutoMore !== 'function') return;
+  langAutoMore(document.querySelector('#lang-detail .lpv-wordlist-more'), 'lang-cmp');
+  langAutoMore(document.querySelector('#lang-detail .lang-more button'), 'lang-dict');
 }
 
 /* ── Dictionary ───────────────────────────────────────────── */
@@ -519,7 +527,7 @@ function langShowMore() {
   langShownCount += LANG_PAGE;
   renderLangDetail();
   const next = document.querySelector('.lang-more button');
-  if (next) { next.focus(); return; }
+  if (next) { next.focus({ preventScroll: true }); return; }
   const rows = document.querySelectorAll('.lang-entry');
   const last = rows[rows.length - 1];
   const btn = last && last.querySelector('button:not([disabled])');
@@ -788,6 +796,7 @@ function langSwapResults() {
   else if (!more && freshMore) host.insertAdjacentElement('afterend', freshMore);
   const moreNow = document.querySelector('.lang-more');
   if (moreNow && typeof lucide !== 'undefined') lucide.createIcons({ root: moreNow });
+  langArmAutoMore();
 }
 
 /** Add or remove one tag from the set. Narrowing the filter starts the list over. */
@@ -1067,6 +1076,7 @@ function langCmpMore() {
   langSwapResults();
   const again = document.querySelector('.lpv-wordlist-rows');
   if (again) again.scrollTop = keep;
+  langArmAutoMore();
 }
 
 function langCmpToggleGaps() {

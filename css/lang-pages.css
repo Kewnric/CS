@@ -144,7 +144,7 @@
 
 /* ── Stat tiles ── */
 
-.lpv-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; }
+.lpv-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.6rem; }
 .lpv-stats > :nth-child(4n+1) { --st: var(--color-primary); }
 .lpv-stats > :nth-child(4n+2) { --st: var(--color-success); }
 .lpv-stats > :nth-child(4n+3) { --st: var(--color-warning); }
@@ -154,7 +154,7 @@
   align-items: center;
   gap: 0.75rem;
   width: 100%;
-  padding: 0.85rem 1rem;
+  padding: 0.6rem 0.8rem;
   border: 1px solid color-mix(in srgb, var(--st, var(--lpv)) 24%, var(--border-color));
   border-radius: var(--radius-lg);
   background: linear-gradient(140deg, color-mix(in srgb, var(--st, var(--lpv)) 11%, var(--bg-surface)), var(--bg-surface) 70%);
@@ -170,22 +170,22 @@ button.lpv-stat { cursor: pointer; }
 .lpv-stat.is-on { border-color: var(--st); box-shadow: inset 0 0 0 1px var(--st), 0 8px 20px -14px var(--st); }
 .lpv-stat:focus-visible { outline: 2px solid var(--st, var(--lpv)); outline-offset: 2px; }
 .lpv-stat-ico {
-  width: 38px;
-  height: 38px;
+  width: 32px;
+  height: 32px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--st, var(--lpv));
   color: #fff;
   box-shadow: 0 3px 0 color-mix(in srgb, var(--st, var(--lpv)) 65%, #000);
 }
-.lpv-stat-ico svg { width: 19px; height: 19px; }
+.lpv-stat-ico svg { width: 16px; height: 16px; }
 .lpv-stat-body { min-width: 0; }
 .lpv-stat-body b {
   display: block;
-  font-size: 1.35rem;
+  font-size: 1.12rem;
   font-weight: 800;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
@@ -1657,15 +1657,15 @@ button.lpv-stat { cursor: pointer; }
 .lpv-ex-list, .lpv-opt-list, .lpv-pair-list { display: flex; flex-direction: column; gap: 0.4rem; }
 .lpv-ex-row, .lpv-pair-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.4rem;
   animation: lpvRowIn 0.25s ease both;
 }
 .lpv-ex-eq, .lpv-pair-link { display: inline-flex; font-weight: 800; color: var(--text-tertiary); }
 .lpv-pair-link svg { width: 15px; height: 15px; }
-.lpv-opt { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.4rem; animation: lpvRowIn 0.25s ease both; }
-.lpv-opt.is-reply { grid-template-columns: auto minmax(0, 1.4fr) minmax(0, 1fr) auto; }
+.lpv-opt { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 0.4rem; animation: lpvRowIn 0.25s ease both; }
+.lpv-opt.is-reply { grid-template-columns: auto minmax(0, 1.4fr) auto minmax(0, 1fr) auto; }
 .lpv-opt-right { position: relative; width: 32px; height: 32px; cursor: pointer; }
 .lpv-opt-right input { position: absolute; inset: 0; margin: 0; opacity: 0; cursor: pointer; }
 .lpv-opt-right span {
@@ -1959,10 +1959,11 @@ button.lpv-stat { cursor: pointer; }
   .lpv-adm-tabs { grid-template-columns: 1fr; }
   .lpv-adm-grid2, .lpv-adm-grid2.is-term { grid-template-columns: 1fr; }
   .lpv-q-status { display: none; }
-  .lpv-ex-row, .lpv-pair-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .lpv-ex-row, .lpv-pair-row { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .lpv-ex-row > :nth-child(4), .lpv-pair-row > :nth-child(4) { grid-column: 1; }
   .lpv-ex-eq, .lpv-pair-link { display: none; }
-  .lpv-opt.is-reply { grid-template-columns: auto minmax(0, 1fr) auto; }
-  .lpv-opt.is-reply .lpv-opt-note { grid-column: 2; }
+  .lpv-opt.is-reply { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+  .lpv-opt.is-reply .lpv-opt-note { grid-column: 2 / 4; }
   .lpv-adm-scenehead { flex-direction: column; }
   .lpv-adm-who { width: 100%; height: 120px; }
   .lpv-adm-keys { display: none; }
@@ -1971,6 +1972,131 @@ button.lpv-stat { cursor: pointer; }
   .lpv-adm-tab-ico, .lpv-adm-bulk, .lpv-adm .is-flash, .lpv-adm-editor, .lpv-adm-langpane, .lpv-ex-row, .lpv-pair-row,
   .lpv-opt, .lpv-chip-x, .lpv-q, .lpv-bw, .lpv-adm-card, .lpv-adm-face, .lpv-loc::after, .lpv-opt-right span { animation: none !important; }
   .lpv-q-body { transition: none; }
+}
+
+
+/* ── Admin, round three: still lists, ticks, letters, voices ── */
+
+/* The admin's numbers are a row of small pills, not four tiles. */
+.lpv-stats.is-compact { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.lpv-stats.is-compact .lpv-stat { width: auto; gap: 0.45rem; padding: 0.28rem 0.7rem 0.28rem 0.3rem; border-radius: var(--radius-full); }
+.lpv-stats.is-compact .lpv-stat:hover { transform: none; }
+.lpv-stats.is-compact .lpv-stat-ico { width: 24px; height: 24px; border-radius: 50%; box-shadow: none; }
+.lpv-stats.is-compact .lpv-stat-ico svg { width: 13px; height: 13px; }
+.lpv-stats.is-compact .lpv-stat-body { display: flex; align-items: baseline; gap: 0.3rem; }
+.lpv-stats.is-compact .lpv-stat-body b { font-size: 0.9rem; }
+.lpv-stats.is-compact .lpv-stat-body em { font-size: 0.72rem; }
+
+/* A redraw of what was already on screen does not replay its entrance. */
+.lpv-quiet .lpv-adm-editor, .lpv-quiet .lpv-q, .lpv-quiet .lpv-adm-card, .lpv-quiet .lpv-scene,
+.lpv-quiet .lpv-ex-row, .lpv-quiet .lpv-pair-row, .lpv-quiet .lpv-opt, .lpv-quiet .lpv-chip-x { animation: none; }
+.lpv-quiet .lpv-q.is-new { animation: lpvIn 0.35s ease both; }
+/* Switching from one word to the next is a quick cross-fade, not an entrance. */
+.lpv-adm-side .lpv-adm-editor { animation: lpvFadeSwap 0.18s ease both; }
+@keyframes lpvFadeSwap { from { opacity: 0.4; } to { opacity: 1; } }
+
+.lpv-adm-rows { position: relative; }
+
+/* Select mode: a toggle, and a proper tick instead of a bare checkbox. */
+.lpv-adm-selbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 40px;
+  padding: 0 0.8rem;
+  flex-shrink: 0;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-full);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+.lpv-adm-selbtn svg { width: 15px; height: 15px; }
+.lpv-adm-selbtn:hover { border-color: var(--lpv); color: var(--lpv); }
+.lpv-adm-selbtn.is-on { border-color: var(--lpv); background: var(--lpv-soft); color: var(--lpv); }
+.lpv-adm-tick {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  border: 2px solid var(--border-color);
+  border-radius: 7px;
+  background: var(--bg-surface);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+.lpv-adm-row:hover .lpv-adm-tick { border-color: var(--lpv); }
+.lpv-adm-row.is-selected .lpv-adm-tick { border-color: var(--lpv); background: var(--lpv); animation: lpvPop 0.25s ease; }
+.lpv-adm-row.is-selected .lpv-adm-tick::after {
+  content: '';
+  position: absolute;
+  left: 5px;
+  top: 1px;
+  width: 6px;
+  height: 11px;
+  border: solid var(--lpv-ink);
+  border-width: 0 2.5px 2.5px 0;
+  transform: rotate(45deg);
+}
+.lpv-adm-rows.is-selecting .lpv-adm-row.is-selected { background: var(--lpv-soft); }
+.lpv-adm-bulk .btn:disabled { opacity: 0.45; }
+
+/* A-Z: jump to a letter; the letter at the top of the list stays lit. */
+.lpv-adm-az { display: flex; flex-wrap: wrap; gap: 2px; padding: 0.1rem 0.15rem; }
+.lpv-adm-az button {
+  min-width: 21px;
+  height: 22px;
+  padding: 0 0.2rem;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-tertiary);
+  font: 800 0.68rem/1 var(--font-sans);
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.lpv-adm-az button:hover { background: var(--lpv-soft); color: var(--lpv); }
+.lpv-adm-az button.is-on { background: var(--lpv); color: var(--lpv-ink); }
+
+/* The row's speaker shows when the row is pointed at. */
+.lpv-adm-row-main b { display: flex; align-items: center; gap: 0.15rem; }
+.lpv-adm-row-main b .lang-speak-chip { flex-shrink: 0; margin-left: 0.2rem; opacity: 0; }
+.lpv-adm-row:hover .lang-speak-chip, .lpv-adm-row:focus-within .lang-speak-chip, .lpv-adm-row.is-active .lang-speak-chip { opacity: 0.7; }
+@media (hover: none) { .lpv-adm-row-main b .lang-speak-chip { opacity: 0.6; } }
+
+/* "More" loads by itself as you near it; the spinner says so. */
+.lpv-adm-more svg { animation: lpvSpin 1.4s linear infinite; }
+@keyframes lpvSpin { to { rotate: 360deg; } }
+
+/* A speaker beside any field that holds a phrase. */
+.lpv-say-wrap { display: flex; align-items: center; gap: 0.35rem; }
+.lpv-say-wrap > input, .lpv-say-wrap > textarea { flex: 1; min-width: 0; }
+.lpv-say {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  background: var(--bg-surface);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.lpv-say svg { width: 15px; height: 15px; }
+.lpv-say:hover { border-color: var(--lpv); color: var(--lpv); }
+.lpv-say.is-on { color: var(--lpv); animation: lpvSay 0.6s ease; }
+@keyframes lpvSay { 30% { scale: 1.18; box-shadow: 0 0 0 6px var(--lpv-soft); } }
+.lpv-adm-langpane .lpv-say:hover { border-color: var(--lc); color: var(--lc); }
+
+@media (prefers-reduced-motion: reduce) {
+  .lpv-adm-more svg, .lpv-say.is-on, .lpv-adm-tick, .lpv-adm-side .lpv-adm-editor { animation: none !important; }
 }
 
 /* ── Narrow panes ── */
