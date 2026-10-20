@@ -4649,6 +4649,5 @@ body.viz-no-anim .app-sidebar {
   color: var(--note-text, #f8fafc);
 }
 
-/* The Bubble dropdown inside Border Type. */
-.brain-bubble-pick { padding-top: 0.2rem; }
-#brain-bubble-list { max-height: 15rem; overflow-y: auto; scrollbar-width: thin; }
+/* Bubble Shape's list: twelve rows, so it scrolls past a screenful. */
+#brain-node-bubble-menu { max-height: 15rem; overflow-y: auto; scrollbar-width: thin; }

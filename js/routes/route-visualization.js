@@ -436,15 +436,12 @@ function vizTemplate() {
         <div class="viz-link-type-option" role="menuitem" data-border="electric" onclick="brainCtxSetBorder('electric')"><i data-lucide="zap"></i> Electric Border</div>
         <div class="viz-link-type-option" role="menuitem" data-border="medieval" onclick="brainCtxSetBorder('medieval')"><i data-lucide="castle"></i> Medieval Border</div>
         <div class="viz-link-type-option" role="menuitem" data-border="manhua" onclick="brainCtxSetBorder('manhua')"><i data-lucide="message-circle"></i> Manhua Border</div>
-        <!-- Only while the note's border is Manhua: which speech bubble it is. -->
-        <div class="brain-bubble-pick hidden" id="brain-bubble-pick">
-          <div class="viz-popup-title">Bubble</div>
-          <button type="button" class="brain-color-target-btn" id="brain-bubble-btn" aria-haspopup="listbox" aria-expanded="false" onclick="brainToggleBubbleList(event)"><span id="brain-bubble-label">Normal Speech</span><i data-lucide="chevron-down"></i></button>
-          <div class="brain-color-target-list hidden" id="brain-bubble-list" role="listbox">
-            ${(typeof BRAIN_BUBBLES !== 'undefined' ? BRAIN_BUBBLES : []).map(([id, label]) =>
-              `<div class="viz-link-type-option" role="option" data-bubble="${id}" onclick="brainCtxSetBubble('${id}')">${label}</div>`).join('')}
-          </div>
-        </div>
+      </div>
+      <!-- Only on a Manhua note: which speech bubble it is. -->
+      <button class="viz-ctx-item hidden" id="brain-node-bubble-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'bubble')"><i data-lucide="message-square"></i> Bubble Shape <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
+      <div class="viz-ctx-submenu hidden" id="brain-node-bubble-menu" role="menu">
+        ${(typeof BRAIN_BUBBLES !== 'undefined' ? BRAIN_BUBBLES : []).map(([id, label]) =>
+          `<div class="viz-link-type-option" role="menuitem" data-bubble="${id}" onclick="brainCtxSetBubble('${id}')">${label}</div>`).join('')}
       </div>
       <button class="viz-ctx-item" id="brain-node-align-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'align')"><i data-lucide="align-left"></i> Text Alignment <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
       <div class="viz-ctx-submenu hidden" id="brain-node-align-menu" role="menu">

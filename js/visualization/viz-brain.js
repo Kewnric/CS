@@ -1929,7 +1929,6 @@ function brainNodeCtx(e, nodeId) {
   // placed at its real size.
   _brainCloseNodeSubs(null);
   _brainShowColorTargetList(false);
-  _brainShowBubbleList(false);
   if (typeof vizPositionMenu === 'function') vizPositionMenu(menu, e.clientX, e.clientY);
   else { menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px'; menu.classList.remove('hidden'); }
   _brainMarkNodeMenu();
@@ -1994,12 +1993,14 @@ function _brainMarkNodeMenu() {
   });
   mark('#brain-note-swatches .viz-color-swatch', 'color', node[BRAIN_COLOR_PROPS[target]] || '');
   mark('#brain-node-border-menu .viz-link-type-option', 'border', node?.border || '');
-  const pick = document.getElementById('brain-bubble-pick');
-  if (pick) pick.classList.toggle('hidden', node.border !== 'manhua');
-  const bubble = BRAIN_BUBBLE_IDS.has(node.bubble) ? node.bubble : 'speech';
-  const bubbleLabel = document.getElementById('brain-bubble-label');
-  if (bubbleLabel) bubbleLabel.textContent = (BRAIN_BUBBLES.find(b => b[0] === bubble) || [, 'Normal Speech'])[1];
-  mark('#brain-bubble-list .viz-link-type-option', 'bubble', bubble);
+  // Bubble Shape is a row of its own, there only while the note is Manhua.
+  const bubbleRow = document.getElementById('brain-node-bubble-toggle');
+  if (bubbleRow) bubbleRow.classList.toggle('hidden', node.border !== 'manhua');
+  if (node.border !== 'manhua') {
+    const sub = document.getElementById('brain-node-bubble-menu');
+    if (sub) sub.classList.add('hidden');
+  }
+  mark('#brain-node-bubble-menu .viz-link-type-option', 'bubble', BRAIN_BUBBLE_IDS.has(node.bubble) ? node.bubble : 'speech');
   mark('#brain-node-align-menu .viz-link-type-option', 'value', node?.textAlign || 'left');
   mark('[data-prop="lineSpacing"] button', 'value', String(node?.lineSpacing || 1.5));
   mark('[data-prop="paraSpacing"] button', 'value', node?.paraSpacing || '');
@@ -2020,7 +2021,7 @@ function brainNoteParagraphs(text) {
 }
 
 /* The node menu's dropdowns, one open at a time. */
-const BRAIN_NODE_SUBS = ['colors', 'border', 'align', 'spacing'];
+const BRAIN_NODE_SUBS = ['colors', 'border', 'bubble', 'align', 'spacing'];
 function _brainCloseNodeSubs(except) {
   BRAIN_NODE_SUBS.forEach(k => {
     if (k === except) return;
@@ -2140,23 +2141,11 @@ const BRAIN_BUBBLE_IDS = new Set(BRAIN_BUBBLES.map(b => b[0]));
 
 function brainCtxSetBubble(id) {
   const node = brain.contextNodeId && brain.nodes.find(n => n.id === brain.contextNodeId);
-  _brainShowBubbleList(false);
   if (!node || (node.bubble || 'speech') === id) return;
   brainPushUndo();
   if (id === 'speech') delete node.bubble; else node.bubble = id;
   brainRenderCanvas(); brainSaveCurrentVersion();
   _brainMarkNodeMenu();
-}
-function brainToggleBubbleList(e) {
-  if (e) e.stopPropagation();
-  const list = document.getElementById('brain-bubble-list');
-  _brainShowBubbleList(!!list && list.classList.contains('hidden'));
-}
-function _brainShowBubbleList(open) {
-  const list = document.getElementById('brain-bubble-list');
-  const btn = document.getElementById('brain-bubble-btn');
-  if (list) list.classList.toggle('hidden', !open);
-  if (btn) btn.setAttribute('aria-expanded', String(open));
 }
 
 /** Repaint every Manhua bubble (cheap: only Manhua notes are measured). */
