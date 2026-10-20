@@ -352,8 +352,11 @@ function renderLangDetail() {
   else if (langView === 'sets') html = langSetsHTML();
   else if (langView === 'run') html = langRunHTML();
   else if (langView === 'scenarios') html = langScenariosHTML();
+  if (typeof lpvArtStyles === 'function') lpvArtStyles();
   host.innerHTML = html;
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: host });
+  // The previews play by themselves and stop when this pane is redrawn.
+  if (typeof lpvBoot === 'function') lpvBoot(host);
 }
 
 /* ── Dictionary ───────────────────────────────────────────── */
@@ -434,23 +437,23 @@ function langDictionaryHTML() {
       </div>`;
   }).join('');
 
+  const rs = typeof langRecallSummary === 'function' ? langRecallSummary() : null;
+  const flip = langFlipWords();
   return `
-    <div class="animate-fade-in prog-detail">
-      <div class="prog-detail-header">
-        <div class="prog-detail-icon"><i data-lucide="library-big"></i></div>
-        <div style="flex:1; min-width:0;">
-          <h2 class="prog-detail-title">Dictionary</h2>
-          <div class="prog-stats">
-            <div class="prog-stat"><i data-lucide="book-a" style="width:13px;height:13px;"></i>
-              <span class="prog-stat-body"><em>Entries</em><strong>${langWords().length}</strong></span></div>
-            <div class="prog-stat"><i data-lucide="filter" style="width:13px;height:13px;"></i>
-              <span class="prog-stat-body"><em>Showing</em><strong id="lang-showing">${sorted.length}</strong></span></div>
-            <div class="prog-stat"><i data-lucide="languages" style="width:13px;height:13px;"></i>
-              <span class="prog-stat-body"><em>Reading</em><strong>${escapeHTML(langShort(study))} / ${escapeHTML(langShort(ref))}</strong></span></div>
-          </div>
+    <div class="lpv-page lpv-tone-primary lpv-dict">
+      ${langHeroHTML('library-big', 'Words', 'Dictionary',
+        'Every word with its meaning. Tap the speaker to hear one.',
+        flip.length ? lpvWordFlipHTML(flip) : '')}
+      <div class="lpv-stats lpv-in" style="--i:1">
+        ${langStatHTML('book-a', langWords().length, 'Entries')}
+        <div class="lpv-stat">
+          <span class="lpv-stat-ico"><i data-lucide="filter"></i></span>
+          <span class="lpv-stat-body"><b id="lang-showing">${sorted.length}</b><em>Showing</em></span>
         </div>
+        ${rs ? langStatHTML('alarm-clock', rs.due, 'Due for review') : ''}
+        ${rs ? langStatHTML('sparkles', rs.known, 'Known') : ''}
       </div>
-      ${langFilterBarHTML()}
+      <div class="lpv-in" style="--i:2">${langFilterBarHTML()}</div>
       ${/* aria-live, because filtering changes the list silently. A screen
            reader user typing in the box had no way to know whether they had
            narrowed it to 40 entries or to none. */ ''}
@@ -467,6 +470,21 @@ function langDictionaryHTML() {
           <span class="lang-more-hint">${list.length} of ${sorted.length} shown${langQuery || langTagFilters.length || langPosFilter ? ' — every match is counted above, search covers all of them' : ''}</span>
         </div>` : ''}
     </div>`;
+}
+
+/** A handful of your words for the Dictionary's flip card, in both languages. */
+function langFlipWords() {
+  const study = langStudy(), ref = langRef();
+  const out = [];
+  lpvShuffle(langWords()).some(w => {
+    const f = langForm(w, study), g = langForm(w, ref);
+    if (!String(f.term || '').trim() || !String(g.term || '').trim()) return false;
+    const d = String(f.definition || g.definition || '');
+    out.push({ t: f.term, p: f.pos || '', g: g.term, d: d.length > 90 ? d.slice(0, 88) + '…' : d,
+               sl: langName(study), rl: langName(ref) });
+    return out.length >= 8;
+  });
+  return out;
 }
 
 /** The sentence a screen reader hears when the result set changes. */
@@ -575,11 +593,16 @@ function langToggleTags(e) {
 function langSetQuery(v) {
   langQuery = (v || '').trim();
   langShownCount = LANG_PAGE;   // a new query starts a new list
-  const host = document.querySelector('.lang-entries');
+  /* Compare has its results in .lang-compare-results, not .lang-entries.
+     Looking only for the Dictionary's list sent every keystroke in Compare
+     down the full re-render below -- which replaced the box being typed in
+     and replayed the whole page's entrance on each letter. */
+  const sel = langView === 'compare' ? '.lang-compare-results' : '.lang-entries';
+  const host = document.querySelector(sel);
   if (!host) { renderLangDetail(); return; }
   const fresh = document.createElement('div');
   fresh.innerHTML = langView === 'compare' ? langCompareHTML() : langDictionaryHTML();
-  const next = fresh.querySelector('.lang-entries') || fresh.querySelector('.lang-compare-results');
+  const next = fresh.querySelector(sel);
   if (next) { host.innerHTML = next.innerHTML; if (typeof lucide !== 'undefined') lucide.createIcons({ root: host }); }
   /* Only the list is swapped, to keep focus in the box -- so everything that
      lives outside that container has to be carried over by hand. */
@@ -682,17 +705,31 @@ function langCompareHTML() {
   const study = langStudy(), ref = langRef();
   const list = langFilteredWords(study);
   const w = langActiveWordId ? langFindWord(langActiveWordId) : (list[0] || null);
+  // How much of the library is readable both ways -- and what to fill in.
+  let both = 0;
+  langWords().forEach(x => {
+    if (String(langForm(x, study).term || '').trim() && String(langForm(x, ref).term || '').trim()) both++;
+  });
+  const gaps = langWords().length - both;
 
   return `
-    <div class="animate-fade-in prog-detail">
-      <div class="prog-detail-header">
-        <div class="prog-detail-icon"><i data-lucide="columns-2"></i></div>
-        <div style="flex:1; min-width:0;">
-          <h2 class="prog-detail-title">Search &amp; compare</h2>
-          <p class="prog-detail-desc" style="margin:0;">Reading ${escapeHTML(langName(study))} against ${escapeHTML(langName(ref))}.</p>
+    <div class="lpv-page lpv-tone-accent lpv-cmp">
+      ${langHeroHTML('columns-2', 'Words', 'Search & compare',
+        'Read a word in ' + langName(study) + ' and ' + langName(ref) + ', side by side.', `
+        <div class="lpv-pair" aria-hidden="true">
+          <span class="lpv-pair-lang is-study"><b>${escapeHTML(langShort(study))}</b><em>${escapeHTML(langName(study))}</em></span>
+          <span class="lpv-pair-arrows"><i data-lucide="arrow-right"></i><i data-lucide="arrow-left"></i></span>
+          <span class="lpv-pair-lang"><b>${escapeHTML(langShort(ref))}</b><em>${escapeHTML(langName(ref))}</em></span>
+        </div>`)}
+      <div class="lpv-stats lpv-in" style="--i:1">
+        <div class="lpv-stat">
+          <span class="lpv-stat-ico"><i data-lucide="search"></i></span>
+          <span class="lpv-stat-body"><b id="lang-showing">${list.length}</b><em>Matching</em></span>
         </div>
+        ${langStatHTML('link', both, 'In both languages')}
+        ${langStatHTML('circle-dashed', gaps, 'Missing a translation')}
       </div>
-      ${langFilterBarHTML()}
+      <div class="lpv-in" style="--i:2">${langFilterBarHTML()}</div>
       <div class="lang-compare-results">
         <div class="lang-pickrow">
           ${list.slice(0, 40).map(x => `
@@ -720,7 +757,12 @@ function langFormColumnHTML(w, code, isStudy) {
         <span class="lang-col-name">${escapeHTML(langName(code))}</span>
         <span class="lang-col-role">${isStudy ? 'learning' : 'reference'}</span>
       </div>
-      ${empty ? `<div class="lang-col-empty">Nothing recorded in ${escapeHTML(langName(code))} yet.</div>` : `
+      ${empty ? `
+        <div class="lang-col-empty">
+          <span class="lpv-empty-ico"><i data-lucide="pencil-line"></i></span>
+          <span>Nothing recorded in ${escapeHTML(langName(code))} yet.</span>
+          <button class="lpv-link" type="button" onclick="spaNavigate('admin-language')">Add it in Admin</button>
+        </div>` : `
         <div class="lang-term">${escapeHTML(f.term)}${f.pos ? `<span class="lang-pos">${escapeHTML(f.pos)}</span>` : ''}${langSpeakBtn(f.term, code)}</div>
         ${f.definition ? `<p class="lang-def">${escapeHTML(f.definition)}</p>` : ''}
         ${(f.examples || []).length ? `
@@ -754,7 +796,44 @@ function langOtherLangsHTML(w, shown) {
     </div>`;
 }
 
-/* ── One drill type ───────────────────────────────────────── */
+/* ── Page furniture ───────────────────────────────────────────
+   The second pane's pages share one shape: a hero with a coloured icon, a
+   row of stat tiles, a preview that plays, and the button. Each page has a
+   tone -- a theme colour -- so the five drills and the two adventure pages
+   are told apart at a glance rather than by reading their titles. */
+
+const LANG_TONES = { arrange: 'primary', blank: 'accent', choice: 'success', translate: 'warning', match: 'danger' };
+
+const LANG_STEP_ICONS = {
+  arrange: ['message-square-text', 'mouse-pointer-click', 'undo-2'],
+  blank: ['text-cursor', 'mouse-pointer-click', 'replace'],
+  choice: ['message-circle-question', 'mouse-pointer-click', 'shuffle'],
+  translate: ['languages', 'keyboard', 'corner-down-left'],
+  match: ['columns-2', 'link', 'rotate-ccw']
+};
+
+function langHeroHTML(icon, eyebrow, title, sub, aside) {
+  return `
+    <header class="lpv-hero lpv-in" style="--i:0">
+      <div class="lpv-hero-icon"><i data-lucide="${icon}"></i></div>
+      <div class="lpv-hero-body">
+        <span class="lpv-eyebrow">${escapeHTML(eyebrow)}</span>
+        <h2 class="lpv-title">${escapeHTML(title)}</h2>
+        ${sub ? `<p class="lpv-sub">${escapeHTML(sub)}</p>` : ''}
+      </div>
+      ${aside || ''}
+    </header>`;
+}
+
+function langStatHTML(icon, value, label) {
+  return `
+    <div class="lpv-stat">
+      <span class="lpv-stat-ico"><i data-lucide="${icon}"></i></span>
+      <span class="lpv-stat-body"><b>${escapeHTML(String(value))}</b><em>${escapeHTML(label)}</em></span>
+    </div>`;
+}
+
+/* ── One puzzle type ──────────────────────────────────────── */
 
 function langDrillTypeHTML(type) {
   const meta = langPuzzleMeta(type);
@@ -764,60 +843,64 @@ function langDrillTypeHTML(type) {
   const best = runs.length ? Math.max(...runs.map(r => r.score || 0)) : -1;
   const fromSets = [];
   pool.forEach(p => { if (fromSets.indexOf(p.set.title) === -1) fromSets.push(p.set.title); });
+  const tone = LANG_TONES[meta.type] || 'primary';
+  const icons = LANG_STEP_ICONS[meta.type] || LANG_STEP_ICONS.arrange;
 
   return `
-    <div class="animate-fade-in prog-detail">
-      <div class="prog-detail-header">
-        <div class="prog-detail-icon"><i data-lucide="${meta.icon}"></i></div>
-        <div style="flex:1; min-width:0;">
-          <h2 class="prog-detail-title">${escapeHTML(meta.name)}</h2>
-          <div class="prog-stats">
-            <div class="prog-stat"><i data-lucide="list" style="width:13px;height:13px;"></i>
-              <span class="prog-stat-body"><em>Questions ready</em><strong>${pool.length}</strong></span></div>
-            <div class="prog-stat"><i data-lucide="rotate-ccw" style="width:13px;height:13px;"></i>
-              <span class="prog-stat-body"><em>Runs</em><strong>${runs.length}</strong></span></div>
-            ${best >= 0 ? `<div class="prog-stat"><i data-lucide="target" style="width:13px;height:13px;"></i>
-              <span class="prog-stat-body"><em>Best</em><strong>${best}%</strong></span></div>` : ''}
-          </div>
-        </div>
-      </div>
+    <div class="lpv-page lpv-tone-${tone}">
+      ${langHeroHTML(meta.icon, 'Drill', meta.name, meta.hint)}
 
-      <p class="prog-detail-desc">${escapeHTML(meta.hint)}</p>
-
-      <div class="lang-rules">
-        <div class="lang-rules-block">
-          <h3><i data-lucide="list-ordered"></i> How to play</h3>
-          <ol>${rules.how.map(h => `<li>${escapeHTML(h)}</li>`).join('')}</ol>
-        </div>
-        <div class="lang-rules-block">
-          <h3><i data-lucide="trophy"></i> What counts as right</h3>
-          <p>${escapeHTML(rules.wins)}</p>
-          <h3 style="margin-top:0.85rem;"><i data-lucide="heart"></i> Hearts</h3>
-          <p>Three. A wrong answer or a skip costs one; at zero the run ends there.</p>
-          <h3 style="margin-top:0.85rem;"><i data-lucide="keyboard"></i> Keys</h3>
-          <p><kbd>1</kbd>–<kbd>9</kbd> pick a tile or answer, <kbd>Backspace</kbd> takes the last word back,
-             <kbd>Enter</kbd> checks and continues, <kbd>Esc</kbd> leaves.</p>
-        </div>
+      <div class="lpv-stats lpv-in" style="--i:1">
+        ${langStatHTML('list-checks', pool.length, 'Questions ready')}
+        ${langStatHTML('rotate-ccw', runs.length, runs.length === 1 ? 'Run' : 'Runs')}
+        ${langStatHTML('trophy', best >= 0 ? best + '%' : '—', 'Best score')}
       </div>
 
       ${pool.length ? `
-        <div class="prog-detail-actions" style="margin-top:1.25rem;">
-          <button class="btn btn-practice btn-lg" onclick="langPromptTimer('type', '${meta.type}')">
-            <i data-lucide="play" style="width:18px;height:18px;fill:currentColor;"></i> Start attempt
-          </button>
-          <button class="btn btn-secondary" onclick="langStartType('${meta.type}', 0)">
-            <i data-lucide="zap" style="width:16px;height:16px;"></i> Quick start (no timer)
-          </button>
+        <div class="lpv-split lpv-in" style="--i:2">
+          ${lpvDemoHTML(meta.type, lpvDrillSample(meta.type), 'How it plays')}
+          <div class="lpv-side">
+            <button class="lpv-go" type="button" onclick="langStartType('${meta.type}', 0)">
+              <i data-lucide="play"></i> Start
+            </button>
+            <button class="lpv-alt" type="button" onclick="langPromptTimer('type', '${meta.type}')">
+              <i data-lucide="timer"></i> Timed run
+            </button>
+            <div class="lpv-fact">
+              <span class="lpv-fact-ico is-hearts"><i data-lucide="heart"></i><i data-lucide="heart"></i><i data-lucide="heart"></i></span>
+              <span><b>Three hearts.</b> A miss or a skip costs one.</span>
+            </div>
+            <div class="lpv-fact">
+              <span class="lpv-fact-ico"><i data-lucide="badge-check"></i></span>
+              <span>${escapeHTML(rules.wins)}</span>
+            </div>
+            <div class="lpv-fact lpv-keys">
+              <span class="lpv-fact-ico"><i data-lucide="keyboard"></i></span>
+              <span><kbd>1</kbd>–<kbd>9</kbd> pick · <kbd>⌫</kbd> undo · <kbd>Enter</kbd> check · <kbd>Esc</kbd> leave</span>
+            </div>
+          </div>
         </div>
-        <p class="lang-form-hint" style="margin-top:0.75rem;">
-          Drawn from ${fromSets.length} set${fromSets.length !== 1 ? 's' : ''}: ${escapeHTML(fromSets.slice(0, 4).join(', '))}${fromSets.length > 4 ? '…' : ''}
-        </p>`
+
+        <div class="lpv-steps lpv-in" style="--i:3">
+          ${rules.how.map((h, i) => `
+            <div class="lpv-step">
+              <span class="lpv-step-ico"><i data-lucide="${icons[i] || 'circle'}"></i><b>${i + 1}</b></span>
+              <span class="lpv-step-text">${escapeHTML(h)}</span>
+            </div>`).join('')}
+        </div>
+
+        <div class="lpv-from lpv-in" style="--i:4">
+          <span class="lpv-from-label"><i data-lucide="layers"></i> From ${fromSets.length} set${fromSets.length !== 1 ? 's' : ''}</span>
+          ${fromSets.slice(0, 6).map(t => `<span class="lpv-chip">${escapeHTML(t)}</span>`).join('')}
+          ${fromSets.length > 6 ? `<span class="lpv-chip is-more">+${fromSets.length - 6}</span>` : ''}
+        </div>`
       : `
-        <div class="lang-problems" style="margin-top:1.25rem;">
-          <strong><i data-lucide="alert-triangle"></i> Nothing to practise yet</strong>
-          <ul><li>No finished ${escapeHTML(meta.name.toLowerCase())} questions exist in any of your sets.</li></ul>
-          <button class="btn btn-secondary btn-sm" style="margin-top:0.5rem;" onclick="spaNavigate('admin-language')">
-            <i data-lucide="plus" style="width:14px;height:14px;"></i> Write some in Admin
+        <div class="lpv-empty lpv-in" style="--i:2">
+          <span class="lpv-empty-ico"><i data-lucide="${meta.icon}"></i></span>
+          <b>Nothing to practise yet</b>
+          <p>No finished ${escapeHTML(meta.name.toLowerCase())} questions exist in any of your sets.</p>
+          <button class="lpv-alt" type="button" onclick="spaNavigate('admin-language')">
+            <i data-lucide="plus"></i> Write some in Admin
           </button>
         </div>
         ${langSets().length ? '' : langSeedOfferHTML('The starter pack brings ten questions of every type, including this one.')}`}
@@ -828,38 +911,43 @@ function langDrillTypeHTML(type) {
 
 function langSetsHTML() {
   const sets = langSets();
+  const ran = sets.filter(s => langBestPct('set', s.id) >= 0).length;
+  const questions = sets.reduce((n, s) => n + (s.items || []).length, 0);
   return `
-    <div class="animate-fade-in prog-detail">
-      <div class="prog-detail-header">
-        <div class="prog-detail-icon"><i data-lucide="layers"></i></div>
-        <div style="flex:1; min-width:0;">
-          <h2 class="prog-detail-title">Your drill sets</h2>
-          <p class="prog-detail-desc" style="margin:0;">Run a set exactly as you wrote it, in its own order.</p>
-        </div>
+    <div class="lpv-page lpv-tone-success">
+      ${langHeroHTML('layers', 'Drills', 'Your drill sets', 'Run a set exactly as you wrote it, start to finish.')}
+      <div class="lpv-stats lpv-in" style="--i:1">
+        ${langStatHTML('layers', sets.length, sets.length === 1 ? 'Set' : 'Sets')}
+        ${langStatHTML('list-checks', questions, 'Questions')}
+        ${langStatHTML('flag', ran, 'Run at least once')}
       </div>
-      <div class="prog-variant-list" style="margin-top:1.25rem;">
+      <div class="lpv-grid lpv-in" style="--i:2">
         ${sets.map((s, i) => {
           const problems = langSetProblems(s);
           const best = langBestPct('set', s.id);
+          const types = [];
+          (s.items || []).forEach(it => { if (types.indexOf(it.type) === -1) types.push(it.type); });
+          const n = (s.items || []).length;
           return `
-          <div class="prog-variant-row">
-            <div class="prog-variant-num">${String(i + 1).padStart(2, '0')}</div>
-            <div class="prog-variant-info">
-              <div class="prog-variant-name">${escapeHTML(s.title || 'Untitled set')}</div>
-              <div class="prog-variant-meta">
-                <span><i data-lucide="list" style="width:11px;height:11px;"></i> ${(s.items || []).length} question${(s.items || []).length !== 1 ? 's' : ''}</span>
-                <span><i data-lucide="languages" style="width:11px;height:11px;"></i> ${escapeHTML(langShort(s.lang))} → ${escapeHTML(langShort(s.refLang))}</span>
-                ${best >= 0 ? `<span><i data-lucide="target" style="width:11px;height:11px;"></i> best ${best}%</span>` : ''}
-                ${problems.length ? `<span style="color:var(--color-warning);"><i data-lucide="alert-triangle" style="width:11px;height:11px;"></i> ${problems.length} to fix</span>` : ''}
-                ${typeof agDeadlineTextHTML === 'function' ? agDeadlineTextHTML('langset', s.id) : ''}
-              </div>
+          <div class="lpv-set" style="--k:${i}">
+            <div class="lpv-set-top">
+              <span class="lpv-ring${best < 0 ? ' is-none' : ''}" style="--p:${Math.max(0, best)}"><b>${best >= 0 ? best + '%' : '—'}</b></span>
+              <span class="lpv-set-info">
+                <b>${escapeHTML(s.title || 'Untitled set')}</b>
+                <span>${n} question${n !== 1 ? 's' : ''} · ${escapeHTML(langShort(s.lang))} → ${escapeHTML(langShort(s.refLang))}</span>
+              </span>
+              <button class="ag-icon-btn" type="button" onclick="agOpenDeadlineModal('langset', '${s.id}')"
+                      title="${typeof agGetDeadline === 'function' && agGetDeadline('langset', s.id) ? 'Change or clear the deadline' : 'Put a due date on this set'}">
+                <i data-lucide="flag"></i>
+              </button>
             </div>
-            <button class="btn btn-ghost btn-sm" onclick="agOpenDeadlineModal('langset', '${s.id}')"
-                    title="${typeof agGetDeadline === 'function' && agGetDeadline('langset', s.id) ? 'Change or clear the deadline' : 'Put a due date on this set'}">
-              <i data-lucide="flag" style="width:14px;height:14px;"></i>
-            </button>
-            <button class="btn btn-practice btn-sm" onclick="langPromptTimer('set', '${s.id}')" ${problems.length ? 'disabled' : ''}>
-              <i data-lucide="play" style="width:14px;height:14px;fill:currentColor;"></i> Run
+            <div class="lpv-set-types">
+              ${types.map(t => { const m = langPuzzleMeta(t); return `<span class="lpv-type lpv-tone-${LANG_TONES[t] || 'primary'}" title="${escapeHTML(m.name)}"><i data-lucide="${m.icon}"></i></span>`; }).join('')}
+              ${typeof agDeadlineTextHTML === 'function' ? agDeadlineTextHTML('langset', s.id) : ''}
+            </div>
+            ${problems.length ? `<div class="lpv-warn"><i data-lucide="alert-triangle"></i> ${problems.length} to fix in Admin</div>` : ''}
+            <button class="lpv-go is-small" type="button" onclick="langPromptTimer('set', '${s.id}')" ${problems.length ? 'disabled' : ''}>
+              <i data-lucide="play"></i> Run
             </button>
           </div>`;
         }).join('') || langSeedOfferHTML('The starter pack brings ten sets, five questions each — one of every puzzle type.')}
@@ -874,97 +962,103 @@ function langRunHTML() {
   const runs = (state.langHistory || []).filter(h => h.kind === 'run');
   const bestDist = runs.length ? Math.max(...runs.map(r => r.steps || 0)) : 0;
   const bestBeat = runs.length ? Math.max(...runs.map(r => r.defeated || 0)) : 0;
+  const flow = [
+    ['footprints', 'Run', 'Each leg costs ' + LANG_RUN_STEP_COST + ' stamina. A quiet block raises your max by ' + LANG_RUN_ENDURANCE_GAIN + '.'],
+    ['user', 'Someone stops you', 'They always speak first.'],
+    ['message-circle', 'Reply', 'A good reply costs nothing and heals. A bad one drains.'],
+    ['trophy', 'Win', 'Beat them and your max stamina rises by ' + LANG_RUN_STAMINA_GAIN + '.'],
+    ['home', 'Go home', 'Any time. It ends the run and keeps the score.']
+  ];
   return `
-    <div class="animate-fade-in prog-detail">
-      <div class="prog-detail-header">
-        <div class="prog-detail-icon"><i data-lucide="footprints"></i></div>
-        <div style="flex:1; min-width:0;">
-          <h2 class="prog-detail-title">Free run</h2>
-          <div class="prog-stats">
-            <div class="prog-stat"><i data-lucide="flame" style="width:13px;height:13px;"></i>
-              <span class="prog-stat-body"><em>Stamina</em><strong>${LANG_RUN_STAMINA}</strong></span></div>
-            <div class="prog-stat"><i data-lucide="rotate-ccw" style="width:13px;height:13px;"></i>
-              <span class="prog-stat-body"><em>Runs</em><strong>${runs.length}</strong></span></div>
-            <div class="prog-stat"><i data-lucide="signpost" style="width:13px;height:13px;"></i>
-              <span class="prog-stat-body"><em>Furthest</em><strong>${bestDist}</strong></span></div>
-            <div class="prog-stat"><i data-lucide="swords" style="width:13px;height:13px;"></i>
-              <span class="prog-stat-body"><em>Most beaten</em><strong>${bestBeat}</strong></span></div>
+    <div class="lpv-page lpv-tone-warning">
+      ${langHeroHTML('footprints', 'Adventure', 'Free run', 'Walk the streets, meet people, and talk your way past them.')}
+      <div class="lpv-stats lpv-in" style="--i:1">
+        ${langStatHTML('flame', LANG_RUN_STAMINA, 'Starting stamina')}
+        ${langStatHTML('rotate-ccw', runs.length, runs.length === 1 ? 'Run' : 'Runs')}
+        ${langStatHTML('signpost', bestDist, 'Furthest')}
+        ${langStatHTML('swords', bestBeat, 'Most beaten')}
+      </div>
+
+      <div class="lpv-split is-wide lpv-in" style="--i:2">
+        ${lpvDemoHTML('quest', lpvQuestSamples(), 'A run, in miniature')}
+        <div class="lpv-side">
+          ${blocker ? `
+            <div class="lpv-empty is-compact">
+              <span class="lpv-empty-ico"><i data-lucide="alert-triangle"></i></span>
+              <b>Not enough to run on</b>
+              <p>${escapeHTML(blocker)}</p>
+              <button class="lpv-alt" type="button" onclick="spaNavigate('admin-language')"><i data-lucide="plus"></i> Add some in Admin</button>
+            </div>`
+          : `<button class="lpv-go" type="button" onclick="langStartRun()"><i data-lucide="play"></i> Set off</button>`}
+          <span class="lpv-side-label">You set off with</span>
+          <div class="lpv-potions">
+            ${LANG_POTIONS.map(p => `
+              <span class="lpv-potion" title="${escapeHTML(p.name)}">
+                <i data-lucide="flask-round"></i><b>${escapeHTML(p.name)}</b><em>+${p.heal}</em>
+              </span>`).join('')}
           </div>
         </div>
       </div>
+      ${blocker ? langSeedOfferHTML('The starter pack gives you people to meet straight away.') : ''}
 
-      <div class="lang-rules">
-        <div class="lang-rules-block">
-          <h3><i data-lucide="list-ordered"></i> How it goes</h3>
-          <ol>
-            <li>You start with ${LANG_RUN_STAMINA} stamina. Stamina is your health.</li>
-            <li>Choose <strong>Run</strong> to walk on. Each leg costs ${LANG_RUN_STEP_COST} stamina,
-                and any block where nobody stops you raises your <em>maximum</em> by
-                ${LANG_RUN_ENDURANCE_GAIN}. Running builds the capacity to run.</li>
-            <li>Sooner or later somebody stops you, and they speak first.</li>
-            <li>Reply well and you take no damage and get some stamina back. Reply badly and it drains.</li>
-            <li>Beat them and your maximum rises by a further ${LANG_RUN_STAMINA_GAIN}.</li>
-            <li>Choose <strong>Go home</strong> whenever you like — that ends the run and keeps the score.</li>
-          </ol>
-        </div>
-        <div class="lang-rules-block">
-          <h3><i data-lucide="sparkles"></i> Power gauge</h3>
-          <p>Fills as you answer well. Spend it on:</p>
-          <ul class="lang-powerlist">
-            ${LANG_POWERUPS.map(p => `<li><i data-lucide="${p.icon}"></i> <strong>${escapeHTML(p.name)}</strong> <span>${p.cost}</span> — ${escapeHTML(p.desc)}</li>`).join('')}
-          </ul>
-          <h3 style="margin-top:0.85rem;"><i data-lucide="flask-round"></i> Potions</h3>
-          <p>${LANG_POTIONS.map(p => escapeHTML(p.name) + ' (+' + p.heal + ')').join(', ')} — you set off with one of each.</p>
-        </div>
+      <h3 class="lpv-h lpv-in" style="--i:3"><i data-lucide="route"></i> How a run goes</h3>
+      <div class="lpv-flow lpv-in" style="--i:3">
+        ${flow.map((f, i) => `
+          <div class="lpv-flow-step" style="--k:${i}">
+            <span class="lpv-step-ico"><i data-lucide="${f[0]}"></i></span>
+            <b>${escapeHTML(f[1])}</b>
+            <span>${escapeHTML(f[2])}</span>
+          </div>`).join('')}
       </div>
 
-      ${blocker ? `
-        <div class="lang-problems" style="margin-top:1.25rem;">
-          <strong><i data-lucide="alert-triangle"></i> Not enough to run on</strong>
-          <ul><li>${escapeHTML(blocker)}</li></ul>
-          <button class="btn btn-secondary btn-sm" style="margin-top:0.5rem;" onclick="spaNavigate('admin-language')">
-            <i data-lucide="plus" style="width:14px;height:14px;"></i> Add some in Admin
-          </button>
-        </div>
-        ${langSeedOfferHTML('The starter pack gives you people to meet straight away.')}`
-      : `<div class="prog-detail-actions" style="margin-top:1.25rem;">
-          <button class="btn btn-practice btn-lg" onclick="langStartRun()">
-            <i data-lucide="play" style="width:18px;height:18px;fill:currentColor;"></i> Set off
-          </button>
-        </div>`}
-
+      <h3 class="lpv-h lpv-in" style="--i:4"><i data-lucide="zap"></i> Power-ups <span class="lpv-h-note">the gauge fills as you answer well</span></h3>
+      <div class="lpv-powers lpv-in" style="--i:4">
+        ${LANG_POWERUPS.map(p => `
+          <div class="lpv-power">
+            <span class="lpv-power-ico"><i data-lucide="${p.icon}"></i></span>
+            <span class="lpv-power-body">
+              <b>${escapeHTML(p.name)}</b>
+              <span>${escapeHTML(p.desc)}</span>
+              <span class="lpv-power-cost"><i style="width:${Math.min(100, p.cost)}%"></i><em>${p.cost}</em></span>
+            </span>
+          </div>`).join('')}
+      </div>
     </div>`;
 }
 
 function langScenariosHTML() {
   const list = langScenarios();
+  const ready = s => (s.encounters || []).some(e => (e.line || '').trim() && (e.options || []).some(o => (o.text || '').trim() && o.correct));
+  const readyN = list.filter(ready).length;
+  const places = [];
+  list.forEach(s => { if (places.indexOf(s.location) === -1) places.push(s.location); });
   return `
-    <div class="animate-fade-in prog-detail">
-      <div class="prog-detail-header">
-        <div class="prog-detail-icon"><i data-lucide="map"></i></div>
-        <div style="flex:1; min-width:0;">
-          <h2 class="prog-detail-title">Scenarios</h2>
-          <p class="prog-detail-desc" style="margin:0;">The encounters you have written. A run draws its opponents from these.</p>
-        </div>
+    <div class="lpv-page lpv-tone-accent">
+      ${langHeroHTML('map', 'Adventure', 'Scenarios', 'The encounters you have written. A run draws the people you meet from these.')}
+      <div class="lpv-stats lpv-in" style="--i:1">
+        ${langStatHTML('map', list.length, list.length === 1 ? 'Scenario' : 'Scenarios')}
+        ${langStatHTML('check-circle-2', readyN, 'Ready to fight')}
+        ${langStatHTML('map-pin', places.length, places.length === 1 ? 'Place' : 'Places')}
       </div>
-      <div class="prog-variant-list" style="margin-top:1.25rem;">
+      ${readyN ? `<div class="lpv-in" style="--i:2">${lpvDemoHTML('quest', lpvQuestSamples(), 'From your scenarios')}</div>` : ''}
+      <div class="lpv-grid lpv-in" style="--i:3">
         ${list.map((s, i) => {
           const loc = langLocation(s.location);
-          const ready = (s.encounters || []).some(e => (e.line || '').trim() && (e.options || []).some(o => (o.text || '').trim() && o.correct));
+          const ok = ready(s);
+          const turns = (s.encounters || []).length;
           return `
-          <div class="prog-variant-row">
-            <div class="prog-variant-num">${String(i + 1).padStart(2, '0')}</div>
-            <div class="prog-variant-info">
-              <div class="prog-variant-name">${escapeHTML(s.title || 'Untitled')}</div>
-              <div class="prog-variant-meta">
-                <span><i data-lucide="${loc.icon}" style="width:11px;height:11px;"></i> ${escapeHTML(loc.name)}</span>
-                <span><i data-lucide="user" style="width:11px;height:11px;"></i> ${escapeHTML(s.npc || 'Someone')}</span>
-                <span><i data-lucide="messages-square" style="width:11px;height:11px;"></i> ${(s.encounters || []).length}</span>
-                ${ready ? '' : '<span style="color:var(--color-warning);"><i data-lucide="alert-triangle" style="width:11px;height:11px;"></i> unfinished</span>'}
-              </div>
+          <div class="lpv-scene${ok ? '' : ' is-unready'}" style="--k:${i}">
+            <div class="lpv-scene-art lpv-bg-${escapeHTML(loc.key)}">
+              <span class="lpv-scene-loc"><i data-lucide="${loc.icon}"></i> ${escapeHTML(loc.name)}</span>
+              <span class="lpv-scene-face lpv-face-${escapeHTML(lpvFaceKey(s.npc))}"></span>
             </div>
-            <button class="btn btn-practice btn-sm" onclick="langStartScenario('${s.id}')" ${ready ? '' : 'disabled'}>
-              <i data-lucide="swords" style="width:14px;height:14px;"></i> Fight
+            <div class="lpv-scene-body">
+              <b>${escapeHTML(s.title || 'Untitled')}</b>
+              <span><i data-lucide="user"></i> ${escapeHTML(s.npc || 'Someone')} · <i data-lucide="messages-square"></i> ${turns} turn${turns !== 1 ? 's' : ''}</span>
+              ${ok ? '' : '<span class="lpv-warn"><i data-lucide="alert-triangle"></i> unfinished</span>'}
+            </div>
+            <button class="lpv-go is-small" type="button" onclick="langStartScenario('${s.id}')" ${ok ? '' : 'disabled'}>
+              <i data-lucide="swords"></i> Fight
             </button>
           </div>`;
         }).join('') || langSeedOfferHTML('The starter pack brings ten scenarios across all six locations.')}

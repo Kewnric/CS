@@ -1,0 +1,1079 @@
+/* ============================================================
+   LANG-PAGES.CSS — the Language Library's second pane
+   ------------------------------------------------------------
+   Dictionary, Search & compare, the five drills, your sets, the free run and
+   the scenarios. They used to be the shared detail page -- a title, a row of
+   tiny stats and three boxes of prose. Now each is a coloured hero, stat
+   tiles, a preview that plays (js/lang-preview.js), and one big button, with
+   the rules as small illustrated cards rather than paragraphs.
+
+   Every colour is a theme token. A page picks a tone (--lpv) and everything
+   tinted on it derives from that one value, so light, dark and the coloured
+   themes all work. The adventure's preview alone keeps the pixel palette,
+   because the adventure is the one part of the library that is a game.
+   ============================================================ */
+
+/* ── Tones ── */
+
+.lpv-tone-primary { --lpv: var(--color-primary); --lpv-ink: #fff; }
+.lpv-tone-accent  { --lpv: var(--color-accent);  --lpv-ink: #052e35; }
+.lpv-tone-success { --lpv: var(--color-success); --lpv-ink: #fff; }
+.lpv-tone-warning { --lpv: var(--color-warning); --lpv-ink: #2a1a00; }
+.lpv-tone-danger  { --lpv: var(--color-danger);  --lpv-ink: #fff; }
+
+/* Derived per element, so a nested tone (a set's type chips) re-derives
+   from its own colour instead of inheriting its parent's tints. */
+.lpv-tone-primary, .lpv-tone-accent, .lpv-tone-success, .lpv-tone-warning, .lpv-tone-danger {
+  --lpv-soft: color-mix(in srgb, var(--lpv) 13%, transparent);
+  --lpv-wash: color-mix(in srgb, var(--lpv) 10%, var(--bg-surface));
+  --lpv-line: color-mix(in srgb, var(--lpv) 38%, var(--border-color));
+  --lpv-dark: color-mix(in srgb, var(--lpv) 70%, #000);
+}
+
+/* ── The page ── */
+
+.lpv-page {
+  max-width: 980px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.15rem;
+  container-type: inline-size;
+}
+
+.lpv-in { animation: lpvIn 0.5s var(--ease-expo-out, ease) both; animation-delay: calc(var(--i, 0) * 70ms); }
+
+/* ── Hero ── */
+
+.lpv-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1.15rem;
+  padding: 1.3rem 1.45rem;
+  border: 1px solid var(--lpv-line);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(120% 160% at 0% 0%, var(--lpv-soft), transparent 62%),
+    var(--bg-surface);
+  overflow: hidden;
+}
+/* A slow drifting glow in the corner -- the hero is alive without asking
+   for attention. */
+.lpv-hero::after {
+  content: '';
+  position: absolute;
+  right: -70px;
+  top: -80px;
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  background: var(--lpv);
+  opacity: 0.09;
+  pointer-events: none;
+  animation: lpvFloat 9s ease-in-out infinite alternate;
+}
+.lpv-hero-icon {
+  position: relative;
+  z-index: 1;
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+  background: var(--lpv);
+  color: var(--lpv-ink);
+  box-shadow: 0 5px 0 var(--lpv-dark), 0 12px 26px -10px var(--lpv);
+  animation: lpvBob 4s ease-in-out infinite;
+}
+.lpv-hero-icon svg { width: 30px; height: 30px; }
+.lpv-hero-body { position: relative; z-index: 1; flex: 1; min-width: 0; }
+.lpv-eyebrow { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; color: var(--lpv); }
+.lpv-title {
+  margin: 0.1rem 0 0.25rem;
+  font-size: clamp(1.5rem, 1.2rem + 1vw, 2.1rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--text-primary);
+}
+.lpv-sub { margin: 0; font-size: 0.92rem; line-height: 1.5; color: var(--text-secondary); }
+
+/* ── Stat tiles ── */
+
+.lpv-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; }
+.lpv-stat {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+.lpv-stat:hover { transform: translateY(-2px); border-color: var(--lpv-line); }
+.lpv-stat-ico {
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: var(--lpv-soft);
+  color: var(--lpv);
+}
+.lpv-stat-ico svg { width: 19px; height: 19px; }
+.lpv-stat-body { min-width: 0; }
+.lpv-stat-body b {
+  display: block;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+.lpv-stat-body em { font-style: normal; font-size: 0.72rem; font-weight: 600; color: var(--text-tertiary); }
+
+/* ── Preview beside the actions ── */
+
+.lpv-split { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(220px, 1fr); gap: 1rem; align-items: stretch; }
+.lpv-split.is-wide { grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr); }
+.lpv-side { display: flex; flex-direction: column; gap: 0.65rem; }
+.lpv-side-label { margin-top: 0.35rem; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-tertiary); }
+
+/* ── Buttons ── */
+
+.lpv-go {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  width: 100%;
+  min-height: 56px;
+  padding: 0.8rem 1.4rem;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--lpv);
+  color: var(--lpv-ink);
+  box-shadow: 0 5px 0 var(--lpv-dark);
+  font: inherit;
+  font-size: 1.02rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.15s ease;
+}
+/* A sheen that sweeps across now and then: this is the button to press. */
+.lpv-go::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.3) 50%, transparent 70%);
+  translate: -130% 0;
+  animation: lpvShine 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+.lpv-go svg { width: 20px; height: 20px; }
+.lpv-go svg.lucide-play { fill: currentColor; }
+.lpv-go:hover:not(:disabled) { filter: brightness(1.07); }
+.lpv-go:active:not(:disabled) { transform: translateY(5px); box-shadow: none; }
+.lpv-go:focus-visible { outline: 2px solid var(--lpv); outline-offset: 3px; }
+.lpv-go:disabled { background: var(--bg-surface-hover); color: var(--text-tertiary); box-shadow: none; cursor: not-allowed; }
+.lpv-go:disabled::after { display: none; }
+.lpv-go.is-small { min-height: 42px; font-size: 0.8rem; box-shadow: 0 4px 0 var(--lpv-dark); }
+.lpv-go.is-small:active:not(:disabled) { transform: translateY(4px); }
+.lpv-go.is-small svg { width: 16px; height: 16px; }
+
+.lpv-alt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 46px;
+  padding: 0.6rem 1rem;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  box-shadow: 0 4px 0 var(--border-color);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 0.08s ease, box-shadow 0.08s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.lpv-alt svg { width: 17px; height: 17px; }
+.lpv-alt:hover { color: var(--lpv); border-color: var(--lpv-line); }
+.lpv-alt:active { transform: translateY(4px); box-shadow: none; }
+.lpv-alt:focus-visible { outline: 2px solid var(--lpv); outline-offset: 3px; }
+
+.lpv-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--lpv);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* ── Facts, steps, chips ── */
+
+.lpv-fact {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+.lpv-fact b { color: var(--text-primary); }
+.lpv-fact-ico { display: inline-flex; gap: 2px; flex-shrink: 0; color: var(--lpv); }
+.lpv-fact-ico svg { width: 18px; height: 18px; }
+.lpv-fact-ico.is-hearts { color: var(--color-danger); }
+.lpv-fact-ico.is-hearts svg { width: 15px; height: 15px; fill: currentColor; animation: lpvBeat 1.8s ease-in-out infinite; }
+.lpv-fact-ico.is-hearts svg:nth-child(2) { animation-delay: 0.15s; }
+.lpv-fact-ico.is-hearts svg:nth-child(3) { animation-delay: 0.3s; }
+.lpv-fact kbd {
+  display: inline-block;
+  min-width: 1.4em;
+  padding: 0 0.3em;
+  border: 1px solid var(--border-color);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+  font: 700 0.68rem/1.5 var(--font-sans);
+  text-align: center;
+}
+
+.lpv-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
+.lpv-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.8rem;
+  padding: 0.95rem 1rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+.lpv-step:hover { transform: translateY(-2px); border-color: var(--lpv-line); }
+.lpv-step-ico {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: var(--lpv-soft);
+  color: var(--lpv);
+}
+.lpv-step-ico svg { width: 19px; height: 19px; }
+.lpv-step-ico b {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 19px;
+  height: 19px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--lpv);
+  color: var(--lpv-ink);
+  font-size: 0.66rem;
+  font-weight: 800;
+  box-shadow: 0 0 0 2px var(--bg-surface);
+}
+
+.lpv-from { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+.lpv-from-label { display: inline-flex; align-items: center; gap: 0.35rem; margin-right: 0.2rem; font-size: 0.75rem; font-weight: 700; color: var(--text-tertiary); }
+.lpv-from-label svg { width: 14px; height: 14px; }
+.lpv-chip {
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  background: var(--bg-surface);
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+.lpv-chip.is-more { color: var(--lpv); border-color: var(--lpv-line); }
+
+.lpv-h { display: flex; align-items: center; gap: 0.5rem; margin: 0.35rem 0 -0.3rem; font-size: 1.02rem; font-weight: 700; color: var(--text-primary); }
+.lpv-h svg { width: 17px; height: 17px; color: var(--lpv); }
+.lpv-h-note { margin-left: 0.2rem; font-size: 0.75rem; font-weight: 500; color: var(--text-tertiary); }
+
+.lpv-warn { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.75rem; font-weight: 700; color: var(--color-warning); }
+.lpv-warn svg { width: 14px; height: 14px; }
+
+/* ── Empty ── */
+
+.lpv-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 2rem 1.5rem;
+  border: 2px dashed var(--lpv-line);
+  border-radius: var(--radius-xl);
+  background: var(--lpv-soft);
+  text-align: center;
+}
+.lpv-empty b { font-size: 1.05rem; color: var(--text-primary); }
+.lpv-empty p { margin: 0; font-size: 0.86rem; color: var(--text-secondary); }
+.lpv-empty .lpv-alt { width: auto; }
+.lpv-empty-ico {
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  color: var(--lpv);
+  animation: lpvBob 3s ease-in-out infinite;
+}
+.lpv-empty-ico svg { width: 26px; height: 26px; }
+.lpv-empty.is-compact { padding: 1.1rem; }
+.lpv-empty.is-compact .lpv-empty-ico { width: 44px; height: 44px; }
+
+/* ============================================================
+   THE PREVIEW FRAME
+   ============================================================ */
+
+.lpv-demo {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--lpv-line);
+  border-radius: var(--radius-xl);
+  background: var(--bg-surface);
+  box-shadow: 0 14px 34px -22px var(--lpv);
+  overflow: hidden;
+}
+.lpv-demo-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.95rem;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-surface-hover);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+.lpv-demo-hint { margin-left: auto; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--text-tertiary); }
+.lpv-live {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-danger);
+  animation: lpvLive 1.6s ease-out infinite;
+}
+
+.lpv-stage {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 260px;
+  padding: 1.1rem 1.2rem 0;
+  overflow: hidden;
+  transition: opacity 0.4s ease;
+}
+.lpv-stage.is-out, .lpv-flip.is-out { opacity: 0; }
+
+/* The drill in miniature: the same shapes as the real one, smaller. */
+.lpv-q { flex: 1; display: flex; flex-direction: column; gap: 0.85rem; }
+.lpv-prompt { font-size: 1.05rem; font-weight: 800; line-height: 1.3; color: var(--text-primary); }
+.lpv-body { display: flex; flex-direction: column; gap: 0.85rem; }
+
+.lpv-lane {
+  min-height: 46px;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 0.4rem;
+  padding: 0.4rem 0 0.55rem;
+  border-top: 2px solid var(--border-color);
+  border-bottom: 2px solid var(--border-color);
+}
+.lpv-pool { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem; padding-bottom: 3px; }
+
+.lpv-tile, .lpv-card, .lpv-option {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.4rem 0.75rem;
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  box-shadow: 0 3px 0 var(--border-color);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  transition: transform 0.1s ease, box-shadow 0.1s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, opacity 0.25s ease;
+}
+.lpv-stage .is-press { transform: translateY(3px); box-shadow: none; }
+.lpv-tile.is-used { color: transparent; background: var(--bg-surface-hover); border-color: var(--bg-surface-hover); box-shadow: none; }
+
+.lpv-sentence { font-size: 1.1rem; font-weight: 700; line-height: 2.1; color: var(--text-primary); }
+.lpv-slot {
+  display: inline-flex;
+  justify-content: center;
+  min-width: 4.5em;
+  margin: 0 0.25em;
+  border-bottom: 3px solid var(--border-color);
+  vertical-align: middle;
+  line-height: 1.3;
+}
+.lpv-slot.is-filled { border-bottom-color: transparent; }
+
+.lpv-options { display: flex; flex-direction: column; gap: 0.45rem; }
+.lpv-option { gap: 0.6rem; white-space: normal; }
+.lpv-option-key {
+  width: 1.55em;
+  height: 1.55em;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.68rem;
+  color: var(--text-tertiary);
+}
+
+.lpv-input {
+  display: flex;
+  align-items: center;
+  min-height: 46px;
+  padding: 0.55rem 0.8rem;
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-surface-hover);
+  font-weight: 600;
+  color: var(--text-primary);
+  transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+}
+.lpv-input.is-focus { border-color: var(--color-primary); background: var(--bg-surface); }
+.lpv-caret { display: none; width: 2px; height: 1.1em; margin-left: 2px; background: var(--color-primary); animation: lpvCaret 1s steps(2, start) infinite; }
+.lpv-input.is-focus .lpv-caret { display: inline-block; }
+.lpv-input.is-ok .lpv-caret { display: none; }
+
+.lpv-match { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; }
+.lpv-match-col { display: flex; flex-direction: column; gap: 0.45rem; }
+.lpv-card { justify-content: center; }
+
+.lpv-option.is-picked, .lpv-card.is-picked {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  box-shadow: 0 3px 0 var(--color-primary);
+}
+.lpv-option.is-ok, .lpv-card.is-ok, .lpv-input.is-ok,
+.lpv-stage.is-right .lpv-lane .lpv-tile, .lpv-stage.is-right .lpv-slot .lpv-tile {
+  border-color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 14%, var(--bg-surface));
+  color: var(--color-success);
+  box-shadow: 0 3px 0 var(--color-success);
+}
+.lpv-option.is-ok, .lpv-card.is-ok { animation: lpvPop 0.3s ease; }
+.lpv-stage.is-right .lpv-lane .lpv-tile, .lpv-stage.is-right .lpv-slot .lpv-tile { animation: lpvHop 0.45s ease both; }
+.lpv-stage.is-right .lpv-lane .lpv-tile:nth-child(2) { animation-delay: 0.05s; }
+.lpv-stage.is-right .lpv-lane .lpv-tile:nth-child(3) { animation-delay: 0.1s; }
+.lpv-stage.is-right .lpv-lane .lpv-tile:nth-child(4) { animation-delay: 0.15s; }
+.lpv-stage.is-right .lpv-lane .lpv-tile:nth-child(5) { animation-delay: 0.2s; }
+.lpv-stage.is-right .lpv-lane .lpv-tile:nth-child(6) { animation-delay: 0.25s; }
+.lpv-card.is-bad {
+  border-color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 13%, var(--bg-surface));
+  color: var(--color-danger);
+  box-shadow: 0 3px 0 var(--color-danger);
+  animation: lpvShake 0.35s ease;
+}
+.lpv-card.is-done { opacity: 0.4; box-shadow: none; transform: translateY(3px); background: var(--bg-surface-hover); }
+
+/* The footer: Skip and Check, and the green bar that slides up over them. */
+.lpv-foot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0.95rem -1.2rem 0;
+  padding: 0.7rem 1.2rem;
+  border-top: 2px solid var(--border-color);
+  overflow: hidden;
+}
+.lpv-skip, .lpv-check {
+  padding: 0.45rem 1rem;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: transform 0.1s ease, box-shadow 0.1s ease, background-color 0.2s ease, color 0.2s ease;
+}
+.lpv-skip { border: 2px solid var(--border-color); color: var(--text-tertiary); box-shadow: 0 3px 0 var(--border-color); }
+.lpv-check { background: var(--bg-surface-hover); color: var(--text-tertiary); }
+.lpv-check.is-ready { background: var(--color-primary); color: var(--text-on-primary); box-shadow: 0 3px 0 color-mix(in srgb, var(--color-primary) 70%, #000); }
+.lpv-verdict {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 1.2rem;
+  background: color-mix(in srgb, var(--color-success) 16%, var(--bg-surface));
+  color: var(--color-success);
+  font-size: 1rem;
+  font-weight: 800;
+  translate: 0 100%;
+  transition: translate 0.35s var(--ease-spring, ease);
+}
+.lpv-verdict.is-on { translate: 0 0; }
+.lpv-badge {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--bg-surface);
+}
+.lpv-verdict.is-on .lpv-badge { animation: lpvBadge 0.45s var(--ease-spring, ease) both; }
+.lpv-verdict.is-on .lpv-badge path { stroke-dasharray: 24; stroke-dashoffset: 24; animation: lpvDraw 0.35s 0.15s ease-out forwards; }
+
+/* The pretend pointer, and the ring it leaves when it taps. */
+.lpv-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 5;
+  color: var(--text-primary);
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35));
+  pointer-events: none;
+  transition: transform 0.5s cubic-bezier(0.4, 0.1, 0.2, 1), opacity 0.3s ease;
+}
+.lpv-cursor svg { display: block; transition: scale 0.1s ease; }
+.lpv-cursor::after {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: -10px;
+  width: 26px;
+  height: 26px;
+  border: 2px solid var(--color-primary);
+  border-radius: 50%;
+  opacity: 0;
+}
+.lpv-cursor.is-tap svg { scale: 0.82; }
+.lpv-cursor.is-tap::after { animation: lpvRipple 0.45s ease-out; }
+.lpv-cursor.is-gone { opacity: 0; }
+
+.lpv-bit { position: absolute; z-index: 6; width: 7px; height: 5px; border-radius: 1px; pointer-events: none; animation: lpvBit 1.1s cubic-bezier(0.2, 0.7, 0.4, 1) forwards; }
+
+/* ============================================================
+   THE ADVENTURE, IN MINIATURE — pixel faces and the run's palette
+   ============================================================ */
+
+.lpv-demo-quest .lpv-stage { padding: 0; min-height: 320px; background: #0d0a14; }
+.lpv-qs {
+  --q-ink: #efeaf5;
+  --q-dim: #9b93ad;
+  --q-panel: #2a2536;
+  --q-edge: #15111e;
+  --q-hot: #ff5f6d;
+  --q-gold: #ffd166;
+  --q-cyan: #7ee8e0;
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  color: var(--q-ink);
+  font-family: 'Pixelify Sans', 'Courier New', monospace;
+  image-rendering: pixelated;
+}
+.lpv-qs-scene { position: relative; flex: 1; min-height: 180px; overflow: hidden; border-bottom: 2px solid var(--q-edge); }
+.lpv-qs-art { position: absolute; top: 0; bottom: 0; left: -6%; right: -6%; }
+.lpv-qs.is-walking .lpv-qs-art { animation: lpvWalk 1.3s steps(8) both; }
+.lpv-qs-tag {
+  position: absolute;
+  top: 0.55rem;
+  left: 0.65rem;
+  z-index: 2;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.52rem;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.78);
+  text-shadow: 2px 2px 0 #000;
+}
+.lpv-qs-npc {
+  position: absolute;
+  right: 9%;
+  bottom: 0;
+  z-index: 2;
+  width: 96px;
+  height: 128px;
+  translate: 170% 0;
+  transition: translate 0.5s steps(5);
+}
+.lpv-qs.is-met .lpv-qs-npc { translate: 0 0; }
+.lpv-qs.is-hit .lpv-qs-npc .lq-person { animation: lpvHitFlash 0.5s steps(2) 2; }
+.lpv-qs.is-won .lpv-qs-npc { translate: 190% 0; transition-duration: 0.7s; }
+.lpv-qs-foe {
+  position: absolute;
+  left: 50%;
+  top: -16px;
+  width: 80px;
+  height: 9px;
+  translate: -50% 0;
+  background: rgba(0, 0, 0, 0.75);
+  border: 2px solid var(--q-edge);
+}
+.lpv-qs-foe i { display: block; width: 100%; height: 100%; background: var(--q-hot); transition: width 0.6s steps(6); }
+.lpv-qs-toast {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  z-index: 3;
+  translate: -50% 0;
+  padding: 0.35rem 0.55rem;
+  border: 2px solid var(--q-edge);
+  background: var(--q-gold);
+  color: #1a1524;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.55rem;
+  opacity: 0;
+  scale: 0.6;
+  transition: opacity 0.2s steps(2), scale 0.3s steps(3);
+}
+.lpv-qs.is-won .lpv-qs-toast { opacity: 1; scale: 1; }
+
+.lpv-qs-hud {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.7rem;
+  background: var(--q-panel);
+  border-bottom: 2px solid var(--q-edge);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 0.48rem;
+  color: var(--q-dim);
+}
+.lpv-qs-gauge { display: inline-block; width: 64px; height: 9px; margin-right: 0.35rem; background: rgba(0, 0, 0, 0.6); border: 2px solid var(--q-edge); }
+.lpv-qs-gauge i { display: block; height: 100%; transition: width 0.5s steps(6); }
+.lpv-qs-gauge.is-sta i { background: #6ee7a5; }
+.lpv-qs-gauge.is-pwr i { background: var(--q-cyan); }
+.lpv-qs-cmd { margin-left: auto; padding: 0.25rem 0.45rem; border: 2px solid var(--q-edge); color: var(--q-dim); }
+.lpv-qs-cmd.is-on { background: var(--q-gold); color: #1a1524; animation: lpvBlink 0.5s steps(2, start) infinite; }
+
+.lpv-qs-box { position: relative; min-height: 84px; padding: 0.95rem 0.95rem 0.75rem; background: #191426; }
+.lpv-qs-name {
+  position: absolute;
+  top: -15px;
+  left: 0.7rem;
+  padding: 0.12rem 0.6rem;
+  border: 2px solid var(--q-edge);
+  background: var(--q-panel);
+  color: var(--q-hot);
+  font-size: 0.82rem;
+  opacity: 0;
+  transition: opacity 0.2s steps(2);
+}
+.lpv-qs.is-met .lpv-qs-name { opacity: 1; }
+.lpv-qs-line { margin: 0; min-height: 1.4em; font-size: 1.05rem; line-height: 1.4; }
+.lpv-qs-menu {
+  position: absolute;
+  left: 0.7rem;
+  bottom: calc(100% + 10px);
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  border: 2px solid var(--q-edge);
+  background: var(--q-panel);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  translate: 0 6px;
+  transition: opacity 0.15s steps(2), translate 0.15s steps(2);
+}
+.lpv-qs.is-asking .lpv-qs-menu { opacity: 1; translate: 0 0; }
+.lpv-qs-mi { position: relative; padding: 0.38rem 0.85rem 0.38rem 1.45rem; font-size: 0.8rem; white-space: nowrap; }
+.lpv-qs-mi + .lpv-qs-mi { box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.35); }
+.lpv-qs-mi.is-hover { background: #3d3650; }
+.lpv-qs-mi.is-hover::before {
+  content: '';
+  position: absolute;
+  left: 0.55rem;
+  top: 50%;
+  margin-top: -4px;
+  border-left: 6px solid var(--q-gold);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+}
+.lpv-qs-mi.is-chosen { background: var(--q-gold); color: #1a1524; }
+
+/* ============================================================
+   DICTIONARY AND COMPARE
+   ============================================================ */
+
+/* The flip card: your word, turned over to what it means. */
+.lpv-flip { position: relative; z-index: 1; width: 214px; height: 130px; flex-shrink: 0; perspective: 900px; transition: opacity 0.4s ease; }
+.lpv-flip-card { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform 0.7s cubic-bezier(0.4, 0.2, 0.2, 1); }
+.lpv-flip-card.is-flipped { transform: rotateY(180deg); }
+.lpv-flip-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+  padding: 0.8rem;
+  border: 1px solid var(--lpv-line);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  box-shadow: 0 5px 0 var(--lpv-line);
+  text-align: center;
+  backface-visibility: hidden;
+}
+.lpv-flip-back { transform: rotateY(180deg); background: var(--lpv-wash); }
+.lpv-flip-lang { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; color: var(--lpv); }
+.lpv-flip-face b { font-size: 1.35rem; font-weight: 800; line-height: 1.2; color: var(--text-primary); overflow-wrap: anywhere; }
+.lpv-flip-face em { font-size: 0.7rem; color: var(--text-tertiary); }
+.lpv-flip-def {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--text-secondary);
+}
+
+.lpv-dict .lang-filterbar, .lpv-cmp .lang-filterbar { margin: 0 0 0.35rem; }
+.lpv-dict .lang-entries { gap: 0.5rem; }
+.lpv-dict .lang-entry {
+  border-radius: var(--radius-lg);
+  padding: 0.85rem 1rem;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.lpv-dict .lang-entry:hover { transform: translateY(-1px); border-color: var(--lpv-line); box-shadow: 0 8px 20px -16px var(--lpv); }
+.lpv-dict .lang-entry-term { font-size: 1.1rem; }
+.lpv-dict .lang-entry-gloss {
+  padding: 0.05rem 0.55rem;
+  border-radius: var(--radius-full);
+  background: var(--lpv-soft);
+  color: var(--lpv);
+  font-size: 0.75rem;
+  font-style: normal;
+  font-weight: 600;
+}
+/* The five row tools wait until the row is pointed at -- eleven rows of
+   five grey icons each was most of what the list looked like. */
+.lpv-dict .lang-entry-tools { opacity: 0.4; transition: opacity 0.15s ease; }
+.lpv-dict .lang-entry:hover .lang-entry-tools,
+.lpv-dict .lang-entry:focus-within .lang-entry-tools { opacity: 1; }
+@media (hover: none) { .lpv-dict .lang-entry-tools { opacity: 1; } }
+
+/* The language pair, drawn: the one you are learning, and the one beside it. */
+.lpv-pair { position: relative; z-index: 1; display: flex; align-items: center; gap: 0.6rem; flex-shrink: 0; }
+.lpv-pair-lang {
+  width: 84px;
+  height: 84px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.1rem;
+  border: 2px solid var(--border-color);
+  border-radius: 20px;
+  background: var(--bg-surface);
+  box-shadow: 0 4px 0 var(--border-color);
+}
+.lpv-pair-lang.is-study { border-color: var(--lpv); box-shadow: 0 4px 0 var(--lpv-dark); }
+.lpv-pair-lang b { font-size: 1.15rem; font-weight: 900; color: var(--text-primary); }
+.lpv-pair-lang em { font-size: 0.64rem; font-style: normal; color: var(--text-tertiary); }
+.lpv-pair-arrows { display: flex; flex-direction: column; color: var(--lpv); }
+.lpv-pair-arrows svg { width: 18px; height: 18px; }
+.lpv-pair-arrows svg:first-child { animation: lpvNudgeR 1.8s ease-in-out infinite; }
+.lpv-pair-arrows svg:last-child { animation: lpvNudgeL 1.8s ease-in-out infinite; }
+
+.lpv-cmp .lang-pickrow { gap: 0.4rem; margin: 0.25rem 0 1rem; }
+.lpv-cmp .lang-pick { border-width: 2px; padding: 0.3rem 0.8rem; box-shadow: 0 2px 0 var(--border-color); transition: transform 0.08s ease, box-shadow 0.08s ease, color 0.15s ease, border-color 0.15s ease; }
+.lpv-cmp .lang-pick:active { transform: translateY(2px); box-shadow: none; }
+.lpv-cmp .lang-compare { animation: lpvIn 0.4s var(--ease-expo-out, ease) both; }
+.lpv-cmp .lang-col { border-radius: var(--radius-lg); padding: 1.1rem 1.2rem; }
+.lpv-cmp .lang-col.is-study { border-left-width: 1px; border-color: var(--lpv-line); box-shadow: inset 4px 0 0 var(--lpv); }
+.lpv-cmp .lang-term { font-size: 1.6rem; }
+.lpv-cmp .lang-col.is-empty { opacity: 1; }
+.lpv-cmp .lang-col-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0.5rem 0.25rem;
+  font-style: normal;
+  text-align: center;
+}
+.lpv-cmp .lang-col-empty .lpv-empty-ico { width: 46px; height: 46px; background: var(--bg-surface-hover); animation: none; }
+.lpv-cmp .lang-col-empty .lpv-empty-ico svg { width: 20px; height: 20px; }
+
+/* ============================================================
+   CARDS — your sets, the scenarios
+   ============================================================ */
+
+.lpv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.9rem; }
+.lpv-grid > .lang-seed-offer { grid-column: 1 / -1; }
+
+.lpv-set, .lpv-scene {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-color);
+  border-bottom-width: 3px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  animation: lpvIn 0.45s var(--ease-expo-out, ease) both;
+  animation-delay: calc(var(--k, 0) * 45ms + 160ms);
+}
+.lpv-set:hover, .lpv-scene:hover { transform: translateY(-3px); border-color: var(--lpv-line); box-shadow: 0 12px 26px -20px var(--lpv); }
+
+.lpv-set { gap: 0.75rem; padding: 1rem; }
+.lpv-set-top { display: flex; align-items: center; gap: 0.75rem; }
+.lpv-set-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.lpv-set-info b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.92rem; font-weight: 700; color: var(--text-primary); }
+.lpv-set-info span { font-size: 0.74rem; color: var(--text-tertiary); }
+.lpv-set-types { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
+.lpv-type {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--lpv-soft);
+  color: var(--lpv);
+}
+.lpv-type svg { width: 15px; height: 15px; }
+
+/* Best score as a ring that fills. */
+.lpv-ring {
+  --p: 0;
+  position: relative;
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: conic-gradient(var(--lpv) calc(var(--p) * 1%), var(--bg-surface-hover) 0);
+}
+.lpv-ring::before { content: ''; position: absolute; inset: 5px; border-radius: 50%; background: var(--bg-surface); }
+.lpv-ring b { position: relative; font-size: 0.72rem; font-weight: 800; color: var(--text-primary); }
+.lpv-ring.is-none b { color: var(--text-tertiary); }
+
+.lpv-scene { overflow: hidden; }
+.lpv-scene-art {
+  position: relative;
+  height: 124px;
+  background-color: #1a1524;
+  background-position: 40% center;
+  background-size: cover;
+  image-rendering: pixelated;
+  transition: background-position 2.4s ease;
+}
+/* Pointing at a card walks you a little way down its street. */
+.lpv-scene:hover .lpv-scene-art { background-position: 65% center; }
+.lpv-scene.is-unready .lpv-scene-art { filter: grayscale(0.7) brightness(0.8); }
+.lpv-scene-loc {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-full);
+  background: rgba(0, 0, 0, 0.58);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+.lpv-scene-loc svg { width: 12px; height: 12px; }
+.lpv-scene-face {
+  position: absolute;
+  right: 0.8rem;
+  bottom: 0;
+  width: 60px;
+  height: 80px;
+  background-position: bottom center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.4));
+}
+.lpv-scene:hover .lpv-scene-face { animation: lpvBob 1.2s ease-in-out infinite; }
+.lpv-scene-body { display: flex; flex-direction: column; gap: 0.3rem; padding: 0.8rem 0.95rem 0.2rem; }
+.lpv-scene-body b { font-size: 0.92rem; font-weight: 700; color: var(--text-primary); }
+.lpv-scene-body > span { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.3rem; font-size: 0.74rem; color: var(--text-tertiary); }
+.lpv-scene-body svg { width: 12px; height: 12px; }
+.lpv-scene .lpv-go { width: auto; margin: 0.65rem 0.95rem 0.95rem; }
+
+/* ── The free run's extras ── */
+
+.lpv-potions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; }
+.lpv-potion {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.7rem 0.4rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  text-align: center;
+}
+.lpv-potion svg { width: 22px; height: 22px; color: var(--lpv); animation: lpvBob 2.6s ease-in-out infinite; }
+.lpv-potion:nth-child(2) svg { animation-delay: 0.4s; }
+.lpv-potion:nth-child(3) svg { animation-delay: 0.8s; }
+.lpv-potion b { font-size: 0.74rem; color: var(--text-primary); }
+.lpv-potion em { font-size: 0.7rem; font-style: normal; font-weight: 800; color: var(--color-success); }
+
+.lpv-flow { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.65rem; }
+.lpv-flow-step {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.9rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+.lpv-flow-step b { font-size: 0.86rem; color: var(--text-primary); }
+.lpv-flow-step .lpv-step-ico { animation: lpvBob 3.2s ease-in-out infinite; animation-delay: calc(var(--k, 0) * 0.35s); }
+/* The thread from one step to the next. */
+.lpv-flow-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: calc(-0.65rem - 1px);
+  width: 0.65rem;
+  height: 2px;
+  background: var(--lpv-line);
+}
+
+.lpv-powers { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
+.lpv-power {
+  display: flex;
+  gap: 0.8rem;
+  padding: 0.95rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background: var(--bg-surface);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+.lpv-power:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--color-accent) 40%, var(--border-color)); }
+.lpv-power-ico {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  color: var(--color-accent);
+  animation: lpvGlow 2.6s ease-in-out infinite;
+}
+.lpv-power-ico svg { width: 20px; height: 20px; }
+.lpv-power-body { min-width: 0; display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.76rem; line-height: 1.45; color: var(--text-secondary); }
+.lpv-power-body b { font-size: 0.88rem; color: var(--text-primary); }
+/* What it costs, as a share of the gauge. */
+.lpv-power-cost { position: relative; height: 8px; margin-top: 0.35rem; margin-right: 2.2rem; border-radius: var(--radius-full); background: var(--bg-surface-hover); }
+.lpv-power-cost i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: inherit; background: var(--color-accent); }
+.lpv-power-cost em { position: absolute; left: calc(100% + 0.45rem); top: 50%; translate: 0 -50%; font-size: 0.7rem; font-style: normal; font-weight: 800; color: var(--color-accent); }
+
+/* ── Narrow panes ── */
+
+@container (max-width: 760px) {
+  .lpv-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lpv-flow-step::after { display: none; }
+}
+@container (max-width: 700px) {
+  .lpv-split, .lpv-split.is-wide { grid-template-columns: 1fr; }
+  .lpv-steps, .lpv-powers { grid-template-columns: 1fr; }
+}
+@container (max-width: 560px) {
+  .lpv-hero { flex-wrap: wrap; padding: 1.1rem; }
+  .lpv-flip, .lpv-pair { display: none; }
+  .lpv-hero-icon { width: 52px; height: 52px; border-radius: 15px; }
+  .lpv-hero-icon svg { width: 25px; height: 25px; }
+}
+
+/* ── Motion ── */
+
+@keyframes lpvIn { from { opacity: 0; translate: 0 14px; } to { opacity: 1; translate: 0 0; } }
+@keyframes lpvBob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -4px; } }
+@keyframes lpvFloat { from { transform: translate(0, 0) scale(1); } to { transform: translate(-40px, 30px) scale(1.15); } }
+@keyframes lpvShine { 0%, 55% { translate: -130% 0; } 85%, 100% { translate: 130% 0; } }
+@keyframes lpvLive {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-danger) 60%, transparent); }
+  100% { box-shadow: 0 0 0 8px transparent; }
+}
+@keyframes lpvBeat { 0%, 60%, 100% { scale: 1; } 30% { scale: 1.2; } }
+@keyframes lpvGlow { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 16px -2px color-mix(in srgb, var(--color-accent) 55%, transparent); } }
+@keyframes lpvPop { 50% { scale: 1.06; } }
+@keyframes lpvHop { 0%, 100% { translate: 0 0; } 40% { translate: 0 -7px; } }
+@keyframes lpvShake { 20% { translate: -5px 0; } 40% { translate: 5px 0; } 60% { translate: -3px 0; } 80% { translate: 3px 0; } }
+@keyframes lpvBadge { 0% { scale: 0; rotate: -30deg; } 70% { scale: 1.18; rotate: 6deg; } 100% { scale: 1; rotate: 0deg; } }
+@keyframes lpvDraw { to { stroke-dashoffset: 0; } }
+@keyframes lpvRipple { from { opacity: 0.9; scale: 0.3; } to { opacity: 0; scale: 1.4; } }
+@keyframes lpvBit {
+  0% { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  45% { transform: translate(calc(var(--dx) * 0.6), var(--dy)) rotate(calc(var(--r) * 0.5)); opacity: 1; }
+  100% { transform: translate(var(--dx), calc(var(--dy) + 130px)) rotate(var(--r)); opacity: 0; }
+}
+@keyframes lpvCaret { 50% { opacity: 0; } }
+@keyframes lpvWalk { from { transform: translateX(4%); } to { transform: translateX(-4%); } }
+@keyframes lpvHitFlash { 50% { opacity: 0.2; } }
+@keyframes lpvBlink { 50% { opacity: 0.55; } }
+@keyframes lpvNudgeR { 0%, 100% { translate: 0 0; } 50% { translate: 4px 0; } }
+@keyframes lpvNudgeL { 0%, 100% { translate: 0 0; } 50% { translate: -4px 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .lpv-in, .lpv-hero::after, .lpv-hero-icon, .lpv-go::after, .lpv-live, .lpv-fact-ico svg, .lpv-empty-ico,
+  .lpv-set, .lpv-scene, .lpv-scene-face, .lpv-potion svg, .lpv-flow-step .lpv-step-ico, .lpv-power-ico,
+  .lpv-pair-arrows svg, .lpv-stage *, .lpv-cmp .lang-compare { animation: none !important; }
+  .lpv-stage *, .lpv-flip-card, .lpv-scene-art { transition: none !important; }
+  .lpv-verdict .lpv-badge path { stroke-dashoffset: 0 !important; }
+}
