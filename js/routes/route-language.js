@@ -256,10 +256,16 @@ function renderLangLibrary() {
   if (typeof lucide !== 'undefined' && root) lucide.createIcons({ root });
 }
 
+/** The colour a board card wears: a drill's own tone, or its page's. */
+function langBoardTone(view, arg) {
+  if (view === 'drill') return (typeof LANG_TONES !== 'undefined' && LANG_TONES[arg]) || 'primary';
+  return { dictionary: 'primary', compare: 'accent', sets: 'success', run: 'warning', scenarios: 'accent' }[view] || 'primary';
+}
+
 function langBoardCard(view, arg, icon, name, desc, chip, cls) {
   const active = langView === view && String(langViewArg || '') === String(arg || '');
   return `
-    <button class="lang-card${active ? ' is-active' : ''}${cls ? ' ' + cls : ''}" type="button"
+    <button class="lang-card${active ? ' is-active' : ''}${cls ? ' ' + cls : ''}" type="button" data-tone="${langBoardTone(view, arg)}"
             onclick="langOpen('${view}'${arg ? `, '${arg}'` : ''})" title="${escapeHTML(desc)}">
       <span class="lang-card-icon"><i data-lucide="${icon}"></i></span>
       ${chip ? `<span class="lang-card-chip">${chip}</span>` : ''}

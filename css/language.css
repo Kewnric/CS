@@ -1525,13 +1525,55 @@ button.la-blank-slot { cursor: pointer; }
   border-radius: var(--radius-lg);
   transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
 }
-.lang-board-group-inner .lang-card:hover { transform: none; background: var(--bg-surface-hover); }
+/* Each tile wears its own colour -- the same tone as the page it opens --
+   and on hover a soft gradient of it fades in behind, the border tints and
+   the icon fills. The gradient is an overlay that fades, because a
+   background gradient itself cannot be transitioned. */
+.lang-board-group-inner .lang-card { --bt: var(--color-primary); --bt-2: var(--color-accent); }
+.lang-board-group-inner .lang-card[data-tone="accent"]  { --bt: var(--color-accent);  --bt-2: var(--color-primary); }
+.lang-board-group-inner .lang-card[data-tone="success"] { --bt: var(--color-success); --bt-2: var(--color-accent); }
+.lang-board-group-inner .lang-card[data-tone="warning"] { --bt: var(--color-warning); --bt-2: var(--color-danger); }
+.lang-board-group-inner .lang-card[data-tone="danger"]  { --bt: var(--color-danger);  --bt-2: var(--color-warning); }
+.lang-board-group-inner .lang-card[data-tone="primary"] { --bt-2: color-mix(in srgb, var(--color-danger) 55%, var(--color-primary)); }
+.lang-board-group-inner .lang-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(120% 90% at 0% 0%, color-mix(in srgb, var(--bt) 22%, transparent), transparent 65%),
+    radial-gradient(90% 80% at 100% 100%, color-mix(in srgb, var(--bt-2) 14%, transparent), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.lang-board-group-inner .lang-card > * { position: relative; z-index: 1; }
+.lang-board-group-inner .lang-card > .lang-card-chip { position: absolute; }
+.lang-board-group-inner .lang-card-icon {
+  background: color-mix(in srgb, var(--bt) 14%, transparent);
+  color: var(--bt);
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease, transform 0.25s var(--ease-spring, ease);
+}
+.lang-board-group-inner .lang-card:hover { transform: none; background: var(--bg-surface); border-color: color-mix(in srgb, var(--bt) 55%, var(--border-color)); }
+.lang-board-group-inner .lang-card:hover::before { opacity: 1; }
+.lang-board-group-inner .lang-card:hover .lang-card-icon {
+  background: linear-gradient(135deg, var(--bt), var(--bt-2));
+  color: #fff;
+  box-shadow: 0 3px 0 color-mix(in srgb, var(--bt) 65%, #000);
+  transform: translateY(-1px) rotate(-4deg);
+}
+.lang-board-group-inner .lang-card:hover .lang-card-chip { color: var(--bt); background: color-mix(in srgb, var(--bt) 14%, transparent); }
 .lang-board-group-inner .lang-card:active { transform: translateY(2px); }
-.lang-board-group-inner .lang-card:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
-.lang-board-group-inner .lang-card.is-active { box-shadow: 0 0 0 1px var(--color-primary) inset; }
+.lang-board-group-inner .lang-card:focus-visible { outline: 2px solid var(--bt); outline-offset: 1px; }
+.lang-board-group-inner .lang-card.is-active { border-color: var(--bt); background: var(--bg-surface); box-shadow: 0 0 0 1px var(--bt) inset; }
+.lang-board-group-inner .lang-card.is-active::before { opacity: 0.85; }
 .lang-board-group-inner .lang-card-icon { width: 36px; height: 36px; border-radius: 10px; }
 .lang-board-group-inner .lang-card-icon svg { width: 18px; height: 18px; }
-.lang-board-group-inner .lang-card.is-active .lang-card-icon { background: var(--color-primary); color: var(--text-on-primary); }
+.lang-board-group-inner .lang-card.is-active .lang-card-icon { background: linear-gradient(135deg, var(--bt), var(--bt-2)); color: #fff; }
+@media (prefers-reduced-motion: reduce) {
+  .lang-board-group-inner .lang-card::before, .lang-board-group-inner .lang-card-icon { transition: none; }
+  .lang-board-group-inner .lang-card:hover .lang-card-icon { transform: none; }
+}
 .lang-board-group-inner .lang-card-name { font-size: 0.86rem; line-height: 1.25; }
 .lang-board-group-inner .lang-card-chip { position: absolute; top: 0.7rem; right: 0.7rem; }
 
