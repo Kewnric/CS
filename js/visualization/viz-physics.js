@@ -426,6 +426,9 @@ function vizHoverFocus(nodeId) {
     el.classList.toggle('viz-hover-main', id === nodeId);
     el.classList.toggle('viz-hover-adj', id !== nodeId && adj.has(id));
   });
+  // Manhua bubbles are drawn in one shared layer, outside the notes, so they
+  // stayed fully black while everything else faded; they fade with their note.
+  nodesLayer.querySelectorAll('.brain-bubbles path[data-node-id]').forEach(p => p.classList.toggle('bb-lit', adj.has(p.dataset.nodeId)));
   if (svg) {
     // container, not svg: the arrowhead copies in #viz-heads-svg dim with their links
     container.querySelectorAll('.viz-link-group').forEach(g => {

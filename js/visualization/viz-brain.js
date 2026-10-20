@@ -1151,6 +1151,7 @@ function brainRenderCanvas() {
     if (existingDefs && existingDefs.querySelector('marker')) svg.insertBefore(existingDefs, svg.firstChild);
     else if (typeof _vizBuildDefs === 'function') _vizBuildDefs(svg);
     vizSyncHeads();
+    svg.querySelectorAll('g.viz-link-group').forEach(g => g.addEventListener('pointerdown', ev => brainLinkGrab(ev, g.dataset.linkId)));
   }
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: container });
   brainPaintBubbles();
@@ -1510,6 +1511,7 @@ function brainAddCommentNode(x, y) {
   const cy = y !== undefined ? y : ((-brain.pan.y / brain.zoom) + 200);
   const id = 'bn_' + generateId();
   const node = { id, commentContent: '', color: null, x: cx + (Math.random() - 0.5) * 40, y: cy + (Math.random() - 0.5) * 40 };
+  Object.assign(node, _brainLastStyle());   // the look you last gave a note
   brain.nodes.push(node);
   brain.selectedNodeId = id;
   brainRenderCanvas();
@@ -1812,11 +1814,12 @@ function brainToggleLinkMode() {
   if (container) container.classList.toggle('linking-mode', brain.linkModeEnabled);
 }
 
-function brainPortDragStart(e, nodeId, side) {
+function brainPortDragStart(e, nodeId, side, opts) {
   e.stopPropagation(); e.preventDefault();
 
   // ---- Link-toggle mode: treat port mousedown as a click, not a drag ----
-  if (brain.linkModeEnabled || brain.linkingFrom) {
+  // (A link end grabbed off its node is always a drag: see brainLinkGrab.)
+  if (!(opts && opts.regrab) && (brain.linkModeEnabled || brain.linkingFrom)) {
     if (brain.linkingFrom) {
       // Already linking — complete to this specific port side
       if (brain._portDragging) return;
@@ -1942,7 +1945,15 @@ function brainPortDragStart(e, nodeId, side) {
 
         const isBridge = (fromNode && fromNode.collapsed) || (toNode && toNode.collapsed);
         const bridgeSourceId = isBridge ? (fromNode && fromNode.collapsed ? nodeId : targetNodeId) : null;
-        brain.links.push({ id: 'bl_' + generateId(), from: nodeId, to: targetNodeId, color: null, fromSide: side, toSide, isBridge: isBridge || false, bridgeSourceId });
+        const made = { id: 'bl_' + generateId(), from: nodeId, to: targetNodeId, color: null, fromSide: side, toSide, isBridge: isBridge || false, bridgeSourceId };
+        // A link end grabbed and dropped here keeps the link's look, and its
+        // direction when it was the start that moved (brainLinkGrab).
+        if (opts && opts.carry) Object.assign(made, opts.carry);
+        if (opts && opts.reverse) {
+          [made.from, made.to] = [made.to, made.from];
+          [made.fromSide, made.toSide] = [made.toSide, made.fromSide];
+        }
+        brain.links.push(made);
         brainRenderCanvas(); brainSaveCurrentVersion();
       }
     }
@@ -1952,6 +1963,44 @@ function brainPortDragStart(e, nodeId, side) {
   }
   document.addEventListener('pointerup', onUp, true);
   document.addEventListener('pointercancel', onUp, true);
+}
+
+/* Grab a link by one of its ends to move that end. Pressed within the last
+   10% of its length (the tip) or the first 30% (where it leaves), that end
+   comes off its note and follows the pointer like a new connection, with the
+   same port snapping: dropped on a note it reconnects there, keeping the
+   link's colour, arrow type and direction; dropped on empty canvas it stays
+   disconnected. One undo step either way. The middle of a link is left
+   alone. It used to do nothing at all, so a link could only be deleted and
+   drawn again. */
+function brainLinkGrab(e, linkId) {
+  if ((e.pointerType === 'mouse' && e.button !== 0) || brainIsLocked() || brain.linkModeEnabled || brain.linkingFrom) return;
+  const link = brain.links.find(l => l.id === linkId);
+  const path = e.currentTarget && e.currentTarget.querySelector('.viz-link-hitbox');
+  const container = document.getElementById('viz-canvas-container');
+  if (!link || !path || !container || typeof path.getTotalLength !== 'function') return;
+  const L = path.getTotalLength();
+  if (!L) return;
+  // Where along the link the press landed, as a share of its length (0 at the
+  // note it leaves, 1 at the tip). Paths are in canvas units.
+  const r = container.getBoundingClientRect();
+  const px = (e.clientX - r.left - brain.pan.x) / brain.zoom, py = (e.clientY - r.top - brain.pan.y) / brain.zoom;
+  let at = 0, bestD = Infinity;
+  for (let i = 0; i <= 60; i++) {
+    const p = path.getPointAtLength(L * i / 60);
+    const d = (p.x - px) ** 2 + (p.y - py) ** 2;
+    if (d < bestD) { bestD = d; at = i / 60; }
+  }
+  const tip = at >= 0.9, start = at <= 0.3;
+  if (!tip && !start) return;
+  e.stopPropagation(); e.preventDefault();
+  brainPushUndo();
+  const carry = { color: link.color || null };
+  if (link.arrowType) carry.arrowType = link.arrowType;
+  brain.links = brain.links.filter(l => l.id !== linkId);
+  brainSaveCurrentVersion();   // dropped on nothing, it stays disconnected
+  if (tip) brainPortDragStart(e, link.from, link.fromSide || null, { regrab: true, carry });
+  else brainPortDragStart(e, link.to, link.toSide || null, { regrab: true, carry, reverse: true });
 }
 
 function brainHideAllMenus() {
@@ -2023,6 +2072,7 @@ function brainCtxPickColor(color) {
   if ((node[prop] || null) === (color || null)) return;
   brainPushUndo();
   if (color) node[prop] = color; else delete node[prop];
+  _brainRememberStyle(node);
   brainRenderCanvas(); brainSaveCurrentVersion();
   _brainMarkNodeMenu();
 }
@@ -2232,6 +2282,26 @@ function brainPaintShape(el, node) {
   svg.innerHTML = out;
 }
 
+/* ── The last look you gave a note ─────────────────────────────
+   Changing a note's border, bubble, colours, alignment, font or spacing
+   remembers that note's whole look, and the next note you make starts with
+   it: switch one note to Manhua and the next one is Manhua too. Objects keep
+   their own looks and are not remembered. */
+const BRAIN_STYLE_KEYS = ['border', 'bubble', 'color', 'bg', 'textColor', 'textAlign', 'fontFamily', 'lineSpacing', 'paraSpacing'];
+function _brainRememberStyle(node) {
+  if (!node || node.shape) return;
+  const style = {};
+  BRAIN_STYLE_KEYS.forEach(k => { if (node[k] != null) style[k] = node[k]; });
+  try { localStorage.setItem('ssp.brainNoteStyle', JSON.stringify(style)); } catch (_) { /* private mode */ }
+}
+function _brainLastStyle() {
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem('ssp.brainNoteStyle') || '{}') || {}; } catch (_) { saved = {}; }
+  const style = {};
+  BRAIN_STYLE_KEYS.forEach(k => { if (saved[k] != null) style[k] = saved[k]; });
+  return style;
+}
+
 /* -- Note text ----------------------------------------------------
    One <p> per line you typed, so each Enter starts a paragraph and paragraph
    spacing has something to space; an empty line keeps its height. */
@@ -2286,6 +2356,7 @@ function brainCtxSetNote(prop, value) {
   if ((node[prop] == null ? null : node[prop]) === (value == null ? null : value)) { brainHideAllMenus(); return; }
   brainPushUndo();
   if (value == null) delete node[prop]; else node[prop] = value;
+  _brainRememberStyle(node);
   brainRenderCanvas(); brainSaveCurrentVersion();
   brainHideAllMenus();
 }
@@ -2422,6 +2493,7 @@ function brainCtxSetBorder(type) {
   if (!node || (node.border || null) === (type || null)) return;
   brainPushUndo();
   if (type) node.border = type; else delete node.border;
+  _brainRememberStyle(node);
   brainRenderCanvas(); brainSaveCurrentVersion();
   // The menu stays open: picking Manhua reveals its Bubble dropdown here.
   _brainMarkNodeMenu();
@@ -2448,6 +2520,7 @@ function brainCtxSetBubble(id) {
   if (!node || (node.bubble || 'speech') === id) return;
   brainPushUndo();
   if (id === 'speech') delete node.bubble; else node.bubble = id;
+  _brainRememberStyle(node);
   brainRenderCanvas(); brainSaveCurrentVersion();
   _brainMarkNodeMenu();
 }
@@ -2471,9 +2544,10 @@ function brainPaintBubbles() {
     const dash = shape === 'whisper' ? ';stroke-dasharray:8 6' : '';
     const ghost = el.classList.contains('viz-bridge-ghost') ? ' opacity="0.25"' : '';
     // Selection does not touch the bubble: no recoloured edge, no glow.
+    // data-node-id lets hover focus fade a bubble with its note (vizHoverFocus).
     parts.forEach(d => {
-      strokes += `<path d="${d}" style="stroke:${stroke}${dash}"${ghost}/>`;
-      fills += `<path d="${d}" style="fill:${fill}"${ghost}/>`;
+      strokes += `<path data-node-id="${node.id}" d="${d}" style="stroke:${stroke}${dash}"${ghost}/>`;
+      fills += `<path data-node-id="${node.id}" d="${d}" style="fill:${fill}"${ghost}/>`;
     });
   });
   svg.innerHTML = `<g class="bb-strokes">${strokes}</g><g class="bb-fills">${fills}</g>`;

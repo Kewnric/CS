@@ -4652,6 +4652,8 @@ body.viz-no-anim .app-sidebar {
    ~1.7px outline (5 read a little heavy). */
 .brain-bubbles .bb-strokes path { fill: none; stroke-width: 3.4; stroke-linejoin: round; }
 .brain-bubbles .bb-fills path { stroke: none; }
+/* Hover focus fades the notes it is not about; their bubbles fade with them. */
+.viz-canvas-container.viz-focus .brain-bubbles path:not(.bb-lit) { opacity: 0.15; }
 
 .viz-node[data-type="comment"][data-border="manhua"] .viz-node-inner,
 .viz-node[data-type="comment"][data-border="manhua"]:hover .viz-node-inner,
