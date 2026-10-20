@@ -96,7 +96,7 @@ function vizTemplate() {
                 </h2>
               </div>
               <div style="display: flex; align-items: center; gap: 0.35rem; flex-shrink: 0;">
-                <button class="tutorial-trigger-btn hidden" id="brain-new-btn" onclick="brainCreateVersion(null)" title="New version" aria-label="New version">
+                <button class="tutorial-trigger-btn hidden" id="brain-new-btn" onclick="brainCreateVersion(null)" title="New Canvas" aria-label="New Canvas">
                   <i data-lucide="plus"></i>
                 </button>
                 <button class="tutorial-trigger-btn" id="viz-toggle-items-btn" onclick="vizToggleTreeItems()" title="Toggle item visibility" aria-label="Toggle item visibility">

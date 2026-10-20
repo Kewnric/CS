@@ -108,7 +108,7 @@ function brainSwitchVersion(id) {
   brain.selectedNodeId = null;
   brain.linkingFrom = null;
   brain.linkModeEnabled = false;
-  v.openedAt = Date.now();          // drives the "most recent first" order
+  v.openedAt = Date.now();          // for the tooltip; it no longer moves the row
   brainSave();
   brainClearObservers();
   brainStopSavedTicker();
@@ -118,8 +118,8 @@ function brainSwitchVersion(id) {
 }
 
 function brainCreateVersion(folderId) {
-  showInputDialog('New Version', null, 'Version name', 'New Version', (name) => {
-    const clean = (name || '').trim() || 'Untitled version';   // never a blank row
+  showInputDialog('New Canvas', null, 'Canvas name', 'New Canvas', (name) => {
+    const clean = (name || '').trim() || 'Untitled canvas';   // never a blank row
     const id = 'bv_' + generateId();
     brain.versions.push({ id, name: clean, folderId: folderId || null, nodes: [], links: [], pan: { x: 0, y: 0 }, zoom: 1 });
     brainSave();
@@ -178,6 +178,7 @@ function brainDuplicateVersion(id) {
   for (let n = 2; brain.versions.some(v => v.name === name); n++) name = `${base} (Copy ${n})`;
   brain.versions.push({
     id: newId, name: name, folderId: src.folderId,
+    order: (typeof src.order === 'number' ? src.order : 0) + 0.5,   // right under its source
     nodes: JSON.parse(JSON.stringify(src.nodes || [])),
     links: JSON.parse(JSON.stringify(src.links || [])),
     pan: { ...src.pan }, zoom: src.zoom,
@@ -331,6 +332,7 @@ function brainSetFolderOpen(id, open) {
 
 function brainRenderSidebar() {
   if (typeof vizSyncModuleTools === 'function') vizSyncModuleTools();
+  if (_brainSettleOrder()) brainSave();   // every canvas in a fixed place
   const body = document.getElementById('viz-content-body');
   const titleEl = document.getElementById('viz-content-scope-label');
   const breadcrumbEl = document.getElementById('viz-content-breadcrumb');
@@ -470,14 +472,14 @@ function brainRenderSidebar() {
   if (!brain.versions.length && !brain.folders.length) {
     html = `<div class="viz-content-empty brain-empty">
       <i data-lucide="brain-circuit"></i>
-      <p>No versions yet.</p>
+      <p>No canvases yet.</p>
       <button type="button" class="btn btn-primary btn-sm" onclick="brainCreateVersion(null)">
-        <i data-lucide="plus" style="width:13px;height:13px;"></i> New version
+        <i data-lucide="plus" style="width:13px;height:13px;"></i> New Canvas
       </button>
       <p class="brain-empty-hint">Right-click anywhere in this pane for folders and import.</p>
     </div>`;
   } else if (!html) {
-    html = `<div class="viz-content-empty"><i data-lucide="search-x"></i><p>No version matches “${escapeHTML(brain.sidebarQuery || '')}”.</p></div>`;
+    html = `<div class="viz-content-empty"><i data-lucide="search-x"></i><p>No canvas matches “${escapeHTML(brain.sidebarQuery || '')}”.</p></div>`;
   } else {
     html += treeRootDropHTML('brain');
   }
@@ -556,20 +558,46 @@ function brainFolderCount(fid) {
 function brainRootVersions() {
   const fav = (typeof libRootMode === 'function') && libRootMode('brain') === 'favorites';
   const list = fav ? brain.versions.filter(v => v.favorite) : brain.versions.filter(v => !v.folderId);
-  // Pinned first, then most recently opened, then by name.
+  // Pinned first, then each in its own place.
   return list.slice().sort(brainVersionSort);
+}
+
+/* A canvas stays where it is. The list used to be sorted most recently opened
+   first, so clicking a canvas to open it moved it to the top of its folder and
+   shuffled the rest. Now only pinning or dragging moves one; opening a canvas
+   only moves the highlight. Every canvas has an `order` within its folder, and
+   one without (an older one, a new one, an import) gets its place here: an
+   unordered folder keeps the order it showed until now, frozen once, and a
+   newcomer goes to the end. */
+function _brainSettleOrder() {
+  const groups = new Map();
+  brain.versions.forEach(v => {
+    const k = v.folderId || '';
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(v);
+  });
+  let changed = false;
+  groups.forEach(list => {
+    const placed = list.filter(v => typeof v.order === 'number');
+    if (placed.length === list.length) return;
+    changed = true;
+    if (!placed.length) {
+      list.slice().sort((a, b) => ((b.openedAt || 0) - (a.openedAt || 0)) || (a.name || '').localeCompare(b.name || ''))
+        .forEach((v, i) => { v.order = i; });
+      return;
+    }
+    let next = Math.max(...placed.map(v => v.order)) + 1;
+    list.forEach(v => { if (typeof v.order !== 'number') v.order = next++; });
+  });
+  return changed;
 }
 
 function brainVersionSort(a, b) {
   if (!!b.pinned !== !!a.pinned) return b.pinned ? 1 : -1;
-  // A version you dragged into place keeps that place. The drop writes `order`
-  // through the host's setOrder, but nothing read it back, so reordering a
-  // folder by hand appeared to do nothing at all — the list re-sorted itself by
-  // last-opened the moment it redrew.
-  if (typeof a.order === 'number' && typeof b.order === 'number' && a.order !== b.order) return a.order - b.order;
-  const ao = a.openedAt || 0, bo = b.openedAt || 0;
-  if (ao !== bo) return bo - ao;
-  return (a.name || '').localeCompare(b.name || '');
+  const ao = typeof a.order === 'number' ? a.order : Infinity;
+  const bo = typeof b.order === 'number' ? b.order : Infinity;
+  if (ao !== bo) return ao - bo;
+  return brain.versions.indexOf(a) - brain.versions.indexOf(b);
 }
 
 function brainVersionTooltip(v) {
@@ -640,9 +668,9 @@ registerTreeHost('brain', {
     libRootDropInto('brain', targetId, ids, (id) => brain.versions.find(v => v.id === id)),
   // Right-click on the empty pane: this is where creating things lives now.
   paneActions: () => ([
-    { icon: 'plus', label: 'New version', fn: () => brainCreateVersion(null) },
+    { icon: 'plus', label: 'New Canvas', fn: () => brainCreateVersion(null) },
     { icon: 'folder-plus', label: 'New folder', fn: () => brainCreateFolder(null) },
-    { icon: 'download', label: 'Import shared version…', fn: () => brainImportVersion() },
+    { icon: 'download', label: 'Import shared canvas…', fn: () => brainImportVersion() },
     { sep: true },
     { icon: 'chevrons-down-up', label: 'Collapse all folders', fn: () => brainCollapseAll(true) },
     { icon: 'chevrons-up-down', label: 'Expand all folders', fn: () => brainCollapseAll(false) }
