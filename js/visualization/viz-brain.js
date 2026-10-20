@@ -1773,10 +1773,7 @@ function brainEnsureElectricFilter() {
     + field(2, 'dx', PX, 0, 1.46, 'o3', animate) + field(2, 'dx', 0, -PX, 1.46, 'o4', animate)
     + '<feComposite in="o1" in2="o2" result="p1"/><feComposite in="o3" in2="o4" result="p2"/>'
     + '<feBlend in="p1" in2="p2" mode="color-dodge" result="noise"/>'
-    // scale 30 (up to +-15px) suits the original's 350x500 card, about 3% of its
-    // height; on a ~70px note it is a fifth of it and the lightning sprawls.
-    // 12 (+-6px) keeps the reference's proportions on a note.
-    + '<feDisplacementMap in="SourceGraphic" in2="noise" scale="12" xChannelSelector="R" yChannelSelector="B"/>'
+    + '<feDisplacementMap in="SourceGraphic" in2="noise" scale="30" xChannelSelector="R" yChannelSelector="B"/>'
     + '</filter>';
   const holder = document.createElement('div');
   holder.innerHTML = '<svg id="viz-electric-defs" aria-hidden="true" focusable="false" width="0" height="0"'

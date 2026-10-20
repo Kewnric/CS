@@ -4305,10 +4305,9 @@ body.viz-no-anim .app-sidebar {
 /* The displacement moves each point by scale x (noise - 0.5), and turbulence
    noise averages below 0.5, so the crackle drifts right and down off the
    edge. The original card corrects for it the same way: its electric layer
-   sits 4px up and left (margin -4px inside 4px of padding) at scale 30. The
-   drift is proportional to the scale, so at 12 it is ~1.6px: 2px here. */
+   sits 4px up and left of the border (margin -4px inside 4px of padding). */
 .viz-electric > .viz-electric-line {
-  inset: -2px 2px 2px -2px;
+  inset: -4px 4px 4px -4px;
 }
 .viz-electric-glow-1 {
   border: 2px solid color-mix(in srgb, var(--el-color) 60%, transparent);
