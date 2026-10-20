@@ -2008,6 +2008,14 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
 .lib-card.is-spatial .lib-card-chips,
 .lib-card.is-spatial .lib-card-progress { transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), text-shadow 0.25s ease; }
 .lib-card.is-spatial .lib-card-icon { transition: box-shadow 0.25s ease, transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1); }
+/* Rising is quick; sinking back (the base transition above) stays unhurried.
+   A transition set on the :hover state governs the way in. */
+.lib-card.is-spatial:hover .lib-card-head,
+.lib-card.is-spatial:hover .lib-card-name,
+.lib-card.is-spatial:hover .lib-card-desc,
+.lib-card.is-spatial:hover .lib-card-chips,
+.lib-card.is-spatial:hover .lib-card-progress,
+.lib-card.is-spatial:hover .lib-card-icon { transition-duration: 0.2s; }
 /* What matters most rises nearest -- the full depth of the first version,
    so a tilted card really comes apart in layers, out towards its edges. */
 .lib-card.is-spatial:hover .lib-card-head { transform: translateZ(28px); }
