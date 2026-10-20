@@ -4117,6 +4117,10 @@ body.viz-zen.viz-zen-nosidebar .app-sidebar {
 /* The side pane folds to nothing. Visibility waits for the width to finish, so
    the fold animates, and then nothing in it can take focus. */
 .viz-workspace.hide-pane .viz-content-pane {
+  /* Dragging the divider writes an inline flex-basis, and in a flex row the
+     basis beats width — a pane dragged to 200px folded to an invisible 200px
+     gap. Basis auto hands the size back to width, which is what animates. */
+  flex-basis: auto !important;
   width: 0 !important;
   min-width: 0 !important;
   border-width: 0 !important;
@@ -4218,6 +4222,7 @@ body.viz-no-anim .app-sidebar {
    back, so the pane jumped to 320px and then stood still until the animated
    width caught up — the stop before it finished. */
 .viz-content-pane.viz-pane-sliding {
+  flex-basis: auto !important;
   width: var(--viz-pane-w) !important;
   min-width: 0 !important;
   max-width: none !important;
