@@ -4497,3 +4497,21 @@ body.viz-no-anim .app-sidebar {
   background: var(--color-primary-subtle);
   border-color: var(--color-primary);
 }
+
+/* ── Note editor: dash / box and a draggable header ─────────────
+   As the Run Code terminal (editor.css): floating, the canvas behind shows and
+   takes clicks; only the window catches them. */
+.viz-comment-editor-header { cursor: grab; user-select: none; touch-action: none; }
+.viz-comment-editor-header.is-dragging { cursor: grabbing; }
+.viz-comment-editor-header button { cursor: pointer; }
+.viz-comment-editor-close.viz-comment-editor-min:hover { color: #e6edf3; }
+.viz-comment-editor-overlay {
+  transition: background-color 0.2s ease, backdrop-filter 0.2s ease, -webkit-backdrop-filter 0.2s ease;
+}
+.viz-comment-editor-overlay.is-floating {
+  background: transparent;
+  backdrop-filter: blur(0px);
+  -webkit-backdrop-filter: blur(0px);
+  pointer-events: none;
+}
+.viz-comment-editor-overlay.is-floating .viz-comment-editor-window { pointer-events: auto; }

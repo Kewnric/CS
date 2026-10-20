@@ -1460,7 +1460,15 @@ function brainDeleteNode(nodeId) {
 function brainOpenEditor(node) {
   if (typeof vizHoverClear === 'function') vizHoverClear();
   let overlay = document.getElementById('viz-comment-editor-overlay');
-  if (overlay) overlay.remove();
+  // Unblurred, the canvas behind takes clicks, so another note can be opened
+  // while this one is: keep what was typed, and keep the window where it was.
+  let carry = null;
+  if (overlay) {
+    if (typeof overlay._commit === 'function') overlay._commit();
+    const prevWin = overlay.querySelector('.viz-comment-editor-window');
+    carry = { floating: overlay.classList.contains('is-floating'), at: prevWin ? prevWin.style.translate : '' };
+    overlay.remove();
+  }
   overlay = document.createElement('div');
   overlay.id = 'viz-comment-editor-overlay';
   overlay.className = 'viz-comment-editor-overlay';
@@ -1469,7 +1477,8 @@ function brainOpenEditor(node) {
     <div class="viz-comment-editor-header">
       <i data-lucide="brain-circuit"></i>
       <span>Brain Note</span>
-      <button class="viz-comment-editor-close" onclick="document.getElementById('viz-comment-editor-overlay').remove(); if(typeof vizHoverClear==='function')vizHoverClear();"><i data-lucide="x"></i></button>
+      <button class="viz-comment-editor-close viz-comment-editor-min" id="viz-comment-editor-min" title="Unblur the canvas behind the note" aria-label="Unblur the canvas behind the note"><i data-lucide="minus"></i></button>
+      <button class="viz-comment-editor-close" title="Close" aria-label="Close" onclick="document.getElementById('viz-comment-editor-overlay').remove(); if(typeof vizHoverClear==='function')vizHoverClear();"><i data-lucide="x"></i></button>
     </div>
     <div class="viz-comment-editor-body">
       <textarea id="viz-comment-editor-textarea" class="viz-comment-editor-textarea" spellcheck="false" placeholder="Enter your idea...">${escapeHTML(node.commentContent || '')}</textarea>
@@ -1488,12 +1497,80 @@ function brainOpenEditor(node) {
     const end = textarea.value.length;
     textarea.setSelectionRange(end, end);
   }, 0);
-  document.getElementById('viz-comment-editor-save').onclick = () => {
+  // Write the text back if it changed. Looked up by id: an undo replaces the
+  // node objects, and the one this editor opened with may be stale by then.
+  const nodeId = node.id;
+  overlay._commit = () => {
+    const target = brain.nodes.find(n => n.id === nodeId);
+    if (!target || target.commentContent === textarea.value) return;
     brainPushUndo();
-    node.commentContent = document.getElementById('viz-comment-editor-textarea').value;
-    brainRenderCanvas(); brainSaveCurrentVersion(); overlay.remove();
+    target.commentContent = textarea.value;
+    brainRenderCanvas(); brainSaveCurrentVersion();
+  };
+  document.getElementById('viz-comment-editor-save').onclick = () => {
+    overlay._commit();
+    overlay.remove();
     if (typeof vizHoverClear === 'function') vizHoverClear();
   };
+  _brainWireEditorFloat(overlay, textarea);
+  if (carry) {
+    if (carry.floating) _brainSetEditorFloating(overlay, true, textarea);
+    const win = overlay.querySelector('.viz-comment-editor-window');
+    if (win && carry.at) win.style.translate = carry.at;
+  }
+}
+
+/* ── The note editor as a floating window ───────────────────────
+   The Run Code terminal's pattern (practice.js _termWireFloat): the dash does
+   not hide the note, it unblurs the canvas behind it and lets clicks through,
+   so you can look at, pan and pick on the map while writing. It becomes a box,
+   which puts the blur back and re-centres the window. The header drags the
+   window in either state. */
+function _brainWireEditorFloat(overlay, textarea) {
+  const win = overlay.querySelector('.viz-comment-editor-window');
+  const head = overlay.querySelector('.viz-comment-editor-header');
+  const btn = overlay.querySelector('#viz-comment-editor-min');
+  if (!win || !head || !btn) return;
+  btn.onclick = () => _brainSetEditorFloating(overlay, !overlay.classList.contains('is-floating'), textarea);
+  let drag = null;
+  head.addEventListener('pointerdown', e => {
+    if (e.button !== 0 || e.target.closest('button')) return;
+    const [x, y] = (win.style.translate || '0px 0px').split(' ').map(parseFloat);
+    drag = { id: e.pointerId, sx: e.clientX, sy: e.clientY, x: x || 0, y: y || 0, r: win.getBoundingClientRect() };
+    head.setPointerCapture(e.pointerId);
+    head.classList.add('is-dragging');
+    e.preventDefault();
+  });
+  head.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const r = drag.r;
+    // Keep part of the header on screen, so the window can always be grabbed back.
+    const dx = Math.max(80 - r.right, Math.min(innerWidth - 80 - r.left, e.clientX - drag.sx));
+    const dy = Math.max(-r.top, Math.min(innerHeight - 48 - r.top, e.clientY - drag.sy));
+    win.style.translate = (drag.x + dx) + 'px ' + (drag.y + dy) + 'px';
+  });
+  const end = e => {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag = null;
+    head.classList.remove('is-dragging');
+  };
+  head.addEventListener('pointerup', end);
+  head.addEventListener('pointercancel', end);
+}
+
+function _brainSetEditorFloating(overlay, on, textarea) {
+  overlay.classList.toggle('is-floating', on);
+  const win = overlay.querySelector('.viz-comment-editor-window');
+  if (!on && win) win.style.translate = '';   // back to the centre
+  const btn = overlay.querySelector('#viz-comment-editor-min');
+  if (btn) {
+    btn.title = on ? 'Restore: blur the canvas and centre the note' : 'Unblur the canvas behind the note';
+    btn.setAttribute('aria-label', btn.title);
+    btn.innerHTML = '<i data-lucide="' + (on ? 'square' : 'minus') + '"></i>';
+    if (typeof lucide !== 'undefined') lucide.createIcons({ root: btn });
+  }
+  // Typing should still go to the note, not to the button just clicked.
+  if (textarea && textarea.isConnected) textarea.focus({ preventScroll: true });
 }
 
 function brainAddLink(fromId, toId) {
