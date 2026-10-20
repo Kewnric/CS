@@ -2161,8 +2161,10 @@ function brainPaintBubbles() {
     const parts = _brainBubbleShape(shape, node.x, node.y, el.offsetWidth, el.offsetHeight, _brainBubbleRand(node.id));
     const neg = shape === 'negative';
     const fill = node.bg ? vizColorMap(node.bg) : (neg ? '#0a0a0a' : '#ffffff');
+    // No edge colour picked: the amber every note's Default edge is. Black, the
+    // print-comic outline, all but vanished against the dark canvas.
     const stroke = node.id === brain.selectedNodeId ? 'var(--color-primary)'
-      : node.color ? vizColorMap(node.color) : (neg ? '#f8fafc' : '#111111');
+      : node.color ? vizColorMap(node.color) : '#f59e0b';
     const dash = shape === 'whisper' ? ';stroke-dasharray:8 6' : '';
     const ghost = el.classList.contains('viz-bridge-ghost') ? ' opacity="0.25"' : '';
     parts.forEach(d => {
