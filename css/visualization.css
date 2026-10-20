@@ -4671,29 +4671,25 @@ body.viz-no-anim .app-sidebar {
 .viz-node[data-type="comment"][data-border="manhua"][data-bubble="daydream"] .viz-node-inner { margin: 1.1rem 1.9rem; }
 .viz-node[data-type="comment"][data-border="manhua"][data-bubble="caption"] .viz-node-inner { margin: 0.35rem; }
 
-/* Resizing is by the grip on the balloon's edge (brainBubbleResizeStart), not
-   the text area's own corner, which sat inside the balloon by the words. */
+/* Resizing is by the grip in the note box's corner (brainBubbleResizeStart),
+   not the text area's own corner, which sat inside the balloon by the words. */
 .viz-node[data-type="comment"][data-border="manhua"] .viz-node-inner { resize: none !important; }
+/* Looks and sits like every other note's resize corner: a small light double
+   stroke in the bottom-right corner of the note's box (just outside the
+   oval), always shown. */
 .bb-resize {
   position: absolute;
-  left: 85.36%;
-  top: 85.36%;
-  width: 14px;
-  height: 14px;
-  transform: translate(-50%, -50%);
+  right: 1px;
+  bottom: 1px;
+  width: 10px;
+  height: 10px;
   cursor: nwse-resize;
   touch-action: none;
   z-index: 5;
-  color: var(--note-text, #111111);
-  /* two short strokes, like a resize corner */
-  background: linear-gradient(135deg, transparent 38%, currentColor 38% 46%, transparent 46% 60%, currentColor 60% 68%, transparent 68%);
-  opacity: 0;
-  transition: opacity 0.15s ease;
+  color: rgba(230, 237, 243, 0.7);
+  background: linear-gradient(135deg, transparent 45%, currentColor 45% 53%, transparent 53% 70%, currentColor 70% 78%, transparent 78%);
 }
-.viz-node[data-bubble="caption"] .bb-resize { left: calc(100% - 9px); top: calc(100% - 9px); }
-.viz-node[data-bubble="negative"] .bb-resize { color: var(--note-text, #f8fafc); }
-.viz-node:hover .bb-resize { opacity: 0.75; }
-.bb-resize:hover { opacity: 1 !important; }
+.bb-resize:hover { color: #e6edf3; }
 .viz-node.dragging .bb-resize,
 .viz-canvas-container.brain-locked .bb-resize { display: none; }
 
