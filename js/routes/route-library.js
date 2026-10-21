@@ -325,49 +325,144 @@ function libSpatialBind(root) {
 
 /* ── Due today, across every library ──────────────────────────
    getDueReviewItems() has always returned this, cross-library and sorted by how
-   overdue each item is. The hub was the obvious place to show it and didn't. */
+   overdue each item is. The hub was the obvious place to show it and didn't.
+   One compact row: how many and how late (a count, a lateness meter and a
+   count per library), the three most overdue as tiles, and Review. The rest
+   waits in a drawer -- twelve pills that each spelled out "44 days overdue"
+   made a wall of red text the size of a whole section. */
 /* How late, in bands. The list is already sorted by it and every badge was
    painted the same amber regardless, so a thing twenty days overdue looked
    exactly like one that slipped yesterday -- the sort carried the urgency and
    nothing on screen did. Three bands rather than a gradient, because the
    decision this drives is only ever 'now, soon, or whenever'. */
 function _libDueTier(days) {
-  if (days <= 0) return '';
+  if (days <= 0) return 'today';
   if (days <= 2) return 'over';
-  if (days <= 7) return 'over over-mid';
-  return 'over over-high';
+  if (days <= 7) return 'mid';
+  return 'high';
+}
+const LIB_DUE_BANDS = [
+  ['high', 'more than a week late'],
+  ['mid', 'three days to a week late'],
+  ['over', 'a day or two late'],
+  ['today', 'due today'],
+];
+
+/* Each kind of item wears the icon and colour of its card below, so a tile
+   says which library it comes from without a word. */
+function _libDueKind(type) {
+  if (type === 'challenge') return { icon: 'file-code', color: 'var(--color-primary)', one: 'program', many: 'programs', rank: 0 };
+  if (type === 'notebook') return { icon: 'book-open', color: 'var(--color-warning)', one: 'notebook', many: 'notebooks', rank: 1 };
+  if (type === 'snippet') return { icon: 'code', color: 'var(--color-accent)', one: 'snippet', many: 'snippets', rank: 2 };
+  const key = String(type || '').startsWith('wing:') ? String(type).slice(5) : '';
+  const i = key ? LIBRARY_WINGS.findIndex(x => x.key === key) : -1;
+  if (i >= 0) {
+    const w = LIBRARY_WINGS[i];
+    const s = typeof wingSchema === 'function' ? wingSchema(key) : null;
+    return { icon: w.icon, color: w.accent, one: (s && s.noun) || 'entry', many: (s && s.nounPlural) || 'entries', rank: 3 + i };
+  }
+  return { icon: 'circle', color: 'var(--color-primary)', one: 'item', many: 'items', rank: 99 };
+}
+
+// Open or shut, and the library the drawer is narrowed to ('' for all). Kept
+// for the visit, so coming back to the hub finds it the way you left it.
+let _libDueView = { open: false, kind: '' };
+let _libDueAll = [];
+
+function _libDueTileHTML(d, cls) {
+  const k = _libDueKind(d.type);
+  const short = d.daysOverdue <= 0 ? 'Today' : d.daysOverdue + 'd';
+  return `
+    <button class="lib-due-tile${cls ? ' ' + cls : ''}" style="--k:${k.color};" onclick="reviewNavigateTo('${d.type}','${d.id}')"
+            title="${escapeHTML(d.title)} · ${escapeHTML(reviewDueLabel(d.daysOverdue))}">
+      <span class="lib-due-ic"><i data-lucide="${k.icon}"></i></span>
+      <span class="lib-due-name">${escapeHTML(d.title)}</span>
+      <span class="lib-due-late t-${_libDueTier(d.daysOverdue)}">${short}</span>
+    </button>`;
 }
 
 function libHubRenderDue() {
   const section = document.getElementById('lib-hub-due-section');
   const host = document.getElementById('lib-hub-due');
   if (!section || !host || typeof getDueReviewItems !== 'function') return;
-  const due = getDueReviewItems(12);
-  if (!due.length) { section.style.display = 'none'; return; }
+  const all = getDueReviewItems();
+  _libDueAll = all;
+  if (!all.length) { section.style.display = 'none'; host.innerHTML = ''; return; }
   section.style.display = '';
 
-  const all = getDueReviewItems();
-  const icon = { challenge: 'file-code', notebook: 'book-open', snippet: 'code' };
+  // A count per library, in the order the collections appear below.
+  const kinds = [];
+  all.forEach(d => {
+    let g = kinds.find(x => x.type === d.type);
+    if (!g) kinds.push(g = { type: d.type, n: 0, k: _libDueKind(d.type) });
+    g.n++;
+  });
+  kinds.sort((x, y) => x.k.rank - y.k.rank);
+  if (_libDueView.kind && !kinds.some(g => g.type === _libDueView.kind)) _libDueView.kind = '';
+  const bands = LIB_DUE_BANDS
+    .map(([band, words]) => ({ band, words, n: all.filter(d => _libDueTier(d.daysOverdue) === band).length }))
+    .filter(x => x.n);
+  const v = _libDueView;
+
   host.innerHTML = `
-    <div class="lib-due-head">
-      <div>
-        <strong>${all.length} item${all.length === 1 ? '' : 's'} due</strong>
-        <span>across ${new Set(all.map(d => d.type)).size} librar${new Set(all.map(d => d.type)).size === 1 ? 'y' : 'ies'}</span>
+    <div class="lib-due${v.open ? ' is-open' : ''}">
+      <div class="lib-due-sum">
+        <div class="lib-due-count t-${_libDueTier(all[0].daysOverdue)}" title="${all.length} due for review">
+          <b>${all.length}</b><span>due</span>
+        </div>
+        <div class="lib-due-meta">
+          <div class="lib-due-meter" role="img" aria-label="${bands.map(x => x.n + ' ' + x.words).join(', ')}">
+            ${bands.map(x => `<i class="t-${x.band}" style="flex:${x.n};" title="${x.n} ${x.words}"></i>`).join('')}
+          </div>
+          <div class="lib-due-kinds">
+            ${kinds.map(g => `
+              <button class="lib-due-kind${v.kind === g.type ? ' is-on' : ''}" style="--k:${g.k.color};" data-kind="${escapeHTML(g.type)}"
+                      onclick="libDueToggle('${escapeHTML(g.type)}')" title="${g.n} ${g.n === 1 ? g.k.one : g.k.many} due">
+                <i data-lucide="${g.k.icon}"></i>${g.n}
+              </button>`).join('')}
+          </div>
+        </div>
       </div>
-      <button class="btn btn-primary" onclick="libHubStartReview()">
-        <i data-lucide="play" style="width:15px;height:15px;"></i> Start review
-      </button>
-    </div>
-    <div class="lib-due-list">
-      ${due.map(d => `
-        <button class="lib-due-row" onclick="reviewNavigateTo('${d.type}','${d.id}')" title="${escapeHTML(reviewDueLabel(d.daysOverdue))}">
-          <i data-lucide="${icon[d.type] || 'circle'}" style="width:14px;height:14px;"></i>
-          <span class="lib-due-name">${escapeHTML(d.title)}</span>
-          <span class="lib-due-when ${_libDueTier(d.daysOverdue)}">${escapeHTML(reviewDueLabel(d.daysOverdue))}</span>
-        </button>`).join('')}
-      ${all.length > due.length ? `<span class="lib-due-more">+${all.length - due.length} more</span>` : ''}
+      <div class="lib-due-next">${all.slice(0, 3).map(d => _libDueTileHTML(d)).join('')}</div>
+      <div class="lib-due-acts">
+        <button class="btn btn-primary btn-sm lib-due-go" onclick="libHubStartReview()" title="Start with the most overdue">
+          <i data-lucide="play"></i> Review
+        </button>
+        <button class="lib-due-more" onclick="libDueToggle()" aria-expanded="${v.open}" title="Every due item">
+          <span>All</span><i data-lucide="chevron-down"></i>
+        </button>
+      </div>
+      <div class="lib-due-drawer"><div><div class="lib-due-grid" id="lib-due-grid"></div></div></div>
     </div>`;
+  _libDuePaintDrawer();
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: host });
+}
+
+/* Fill the drawer -- only once it is open, so fifty tiles are not built for
+   nobody, and left in place when it shuts so it does not empty mid-slide. */
+function _libDuePaintDrawer() {
+  const grid = document.getElementById('lib-due-grid');
+  if (!grid || !_libDueView.open) return;
+  const list = _libDueView.kind ? _libDueAll.filter(d => d.type === _libDueView.kind) : _libDueAll;
+  grid.innerHTML = list.map(d => _libDueTileHTML(d, 'is-row')).join('');
+  grid.scrollTop = 0;
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: grid });
+}
+
+/* All opens and shuts the drawer. A library's count opens it on just that
+   library; pressing the same count again shows everything. */
+function libDueToggle(kind) {
+  const v = _libDueView;
+  if (kind === undefined) { v.open = !v.open; if (!v.open) v.kind = ''; }
+  else if (v.open && v.kind === kind) v.kind = '';
+  else { v.kind = kind; v.open = true; }
+  const root = document.querySelector('#lib-hub-due .lib-due');
+  if (!root) return;
+  root.classList.toggle('is-open', v.open);
+  root.querySelectorAll('.lib-due-kind').forEach(b => b.classList.toggle('is-on', b.dataset.kind === v.kind));
+  const more = root.querySelector('.lib-due-more');
+  if (more) more.setAttribute('aria-expanded', String(v.open));
+  _libDuePaintDrawer();
 }
 
 /** Jump straight to the most overdue thing. */

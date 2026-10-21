@@ -603,63 +603,174 @@
 }
 .lib-hub-noresult { padding: 0.75rem; font-size: 0.82rem; color: var(--text-tertiary); text-align: center; }
 
+/* ── Due today: one compact row ──
+   A count and how late (a meter, and a count per library), the three most
+   overdue as tiles, and Review. Everything else waits in the drawer. */
 .lib-due-panel {
-  padding: 1rem 1.15rem;
-  border: 1px solid rgba(99, 102, 241, 0.35);
+  container-type: inline-size;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
-  background: linear-gradient(180deg, rgba(99, 102, 241, 0.09), transparent);
+  background: linear-gradient(100deg, color-mix(in srgb, var(--color-primary) 9%, var(--bg-surface)), var(--bg-surface) 60%);
 }
-.lib-due-head {
-  display: flex;
+.lib-due {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.85rem;
+  column-gap: 1rem;
 }
-.lib-due-head strong { color: var(--text-primary); font-size: 1rem; }
-.lib-due-head span { color: var(--text-tertiary); font-size: 0.82rem; margin-left: 0.35rem; }
-.lib-due-list { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-.lib-due-row {
+/* Lateness, in the three bands plus today: one colour each, shared by the
+   meter, the count and the badge on every tile. */
+.lib-due .t-today { --t: var(--color-primary); }
+.lib-due .t-over { --t: var(--color-warning); }
+.lib-due .t-mid { --t: #fb923c; }
+.lib-due .t-high { --t: var(--color-danger); }
+
+.lib-due-sum { display: flex; align-items: center; gap: 0.7rem; }
+.lib-due-count {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 50px;
+  height: 50px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--t) 40%, var(--border-color));
+  background: radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--t) 26%, transparent), color-mix(in srgb, var(--t) 8%, transparent));
+}
+.lib-due-count b { font-size: 1.15rem; font-weight: 800; line-height: 1; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.lib-due-count span { margin-top: 3px; font-size: 0.56rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--t); }
+.lib-due-meta { display: flex; flex-direction: column; gap: 0.45rem; min-width: 0; }
+.lib-due-meter { display: flex; gap: 2px; width: 120px; height: 5px; }
+.lib-due-meter i { min-width: 5px; border-radius: 999px; background: var(--t); }
+.lib-due-kinds { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.lib-due-kind {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  max-width: 100%;
-  padding: 0.35rem 0.7rem;
+  gap: 0.25rem;
+  padding: 0.1rem 0.45rem 0.1rem 0.35rem;
   border: 1px solid var(--border-color);
   border-radius: 999px;
   background: var(--bg-surface);
   color: var(--text-secondary);
-  font-size: 0.8rem;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+}
+.lib-due-kind svg { width: 12px; height: 12px; color: var(--k); }
+.lib-due-kind:hover { border-color: color-mix(in srgb, var(--k) 55%, var(--border-color)); color: var(--text-primary); }
+.lib-due-kind.is-on { border-color: var(--k); color: var(--text-primary); background: color-mix(in srgb, var(--k) 14%, var(--bg-surface)); }
+
+/* The three most overdue. Always three columns, so nothing wraps onto a
+   second line; a long title shortens with an ellipsis instead. */
+.lib-due-next { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.45rem; }
+.lib-due-tile {
+  --k: var(--color-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.35rem 0.45rem 0.35rem 0.35rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+.lib-due-tile:hover {
+  border-color: color-mix(in srgb, var(--k) 55%, var(--border-color));
+  background: color-mix(in srgb, var(--k) 7%, var(--bg-surface));
+  color: var(--text-primary);
+  transform: translateY(-1px);
+}
+.lib-due-tile:focus-visible { outline: 2px solid var(--k); outline-offset: 1px; }
+.lib-due-ic {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--k) 16%, transparent);
+  color: var(--k);
+}
+.lib-due-ic svg { width: 14px; height: 14px; }
+.lib-due-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-due-late {
+  flex: none;
+  padding: 0.08rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--t);
+  background: color-mix(in srgb, var(--t) 15%, transparent);
+}
+
+.lib-due-acts { display: flex; align-items: center; gap: 0.4rem; }
+.lib-due-go { display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
+.lib-due-go svg { width: 14px; height: 14px; }
+.lib-due-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  height: 32px;
+  padding: 0 0.5rem 0 0.65rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
   cursor: pointer;
   transition: border-color var(--transition-fast), color var(--transition-fast);
 }
-.lib-due-row:hover { border-color: var(--color-primary); color: var(--text-primary); }
-.lib-due-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 220px; }
-.lib-due-when { font-size: 0.68rem; color: var(--text-tertiary); font-weight: 700; }
+.lib-due-more:hover { border-color: var(--color-primary); color: var(--text-primary); }
+.lib-due-more svg { width: 15px; height: 15px; transition: transform 0.25s ease; }
+.lib-due.is-open .lib-due-more svg { transform: rotate(180deg); }
 
-/* Three bands of lateness. Everything overdue used to be one amber, so twenty
-   days looked the same as one and the row order was the only clue. */
-.lib-due-when.over { color: var(--color-warning); }
-.lib-due-when.over-mid { color: #fb923c; }
-.lib-due-when.over-high { color: var(--color-danger); }
-
-/* The worst ones carry it on the pill too, so the eye finds them without
-   reading a single label. Kept to the top band only -- tinting all of them
-   just makes a wall of orange and loses the distinction again. */
-.lib-due-row:has(.over-high) {
-  border-color: color-mix(in srgb, var(--color-danger) 45%, var(--border-color));
-  background: color-mix(in srgb, var(--color-danger) 7%, var(--bg-surface));
+/* The drawer: every due item, opened by All or by a library's count. It
+   slides open by growing its row from 0fr to 1fr; shut, it is hidden too,
+   so its tiles are not reachable with Tab. */
+.lib-due-drawer { grid-column: 1 / -1; display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.3s ease; }
+.lib-due.is-open .lib-due-drawer { grid-template-rows: 1fr; }
+.lib-due-drawer > div { min-height: 0; overflow: hidden; visibility: hidden; transition: visibility 0s linear 0.3s; }
+.lib-due.is-open .lib-due-drawer > div { visibility: visible; transition-delay: 0s; }
+.lib-due-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 0.4rem;
+  max-height: 240px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  margin-top: 0.7rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--border-color);
 }
+.lib-due-grid::-webkit-scrollbar { display: none; }
+.lib-due-tile.is-row { padding: 0.3rem 0.45rem 0.3rem 0.3rem; font-size: 0.76rem; }
+.lib-due-tile.is-row .lib-due-ic { width: 22px; height: 22px; border-radius: 7px; }
+.lib-due-tile.is-row .lib-due-ic svg { width: 12px; height: 12px; }
 
-/* A count, not a row. It sat in the same flex line as twelve pills at a similar
-   size and read as a thirteenth you could press. */
-.lib-due-more {
-  align-self: center;
-  font-size: 0.72rem;
-  color: var(--text-tertiary);
-  padding-left: 0.35rem;
-  font-style: italic;
+/* Narrow: the tiles take a line of their own under the count and Review. */
+@container (max-width: 680px) {
+  .lib-due-next { grid-column: 1 / -1; grid-row: 2; margin-top: 0.6rem; }
+  .lib-due-acts { grid-column: 3; grid-row: 1; }
+}
+@container (max-width: 420px) {
+  .lib-due-next { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .lib-due-next .lib-due-tile:nth-child(3) { display: none; }
+  .lib-due-more span { display: none; }
 }
 .lib-stat-chip.due { border-color: rgba(99, 102, 241, 0.5); color: #a5b4fc; }
 
