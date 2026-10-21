@@ -1936,8 +1936,9 @@ function bossCrystalTemplate() {
 function bossBarTemplate() {
   return `
     <div class="sao-boss" id="boss-health-wrapper" role="img" aria-label="Boss health" style="display:none;">
-      <span class="sao-plate-cap" aria-hidden="true"></span>
+      <span class="sao-slab sao-cap-slab" aria-hidden="true"><span class="sao-plate-cap"></span></span>
       <div class="sao-plate">
+        <span class="sao-slab sao-face-slab" aria-hidden="true"><span class="sao-plate-face"></span></span>
         <span class="sao-plate-name" id="boss-plate-name"></span>
         <div class="sao-track">
           <div class="sao-well">
@@ -1982,17 +1983,22 @@ function bossSetVisible(on) {
 
 /* ── The plate turns toward the pointer ────────────────────────
    The same spatial behaviour as the library's cards (libSpatialBind): it
-   leans toward the mouse, comes forward a little, and a light follows the
-   pointer across the metal. The plate is wide and short, so it tips mostly
-   on its long axis and only a little at the ends. Eased per frame so it
-   turns with weight; mouse only, and still under reduced motion. The slab's
-   side and its shadow lean with it (--tx/--ty, read in editor.css). */
+   leans toward the mouse and a light follows the pointer across the metal,
+   and what is on it sits at different depths -- the crystal nearest, then
+   the readout, the name and the bar, the metal at the back (editor.css).
+
+   It turns the topbar's centre, not just the plate, so the crystal turns with
+   it. The plate is wide and short, so it tips mostly on its long axis and only
+   a little at the ends. Eased per frame so it turns with weight; mouse only,
+   and still under reduced motion. The slabs' sides and shadows lean with it
+   (--tx/--ty). */
 const BOSS_TILT_X = 9;   // degrees: top and bottom edges
 const BOSS_TILT_Y = 3;   // degrees: the two ends
-const BOSS_LIFT = 6;     // px forward while hovered
+const BOSS_LIFT = 3;     // px forward while hovered
 
 function _bossSpatialBind() {
-  const el = document.getElementById('boss-health-wrapper');
+  const wrap = document.getElementById('boss-health-wrapper');
+  const el = wrap && wrap.closest('.practice-topbar-center');
   if (!el || el._bossSpatial) return;
   el._bossSpatial = true;
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -2032,7 +2038,8 @@ function _bossSpatialBind() {
     to.y = Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height) * 2 - 1));
   };
   const track = e => {
-    if (e.pointerType !== 'mouse') return;
+    // The centre holds the nameplate chip instead when the bar is off.
+    if (e.pointerType !== 'mouse' || !el.classList.contains('boss-on')) return;
     if (!over) { over = true; to.z = BOSS_LIFT; el.classList.add('is-tilting'); }
     aim(e); kick();
   };

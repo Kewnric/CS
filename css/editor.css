@@ -2126,7 +2126,9 @@ mark.diff-hit.current {
 }
 
 /* ---------- The detached "]" bracket — spine right, notch opening left ---------- */
+.sao-cap-slab { flex: 0 0 auto; display: block; }
 .sao-plate-cap {
+  display: block;
   flex: 0 0 auto;
   width: 10px;
   height: var(--sao-h);
@@ -2162,11 +2164,21 @@ mark.diff-hit.current {
   align-items: center;
   gap: 5px;
   padding: 0 calc(var(--sao-chamfer) + 3px) 0 6px;
-  /* One constant tone across the face — the old brushed-metal ramp ran near
-     white at the top lip to near black at the bottom and washed out the name
-     sitting on it. The depth is all at the edges instead: a lit top lip, a
-     dark under-edge, and a soft darkening in the bottom corners so the slab
-     has thickness without anything crossing the middle where the text is. */
+  /* Layout only. The metal is .sao-plate-face, a layer of its own at the back:
+     a clip-path here would flatten the plate, and the name and the bar could
+     not stand forward of the metal they sit on. */
+  transform-style: preserve-3d;
+}
+
+/* The metal. One constant tone across the face — the old brushed-metal ramp ran
+   near white at the top lip to near black at the bottom and washed out the name
+   sitting on it. The depth is all at the edges instead: a lit top lip, a dark
+   under-edge, and a soft darkening in the bottom corners so the slab has
+   thickness without anything crossing the middle where the text is. */
+.sao-face-slab { position: absolute; inset: 0; }
+.sao-plate-face {
+  position: absolute;
+  inset: 0;
   background-color: var(--sao-frame);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.24),
@@ -2177,9 +2189,9 @@ mark.diff-hit.current {
 }
 
 /* The light that follows the pointer while the plate is tilted
-   (_bossSpatialBind sets --mx/--my). Inside the clipped plate, so it stays
-   on the metal and the bar and never spills past the chamfer. */
-.sao-plate::after {
+   (_bossSpatialBind sets --mx/--my). Inside the clipped face, so it stays on
+   the metal and never spills past the chamfer. */
+.sao-plate-face::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -2190,23 +2202,37 @@ mark.diff-hit.current {
   opacity: 0;
   transition: opacity 0.25s ease;
 }
-.sao-boss.is-tilting .sao-plate::after { opacity: 1; }
+.practice-topbar-center.is-tilting .sao-plate-face::after { opacity: 1; }
 
-/* The whole assembly sits ON the topbar rather than being painted into it.
-   clip-path crops a box-shadow, so the drop shadow is a filter on the wrapper
-   — the only way to get one that follows the chamfer.
+/* The assembly sits ON the topbar rather than being painted into it. clip-path
+   crops a box-shadow, so each metal piece's shadow is a filter on a wrapper
+   around it (.sao-slab) -- the only way to get one that follows the chamfer.
 
    And it has THICKNESS. Two hard 1px shadows in darker frame tones stack under
    every clipped edge as the slab's side, then the soft shadow it casts. The
-   side and the shadow lean against the tilt (--tx/--ty), so it reads as a
-   solid plate turning rather than a picture of one. */
-.sao-boss {
+   side and the shadow lean against the tilt (--tx/--ty).
+
+   NOT ON THE WRAPPER. A filter there flattened the whole bar into one picture,
+   which the tilt then resampled -- the blur -- and nothing in it could stand
+   forward of anything else. On the slabs it only flattens the metal. */
+.sao-slab {
   filter:
     drop-shadow(calc(var(--tx, 0) * -1px) 1px 0 #2e3238)
     drop-shadow(calc(var(--tx, 0) * -1px) 1px 0 #1e2125)
     drop-shadow(calc(var(--tx, 0) * -3px) calc(3px - var(--ty, 0) * 1px) 4px rgba(0, 0, 0, 0.6));
-  transform-origin: 50% 50%;
 }
+
+/* Depth. The tilt turns .practice-topbar-center, so the crystal turns with the
+   plate; everything keeps its 3D down to the layers below. `translate`, not
+   `transform`, so it adds to the bob, shake and combo animations rather than
+   being replaced by them. */
+.practice-topbar-center.boss-on { transform-style: preserve-3d; transform-origin: 50% 50%; }
+.sao-boss { transform-style: preserve-3d; }
+.practice-topbar-center.boss-on .sao-crystal { translate: 0 0 20px; }
+.sao-plate-name { translate: 0 0 10px; }
+.sao-track { translate: 0 0 7px; }
+.sao-readout { translate: 0 0 12px; }
+.sao-combo { translate: 0 0 16px; }
 
 .sao-plate-lv {
   flex: 0 0 auto;
