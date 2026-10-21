@@ -1667,8 +1667,10 @@ function renderBrowseContent() {
     subfoldersHtml = `<div class="card-grid subfolder-grid ${window.disableNextStagger ? '' : 'stagger-children'}">`;
     childFolders.forEach(sf => {
       const sfCount = browseCountInView(sf.id);
+      const sfTodo = browseUnsolvedInView(sf.id);
       subfoldersHtml += `
         <div class="subfolder-card" onclick="selectBrowseNode('${sf.id}'); toggleNodeExpanded('${sf.id}');">
+          ${sfTodo ? `<span class="subfolder-card-todo" title="${sfTodo} still to solve">${sfTodo}</span>` : ''}
           <i data-lucide="folder"></i>
           <span class="subfolder-card-label">${escapeHTML(sf.name)}</span>
           <span class="subfolder-card-count">${sfCount} item${sfCount !== 1 ? 's' : ''}</span>
@@ -2267,6 +2269,21 @@ function browseCountInView(folderId) {
         + (state.codingSets || []).filter(s => (s.parentId || null) === pid && browseInView(s)).length;
   (state.nodes || []).forEach(f => {
     if (f.type === 'folder' && f.scope === 'challenge' && (f.parentId || null) === pid) n += browseCountInView(f.id);
+  });
+  return n;
+}
+
+/** Programs in this folder and every folder under it not yet solved at 100%
+    -- the number on the red badge that rises from a folder tile on hover. */
+function browseUnsolvedInView(folderId) {
+  const pid = folderId || null;
+  const solved = c => {
+    const logs = (_browseHistoryIndex && _browseHistoryIndex[c.id]) || [];
+    return logs.some(l => l.score === 100);
+  };
+  let n = state.challenges.filter(c => (c.parentId || null) === pid && browseInView(c) && !solved(c)).length;
+  (state.nodes || []).forEach(f => {
+    if (f.type === 'folder' && f.scope === 'challenge' && (f.parentId || null) === pid) n += browseUnsolvedInView(f.id);
   });
   return n;
 }
