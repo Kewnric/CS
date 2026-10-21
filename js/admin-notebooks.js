@@ -332,6 +332,9 @@ function _openNotebookFormNow(id) {
   _nbCollapsedSections.clear();
   const emptyState = document.getElementById('admin-empty-state');
   if (emptyState) emptyState.classList.add('hidden');
+  // The cards and the editor are alternatives: put the cards away, or the
+  // editor opens behind them and the click looks like it did nothing.
+  if (typeof adminHideCardBrowser === 'function') adminHideCardBrowser();
   const formContainer = document.getElementById('notebook-form-container');
   if (formContainer) {
     formContainer.classList.remove('hidden');

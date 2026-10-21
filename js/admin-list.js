@@ -217,6 +217,44 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+/* A folder group slides open and shut. A <details> drops its content to
+   display:none the instant it closes, which nothing can transition -- that is
+   why only the General tree (built from divs) used to animate. So the click
+   is taken over: opening sets [open] and grows the body from nothing;
+   closing shrinks it first and only then clears [open]. */
+function adminGroupToggle(e) {
+  const d = e.currentTarget.parentElement;
+  const body = d && d.querySelector(':scope > .admin-group-body');
+  const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!body || still || typeof body.animate !== 'function') {
+    setTimeout(() => _adminRememberGroups(), 0);   // the browser toggles it
+    return;
+  }
+  e.preventDefault();
+  if (d._anim) { d._anim.cancel(); d._anim = null; }
+  const cs = getComputedStyle(body);
+  const pad = { paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom };
+  const shut = { height: '0px', paddingTop: '0px', paddingBottom: '0px', opacity: 0 };
+  const done = () => { body.style.overflow = ''; d._anim = null; };
+  body.style.overflow = 'hidden';
+  if (!d.open || d.classList.contains('is-closing')) {
+    d.classList.remove('is-closing');
+    d.open = true;
+    const h = body.scrollHeight;
+    d._anim = body.animate([shut, Object.assign({ height: h + 'px', opacity: 1 }, pad)],
+      { duration: 360, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+    d._anim.onfinish = done;
+    d._anim.oncancel = done;
+    _adminRememberGroups();
+  } else {
+    d.classList.add('is-closing');
+    d._anim = body.animate([Object.assign({ height: body.offsetHeight + 'px', opacity: 1 }, pad), shut],
+      { duration: 280, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' });
+    d._anim.onfinish = () => { d.open = false; d.classList.remove('is-closing'); done(); _adminRememberGroups(); };
+    d._anim.oncancel = done;
+  }
+}
+
 function adminToggleAllGroups() {
   const groups = [...document.querySelectorAll('.admin-group')];
   if (!groups.length) return;
@@ -391,8 +429,12 @@ function renderAdmin() {
         <div class="admin-list-item-left">
           <div class="admin-list-item-title">${escapeHTML(c.title)}</div>
           <div class="admin-list-item-meta">
-            <span>${c.variants.length} version${c.variants.length !== 1 ? 's' : ''}</span>
-            <span class="admin-list-item-dot" aria-hidden="true">·</span>
+            ${(() => {
+              const nv = (c.variants || []).length;
+              const nt = typeof _adminCountTests === 'function' ? _adminCountTests(c) : 0;
+              return `<span class="ali-stat" title="${nv} version${nv !== 1 ? 's' : ''}"><i data-lucide="layers"></i>${nv}</span>` +
+                     `<span class="ali-stat${nt ? '' : ' is-zero'}" title="${nt} test${nt !== 1 ? 's' : ''}"><i data-lucide="flask-conical"></i>${nt}</span>`;
+            })()}
             <button onclick="event.stopPropagation(); openListItemFolderPicker('${c.id}', 'challenge', this)" class="ali-folder-btn" title="Move to folder" aria-label="Move to folder">
               <i data-lucide="folder" style="width:11px;height:11px;"></i>
               <span>${c.parentId ? escapeHTML((folderPickerOptions.find(f=>f.id===c.parentId)||{label:'Folder'}).label.trim()) : 'Uncategorized'}</span>
@@ -457,7 +499,7 @@ function renderAdmin() {
       return `
       <details class="admin-group"${collapsed.includes(key) ? '' : ' open'} data-group="${escapeHTML(key)}"
                style="--fc:${root ? '#94a3b8' : adminFolderHue(key)};--gi:${gi};">
-        <summary onclick="setTimeout(() => _adminRememberGroups(), 0)" title="${escapeHTML(name)}">
+        <summary onclick="adminGroupToggle(event)" title="${escapeHTML(name)}">
           <i data-lucide="chevron-right" class="admin-group-chev"></i>
           <span class="admin-group-ic">${root
             ? '<i data-lucide="inbox"></i>'

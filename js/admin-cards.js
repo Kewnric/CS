@@ -248,12 +248,33 @@ function adminSectionClick(e) {
   e.preventDefault();
 
   if (e.target.closest('.admin-panel-chev')) {
+    const opening = det.classList.contains('collapsed');
     det.classList.toggle('collapsed');
+    if (opening) _adminAccordion(det);
     return;
   }
   det.classList.remove('collapsed');
+  _adminAccordion(det);
   const key = det.getAttribute('data-collection');
   if (key) adminShowCollection(key);
+}
+
+/* One section open at a time: opening one folds the others away, and both
+   slide, so the pane never holds two long lists stacked on each other. */
+function _adminAccordion(det) {
+  const box = det.parentElement;
+  if (!box) return;
+  box.querySelectorAll(':scope > details.admin-panel').forEach(d => {
+    if (d !== det) d.classList.add('collapsed');
+  });
+}
+
+/* The editor and the card browser are alternatives, not layers. Every editor
+   calls this as it opens; before it did, opening one from the pane-1 list
+   while cards were showing left the editor hidden underneath them. */
+function adminHideCardBrowser() {
+  const host = document.getElementById('admin-card-browser');
+  if (host) host.classList.add('hidden');
 }
 
 /** Keep the panel counts honest for the sections the other admins now have. */
@@ -448,7 +469,8 @@ function adminRenderCards() {
   const col = _adminFindCollection(_adminCollection);
   if (!col) { host.classList.add('hidden'); return; }
 
-  const items = (col.items() || []).map(col.card);
+  // The record rides along with its card, so the card can wear its folder.
+  const items = (col.items() || []).map(x => Object.assign(col.card(x), { _raw: x }));
   const q = (_adminCardQuery || '').trim().toLowerCase();
   const shown = q ? items.filter(c => (c.title + ' ' + (c.sub || '')).toLowerCase().includes(q)) : items;
   const label = escapeHTML(col.label);
@@ -460,8 +482,10 @@ function adminRenderCards() {
         <i data-lucide="chevron-left" style="width:14px;height:14px;"></i> Back
       </button>
       <div class="admin-cards-titles">
-        <h2><i data-lucide="${col.icon}" style="width:17px;height:17px;color:${col.accent};"></i> ${label}</h2>
-        <p>${shown.length}${q && shown.length !== items.length ? ' of ' + items.length : ''} item${shown.length !== 1 ? 's' : ''} — pick one to edit</p>
+        <h2 style="--k:${col.accent};">
+          <span class="admin-cards-ic"><i data-lucide="${col.icon}"></i></span> ${label}
+          <span class="admin-cards-count" title="${shown.length}${q && shown.length !== items.length ? ' of ' + items.length : ''} shown">${shown.length}${q && shown.length !== items.length ? '/' + items.length : ''}</span>
+        </h2>
       </div>
       <div class="admin-cards-search search-container">
         <i data-lucide="search"></i>
@@ -472,17 +496,15 @@ function adminRenderCards() {
     </div>
     <div class="admin-cards-grid">
       ${shown.map(c => `
-        <button class="admin-card" onclick="adminOpenFromCard('${escapeHTML(String(c.id))}')" title="${escapeHTML(c.title)}">
-          <span class="admin-card-chip" style="background:color-mix(in srgb, ${col.accent} 18%, transparent);">
-            <i data-lucide="${escapeHTML(c.icon || col.icon)}" style="color:${col.accent};"></i>
-          </span>
+        <button class="admin-card" style="--k:${_adminCardHue(c._raw, col.accent)};" onclick="adminOpenFromCard('${escapeHTML(String(c.id))}')" title="${escapeHTML(c.title)}">
+          <span class="admin-card-chip"><i data-lucide="${escapeHTML(c.icon || col.icon)}"></i></span>
           <span class="admin-card-title">${escapeHTML(c.title)}</span>
-          ${c.sub ? `<span class="admin-card-sub">${escapeHTML(c.sub)}</span>` : ''}
+          ${_adminCardSubHTML(c)}
           <span class="admin-card-meta">
             ${(c.meta || []).map(m => `<span><i data-lucide="${m.icon}"></i>${escapeHTML(String(m.text))}</span>`).join('')}
           </span>
         </button>`).join('')}
-      <button class="admin-card admin-card-add" onclick="adminCreateFromCard()" title="${escapeHTML(col.newLabel)}">
+      <button class="admin-card admin-card-add" style="--k:${col.accent};" onclick="adminCreateFromCard()" title="${escapeHTML(col.newLabel)}">
         <i data-lucide="plus"></i>
         <span>${escapeHTML(col.newLabel)}</span>
       </button>
@@ -493,6 +515,61 @@ function adminRenderCards() {
   host.classList.remove('hidden');
   if (typeof lucide !== 'undefined') lucide.createIcons({ el: host });
   _adminStaggerCards(host);
+  adminCardsFxBind(host);
+}
+
+/* A card wears its folder's family colour (the same one pane 1 gives that
+   folder); a record outside any folder keeps the collection's accent. */
+function _adminCardHue(raw, fallback) {
+  const fid = raw && (raw.type === 'folder' ? raw.id : raw.parentId);
+  const isFolder = fid && (state.nodes || []).some(n => n.id === fid && n.type === 'folder');
+  return isFolder && typeof adminFolderHue === 'function' ? adminFolderHue(fid) : fallback;
+}
+
+/* The line under a card's title. When it is only the folder's name, it
+   becomes the folder chip pane 1 uses -- "E" and "First whole programs" --
+   rather than another line of grey text. */
+function _adminCardSubHTML(c) {
+  if (!c.sub) return '';
+  const raw = c._raw || {};
+  const fname = raw.parentId ? _adminFolderName(raw.parentId) : '';
+  if (fname && c.sub === fname && typeof adminSplitFolderName === 'function') {
+    const p = adminSplitFolderName(fname);
+    return `<span class="admin-card-folder">${p.tag
+      ? `<span class="admin-group-tag">${escapeHTML(p.tag)}</span>`
+      : '<i data-lucide="folder"></i>'}<span class="admin-card-folder-name">${escapeHTML(p.label)}</span></span>`;
+  }
+  return `<span class="admin-card-sub">${escapeHTML(c.sub)}</span>`;
+}
+
+/* The cards tilt toward the pointer, and a light follows it across them --
+   the Library's spatial cards, done with one set of listeners on the pane.
+   Mouse only; reduced motion keeps the light and drops the tilt. */
+const ADMIN_CARD_TILT = 7;
+
+function adminCardsFxBind(host) {
+  if (!host || host._adminFx) return;
+  host._adminFx = true;
+  const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let tilted = null;
+  const untilt = () => { if (tilted) { tilted.style.transform = ''; tilted = null; } };
+  host.addEventListener('pointermove', e => {
+    if (e.pointerType !== 'mouse') return;
+    const card = e.target.closest('.admin-card');
+    if (card !== tilted) untilt();
+    if (!card || !host.contains(card)) return;
+    const r = card.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const x = Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width) * 2 - 1));
+    const y = Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height) * 2 - 1));
+    card.style.setProperty('--mx', ((x + 1) * 50).toFixed(1) + '%');
+    card.style.setProperty('--my', ((y + 1) * 50).toFixed(1) + '%');
+    if (still) return;
+    card.style.transform = 'perspective(700px) rotateX(' + (-y * ADMIN_CARD_TILT).toFixed(2) + 'deg) rotateY(' +
+      (x * ADMIN_CARD_TILT).toFixed(2) + 'deg) translateY(-2px)';
+    tilted = card;
+  });
+  host.addEventListener('pointerleave', untilt);
 }
 
 /**

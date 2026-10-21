@@ -598,7 +598,7 @@ function adminCodingTemplate() {
           <div id="admin-practice-wrapper">
             <!-- General: browse the library the way the library does, by
                  opening categories rather than reading one flat list. -->
-            <details class="admin-panel admin-panel-general" data-collection="general" open>
+            <details class="admin-panel admin-panel-general collapsed" data-collection="general" open>
               <summary onclick="adminSectionClick(event)" title="Open a category to see what is inside it, set the order programs run in, and lock categories behind prerequisites.">
                 <i data-lucide="chevron-right" class="admin-panel-chev"></i>
                 <i data-lucide="compass" style="color:var(--color-accent);width:16px;height:16px;"></i>
@@ -811,7 +811,7 @@ function adminNotesTemplate() {
           <div id="admin-study-wrapper">
             <!-- General: browse the library the way the library does, by
                  opening categories rather than reading one flat list. -->
-            <details class="admin-panel admin-panel-general" data-collection="general" open>
+            <details class="admin-panel admin-panel-general collapsed" data-collection="general" open>
               <summary onclick="adminSectionClick(event)">
                 <i data-lucide="chevron-right" class="admin-panel-chev"></i>
                 <i data-lucide="compass" style="color:var(--color-accent);width:16px;height:16px;"></i>
@@ -953,7 +953,7 @@ function adminSnippetsTemplate() {
           <div id="admin-study-wrapper">
             <!-- General: browse the library the way the library does, by
                  opening categories rather than reading one flat list. -->
-            <details class="admin-panel admin-panel-general" data-collection="general" open>
+            <details class="admin-panel admin-panel-general collapsed" data-collection="general" open>
               <summary onclick="adminSectionClick(event)">
                 <i data-lucide="chevron-right" class="admin-panel-chev"></i>
                 <i data-lucide="compass" style="color:var(--color-accent);width:16px;height:16px;"></i>

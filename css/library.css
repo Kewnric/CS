@@ -2818,3 +2818,195 @@ body.tree-dragging [data-tree-ns]::-webkit-scrollbar { width: 0; height: 0; }
   .admin-panel, .ag-enter .admin-group { animation: none !important; }
   .admin-panel > summary > svg, .admin-group-ic, .admin-gen-ic { transition: none !important; }
 }
+
+/* ============================================================
+   CODING ADMIN, ROUND TWO
+   ------------------------------------------------------------
+   Folder groups slide (adminGroupToggle), rows are compact and wear their
+   folder's colour, the checkbox is drawn rather than the browser's, and the
+   cards in pane 2 take their folder's colour, chip and tilt.
+   ============================================================ */
+/* While a group slides shut, its chevron and icon turn back at once. */
+.admin-group.is-closing > summary .admin-group-chev { transform: none; }
+.admin-group.is-closing > summary .admin-group-ic {
+  color: var(--fc);
+  background: color-mix(in srgb, var(--fc) 17%, transparent);
+  box-shadow: none;
+}
+.admin-group.is-closing > summary .admin-group-ic .ag-open { opacity: 0; transform: scale(0.6); }
+.admin-group.is-closing > summary .admin-group-ic .ag-closed { opacity: 1; transform: none; }
+
+/* Program rows: compact, in their folder's colour. */
+.admin-group .admin-list-item {
+  gap: 0.55rem;
+  padding: 0.5rem 0.5rem 0.5rem 0.6rem;
+  border-radius: 11px;
+  border-color: color-mix(in srgb, var(--fc) 12%, var(--border-color));
+}
+.admin-group .admin-list-item-title { font-size: 0.84rem; margin-bottom: 0.25rem; }
+.admin-group .admin-list-item-meta { gap: 0.3rem; }
+.ali-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.05rem 0.38rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--fc, var(--color-primary)) 10%, transparent);
+}
+.ali-stat svg { width: 11px; height: 11px; color: var(--fc, var(--color-primary)); }
+/* No tests yet is worth noticing. */
+.ali-stat.is-zero { color: var(--color-warning); background: color-mix(in srgb, var(--color-warning) 12%, transparent); }
+.ali-stat.is-zero svg { color: var(--color-warning); }
+/* Inside a group the folder button needs no label: the group names it. */
+.admin-group .ali-folder-btn { gap: 0.15rem; padding: 0.1rem 0.35rem; }
+.admin-group .ali-folder-btn span { display: none; }
+.admin-group .ali-folder-btn:hover {
+  color: var(--fc);
+  border-color: var(--fc);
+  background: color-mix(in srgb, var(--fc) 12%, transparent);
+}
+.admin-group .admin-list-item.is-selected {
+  border-color: var(--fc);
+  background: color-mix(in srgb, var(--fc) 10%, var(--bg-surface));
+}
+.admin-group .admin-list-item-actions {
+  gap: 0.15rem;
+  opacity: 0.35;
+  transform: translateX(4px);
+  transition: opacity 0.18s ease, transform 0.22s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+.admin-group .admin-list-item:hover .admin-list-item-actions,
+.admin-group .admin-list-item.active .admin-list-item-actions { opacity: 1; transform: none; }
+.admin-group .admin-list-item-actions .btn { min-width: 30px; min-height: 30px; padding: 0; border-radius: 9px; }
+.admin-group .admin-list-item-actions .btn:hover { transform: scale(1.12); }
+.admin-group .admin-list-item-actions .btn:first-child svg { color: var(--fc) !important; }
+.admin-group .admin-list-item-actions .btn:first-child:hover { background: color-mix(in srgb, var(--fc) 16%, transparent); }
+.admin-group .admin-list-item-actions .btn:last-child:hover { background: color-mix(in srgb, var(--color-danger) 14%, transparent); }
+
+/* The checkbox, drawn: a rounded square in the folder's colour that fills
+   and springs a tick when checked. It sits faintly at rest -- it used to be
+   invisible, which left a blank gap at the start of every row. */
+.ali-check { padding-right: 0; opacity: 0.45; }
+.ali-check input {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border-radius: 6px;
+  border: 1.5px solid color-mix(in srgb, var(--fc, var(--color-primary)) 50%, var(--border-color));
+  background: color-mix(in srgb, var(--fc, var(--color-primary)) 6%, transparent)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E")
+    center / 0 no-repeat;
+  cursor: pointer;
+  transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.2s ease, transform 0.15s ease,
+              background-size 0.25s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.ali-check input:hover { border-color: var(--fc, var(--color-primary)); transform: scale(1.08); }
+.ali-check input:checked {
+  border-color: var(--fc, var(--color-primary));
+  background-color: var(--fc, var(--color-primary));
+  background-size: 12px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--fc, var(--color-primary)) 22%, transparent);
+}
+.ali-check input:focus-visible { outline: 2px solid var(--fc, var(--color-primary)); outline-offset: 2px; }
+
+/* ── Pane 2: the cards ── */
+.admin-cards-titles h2 { gap: 0.55rem; font-size: 1.1rem; font-weight: 800; }
+.admin-cards-ic {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  color: #fff;
+  background: linear-gradient(145deg, var(--k), color-mix(in srgb, var(--k) 65%, #000));
+  box-shadow: 0 6px 14px -6px var(--k);
+}
+.admin-cards-ic svg { width: 16px; height: 16px; }
+.admin-cards-count {
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--k);
+  background: color-mix(in srgb, var(--k) 15%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--k) 28%, transparent);
+}
+.admin-card {
+  --k: var(--color-primary);
+  --fc: var(--k);
+  position: relative;
+  overflow: hidden;
+  border-radius: 14px;
+  border-color: color-mix(in srgb, var(--k) 16%, var(--border-color));
+  background: linear-gradient(160deg, color-mix(in srgb, var(--k) 8%, var(--bg-surface)), var(--bg-surface) 55%);
+  transition: transform 0.25s ease-out, border-color 0.2s ease, box-shadow 0.25s ease;
+}
+/* A hairline of the card's colour across the top, and the pointer's light. */
+.admin-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--k), transparent 80%);
+  opacity: 0.6;
+  pointer-events: none;
+}
+.admin-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(220px circle at var(--mx, 50%) var(--my, 0%), color-mix(in srgb, var(--k) 16%, transparent), transparent 65%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.admin-card:hover {
+  border-color: color-mix(in srgb, var(--k) 60%, var(--border-color));
+  box-shadow: 0 16px 30px -18px color-mix(in srgb, var(--k) 75%, transparent);
+}
+.admin-card:hover::after { opacity: 1; }
+.admin-card:focus-visible { outline-color: var(--k); }
+.admin-card-chip {
+  color: var(--k);
+  border-radius: 10px;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--k) 26%, transparent), color-mix(in srgb, var(--k) 10%, transparent));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: transform 0.3s cubic-bezier(0.3, 1.5, 0.5, 1), background 0.25s ease, color 0.25s ease;
+}
+.admin-card:hover .admin-card-chip { transform: scale(1.08) rotate(-6deg); color: #fff; background: var(--k); }
+.admin-card-folder {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  max-width: 100%;
+  min-width: 0;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+.admin-card-folder svg { width: 12px; height: 12px; flex: none; color: var(--k); }
+.admin-card-folder-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-card-meta { gap: 0.3rem; }
+.admin-card-meta span {
+  padding: 0.08rem 0.42rem;
+  border-radius: 999px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--k) 10%, transparent);
+}
+.admin-card-meta svg { color: var(--k); }
+.admin-card.admin-card-add {
+  border-color: color-mix(in srgb, var(--k) 35%, var(--border-color));
+  background: transparent;
+}
+.admin-card.admin-card-add::before { display: none; }
+.admin-card.admin-card-add:hover { color: var(--k); border-color: var(--k); background: color-mix(in srgb, var(--k) 8%, transparent); }
