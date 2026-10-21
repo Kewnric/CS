@@ -2164,8 +2164,10 @@ mark.diff-hit.current {
   align-items: center;
   gap: 5px;
   padding: 0 calc(var(--sao-chamfer) + 3px) 0 6px;
-  /* Layout only. The metal is .sao-plate-face, a layer of its own at the back,
-     so it can tilt while the name and the bar on it do not. */
+  /* Layout only. The metal is .sao-plate-face, a layer of its own at the back:
+     a clip-path here would flatten the plate, and the name and the bar could
+     not stand forward of the metal they sit on. */
+  transform-style: preserve-3d;
 }
 
 /* The metal. One constant tone across the face — the old brushed-metal ramp ran
@@ -2211,41 +2213,26 @@ mark.diff-hit.current {
    side and the shadow lean against the tilt (--tx/--ty).
 
    NOT ON THE WRAPPER. A filter there flattened the whole bar into one picture,
-   which the tilt then resampled -- the blur. On the slabs it only touches the
-   metal, which has no text to soften.
-
-   THE METAL IS THE ONLY THING TURNED IN 3D (--tx/--ty, from _bossSpatialBind).
-   Everything with text or detail on it moves flat, by whole pixels. */
+   which the tilt then resampled -- the blur -- and nothing in it could stand
+   forward of anything else. On the slabs it only flattens the metal. */
 .sao-slab {
   filter:
     drop-shadow(calc(var(--tx, 0) * -1px) 1px 0 #2e3238)
     drop-shadow(calc(var(--tx, 0) * -1px) 1px 0 #1e2125)
     drop-shadow(calc(var(--tx, 0) * -3px) calc(3px - var(--ty, 0) * 1px) 4px rgba(0, 0, 0, 0.6));
-  transform: perspective(380px) rotateX(calc(var(--ty, 0) * -16deg)) rotateY(calc(var(--tx, 0) * 5deg));
 }
 
-/* The track, wrapped so it can cast a shadow (its own clip-path would crop
-   one). The wrapper takes the track's place in the plate's row. */
-.sao-track-lift {
-  position: relative;
-  z-index: 1;
-  flex: 1 1 auto;
-  min-width: 40px;
-  display: flex;
-  align-items: center;
-}
-
-/* Off the metal. At rest the name and the bar sit on the plate with a short
-   shadow; hovered (--lift -> 1) they rise and the shadow grows and softens,
-   the readout with them. The parallax that slides them is their `translate`,
-   which adds to the crystal's bob and the combo's own motion. */
-.sao-plate-name,
-.sao-track-lift {
-  filter: drop-shadow(0 calc(1px + var(--lift, 0) * 3px) calc(0.5px + var(--lift, 0) * 3.5px) rgba(0, 0, 0, 0.6));
-}
-.sao-readout {
-  filter: drop-shadow(0 calc(2px + var(--lift, 0) * 3px) calc(4px + var(--lift, 0) * 3px) rgba(0, 0, 0, 0.55));
-}
+/* Depth. The tilt turns .practice-topbar-center, so the crystal turns with the
+   plate; everything keeps its 3D down to the layers below. `translate`, not
+   `transform`, so it adds to the bob, shake and combo animations rather than
+   being replaced by them. */
+.practice-topbar-center.boss-on { transform-style: preserve-3d; transform-origin: 50% 50%; }
+.sao-boss { transform-style: preserve-3d; }
+.practice-topbar-center.boss-on .sao-crystal { translate: 0 0 20px; }
+.sao-plate-name { translate: 0 0 10px; }
+.sao-track { translate: 0 0 7px; }
+.sao-readout { translate: 0 0 12px; }
+.sao-combo { translate: 0 0 16px; }
 
 .sao-plate-lv {
   flex: 0 0 auto;

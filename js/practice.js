@@ -1940,7 +1940,7 @@ function bossBarTemplate() {
       <div class="sao-plate">
         <span class="sao-slab sao-face-slab" aria-hidden="true"><span class="sao-plate-face"></span></span>
         <span class="sao-plate-name" id="boss-plate-name"></span>
-        <div class="sao-track-lift"><div class="sao-track">
+        <div class="sao-track">
           <div class="sao-well">
             <div class="sao-ghost" id="boss-health-ghost"></div>
             <div class="sao-fill" id="boss-health-bar"></div>
@@ -1948,7 +1948,7 @@ function bossBarTemplate() {
             <div class="sao-ticks" aria-hidden="true"></div>
             <div class="sao-gloss" aria-hidden="true"></div>
           </div>
-        </div></div>
+        </div>
       </div>
       <div class="sao-combo" id="boss-combo" aria-hidden="true"></div>
       <div class="sao-readout">
@@ -1982,28 +1982,19 @@ function bossSetVisible(on) {
 }
 
 /* ── The plate turns toward the pointer ────────────────────────
-   Spatial, like the library's cards, but built so nothing with text in it is
-   ever turned in 3D. A 3D-turned layer is drawn as a picture and warped, and
-   the name, the HP numbers and the bar went soft the moment it moved.
+   The same spatial behaviour as the library's cards (libSpatialBind): it
+   leans toward the mouse and a light follows the pointer across the metal,
+   and what is on it sits at different depths -- the crystal nearest, then
+   the readout, the name and the bar, the metal at the back (editor.css).
 
-   So only the bare metal (the bracket and the plate's face) tilts in real 3D
-   -- it has no text to blur. The things ON the plate -- crystal, name, bar,
-   readout, combo -- slide toward the pointer by whole pixels, the nearer ones
-   further (parallax), and lift off the metal on a growing shadow. A light
-   follows the pointer across the metal.
-
-   _bossSpatialBind only writes numbers: --tx/--ty (-1..1, where the pointer
-   is), --lift (0..1, how far off the plate), --mx/--my (the light), and each
-   layer's `translate`. Eased per frame so it moves with weight; mouse only,
-   and still under reduced motion. */
-const BOSS_PARALLAX = [            // [selector, px across, px down] at full tilt
-  ['.sao-crystal', 6, 2.5],
-  ['.sao-combo', 5, 2],
-  ['.sao-plate-name', 4, 1.5],
-  ['.sao-readout', 3, 1.5],
-  ['.sao-track-lift', 2.5, 1]
-];
-const BOSS_LIFT_PX = 1.5;          // how far the layers rise off the metal
+   It turns the topbar's centre, not just the plate, so the crystal turns with
+   it. The plate is wide and short, so it tips mostly on its long axis and only
+   a little at the ends. Eased per frame so it turns with weight; mouse only,
+   and still under reduced motion. The slabs' sides and shadows lean with it
+   (--tx/--ty). */
+const BOSS_TILT_X = 9;   // degrees: top and bottom edges
+const BOSS_TILT_Y = 3;   // degrees: the two ends
+const BOSS_LIFT = 3;     // px forward while hovered
 
 function _bossSpatialBind() {
   const wrap = document.getElementById('boss-health-wrapper');
@@ -2011,12 +2002,8 @@ function _bossSpatialBind() {
   if (!el || el._bossSpatial) return;
   el._bossSpatial = true;
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const layers = BOSS_PARALLAX.map(([sel, dx, dy]) => [el.querySelector(sel), dx, dy]).filter(l => l[0]);
   const to = { x: 0, y: 0, z: 0 }, at = { x: 0, y: 0, z: 0 };
   let raf = 0, last = 0, over = false;
-  // Whole device pixels: a layer left on a fractional offset is resampled, and
-  // that is blur again.
-  const snap = v => { const d = window.devicePixelRatio || 1; return Math.round(v * d) / d; };
   const frame = now => {
     raf = 0;
     const dt = Math.min(64, last ? now - last : 16.7);
@@ -2025,23 +2012,21 @@ function _bossSpatialBind() {
     let moving = false;
     ['x', 'y', 'z'].forEach(a => {
       const d = to[a] - at[a];
-      if (Math.abs(d) > 0.002) { at[a] += d * k; moving = true; }
+      if (Math.abs(d) > (a === 'z' ? 0.05 : 0.002)) { at[a] += d * k; moving = true; }
       else at[a] = to[a];
     });
     if (!over && !moving) {
-      ['--mx', '--my', '--tx', '--ty', '--lift'].forEach(p => el.style.removeProperty(p));
-      layers.forEach(([n]) => { n.style.translate = ''; });
+      el.style.transform = '';
+      ['--mx', '--my', '--tx', '--ty'].forEach(p => el.style.removeProperty(p));
       last = 0;
       return;
     }
+    el.style.transform = 'perspective(700px) rotateX(' + (-at.y * BOSS_TILT_X).toFixed(2) + 'deg) rotateY(' +
+      (at.x * BOSS_TILT_Y).toFixed(2) + 'deg) translateZ(' + at.z.toFixed(1) + 'px)';
     el.style.setProperty('--mx', ((at.x + 1) * 50).toFixed(1) + '%');
     el.style.setProperty('--my', ((at.y + 1) * 50).toFixed(1) + '%');
     el.style.setProperty('--tx', at.x.toFixed(3));
     el.style.setProperty('--ty', at.y.toFixed(3));
-    el.style.setProperty('--lift', at.z.toFixed(3));
-    layers.forEach(([n, dx, dy]) => {
-      n.style.translate = snap(at.x * dx) + 'px ' + snap(at.y * dy - at.z * BOSS_LIFT_PX) + 'px';
-    });
     if (moving) raf = requestAnimationFrame(frame);
     else last = 0;
   };
@@ -2055,7 +2040,7 @@ function _bossSpatialBind() {
   const track = e => {
     // The centre holds the nameplate chip instead when the bar is off.
     if (e.pointerType !== 'mouse' || !el.classList.contains('boss-on')) return;
-    if (!over) { over = true; to.z = 1; el.classList.add('is-tilting'); }
+    if (!over) { over = true; to.z = BOSS_LIFT; el.classList.add('is-tilting'); }
     aim(e); kick();
   };
   el.addEventListener('pointerenter', track);
