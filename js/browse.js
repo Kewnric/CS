@@ -1670,7 +1670,8 @@ function renderBrowseContent() {
       const sfTodo = browseUnsolvedInView(sf.id);
       subfoldersHtml += `
         <div class="subfolder-card" onclick="selectBrowseNode('${sf.id}'); toggleNodeExpanded('${sf.id}');">
-          ${sfTodo ? `<span class="subfolder-card-todo" title="${sfTodo} still to solve">${sfTodo}</span>` : ''}
+          ${sfTodo ? `<span class="subfolder-card-todo" title="${sfTodo} still to solve">${sfTodo}</span>`
+            : sfCount ? `<span class="subfolder-card-todo is-done" title="All solved"><i data-lucide="check"></i></span>` : ''}
           <i data-lucide="folder"></i>
           <span class="subfolder-card-label">${escapeHTML(sf.name)}</span>
           <span class="subfolder-card-count">${sfCount} item${sfCount !== 1 ? 's' : ''}</span>
