@@ -599,14 +599,13 @@ function adminCodingTemplate() {
             <!-- General: browse the library the way the library does, by
                  opening categories rather than reading one flat list. -->
             <details class="admin-panel admin-panel-general" data-collection="general" open>
-              <summary onclick="adminSectionClick(event)">
+              <summary onclick="adminSectionClick(event)" title="Open a category to see what is inside it, set the order programs run in, and lock categories behind prerequisites.">
                 <i data-lucide="chevron-right" class="admin-panel-chev"></i>
                 <i data-lucide="compass" style="color:var(--color-accent);width:16px;height:16px;"></i>
                 <span class="admin-panel-name">General</span>
                 <span class="admin-panel-count" id="admin-general-count">0</span>
               </summary>
               <div class="admin-panel-slot"><div class="admin-panel-body">
-                <p style="font-size:0.75rem; color:var(--text-tertiary); margin-bottom:0.6rem;">Open a category to see what is inside it, set the order programs run in, and lock categories behind prerequisites.</p>
                 <div id="admin-general-nav" class="admin-gen-list"></div>
               </div></div>
             </details>
@@ -645,14 +644,13 @@ function adminCodingTemplate() {
             <!-- Practice Sets. Programs is what you come here for, so everything
                  below it is collapsed by default rather than sharing the scroll. -->
             <details class="admin-panel collapsed" data-collection="sets" open>
-              <summary onclick="adminSectionClick(event)">
+              <summary onclick="adminSectionClick(event)" title="Bundle several problems into one session.">
                 <i data-lucide="chevron-right" class="admin-panel-chev"></i>
                 <i data-lucide="layout-grid" style="color:var(--color-accent);width:16px;height:16px;"></i>
                 <span class="admin-panel-name">Practice Sets</span>
                 <span class="admin-panel-count" id="admin-sets-count">0</span>
               </summary>
               <div class="admin-panel-slot"><div class="admin-panel-body">
-                <p style="font-size:0.75rem; color:var(--text-tertiary); margin-bottom:1rem;">Bundle several problems into one session.</p>
                 <div id="admin-sets-list" style="display:flex; flex-direction:column; gap:0.5rem; margin-bottom:0.75rem;"></div>
                 <button onclick="openSetBuilder('new')" class="btn btn-secondary" style="width:100%;">
                   <i data-lucide="plus" style="width:16px;height:16px;"></i> New Practice Set
@@ -751,7 +749,14 @@ function adminCodingInit() {
   const folders = state.nodes.filter(n => n.scope === 'challenge' && n.type === 'folder').length;
   const sub = document.getElementById('admin-coding-header-stats');
   if (sub) {
-    sub.textContent = `${totalPrograms} program${totalPrograms !== 1 ? 's' : ''} across ${folders} folder${folders !== 1 ? 's' : ''}`;
+    // Three coloured counts rather than a sentence; the words are in the tooltips.
+    const sets = (state.codingSets || []).length;
+    const stat = (icon, color, n, word) =>
+      `<span class="ap-stat" style="--c:${color};" title="${n} ${word}${n === 1 ? '' : 's'}"><i data-lucide="${icon}"></i>${n}</span>`;
+    sub.innerHTML = stat('file-code', 'var(--color-primary)', totalPrograms, 'program') +
+      stat('folder', 'var(--color-warning)', folders, 'folder') +
+      stat('layout-grid', '#ec4899', sets, 'practice set');
+    if (typeof lucide !== 'undefined') lucide.createIcons({ root: sub });
   }
 
   if (typeof renderAdminSets === 'function') renderAdminSets();

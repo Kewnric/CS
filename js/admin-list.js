@@ -243,7 +243,86 @@ function _adminRememberGroups() {
   }
 }
 
+/* Every folder wears a colour, taken from its top-level category, so one
+   branch reads as one family in both trees of pane 1. */
+const ADMIN_HUES = ['#6366f1', '#06b6d4', '#f59e0b', '#ec4899', '#10b981', '#8b5cf6',
+                    '#f97316', '#3b82f6', '#84cc16', '#f43f5e', '#14b8a6', '#eab308'];
+
+function adminFolderHue(folderId) {
+  const nodes = state.nodes || [];
+  let f = nodes.find(n => n.id === folderId && n.type === 'folder');
+  if (!f) return '#94a3b8';   // Uncategorized, or anything that is not a folder
+  const seen = new Set();
+  while (f.parentId && !seen.has(f.id)) {
+    seen.add(f.id);
+    const up = nodes.find(n => n.id === f.parentId);
+    if (!up) break;
+    f = up;
+  }
+  const roots = typeof getChildFolders === 'function'
+    ? getChildFolders(null, f.scope)
+    : nodes.filter(n => n.type === 'folder' && n.scope === f.scope && !n.parentId);
+  const i = Math.max(0, roots.findIndex(r => r.id === f.id));
+  return ADMIN_HUES[i % ADMIN_HUES.length];
+}
+
+/* "0.1 · Putting it on the screen" -> a "0.1" tag and the name. The number is
+   how the folders are ordered, not something to read, so it becomes a chip. */
+function adminSplitFolderName(name) {
+  const m = /^\s*(\S{1,6})\s+·\s+(.+)$/.exec(String(name || ''));
+  return m ? { tag: m[1], label: m[2] } : { tag: '', label: String(name || '') };
+}
+
+/* Pane 1 of the admin pages, brought to life. A collapsed section tilts
+   toward the pointer like the Library's spatial cards -- an open one holds a
+   list, and a list should not swim -- and whichever header or row the
+   pointer is over carries a soft light that follows it. One set of listeners
+   on the pane, mouse only; reduced motion keeps the light and drops the tilt. */
+const ADMIN_TILT = 8;   // degrees at a section's top and bottom edges
+
+function adminPaneFxBind(root) {
+  if (!root || root._adminFx) return;
+  root._adminFx = true;
+  const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let tilted = null;
+  const untilt = () => {
+    if (!tilted) return;
+    tilted.style.transform = '';
+    tilted.classList.remove('is-tilting');
+    tilted = null;
+  };
+  root.addEventListener('pointermove', e => {
+    if (e.pointerType !== 'mouse') return;
+    const lit = e.target.closest('.admin-panel > summary, .admin-group > summary, .admin-gen-row, .admin-list-item');
+    if (lit && root.contains(lit)) {
+      const r = lit.getBoundingClientRect();
+      if (r.width && r.height) {
+        lit.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100).toFixed(1) + '%');
+        lit.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100).toFixed(1) + '%');
+      }
+    }
+    if (still) return;
+    const panel = e.target.closest('.admin-panel.collapsed');
+    if (panel !== tilted) untilt();
+    if (!panel || !root.contains(panel)) return;
+    const r = panel.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const x = Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width) * 2 - 1));
+    const y = Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height) * 2 - 1));
+    panel.style.transform = 'perspective(900px) rotateX(' + (-y * ADMIN_TILT).toFixed(2) + 'deg) rotateY(' +
+      (x * ADMIN_TILT / 2).toFixed(2) + 'deg) translateZ(6px)';
+    panel.classList.add('is-tilting');
+    tilted = panel;
+  });
+  root.addEventListener('pointerleave', untilt);
+  // Opening a section stops its tilt at once.
+  root.addEventListener('click', () => setTimeout(() => {
+    if (tilted && !tilted.classList.contains('collapsed')) untilt();
+  }, 0));
+}
+
 function renderAdmin() {
+  if (typeof adminPaneFxBind === 'function') adminPaneFxBind(document.querySelector('.messenger-pane-1 .pane-1-content'));
   // The counts on the collapsed section headers, for whichever admin this is.
   if (typeof adminSyncPanelCounts === 'function') adminSyncPanelCounts();
   // Cards already on screen are showing data that just changed.
@@ -370,22 +449,39 @@ function renderAdmin() {
     let collapsed = [];
     try { collapsed = JSON.parse(localStorage.getItem('adminGroupsCollapsed') || '[]') || []; }
     catch (e) { collapsed = []; }
-    return ordered.map(([key, name, items]) => `
-      <details class="admin-group"${collapsed.includes(key) ? '' : ' open'} data-group="${escapeHTML(key)}">
-        <summary onclick="setTimeout(() => _adminRememberGroups(), 0)">
+    // Each folder in its family's colour, its number as a chip, and an icon
+    // that opens with it.
+    return ordered.map(([key, name, items], gi) => {
+      const part = adminSplitFolderName(name);
+      const root = key === '__root__';
+      return `
+      <details class="admin-group"${collapsed.includes(key) ? '' : ' open'} data-group="${escapeHTML(key)}"
+               style="--fc:${root ? '#94a3b8' : adminFolderHue(key)};--gi:${gi};">
+        <summary onclick="setTimeout(() => _adminRememberGroups(), 0)" title="${escapeHTML(name)}">
           <i data-lucide="chevron-right" class="admin-group-chev"></i>
-          <i data-lucide="${key === '__root__' ? 'inbox' : 'folder'}" style="width:14px;height:14px;"></i>
-          <span class="admin-group-name">${escapeHTML(name)}</span>
+          <span class="admin-group-ic">${root
+            ? '<i data-lucide="inbox"></i>'
+            : '<i data-lucide="folder" class="ag-closed"></i><i data-lucide="folder-open" class="ag-open"></i>'}</span>
+          ${part.tag ? `<span class="admin-group-tag">${escapeHTML(part.tag)}</span>` : ''}
+          <span class="admin-group-name">${escapeHTML(part.label)}</span>
           <span class="admin-group-count">${items.length}</span>
         </summary>
         <div class="admin-group-body">${renderPrograms(items)}</div>
-      </details>`).join('');
+      </details>`;
+    }).join('');
   };
 
   const programsRest = document.getElementById('admin-table-body-rest');
   const programsDropdown = document.getElementById('admin-programs-dropdown-wrapper');
 
   if (programsPreview) {
+    // The folders ripple in the first time the list is drawn, not on every
+    // redraw (a search keystroke, a tick in a checkbox).
+    if (!programsPreview._entered) {
+      programsPreview._entered = true;
+      programsPreview.classList.add('ag-enter');
+      setTimeout(() => programsPreview.classList.remove('ag-enter'), 1400);
+    }
     programsPreview.innerHTML = filteredChallenges.length === 0
       ? '<div class="empty-state" style="padding:1rem;"><p>No programs found.</p></div>'
       : renderGrouped(filteredChallenges);

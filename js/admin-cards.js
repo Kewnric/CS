@@ -360,8 +360,11 @@ function _adminGenNodeHTML(id, name, icon, count, kids) {
   // branch is a result you cannot see. The stored set is left untouched.
   const open = _adminGenQuery() ? true : _adminGenOpen(id);
   const sid = escapeHTML(String(id));
+  // The same colour and number chip as the Programs panel's folders.
+  const hue = typeof adminFolderHue === 'function' ? adminFolderHue(id) : '';
+  const part = typeof adminSplitFolderName === 'function' ? adminSplitFolderName(name) : { tag: '', label: name };
   return `
-    <div class="admin-gen-node" data-folder="${sid}">
+    <div class="admin-gen-node" data-folder="${sid}"${hue ? ` style="--fc:${hue};"` : ''}>
       <div class="admin-gen-row${showing ? ' current' : ''}" onclick="_adminGenRowClick(event, '${sid}')">
         ${kids
           ? `<button class="admin-gen-chev${open ? ' open' : ''}" aria-expanded="${open}"
@@ -369,8 +372,9 @@ function _adminGenNodeHTML(id, name, icon, count, kids) {
                <i data-lucide="chevron-right"></i>
              </button>`
           : '<span class="admin-gen-chev-spacer"></span>'}
-        <i data-lucide="${escapeHTML(icon)}" class="admin-gen-icon"></i>
-        <span class="admin-gen-name">${escapeHTML(name)}</span>
+        <span class="admin-gen-ic"><i data-lucide="${escapeHTML(icon)}" class="admin-gen-icon"></i></span>
+        ${part.tag ? `<span class="admin-group-tag">${escapeHTML(part.tag)}</span>` : ''}
+        <span class="admin-gen-name" title="${escapeHTML(name)}">${escapeHTML(part.label)}</span>
         <span class="admin-group-count">${count}</span>
       </div>
       ${kids ? `<div class="admin-gen-children${open ? '' : ' collapsed'}">

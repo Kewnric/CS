@@ -86,7 +86,7 @@ function updateAdminFilter() {
   }
 
   filterContainer.innerHTML = `
-    <div class="admin-filter-wrap">
+    <div class="admin-filter-wrap" title="Show one folder">
       <i data-lucide="filter" class="admin-filter-icon"></i>
       <span class="admin-filter-label">Filter</span>
       <div id="admin-filter-cs" class="admin-filter-cs"></div>
