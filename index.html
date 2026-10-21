@@ -368,13 +368,13 @@
       <div class="ss-field">
         <div class="ss-label">Time limit <em>leave at zero for none</em></div>
         <div class="ss-time" role="group" aria-label="Time limit">
-          <label class="ss-time-unit"><input type="number" id="timer-h" min="0" value="0" inputmode="numeric"
+          <label class="ss-time-unit"><input type="number" id="timer-h" min="0" max="23" value="0" inputmode="numeric"
               oninput="timerPresetSync()" /><span>hr</span></label>
           <span class="ss-time-sep">:</span>
-          <label class="ss-time-unit"><input type="number" id="timer-m" min="0" value="0" inputmode="numeric"
+          <label class="ss-time-unit"><input type="number" id="timer-m" min="0" max="59" value="0" inputmode="numeric"
               oninput="timerPresetSync()" /><span>min</span></label>
           <span class="ss-time-sep">:</span>
-          <label class="ss-time-unit"><input type="number" id="timer-s" min="0" value="0" inputmode="numeric"
+          <label class="ss-time-unit"><input type="number" id="timer-s" min="0" max="59" value="0" inputmode="numeric"
               oninput="timerPresetSync()" /><span>sec</span></label>
         </div>
         <div class="ss-presets" role="group" aria-label="Quick time limits">

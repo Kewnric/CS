@@ -4885,7 +4885,63 @@ body.is-resizing .practice-panel { transition: none; }
   color: var(--text-secondary);
 }
 .ss-label em { font-style: normal; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--text-tertiary); }
-.ss-select { font-weight: 600; }
+/* The version picker. Closed: the field with its own chevron. Open: a themed
+   list in browsers with customizable <select> (appearance: base-select);
+   elsewhere at least the options are dark rather than the OS grey. */
+.ss-modal .ss-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0.7rem 2.4rem 0.7rem 0.9rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  background-color: var(--bg-surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  transition: border-color .15s ease, box-shadow .15s ease, background-color .15s ease;
+}
+.ss-modal .ss-select:hover { background-color: var(--bg-surface-hover); }
+.ss-modal .ss-select:focus,
+.ss-modal .ss-select:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 22%, transparent);
+}
+.ss-modal .ss-select option { background: #161b22; color: #e6edf3; }
+@supports (appearance: base-select) {
+  .ss-modal .ss-select,
+  .ss-modal .ss-select::picker(select) { appearance: base-select; }
+  .ss-modal .ss-select { background-image: none; padding-right: 0.9rem; }
+  .ss-modal .ss-select::picker-icon {
+    color: var(--text-tertiary);
+    transition: rotate .2s cubic-bezier(.4, 0, .2, 1);
+  }
+  .ss-modal .ss-select:open::picker-icon { rotate: 180deg; }
+  .ss-modal .ss-select::picker(select) {
+    margin-top: 6px;
+    padding: 4px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    background: var(--bg-elevated, #161b22);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  }
+  .ss-modal .ss-select option {
+    padding: 0.55rem 0.7rem;
+    border-radius: calc(var(--radius-md) - 3px);
+    background: transparent;
+    color: var(--text-secondary);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .ss-modal .ss-select option:hover,
+  .ss-modal .ss-select option:focus-visible {
+    outline: none;
+    background: color-mix(in srgb, var(--color-primary) 16%, transparent);
+    color: var(--text-primary);
+  }
+  .ss-modal .ss-select option:checked { color: var(--text-primary); }
+  .ss-modal .ss-select option::checkmark { color: var(--color-primary); }
+}
 
 /* One field, three cells. */
 .ss-time {
@@ -4911,7 +4967,9 @@ body.is-resizing .practice-panel { transition: none; }
   border-radius: calc(var(--radius-md) - 3px);
   cursor: text;
 }
-.ss-time-unit:focus-within { background: color-mix(in srgb, var(--color-primary) 10%, transparent); }
+/* No per-digit highlight: the field's own ring says where you are. */
+.ss-time-unit input:focus,
+.ss-time-unit input:focus-visible { outline: none; box-shadow: none; }
 .ss-time-unit input {
   width: 3ch;
   padding: 0;

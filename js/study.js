@@ -1268,10 +1268,29 @@ function timerPreset(mins) {
 }
 
 function timerPresetSync() {
+  _timerWheelBind();
   const num = id => Math.max(0, parseInt((document.getElementById(id) || {}).value, 10) || 0);
   const secs = num('timer-h') * 3600 + num('timer-m') * 60 + num('timer-s');
   document.querySelectorAll('#timer-modal .ss-preset').forEach(b =>
     b.classList.toggle('is-on', parseInt(b.dataset.mins, 10) * 60 === secs));
+}
+
+/* Mouse wheel over a digit changes it: up adds one, down takes one away,
+   held to the field's min/max. Bound per input rather than on the document,
+   because a non-passive wheel listener on the document would hold up every
+   scroll in the app. */
+function _timerWheelBind() {
+  document.querySelectorAll('#timer-modal .ss-time-unit').forEach(unit => {
+    if (unit._wheelBound) return;
+    unit._wheelBound = true;
+    const input = unit.querySelector('input');
+    unit.addEventListener('wheel', e => {
+      if (!input || !e.deltaY) return;
+      e.preventDefault();
+      timerStep(input.id, e.deltaY < 0 ? 1 : -1);
+      timerPresetSync();
+    }, { passive: false });
+  });
 }
 
 function timerStep(id, delta) {
