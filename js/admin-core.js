@@ -210,9 +210,34 @@ function renderAdminFolderList(folders, scope, depth) {
   return html;
 }
 
+/* A category branch in the Categories and Skill Tree Locks panels opens in
+   place. It used to redraw the whole list, which swapped every branch at once,
+   so none of them slid; .tree-children already eases over 0.7s, the same as
+   General's subfolders, given the chance. Every branch on screen follows the
+   stored state afterwards -- opening one closes the ones beside it, and the
+   same folder in the other panel keeps step. */
 function toggleAdminCatExpand(nodeId, scope) {
   toggleNodeExpanded(nodeId);
-  renderAdmin();
+  const chevs = document.querySelectorAll('.tree-node-chevron[onclick^="toggleAdminCatExpand("]');
+  if (!chevs.length) { renderAdmin(); return; }
+  chevs.forEach(ch => {
+    const m = /toggleAdminCatExpand\('([^']*)'/.exec(ch.getAttribute('onclick') || '');
+    const kids = m && _adminCatKids(ch);
+    if (!kids) return;
+    const open = isNodeExpanded(m[1]);
+    kids.classList.toggle('collapsed', !open);
+    if (!ch.classList.contains('invisible')) ch.classList.toggle('expanded', open);
+  });
+}
+
+/* A branch's children: inside its own <li> in the Categories list, or right
+   after its row in the lock tree. */
+function _adminCatKids(chev) {
+  const li = chev.closest('li.category-item');
+  if (li) return li.querySelector(':scope > .tree-children');
+  const item = chev.closest('.category-item');
+  const next = item && item.nextElementSibling;
+  return next && next.classList.contains('tree-children') ? next : null;
 }
 
 function updateFolderTier(nodeId, tier) {

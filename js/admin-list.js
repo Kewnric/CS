@@ -231,28 +231,40 @@ function adminGroupToggle(e) {
     return;
   }
   e.preventDefault();
-  if (d._anim) { d._anim.cancel(); d._anim = null; }
+  if (d._anim) d._anim.cancel();
+  if (d._fade) d._fade.cancel();
+  // General's subfolders, exactly (.admin-gen-children): the space eases open
+  // over 0.7s, and the content fades over 0.7s, starting 80ms behind it so
+  // the room opens before the rows appear. Closing fades and shrinks together.
+  const ROOM = { duration: 700, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' };
   const cs = getComputedStyle(body);
   const pad = { paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom };
-  const shut = { height: '0px', paddingTop: '0px', paddingBottom: '0px', opacity: 0 };
-  const done = () => { body.style.overflow = ''; d._anim = null; };
+  const shut = { height: '0px', paddingTop: '0px', paddingBottom: '0px' };
+  const done = () => {
+    body.style.overflow = '';
+    if (d._fade) { d._fade.cancel(); d._fade = null; }
+    d._anim = null;
+  };
   body.style.overflow = 'hidden';
   if (!d.open || d.classList.contains('is-closing')) {
     d.classList.remove('is-closing');
     d.open = true;
-    const h = body.scrollHeight;
-    d._anim = body.animate([shut, Object.assign({ height: h + 'px', opacity: 1 }, pad)],
-      { duration: 360, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
+    d._anim = body.animate([shut, Object.assign({ height: body.scrollHeight + 'px' }, pad)], ROOM);
+    d._fade = body.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 700, delay: 80, easing: 'ease', fill: 'backwards' });
     d._anim.onfinish = done;
-    d._anim.oncancel = done;
     _adminRememberGroups();
   } else {
     d.classList.add('is-closing');
-    d._anim = body.animate([Object.assign({ height: body.offsetHeight + 'px', opacity: 1 }, pad), shut],
-      { duration: 280, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' });
-    d._anim.onfinish = () => { d.open = false; d.classList.remove('is-closing'); done(); _adminRememberGroups(); };
-    d._anim.oncancel = done;
+    d._anim = body.animate([Object.assign({ height: body.offsetHeight + 'px' }, pad), shut], ROOM);
+    d._fade = body.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 700, easing: 'ease', fill: 'forwards' });
+    d._anim.onfinish = () => {
+      d.open = false;
+      d.classList.remove('is-closing');
+      done();
+      _adminRememberGroups();
+    };
   }
+  d._anim.oncancel = () => { body.style.overflow = ''; };
 }
 
 function adminToggleAllGroups() {
