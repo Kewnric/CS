@@ -239,20 +239,35 @@
         }
       } catch {}
 
-      /* Observe resize to persist dimensions (disconnect the previous observer
-         first — re-renders used to leak one observer per refresh). */
-      if (_hudRO) _hudRO.disconnect();
-      _hudRO = new ResizeObserver((entries) => {
-        for (const entry of entries) {
-          const { width, height } = entry.contentRect;
-          if (width > 0 && height > 0) {
-            try {
-              localStorage.setItem(HUD_SIZE_KEY, JSON.stringify({ w: Math.round(entry.target.offsetWidth), h: Math.round(entry.target.offsetHeight) }));
-            } catch {}
+      /* SAVED ONLY WHEN YOU RESIZE IT. This used to be a ResizeObserver that
+         saved every size change -- including the panel being squeezed by its
+         own max-width: 90vw / max-height: 80vh whenever the window was smaller
+         (DevTools open, a side panel, a narrower window, a phone's bars) --
+         and the next render pinned it to that smaller size for good. A
+         ratchet: coming back to the tab, the HUD had shrunk, and it never grew
+         back. Now the size is compared between pressing on the panel and
+         letting go, so only a drag of its corner is ever recorded. Moving the
+         HUD presses on it too, but leaves the size alone, so saves nothing. */
+      if (_hudRO) { _hudRO.disconnect(); _hudRO = null; }
+      panel.addEventListener('pointerdown', () => {
+        const w0 = panel.offsetWidth, h0 = panel.offsetHeight;
+        let settled = false;
+        const done = () => {
+          if (settled) return;
+          settled = true;
+          window.removeEventListener('pointerup', done);
+          window.removeEventListener('mouseup', done);
+          window.removeEventListener('pointercancel', done);
+          const w = panel.offsetWidth, h = panel.offsetHeight;
+          if (panel.isConnected && w > 0 && h > 0 && (w !== w0 || h !== h0)) {
+            try { localStorage.setItem(HUD_SIZE_KEY, JSON.stringify({ w, h })); } catch {}
           }
-        }
+        };
+        // mouseup as well: the native resize grip is not guaranteed to end in a pointerup.
+        window.addEventListener('pointerup', done);
+        window.addEventListener('mouseup', done);
+        window.addEventListener('pointercancel', done);
       });
-      _hudRO.observe(panel);
     }
   }
 
