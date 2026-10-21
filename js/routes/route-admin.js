@@ -628,7 +628,7 @@ function adminCodingTemplate() {
                   </button>
                   <button class="admin-tool-btn" id="admin-groups-btn"
                           onclick="event.preventDefault(); event.stopPropagation(); adminToggleAllGroups();"
-                          title="Expand or collapse every folder" aria-label="Collapse all folders">
+                          title="Fold every folder" aria-label="Fold every folder">
                     <i data-lucide="chevrons-down-up" class="admin-tool-ic" id="admin-groups-ic"></i>
                     <span id="admin-groups-label">Collapse all</span>
                   </button>

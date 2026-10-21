@@ -221,21 +221,47 @@ document.addEventListener('keydown', (e) => {
    display:none the instant it closes, which nothing can transition -- that is
    why only the General tree (built from divs) used to animate. So the click
    is taken over: opening sets [open] and grows the body from nothing;
-   closing shrinks it first and only then clears [open]. */
+   closing shrinks it first and only then clears [open].
+
+   One folder open at a time, as in the General tree and the Library: opening
+   a folder slides the others shut. Searching is the exception -- every
+   folder holding a match is open, or the matches could not be seen. */
 function adminGroupToggle(e) {
   const d = e.currentTarget.parentElement;
-  const body = d && d.querySelector(':scope > .admin-group-body');
-  const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (!body || still || typeof body.animate !== 'function') {
-    setTimeout(() => _adminRememberGroups(), 0);   // the browser toggles it
-    return;
-  }
+  if (!d) return;
   e.preventDefault();
+  const opening = !d.open || d.classList.contains('is-closing');
+  if (opening && !_adminSearching()) {
+    d.parentElement.querySelectorAll(':scope > details.admin-group').forEach(x => {
+      if (x !== d && x.open && !x.classList.contains('is-closing')) _adminGroupSlide(x, false);
+    });
+  }
+  _adminGroupSlide(d, opening);
+}
+
+function _adminSearching() {
+  const el = document.getElementById('admin-search-input');
+  return !!(el && el.value.trim());
+}
+
+/* Slide one group open or shut, with General's subfolder motion exactly
+   (.admin-gen-children): the space eases over 0.7s, and the rows fade over
+   0.7s, 80ms behind on the way in; closing fades and shrinks together. */
+function _adminGroupSlide(d, open) {
+  const body = d.querySelector(':scope > .admin-group-body');
+  const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // Mid-slide, the height on screen is where the next slide starts from;
+  // it has to be read before the running one is cancelled.
+  const midway = d._anim && body ? body.offsetHeight : null;
   if (d._anim) d._anim.cancel();
   if (d._fade) d._fade.cancel();
-  // General's subfolders, exactly (.admin-gen-children): the space eases open
-  // over 0.7s, and the content fades over 0.7s, starting 80ms behind it so
-  // the room opens before the rows appear. Closing fades and shrinks together.
+  d._anim = d._fade = null;
+  if (!body || still || typeof body.animate !== 'function') {
+    d.open = open;
+    d.classList.remove('is-closing');
+    _adminRememberGroups();
+    return;
+  }
   const ROOM = { duration: 700, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' };
   const cs = getComputedStyle(body);
   const pad = { paddingTop: cs.paddingTop, paddingBottom: cs.paddingBottom };
@@ -246,16 +272,18 @@ function adminGroupToggle(e) {
     d._anim = null;
   };
   body.style.overflow = 'hidden';
-  if (!d.open || d.classList.contains('is-closing')) {
+  if (open) {
+    // From wherever a half-finished close had got to, not from nothing.
+    const from = midway !== null ? midway : 0;
     d.classList.remove('is-closing');
     d.open = true;
-    d._anim = body.animate([shut, Object.assign({ height: body.scrollHeight + 'px' }, pad)], ROOM);
+    d._anim = body.animate([Object.assign({}, shut, { height: from + 'px' }), Object.assign({ height: body.scrollHeight + 'px' }, pad)], ROOM);
     d._fade = body.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 700, delay: 80, easing: 'ease', fill: 'backwards' });
     d._anim.onfinish = done;
     _adminRememberGroups();
   } else {
     d.classList.add('is-closing');
-    d._anim = body.animate([Object.assign({ height: body.offsetHeight + 'px' }, pad), shut], ROOM);
+    d._anim = body.animate([Object.assign({ height: (midway !== null ? midway : body.offsetHeight) + 'px' }, pad), shut], ROOM);
     d._fade = body.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 700, easing: 'ease', fill: 'forwards' });
     d._anim.onfinish = () => {
       d.open = false;
@@ -267,30 +295,22 @@ function adminGroupToggle(e) {
   d._anim.oncancel = () => { body.style.overflow = ''; };
 }
 
+/* With one folder open at a time there is no "all" to expand; the button
+   folds whatever is open. */
 function adminToggleAllGroups() {
-  const groups = [...document.querySelectorAll('.admin-group')];
-  if (!groups.length) return;
-  const anyClosed = groups.some(d => !d.open);
-  groups.forEach(d => { d.open = anyClosed; });
-  _adminRememberGroups();
+  document.querySelectorAll('.admin-group').forEach(d => {
+    if (d.open && !d.classList.contains('is-closing')) _adminGroupSlide(d, false);
+  });
 }
 
-/** Remember which folder groups you closed in the admin list, across renders. */
+/** Remember which folder is open in the admin list, across renders. */
 function _adminRememberGroups() {
-  const groups = [...document.querySelectorAll('.admin-group')];
-  const closed = groups.filter(d => !d.open).map(d => d.dataset.group);
-  try { localStorage.setItem('adminGroupsCollapsed', JSON.stringify(closed)); }
-  catch (e) { /* quota — the groups still work for this session */ }
-  // The button carries an icon now, so only its label span is rewritten —
-  // setting textContent on the button itself wiped the icon out.
-  const allClosed = closed.length === groups.length;
-  const lbl = document.getElementById('admin-groups-label');
-  if (lbl) lbl.textContent = allClosed ? 'Expand all' : 'Collapse all';
-  const ic = document.getElementById('admin-groups-ic');
-  if (ic) {
-    ic.setAttribute('data-lucide', allClosed ? 'chevrons-up-down' : 'chevrons-down-up');
-    if (typeof lucide !== 'undefined') lucide.createIcons({ root: ic.parentElement });
-  }
+  // While searching every match is open; that is not a choice worth keeping.
+  if (_adminSearching()) return;
+  const open = [...document.querySelectorAll('.admin-group')]
+    .find(d => d.open && !d.classList.contains('is-closing'));
+  try { localStorage.setItem('adminGroupOpen', open ? open.dataset.group : ''); }
+  catch (e) { /* quota -- the groups still work for this session */ }
 }
 
 /* Every folder wears a colour, taken from its top-level category, so one
@@ -498,18 +518,18 @@ function renderAdmin() {
       }
     });
 
-    // Guarded like every other read of this kind: a corrupt value here used
-    // to throw mid-render and leave the Coding admin list blank.
-    let collapsed = [];
-    try { collapsed = JSON.parse(localStorage.getItem('adminGroupsCollapsed') || '[]') || []; }
-    catch (e) { collapsed = []; }
+    // One folder open at a time: the one you last opened. While searching,
+    // every folder with a match is open; filtered down to one, it is open.
+    let openKey = '';
+    try { openKey = localStorage.getItem('adminGroupOpen') || ''; } catch (e) { openKey = ''; }
+    const openAll = !!query || ordered.length === 1;
     // Each folder in its family's colour, its number as a chip, and an icon
     // that opens with it.
     return ordered.map(([key, name, items], gi) => {
       const part = adminSplitFolderName(name);
       const root = key === '__root__';
       return `
-      <details class="admin-group"${collapsed.includes(key) ? '' : ' open'} data-group="${escapeHTML(key)}"
+      <details class="admin-group"${openAll || key === openKey ? ' open' : ''} data-group="${escapeHTML(key)}"
                style="--fc:${root ? '#94a3b8' : adminFolderHue(key)};--gi:${gi};">
         <summary onclick="adminGroupToggle(event)" title="${escapeHTML(name)}">
           <i data-lucide="chevron-right" class="admin-group-chev"></i>
@@ -542,7 +562,7 @@ function renderAdmin() {
     // The old preview/rest split is gone — everything is in the grouped list.
     if (programsRest) programsRest.innerHTML = '';
     if (programsDropdown) programsDropdown.style.display = 'none';
-    _adminRememberGroups();   // keeps the Expand/Collapse-all label honest
+    _adminRememberGroups();
   }
 
   // Counts on the collapsed panel headers, so you can see what's inside them

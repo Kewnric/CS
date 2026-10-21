@@ -2805,13 +2805,14 @@ body.tree-dragging [data-tree-ns]::-webkit-scrollbar { width: 0; height: 0; }
 }
 .ap-stat svg { width: 12px; height: 12px; color: var(--c); }
 
-/* The filter: its funnel says what it is, so the word goes. */
-.admin-filter-wrap {
+/* The filter: its funnel says what it is, so the word goes. Qualified by
+   its container, for the same reason as the checkbox above. */
+#admin-filter-container .admin-filter-wrap {
   border-color: color-mix(in srgb, var(--color-primary) 18%, var(--border-color));
   background: linear-gradient(100deg, color-mix(in srgb, var(--color-primary) 8%, var(--bg-surface-hover)), var(--bg-surface-hover) 60%);
 }
-.admin-filter-icon { color: var(--color-primary); }
-.admin-filter-label { display: none; }
+#admin-filter-container .admin-filter-icon { color: var(--color-primary); }
+#admin-filter-container .admin-filter-label { display: none; }
 
 @keyframes apIn { from { opacity: 0; transform: translateY(8px); } }
 @media (prefers-reduced-motion: reduce) {
@@ -2890,8 +2891,10 @@ body.tree-dragging [data-tree-ns]::-webkit-scrollbar { width: 0; height: 0; }
 /* The checkbox, drawn: a rounded square in the folder's colour that fills
    and springs a tick when checked. It sits faintly at rest -- it used to be
    invisible, which left a blank gap at the start of every row. */
-.ali-check { padding-right: 0; opacity: 0.45; }
-.ali-check input {
+/* Qualified by the row: admin.css loads after this file, and its plain
+   .ali-check rules (opacity 0, a 15px box) were winning. */
+.admin-list-item .ali-check { padding-right: 0; opacity: 0.45; }
+.admin-list-item .ali-check input {
   -webkit-appearance: none;
   appearance: none;
   flex: none;
@@ -2907,14 +2910,14 @@ body.tree-dragging [data-tree-ns]::-webkit-scrollbar { width: 0; height: 0; }
   transition: background-color 0.18s ease, border-color 0.18s ease, box-shadow 0.2s ease, transform 0.15s ease,
               background-size 0.25s cubic-bezier(0.3, 1.6, 0.5, 1);
 }
-.ali-check input:hover { border-color: var(--fc, var(--color-primary)); transform: scale(1.08); }
-.ali-check input:checked {
+.admin-list-item .ali-check input:hover { border-color: var(--fc, var(--color-primary)); transform: scale(1.08); }
+.admin-list-item .ali-check input:checked {
   border-color: var(--fc, var(--color-primary));
   background-color: var(--fc, var(--color-primary));
   background-size: 12px;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--fc, var(--color-primary)) 22%, transparent);
 }
-.ali-check input:focus-visible { outline: 2px solid var(--fc, var(--color-primary)); outline-offset: 2px; }
+.admin-list-item .ali-check input:focus-visible { outline: 2px solid var(--fc, var(--color-primary)); outline-offset: 2px; }
 
 /* ── Pane 2: the cards ── */
 .admin-cards-titles h2 { gap: 0.55rem; font-size: 1.1rem; font-weight: 800; }
