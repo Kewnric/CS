@@ -601,6 +601,7 @@ function notesStartAttempt() {
   document.getElementById('timer-h').value = '0';
   document.getElementById('timer-m').value = '0';
   document.getElementById('timer-s').value = '0';
+  if (typeof timerPresetSync === 'function') timerPresetSync();
 
   // Swap the confirm button action
   const confirmBtn = timerModal.querySelector('button[onclick="confirmStartPractice()"]');

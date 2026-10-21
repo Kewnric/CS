@@ -1252,8 +1252,34 @@ function promptTimer(challengeId) {
   document.getElementById('timer-h').value = '0';
   document.getElementById('timer-m').value = '0';
   document.getElementById('timer-s').value = '0';
+  timerPresetSync();
   if (timerModal) timerModal.classList.remove('hidden');
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: timerModal });
+}
+
+/* Session Setup: the quick time-limit chips and the run-budget stepper. The
+   chip that matches the fields is lit, so typing 0:30:00 lights 30m too. */
+function timerPreset(mins) {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = String(v); };
+  set('timer-h', Math.floor(mins / 60));
+  set('timer-m', mins % 60);
+  set('timer-s', 0);
+  timerPresetSync();
+}
+
+function timerPresetSync() {
+  const num = id => Math.max(0, parseInt((document.getElementById(id) || {}).value, 10) || 0);
+  const secs = num('timer-h') * 3600 + num('timer-m') * 60 + num('timer-s');
+  document.querySelectorAll('#timer-modal .ss-preset').forEach(b =>
+    b.classList.toggle('is-on', parseInt(b.dataset.mins, 10) * 60 === secs));
+}
+
+function timerStep(id, delta) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const min = parseInt(el.min, 10) || 0;
+  const max = parseInt(el.max, 10) || 99;
+  el.value = String(Math.min(max, Math.max(min, (parseInt(el.value, 10) || 0) + delta)));
 }
 
 function closeTimerModal() {

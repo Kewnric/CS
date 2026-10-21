@@ -4846,37 +4846,115 @@ body.is-resizing .practice-panel { transition: none; }
   margin-bottom: 1.25rem;
   text-align: left;
 }
-/* A label above the time fields. Three bare inputs reading 0 said nothing
-   about whether zero meant 'no limit' or 'not filled in yet'. */
-.setup-group-label {
+
+/* ── Session Setup dialog (#timer-modal) ────────────────────────
+   Header beside its icon instead of a 48px glyph over a centred title, one
+   HH:MM:SS field with quick presets instead of three loose boxes, the two
+   options as rows with an icon and a real control (a switch, a stepper), and
+   Start as the wide button. The ids and the .modal-title / .modal-desc /
+   .setup-constraints hooks are what notes.js, study.js and route-language.js
+   reach for when they reuse this dialog, so they are all still here. */
+.ss-modal { text-align: left; max-width: 440px; padding: 1.5rem; }
+.ss-head { display: flex; align-items: center; gap: 0.85rem; margin-bottom: 1.35rem; }
+.ss-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 30%, transparent);
+}
+.ss-icon svg { width: 22px; height: 22px; }
+.ss-head-text { min-width: 0; }
+.ss-modal .modal-title { margin: 0; font-size: 1.15rem; text-align: left; }
+.ss-modal .modal-desc { margin: 0.15rem 0 0; font-size: 0.8rem; text-align: left; color: var(--text-tertiary); }
+
+.ss-field { margin-bottom: 1.1rem; }
+.ss-label {
   display: flex;
   align-items: baseline;
   gap: 0.4rem;
-  text-align: left;
-  margin-bottom: 0.35rem;
-}
-.setup-group-label span {
+  margin-bottom: 0.45rem;
   font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--text-secondary);
 }
-.setup-group-label em {
-  font-style: normal;
-  font-size: 0.68rem;
-  color: var(--text-tertiary);
+.ss-label em { font-style: normal; font-weight: 500; letter-spacing: 0; text-transform: none; color: var(--text-tertiary); }
+.ss-select { font-weight: 600; }
+
+/* One field, three cells. */
+.ss-time {
+  display: flex;
+  align-items: center;
+  padding: 0.3rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+.ss-time:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 22%, transparent);
+}
+.ss-time-unit {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.25rem;
+  border-radius: calc(var(--radius-md) - 3px);
+  cursor: text;
+}
+.ss-time-unit:focus-within { background: color-mix(in srgb, var(--color-primary) 10%, transparent); }
+.ss-time-unit input {
+  width: 3ch;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: 700 1.35rem/1.2 var(--font-mono, monospace);
+  text-align: right;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.ss-time-unit input::-webkit-outer-spin-button,
+.ss-time-unit input::-webkit-inner-spin-button,
+.setup-num::-webkit-outer-spin-button,
+.setup-num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.ss-time-unit span { font-size: 0.7rem; font-weight: 600; color: var(--text-tertiary); }
+.ss-time-sep { color: var(--text-tertiary); font-weight: 700; font-size: 1.1rem; padding-bottom: 2px; }
+
+.ss-presets { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.55rem; }
+.ss-preset {
+  padding: 0.28rem 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.ss-preset:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+.ss-preset.is-on {
+  border-color: color-mix(in srgb, var(--color-primary) 60%, transparent);
+  background: color-mix(in srgb, var(--color-primary) 16%, transparent);
+  color: var(--text-primary);
 }
 
-/* BOTH ROWS THE SAME SHAPE: what it is on the left, the control on the right.
-   Recall used to be [checkbox][text] and Run budget [text][number], so two
-   settings of the same kind read as two unrelated widgets. Centred rather than
-   top-aligned, so a control sits against the middle of its description. */
+/* BOTH ROWS THE SAME SHAPE: icon, what it is, then the control. */
 .setup-row {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  padding: 0.6rem 0.7rem;
+  padding: 0.7rem 0.8rem;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--bg-surface);
@@ -4884,43 +4962,20 @@ body.is-resizing .practice-panel { transition: none; }
   transition: background .15s ease, border-color .15s ease;
 }
 .setup-row:hover { background: var(--bg-surface-hover); border-color: var(--border-color-hover, var(--border-color)); }
-
-/* The one thing on this dialog that was not themed: an unstyled checkbox is a
-   white OS square, which on a dark modal is the brightest object on screen and
-   the only control that does not belong to the app. */
-.setup-check {
-  appearance: none;
-  -webkit-appearance: none;
+.setup-row-icon {
   flex-shrink: 0;
-  width: 19px;
-  height: 19px;
-  margin: 0;
-  border: 1.5px solid var(--border-color);
-  border-radius: 5px;
-  background: var(--bg-tertiary, rgba(127,127,127,.14));
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
   display: grid;
-  place-content: center;
-  cursor: pointer;
-  transition: background .15s ease, border-color .15s ease;
+  place-items: center;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary, rgba(127,127,127,.14));
+  transition: color .15s ease, background .15s ease;
 }
-.setup-check::after {
-  content: '';
-  width: 11px;
-  height: 11px;
-  background: #fff;
-  transform: scale(0);
-  transition: transform .16s cubic-bezier(.2, .9, .3, 1.4);
-  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
-}
-.setup-check:checked {
-  background: var(--color-primary);
-  border-color: var(--color-primary);
-}
-.setup-check:checked::after { transform: scale(1); }
-.setup-check:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-.setup-row:has(.setup-check:checked) { border-color: color-mix(in srgb, var(--color-primary) 55%, transparent); }
+.setup-row-icon svg { width: 16px; height: 16px; }
 .setup-row-main { flex: 1; min-width: 0; }
-.setup-row strong { display: block; font-size: 0.82rem; color: var(--text-primary); }
+.setup-row strong { display: block; font-size: 0.84rem; color: var(--text-primary); }
 .setup-row em {
   display: block;
   font-style: normal;
@@ -4929,7 +4984,81 @@ body.is-resizing .practice-panel { transition: none; }
   color: var(--text-tertiary);
   margin-top: 2px;
 }
-.setup-num { width: 66px; flex-shrink: 0; text-align: center; }
+
+/* Recall is an on/off setting, so it is a switch. */
+.setup-check {
+  appearance: none;
+  -webkit-appearance: none;
+  flex-shrink: 0;
+  position: relative;
+  width: 38px;
+  height: 22px;
+  margin: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--bg-tertiary, rgba(127,127,127,.2));
+  cursor: pointer;
+  transition: background .18s ease, border-color .18s ease;
+}
+.setup-check::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,.35);
+  transition: transform .18s cubic-bezier(.4, 0, .2, 1);
+}
+.setup-check:checked { background: var(--color-primary); border-color: var(--color-primary); }
+.setup-check:checked::after { transform: translateX(16px); }
+.setup-check:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.setup-row:has(.setup-check:checked) { border-color: color-mix(in srgb, var(--color-primary) 55%, transparent); }
+.setup-row:has(.setup-check:checked) .setup-row-icon {
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 14%, transparent);
+}
+
+/* Run budget: − [n] + */
+.ss-stepper {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated, var(--bg-surface));
+  overflow: hidden;
+}
+.ss-stepper button {
+  width: 28px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.ss-stepper button:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+.setup-num {
+  width: 34px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: 700 0.9rem var(--font-mono, monospace);
+  text-align: center;
+  outline: none;
+  -moz-appearance: textfield;
+}
+
+.ss-modal .modal-actions { display: flex; gap: 0.6rem; margin-top: 0.25rem; }
+.ss-modal .modal-actions .btn { justify-content: center; }
+.ss-modal .modal-actions .btn-secondary { flex: 1; }
+.ss-modal .modal-actions .btn-primary { flex: 2; }
 
 /* The badge, beside the boss plate. */
 .exam-chip {

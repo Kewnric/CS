@@ -1433,6 +1433,7 @@ function langPromptTimer(kind, id) {
   if (t) t.textContent = 'Start drill';
   if (d) d.textContent = 'Set an optional time limit (0 for untimed).';
   ['timer-h', 'timer-m', 'timer-s'].forEach(x => { const el = document.getElementById(x); if (el) el.value = '0'; });
+  if (typeof timerPresetSync === 'function') timerPresetSync();
   const btn = modal.querySelector('.modal-actions .btn-primary');
   if (btn) btn.setAttribute('onclick', 'langConfirmStart()');
   modal.classList.remove('hidden');
