@@ -1949,14 +1949,23 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
   perspective: 1000px;
   transition: none;
 }
-.lib-card.is-spatial:hover { transform: none; box-shadow: none; }
+/* The hovered card sits above its neighbours, so its shadow falls over them
+   instead of being painted underneath the next card along. */
+.lib-card.is-spatial:hover { transform: none; box-shadow: none; z-index: 2; }
+/* A column, so the progress bar can sit on the bottom edge and a row of cards
+   lines up even when one card's chips wrap onto a second line. (Every margin
+   here is explicit and none of them collapse, so at rest nothing moves.)
+   The tilt itself is eased frame by frame in libSpatialBind; this transition
+   is only for the press on a touch screen. */
 .lib-card-inner {
   position: relative;
+  display: flex;
+  flex-direction: column;
   height: 100%;
   padding: 1.25rem;
   border-radius: var(--radius-lg);
   transform-style: preserve-3d;
-  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: transform 0.25s ease;
 }
 .lib-card-bg {
   position: absolute;
@@ -1974,21 +1983,53 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
   transform: translateZ(-1px);
   transition: border-color 0.25s ease, box-shadow 0.35s ease;
 }
-/* The light that follows the pointer. */
+/* The light that follows the pointer. It used to be one wide disc of white
+   at 11%, which on a dark card reads as a grey smudge rather than light.
+   Now: a small bright core, a wide wash in the card's own colour, and a
+   faint diagonal sheen that slides the other way as the card turns -- the
+   way a reflection moves across a tilted glossy surface. */
 .lib-card-light {
   position: absolute;
   inset: 0;
-  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 0%), rgba(255, 255, 255, 0.11), transparent 45%);
+  background:
+    radial-gradient(150px circle at var(--mx, 50%) var(--my, 0%), rgba(255, 255, 255, 0.08), transparent 70%),
+    radial-gradient(380px circle at var(--mx, 50%) var(--my, 0%), color-mix(in srgb, var(--lib-accent, var(--color-primary)) 18%, transparent), transparent 60%),
+    linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.05) 48%, transparent 58%);
+  background-size: auto, auto, 260% 100%;
+  background-position: 0 0, 0 0, calc(50% - var(--tx, 0) * 22%) 0;
+  background-repeat: no-repeat;
   opacity: 0;
   transition: opacity 0.3s ease;
   pointer-events: none;
 }
-.lib-card.is-spatial:hover .lib-card-bg {
-  border-color: var(--lib-accent, var(--color-primary));
-  box-shadow: 0 28px 56px -22px rgba(0, 0, 0, 0.65), 0 0 0 1px color-mix(in srgb, var(--lib-accent, var(--color-primary)) 30%, transparent);
+/* The rim catches the light nearest the pointer: a one-pixel ring just inside
+   the border, lit only around the pointer. The border itself stays a quieter
+   tint, so the outline of the turned card does not shout its trapezoid. */
+.lib-card-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: calc(var(--radius-lg) - 1px);
+  background: radial-gradient(200px circle at var(--mx, 50%) var(--my, 0%), color-mix(in srgb, var(--lib-accent, var(--color-primary)) 85%, #fff), transparent 70%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
 }
-.lib-card.is-spatial:hover .lib-card-light { opacity: 1; }
-.lib-card.is-spatial:hover .lib-card-glow { opacity: 0.28; }
+/* The shadow falls away from the pointer -- the side that dips back throws
+   it -- and a little of the card's colour glows underneath. */
+.lib-card.is-spatial:hover .lib-card-bg {
+  border-color: color-mix(in srgb, var(--lib-accent, var(--color-primary)) 55%, var(--border-color));
+  box-shadow:
+    calc(var(--tx, 0) * -16px) calc(26px - var(--ty, 0) * 10px) 48px -20px rgba(0, 0, 0, 0.6),
+    0 16px 40px -22px color-mix(in srgb, var(--lib-accent, var(--color-primary)) 60%, transparent);
+}
+.lib-card.is-spatial:hover .lib-card-light,
+.lib-card.is-spatial:hover .lib-card-bg::after { opacity: 1; }
+.lib-card.is-spatial:hover .lib-card-glow { opacity: 0.18; }
 
 /* DEPTH ONLY WHILE HOVERED. Anything lifted towards the viewer is drawn a
    little larger and pushed out from the centre, so with the layers lifted
@@ -2017,14 +2058,16 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
 .lib-card.is-spatial:hover .lib-card-progress,
 .lib-card.is-spatial:hover .lib-card-icon { transition-duration: 0.2s; }
 /* What matters most rises nearest -- the full depth of the first version,
-   so a tilted card really comes apart in layers, out towards its edges. */
-.lib-card.is-spatial:hover .lib-card-head { transform: translateZ(28px); }
+   so a tilted card really comes apart in layers, out towards its edges.
+   The icon is the one exception: it sits in the corner, and at 50px it
+   leaned straight through the border whenever that corner dipped away. */
+.lib-card.is-spatial:hover .lib-card-head { transform: translateZ(26px); }
 .lib-card.is-spatial:hover .lib-card-name { transform: translateZ(44px); }
 .lib-card.is-spatial:hover .lib-card-desc { transform: translateZ(22px); }
 .lib-card.is-spatial:hover .lib-card-chips { transform: translateZ(36px); }
 .lib-card.is-spatial:hover .lib-card-progress { transform: translateZ(18px); }
 .lib-card.is-spatial:hover .lib-card-icon {
-  transform: translateZ(22px);
+  transform: translateZ(14px);
   box-shadow: 0 10px 22px -8px color-mix(in srgb, var(--lib-accent, var(--color-primary)) 70%, transparent);
 }
 .lib-card.is-spatial:hover .lib-card-name { text-shadow: 0 10px 22px rgba(0, 0, 0, 0.45); }
@@ -2032,10 +2075,17 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
 .lib-card.is-spatial:active .lib-card-inner { transform: scale(0.985); }
 .lib-card.is-spatial:focus-visible { outline: 2px solid var(--lib-accent, var(--color-primary)); outline-offset: 3px; }
 .lib-card-soon.is-spatial:hover { opacity: 1; }
+/* The progress row sits on the bottom edge, its bar takes the room it has
+   instead of a fixed 80px that left the percentage stranded, and both wear
+   the card's own colour. */
+.lib-card.is-spatial .lib-card-progress { margin-top: auto; }
+.lib-card-progress .folder-progress-bar { flex: 1; width: auto; }
+.lib-card-progress .folder-progress-fill { background: linear-gradient(90deg, var(--lib-accent, var(--color-primary)), color-mix(in srgb, var(--lib-accent, var(--color-primary)) 55%, #fff)); }
+.lib-card-progress .folder-progress-label { min-width: 0; color: var(--lib-accent, var(--color-primary)); }
 /* The placeholder keeps its dashed edge -- on the layer that draws the edge now. */
 .lib-card-placeholder.is-spatial .lib-card-bg { border-style: dashed; }
 @media (prefers-reduced-motion: reduce) {
-  .lib-card-inner, .lib-card-bg, .lib-card-light { transition: none; }
+  .lib-card-inner, .lib-card-bg, .lib-card-bg::after, .lib-card-light { transition: none; }
   .lib-card.is-spatial:hover .lib-card-head, .lib-card.is-spatial:hover .lib-card-name, .lib-card.is-spatial:hover .lib-card-desc,
   .lib-card.is-spatial:hover .lib-card-chips, .lib-card.is-spatial:hover .lib-card-progress, .lib-card.is-spatial:hover .lib-card-icon { transform: none; }
 }

@@ -233,8 +233,15 @@ function libraryInit() {
    furthest back -- so a card reads as a little object with layers rather
    than a flat tile. A soft light follows the pointer across it. Mouse only:
    on a touch screen there is no hover to tilt toward, and the card simply
-   presses in. With reduced motion it does not move at all. */
-const LIB_TILT = 12;   // degrees at the card's edge
+   presses in. With reduced motion it does not move at all.
+   The card eases toward the pointer every frame instead of being handed a
+   fresh CSS transition on every mouse move, so it turns with a little weight
+   rather than snapping to the pointer the moment it arrives; a mouse press
+   sinks it back toward the page. 10 degrees, not 12: at 12 the deepest
+   layers leaned through the border on the side that dipped away. */
+const LIB_TILT = 10;   // degrees at the card's edge
+const LIB_LIFT = 12;   // px the card comes forward while hovered
+const LIB_PRESS = -4;  // and where it sits while the mouse is pressed
 
 function libSpatialBind(root) {
   if (!root) return;
@@ -244,35 +251,74 @@ function libSpatialBind(root) {
     card._libSpatial = true;
     const inner = card.querySelector('.lib-card-inner');
     if (!inner || still) return;
-    let raf = 0, px = 0, py = 0;
-    const apply = () => {
+    // Where the card is headed (to) and where it is now (at): x and y run
+    // -1..1 across the card, z is the lift in px. Each frame closes a share
+    // of the gap scaled by the time that passed, so it moves the same at
+    // 60 Hz and 144 Hz -- quicker on the way in, unhurried settling back.
+    const to = { x: 0, y: 0, z: 0 }, at = { x: 0, y: 0, z: 0 };
+    let raf = 0, last = 0, over = false;
+    const frame = now => {
       raf = 0;
+      const dt = Math.min(64, last ? now - last : 16.7);
+      last = now;
+      const k = 1 - Math.pow(over ? 0.78 : 0.88, dt / 16.7);
+      let moving = false;
+      ['x', 'y', 'z'].forEach(a => {
+        const d = to[a] - at[a];
+        if (Math.abs(d) > (a === 'z' ? 0.05 : 0.002)) { at[a] += d * k; moving = true; }
+        else at[a] = to[a];
+      });
+      if (!over && !moving) {
+        // Back flat: hand the card back to the stylesheet.
+        inner.style.transform = '';
+        inner.style.transition = '';
+        last = 0;
+        return;
+      }
+      inner.style.transform = 'rotateX(' + (-at.y * LIB_TILT).toFixed(2) + 'deg) rotateY(' +
+        (at.x * LIB_TILT).toFixed(2) + 'deg) translateZ(' + at.z.toFixed(1) + 'px)';
+      card.style.setProperty('--mx', ((at.x + 1) * 50).toFixed(1) + '%');
+      card.style.setProperty('--my', ((at.y + 1) * 50).toFixed(1) + '%');
+      card.style.setProperty('--tx', at.x.toFixed(3));
+      card.style.setProperty('--ty', at.y.toFixed(3));
+      if (moving) raf = requestAnimationFrame(frame);
+      else last = 0;
+    };
+    const kick = () => { if (!raf) raf = requestAnimationFrame(frame); };
+    const aim = e => {
       const r = card.getBoundingClientRect();
       if (!r.width || !r.height) return;
-      const x = Math.max(0, Math.min(r.width, px - r.left));
-      const y = Math.max(0, Math.min(r.height, py - r.top));
-      const rx = ((y - r.height / 2) / (r.height / 2)) * -LIB_TILT;
-      const ry = ((x - r.width / 2) / (r.width / 2)) * LIB_TILT;
-      inner.style.transform = 'rotateX(' + rx.toFixed(2) + 'deg) rotateY(' + ry.toFixed(2) + 'deg) translateZ(10px)';
-      card.style.setProperty('--mx', (x / r.width * 100).toFixed(1) + '%');
-      card.style.setProperty('--my', (y / r.height * 100).toFixed(1) + '%');
+      to.x = Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width) * 2 - 1));
+      to.y = Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height) * 2 - 1));
+    };
+    const enter = () => {
+      if (over) return;
+      over = true;
+      to.z = LIB_LIFT;
+      inner.style.transition = 'none';   // the frames do the easing
+      card.classList.add('is-tilting');
     };
     card.addEventListener('pointerenter', e => {
       if (e.pointerType !== 'mouse') return;
-      inner.style.transition = 'transform 0.12s ease-out';
-      card.classList.add('is-tilting');
+      enter(); aim(e); kick();
     });
     card.addEventListener('pointermove', e => {
       if (e.pointerType !== 'mouse') return;
-      px = e.clientX; py = e.clientY;
-      if (!raf) raf = requestAnimationFrame(apply);
+      enter(); aim(e); kick();
+    });
+    card.addEventListener('pointerdown', e => {
+      if (e.pointerType !== 'mouse' || !over) return;
+      to.z = LIB_PRESS; kick();
+    });
+    card.addEventListener('pointerup', e => {
+      if (e.pointerType !== 'mouse' || !over) return;
+      to.z = LIB_LIFT; kick();
     });
     card.addEventListener('pointerleave', () => {
-      if (raf) { cancelAnimationFrame(raf); raf = 0; }
-      // Settle back slowly, with a little give, the way the reference does.
-      inner.style.transition = 'transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
-      inner.style.transform = '';
+      over = false;
+      to.x = to.y = to.z = 0;
       card.classList.remove('is-tilting');
+      kick();
     });
   });
 }
