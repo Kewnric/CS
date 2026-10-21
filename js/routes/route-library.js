@@ -326,7 +326,7 @@ function libSpatialBind(root) {
 /* ── Due today, across every library ──────────────────────────
    getDueReviewItems() has always returned this, cross-library and sorted by how
    overdue each item is. The hub was the obvious place to show it and didn't.
-   One compact row: how many and how late (a count, a lateness meter and a
+   One compact row: how many and how late (a ring split by lateness, and a
    count per library), the three most overdue as tiles, and Review. The rest
    waits in a drawer -- twelve pills that each spelled out "44 days overdue"
    made a wall of red text the size of a whole section. */
@@ -368,17 +368,63 @@ function _libDueKind(type) {
 // for the visit, so coming back to the hub finds it the way you left it.
 let _libDueView = { open: false, kind: '' };
 let _libDueAll = [];
+const LIB_DUE_RING = 2 * Math.PI * 25;   // circumference of the ring (r = 25)
 
-function _libDueTileHTML(d, cls) {
+/* One due item. The bar under its title shows how late it is next to the
+   latest one, so the eye reads urgency before reading a number; --i
+   staggers the tiles' entrance. */
+function _libDueTileHTML(d, cls, i, maxDays) {
   const k = _libDueKind(d.type);
   const short = d.daysOverdue <= 0 ? 'Today' : d.daysOverdue + 'd';
+  const heat = Math.max(0.06, Math.min(1, Math.max(0, d.daysOverdue) / Math.max(1, maxDays || 1)));
   return `
-    <button class="lib-due-tile${cls ? ' ' + cls : ''}" style="--k:${k.color};" onclick="reviewNavigateTo('${d.type}','${d.id}')"
+    <button class="lib-due-tile t-${_libDueTier(d.daysOverdue)}${cls ? ' ' + cls : ''}"
+            style="--k:${k.color};--i:${Math.min(i || 0, 14)};--heat:${heat.toFixed(3)};"
+            onclick="reviewNavigateTo('${d.type}','${d.id}')"
             title="${escapeHTML(d.title)} · ${escapeHTML(reviewDueLabel(d.daysOverdue))}">
       <span class="lib-due-ic"><i data-lucide="${k.icon}"></i></span>
-      <span class="lib-due-name">${escapeHTML(d.title)}</span>
-      <span class="lib-due-late t-${_libDueTier(d.daysOverdue)}">${short}</span>
+      <span class="lib-due-txt">
+        <span class="lib-due-name">${escapeHTML(d.title)}</span>
+        <span class="lib-due-heat"><i></i></span>
+      </span>
+      <span class="lib-due-late">${short}</span>
     </button>`;
+}
+
+/* The ring: one arc per lateness band, worst first from twelve o'clock, with
+   a hair of space between them. A mask sweeps round to draw it in. */
+function _libDueRingHTML(bands, total) {
+  const gap = bands.length > 1 ? 2.5 : 0;
+  const room = LIB_DUE_RING - gap * bands.length;
+  let at = 0;
+  const arcs = bands.map(x => {
+    const len = room * x.n / total;
+    const arc = `<circle class="lib-due-ring-seg t-${x.band}" cx="30" cy="30" r="25"
+      stroke-dasharray="${len.toFixed(2)} ${LIB_DUE_RING.toFixed(2)}" stroke-dashoffset="${(-at).toFixed(2)}"></circle>`;
+    at += len + gap;
+    return arc;
+  }).join('');
+  return `
+    <svg viewBox="0 0 60 60" aria-hidden="true">
+      <defs><mask id="lib-due-ring-mask"><circle class="lib-due-ring-sweep" cx="30" cy="30" r="25"></circle></mask></defs>
+      <circle class="lib-due-ring-track" cx="30" cy="30" r="25"></circle>
+      <g mask="url(#lib-due-ring-mask)">${arcs}</g>
+    </svg>`;
+}
+
+/* The number counts up as the ring draws. */
+function _libDueCountUp(el, n) {
+  const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!el || still || n < 2 || typeof requestAnimationFrame !== 'function') return;
+  const t0 = performance.now(), span = 800;
+  el.textContent = '0';
+  const step = now => {
+    if (!el.isConnected) return;
+    const p = Math.max(0, Math.min(1, (now - t0) / span));
+    el.textContent = String(Math.round(n * (1 - Math.pow(1 - p, 3))));
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 
 function libHubRenderDue() {
@@ -403,39 +449,44 @@ function libHubRenderDue() {
     .map(([band, words]) => ({ band, words, n: all.filter(d => _libDueTier(d.daysOverdue) === band).length }))
     .filter(x => x.n);
   const v = _libDueView;
+  const maxDays = all[0].daysOverdue;
+  const rest = all.length - Math.min(3, all.length);
+  // The panel takes the colour of the worst lateness: its glow, its edge.
+  host.dataset.worst = _libDueTier(maxDays);
 
   host.innerHTML = `
     <div class="lib-due${v.open ? ' is-open' : ''}">
       <div class="lib-due-sum">
-        <div class="lib-due-count t-${_libDueTier(all[0].daysOverdue)}" title="${all.length} due for review">
-          <b>${all.length}</b><span>due</span>
+        <div class="lib-due-ring" role="img" aria-label="${all.length} due: ${bands.map(x => x.n + ' ' + x.words).join(', ')}"
+             title="${bands.map(x => x.n + ' ' + x.words).join('\n')}">
+          ${_libDueRingHTML(bands, all.length)}
+          <div class="lib-due-ring-num"><b>${all.length}</b><span>due</span></div>
         </div>
-        <div class="lib-due-meta">
-          <div class="lib-due-meter" role="img" aria-label="${bands.map(x => x.n + ' ' + x.words).join(', ')}">
-            ${bands.map(x => `<i class="t-${x.band}" style="flex:${x.n};" title="${x.n} ${x.words}"></i>`).join('')}
-          </div>
+        <div class="lib-due-info">
+          <div class="lib-due-title">Review queue</div>
           <div class="lib-due-kinds">
-            ${kinds.map(g => `
-              <button class="lib-due-kind${v.kind === g.type ? ' is-on' : ''}" style="--k:${g.k.color};" data-kind="${escapeHTML(g.type)}"
+            ${kinds.map((g, i) => `
+              <button class="lib-due-kind${v.kind === g.type ? ' is-on' : ''}" style="--k:${g.k.color};--i:${i};" data-kind="${escapeHTML(g.type)}"
                       onclick="libDueToggle('${escapeHTML(g.type)}')" title="${g.n} ${g.n === 1 ? g.k.one : g.k.many} due">
                 <i data-lucide="${g.k.icon}"></i>${g.n}
               </button>`).join('')}
           </div>
         </div>
       </div>
-      <div class="lib-due-next">${all.slice(0, 3).map(d => _libDueTileHTML(d)).join('')}</div>
+      <div class="lib-due-next">${all.slice(0, 3).map((d, i) => _libDueTileHTML(d, '', i, maxDays)).join('')}</div>
       <div class="lib-due-acts">
         <button class="btn btn-primary btn-sm lib-due-go" onclick="libHubStartReview()" title="Start with the most overdue">
           <i data-lucide="play"></i> Review
         </button>
         <button class="lib-due-more" onclick="libDueToggle()" aria-expanded="${v.open}" title="Every due item">
-          <span>All</span><i data-lucide="chevron-down"></i>
+          <span>${rest ? '+' + rest : 'All'}</span><i data-lucide="chevron-down"></i>
         </button>
       </div>
       <div class="lib-due-drawer"><div><div class="lib-due-grid" id="lib-due-grid"></div></div></div>
     </div>`;
   _libDuePaintDrawer();
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: host });
+  _libDueCountUp(host.querySelector('.lib-due-ring-num b'), all.length);
 }
 
 /* Fill the drawer -- only once it is open, so fifty tiles are not built for
@@ -444,7 +495,8 @@ function _libDuePaintDrawer() {
   const grid = document.getElementById('lib-due-grid');
   if (!grid || !_libDueView.open) return;
   const list = _libDueView.kind ? _libDueAll.filter(d => d.type === _libDueView.kind) : _libDueAll;
-  grid.innerHTML = list.map(d => _libDueTileHTML(d, 'is-row')).join('');
+  const maxDays = _libDueAll.length ? _libDueAll[0].daysOverdue : 1;
+  grid.innerHTML = list.map((d, i) => _libDueTileHTML(d, 'is-row', i, maxDays)).join('');
   grid.scrollTop = 0;
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: grid });
 }

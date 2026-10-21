@@ -604,14 +604,60 @@
 .lib-hub-noresult { padding: 0.75rem; font-size: 0.82rem; color: var(--text-tertiary); text-align: center; }
 
 /* ── Due today: one compact row ──
-   A count and how late (a meter, and a count per library), the three most
-   overdue as tiles, and Review. Everything else waits in the drawer. */
+   A ring that counts what is due and is split by how late, a count per
+   library, the three most overdue as tiles, and Review; the rest waits in
+   the drawer. It arrives in sequence -- the panel rises, the ring draws
+   itself round as the number counts up, the counts pop in, the tiles rise one
+   after another and their lateness bars fill -- and after that keeps only a
+   slow glow behind the ring, a glint now and then, and a pulse on Review.
+   Entrances fill backwards only, so once done they leave hover transforms
+   alone. */
 .lib-due-panel {
+  --due: var(--color-primary);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
   container-type: inline-size;
-  padding: 0.7rem 0.85rem;
-  border: 1px solid var(--border-color);
+  padding: 0.75rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--due) 22%, var(--border-color));
   border-radius: var(--radius-lg);
-  background: linear-gradient(100deg, color-mix(in srgb, var(--color-primary) 9%, var(--bg-surface)), var(--bg-surface) 60%);
+  background: linear-gradient(100deg, color-mix(in srgb, var(--due) 8%, var(--bg-surface)), var(--bg-surface) 50%, color-mix(in srgb, var(--color-primary) 5%, var(--bg-surface)));
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  animation: libDueIn 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+.lib-due-panel:hover {
+  border-color: color-mix(in srgb, var(--due) 40%, var(--border-color));
+  box-shadow: 0 12px 30px -20px color-mix(in srgb, var(--due) 70%, transparent);
+}
+.lib-due-panel[data-worst="over"] { --due: var(--color-warning); }
+.lib-due-panel[data-worst="mid"] { --due: #fb923c; }
+.lib-due-panel[data-worst="high"] { --due: var(--color-danger); }
+/* A glow in the colour of the worst lateness, breathing behind the ring. */
+.lib-due-panel::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  left: -70px;
+  top: 50%;
+  width: 260px;
+  height: 260px;
+  margin-top: -130px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--due) 24%, transparent), transparent 65%);
+  pointer-events: none;
+  animation: libDueBreathe 4s ease-in-out infinite alternate;
+}
+/* Now and then a glint crosses the whole panel. */
+.lib-due-panel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, 0.05) 50%, transparent 58%) no-repeat;
+  background-size: 250% 100%;
+  background-position: 130% 0;
+  pointer-events: none;
+  animation: libDueShine 8s ease-in-out 1.4s infinite;
 }
 .lib-due {
   display: grid;
@@ -620,30 +666,30 @@
   column-gap: 1rem;
 }
 /* Lateness, in the three bands plus today: one colour each, shared by the
-   meter, the count and the badge on every tile. */
+   ring, the bars and the badge on every tile. */
 .lib-due .t-today { --t: var(--color-primary); }
 .lib-due .t-over { --t: var(--color-warning); }
 .lib-due .t-mid { --t: #fb923c; }
 .lib-due .t-high { --t: var(--color-danger); }
 
-.lib-due-sum { display: flex; align-items: center; gap: 0.7rem; }
-.lib-due-count {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  width: 50px;
-  height: 50px;
-  border-radius: 14px;
-  border: 1px solid color-mix(in srgb, var(--t) 40%, var(--border-color));
-  background: radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--t) 26%, transparent), color-mix(in srgb, var(--t) 8%, transparent));
+.lib-due-sum { display: flex; align-items: center; gap: 0.75rem; }
+.lib-due-ring { position: relative; display: grid; place-items: center; flex: none; width: 58px; height: 58px; }
+.lib-due-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; transform: rotate(-90deg); }
+.lib-due-ring-track { fill: none; stroke: color-mix(in srgb, var(--due) 14%, transparent); stroke-width: 5; }
+.lib-due-ring-seg { fill: none; stroke: var(--t); stroke-width: 5; }
+.lib-due-ring-sweep {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 9;
+  stroke-dasharray: 157.08;
+  stroke-dashoffset: 0;
+  animation: libDueSweep 1s cubic-bezier(0.3, 0.7, 0.2, 1) 0.15s backwards;
 }
-.lib-due-count b { font-size: 1.15rem; font-weight: 800; line-height: 1; color: var(--text-primary); font-variant-numeric: tabular-nums; }
-.lib-due-count span { margin-top: 3px; font-size: 0.56rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--t); }
-.lib-due-meta { display: flex; flex-direction: column; gap: 0.45rem; min-width: 0; }
-.lib-due-meter { display: flex; gap: 2px; width: 120px; height: 5px; }
-.lib-due-meter i { min-width: 5px; border-radius: 999px; background: var(--t); }
+.lib-due-ring-num { position: relative; display: flex; flex-direction: column; align-items: center; line-height: 1; }
+.lib-due-ring-num b { font-size: 1.05rem; font-weight: 800; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.lib-due-ring-num span { margin-top: 2px; font-size: 0.5rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--due); }
+.lib-due-info { display: flex; flex-direction: column; gap: 0.4rem; min-width: 0; }
+.lib-due-title { font-size: 0.88rem; font-weight: 800; color: var(--text-primary); white-space: nowrap; }
 .lib-due-kinds { display: flex; flex-wrap: wrap; gap: 0.3rem; }
 .lib-due-kind {
   display: inline-flex;
@@ -659,22 +705,29 @@
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
-  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast), transform 0.2s ease;
+  animation: libDuePop 0.4s cubic-bezier(0.3, 1.5, 0.5, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 70ms + 350ms);
 }
 .lib-due-kind svg { width: 12px; height: 12px; color: var(--k); }
-.lib-due-kind:hover { border-color: color-mix(in srgb, var(--k) 55%, var(--border-color)); color: var(--text-primary); }
-.lib-due-kind.is-on { border-color: var(--k); color: var(--text-primary); background: color-mix(in srgb, var(--k) 14%, var(--bg-surface)); }
+.lib-due-kind:hover { border-color: color-mix(in srgb, var(--k) 55%, var(--border-color)); color: var(--text-primary); transform: translateY(-1px); }
+.lib-due-kind.is-on {
+  border-color: var(--k);
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--k) 16%, var(--bg-surface));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--k) 14%, transparent);
+}
 
 /* The three most overdue. Always three columns, so nothing wraps onto a
    second line; a long title shortens with an ellipsis instead. */
-.lib-due-next { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.45rem; }
+.lib-due-next { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; }
 .lib-due-tile {
   --k: var(--color-primary);
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.55rem;
   min-width: 0;
-  padding: 0.35rem 0.45rem 0.35rem 0.35rem;
+  padding: 0.4rem 0.5rem 0.4rem 0.4rem;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--bg-surface);
@@ -684,47 +737,85 @@
   font-weight: 600;
   text-align: left;
   cursor: pointer;
-  transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  animation: libDueIn 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 80ms + 220ms);
 }
 .lib-due-tile:hover {
-  border-color: color-mix(in srgb, var(--k) 55%, var(--border-color));
-  background: color-mix(in srgb, var(--k) 7%, var(--bg-surface));
+  border-color: color-mix(in srgb, var(--k) 60%, var(--border-color));
+  background: color-mix(in srgb, var(--k) 8%, var(--bg-surface));
   color: var(--text-primary);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px -14px color-mix(in srgb, var(--k) 85%, transparent);
 }
+.lib-due-tile:active { transform: translateY(0) scale(0.98); }
 .lib-due-tile:focus-visible { outline: 2px solid var(--k); outline-offset: 1px; }
 .lib-due-ic {
   display: grid;
   place-items: center;
   flex: none;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   border-radius: 8px;
   background: color-mix(in srgb, var(--k) 16%, transparent);
   color: var(--k);
+  transition: background 0.2s ease, color 0.2s ease, transform 0.3s cubic-bezier(0.3, 1.5, 0.5, 1);
 }
 .lib-due-ic svg { width: 14px; height: 14px; }
-.lib-due-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-due-tile:hover .lib-due-ic { background: var(--k); color: #fff; transform: scale(1.08) rotate(-6deg); }
+.lib-due-txt { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0; }
+.lib-due-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* How late, as a bar: full for the latest thing due, shorter for the rest. */
+.lib-due-heat { height: 3px; border-radius: 999px; background: color-mix(in srgb, var(--t) 16%, transparent); overflow: hidden; }
+.lib-due-heat i {
+  display: block;
+  width: calc(var(--heat, 1) * 100%);
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--t) 40%, transparent), var(--t));
+  transform-origin: left;
+  animation: libDueGrow 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 80ms + 420ms);
+}
 .lib-due-late {
   flex: none;
-  padding: 0.08rem 0.4rem;
+  padding: 0.1rem 0.42rem;
   border-radius: 999px;
   font-size: 0.66rem;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   color: var(--t);
   background: color-mix(in srgb, var(--t) 15%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--t) 25%, transparent);
 }
 
-.lib-due-acts { display: flex; align-items: center; gap: 0.4rem; }
-.lib-due-go { display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
-.lib-due-go svg { width: 14px; height: 14px; }
+.lib-due-acts { display: flex; align-items: center; gap: 0.45rem; }
+/* Review: the one thing to press, so it glows and, now and then, pulses;
+   a shine runs across it on hover and the play mark nudges forward. */
+.btn.lib-due-go {
+  gap: 0.4rem;
+  background: linear-gradient(135deg, var(--color-primary), #8b5cf6);
+  box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--color-primary) 85%, transparent);
+  animation: libDuePulse 3s ease-out 1.6s infinite;
+}
+.btn.lib-due-go::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.35) 50%, transparent 70%);
+  transform: translateX(-120%);
+  transition: transform 0.6s ease;
+  pointer-events: none;
+}
+.btn.lib-due-go:hover::before { transform: translateX(120%); }
+.btn.lib-due-go svg { width: 14px; height: 14px; transition: transform 0.25s cubic-bezier(0.3, 1.5, 0.5, 1); }
+.btn.lib-due-go:hover svg { transform: translateX(2px) scale(1.12); }
 .lib-due-more {
   display: inline-flex;
   align-items: center;
   gap: 0.2rem;
   height: 32px;
-  padding: 0 0.5rem 0 0.65rem;
+  padding: 0 0.45rem 0 0.6rem;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   background: var(--bg-surface);
@@ -732,45 +823,67 @@
   font: inherit;
   font-size: 0.75rem;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
   cursor: pointer;
-  transition: border-color var(--transition-fast), color var(--transition-fast);
+  transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
 }
-.lib-due-more:hover { border-color: var(--color-primary); color: var(--text-primary); }
-.lib-due-more svg { width: 15px; height: 15px; transition: transform 0.25s ease; }
+.lib-due-more:hover { border-color: var(--color-primary); color: var(--text-primary); background: color-mix(in srgb, var(--color-primary) 8%, var(--bg-surface)); }
+.lib-due-more svg { width: 15px; height: 15px; transition: transform 0.3s cubic-bezier(0.3, 1.4, 0.5, 1); }
 .lib-due.is-open .lib-due-more svg { transform: rotate(180deg); }
 
-/* The drawer: every due item, opened by All or by a library's count. It
-   slides open by growing its row from 0fr to 1fr; shut, it is hidden too,
-   so its tiles are not reachable with Tab. */
-.lib-due-drawer { grid-column: 1 / -1; display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.3s ease; }
+/* The drawer: every due item, opened by the + button or by a library's
+   count. It slides open by growing its row from 0fr to 1fr, and its tiles
+   ripple in; shut, it is hidden too, so its tiles are not reachable with Tab. */
+.lib-due-drawer { grid-column: 1 / -1; display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.35s cubic-bezier(0.2, 0.8, 0.2, 1); }
 .lib-due.is-open .lib-due-drawer { grid-template-rows: 1fr; }
-.lib-due-drawer > div { min-height: 0; overflow: hidden; visibility: hidden; transition: visibility 0s linear 0.3s; }
+.lib-due-drawer > div { min-height: 0; overflow: hidden; visibility: hidden; transition: visibility 0s linear 0.35s; }
 .lib-due.is-open .lib-due-drawer > div { visibility: visible; transition-delay: 0s; }
 .lib-due-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-  gap: 0.4rem;
-  max-height: 240px;
+  gap: 0.45rem;
+  max-height: 252px;
   overflow-y: auto;
   scrollbar-width: none;
-  margin-top: 0.7rem;
-  padding-top: 0.7rem;
+  margin-top: 0.75rem;
+  padding: 0.75rem 0 0.15rem;
   border-top: 1px solid var(--border-color);
 }
 .lib-due-grid::-webkit-scrollbar { display: none; }
-.lib-due-tile.is-row { padding: 0.3rem 0.45rem 0.3rem 0.3rem; font-size: 0.76rem; }
-.lib-due-tile.is-row .lib-due-ic { width: 22px; height: 22px; border-radius: 7px; }
+.lib-due-tile.is-row { padding: 0.32rem 0.45rem 0.32rem 0.32rem; font-size: 0.76rem; animation-duration: 0.35s; animation-delay: calc(var(--i, 0) * 25ms); }
+.lib-due-tile.is-row .lib-due-ic { width: 24px; height: 24px; border-radius: 7px; }
 .lib-due-tile.is-row .lib-due-ic svg { width: 12px; height: 12px; }
+.lib-due-tile.is-row .lib-due-heat i { animation-delay: calc(var(--i, 0) * 25ms + 150ms); }
 
-/* Narrow: the tiles take a line of their own under the count and Review. */
+@keyframes libDueIn { from { opacity: 0; transform: translateY(8px); } }
+@keyframes libDuePop { from { opacity: 0; transform: scale(0.6); } }
+@keyframes libDueSweep { from { stroke-dashoffset: 157.08; } }
+@keyframes libDueGrow { from { transform: scaleX(0); } }
+@keyframes libDueBreathe {
+  from { opacity: 0.55; transform: scale(0.88); }
+  to { opacity: 1; transform: scale(1.08); }
+}
+@keyframes libDueShine {
+  0% { background-position: 130% 0; }
+  28%, 100% { background-position: -30% 0; }
+}
+@keyframes libDuePulse {
+  0% { box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--color-primary) 85%, transparent), 0 0 0 0 color-mix(in srgb, var(--color-primary) 45%, transparent); }
+  60%, 100% { box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--color-primary) 85%, transparent), 0 0 0 9px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lib-due-panel, .lib-due-panel::before, .lib-due-panel::after, .lib-due *, .btn.lib-due-go { animation: none !important; }
+}
+
+/* Narrow: the tiles take a line of their own under the ring and Review. */
 @container (max-width: 680px) {
-  .lib-due-next { grid-column: 1 / -1; grid-row: 2; margin-top: 0.6rem; }
+  .lib-due-next { grid-column: 1 / -1; grid-row: 2; margin-top: 0.65rem; }
   .lib-due-acts { grid-column: 3; grid-row: 1; }
 }
 @container (max-width: 420px) {
   .lib-due-next { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .lib-due-next .lib-due-tile:nth-child(3) { display: none; }
-  .lib-due-more span { display: none; }
+  .lib-due-title { display: none; }
 }
 .lib-stat-chip.due { border-color: rgba(99, 102, 241, 0.5); color: #a5b4fc; }
 
