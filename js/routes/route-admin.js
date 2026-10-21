@@ -496,19 +496,10 @@ function adminInit() {
 
   const active = document.getElementById('admin-hub-active');
   if (active) {
-    const card = (route, cls, icon, name, desc, chips, accent) => `
-      <div class="lib-card ${cls}" onclick="spaNavigate('${route}')" role="link" tabindex="0"
-           ${accent ? `style="--lib-accent:${accent};"` : ''}
-           onkeydown="if(event.key==='Enter')spaNavigate('${route}')">
-        <div class="lib-card-glow"></div>
-        <div class="lib-card-head">
-          <div class="lib-card-icon"><i data-lucide="${icon}"></i></div>
-          <i data-lucide="arrow-up-right" class="lib-card-arrow"></i>
-        </div>
-        <h3 class="lib-card-name">${name}</h3>
-        <p class="lib-card-desc">${desc}</p>
-        <div class="lib-card-chips">${chips}</div>
-      </div>`;
+    // The same spatial card as the Library hub: it tilts toward the pointer
+    // and its layers lift apart.
+    const card = (route, cls, icon, name, desc, chips, accent) =>
+      libSpatialCardHTML({ route, cls, icon, name, desc, chips, accent });
 
     active.innerHTML =
       card('admin-coding', 'lib-card-coding', 'code-2', 'Coding Library Admin',
@@ -555,22 +546,17 @@ function adminInit() {
      would say something untrue about the state of the app. */
   const soon = document.getElementById('admin-hub-soon');
   if (soon) {
-    soon.innerHTML = `
-      <div class="lib-card lib-card-placeholder" role="note" tabindex="0"
-           onclick="libPlaceholderNote()" onkeydown="if(event.key==='Enter')libPlaceholderNote()">
-        <div class="lib-card-glow"></div>
-        <div class="lib-card-head">
-          <div class="lib-card-icon"><i data-lucide="package-plus"></i></div>
-          <i data-lucide="sparkles" class="lib-card-arrow"></i>
-        </div>
-        <h3 class="lib-card-name">Placeholder Library</h3>
-        <p class="lib-card-desc">Room for the next wing. Its admin will appear here.</p>
-        <div class="lib-card-chips">${_libStatChip('clock', 'Not built yet')}</div>
-      </div>`;
+    soon.innerHTML = libSpatialCardHTML({
+      cls: 'lib-card-placeholder', role: 'note', onclick: 'libPlaceholderNote()',
+      icon: 'package-plus', arrow: 'sparkles', name: 'Placeholder Library',
+      desc: 'Room for the next wing. Its admin will appear here.',
+      chips: _libStatChip('clock', 'Not built yet'),
+    });
   }
 
   const adminRoot = document.querySelector('.lib-hub');
   if (typeof lucide !== 'undefined') lucide.createIcons(adminRoot ? { root: adminRoot } : undefined);
+  if (typeof libSpatialBind === 'function') libSpatialBind(adminRoot);
 }
 
 function adminDestroy() {}

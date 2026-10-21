@@ -632,6 +632,7 @@
 .lib-due-panel[data-worst="over"] { --due: var(--color-warning); }
 .lib-due-panel[data-worst="mid"] { --due: #fb923c; }
 .lib-due-panel[data-worst="high"] { --due: var(--color-danger); }
+.lib-due-panel[data-worst="good"] { --due: var(--color-success); }
 /* A glow in the colour of the worst lateness, breathing behind the ring. */
 .lib-due-panel::before {
   content: '';
@@ -671,6 +672,7 @@
 .lib-due .t-over { --t: var(--color-warning); }
 .lib-due .t-mid { --t: #fb923c; }
 .lib-due .t-high { --t: var(--color-danger); }
+.lib-due .t-good { --t: var(--color-success); }
 
 .lib-due-sum { display: flex; align-items: center; gap: 0.75rem; }
 .lib-due-ring { position: relative; display: grid; place-items: center; flex: none; width: 58px; height: 58px; }
@@ -874,6 +876,46 @@
 @media (prefers-reduced-motion: reduce) {
   .lib-due-panel, .lib-due-panel::before, .lib-due-panel::after, .lib-due *, .btn.lib-due-go { animation: none !important; }
 }
+
+/* Analytics' This week row uses every piece above, with two of its own: the
+   week's average score beside the heading, and the last seven days as little
+   stacked columns (one colour per library) where Review would be. */
+.an-week-avg {
+  margin-left: 0.3rem;
+  padding: 0.08rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  vertical-align: 1px;
+  color: var(--t);
+  background: color-mix(in srgb, var(--t) 15%, transparent);
+}
+.lib-due-acts.an-week { align-items: flex-end; gap: 5px; padding-right: 0.15rem; }
+.an-week-day { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.an-week-col {
+  display: flex;
+  align-items: flex-end;
+  width: 10px;
+  height: 38px;
+  border-radius: 5px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--text-tertiary) 14%, transparent);
+}
+.an-week-col b {
+  display: flex;
+  flex-direction: column-reverse;
+  width: 100%;
+  border-radius: inherit;
+  overflow: hidden;
+  transform-origin: bottom;
+  animation: anWeekGrow 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 60ms + 300ms);
+}
+.an-week-col i { display: block; min-height: 2px; background: var(--k); }
+.an-week-day span { font-size: 0.56rem; font-weight: 800; color: var(--text-tertiary); }
+.an-week-day.is-today span { color: var(--due); }
+.an-week-day.is-today .an-week-col { box-shadow: 0 0 0 1px color-mix(in srgb, var(--due) 50%, transparent); }
+@keyframes anWeekGrow { from { transform: scaleY(0); } }
 
 /* Narrow: the tiles take a line of their own under the ring and Review. */
 @container (max-width: 680px) {

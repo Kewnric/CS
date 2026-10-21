@@ -114,26 +114,8 @@ function libraryInit() {
 
   const active = document.getElementById('lib-hub-active');
   if (active) {
-    const card = (route, cls, icon, name, desc, chips, pct, pctLabel, accent) => `
-      <div class="lib-card is-spatial ${cls}" onclick="spaNavigate('${route}')" role="link" tabindex="0"
-           ${accent ? `style="--lib-accent:${accent};"` : ''}
-           onkeydown="if(event.key==='Enter')spaNavigate('${route}')">
-        <div class="lib-card-inner">
-          <div class="lib-card-bg"><div class="lib-card-glow"></div><div class="lib-card-light"></div></div>
-          <div class="lib-card-head">
-            <div class="lib-card-icon"><i data-lucide="${icon}"></i></div>
-            <i data-lucide="arrow-up-right" class="lib-card-arrow"></i>
-          </div>
-          <h3 class="lib-card-name">${name}</h3>
-          <p class="lib-card-desc">${desc}</p>
-          <div class="lib-card-chips">${chips}</div>
-          ${pct === null || pct === undefined ? '' : `
-          <div class="lib-card-progress" title="${pctLabel}">
-            <div class="folder-progress-bar"><div class="folder-progress-fill" style="width:${pct}%;"></div></div>
-            <span class="folder-progress-label">${pct}%</span>
-          </div>`}
-        </div>
-      </div>`;
+    const card = (route, cls, icon, name, desc, chips, pct, pctLabel, accent) =>
+      libSpatialCardHTML({ route, cls, icon, name, desc, chips, pct, pctLabel, accent });
 
     // Read straight from the cheat-sheet store; it is not part of `state`.
     let cheatCount = 0, cheatPages = 0;
@@ -206,20 +188,12 @@ function libraryInit() {
      the app. */
   const soon = document.getElementById('lib-hub-soon');
   if (soon) {
-    soon.innerHTML = `
-      <div class="lib-card is-spatial lib-card-placeholder" role="note" tabindex="0"
-           onclick="libPlaceholderNote()" onkeydown="if(event.key==='Enter')libPlaceholderNote()">
-        <div class="lib-card-inner">
-          <div class="lib-card-bg"><div class="lib-card-glow"></div><div class="lib-card-light"></div></div>
-          <div class="lib-card-head">
-            <div class="lib-card-icon"><i data-lucide="package-plus"></i></div>
-            <i data-lucide="sparkles" class="lib-card-arrow"></i>
-          </div>
-          <h3 class="lib-card-name">Placeholder Library</h3>
-          <p class="lib-card-desc">Room for the next wing. Nothing lives here yet.</p>
-          <div class="lib-card-chips">${_libStatChip('clock', 'Not built yet')}</div>
-        </div>
-      </div>`;
+    soon.innerHTML = libSpatialCardHTML({
+      cls: 'lib-card-placeholder', role: 'note', onclick: 'libPlaceholderNote()',
+      icon: 'package-plus', arrow: 'sparkles', name: 'Placeholder Library',
+      desc: 'Room for the next wing. Nothing lives here yet.',
+      chips: _libStatChip('clock', 'Not built yet'),
+    });
   }
 
   const libRoot = document.querySelector('.lib-hub');
@@ -242,6 +216,33 @@ function libraryInit() {
 const LIB_TILT = 10;   // degrees at the card's edge
 const LIB_LIFT = 12;   // px the card comes forward while hovered
 const LIB_PRESS = -4;  // and where it sits while the mouse is pressed
+
+/* One spatial card. The Library, Admin and Analytics hubs all build theirs
+   here, so the three share one shape -- wrapper > inner > background, then
+   the layers -- and one libSpatialBind brings any of them to life. */
+function libSpatialCardHTML(o) {
+  const click = o.onclick || `spaNavigate('${o.route}')`;
+  return `
+    <div class="lib-card is-spatial ${o.cls || ''}" onclick="${click}" role="${o.role || 'link'}" tabindex="0"
+         ${o.accent ? `style="--lib-accent:${o.accent};"` : ''}
+         onkeydown="if(event.key==='Enter')${click}">
+      <div class="lib-card-inner">
+        <div class="lib-card-bg"><div class="lib-card-glow"></div><div class="lib-card-light"></div></div>
+        <div class="lib-card-head">
+          <div class="lib-card-icon"><i data-lucide="${o.icon}"></i></div>
+          <i data-lucide="${o.arrow || 'arrow-up-right'}" class="lib-card-arrow"></i>
+        </div>
+        <h3 class="lib-card-name">${o.name}</h3>
+        <p class="lib-card-desc">${o.desc}</p>
+        <div class="lib-card-chips">${o.chips || ''}</div>
+        ${o.pct === null || o.pct === undefined ? '' : `
+        <div class="lib-card-progress" title="${o.pctLabel || ''}">
+          <div class="folder-progress-bar"><div class="folder-progress-fill" style="width:${o.pct}%;"></div></div>
+          <span class="folder-progress-label">${o.pct}%</span>
+        </div>`}
+      </div>
+    </div>`;
+}
 
 function libSpatialBind(root) {
   if (!root) return;
@@ -393,22 +394,23 @@ function _libDueTileHTML(d, cls, i, maxDays) {
 
 /* The ring: one arc per lateness band, worst first from twelve o'clock, with
    a hair of space between them. A mask sweeps round to draw it in. */
-function _libDueRingHTML(bands, total) {
+function _libDueRingHTML(bands, total, maskId) {
+  const mask = maskId || 'lib-due-ring-mask';
   const gap = bands.length > 1 ? 2.5 : 0;
   const room = LIB_DUE_RING - gap * bands.length;
   let at = 0;
   const arcs = bands.map(x => {
     const len = room * x.n / total;
-    const arc = `<circle class="lib-due-ring-seg t-${x.band}" cx="30" cy="30" r="25"
+    const arc = `<circle class="lib-due-ring-seg t-${x.band}"${x.color ? ` style="--t:${x.color};"` : ''} cx="30" cy="30" r="25"
       stroke-dasharray="${len.toFixed(2)} ${LIB_DUE_RING.toFixed(2)}" stroke-dashoffset="${(-at).toFixed(2)}"></circle>`;
     at += len + gap;
     return arc;
   }).join('');
   return `
     <svg viewBox="0 0 60 60" aria-hidden="true">
-      <defs><mask id="lib-due-ring-mask"><circle class="lib-due-ring-sweep" cx="30" cy="30" r="25"></circle></mask></defs>
+      <defs><mask id="${mask}"><circle class="lib-due-ring-sweep" cx="30" cy="30" r="25"></circle></mask></defs>
       <circle class="lib-due-ring-track" cx="30" cy="30" r="25"></circle>
-      <g mask="url(#lib-due-ring-mask)">${arcs}</g>
+      <g mask="url(#${mask})">${arcs}</g>
     </svg>`;
 }
 

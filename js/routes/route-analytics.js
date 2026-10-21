@@ -11,6 +11,11 @@ function analyticsTemplate() {
           <div class="lib-hub-totals" id="analytics-hub-totals"></div>
         </section>
 
+        <section id="an-hub-week-section" style="display:none;">
+          <h2 class="lib-hub-section-title"><i data-lucide="activity"></i> Activity</h2>
+          <div class="lib-due-panel" id="an-hub-week"></div>
+        </section>
+
         <section>
           <h2 class="lib-hub-section-title"><i data-lucide="bar-chart-2"></i> Performance Wings</h2>
           <div class="lib-hub-grid stagger-children" id="analytics-hub-active"></div>
@@ -65,22 +70,9 @@ function analyticsInit() {
 
   const active = document.getElementById('analytics-hub-active');
   if (active) {
-    const card = (route, cls, icon, name, desc, chips, pct, pctLabel) => `
-      <div class="lib-card ${cls}" onclick="spaNavigate('${route}')" role="link" tabindex="0"
-           onkeydown="if(event.key==='Enter')spaNavigate('${route}')">
-        <div class="lib-card-glow"></div>
-        <div class="lib-card-head">
-          <div class="lib-card-icon"><i data-lucide="${icon}"></i></div>
-          <i data-lucide="arrow-up-right" class="lib-card-arrow"></i>
-        </div>
-        <h3 class="lib-card-name">${name}</h3>
-        <p class="lib-card-desc">${desc}</p>
-        <div class="lib-card-chips">${chips}</div>
-        <div class="lib-card-progress" title="${pctLabel}">
-          <div class="folder-progress-bar"><div class="folder-progress-fill" style="width:${pct}%;"></div></div>
-          <span class="folder-progress-label">${pct}%</span>
-        </div>
-      </div>`;
+    // The same spatial card as the Library hub.
+    const card = (route, cls, icon, name, desc, chips, pct, pctLabel) =>
+      libSpatialCardHTML({ route, cls, icon, name, desc, chips, pct, pctLabel });
 
     active.innerHTML =
       card('analytics-coding', 'lib-card-coding', 'code-2', 'Coding Analytics',
@@ -97,8 +89,153 @@ function analyticsInit() {
         snipPct, `${snippetTracked}/${snippets.length} in rotation`);
   }
 
+  analyticsRenderWeek();
   const libRoot = document.querySelector('.lib-hub');
   if (typeof lucide !== 'undefined') lucide.createIcons(libRoot ? { root: libRoot } : undefined);
+  if (typeof libSpatialBind === 'function') libSpatialBind(libRoot);
+}
+
+/* ── This week ─────────────────────────────────────────────────
+   The analytics twin of the Library hub's Due today row, built from the same
+   pieces and styles: a ring of the last seven days' attempts split by
+   library, a count per library, the latest attempts as tiles with their
+   score, and the seven days as little stacked columns where the Library hub
+   has its Review button. */
+const AN_WEEK_SOURCES = [
+  { type: 'challenge', label: 'Coding', route: 'analytics-coding', list: () => state.history, title: r => r.challengeTitle || 'Program' },
+  { type: 'notebook', label: 'Notes', route: 'analytics-notes', list: () => state.notebookHistory, title: r => r.notebookTitle || 'Notebook' },
+  { type: 'snippet', label: 'Snippet', route: 'analytics-snippets', list: () => state.snippetHistory, title: r => r.snippetTitle || r.title || 'Snippet' },
+];
+
+/* When an attempt happened, in ms: the sources _historyDayKey reads, for
+   ordering rather than grouping by day. */
+function _anRecMs(rec) {
+  let ms = Number(rec.submitTime || rec.startTime || rec.ts || 0);
+  if (!ms && typeof rec.id === 'string') {
+    const m = rec.id.match(/(\d{10,})/);
+    if (m) ms = Number(m[1]);
+  }
+  if (!ms) {
+    const k = _historyDayKey(rec);
+    if (k) { const [y, mo, d] = k.split('-').map(Number); ms = new Date(y, mo - 1, d, 12).getTime(); }
+  }
+  return ms || 0;
+}
+
+/* A score out of 100, however the record keeps it: coding and Try Coding
+   store one, a notebook keeps right and total per section. */
+function _anRecScore(rec) {
+  if (typeof rec.score === 'number' && isFinite(rec.score)) return Math.round(rec.score);
+  if (Array.isArray(rec.sections)) {
+    let c = 0, t = 0;
+    rec.sections.forEach(x => { c += x.correct || 0; t += x.total || 0; });
+    return t ? Math.round(c / t * 100) : null;
+  }
+  return null;
+}
+
+// Green from 80, amber from 50, red below; no score is the plain accent.
+function _anScoreTier(score) {
+  if (score === null || score === undefined) return 'today';
+  return score >= 80 ? 'good' : score >= 50 ? 'over' : 'high';
+}
+
+function _anWhen(ms) {
+  if (!ms) return '';
+  const a = new Date(ms); a.setHours(0, 0, 0, 0);
+  const b = new Date(); b.setHours(0, 0, 0, 0);
+  const n = Math.round((b - a) / 86400000);
+  return n <= 0 ? 'today' : n === 1 ? 'yesterday' : n + ' days ago';
+}
+
+function _anYmd(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function _anWeekTileHTML(x, i) {
+  const k = _libDueKind(x.src.type);
+  const title = x.src.title(x.r);
+  const when = _anWhen(x.ms);
+  const heat = x.score === null ? 1 : Math.max(0.04, x.score / 100);
+  return `
+    <button class="lib-due-tile t-${_anScoreTier(x.score)}" style="--k:${k.color};--i:${i};--heat:${heat.toFixed(3)};"
+            onclick="spaNavigate('${x.src.route}')"
+            title="${escapeHTML(title)}${x.score === null ? '' : ' · ' + x.score + '%'}${when ? ' · ' + when : ''}">
+      <span class="lib-due-ic"><i data-lucide="${k.icon}"></i></span>
+      <span class="lib-due-txt">
+        <span class="lib-due-name">${escapeHTML(title)}</span>
+        <span class="lib-due-heat"><i></i></span>
+      </span>
+      <span class="lib-due-late">${x.score === null ? escapeHTML(when || '-') : x.score + '%'}</span>
+    </button>`;
+}
+
+function analyticsRenderWeek() {
+  const section = document.getElementById('an-hub-week-section');
+  const host = document.getElementById('an-hub-week');
+  if (!section || !host) return;
+  const all = [];
+  AN_WEEK_SOURCES.forEach(src => (src.list() || []).forEach(r => {
+    if (r) all.push({ src, r, ms: _anRecMs(r), day: _historyDayKey(r), score: _anRecScore(r) });
+  }));
+  if (!all.length) { section.style.display = 'none'; host.innerHTML = ''; return; }
+  section.style.display = '';
+
+  // The last seven days, today last.
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setHours(12, 0, 0, 0); d.setDate(d.getDate() - i);
+    days.push({ key: _anYmd(d), name: d.toLocaleDateString(undefined, { weekday: 'long' }),
+                letter: 'SMTWTFS'[d.getDay()], by: {}, n: 0, today: i === 0 });
+  }
+  const byKey = new Map(days.map(d => [d.key, d]));
+  const week = all.filter(x => byKey.has(x.day));
+  week.forEach(x => { const d = byKey.get(x.day); d.by[x.src.type] = (d.by[x.src.type] || 0) + 1; d.n++; });
+  const peak = Math.max(1, ...days.map(d => d.n));
+
+  const counts = AN_WEEK_SOURCES.map(src => ({ src, k: _libDueKind(src.type), n: week.filter(x => x.src === src).length }));
+  const plural = (n, w) => `${n} ${w} attempt${n === 1 ? '' : 's'}`;
+  const bands = counts.filter(c => c.n).map(c => ({ band: c.src.type, color: c.k.color, n: c.n, words: plural(c.n, c.src.label.toLowerCase()).replace(/^\d+ /, '') }));
+  const scored = week.filter(x => x.score !== null);
+  const avg = scored.length ? Math.round(scored.reduce((t, x) => t + x.score, 0) / scored.length) : null;
+  // The panel glows the colour of the week's average score.
+  host.dataset.worst = _anScoreTier(avg);
+  const recent = all.slice().sort((a, b) => b.ms - a.ms).slice(0, 3);
+  const said = bands.length ? bands.map(x => x.n + ' ' + x.words).join(', ') : 'nothing in the last seven days';
+
+  host.innerHTML = `
+    <div class="lib-due">
+      <div class="lib-due-sum">
+        <div class="lib-due-ring" role="img" aria-label="${week.length} attempts in the last seven days: ${said}"
+             title="${said}${avg === null ? '' : '\nAverage score ' + avg + '%'}">
+          ${_libDueRingHTML(bands, week.length || 1, 'an-week-ring-mask')}
+          <div class="lib-due-ring-num"><b>${week.length}</b><span>7 days</span></div>
+        </div>
+        <div class="lib-due-info">
+          <div class="lib-due-title">This week${avg === null ? '' : ` <span class="an-week-avg t-${_anScoreTier(avg)}" title="Average score this week">${avg}%</span>`}</div>
+          <div class="lib-due-kinds">
+            ${counts.map((c, i) => `
+              <button class="lib-due-kind" style="--k:${c.k.color};--i:${i};" onclick="spaNavigate('${c.src.route}')"
+                      title="${plural(c.n, c.src.label.toLowerCase())} this week · open ${c.src.label} Analytics">
+                <i data-lucide="${c.k.icon}"></i>${c.n}
+              </button>`).join('')}
+          </div>
+        </div>
+      </div>
+      <div class="lib-due-next">${recent.map((x, i) => _anWeekTileHTML(x, i)).join('')}</div>
+      <div class="lib-due-acts an-week" role="img" aria-label="Attempts per day: ${days.map(d => d.name + ' ' + d.n).join(', ')}">
+        ${days.map((d, i) => `
+          <div class="an-week-day${d.today ? ' is-today' : ''}" title="${d.name}${d.today ? ' (today)' : ''} · ${d.n} attempt${d.n === 1 ? '' : 's'}">
+            <div class="an-week-col"><b style="height:${(d.n / peak * 100).toFixed(1)}%;--i:${i};">${
+              AN_WEEK_SOURCES.filter(src => d.by[src.type]).map(src =>
+                `<i style="--k:${_libDueKind(src.type).color};flex:${d.by[src.type]};"></i>`).join('')
+            }</b></div>
+            <span>${d.letter}</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: host });
+  _libDueCountUp(host.querySelector('.lib-due-ring-num b'), week.length);
 }
 
 function analyticsDestroy() { animateCountersStop(); }
