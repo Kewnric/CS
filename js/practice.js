@@ -1977,6 +1977,73 @@ function bossSetVisible(on) {
   if (center) center.classList.toggle('boss-on', !!on);
   // Read after the bar has been hidden or shown: the chip is its stand-in.
   _bossSyncNick();
+  if (on) _bossSpatialBind();
+}
+
+/* ── The plate turns toward the pointer ────────────────────────
+   The same spatial behaviour as the library's cards (libSpatialBind): it
+   leans toward the mouse, comes forward a little, and a light follows the
+   pointer across the metal. The plate is wide and short, so it tips mostly
+   on its long axis and only a little at the ends. Eased per frame so it
+   turns with weight; mouse only, and still under reduced motion. The slab's
+   side and its shadow lean with it (--tx/--ty, read in editor.css). */
+const BOSS_TILT_X = 9;   // degrees: top and bottom edges
+const BOSS_TILT_Y = 3;   // degrees: the two ends
+const BOSS_LIFT = 6;     // px forward while hovered
+
+function _bossSpatialBind() {
+  const el = document.getElementById('boss-health-wrapper');
+  if (!el || el._bossSpatial) return;
+  el._bossSpatial = true;
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const to = { x: 0, y: 0, z: 0 }, at = { x: 0, y: 0, z: 0 };
+  let raf = 0, last = 0, over = false;
+  const frame = now => {
+    raf = 0;
+    const dt = Math.min(64, last ? now - last : 16.7);
+    last = now;
+    const k = 1 - Math.pow(over ? 0.78 : 0.88, dt / 16.7);
+    let moving = false;
+    ['x', 'y', 'z'].forEach(a => {
+      const d = to[a] - at[a];
+      if (Math.abs(d) > (a === 'z' ? 0.05 : 0.002)) { at[a] += d * k; moving = true; }
+      else at[a] = to[a];
+    });
+    if (!over && !moving) {
+      el.style.transform = '';
+      ['--mx', '--my', '--tx', '--ty'].forEach(p => el.style.removeProperty(p));
+      last = 0;
+      return;
+    }
+    el.style.transform = 'perspective(700px) rotateX(' + (-at.y * BOSS_TILT_X).toFixed(2) + 'deg) rotateY(' +
+      (at.x * BOSS_TILT_Y).toFixed(2) + 'deg) translateZ(' + at.z.toFixed(1) + 'px)';
+    el.style.setProperty('--mx', ((at.x + 1) * 50).toFixed(1) + '%');
+    el.style.setProperty('--my', ((at.y + 1) * 50).toFixed(1) + '%');
+    el.style.setProperty('--tx', at.x.toFixed(3));
+    el.style.setProperty('--ty', at.y.toFixed(3));
+    if (moving) raf = requestAnimationFrame(frame);
+    else last = 0;
+  };
+  const kick = () => { if (!raf) raf = requestAnimationFrame(frame); };
+  const aim = e => {
+    const r = el.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    to.x = Math.max(-1, Math.min(1, ((e.clientX - r.left) / r.width) * 2 - 1));
+    to.y = Math.max(-1, Math.min(1, ((e.clientY - r.top) / r.height) * 2 - 1));
+  };
+  const track = e => {
+    if (e.pointerType !== 'mouse') return;
+    if (!over) { over = true; to.z = BOSS_LIFT; el.classList.add('is-tilting'); }
+    aim(e); kick();
+  };
+  el.addEventListener('pointerenter', track);
+  el.addEventListener('pointermove', track);
+  el.addEventListener('pointerleave', () => {
+    over = false;
+    to.x = to.y = to.z = 0;
+    el.classList.remove('is-tilting');
+    kick();
+  });
 }
 
 function bossIsVisible() {

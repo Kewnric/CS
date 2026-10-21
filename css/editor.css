@@ -2138,6 +2138,8 @@ mark.diff-hit.current {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.22),
     inset 0 -1px 0 rgba(0, 0, 0, 0.55);
+  /* A faint sheen on the top half: light from above, kept off the middle. */
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent 45%);
   clip-path: polygon(
     0 0,
     100% 0,
@@ -2170,14 +2172,40 @@ mark.diff-hit.current {
     inset 0 1px 0 rgba(255, 255, 255, 0.24),
     inset 0 -1px 0 rgba(0, 0, 0, 0.6),
     inset 0 -7px 9px -7px rgba(0, 0, 0, 0.45);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent 45%);
   clip-path: polygon(0 0, 100% 0, calc(100% - var(--sao-chamfer)) 100%, 0 100%);
 }
 
+/* The light that follows the pointer while the plate is tilted
+   (_bossSpatialBind sets --mx/--my). Inside the clipped plate, so it stays
+   on the metal and the bar and never spills past the chamfer. */
+.sao-plate::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: radial-gradient(160px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.05) 45%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+.sao-boss.is-tilting .sao-plate::after { opacity: 1; }
+
 /* The whole assembly sits ON the topbar rather than being painted into it.
    clip-path crops a box-shadow, so the drop shadow is a filter on the wrapper
-   — the only way to get one that follows the chamfer. */
+   — the only way to get one that follows the chamfer.
+
+   And it has THICKNESS. Two hard 1px shadows in darker frame tones stack under
+   every clipped edge as the slab's side, then the soft shadow it casts. The
+   side and the shadow lean against the tilt (--tx/--ty), so it reads as a
+   solid plate turning rather than a picture of one. */
 .sao-boss {
-  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
+  filter:
+    drop-shadow(calc(var(--tx, 0) * -1px) 1px 0 #2e3238)
+    drop-shadow(calc(var(--tx, 0) * -1px) 1px 0 #1e2125)
+    drop-shadow(calc(var(--tx, 0) * -3px) calc(3px - var(--ty, 0) * 1px) 4px rgba(0, 0, 0, 0.6));
+  transform-origin: 50% 50%;
 }
 
 .sao-plate-lv {
