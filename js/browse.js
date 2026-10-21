@@ -631,7 +631,7 @@ function _buildChallengeCardCompact(c) {
   const actionLabel = resumable ? 'Resume' : bestScore === 100 ? 'Retry' : 'Practice';
   const actionTone = resumable ? 'is-resume' : bestScore === 100 ? 'is-retry' : 'is-fresh';
   return `
-    <div class="card card-compact${libIsSelected('browse', c.id) ? ' lib-selected' : ''}" id="card-${c.id}"
+    <div class="card card-compact${bestScore === 100 ? ' is-finished' : ''}${libIsSelected('browse', c.id) ? ' lib-selected' : ''}" id="card-${c.id}"
          onclick="${selecting ? `libToggleSelect('browse','${c.id}')` : `browseSelectProgram('${c.id}')`}" style="cursor:pointer;">
       ${typeof programSeqBadgeHTML === 'function' ? programSeqBadgeHTML(c) : ''}
       ${libSelectBoxHTML('browse', c.id)}
@@ -671,7 +671,7 @@ function _buildChallengeCard(c, query) {
   const resumable = browseHasResumable(c);
   const selecting = libSelectMode('browse');
   return `
-    <div class="card card-enhanced has-cover${libIsSelected('browse', c.id) ? ' lib-selected' : ''}" id="card-${c.id}"
+    <div class="card card-enhanced has-cover${isPerfect ? ' is-finished' : ''}${libIsSelected('browse', c.id) ? ' lib-selected' : ''}" id="card-${c.id}"
          onclick="${selecting ? `libToggleSelect('browse','${c.id}')` : `browseSelectProgram('${c.id}')`}" style="cursor: pointer;">
       ${coverHtml}
       ${typeof programSeqBadgeHTML === 'function' ? programSeqBadgeHTML(c) : ''}
@@ -909,6 +909,14 @@ function _applyBrowseFilterSort(list) {
 
   // Favourites always float to the top of whatever order was chosen.
   out.sort((a, b) => (libIsFavorite(b) ? 1 : 0) - (libIsFavorite(a) ? 1 : 0));
+
+  /* Finished (solved at 100%) programs sink to the end, and their cards are
+     dimmed (.is-finished), so what is left to do comes first. Stable, so each
+     group keeps the order above. Not under "Best score", which ranks BY it. */
+  if (sort !== 'best') {
+    const done = c => (bestScore(c) === 100 ? 1 : 0);
+    out.sort((a, b) => done(a) - done(b));
+  }
   return out;
 }
 

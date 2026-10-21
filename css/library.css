@@ -3013,3 +3013,14 @@ body.tree-dragging [data-tree-ns]::-webkit-scrollbar { width: 0; height: 0; }
 }
 .admin-card.admin-card-add::before { display: none; }
 .admin-card.admin-card-add:hover { color: var(--k); border-color: var(--k); background: color-mix(in srgb, var(--k) 8%, transparent); }
+
+/* ── Finished programs: dimmed, and sorted to the end (js/browse.js) ──
+   Back to full brightness under the pointer or keyboard focus, so a finished
+   card is still easy to read and pick for a retry. */
+.card.is-finished {
+  filter: brightness(0.55) saturate(0.6);
+}
+.card.is-finished:hover,
+.card.is-finished:focus-within {
+  filter: none;
+}
