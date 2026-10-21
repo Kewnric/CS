@@ -306,8 +306,8 @@
        phone it is three words of a title. */
     max-width: 72%;
   }
-  .practice-topbar-center .sao-track {
-    flex: 0 1 auto;
+  .practice-topbar-center .sao-track-lift {
+    flex: 0 1 64px;
     max-width: 64px;
   }
   /* The level chip is "LV. —" until a level exists; it is not worth 46px of a
