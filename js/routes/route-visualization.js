@@ -498,6 +498,9 @@ function vizTemplate() {
         <div class="brain-ctx-ref-head">
           <span class="brain-ctx-ref-ic"><i data-lucide="link-2"></i></span>
           <span class="brain-ctx-ref-text"><b id="brain-ctx-ref-name">Library link</b><span id="brain-ctx-ref-where"></span></span>
+          <!-- Done: dims the note like a finished card in its library. Yours to
+               set; nothing marks it for you. -->
+          <button type="button" class="bnm-icon brain-ref-done-btn" id="brain-ctx-ref-done" aria-pressed="false" onclick="brainRefToggleDone()" title="Mark as done" aria-label="Mark as done"><i data-lucide="check-circle-2"></i></button>
           <button type="button" class="bnm-icon" id="brain-ctx-ref-other" data-mode="goto" onclick="brainRefCtxOther()" title="Show in library now" aria-label="Show in library now"><i data-lucide="locate-fixed"></i></button>
           <button type="button" class="bnm-icon" onclick="brainRefCtxRelink()" title="Link another item…" aria-label="Link another item"><i data-lucide="replace"></i></button>
         </div>

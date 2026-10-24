@@ -6153,3 +6153,37 @@ body.viz-no-anim .app-sidebar {
 @media (prefers-reduced-motion: reduce) {
   .viz-wheel, .viz-wheel.is-closing, .bnm-seg button.active svg { animation: none !important; }
 }
+
+/* ── A library link marked done ─────────────────────────────────
+   Faded like a finished card in its library; the check on its corner and the
+   ports stay at full strength, and hovering brings the note back up to read. */
+.viz-node.is-libref-done > :not(.brain-ref-done):not(.viz-port) { opacity: 0.4; transition: opacity 0.25s ease; }
+.viz-node.is-libref-done:hover > :not(.brain-ref-done):not(.viz-port) { opacity: 0.85; }
+.brain-ref-done {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  color: #fff;
+  background: var(--color-success);
+  box-shadow: 0 0 0 3px var(--bg-body), 0 4px 12px -3px var(--color-success);
+  pointer-events: none;
+  animation: brDoneIn 0.4s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.brain-ref-done svg { width: 13px; height: 13px; stroke-width: 3; }
+.bnm-icon.brain-ref-done-btn.is-on {
+  color: #fff;
+  background: var(--color-success);
+  box-shadow: 0 4px 12px -5px var(--color-success);
+}
+.bnm-icon.brain-ref-done-btn.is-on:hover { color: #fff; background: var(--color-success); }
+@keyframes brDoneIn { from { opacity: 0; transform: scale(0.3) rotate(-30deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .brain-ref-done { animation: none; }
+  .viz-node.is-libref-done > * { transition: none; }
+}

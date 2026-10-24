@@ -285,6 +285,12 @@ function brainRefDecorate(el, node) {
     `<button class="brain-ref-btn${goto ? ' is-goto' : ''}" type="button" title="${escapeHTML(label)}" aria-label="${escapeHTML(label)}">
        <i data-lucide="${!it ? 'unlink' : goto ? 'locate-fixed' : 'play'}"></i>
      </button>`);
+  // Done (set by hand from the menu): the note fades like a finished card in
+  // its library and a green check sits on its corner, outside the faded part.
+  el.classList.toggle('is-libref-done', !!node.refDone);
+  if (node.refDone) {
+    el.insertAdjacentHTML('beforeend', '<span class="brain-ref-done" title="Done" aria-label="Done"><i data-lucide="check"></i></span>');
+  }
   const btn = body.querySelector(':scope > .brain-ref-btn');
   // The button is not a handle: a press on it must not start dragging the
   // note, and a double click must not open the editor.
@@ -355,6 +361,14 @@ function brainRefSyncCtx(node) {
     b.classList.toggle('is-on', onB);
     b.setAttribute('aria-checked', String(onB));
   });
+  const done = document.getElementById('brain-ctx-ref-done');
+  if (done) {
+    const on = !!node.refDone;
+    done.classList.toggle('is-on', on);
+    done.setAttribute('aria-pressed', String(on));
+    done.title = on ? 'Done · press to mark it not done' : 'Mark as done';
+    done.setAttribute('aria-label', on ? 'Mark as not done' : 'Mark as done');
+  }
   // The one-off action is always the other one.
   const other = document.getElementById('brain-ctx-ref-other');
   if (other) {
@@ -373,6 +387,17 @@ function brainRefSetMode(mode) {
   if (!node || !node.ref || (node.refMode || 'play') === mode) return;
   brainPushUndo();
   node.refMode = mode;
+  brainRenderCanvas(); brainSaveCurrentVersion();
+  brainRefSyncCtx(node);
+}
+
+/* Done is a mark you set yourself -- finishing the attempt does not set it --
+   and only a library link has one. Keeps the menu open, like the mode switch. */
+function brainRefToggleDone() {
+  const node = brain.contextNodeId && brain.nodes.find(n => n.id === brain.contextNodeId);
+  if (!node || !node.ref) return;
+  brainPushUndo();
+  if (node.refDone) delete node.refDone; else node.refDone = true;
   brainRenderCanvas(); brainSaveCurrentVersion();
   brainRefSyncCtx(node);
 }
