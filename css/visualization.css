@@ -5430,3 +5430,387 @@ body.viz-no-anim .app-sidebar {
   .vtb-cat.is-active svg, .vtb-cat.has-on::after,
   .vtb-panel.is-active > *, .vtb-panel.is-active > .brain-only-tools > * { animation: none; }
 }
+
+/* ── Brain library links (brain-libref.js) ─────────────────────
+   A note that stands for a library item: a small tag naming its library, its
+   text as the title, and a round button in the library's colour (--rc) that
+   plays it or, set to Show in library, locates it. */
+.viz-node.is-libref .viz-comment-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "tag btn" "text btn";
+  align-items: center;
+  column-gap: 0.7rem;
+}
+.viz-node.is-libref .viz-comment-content { grid-area: text; min-width: 0; }
+.brain-ref-tag {
+  grid-area: tag;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  margin-bottom: 0.3rem;
+  padding: 0.08rem 0.45rem 0.08rem 0.35rem;
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--rc);
+  background: color-mix(in srgb, var(--rc) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rc) 32%, transparent);
+  pointer-events: none;
+}
+.brain-ref-tag svg { width: 11px; height: 11px; }
+.brain-ref-btn {
+  grid-area: btn;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+  background: radial-gradient(circle at 30% 25%, color-mix(in srgb, var(--rc) 70%, #fff), var(--rc) 55%, color-mix(in srgb, var(--rc) 70%, #000));
+  box-shadow: 0 6px 16px -6px var(--rc), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  transition: transform 0.25s cubic-bezier(0.3, 1.5, 0.5, 1), box-shadow 0.25s ease;
+}
+.brain-ref-btn svg { width: 16px; height: 16px; margin-left: 2px; fill: currentColor; }
+.brain-ref-btn.is-goto svg { margin-left: 0; fill: none; }
+/* A ring breathes out of the button so it reads as something to press. */
+.brain-ref-btn::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid var(--rc);
+  opacity: 0;
+  animation: blrRing 2.6s ease-out infinite;
+  pointer-events: none;
+}
+.brain-ref-btn:hover { transform: scale(1.12); box-shadow: 0 10px 22px -6px var(--rc), inset 0 1px 0 rgba(255, 255, 255, 0.3); }
+.brain-ref-btn:active { transform: scale(0.94); }
+.brain-ref-btn:focus-visible { outline: 2px solid var(--rc); outline-offset: 3px; }
+.viz-node.is-libref-missing .brain-ref-btn { background: var(--bg-surface-hover); color: var(--text-tertiary); box-shadow: none; }
+.viz-node.is-libref-missing .brain-ref-btn::after { display: none; }
+.viz-node.is-libref-missing .brain-ref-tag { color: var(--text-tertiary); background: var(--bg-surface-hover); box-shadow: none; }
+
+/* Insert > Library: a tile per library. */
+.blr-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.3rem; padding: 0.15rem 0.1rem 0.3rem; }
+.blr-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.5rem 0.25rem 0.4rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--rc) 7%, transparent);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+  animation: blrIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+}
+.blr-tile:nth-child(2) { animation-delay: 25ms; } .blr-tile:nth-child(3) { animation-delay: 50ms; }
+.blr-tile:nth-child(4) { animation-delay: 75ms; } .blr-tile:nth-child(5) { animation-delay: 100ms; }
+.blr-tile:nth-child(6) { animation-delay: 125ms; }
+.blr-tile-ic {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--rc);
+  background: color-mix(in srgb, var(--rc) 18%, transparent);
+  transition: transform 0.3s cubic-bezier(0.3, 1.5, 0.5, 1), background 0.2s ease, color 0.2s ease;
+}
+.blr-tile-ic svg { width: 15px; height: 15px; }
+.blr-tile:hover { color: var(--text-primary); border-color: color-mix(in srgb, var(--rc) 50%, transparent); background: color-mix(in srgb, var(--rc) 13%, transparent); transform: translateY(-1px); }
+.blr-tile:hover .blr-tile-ic { transform: scale(1.1) rotate(-6deg); color: #fff; background: var(--rc); }
+
+/* The note menu's link section. */
+.brain-ctx-ref { --rc: var(--color-primary); }
+.brain-ctx-ref-head { display: flex; align-items: center; gap: 0.55rem; padding: 0.35rem 0.5rem 0.45rem; }
+.brain-ctx-ref-ic {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: #fff;
+  background: var(--rc);
+  box-shadow: 0 4px 12px -5px var(--rc);
+}
+.brain-ctx-ref-ic svg { width: 14px; height: 14px; }
+.brain-ctx-ref-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.brain-ctx-ref-text b { font-size: 0.8rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 190px; }
+.brain-ctx-ref-text span { font-size: 0.66rem; color: var(--text-tertiary); }
+.brain-ref-mode-label { padding: 0 0.55rem 0.25rem; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); }
+.brain-ref-mode {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  margin: 0 0.4rem 0.35rem;
+  padding: 3px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+.brain-ref-mode button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+.brain-ref-mode button svg { width: 13px; height: 13px; }
+.brain-ref-mode button:hover { color: var(--text-primary); }
+.brain-ref-mode button.is-on {
+  color: #fff;
+  background: var(--rc);
+  box-shadow: 0 4px 12px -6px var(--rc);
+}
+.brain-ref-mode button.is-on svg { animation: vtbHop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1); }
+
+/* The picker. */
+.blr-overlay {
+  --rc: var(--color-primary);
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgba(3, 6, 15, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: blrFade 0.2s ease;
+}
+.blr-overlay.hidden { display: none; }
+.blr-overlay.is-closing { animation: blrFade 0.18s ease reverse forwards; }
+.blr-overlay.is-closing .blr-box { animation: blrPop 0.18s ease reverse forwards; }
+.blr-box {
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100%);
+  max-height: min(640px, 86vh);
+  border: 1px solid color-mix(in srgb, var(--rc) 28%, var(--border-color));
+  border-radius: 16px;
+  background: linear-gradient(165deg, color-mix(in srgb, var(--rc) 8%, var(--bg-elevated, var(--bg-surface))), var(--bg-elevated, var(--bg-surface)) 45%);
+  box-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+  overflow: hidden;
+  animation: blrPop 0.28s cubic-bezier(0.2, 0.9, 0.3, 1.15);
+  transition: border-color 0.3s ease;
+}
+.blr-head { display: flex; align-items: center; gap: 0.7rem; padding: 1rem 1rem 0.75rem; }
+.blr-head-ic {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+  color: #fff;
+  background: linear-gradient(145deg, var(--rc), color-mix(in srgb, var(--rc) 65%, #000));
+  box-shadow: 0 8px 18px -8px var(--rc);
+  transition: background 0.3s ease;
+}
+.blr-head-ic svg { width: 18px; height: 18px; }
+.blr-head-text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.blr-head-text b { font-size: 1rem; color: var(--text-primary); }
+.blr-head-text span { font-size: 0.74rem; color: var(--text-tertiary); }
+.blr-x {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.2s ease;
+}
+.blr-x:hover { background: color-mix(in srgb, var(--text-primary) 8%, transparent); color: var(--text-primary); transform: rotate(90deg); }
+.blr-x svg { width: 16px; height: 16px; }
+.blr-libs {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0 1rem 0.7rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.blr-libs::-webkit-scrollbar { display: none; }
+.blr-lib {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: none;
+  height: 32px;
+  padding: 0 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  animation: blrIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 25ms);
+  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+.blr-lib svg { width: 14px; height: 14px; color: var(--rc); transition: color 0.2s ease; }
+.blr-lib b { padding: 0 0.35rem; border-radius: 999px; font-size: 0.64rem; color: var(--rc); background: color-mix(in srgb, var(--rc) 14%, transparent); }
+.blr-lib:hover { color: var(--text-primary); border-color: color-mix(in srgb, var(--rc) 50%, var(--border-color)); }
+.blr-lib.is-on { color: #fff; border-color: var(--rc); background: var(--rc); box-shadow: 0 6px 16px -8px var(--rc); }
+.blr-lib.is-on svg, .blr-lib.is-on b { color: #fff; }
+.blr-lib.is-on b { background: rgba(255, 255, 255, 0.2); }
+.blr-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 1rem 0.6rem;
+  padding: 0 0.75rem;
+  height: 38px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.blr-search:focus-within { border-color: var(--rc); box-shadow: 0 0 0 3px color-mix(in srgb, var(--rc) 20%, transparent); }
+.blr-search svg { width: 15px; height: 15px; color: var(--text-tertiary); flex: none; }
+.blr-search input { flex: 1; min-width: 0; border: 0; outline: none; background: transparent; color: var(--text-primary); font: inherit; font-size: 0.85rem; }
+.blr-crumbs { display: flex; align-items: center; flex-wrap: wrap; gap: 0.2rem; padding: 0 1rem 0.5rem; min-height: 1.6rem; }
+.blr-crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.15rem 0.45rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-tertiary);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.blr-crumb svg { width: 12px; height: 12px; }
+.blr-crumb:hover { color: var(--text-primary); background: color-mix(in srgb, var(--text-primary) 7%, transparent); }
+.blr-crumb.is-here { color: var(--rc); cursor: default; }
+.blr-crumb-sep { width: 12px; height: 12px; color: var(--text-tertiary); opacity: 0.6; }
+.blr-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.25rem 0.75rem 1rem;
+  overflow-y: auto;
+  scrollbar-width: none;
+  min-height: 160px;
+}
+.blr-list::-webkit-scrollbar { display: none; }
+.blr-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.5rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+  animation: blrIn 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 22ms);
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+.blr-list.is-fwd .blr-row { animation-name: blrInFwd; }
+.blr-list.is-back .blr-row { animation-name: blrInBack; }
+.blr-row:hover { color: var(--text-primary); background: color-mix(in srgb, var(--rc) 9%, transparent); border-color: color-mix(in srgb, var(--rc) 30%, transparent); }
+.blr-ic {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--rc);
+  background: color-mix(in srgb, var(--rc) 15%, transparent);
+  transition: transform 0.3s cubic-bezier(0.3, 1.5, 0.5, 1), background 0.2s ease, color 0.2s ease;
+}
+.blr-ic svg { width: 14px; height: 14px; }
+.blr-row:hover .blr-ic { transform: scale(1.08) rotate(-6deg); }
+.blr-row.is-item:hover .blr-ic { color: #fff; background: var(--rc); }
+.blr-name { display: flex; align-items: center; flex-wrap: wrap; gap: 0.1rem 0.4rem; flex: 1; min-width: 0; }
+.blr-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 650; }
+.blr-name small { flex-basis: 100%; font-size: 0.68rem; color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.blr-tag { flex: none; padding: 0.02rem 0.35rem; border-radius: 6px; font-size: 0.64rem; font-weight: 800; color: var(--rc); background: color-mix(in srgb, var(--rc) 14%, transparent); }
+.blr-count { flex: none; padding: 0.02rem 0.45rem; border-radius: 999px; font-size: 0.66rem; font-weight: 800; color: var(--text-tertiary); background: color-mix(in srgb, var(--text-primary) 7%, transparent); }
+.blr-chev { width: 15px; height: 15px; color: var(--text-tertiary); transition: transform 0.2s ease; }
+.blr-row:hover .blr-chev { transform: translateX(3px); color: var(--rc); }
+.blr-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  flex: none;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--rc);
+  background: color-mix(in srgb, var(--rc) 12%, transparent);
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 0.18s ease, transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+.blr-add svg { width: 12px; height: 12px; }
+.blr-row:hover .blr-add, .blr-row:focus-visible .blr-add { opacity: 1; transform: none; }
+.blr-add:hover { color: #fff; background: var(--rc); }
+.blr-empty { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; padding: 2rem 1rem; color: var(--text-tertiary); font-size: 0.8rem; }
+.blr-empty svg { width: 22px; height: 22px; }
+
+/* Where Show in library lands: the item glows for a few seconds. Global, since
+   it lights up rows on other pages. */
+.blr-flash {
+  position: relative;
+  animation: blrFlash 1s ease-in-out 3;
+  border-radius: var(--radius-md, 8px);
+}
+@keyframes blrFlash {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); background-color: transparent; }
+  45% { box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.75), 0 0 22px 2px rgba(99, 102, 241, 0.45); background-color: rgba(99, 102, 241, 0.16); }
+}
+@keyframes blrIn { from { opacity: 0; transform: translateY(6px); } }
+@keyframes blrInFwd { from { opacity: 0; transform: translateX(14px); } }
+@keyframes blrInBack { from { opacity: 0; transform: translateX(-14px); } }
+@keyframes blrPop { from { opacity: 0; transform: translateY(10px) scale(0.96); } }
+@keyframes blrFade { from { opacity: 0; } }
+@keyframes blrRing {
+  0% { opacity: 0.55; transform: scale(1); }
+  70%, 100% { opacity: 0; transform: scale(1.45); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brain-ref-btn::after, .blr-tile, .blr-lib, .blr-row, .blr-box, .blr-overlay, .blr-flash { animation: none !important; }
+  .blr-flash { box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.75); }
+}

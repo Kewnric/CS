@@ -181,8 +181,14 @@ function vizTemplate() {
                       <i data-lucide="shapes" style="width:12px;height:12px;"></i>
                       <span class="viz-pill-chevron"><i data-lucide="chevron-down" style="width:10px;height:10px;"></i></span>
                     </button>
-                    <div id="brain-insert-popup" class="viz-toolbar-popup hidden" role="menu" style="min-width:200px;">
-                      <div class="viz-popup-title">Insert</div>
+                    <div id="brain-insert-popup" class="viz-toolbar-popup hidden" role="menu" style="min-width:236px;">
+                      <!-- Two categories. Library: a note that links to something
+                           in a library and plays it or shows where it lives
+                           (brain-libref.js). Objects: the drawings. -->
+                      <div class="viz-popup-title">Library</div>
+                      <div class="blr-tiles">${typeof brainRefInsertTilesHTML === 'function' ? brainRefInsertTilesHTML() : ''}</div>
+                      <div class="viz-ctx-divider"></div>
+                      <div class="viz-popup-title">Objects</div>
                       ${(typeof BRAIN_SHAPES !== 'undefined' ? BRAIN_SHAPES : []).map(([id, label, icon]) =>
                         `<div class="viz-link-type-option" role="menuitem" onclick="brainInsertShape('${id}')"><i data-lucide="${icon}" style="width:14px;height:14px;"></i> ${label}</div>`).join('')}
                     </div>
@@ -475,6 +481,23 @@ function vizTemplate() {
 
     <!-- Brain Node Context Menu -->
     <div id="brain-node-ctx" class="viz-context-menu hidden" role="menu">
+      <!-- A library link's own controls (brain-libref.js): what its button does,
+           the other action once, and pointing it at something else. Shown only
+           for a note that links to a library item. -->
+      <div id="brain-ctx-ref" class="brain-ctx-ref hidden">
+        <div class="brain-ctx-ref-head">
+          <span class="brain-ctx-ref-ic"><i data-lucide="link-2"></i></span>
+          <span class="brain-ctx-ref-text"><b id="brain-ctx-ref-name">Library link</b><span id="brain-ctx-ref-where"></span></span>
+        </div>
+        <div class="brain-ref-mode-label">The button</div>
+        <div class="brain-ref-mode" role="radiogroup" aria-label="What the note's button does">
+          <button type="button" role="radio" data-mode="play" aria-checked="true" onclick="brainRefSetMode('play')" title="Start it, through its timer or setup window when it has one"><i data-lucide="play"></i> Play</button>
+          <button type="button" role="radio" data-mode="goto" aria-checked="false" onclick="brainRefSetMode('goto')" title="Open its library at its folder and light it up"><i data-lucide="locate-fixed"></i> Show in library</button>
+        </div>
+        <button class="viz-ctx-item" id="brain-ctx-ref-other" data-mode="goto" onclick="brainRefCtxOther()"><i data-lucide="locate-fixed"></i> Show in library now</button>
+        <button class="viz-ctx-item" onclick="brainRefCtxRelink()"><i data-lucide="replace"></i> Link another item…</button>
+        <div class="viz-ctx-divider"></div>
+      </div>
       <!-- Every colour lives in Personalize Color: one swatch row, and a toggle for
            what it paints. Text, fill and edge are three separate settings
            (node.textColor, node.bg, node.color) that never read each other.

@@ -1256,6 +1256,8 @@ function brainRenderCanvas() {
       </div>${isElectric ? BRAIN_ELECTRIC_FRONT : ''}${isMedieval ? BRAIN_MEDIEVAL_FRONT : ''}${node.border === 'manhua' ? '<div class="bb-resize" title="Resize" aria-hidden="true"></div>' : ''}${brainCollapseBadge}`;
       const grip = el.querySelector('.bb-resize');
       if (grip) grip.addEventListener('pointerdown', e => brainBubbleResizeStart(e, node.id, el));
+      // A note that links to a library item: its tag and its button (brain-libref.js).
+      if (node.ref && typeof brainRefDecorate === 'function') brainRefDecorate(el, node);
       if (objectTop) el.insertAdjacentHTML('beforeend', objectTop);
       if (node.shape) {
         el.insertAdjacentHTML('beforeend', '<button class="shape-rotate" type="button" title="Drag to rotate (Shift: 15° steps)" aria-label="Rotate"><i data-lucide="rotate-cw"></i></button>');
@@ -2436,6 +2438,7 @@ function brainNodeCtx(e, nodeId) {
   // placed at its real size.
   _brainCloseNodeSubs(null);
   _brainShowColorTargetList(false);
+  if (typeof brainRefSyncCtx === 'function') brainRefSyncCtx(node);   // a library link's section
   if (typeof vizPositionMenu === 'function') vizPositionMenu(menu, e.clientX, e.clientY);
   else { menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px'; menu.classList.remove('hidden'); }
   _brainMarkNodeMenu();

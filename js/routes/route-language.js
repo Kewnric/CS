@@ -1280,7 +1280,7 @@ function langSetsHTML() {
           (s.items || []).forEach(it => { if (types.indexOf(it.type) === -1) types.push(it.type); });
           const n = (s.items || []).length;
           return `
-          <div class="lpv-set" style="--k:${i}">
+          <div class="lpv-set" style="--k:${i}" data-ref-id="${escapeHTML(s.id)}">
             <div class="lpv-set-top">
               <span class="lpv-ring${best < 0 ? ' is-none' : ''}" style="--p:${Math.max(0, best)}"><b>${best >= 0 ? best + '%' : '—'}</b></span>
               <span class="lpv-set-info">
@@ -1398,7 +1398,7 @@ function langScenariosHTML() {
           const ok = ready(s);
           const turns = (s.encounters || []).length;
           return `
-          <div class="lpv-scene${ok ? '' : ' is-unready'}" style="--k:${i}">
+          <div class="lpv-scene${ok ? '' : ' is-unready'}" style="--k:${i}" data-ref-id="${escapeHTML(s.id)}">
             <div class="lpv-scene-art lpv-bg-${escapeHTML(loc.key)}">
               <span class="lpv-scene-loc"><i data-lucide="${loc.icon}"></i> ${escapeHTML(loc.name)}</span>
               <span class="lpv-scene-face lpv-face-${escapeHTML(lpvFaceKey(s.npc, s.face))}"></span>

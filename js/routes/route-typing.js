@@ -245,7 +245,7 @@ function mtlRowsHTML() {
     const open = mtlOpenPreview === it.id;
     const guess = it.kind === 'text' ? mtGuessLang(it.content) : null;
     return `
-      <div class="prog-variant-row mtl-row${open ? ' is-open' : ''}">
+      <div class="prog-variant-row mtl-row${open ? ' is-open' : ''}" data-ref-id="${escapeHTML(it.id)}">
         <div class="prog-variant-num">${String(i + 1).padStart(2, '0')}</div>
         <div class="prog-variant-info">
           <div class="prog-variant-name">${escapeHTML(it.title || 'Untitled')}</div>
