@@ -122,160 +122,203 @@ function vizTemplate() {
         </div>
         <div class="viz-canvas-pane">
           <div class="viz-canvas-toolbar-wrap" id="viz-canvas-toolbar-wrap">
-          <!-- Seventeen unlabelled icons in one flat row, mixing view toggles,
-               edit modes and navigation. Grouped now, with the three you touch
-               least behind one "More" button — the same treatment brain's own
-               tools already had. -->
+          <!-- Seventeen unlabelled icons used to sit in one flat row. They are
+               sorted into three categories now -- Build, View, Edit -- and only
+               the open one's tools are on screen; zoom and More stay put.
+               vizToolCat switches, vizToolCatSync hides an empty category. -->
           <div class="viz-canvas-toolbar" id="viz-canvas-toolbar" role="toolbar" aria-label="Canvas tools">
             <div class="viz-canvas-toolbar-left">
               <span class="vct-icon" id="viz-canvas-toolbar-icon" aria-hidden="true"><i data-lucide="git-branch"></i></span>
               <span class="vct-text" id="viz-canvas-toolbar-label"><span class="vct-eyebrow">Canvas</span><span class="vct-name">Canvas</span></span>
             </div>
-            <div style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
+            <div class="vtb-main">
               <span class="brain-saved-chip" id="brain-saved-chip" aria-live="polite"></span>
-              <!-- Brain-only canvas options. The grid was drawn but nothing
-                   snapped to it, and a map you only wanted to read was one drag
-                   from being rearranged. -->
-              <span class="brain-only-tools" id="brain-only-tools">
-                <button class="viz-zoom-btn viz-toolbar-pill-btn" id="brain-snap-btn" onclick="brainToggleOpt('snap')" title="Snap to grid" aria-label="Snap to grid">
-                  <i data-lucide="grid-3x3" style="width:12px;height:12px;"></i>
+
+              <!-- ── Categories: the tools sorted into three, one shown at a time ── -->
+              <div class="vtb-cats" role="tablist" aria-label="Tool categories" onkeydown="vizToolCatKey(event)">
+                <span class="vtb-ink" aria-hidden="true"></span>
+                <button type="button" class="vtb-cat" role="tab" data-cat="build" aria-selected="false" onclick="vizToolCat('build')" title="Build: snap, connections, lock, arrange and insert">
+                  <i data-lucide="hammer"></i><span>Build</span>
                 </button>
-                <button class="viz-zoom-btn viz-toolbar-pill-btn" id="brain-links-btn" onclick="brainToggleOpt('links')" title="Show connections" aria-label="Show connections">
-                  <i data-lucide="waypoints" style="width:12px;height:12px;"></i>
+                <button type="button" class="vtb-cat" role="tab" data-cat="view" aria-selected="false" onclick="vizToolCat('view')" title="View: what the canvas shows, colours, focus, saved views, sheet and display">
+                  <i data-lucide="eye"></i><span>View</span>
                 </button>
-                <button class="viz-zoom-btn viz-toolbar-pill-btn" id="brain-lock-btn" onclick="brainToggleLock()" title="Lock this version (read-only)" aria-label="Lock this version">
-                  <i data-lucide="lock" style="width:12px;height:12px;"></i>
+                <button type="button" class="vtb-cat" role="tab" data-cat="edit" aria-selected="false" onclick="vizToolCat('edit')" title="Edit: link, paint and physics">
+                  <i data-lucide="pen-tool"></i><span>Edit</span>
                 </button>
+              </div>
+
+              <div class="vtb-panels">
+                <!-- Build: Brain's own tools. -->
+                <div class="vtb-panel" data-cat="build" role="tabpanel" aria-label="Build">
+                <!-- Brain-only canvas options. The grid was drawn but nothing
+                     snapped to it, and a map you only wanted to read was one drag
+                     from being rearranged. -->
+                <span class="brain-only-tools" id="brain-only-tools">
+                  <button class="viz-zoom-btn viz-toolbar-pill-btn" id="brain-snap-btn" onclick="brainToggleOpt('snap')" title="Snap to grid" aria-label="Snap to grid">
+                    <i data-lucide="grid-3x3" style="width:12px;height:12px;"></i>
+                  </button>
+                  <button class="viz-zoom-btn viz-toolbar-pill-btn" id="brain-links-btn" onclick="brainToggleOpt('links')" title="Show connections" aria-label="Show connections">
+                    <i data-lucide="waypoints" style="width:12px;height:12px;"></i>
+                  </button>
+                  <button class="viz-zoom-btn viz-toolbar-pill-btn" id="brain-lock-btn" onclick="brainToggleLock()" title="Lock this version (read-only)" aria-label="Lock this version">
+                    <i data-lucide="lock" style="width:12px;height:12px;"></i>
+                  </button>
+                  <div class="viz-toolbar-dropdown">
+                    <button class="viz-zoom-btn viz-toolbar-pill-btn" id="brain-layout-btn" onclick="brainToggleLayoutMenu()" title="Arrange nodes" aria-label="Arrange nodes" aria-haspopup="true">
+                      <i data-lucide="layout-dashboard" style="width:12px;height:12px;"></i>
+                      <span class="viz-pill-chevron"><i data-lucide="chevron-down" style="width:10px;height:10px;"></i></span>
+                    </button>
+                    <div id="brain-layout-popup" class="viz-toolbar-popup hidden" role="menu">
+                      <div class="viz-link-type-option" role="menuitem" onclick="brainToggleLayoutMenu();brainAutoLayout('tree')"><i data-lucide="git-branch" style="width:14px;height:14px;"></i> Tree</div>
+                      <div class="viz-link-type-option" role="menuitem" onclick="brainToggleLayoutMenu();brainAutoLayout('grid')"><i data-lucide="grid-3x3" style="width:14px;height:14px;"></i> Grid</div>
+                      <div class="viz-link-type-option" role="menuitem" onclick="brainToggleLayoutMenu();brainAutoLayout('radial')"><i data-lucide="circle-dot" style="width:14px;height:14px;"></i> Radial</div>
+                    </div>
+                  </div>
+                  <!-- Free-standing objects: arrows, lines, a timeline, shapes, text. -->
+                  <div class="viz-toolbar-dropdown">
+                    <button class="viz-zoom-btn viz-toolbar-pill-btn" id="brain-insert-btn" onclick="brainToggleInsertMenu()" title="Insert an object" aria-label="Insert an object" aria-haspopup="true">
+                      <i data-lucide="shapes" style="width:12px;height:12px;"></i>
+                      <span class="viz-pill-chevron"><i data-lucide="chevron-down" style="width:10px;height:10px;"></i></span>
+                    </button>
+                    <div id="brain-insert-popup" class="viz-toolbar-popup hidden" role="menu" style="min-width:200px;">
+                      <div class="viz-popup-title">Insert</div>
+                      ${(typeof BRAIN_SHAPES !== 'undefined' ? BRAIN_SHAPES : []).map(([id, label, icon]) =>
+                        `<div class="viz-link-type-option" role="menuitem" onclick="brainInsertShape('${id}')"><i data-lucide="${icon}" style="width:14px;height:14px;"></i> ${label}</div>`).join('')}
+                    </div>
+                  </div>
+                </span>
+
+                </div>
+
+                <!-- View: what the canvas shows and how it looks. -->
+                <div class="vtb-panel" data-cat="view" role="tabpanel" aria-label="View">
+                <!-- ── View: what the canvas shows and how it is coloured ── -->
                 <div class="viz-toolbar-dropdown">
-                  <button class="viz-zoom-btn viz-toolbar-pill-btn" id="brain-layout-btn" onclick="brainToggleLayoutMenu()" title="Arrange nodes" aria-label="Arrange nodes" aria-haspopup="true">
-                    <i data-lucide="layout-dashboard" style="width:12px;height:12px;"></i>
+                  <button class="viz-zoom-btn viz-toolbar-pill-btn" id="viz-depth-btn" onclick="vizToggleDepthMenu()" title="Canvas shows: Folders + items" aria-label="Choose what the canvas shows" aria-haspopup="true">
+                    <i data-lucide="list-tree" style="width:12px;height:12px;"></i>
                     <span class="viz-pill-chevron"><i data-lucide="chevron-down" style="width:10px;height:10px;"></i></span>
                   </button>
-                  <div id="brain-layout-popup" class="viz-toolbar-popup hidden" role="menu">
-                    <div class="viz-link-type-option" role="menuitem" onclick="brainToggleLayoutMenu();brainAutoLayout('tree')"><i data-lucide="git-branch" style="width:14px;height:14px;"></i> Tree</div>
-                    <div class="viz-link-type-option" role="menuitem" onclick="brainToggleLayoutMenu();brainAutoLayout('grid')"><i data-lucide="grid-3x3" style="width:14px;height:14px;"></i> Grid</div>
-                    <div class="viz-link-type-option" role="menuitem" onclick="brainToggleLayoutMenu();brainAutoLayout('radial')"><i data-lucide="circle-dot" style="width:14px;height:14px;"></i> Radial</div>
+                  <div id="viz-depth-popup" class="viz-toolbar-popup hidden" role="menu">
+                    <div class="viz-link-type-option active" role="menuitem" data-depth="all" onclick="vizSetDepth('all')"><i data-lucide="list-tree" style="width:14px;height:14px;"></i> Folders + items</div>
+                    <div class="viz-link-type-option" role="menuitem" data-depth="folders" onclick="vizSetDepth('folders')"><i data-lucide="folder-tree" style="width:14px;height:14px;"></i> Folders only</div>
+                    <div class="viz-link-type-option" role="menuitem" data-depth="items" onclick="vizSetDepth('items')"><i data-lucide="file" style="width:14px;height:14px;"></i> Items only</div>
                   </div>
                 </div>
-                <!-- Free-standing objects: arrows, lines, a timeline, shapes, text. -->
+
+                <!-- Colour by a rule. Painting nodes by hand is decoration; this
+                     is the one thing the map can show that the tree cannot. -->
                 <div class="viz-toolbar-dropdown">
-                  <button class="viz-zoom-btn viz-toolbar-pill-btn" id="brain-insert-btn" onclick="brainToggleInsertMenu()" title="Insert an object" aria-label="Insert an object" aria-haspopup="true">
-                    <i data-lucide="shapes" style="width:12px;height:12px;"></i>
+                  <button class="viz-zoom-btn viz-toolbar-pill-btn" id="viz-tint-btn" onclick="vizToggleTintMenu()" title="Colour by: Manual colours" aria-label="Colour the nodes by a rule" aria-haspopup="true">
+                    <i data-lucide="paintbrush" style="width:12px;height:12px;"></i>
                     <span class="viz-pill-chevron"><i data-lucide="chevron-down" style="width:10px;height:10px;"></i></span>
                   </button>
-                  <div id="brain-insert-popup" class="viz-toolbar-popup hidden" role="menu" style="min-width:200px;">
-                    <div class="viz-popup-title">Insert</div>
-                    ${(typeof BRAIN_SHAPES !== 'undefined' ? BRAIN_SHAPES : []).map(([id, label, icon]) =>
-                      `<div class="viz-link-type-option" role="menuitem" onclick="brainInsertShape('${id}')"><i data-lucide="${icon}" style="width:14px;height:14px;"></i> ${label}</div>`).join('')}
+                  <div id="viz-tint-popup" class="viz-toolbar-popup hidden" role="menu">
+                    <div class="viz-link-type-option active" role="menuitem" data-tint="none" onclick="vizSetTintRule('none')"><i data-lucide="palette" style="width:14px;height:14px;"></i> Manual colours</div>
+                    <div class="viz-link-type-option" role="menuitem" data-tint="progress" onclick="vizSetTintRule('progress')"><i data-lucide="trending-up" style="width:14px;height:14px;"></i> Progress</div>
+                    <div class="viz-link-type-option" role="menuitem" data-tint="score" onclick="vizSetTintRule('score')"><i data-lucide="target" style="width:14px;height:14px;"></i> Best score</div>
+                    <div class="viz-link-type-option" role="menuitem" data-tint="recency" onclick="vizSetTintRule('recency')"><i data-lucide="history" style="width:14px;height:14px;"></i> Last practised</div>
+                    <div class="viz-link-type-option" role="menuitem" data-tint="scope" onclick="vizSetTintRule('scope')"><i data-lucide="layers" style="width:14px;height:14px;"></i> Library</div>
                   </div>
                 </div>
-              </span>
 
-              <!-- ── View: what the canvas shows and how it is coloured ── -->
-              <div class="viz-toolbar-dropdown">
-                <button class="viz-zoom-btn viz-toolbar-pill-btn" id="viz-depth-btn" onclick="vizToggleDepthMenu()" title="Canvas shows: Folders + items" aria-label="Choose what the canvas shows" aria-haspopup="true">
-                  <i data-lucide="list-tree" style="width:12px;height:12px;"></i>
-                  <span class="viz-pill-chevron"><i data-lucide="chevron-down" style="width:10px;height:10px;"></i></span>
-                </button>
-                <div id="viz-depth-popup" class="viz-toolbar-popup hidden" role="menu">
-                  <div class="viz-link-type-option active" role="menuitem" data-depth="all" onclick="vizSetDepth('all')"><i data-lucide="list-tree" style="width:14px;height:14px;"></i> Folders + items</div>
-                  <div class="viz-link-type-option" role="menuitem" data-depth="folders" onclick="vizSetDepth('folders')"><i data-lucide="folder-tree" style="width:14px;height:14px;"></i> Folders only</div>
-                  <div class="viz-link-type-option" role="menuitem" data-depth="items" onclick="vizSetDepth('items')"><i data-lucide="file" style="width:14px;height:14px;"></i> Items only</div>
-                </div>
-              </div>
-
-              <!-- Colour by a rule. Painting nodes by hand is decoration; this
-                   is the one thing the map can show that the tree cannot. -->
-              <div class="viz-toolbar-dropdown">
-                <button class="viz-zoom-btn viz-toolbar-pill-btn" id="viz-tint-btn" onclick="vizToggleTintMenu()" title="Colour by: Manual colours" aria-label="Colour the nodes by a rule" aria-haspopup="true">
-                  <i data-lucide="paintbrush" style="width:12px;height:12px;"></i>
-                  <span class="viz-pill-chevron"><i data-lucide="chevron-down" style="width:10px;height:10px;"></i></span>
-                </button>
-                <div id="viz-tint-popup" class="viz-toolbar-popup hidden" role="menu">
-                  <div class="viz-link-type-option active" role="menuitem" data-tint="none" onclick="vizSetTintRule('none')"><i data-lucide="palette" style="width:14px;height:14px;"></i> Manual colours</div>
-                  <div class="viz-link-type-option" role="menuitem" data-tint="progress" onclick="vizSetTintRule('progress')"><i data-lucide="trending-up" style="width:14px;height:14px;"></i> Progress</div>
-                  <div class="viz-link-type-option" role="menuitem" data-tint="score" onclick="vizSetTintRule('score')"><i data-lucide="target" style="width:14px;height:14px;"></i> Best score</div>
-                  <div class="viz-link-type-option" role="menuitem" data-tint="recency" onclick="vizSetTintRule('recency')"><i data-lucide="history" style="width:14px;height:14px;"></i> Last practised</div>
-                  <div class="viz-link-type-option" role="menuitem" data-tint="scope" onclick="vizSetTintRule('scope')"><i data-lucide="layers" style="width:14px;height:14px;"></i> Library</div>
-                </div>
-              </div>
-
-              <!-- Local graph. 181 nodes is not a map, it is a wall. -->
-              <div class="viz-toolbar-dropdown">
-                <button class="viz-zoom-btn viz-toolbar-pill-btn" id="viz-focus-btn" onclick="vizToggleFocusMenu()" title="Local graph (G)" aria-label="Show only nodes near the selected one" aria-haspopup="true">
-                  <i data-lucide="crosshair" style="width:12px;height:12px;"></i>
-                  <span class="viz-pill-chevron"><i data-lucide="chevron-down" style="width:10px;height:10px;"></i></span>
-                </button>
-                <div id="viz-focus-popup" class="viz-toolbar-popup hidden" role="menu">
-                  <div class="viz-popup-title">Show around the selected node</div>
-                  <div class="viz-link-type-option active" role="menuitem" data-hops="0" onclick="vizSetFocusHops(0)"><i data-lucide="maximize" style="width:14px;height:14px;"></i> The whole graph</div>
-                  <div class="viz-link-type-option" role="menuitem" data-hops="1" onclick="vizSetFocusHops(1)"><i data-lucide="dot" style="width:14px;height:14px;"></i> 1 step away</div>
-                  <div class="viz-link-type-option" role="menuitem" data-hops="2" onclick="vizSetFocusHops(2)"><i data-lucide="dot" style="width:14px;height:14px;"></i> 2 steps</div>
-                  <div class="viz-link-type-option" role="menuitem" data-hops="3" onclick="vizSetFocusHops(3)"><i data-lucide="dot" style="width:14px;height:14px;"></i> 3 steps</div>
-                </div>
-              </div>
-
-              <!-- Saved views: a bookmark of the camera and the filters. -->
-              <div class="viz-toolbar-dropdown">
-                <button class="viz-zoom-btn viz-toolbar-pill-btn" id="viz-views-btn" onclick="vizToggleViewsMenu()" title="Saved views" aria-label="Saved views" aria-haspopup="true">
-                  <i data-lucide="bookmark" style="width:12px;height:12px;"></i>
-                  <span class="viz-pill-chevron"><i data-lucide="chevron-down" style="width:10px;height:10px;"></i></span>
-                </button>
-                <div id="viz-views-popup" class="viz-toolbar-popup hidden" role="menu"></div>
-              </div>
-
-              <div class="viz-toolbar-sep"></div>
-
-              <!-- ── Edit: the two modes that change what a click does ── -->
-              <div class="viz-toolbar-dropdown">
-                <button class="viz-zoom-btn viz-toolbar-pill-btn" id="viz-link-toggle-btn" onclick="vizToggleLinkMode()" title="Link mode (L)" aria-label="Link mode" aria-pressed="false">
-                  <i data-lucide="link" style="width:12px;height:12px;"></i>
-                  <span class="viz-pill-chevron" onclick="event.stopPropagation();vizToggleLinkTypeDropdown()"><i data-lucide="chevron-down" style="width:10px;height:10px;"></i></span>
-                </button>
-                <div id="viz-link-type-popup" class="viz-toolbar-popup hidden" role="menu">
-                  <div class="viz-link-type-option active" role="menuitem" data-type="arrow" onclick="vizSetLinkArrowType('arrow')"><i data-lucide="arrow-right" style="width:14px;height:14px;"></i> Arrow</div>
-                  <div class="viz-link-type-option" role="menuitem" data-type="double-arrow" onclick="vizSetLinkArrowType('double-arrow')"><i data-lucide="arrow-left-right" style="width:14px;height:14px;"></i> Double</div>
-                  <div class="viz-link-type-option" role="menuitem" data-type="none" onclick="vizSetLinkArrowType('none')"><i data-lucide="minus" style="width:14px;height:14px;"></i> None</div>
-                </div>
-              </div>
-              <div class="viz-toolbar-dropdown">
-                <button class="viz-zoom-btn viz-toolbar-pill-btn" id="viz-color-toggle-btn" onclick="vizToggleColorMode()" title="Paint colors" aria-label="Paint colours onto nodes" aria-pressed="false">
-                  <i data-lucide="palette" style="width:12px;height:12px;"></i>
-                </button>
-                <div id="viz-color-mode-popup" class="viz-toolbar-popup hidden" style="min-width:140px;">
-                  <div class="viz-popup-title">Paint colour</div>
-                  <div class="viz-color-picker" style="flex-wrap:wrap;gap:0.3rem;padding:0;">
-                    ${vizSwatchesHTML('vizSetPaintColor')}
+                <!-- Local graph. 181 nodes is not a map, it is a wall. -->
+                <div class="viz-toolbar-dropdown">
+                  <button class="viz-zoom-btn viz-toolbar-pill-btn" id="viz-focus-btn" onclick="vizToggleFocusMenu()" title="Local graph (G)" aria-label="Show only nodes near the selected one" aria-haspopup="true">
+                    <i data-lucide="crosshair" style="width:12px;height:12px;"></i>
+                    <span class="viz-pill-chevron"><i data-lucide="chevron-down" style="width:10px;height:10px;"></i></span>
+                  </button>
+                  <div id="viz-focus-popup" class="viz-toolbar-popup hidden" role="menu">
+                    <div class="viz-popup-title">Show around the selected node</div>
+                    <div class="viz-link-type-option active" role="menuitem" data-hops="0" onclick="vizSetFocusHops(0)"><i data-lucide="maximize" style="width:14px;height:14px;"></i> The whole graph</div>
+                    <div class="viz-link-type-option" role="menuitem" data-hops="1" onclick="vizSetFocusHops(1)"><i data-lucide="dot" style="width:14px;height:14px;"></i> 1 step away</div>
+                    <div class="viz-link-type-option" role="menuitem" data-hops="2" onclick="vizSetFocusHops(2)"><i data-lucide="dot" style="width:14px;height:14px;"></i> 2 steps</div>
+                    <div class="viz-link-type-option" role="menuitem" data-hops="3" onclick="vizSetFocusHops(3)"><i data-lucide="dot" style="width:14px;height:14px;"></i> 3 steps</div>
                   </div>
                 </div>
-              </div>
-              <button class="viz-zoom-btn viz-toolbar-pill-btn" id="viz-force-toggle-btn" onclick="vizToggleForceLayout()" title="Force layout (P) — physics simulation like Obsidian's graph" aria-label="Force layout" aria-pressed="false">
-                <i data-lucide="atom" style="width:12px;height:12px;"></i>
-              </button>
 
-              <div class="viz-toolbar-sep"></div>
+                <!-- Saved views: a bookmark of the camera and the filters. -->
+                <div class="viz-toolbar-dropdown">
+                  <button class="viz-zoom-btn viz-toolbar-pill-btn" id="viz-views-btn" onclick="vizToggleViewsMenu()" title="Saved views" aria-label="Saved views" aria-haspopup="true">
+                    <i data-lucide="bookmark" style="width:12px;height:12px;"></i>
+                    <span class="viz-pill-chevron"><i data-lucide="chevron-down" style="width:10px;height:10px;"></i></span>
+                  </button>
+                  <div id="viz-views-popup" class="viz-toolbar-popup hidden" role="menu"></div>
+                </div>
 
-              <!-- ── The sheet the canvas is drawn on: one dropdown, with its
-                   pattern and its colour as two child dropdowns ── -->
-              <div class="viz-toolbar-dropdown">
-                <button class="viz-zoom-btn viz-toolbar-pill-btn" id="viz-sheet-btn" onclick="vizToggleSheetMenu()" title="Sheet" aria-label="Sheet: pattern and colour" aria-haspopup="true">
-                  <i data-lucide="grid-2x2" style="width:12px;height:12px;"></i>
-                  <span class="viz-pill-chevron"><i data-lucide="chevron-down" style="width:10px;height:10px;"></i></span>
-                </button>
-                <div id="viz-sheet-popup" class="viz-toolbar-popup hidden" role="menu" style="min-width:220px;">
-                  <div class="viz-popup-title">Sheet</div>
-                  <button type="button" class="viz-link-type-option viz-sheet-sub-toggle" id="viz-sheet-pattern-toggle" aria-haspopup="menu" aria-expanded="false" onclick="vizToggleSheetSub('pattern')"><i data-lucide="grid-2x2"></i> Pattern <span class="viz-sheet-current" id="viz-sheet-pattern-current"></span><i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
-                  <div class="viz-ctx-submenu hidden" id="viz-sheet-pattern-list" role="menu">
-                    ${(typeof VIZ_SHEETS !== 'undefined' ? VIZ_SHEETS : []).map(([id, label]) =>
-                      `<div class="viz-link-type-option" role="menuitem" data-sheet="${id}" onclick="vizSetSheet('${id}')"><span class="viz-sheet-chip" data-sheet="${id}"></span>${label}</div>`).join('')}
-                  </div>
-                  <button type="button" class="viz-link-type-option viz-sheet-sub-toggle" id="viz-sheet-color-toggle" aria-haspopup="menu" aria-expanded="false" onclick="vizToggleSheetSub('color')"><i data-lucide="paint-bucket"></i> Colour <span class="viz-sheet-current" id="viz-sheet-color-current"></span><i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
-                  <div class="viz-ctx-submenu hidden" id="viz-sheet-color-list" role="menu">
-                    ${(typeof VIZ_SHEET_COLORS !== 'undefined' ? VIZ_SHEET_COLORS : []).map(([id, label, swatch]) =>
-                      `<div class="viz-link-type-option" role="menuitem" data-sheet-color="${id}" onclick="vizSetSheetColor('${id}')"><span class="viz-sheet-swatch" style="background:${swatch};"></span>${label}</div>`).join('')}
+                <!-- ── The sheet the canvas is drawn on: one dropdown, with its
+                     pattern and its colour as two child dropdowns ── -->
+                <div class="viz-toolbar-dropdown">
+                  <button class="viz-zoom-btn viz-toolbar-pill-btn" id="viz-sheet-btn" onclick="vizToggleSheetMenu()" title="Sheet" aria-label="Sheet: pattern and colour" aria-haspopup="true">
+                    <i data-lucide="grid-2x2" style="width:12px;height:12px;"></i>
+                    <span class="viz-pill-chevron"><i data-lucide="chevron-down" style="width:10px;height:10px;"></i></span>
+                  </button>
+                  <div id="viz-sheet-popup" class="viz-toolbar-popup hidden" role="menu" style="min-width:220px;">
+                    <div class="viz-popup-title">Sheet</div>
+                    <button type="button" class="viz-link-type-option viz-sheet-sub-toggle" id="viz-sheet-pattern-toggle" aria-haspopup="menu" aria-expanded="false" onclick="vizToggleSheetSub('pattern')"><i data-lucide="grid-2x2"></i> Pattern <span class="viz-sheet-current" id="viz-sheet-pattern-current"></span><i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
+                    <div class="viz-ctx-submenu hidden" id="viz-sheet-pattern-list" role="menu">
+                      ${(typeof VIZ_SHEETS !== 'undefined' ? VIZ_SHEETS : []).map(([id, label]) =>
+                        `<div class="viz-link-type-option" role="menuitem" data-sheet="${id}" onclick="vizSetSheet('${id}')"><span class="viz-sheet-chip" data-sheet="${id}"></span>${label}</div>`).join('')}
+                    </div>
+                    <button type="button" class="viz-link-type-option viz-sheet-sub-toggle" id="viz-sheet-color-toggle" aria-haspopup="menu" aria-expanded="false" onclick="vizToggleSheetSub('color')"><i data-lucide="paint-bucket"></i> Colour <span class="viz-sheet-current" id="viz-sheet-color-current"></span><i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
+                    <div class="viz-ctx-submenu hidden" id="viz-sheet-color-list" role="menu">
+                      ${(typeof VIZ_SHEET_COLORS !== 'undefined' ? VIZ_SHEET_COLORS : []).map(([id, label, swatch]) =>
+                        `<div class="viz-link-type-option" role="menuitem" data-sheet-color="${id}" onclick="vizSetSheetColor('${id}')"><span class="viz-sheet-swatch" style="background:${swatch};"></span>${label}</div>`).join('')}
+                    </div>
                   </div>
                 </div>
+
+                  <!-- Display: the switches that used to hide in More. -->
+                  <div class="viz-toolbar-dropdown">
+                    <button class="viz-zoom-btn viz-toolbar-pill-btn" id="viz-display-btn" onclick="vizToggleDisplayMenu()" title="Display: fog, globe, drag children, minimap" aria-label="Display options" aria-haspopup="true">
+                      <i data-lucide="monitor" style="width:12px;height:12px;"></i>
+                      <span class="viz-pill-chevron"><i data-lucide="chevron-down" style="width:10px;height:10px;"></i></span>
+                    </button>
+                    <div id="viz-display-popup" class="viz-toolbar-popup hidden" role="menu" style="min-width:210px;">
+                      <div class="viz-popup-title">Display</div>
+                      <button type="button" class="viz-link-type-option" role="menuitem" id="viz-fog-toggle-btn" onclick="vizToggleFog()" aria-pressed="false"><i data-lucide="eye-off" style="width:14px;height:14px;"></i> Fog of war</button>
+                      <button type="button" class="viz-link-type-option" role="menuitem" id="viz-globe-toggle-btn" onclick="vizToggleGlobeMode()" aria-pressed="false"><i data-lucide="circle-dot" style="width:14px;height:14px;"></i> Globe mode</button>
+                      <button type="button" class="viz-link-type-option" role="menuitem" id="viz-flow-toggle-btn" onclick="vizToggleFlowyDrag()" aria-pressed="false"><i data-lucide="wind" style="width:14px;height:14px;"></i> Drag children along</button>
+                      <!-- The minimap could only be dismissed inside Brain, which is
+                           where it is least in the way. On a phone it covers 16% of
+                           the canvas. -->
+                      <button type="button" class="viz-link-type-option" role="menuitem" id="viz-minimap-btn" onclick="vizToggleMinimap()" aria-pressed="true"><i data-lucide="map" style="width:14px;height:14px;"></i> Minimap</button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Edit: the modes that change what a click does. -->
+                <div class="vtb-panel" data-cat="edit" role="tabpanel" aria-label="Edit">
+                <!-- ── Edit: the two modes that change what a click does ── -->
+                <div class="viz-toolbar-dropdown">
+                  <button class="viz-zoom-btn viz-toolbar-pill-btn" id="viz-link-toggle-btn" onclick="vizToggleLinkMode()" title="Link mode (L)" aria-label="Link mode" aria-pressed="false">
+                    <i data-lucide="link" style="width:12px;height:12px;"></i>
+                    <span class="viz-pill-chevron" onclick="event.stopPropagation();vizToggleLinkTypeDropdown()"><i data-lucide="chevron-down" style="width:10px;height:10px;"></i></span>
+                  </button>
+                  <div id="viz-link-type-popup" class="viz-toolbar-popup hidden" role="menu">
+                    <div class="viz-link-type-option active" role="menuitem" data-type="arrow" onclick="vizSetLinkArrowType('arrow')"><i data-lucide="arrow-right" style="width:14px;height:14px;"></i> Arrow</div>
+                    <div class="viz-link-type-option" role="menuitem" data-type="double-arrow" onclick="vizSetLinkArrowType('double-arrow')"><i data-lucide="arrow-left-right" style="width:14px;height:14px;"></i> Double</div>
+                    <div class="viz-link-type-option" role="menuitem" data-type="none" onclick="vizSetLinkArrowType('none')"><i data-lucide="minus" style="width:14px;height:14px;"></i> None</div>
+                  </div>
+                </div>
+                <div class="viz-toolbar-dropdown">
+                  <button class="viz-zoom-btn viz-toolbar-pill-btn" id="viz-color-toggle-btn" onclick="vizToggleColorMode()" title="Paint colors" aria-label="Paint colours onto nodes" aria-pressed="false">
+                    <i data-lucide="palette" style="width:12px;height:12px;"></i>
+                  </button>
+                  <div id="viz-color-mode-popup" class="viz-toolbar-popup hidden" style="min-width:140px;">
+                    <div class="viz-popup-title">Paint colour</div>
+                    <div class="viz-color-picker" style="flex-wrap:wrap;gap:0.3rem;padding:0;">
+                      ${vizSwatchesHTML('vizSetPaintColor')}
+                    </div>
+                  </div>
+                </div>
+                <button class="viz-zoom-btn viz-toolbar-pill-btn" id="viz-force-toggle-btn" onclick="vizToggleForceLayout()" title="Force layout (P) — physics simulation like Obsidian's graph" aria-label="Force layout" aria-pressed="false">
+                  <i data-lucide="atom" style="width:12px;height:12px;"></i>
+                </button>
+
+                </div>
               </div>
+
               <div class="viz-toolbar-sep"></div>
               <div class="viz-zoom-controls">
                 <button class="viz-zoom-btn" onclick="vizZoomOut()" title="Zoom out (-)" aria-label="Zoom out"><i data-lucide="minus"></i></button>
@@ -287,21 +330,12 @@ function vizTemplate() {
               <button class="viz-zoom-btn" id="viz-zen-btn" onclick="vizToggleZen()" title="Canvas only (Ctrl+\\)" aria-label="Canvas only" aria-pressed="false"><i data-lucide="expand"></i></button>
               <div class="viz-toolbar-sep"></div>
 
-              <!-- ── The rest, behind one button ── -->
+              <!-- ── Export and help, behind one button ── -->
               <div class="viz-toolbar-dropdown">
-                <button class="viz-zoom-btn" id="viz-more-btn" onclick="vizToggleMoreMenu()" title="More canvas options" aria-label="More canvas options" aria-haspopup="true">
+                <button class="viz-zoom-btn" id="viz-more-btn" onclick="vizToggleMoreMenu()" title="Export and shortcuts" aria-label="Export and shortcuts" aria-haspopup="true">
                   <i data-lucide="more-horizontal"></i>
                 </button>
                 <div id="viz-more-popup" class="viz-toolbar-popup hidden" role="menu" style="min-width:210px;">
-                  <div class="viz-popup-title">Display</div>
-                  <button type="button" class="viz-link-type-option" role="menuitem" id="viz-fog-toggle-btn" onclick="vizToggleFog()" aria-pressed="false"><i data-lucide="eye-off" style="width:14px;height:14px;"></i> Fog of war</button>
-                  <button type="button" class="viz-link-type-option" role="menuitem" id="viz-globe-toggle-btn" onclick="vizToggleGlobeMode()" aria-pressed="false"><i data-lucide="circle-dot" style="width:14px;height:14px;"></i> Globe mode</button>
-                  <button type="button" class="viz-link-type-option" role="menuitem" id="viz-flow-toggle-btn" onclick="vizToggleFlowyDrag()" aria-pressed="false"><i data-lucide="wind" style="width:14px;height:14px;"></i> Drag children along</button>
-                  <!-- The minimap could only be dismissed inside Brain, which is
-                       where it is least in the way. On a phone it covers 16% of
-                       the canvas. -->
-                  <button type="button" class="viz-link-type-option" role="menuitem" id="viz-minimap-btn" onclick="vizToggleMinimap()" aria-pressed="true"><i data-lucide="map" style="width:14px;height:14px;"></i> Minimap</button>
-                  <div class="viz-ctx-divider"></div>
                   <div class="viz-popup-title">Export</div>
                   <button type="button" class="viz-link-type-option" role="menuitem" onclick="vizExportPNG()"><i data-lucide="image" style="width:14px;height:14px;"></i> Save as PNG</button>
                   <button type="button" class="viz-link-type-option" role="menuitem" onclick="vizExportSVG()"><i data-lucide="file-code-2" style="width:14px;height:14px;"></i> Save as SVG</button>
@@ -532,6 +566,102 @@ function vizTemplate() {
 
 function vizInit() {
   if (typeof initVisualization === 'function') initVisualization();
+  vizToolCatSync();
+}
+
+/* ── Tool categories ───────────────────────────────────────────
+   Build is Brain's own (snap, connections, lock, arrange, insert); View is
+   what the canvas shows and how (depth, colour rule, focus, saved views,
+   sheet, display switches); Edit is what a click does (link, paint, physics).
+   One is open at a time and remembered; a highlight slides between the tabs,
+   and a tab whose tools are switched on carries a dot, so a mode left on is
+   never hidden behind another tab. */
+const VIZ_TOOL_CAT_KEY = 'ssp.vizToolCat';
+
+function vizToolCat(cat, quiet) {
+  const bar = document.getElementById('viz-canvas-toolbar');
+  const tab = bar && bar.querySelector(`.vtb-cat[data-cat="${cat}"]`);
+  if (!tab || tab.classList.contains('hidden')) return;
+  if (!tab.classList.contains('is-active') && typeof vizClosePopups === 'function') vizClosePopups();
+  bar.querySelectorAll('.vtb-cat').forEach(t => {
+    const on = t === tab;
+    t.classList.toggle('is-active', on);
+    t.setAttribute('aria-selected', String(on));
+    t.tabIndex = on ? 0 : -1;
+  });
+  bar.querySelectorAll('.vtb-panel').forEach(p => p.classList.toggle('is-active', p.dataset.cat === cat));
+  _vizToolCatInk(bar);
+  if (!quiet) { try { localStorage.setItem(VIZ_TOOL_CAT_KEY, cat); } catch (e) { /* private mode */ } }
+}
+
+/** The sliding highlight sits under the open tab. */
+function _vizToolCatInk(bar) {
+  const tab = bar.querySelector('.vtb-cat.is-active');
+  const ink = bar.querySelector('.vtb-ink');
+  if (!tab || !ink) return;
+  ink.style.setProperty('--x', tab.offsetLeft + 'px');
+  ink.style.setProperty('--w', tab.offsetWidth + 'px');
+}
+
+/** A tab whose tools have something switched on carries a dot. */
+function _vizToolCatDots(bar) {
+  bar.querySelectorAll('.vtb-panel').forEach(p => {
+    const tab = bar.querySelector(`.vtb-cat[data-cat="${p.dataset.cat}"]`);
+    const on = [...p.querySelectorAll('.viz-toolbar-pill-btn.is-active, .viz-toolbar-pill-btn.active, .viz-toolbar-pill-btn[aria-pressed="true"]')]
+      .some(b => !b.closest('.hidden'));
+    if (tab) tab.classList.toggle('has-on', on);
+  });
+}
+
+/* Which categories have anything in them: outside Brain, Build is empty and
+   its tab goes; the four library views go inside Brain. Called on every
+   module switch (vizSyncModuleTools) and when the page opens. */
+function vizToolCatSync() {
+  const bar = document.getElementById('viz-canvas-toolbar');
+  if (!bar) return;
+  bar.querySelectorAll('.vtb-panel').forEach(p => {
+    const tab = bar.querySelector(`.vtb-cat[data-cat="${p.dataset.cat}"]`);
+    const has = [...p.querySelectorAll('.viz-toolbar-pill-btn')].some(b => !b.closest('.hidden'));
+    if (tab) tab.classList.toggle('hidden', !has);
+  });
+  const usable = c => { const t = c && bar.querySelector(`.vtb-cat[data-cat="${c}"]`); return t && !t.classList.contains('hidden'); };
+  let saved = null;
+  try { saved = localStorage.getItem(VIZ_TOOL_CAT_KEY); } catch (e) { saved = null; }
+  const isBrain = typeof viz !== 'undefined' && viz.activeModule === 'brain';
+  const cat = [saved, isBrain ? 'build' : 'view', 'view', 'edit', 'build'].find(usable);
+  if (cat) vizToolCat(cat, true);
+  // Keep the highlight under its tab as the bar narrows and the labels go,
+  // and the dots honest as tools switch on and off.
+  if (!bar._vtbWatch) {
+    bar._vtbWatch = true;
+    if (typeof ResizeObserver === 'function') {
+      const cats = bar.querySelector('.vtb-cats');
+      if (cats) new ResizeObserver(() => _vizToolCatInk(bar)).observe(cats);
+    }
+    const panels = bar.querySelector('.vtb-panels');
+    if (panels && typeof MutationObserver === 'function') {
+      new MutationObserver(() => _vizToolCatDots(bar))
+        .observe(panels, { subtree: true, attributes: true, attributeFilter: ['class', 'aria-pressed'] });
+    }
+  }
+  _vizToolCatDots(bar);
+}
+
+/** Left and right arrows move between the tabs. */
+function vizToolCatKey(e) {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  const tabs = [...e.currentTarget.querySelectorAll('.vtb-cat:not(.hidden)')];
+  const i = tabs.findIndex(t => t.classList.contains('is-active'));
+  const next = tabs[(i + (e.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length];
+  if (!next) return;
+  e.preventDefault();
+  vizToolCat(next.dataset.cat);
+  next.focus();
+}
+
+/** View's Display menu: fog, globe, drag children, minimap. */
+function vizToggleDisplayMenu() {
+  if (typeof vizTogglePopup === 'function') vizTogglePopup('viz-display-popup', typeof vizSyncMoreMenu === 'function' ? vizSyncMoreMenu : null);
 }
 function vizDestroy() {
   if (typeof destroyVisualization === 'function') destroyVisualization();

@@ -5321,3 +5321,112 @@ body.viz-no-anim .app-sidebar {
 /* Pin and lock beside a canvas that has an icon of its own: the star's size,
    quieter, so the star still reads as the one that matters. */
 .tree-node-star.brain-tree-mark { color: var(--text-tertiary); fill: none; }
+
+/* ── The canvas toolbar, in categories ──────────────────────────
+   Build / View / Edit tabs with a highlight that slides between them; only the
+   open category's tools are on screen, and they ripple in when it opens. A
+   tab whose tools have something switched on carries a dot. */
+.vtb-main { gap: 0.4rem; }
+.vtb-cats {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  padding: 3px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border-color) 80%, transparent);
+}
+.vtb-ink {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 0;
+  width: var(--w, 0px);
+  transform: translateX(var(--x, 0px));
+  border-radius: 8px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 30%, transparent), color-mix(in srgb, var(--color-primary) 16%, transparent));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary) 45%, transparent), 0 4px 14px -6px var(--color-primary);
+  transition: transform 0.38s cubic-bezier(0.3, 1.35, 0.5, 1), width 0.38s cubic-bezier(0.3, 1.35, 0.5, 1);
+  pointer-events: none;
+}
+.vtb-cat {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  height: 26px;
+  padding: 0 0.62rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+.vtb-cat.hidden { display: none; }
+.vtb-cat svg { width: 13px; height: 13px; transition: transform 0.3s cubic-bezier(0.3, 1.5, 0.5, 1); }
+.vtb-cat:hover { color: var(--text-primary); }
+.vtb-cat:hover svg { transform: rotate(-10deg) scale(1.12); }
+.vtb-cat.is-active { color: var(--color-primary); }
+.vtb-cat.is-active svg { animation: vtbHop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1); }
+.vtb-cat:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+/* Something in this category is switched on. */
+.vtb-cat.has-on::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--bg-surface), 0 0 8px var(--color-primary);
+  animation: vtbDot 0.3s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.vtb-cat.is-active.has-on::after { opacity: 0.55; }
+
+.vtb-panels { display: flex; align-items: center; min-width: 0; }
+.vtb-panel { display: none; align-items: center; gap: 0.3rem; }
+.vtb-panel.is-active { display: flex; }
+.vtb-panel .brain-only-tools { gap: 0.3rem; }
+/* The open category's tools ripple in, one after another. */
+.vtb-panel.is-active > *,
+.vtb-panel.is-active > .brain-only-tools > * {
+  animation: vtbIn 0.34s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+.vtb-panel.is-active > :nth-child(2),
+.vtb-panel.is-active > .brain-only-tools > :nth-child(2) { animation-delay: 35ms; }
+.vtb-panel.is-active > :nth-child(3),
+.vtb-panel.is-active > .brain-only-tools > :nth-child(3) { animation-delay: 70ms; }
+.vtb-panel.is-active > :nth-child(4),
+.vtb-panel.is-active > .brain-only-tools > :nth-child(4) { animation-delay: 105ms; }
+.vtb-panel.is-active > :nth-child(5),
+.vtb-panel.is-active > .brain-only-tools > :nth-child(5) { animation-delay: 140ms; }
+.vtb-panel.is-active > :nth-child(n+6),
+.vtb-panel.is-active > .brain-only-tools > :nth-child(n+6) { animation-delay: 175ms; }
+/* Tool icons lift a touch on hover. */
+.vtb-panel .viz-toolbar-pill-btn svg { transition: transform 0.25s cubic-bezier(0.3, 1.5, 0.5, 1); }
+.vtb-panel .viz-toolbar-pill-btn:hover svg:first-child { transform: translateY(-1px) scale(1.12); }
+
+@keyframes vtbIn { from { opacity: 0; translate: 0 6px; scale: 0.88; } }
+@keyframes vtbHop { 40% { transform: translateY(-3px) scale(1.15); } }
+@keyframes vtbDot { from { transform: scale(0); } }
+
+/* Narrow toolbars keep the tab icons and drop their words. */
+@container viztoolbar (max-width: 640px) {
+  .vtb-cat span { display: none; }
+  .vtb-cat { padding: 0 0.45rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vtb-ink { transition: none; }
+  .vtb-cat.is-active svg, .vtb-cat.has-on::after,
+  .vtb-panel.is-active > *, .vtb-panel.is-active > .brain-only-tools > * { animation: none; }
+}

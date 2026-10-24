@@ -2764,6 +2764,8 @@ function vizSyncModuleTools() {
   if (typeof vizSyncFocusBtn === 'function') vizSyncFocusBtn();
   if (typeof vizApplyMinimapVisibility === 'function') vizApplyMinimapVisibility();
   if (typeof vizSyncMoreMenu === 'function') vizSyncMoreMenu();
+  // Build is Brain's alone; the toolbar's categories follow what is shown.
+  if (typeof vizToolCatSync === 'function') vizToolCatSync();
 }
 
 /* ── The shortcuts, on request ────────────────────────────────
