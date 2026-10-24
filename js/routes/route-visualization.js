@@ -481,88 +481,96 @@ function vizTemplate() {
     </div>
 
     <!-- Brain Node Context Menu -->
-    <div id="brain-node-ctx" class="viz-context-menu hidden" role="menu">
+    <!-- The note menu, in three parts: the library link (only on a link), the
+         style -- five tabs, one panel open at a time -- and the actions as one
+         row. Every control keeps its id and handler; only the arrangement is
+         new. It used to be fourteen rows. -->
+    <div id="brain-node-ctx" class="viz-context-menu brain-note-menu hidden" role="menu">
       <!-- A library link's own controls (brain-libref.js): what its button does,
-           the other action once, and pointing it at something else. Shown only
-           for a note that links to a library item. -->
+           the other action once, and pointing it at something else. -->
       <div id="brain-ctx-ref" class="brain-ctx-ref hidden">
         <div class="brain-ctx-ref-head">
           <span class="brain-ctx-ref-ic"><i data-lucide="link-2"></i></span>
           <span class="brain-ctx-ref-text"><b id="brain-ctx-ref-name">Library link</b><span id="brain-ctx-ref-where"></span></span>
+          <button type="button" class="bnm-icon" id="brain-ctx-ref-other" data-mode="goto" onclick="brainRefCtxOther()" title="Show in library now" aria-label="Show in library now"><i data-lucide="locate-fixed"></i></button>
+          <button type="button" class="bnm-icon" onclick="brainRefCtxRelink()" title="Link another item…" aria-label="Link another item"><i data-lucide="replace"></i></button>
         </div>
-        <div class="brain-ref-mode-label">The button</div>
-        <div class="brain-ref-mode" role="radiogroup" aria-label="What the note's button does">
+        <div class="brain-ref-mode" role="radiogroup" aria-label="What the note's button does" title="What the note's button does">
           <button type="button" role="radio" data-mode="play" aria-checked="true" onclick="brainRefSetMode('play')" title="Start it, through its timer or setup window when it has one"><i data-lucide="play"></i> Play</button>
           <button type="button" role="radio" data-mode="goto" aria-checked="false" onclick="brainRefSetMode('goto')" title="Open its library at its folder and light it up"><i data-lucide="locate-fixed"></i> Show in library</button>
         </div>
-        <button class="viz-ctx-item" id="brain-ctx-ref-other" data-mode="goto" onclick="brainRefCtxOther()"><i data-lucide="locate-fixed"></i> Show in library now</button>
-        <button class="viz-ctx-item" onclick="brainRefCtxRelink()"><i data-lucide="replace"></i> Link another item…</button>
-        <div class="viz-ctx-divider"></div>
       </div>
-      <!-- Every colour lives in Personalize Color: one swatch row, and a toggle for
-           what it paints. Text, fill and edge are three separate settings
-           (node.textColor, node.bg, node.color) that never read each other.
-           Charcoal is the original Electric Border card's fill. -->
-      <button class="viz-ctx-item" id="brain-node-colors-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'colors')"><i data-lucide="palette"></i> Personalize Color <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
-      <div class="viz-ctx-submenu hidden" id="brain-node-colors-menu" role="menu">
-        <button type="button" class="brain-color-target-btn" id="brain-color-target-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="What the colour applies to" onclick="brainToggleColorTargetList(event)"><span id="brain-color-target-label">Border Edge Color</span><i data-lucide="chevron-down"></i></button>
-        <div class="brain-color-target-list hidden" id="brain-color-target-list" role="listbox">
-          <div class="viz-link-type-option" role="option" data-target="text" onclick="brainSetColorTarget('text')"><i data-lucide="type"></i> Text Color</div>
-          <div class="viz-link-type-option" role="option" data-target="bg" onclick="brainSetColorTarget('bg')"><i data-lucide="paint-bucket"></i> Background Color</div>
-          <div class="viz-link-type-option" role="option" data-target="edge" onclick="brainSetColorTarget('edge')"><i data-lucide="square"></i> Border Edge Color</div>
-          <!-- A library link's own two (brain-libref.js); hidden on other notes. -->
-          <div class="viz-link-type-option brain-ref-only hidden" role="option" data-target="refbtn" onclick="brainSetColorTarget('refbtn')"><i data-lucide="play"></i> Button Color</div>
-          <div class="viz-link-type-option brain-ref-only hidden" role="option" data-target="reftag" onclick="brainSetColorTarget('reftag')"><i data-lucide="tag"></i> Tag Color</div>
+
+      <!-- Style: Personalize Color, Border Type, Text Alignment, Font Family,
+           Spacing. Every colour lives in Color: one swatch row and a toggle for
+           what it paints (node.textColor, node.bg, node.color, and on a link
+           its button and tag). Charcoal is the original Electric Border card's
+           fill. Font's Default is the border's own font. -->
+      <div class="bnm-section">
+        <div class="bnm-tabs" role="toolbar" aria-label="Style">
+        <button type="button" class="bnm-tab" id="brain-node-colors-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'colors')" title="Personalize Color"><i data-lucide="palette"></i><span>Color</span></button>
+        <button type="button" class="bnm-tab" id="brain-node-border-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'border')" title="Border Type"><i data-lucide="frame"></i><span>Border</span></button>
+        <button type="button" class="bnm-tab" id="brain-node-align-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'align')" title="Text Alignment"><i data-lucide="align-left"></i><span>Align</span></button>
+        <button type="button" class="bnm-tab" id="brain-node-font-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'font')" title="Font Family"><i data-lucide="type"></i><span>Font</span></button>
+        <button type="button" class="bnm-tab" id="brain-node-spacing-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'spacing')" title="Spacing"><i data-lucide="unfold-vertical"></i><span>Spacing</span></button>
         </div>
-        <div class="viz-color-picker" id="brain-note-swatches">${vizSwatchesHTML('brainCtxPickColor', [['white', '#ffffff'], ['softwhite', '#e2e8f0', 'soft white (the default note text)'], ['black', '#000000'], ['charcoal', 'oklch(0.185 0 0)', 'charcoal (Electric Border original)']])}</div>
-      </div>
-      <button class="viz-ctx-item" id="brain-node-border-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'border')"><i data-lucide="frame"></i> Border Type <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
-      <div class="viz-ctx-submenu hidden" id="brain-node-border-menu" role="menu">
-        <div class="viz-link-type-option" role="menuitem" data-border="" onclick="brainCtxSetBorder(null)"><i data-lucide="square"></i> Default</div>
-        <div class="viz-link-type-option" role="menuitem" data-border="electric" onclick="brainCtxSetBorder('electric')"><i data-lucide="zap"></i> Electric Border</div>
-        <div class="viz-link-type-option" role="menuitem" data-border="medieval" onclick="brainCtxSetBorder('medieval')"><i data-lucide="castle"></i> Medieval Border</div>
-        <!-- Manhua Border is a dropdown of its own: picking it makes the note
-             Manhua and opens it, and its one child is Bubble Shape, which holds
-             the balloons. None of it exists for any other border. -->
-        <div class="viz-link-type-option brain-manhua-opt" role="menuitem" id="brain-node-manhua-toggle" data-border="manhua" aria-haspopup="menu" aria-expanded="false" onclick="brainCtxManhua(event)"><i data-lucide="message-circle"></i> Manhua Border <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></div>
-        <div class="viz-ctx-submenu hidden" id="brain-node-manhua-menu" role="menu">
-          <button class="viz-ctx-item" id="brain-node-bubble-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleBubbleSub(event)"><i data-lucide="message-square"></i> Bubble Shape <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
-          <div class="viz-ctx-submenu hidden" id="brain-node-bubble-menu" role="menu">
-            ${(typeof BRAIN_BUBBLES !== 'undefined' ? BRAIN_BUBBLES : []).map(([id, label]) =>
-              `<div class="viz-link-type-option" role="menuitem" data-bubble="${id}" onclick="brainCtxSetBubble('${id}')">${label}</div>`).join('')}
+        <div class="bnm-panels">
+        <div class="viz-ctx-submenu hidden" id="brain-node-colors-menu" role="menu">
+          <button type="button" class="brain-color-target-btn" id="brain-color-target-btn" aria-haspopup="listbox" aria-expanded="false" aria-label="What the colour applies to" onclick="brainToggleColorTargetList(event)"><span id="brain-color-target-label">Border Edge Color</span><i data-lucide="chevron-down"></i></button>
+          <div class="brain-color-target-list hidden" id="brain-color-target-list" role="listbox">
+            <div class="viz-link-type-option" role="option" data-target="text" onclick="brainSetColorTarget('text')"><i data-lucide="type"></i> Text Color</div>
+            <div class="viz-link-type-option" role="option" data-target="bg" onclick="brainSetColorTarget('bg')"><i data-lucide="paint-bucket"></i> Background Color</div>
+            <div class="viz-link-type-option" role="option" data-target="edge" onclick="brainSetColorTarget('edge')"><i data-lucide="square"></i> Border Edge Color</div>
+            <!-- A library link's own two (brain-libref.js); hidden on other notes. -->
+            <div class="viz-link-type-option brain-ref-only hidden" role="option" data-target="refbtn" onclick="brainSetColorTarget('refbtn')"><i data-lucide="play"></i> Button Color</div>
+            <div class="viz-link-type-option brain-ref-only hidden" role="option" data-target="reftag" onclick="brainSetColorTarget('reftag')"><i data-lucide="tag"></i> Tag Color</div>
+          </div>
+          <div class="viz-color-picker" id="brain-note-swatches">${vizSwatchesHTML('brainCtxPickColor', [['white', '#ffffff'], ['softwhite', '#e2e8f0', 'soft white (the default note text)'], ['black', '#000000'], ['charcoal', 'oklch(0.185 0 0)', 'charcoal (Electric Border original)']])}</div>
+        </div>
+        <div class="viz-ctx-submenu hidden" id="brain-node-border-menu" role="menu">
+          <div class="viz-link-type-option" role="menuitem" data-border="" onclick="brainCtxSetBorder(null)"><i data-lucide="square"></i> Default</div>
+          <div class="viz-link-type-option" role="menuitem" data-border="electric" onclick="brainCtxSetBorder('electric')"><i data-lucide="zap"></i> Electric Border</div>
+          <div class="viz-link-type-option" role="menuitem" data-border="medieval" onclick="brainCtxSetBorder('medieval')"><i data-lucide="castle"></i> Medieval Border</div>
+          <!-- Manhua Border is a dropdown of its own: picking it makes the note
+               Manhua and opens it, and its one child is Bubble Shape, which holds
+               the balloons. None of it exists for any other border. -->
+          <div class="viz-link-type-option brain-manhua-opt" role="menuitem" id="brain-node-manhua-toggle" data-border="manhua" aria-haspopup="menu" aria-expanded="false" onclick="brainCtxManhua(event)"><i data-lucide="message-circle"></i> Manhua Border <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></div>
+          <div class="viz-ctx-submenu hidden" id="brain-node-manhua-menu" role="menu">
+            <button class="viz-ctx-item" id="brain-node-bubble-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleBubbleSub(event)"><i data-lucide="message-square"></i> Bubble Shape <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
+            <div class="viz-ctx-submenu hidden" id="brain-node-bubble-menu" role="menu">
+              ${(typeof BRAIN_BUBBLES !== 'undefined' ? BRAIN_BUBBLES : []).map(([id, label]) =>
+                `<div class="viz-link-type-option" role="menuitem" data-bubble="${id}" onclick="brainCtxSetBubble('${id}')">${label}</div>`).join('')}
+            </div>
           </div>
         </div>
+        <div class="viz-ctx-submenu hidden" id="brain-node-align-menu" role="menu">
+          <div class="viz-link-type-option" role="menuitem" data-value="left" onclick="brainCtxSetNote('textAlign', 'left')"><i data-lucide="align-left"></i> Left</div>
+          <div class="viz-link-type-option" role="menuitem" data-value="center" onclick="brainCtxSetNote('textAlign', 'center')"><i data-lucide="align-center"></i> Center</div>
+          <div class="viz-link-type-option" role="menuitem" data-value="right" onclick="brainCtxSetNote('textAlign', 'right')"><i data-lucide="align-right"></i> Right</div>
+        </div>
+        <div class="viz-ctx-submenu hidden" id="brain-node-font-menu" role="menu">
+          <div class="viz-link-type-option" role="menuitem" data-value="" onclick="brainCtxSetNote('fontFamily', null)">Default</div>
+          <div class="viz-link-type-option" role="menuitem" data-value="arial" style="font-family: Arial, Helvetica, sans-serif;" onclick="brainCtxSetNote('fontFamily', 'arial')">Arial</div>
+          <div class="viz-link-type-option" role="menuitem" data-value="sans" style="font-family: sans-serif;" onclick="brainCtxSetNote('fontFamily', 'sans')">Sans-serif</div>
+          <div class="viz-link-type-option" role="menuitem" data-value="comic" style="font-family: var(--font-comic); text-transform: uppercase;" onclick="brainCtxSetNote('fontFamily', 'comic')">Comic (Manga)</div>
+        </div>
+        <div class="viz-ctx-submenu hidden" id="brain-node-spacing-menu" role="menu">
+          <div class="viz-popup-title">Line Spacing</div>
+          <div class="brain-spacing-row" data-prop="lineSpacing"><button type="button" data-value="1" onclick="brainCtxSetNote('lineSpacing', 1)">1.0</button><button type="button" data-value="1.15" onclick="brainCtxSetNote('lineSpacing', 1.15)">1.15</button><button type="button" data-value="1.5" onclick="brainCtxSetNote('lineSpacing', null)">1.5</button><button type="button" data-value="2" onclick="brainCtxSetNote('lineSpacing', 2)">2.0</button></div>
+          <div class="viz-popup-title">Paragraph Spacing</div>
+          <div class="brain-spacing-row" data-prop="paraSpacing"><button type="button" data-value="" onclick="brainCtxSetNote('paraSpacing', null)">None</button><button type="button" data-value="s" onclick="brainCtxSetNote('paraSpacing', 's')">Small</button><button type="button" data-value="m" onclick="brainCtxSetNote('paraSpacing', 'm')">Medium</button><button type="button" data-value="l" onclick="brainCtxSetNote('paraSpacing', 'l')">Large</button></div>
+        </div>
+        </div>
       </div>
-      <button class="viz-ctx-item" id="brain-node-align-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'align')"><i data-lucide="align-left"></i> Text Alignment <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
-      <div class="viz-ctx-submenu hidden" id="brain-node-align-menu" role="menu">
-        <div class="viz-link-type-option" role="menuitem" data-value="left" onclick="brainCtxSetNote('textAlign', 'left')"><i data-lucide="align-left"></i> Left</div>
-        <div class="viz-link-type-option" role="menuitem" data-value="center" onclick="brainCtxSetNote('textAlign', 'center')"><i data-lucide="align-center"></i> Center</div>
-        <div class="viz-link-type-option" role="menuitem" data-value="right" onclick="brainCtxSetNote('textAlign', 'right')"><i data-lucide="align-right"></i> Right</div>
+
+      <!-- Actions, one row. -->
+      <div class="bnm-actions">
+        <button type="button" class="bnm-act" onclick="brainCtxEditComment()" title="Edit Comment"><i data-lucide="edit-2"></i><span>Edit</span></button>
+        <button type="button" class="bnm-act" onclick="brainCtxStartLink()" title="Add Link"><i data-lucide="link"></i><span>Link</span></button>
+        <button type="button" class="bnm-act" id="brain-ctx-collapse-btn" style="display:none;" onclick="brainCtxCollapseChildren()" title="Collapse Children"><i data-lucide="chevrons-up"></i><span>Collapse</span></button>
+        <button type="button" class="bnm-act" id="brain-ctx-expand-btn" style="display:none;" onclick="brainCtxExpandChildren()" title="Expand Children"><i data-lucide="chevrons-down"></i><span>Expand</span></button>
+        <button type="button" class="bnm-act danger" onclick="brainCtxDeleteNode()" title="Delete"><i data-lucide="trash-2"></i><span>Delete</span></button>
       </div>
-      <!-- Default is the border's own font: the app's for every border but
-           Manhua, whose default is comic lettering. Each option shows itself. -->
-      <button class="viz-ctx-item" id="brain-node-font-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'font')"><i data-lucide="type"></i> Font Family <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
-      <div class="viz-ctx-submenu hidden" id="brain-node-font-menu" role="menu">
-        <div class="viz-link-type-option" role="menuitem" data-value="" onclick="brainCtxSetNote('fontFamily', null)">Default</div>
-        <div class="viz-link-type-option" role="menuitem" data-value="arial" style="font-family: Arial, Helvetica, sans-serif;" onclick="brainCtxSetNote('fontFamily', 'arial')">Arial</div>
-        <div class="viz-link-type-option" role="menuitem" data-value="sans" style="font-family: sans-serif;" onclick="brainCtxSetNote('fontFamily', 'sans')">Sans-serif</div>
-        <div class="viz-link-type-option" role="menuitem" data-value="comic" style="font-family: var(--font-comic); text-transform: uppercase;" onclick="brainCtxSetNote('fontFamily', 'comic')">Comic (Manga)</div>
-      </div>
-      <button class="viz-ctx-item" id="brain-node-spacing-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleNodeSub(event, 'spacing')"><i data-lucide="unfold-vertical"></i> Spacing <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
-      <div class="viz-ctx-submenu hidden" id="brain-node-spacing-menu" role="menu">
-        <div class="viz-popup-title">Line Spacing</div>
-        <div class="brain-spacing-row" data-prop="lineSpacing"><button type="button" data-value="1" onclick="brainCtxSetNote('lineSpacing', 1)">1.0</button><button type="button" data-value="1.15" onclick="brainCtxSetNote('lineSpacing', 1.15)">1.15</button><button type="button" data-value="1.5" onclick="brainCtxSetNote('lineSpacing', null)">1.5</button><button type="button" data-value="2" onclick="brainCtxSetNote('lineSpacing', 2)">2.0</button></div>
-        <div class="viz-popup-title">Paragraph Spacing</div>
-        <div class="brain-spacing-row" data-prop="paraSpacing"><button type="button" data-value="" onclick="brainCtxSetNote('paraSpacing', null)">None</button><button type="button" data-value="s" onclick="brainCtxSetNote('paraSpacing', 's')">Small</button><button type="button" data-value="m" onclick="brainCtxSetNote('paraSpacing', 'm')">Medium</button><button type="button" data-value="l" onclick="brainCtxSetNote('paraSpacing', 'l')">Large</button></div>
-      </div>
-      <div class="viz-ctx-divider"></div>
-      <button class="viz-ctx-item" onclick="brainCtxEditComment()"><i data-lucide="edit-2"></i> Edit Comment</button>
-      <button class="viz-ctx-item" onclick="brainCtxStartLink()"><i data-lucide="link"></i> Add Link</button>
-      <div class="viz-ctx-divider"></div>
-      <button class="viz-ctx-item" id="brain-ctx-collapse-btn" style="display:none;" onclick="brainCtxCollapseChildren()"><i data-lucide="chevrons-up"></i> Collapse Children</button>
-      <button class="viz-ctx-item" id="brain-ctx-expand-btn" style="display:none;" onclick="brainCtxExpandChildren()"><i data-lucide="chevrons-down"></i> Expand Children</button>
-      <div class="viz-ctx-divider"></div>
-      <button class="viz-ctx-item danger" onclick="brainCtxDeleteNode()"><i data-lucide="trash-2"></i> Delete</button>
     </div>
 
     <!-- Brain Link Context Menu -->

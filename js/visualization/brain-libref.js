@@ -359,9 +359,10 @@ function brainRefSyncCtx(node) {
   const other = document.getElementById('brain-ctx-ref-other');
   if (other) {
     other.dataset.mode = mode === 'play' ? 'goto' : 'play';
-    other.innerHTML = mode === 'play'
-      ? '<i data-lucide="locate-fixed"></i> Show in library now'
-      : '<i data-lucide="play"></i> Play now';
+    const words = mode === 'play' ? 'Show in library now' : 'Play now';
+    other.title = words;
+    other.setAttribute('aria-label', words);
+    other.innerHTML = `<i data-lucide="${mode === 'play' ? 'locate-fixed' : 'play'}"></i>`;
     if (typeof lucide !== 'undefined') lucide.createIcons({ root: other });
   }
 }

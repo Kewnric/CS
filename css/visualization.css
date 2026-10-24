@@ -5552,7 +5552,6 @@ body.viz-no-anim .app-sidebar {
 .brain-ctx-ref-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
 .brain-ctx-ref-text b { font-size: 0.8rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 190px; }
 .brain-ctx-ref-text span { font-size: 0.66rem; color: var(--text-tertiary); }
-.brain-ref-mode-label { padding: 0 0.55rem 0.25rem; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); }
 .brain-ref-mode {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -5820,3 +5819,102 @@ body.viz-no-anim .app-sidebar {
    switching category changes the tools' width, never where the tabs are. */
 .viz-canvas-toolbar > .viz-canvas-toolbar-left { flex: 0 1 auto; }
 .viz-canvas-toolbar > .vtb-cats { margin-right: auto; }
+
+/* ── The note menu, compact ─────────────────────────────────────
+   Link section, then Style as five tabs with one panel open beneath them,
+   then the actions as one row of small buttons. */
+.brain-note-menu { width: 252px; padding: 0.4rem; }
+.brain-note-menu .brain-ctx-ref { padding-bottom: 0.4rem; margin-bottom: 0.35rem; border-bottom: 1px solid var(--border-color); }
+.brain-note-menu .brain-ctx-ref-head { padding: 0.2rem 0.15rem 0.45rem 0.25rem; gap: 0.5rem; }
+.brain-note-menu .brain-ctx-ref-text { flex: 1; }
+.brain-note-menu .brain-ctx-ref-text b { max-width: 130px; }
+.brain-note-menu .brain-ref-mode { margin: 0 0.1rem; }
+.bnm-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.2s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+.bnm-icon svg { width: 15px; height: 15px; }
+.bnm-icon:hover { color: var(--rc, var(--color-primary)); background: color-mix(in srgb, var(--rc, var(--color-primary)) 14%, transparent); transform: scale(1.08); }
+
+.bnm-tabs { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 2px; padding: 3px; border-radius: 11px; background: color-mix(in srgb, var(--text-primary) 5%, transparent); }
+.bnm-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.38rem 0.1rem 0.3rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.6rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+.bnm-tab.hidden { display: none; }
+.bnm-tab svg { width: 15px; height: 15px; transition: transform 0.3s cubic-bezier(0.3, 1.5, 0.5, 1); }
+.bnm-tab:hover { color: var(--text-primary); background: color-mix(in srgb, var(--text-primary) 7%, transparent); }
+.bnm-tab:hover svg { transform: translateY(-1px) scale(1.1); }
+.bnm-tab[aria-expanded="true"] {
+  color: #fff;
+  background: var(--color-primary);
+  box-shadow: 0 4px 12px -6px var(--color-primary);
+}
+.bnm-tab[aria-expanded="true"] svg { animation: vtbHop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1); }
+/* The open panel sits under the tabs as a card, sliding in. */
+.bnm-panels > .viz-ctx-submenu:not(.hidden) {
+  margin: 0.35rem 0 0;
+  padding: 0.35rem;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--text-primary) 3%, transparent);
+  animation: bnmPanel 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.bnm-panels > .viz-ctx-submenu .viz-ctx-submenu:not(.hidden) { animation: bnmPanel 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
+
+.bnm-actions {
+  display: flex;
+  gap: 2px;
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--border-color);
+}
+.bnm-act {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  min-width: 0;
+  padding: 0.38rem 0.1rem 0.3rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.6rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.bnm-act svg { width: 15px; height: 15px; transition: transform 0.25s cubic-bezier(0.3, 1.5, 0.5, 1); }
+.bnm-act:hover { color: var(--text-primary); background: color-mix(in srgb, var(--text-primary) 7%, transparent); }
+.bnm-act:hover svg { transform: translateY(-1px) scale(1.1); }
+.bnm-act.danger { color: color-mix(in srgb, var(--color-danger) 80%, var(--text-secondary)); }
+.bnm-act.danger:hover { color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 12%, transparent); }
+.bnm-tab:focus-visible, .bnm-act:focus-visible, .bnm-icon:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+@keyframes bnmPanel { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) {
+  .bnm-panels .viz-ctx-submenu, .bnm-tab svg { animation: none !important; }
+}
