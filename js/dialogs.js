@@ -567,11 +567,21 @@ function showIconPicker(title, message, current, onConfirm) {
   setTimeout(() => q.focus(), 50);
 }
 
-function showInputDialog(title, message, placeholder, defaultValue, onConfirm) {
+/* The box opens EMPTY and focused, ready to type. A default value -- a
+   suggested name like "New Folder", or the current name when renaming -- is
+   shown as the placeholder rather than typed into the box, where it had to be
+   deleted before anything new could go in. Enter on an empty box takes it.
+   A dialog that edits a value in place (a comma list you add to) passes
+   { prefill: true } as a sixth argument to keep the text in the box. */
+function showInputDialog(title, message, placeholder, defaultValue, onConfirm, opts) {
   const modal = document.getElementById('dialog-modal');
+  const suggestion = String(defaultValue == null ? '' : defaultValue).trim();
+  const prefill = !!(opts && opts.prefill);
   if (!modal) {
-    const result = prompt(message || title, defaultValue || '');
-    if (result !== null && result.trim()) onConfirm(result.trim());
+    const result = prompt(message || title, prefill ? suggestion : '');
+    if (result === null) return;
+    const v = result.trim() || (prefill ? '' : suggestion);
+    if (v) onConfirm(v);
     return;
   }
 
@@ -583,9 +593,9 @@ function showInputDialog(title, message, placeholder, defaultValue, onConfirm) {
   const btnContainer = document.getElementById('dialog-actions');
   btnContainer.innerHTML = `
     <div style="display:flex;flex-direction:column;gap:0.625rem;width:100%;">
-      <input id="dlg-input" class="form-input"
-        placeholder="${escapeHTML(placeholder || '')}"
-        value="${escapeHTML(defaultValue || '')}"
+      <input id="dlg-input" class="form-input" autocomplete="off"
+        placeholder="${escapeHTML(!prefill && suggestion ? suggestion : (placeholder || ''))}"
+        value="${escapeHTML(prefill ? suggestion : '')}"
         style="width:100%;" />
       <div style="display:flex;gap:0.5rem;">
         <button id="dlg-cancel" class="btn btn-secondary" style="flex:1;">Cancel</button>
@@ -596,7 +606,7 @@ function showInputDialog(title, message, placeholder, defaultValue, onConfirm) {
 
   const input = document.getElementById('dlg-input');
   const doConfirm = () => {
-    const val = input.value.trim();
+    const val = input.value.trim() || (prefill ? '' : suggestion);
     if (!val) { input.focus(); return; }
     closeModalSmooth(modal);
     onConfirm(val);
@@ -608,7 +618,18 @@ function showInputDialog(title, message, placeholder, defaultValue, onConfirm) {
 
   _dlgOpen(modal);
   lucide.createIcons({ root: modal });
-  setTimeout(() => input.focus(), 80);
+  // Focus at once, and again once the opening animation and whatever click
+  // opened the dialog (a menu closing, a button keeping focus) have settled,
+  // so the caret is always waiting in the box. A text being kept is selected,
+  // so typing replaces it and an arrow key keeps it.
+  const ready = () => {
+    if (!input.isConnected || modal.classList.contains('hidden') || document.activeElement === input) return;
+    input.focus({ preventScroll: true });
+    if (prefill && input.value) input.select();
+  };
+  ready();
+  setTimeout(ready, 80);
+  setTimeout(ready, 260);
 }
 
 // ── showListPickerDialog — replaces numbered-list prompt() ──

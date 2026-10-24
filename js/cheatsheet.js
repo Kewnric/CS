@@ -488,7 +488,7 @@ window.csCardMenu = function (e, id) {
   const linked = programs.find(c => c.id === s.programId);
   const actions = [
     { icon: 'pencil', label: 'Rename', fn: () => showInputDialog('Rename sheet', null, 'Name', s.title, v => { s.title = (v || '').trim() || s.title; csBump(s); csRender(); }) },
-    { icon: 'tag', label: 'Topics…', fn: () => showInputDialog('Topics', 'Comma separated.', 'Topics', (s.tags || []).join(', '), v => { s.tags = (v || '').split(',').map(x => x.trim()).filter(Boolean); csBump(s); csRender(); }) },
+    { icon: 'tag', label: 'Topics…', fn: () => showInputDialog('Topics', 'Comma separated.', 'Topics', (s.tags || []).join(', '), v => { s.tags = (v || '').split(',').map(x => x.trim()).filter(Boolean); csBump(s); csRender(); }, { prefill: true }) },
     { icon: s.pinned ? 'pin-off' : 'pin', label: s.pinned ? 'Unpin' : 'Pin to top', fn: () => { s.pinned = !s.pinned; csBump(s); csRender(); } },
     { sep: true },
     // The cover was already in the model (csCover reads both) with no way in.
