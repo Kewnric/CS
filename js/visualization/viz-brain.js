@@ -1324,7 +1324,14 @@ function brainRenderCanvas() {
         port.addEventListener('pointerdown', (e) => {
           if (e.pointerType === 'mouse' && e.button !== 0) return;
           e.stopPropagation(); e.preventDefault();
-          brainPortDragStart(e, node.id, side);
+          // The port sits over the last few pixels of every link arriving
+          // here, arrowhead included -- exactly where you reach to move that
+          // link -- so it used to swallow the press and start a new link
+          // instead. Pressed on an arriving link's line, it takes that link's
+          // tip; pressed clear of one, it starts a new link as before.
+          const arriving = _brainLinkArrivingAt(e, node.id);
+          if (arriving) _brainLinkEndDrag(e, arriving, 'tip');
+          else brainPortDragStart(e, node.id, side);
         });
         el.appendChild(port);
       });
@@ -2292,6 +2299,11 @@ function brainPortDragStart(e, nodeId, side, opts) {
         }
         brain.links.push(made);
         brainRenderCanvas(); brainSaveCurrentVersion();
+      } else if (opts && opts.original) {
+        // A moved end dropped where the same connection already exists: the
+        // link goes back where it was rather than vanishing.
+        brain.links.push(opts.original);
+        brainRenderCanvas(); brainSaveCurrentVersion();
       }
     }
     brain._portDragSide = null;
@@ -2302,42 +2314,96 @@ function brainPortDragStart(e, nodeId, side, opts) {
   document.addEventListener('pointercancel', onUp, true);
 }
 
-/* Grab a link by one of its ends to move that end. Pressed within the last
-   10% of its length (the tip) or the first 30% (where it leaves), that end
-   comes off its note and follows the pointer like a new connection, with the
-   same port snapping: dropped on a note it reconnects there, keeping the
-   link's colour, arrow type and direction; dropped on empty canvas it stays
-   disconnected. One undo step either way. The middle of a link is left
-   alone. It used to do nothing at all, so a link could only be deleted and
-   drawn again. */
+/* Grab a link by one of its ends to move that end. Pressed on its first or
+   last third, that end comes off its note and follows the pointer like a new
+   connection, with the same port snapping: dropped on a note it reconnects
+   there, keeping the link's id, colour, arrow type and direction; dropped on
+   empty canvas it stays disconnected. One undo step either way. The middle
+   third is left alone, so the canvas can still be panned from it. The tip can
+   also be taken from the port it arrives at (see the port's pointerdown). */
 function brainLinkGrab(e, linkId) {
   if ((e.pointerType === 'mouse' && e.button !== 0) || brainIsLocked() || brain.linkModeEnabled || brain.linkingFrom) return;
   const link = brain.links.find(l => l.id === linkId);
   const path = e.currentTarget && e.currentTarget.querySelector('.viz-link-hitbox');
-  const container = document.getElementById('viz-canvas-container');
-  if (!link || !path || !container || typeof path.getTotalLength !== 'function') return;
+  const pt = _brainCanvasPoint(e);
+  if (!link || !path || !pt || typeof path.getTotalLength !== 'function') return;
   const L = path.getTotalLength();
   if (!L) return;
   // Where along the link the press landed, as a share of its length (0 at the
   // note it leaves, 1 at the tip). Paths are in canvas units.
-  const r = container.getBoundingClientRect();
-  const px = (e.clientX - r.left - brain.pan.x) / brain.zoom, py = (e.clientY - r.top - brain.pan.y) / brain.zoom;
   let at = 0, bestD = Infinity;
   for (let i = 0; i <= 60; i++) {
     const p = path.getPointAtLength(L * i / 60);
-    const d = (p.x - px) ** 2 + (p.y - py) ** 2;
+    const d = (p.x - pt.x) ** 2 + (p.y - pt.y) ** 2;
     if (d < bestD) { bestD = d; at = i / 60; }
   }
-  const tip = at >= 0.9, start = at <= 0.3;
-  if (!tip && !start) return;
+  if (at > 1 / 3 && at < 2 / 3) return;
+  _brainLinkEndDrag(e, link, at >= 2 / 3 ? 'tip' : 'start');
+}
+
+/** A pointer event's position in canvas units. */
+function _brainCanvasPoint(e) {
+  const container = document.getElementById('viz-canvas-container');
+  if (!container) return null;
+  const r = container.getBoundingClientRect();
+  return { x: (e.clientX - r.left - brain.pan.x) / brain.zoom, y: (e.clientY - r.top - brain.pan.y) / brain.zoom };
+}
+
+/* The link whose tip arrives at this note under the pointer, if any: its
+   line passes within 10 canvas units of the press somewhere in its last 40. */
+function _brainLinkArrivingAt(e, nodeId) {
+  if (brainIsLocked() || brain.linkModeEnabled || brain.linkingFrom) return null;
+  const svg = document.getElementById('viz-canvas-svg');
+  const pt = _brainCanvasPoint(e);
+  if (!svg || !pt) return null;
+  let best = null, bestD = 10 * 10;
+  brain.links.forEach(link => {
+    if (link.to !== nodeId) return;
+    const g = svg.querySelector(`g.viz-link-group[data-link-id="${link.id}"]`);
+    const path = g && g.querySelector('.viz-link-hitbox');
+    if (!path || typeof path.getTotalLength !== 'function') return;
+    const L = path.getTotalLength();
+    for (let s = Math.max(0, L - 40); s <= L; s += 4) {
+      const p = path.getPointAtLength(s);
+      const d = (p.x - pt.x) ** 2 + (p.y - pt.y) ** 2;
+      if (d <= bestD) { bestD = d; best = link; }
+    }
+  });
+  return best;
+}
+
+/* Where a link is attached, as opposed to what it looks like. Everything
+   else -- id, colour, arrow type, and anything a link gains later -- travels
+   with an end that is moved. */
+const BRAIN_LINK_PLACE_KEYS = new Set(['from', 'to', 'fromSide', 'toSide', 'isBridge', 'bridgeSourceId']);
+
+/* Move one end of a link. Nothing comes off until the pointer has moved a few
+   pixels: a plain click near a link's end used to disconnect it on the spot.
+   Then the end leaves its note and follows the pointer (brainPortDragStart),
+   held at the other end. */
+function _brainLinkEndDrag(e, link, end) {
   e.stopPropagation(); e.preventDefault();
-  brainPushUndo();
-  const carry = { color: link.color || null };
-  if (link.arrowType) carry.arrowType = link.arrowType;
-  brain.links = brain.links.filter(l => l.id !== linkId);
-  brainSaveCurrentVersion();   // dropped on nothing, it stays disconnected
-  if (tip) brainPortDragStart(e, link.from, link.fromSide || null, { regrab: true, carry });
-  else brainPortDragStart(e, link.to, link.toSide || null, { regrab: true, carry, reverse: true });
+  const x0 = e.clientX, y0 = e.clientY;
+  const stop = () => {
+    document.removeEventListener('pointermove', onMove, true);
+    document.removeEventListener('pointerup', stop, true);
+    document.removeEventListener('pointercancel', stop, true);
+  };
+  function onMove(mv) {
+    if (Math.hypot(mv.clientX - x0, mv.clientY - y0) < 4) return;
+    stop();
+    if (!brain.links.includes(link)) return;
+    brainPushUndo();
+    const carry = {};
+    Object.keys(link).forEach(k => { if (!BRAIN_LINK_PLACE_KEYS.has(k)) carry[k] = link[k]; });
+    brain.links = brain.links.filter(l => l !== link);
+    brainSaveCurrentVersion();   // dropped on nothing, it stays disconnected
+    if (end === 'tip') brainPortDragStart(mv, link.from, link.fromSide || null, { regrab: true, carry, original: link });
+    else brainPortDragStart(mv, link.to, link.toSide || null, { regrab: true, carry, original: link, reverse: true });
+  }
+  document.addEventListener('pointermove', onMove, true);
+  document.addEventListener('pointerup', stop, true);
+  document.addEventListener('pointercancel', stop, true);
 }
 
 function brainHideAllMenus() {
