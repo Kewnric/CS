@@ -6156,9 +6156,16 @@ body.viz-no-anim .app-sidebar {
 
 /* ── A library link marked done ─────────────────────────────────
    Faded like a finished card in its library; the check on its corner and the
-   ports stay at full strength, and hovering brings the note back up to read. */
-.viz-node.is-libref-done > :not(.brain-ref-done):not(.viz-port) { opacity: 0.4; transition: opacity 0.25s ease; }
-.viz-node.is-libref-done:hover > :not(.brain-ref-done):not(.viz-port) { opacity: 0.85; }
+   ports stay at full strength, and hovering brings the note back up to read.
+   !important because a Brain note's card pins itself solid with
+   `.viz-node[data-type="comment"] .viz-node-inner { opacity: 1 !important }`;
+   this selector is the more specific of the two, so with !important it wins.
+   Without it the check appeared and nothing faded. */
+.viz-node.is-libref-done > :not(.brain-ref-done):not(.viz-port) { opacity: 0.4 !important; }
+.viz-node.is-libref-done:hover > :not(.brain-ref-done):not(.viz-port) { opacity: 0.85 !important; }
+/* A finished item does not call for attention: its button stops pulsing.
+   (Caught mid-pulse on a dark card, the ring read as a muddy box.) */
+.viz-node.is-libref-done .brain-ref-btn::after { display: none; }
 .brain-ref-done {
   position: absolute;
   top: -10px;
