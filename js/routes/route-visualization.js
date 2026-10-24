@@ -131,22 +131,23 @@ function vizTemplate() {
               <span class="vct-icon" id="viz-canvas-toolbar-icon" aria-hidden="true"><i data-lucide="git-branch"></i></span>
               <span class="vct-text" id="viz-canvas-toolbar-label"><span class="vct-eyebrow">Canvas</span><span class="vct-name">Canvas</span></span>
             </div>
+            <!-- The tabs sit beside the title, so switching category never moves
+                 them: only the tools on the right change width. -->
+            <!-- ── Categories: the tools sorted into three, one shown at a time ── -->
+            <div class="vtb-cats" role="tablist" aria-label="Tool categories" onkeydown="vizToolCatKey(event)">
+              <span class="vtb-ink" aria-hidden="true"></span>
+              <button type="button" class="vtb-cat" role="tab" data-cat="build" aria-selected="false" onclick="vizToolCat('build')" title="Build: snap, connections, lock, arrange and insert">
+                <i data-lucide="hammer"></i><span>Build</span>
+              </button>
+              <button type="button" class="vtb-cat" role="tab" data-cat="view" aria-selected="false" onclick="vizToolCat('view')" title="View: what the canvas shows, colours, focus, saved views, sheet and display">
+                <i data-lucide="eye"></i><span>View</span>
+              </button>
+              <button type="button" class="vtb-cat" role="tab" data-cat="edit" aria-selected="false" onclick="vizToolCat('edit')" title="Edit: link, paint and physics">
+                <i data-lucide="pen-tool"></i><span>Edit</span>
+              </button>
+            </div>
             <div class="vtb-main">
               <span class="brain-saved-chip" id="brain-saved-chip" aria-live="polite"></span>
-
-              <!-- ── Categories: the tools sorted into three, one shown at a time ── -->
-              <div class="vtb-cats" role="tablist" aria-label="Tool categories" onkeydown="vizToolCatKey(event)">
-                <span class="vtb-ink" aria-hidden="true"></span>
-                <button type="button" class="vtb-cat" role="tab" data-cat="build" aria-selected="false" onclick="vizToolCat('build')" title="Build: snap, connections, lock, arrange and insert">
-                  <i data-lucide="hammer"></i><span>Build</span>
-                </button>
-                <button type="button" class="vtb-cat" role="tab" data-cat="view" aria-selected="false" onclick="vizToolCat('view')" title="View: what the canvas shows, colours, focus, saved views, sheet and display">
-                  <i data-lucide="eye"></i><span>View</span>
-                </button>
-                <button type="button" class="vtb-cat" role="tab" data-cat="edit" aria-selected="false" onclick="vizToolCat('edit')" title="Edit: link, paint and physics">
-                  <i data-lucide="pen-tool"></i><span>Edit</span>
-                </button>
-              </div>
 
               <div class="vtb-panels">
                 <!-- Build: Brain's own tools. -->
@@ -509,6 +510,9 @@ function vizTemplate() {
           <div class="viz-link-type-option" role="option" data-target="text" onclick="brainSetColorTarget('text')"><i data-lucide="type"></i> Text Color</div>
           <div class="viz-link-type-option" role="option" data-target="bg" onclick="brainSetColorTarget('bg')"><i data-lucide="paint-bucket"></i> Background Color</div>
           <div class="viz-link-type-option" role="option" data-target="edge" onclick="brainSetColorTarget('edge')"><i data-lucide="square"></i> Border Edge Color</div>
+          <!-- A library link's own two (brain-libref.js); hidden on other notes. -->
+          <div class="viz-link-type-option brain-ref-only hidden" role="option" data-target="refbtn" onclick="brainSetColorTarget('refbtn')"><i data-lucide="play"></i> Button Color</div>
+          <div class="viz-link-type-option brain-ref-only hidden" role="option" data-target="reftag" onclick="brainSetColorTarget('reftag')"><i data-lucide="tag"></i> Tag Color</div>
         </div>
         <div class="viz-color-picker" id="brain-note-swatches">${vizSwatchesHTML('brainCtxPickColor', [['white', '#ffffff'], ['softwhite', '#e2e8f0', 'soft white (the default note text)'], ['black', '#000000'], ['charcoal', 'oklch(0.185 0 0)', 'charcoal (Electric Border original)']])}</div>
       </div>

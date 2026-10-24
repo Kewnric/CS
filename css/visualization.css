@@ -5448,52 +5448,52 @@ body.viz-no-anim .app-sidebar {
   justify-self: start;
   display: inline-flex;
   align-items: center;
-  gap: 0.28rem;
+  gap: 0.22rem;
   margin-bottom: 0.3rem;
-  padding: 0.08rem 0.45rem 0.08rem 0.35rem;
+  padding: 0.06rem 0.42rem 0.06rem 0.32rem;
   border-radius: 999px;
   font-family: var(--font-sans);
-  font-size: 0.62rem;
+  font-size: 0.56rem;
   font-weight: 800;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--rc);
-  background: color-mix(in srgb, var(--rc) 16%, transparent);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rc) 32%, transparent);
+  color: var(--rt-ink, #fff);
+  background: var(--rt, var(--rc));
+  box-shadow: 0 3px 8px -4px var(--rt, var(--rc)), inset 0 1px 0 rgba(255, 255, 255, 0.18);
   pointer-events: none;
 }
-.brain-ref-tag svg { width: 11px; height: 11px; }
+.brain-ref-tag svg { width: 10px; height: 10px; }
 .brain-ref-btn {
   grid-area: btn;
   position: relative;
   display: grid;
   place-items: center;
-  width: 38px;
-  height: 38px;
+  width: 30px;
+  height: 30px;
   border: 0;
-  border-radius: 50%;
-  color: #fff;
-  background: radial-gradient(circle at 30% 25%, color-mix(in srgb, var(--rc) 70%, #fff), var(--rc) 55%, color-mix(in srgb, var(--rc) 70%, #000));
-  box-shadow: 0 6px 16px -6px var(--rc), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  border-radius: 9px;
+  color: var(--rb-ink, #fff);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--rb, var(--rc)) 78%, #fff), var(--rb, var(--rc)) 55%, color-mix(in srgb, var(--rb, var(--rc)) 82%, #000));
+  box-shadow: 0 5px 14px -6px var(--rb, var(--rc)), inset 0 1px 0 rgba(255, 255, 255, 0.28);
   cursor: pointer;
   transition: transform 0.25s cubic-bezier(0.3, 1.5, 0.5, 1), box-shadow 0.25s ease;
 }
-.brain-ref-btn svg { width: 16px; height: 16px; margin-left: 2px; fill: currentColor; }
+.brain-ref-btn svg { width: 14px; height: 14px; margin-left: 1px; fill: currentColor; }
 .brain-ref-btn.is-goto svg { margin-left: 0; fill: none; }
 /* A ring breathes out of the button so it reads as something to press. */
 .brain-ref-btn::after {
   content: '';
   position: absolute;
   inset: -3px;
-  border-radius: 50%;
-  border: 2px solid var(--rc);
+  border-radius: 11px;
+  border: 2px solid var(--rb, var(--rc));
   opacity: 0;
   animation: blrRing 2.6s ease-out infinite;
   pointer-events: none;
 }
-.brain-ref-btn:hover { transform: scale(1.12); box-shadow: 0 10px 22px -6px var(--rc), inset 0 1px 0 rgba(255, 255, 255, 0.3); }
+.brain-ref-btn:hover { transform: scale(1.1) rotate(-4deg); box-shadow: 0 9px 20px -6px var(--rb, var(--rc)), inset 0 1px 0 rgba(255, 255, 255, 0.3); }
 .brain-ref-btn:active { transform: scale(0.94); }
-.brain-ref-btn:focus-visible { outline: 2px solid var(--rc); outline-offset: 3px; }
+.brain-ref-btn:focus-visible { outline: 2px solid var(--rb, var(--rc)); outline-offset: 3px; }
 .viz-node.is-libref-missing .brain-ref-btn { background: var(--bg-surface-hover); color: var(--text-tertiary); box-shadow: none; }
 .viz-node.is-libref-missing .brain-ref-btn::after { display: none; }
 .viz-node.is-libref-missing .brain-ref-tag { color: var(--text-tertiary); background: var(--bg-surface-hover); box-shadow: none; }
@@ -5814,3 +5814,9 @@ body.viz-no-anim .app-sidebar {
   .brain-ref-btn::after, .blr-tile, .blr-lib, .blr-row, .blr-box, .blr-overlay, .blr-flash { animation: none !important; }
   .blr-flash { box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.75); }
 }
+
+/* The category tabs beside the canvas title: the title takes only what it
+   needs, the tabs follow it, and everything else goes to the right -- so
+   switching category changes the tools' width, never where the tabs are. */
+.viz-canvas-toolbar > .viz-canvas-toolbar-left { flex: 0 1 auto; }
+.viz-canvas-toolbar > .vtb-cats { margin-right: auto; }

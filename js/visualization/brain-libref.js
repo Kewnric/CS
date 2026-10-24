@@ -20,7 +20,7 @@
 function brainRefLibs() {
   const libs = [
     {
-      key: 'coding', name: 'Coding', full: 'Coding Library', icon: 'code-2', itemIcon: 'file-code',
+      key: 'coding', name: 'Coding', homes: ['browse'], full: 'Coding Library', icon: 'code-2', itemIcon: 'file-code',
       color: 'var(--color-primary)', noun: 'program', scope: 'challenge',
       items: () => state.challenges || [],
       play: id => { if (typeof promptTimer === 'function') promptTimer(id); },
@@ -28,7 +28,7 @@ function brainRefLibs() {
       flash: id => `.tree-node[data-node-id="${id}"] > .tree-node-row`
     },
     {
-      key: 'notes', name: 'Notes', full: 'Notes Library', icon: 'book-open', itemIcon: 'book-open',
+      key: 'notes', name: 'Notes', homes: ['study'], full: 'Notes Library', icon: 'book-open', itemIcon: 'book-open',
       color: 'var(--color-warning)', noun: 'notebook', scope: 'notebook',
       items: () => state.notebooks || [],
       play: id => {
@@ -52,13 +52,14 @@ function brainRefLibs() {
         _brainRefGo('snippets', () => {
           activeSnippetId = id;
           if (typeof openTryCodingModal === 'function') openTryCodingModal();
+          _brainReturnWhenClosed('try-coding-modal', 'snippets');
         });
       },
       reveal: id => { setSessionParam('activeSnippetId', id); return 'snippets'; },
       flash: id => `.tree-node[data-node-id="${id}"] > .tree-node-row`
     },
     {
-      key: 'typing', name: 'Typing', full: 'Memorization Typing Library', icon: 'keyboard', itemIcon: 'file-text',
+      key: 'typing', name: 'Typing', homes: ['typing'], full: 'Memorization Typing Library', icon: 'keyboard', itemIcon: 'file-text',
       color: '#e2b714', noun: 'entry',
       items: () => state.typeItems || [],
       groups: () => [
@@ -75,7 +76,7 @@ function brainRefLibs() {
       flash: id => `.mtl-row[data-ref-id="${id}"]`
     },
     {
-      key: 'language', name: 'Language', full: 'Language Library', icon: 'languages', itemIcon: 'dumbbell',
+      key: 'language', name: 'Language', homes: ['language'], full: 'Language Library', icon: 'languages', itemIcon: 'dumbbell',
       color: '#a855f7', noun: 'drill',
       items: () => (state.langSets || []).concat(state.langScenarios || []),
       groups: () => [
@@ -96,7 +97,7 @@ function brainRefLibs() {
     }
   ];
   (typeof LIBRARY_WINGS !== 'undefined' ? LIBRARY_WINGS : []).forEach(w => libs.push({
-    key: 'wing:' + w.key, wing: w.key, name: String(w.name || w.key).replace(/ Library$/, ''), full: w.name,
+    key: 'wing:' + w.key, wing: w.key, homes: [w.key, 'library'], name: String(w.name || w.key).replace(/ Library$/, ''), full: w.name,
     icon: w.icon || 'file-text', itemIcon: w.icon || 'file-text', color: w.accent || '#8b5cf6',
     noun: 'entry', scope: 'wing:' + w.key,
     items: () => (typeof wingItems === 'function' ? wingItems(w.key) : []),
@@ -163,8 +164,98 @@ function brainRefRun(nodeId, mode) {
     const route = typeof went === 'string' ? went : went && went.route;
     if (route) _brainRefGo(route, () => _brainRefFlash(lib.flash(it.id, node.ref.sub)), !!(went && went.navigated));
   } else {
+    _brainReturnArm(lib);
     lib.play(it.id, node.ref.sub);
   }
+}
+
+/* ── Coming back to Brain ───────────────────────────────────────
+   An attempt started from a Brain note comes back to Brain when it ends; one
+   started in its library goes back to its library, as it always has. Play
+   leaves a marker for the tab (sessionStorage); every attempt page counts as
+   still inside the trip, and when the attempt exits to its library's page --
+   the one place its exits go -- that navigation is swapped for Brain, replacing
+   the history entry so Back does not bounce through the library. Leaving the
+   attempt for anywhere else, or going back to Brain by hand, ends the trip.
+   A Play that never reached its attempt (the timer window cancelled) is
+   forgotten the moment you go anywhere. The listener runs in the capture
+   phase, before the router's, so the library is never drawn on the way. */
+const BRAIN_RETURN_KEY = 'ssp.brainReturn';
+const BRAIN_ATTEMPT_ROUTES = new Set(['practice', 'practice-set', 'solution', 'drills', 'notes-practice', 'notes-solution',
+  'snippet-attempt', 'typing-attempt', 'lang-attempt', 'lang-quest', 'wing-recall']);
+
+function _brainReturnArm(lib) {
+  if (!lib || !lib.homes) return;
+  try { sessionStorage.setItem(BRAIN_RETURN_KEY, JSON.stringify({ homes: lib.homes, entered: false })); } catch (e) { /* private mode */ }
+}
+function _brainReturnRead() {
+  try { return JSON.parse(sessionStorage.getItem(BRAIN_RETURN_KEY) || 'null'); } catch (e) { return null; }
+}
+function _brainReturnClear() {
+  try { sessionStorage.removeItem(BRAIN_RETURN_KEY); } catch (e) { /* private mode */ }
+}
+
+window.addEventListener('hashchange', e => {
+  const trip = _brainReturnRead();
+  if (!trip) return;
+  const next = (location.hash.replace(/^#\/?/, '') || 'home').split('?')[0];
+  if (BRAIN_ATTEMPT_ROUTES.has(next)) {
+    if (!trip.entered) {
+      trip.entered = true;
+      try { sessionStorage.setItem(BRAIN_RETURN_KEY, JSON.stringify(trip)); } catch (_) { /* private mode */ }
+    }
+    return;
+  }
+  const prev = document.body.dataset.route;
+  _brainReturnClear();
+  if (trip.entered && BRAIN_ATTEMPT_ROUTES.has(prev) && (trip.homes || []).includes(next)) {
+    e.stopImmediatePropagation();
+    location.replace('#/visualization');
+  }
+}, true);
+
+/* Snippets' Try Coding happens in a window on the snippets page: closing the
+   window ends it, and an attempt that came from Brain goes back there. */
+function _brainReturnWhenClosed(modalId, route) {
+  const modal = document.getElementById(modalId);
+  if (!modal || modal.classList.contains('hidden') || typeof MutationObserver !== 'function') return;
+  const watch = new MutationObserver(() => {
+    if (!modal.isConnected || document.body.dataset.route !== route) { watch.disconnect(); return; }
+    if (modal.classList.contains('hidden')) { watch.disconnect(); location.replace('#/visualization'); }
+  });
+  watch.observe(modal, { attributes: true, attributeFilter: ['class'] });
+}
+
+/* ── Colours ────────────────────────────────────────────────────
+   The button and the tag can each take a colour from Personalize Color
+   (Button Color, Tag Color: offered only on a link). What sits on them --
+   the glyph, the words -- is worked out from how light that colour is: a deep
+   shade of it on a light colour, a near-white tint of it on a dark one, so a
+   white button never carries a white play mark. */
+if (typeof BRAIN_COLOR_PROPS !== 'undefined') Object.assign(BRAIN_COLOR_PROPS, { refbtn: 'refBtn', reftag: 'refTag' });
+if (typeof BRAIN_COLOR_TARGET_LABELS !== 'undefined') Object.assign(BRAIN_COLOR_TARGET_LABELS, { refbtn: 'Button Color', reftag: 'Tag Color' });
+const BRAIN_REF_TARGETS = new Set(['refbtn', 'reftag']);
+
+/** A colour's relative lightness, 0..1; CSS variables are read off the page. */
+function _brainRefLightness(color) {
+  let c = String(color || '').trim();
+  const v = /^var\((--[\w-]+)/.exec(c);
+  if (v && typeof getComputedStyle === 'function') c = getComputedStyle(document.documentElement).getPropertyValue(v[1]).trim();
+  let r, g, b;
+  let m = /^#([0-9a-f]{3})$/i.exec(c);
+  if (m) [r, g, b] = m[1].split('').map(h => parseInt(h + h, 16));
+  else if ((m = /^#([0-9a-f]{6})/i.exec(c))) [r, g, b] = [0, 2, 4].map(i => parseInt(m[1].slice(i, i + 2), 16));
+  else if ((m = /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i.exec(c))) [r, g, b] = [m[1], m[2], m[3]].map(Number);
+  else return 0.3;   // unknown: treat as dark, so the mark on it is light
+  const lin = x => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+/** What goes on top of a colour: its own deep shade, or its own pale tint. */
+function _brainRefInk(color) {
+  return _brainRefLightness(color) > 0.45
+    ? `color-mix(in srgb, ${color} 28%, #05070d)`
+    : `color-mix(in srgb, ${color} 10%, #ffffff)`;
 }
 
 /* ── The note ───────────────────────────────────────────────── */
@@ -178,7 +269,14 @@ function brainRefDecorate(el, node) {
   const goto = node.refMode === 'goto';
   el.classList.add('is-libref');
   el.classList.toggle('is-libref-missing', !it);
-  el.style.setProperty('--rc', lib ? lib.color : 'var(--text-tertiary)');
+  const base = lib ? lib.color : 'var(--text-tertiary)';
+  const btnC = node.refBtn && typeof vizColorMap === 'function' ? vizColorMap(node.refBtn) : base;
+  const tagC = node.refTag && typeof vizColorMap === 'function' ? vizColorMap(node.refTag) : base;
+  el.style.setProperty('--rc', base);
+  el.style.setProperty('--rb', btnC);
+  el.style.setProperty('--rb-ink', _brainRefInk(btnC));
+  el.style.setProperty('--rt', tagC);
+  el.style.setProperty('--rt-ink', _brainRefInk(tagC));
   const what = lib ? (lib.name + ' · ' + lib.noun) : 'Library link';
   const label = !it ? 'Missing from its library' : goto ? 'Show it in ' + (lib.full || lib.name) : 'Play it';
   body.insertAdjacentHTML('afterbegin',
@@ -237,9 +335,11 @@ function _brainRefRelink(nodeId, libKey, id, sub) {
 
 /** Show the link's section of the note menu, marked with what its button does. */
 function brainRefSyncCtx(node) {
+  const on = !!(node && node.ref);
+  document.querySelectorAll('#brain-node-ctx .brain-ref-only').forEach(o => o.classList.toggle('hidden', !on));
+  if (!on && BRAIN_REF_TARGETS.has(brain._colorTarget)) brain._colorTarget = 'edge';
   const box = document.getElementById('brain-ctx-ref');
   if (!box) return;
-  const on = !!(node && node.ref);
   box.classList.toggle('hidden', !on);
   if (!on) return;
   const lib = _brainRefLib(node.ref.lib);
