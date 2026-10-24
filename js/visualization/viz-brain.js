@@ -1181,8 +1181,8 @@ function brainRenderCanvas() {
     const isGhost = brainBridgeGhostIds.has(node.id) || (brain._focusedParentId && !brainFocusIds.has(node.id));
     el.className = `viz-node ${node.id === brain.selectedNodeId ? 'selected' : ''}${isGlobe ? ' viz-globe-node' : ''}${isGhost ? ' viz-bridge-ghost' : ''}`;
     el.dataset.type = 'comment';
-    if (node.color) el.dataset.color = node.color;
-    if (node.bg) el.dataset.bg = node.bg;
+    vizApplyNodeColor(el, node.color);   // a palette name or a hex code
+    vizApplyNodeBg(el, node.bg);
     // Text settings ride on custom properties the note's text reads.
     if (node.textColor) el.style.setProperty('--note-text', vizColorMap(node.textColor));
     if (node.textAlign) el.style.setProperty('--note-align', node.textAlign);
@@ -1362,7 +1362,7 @@ function brainRenderCanvas() {
       ? vizBezierPath(fn.x, fn.y, fw, fh, tn.x, tn.y, tw, th, link.fromSide, link.toSide)
       : `M ${fn.x + fw/2} ${fn.y + fh/2} L ${tn.x + tw/2} ${tn.y + th/2}`;
     const lc = link.color ? `stroke:${vizColorMap(link.color)};` : '';
-    const arrowId = link.color ? `viz-arrowhead-col-${link.color}` : 'viz-arrowhead-custom';
+    const arrowId = link.color ? vizArrowheadId(link.color) : 'viz-arrowhead-custom';
     // Older links have no arrowType; they were always drawn with one head.
     const arrowType = link.arrowType || 'arrow';
     const markerEnd = arrowType !== 'none' ? `marker-end="url(#${arrowId})"` : '';
@@ -3245,17 +3245,15 @@ function brainLinkCtx(e, linkId) {
   brain.contextLinkId = linkId;
   const menu = document.getElementById('brain-link-ctx');
   if (!menu) return;
-  // Opens collapsed, and before it is measured, so it is placed at its real size.
-  const sub = document.getElementById('brain-link-type-menu');
-  const toggle = document.getElementById('brain-link-type-toggle');
-  if (sub) sub.classList.add('hidden');
-  if (toggle) toggle.setAttribute('aria-expanded', 'false');
   if (typeof vizPositionMenu === 'function') vizPositionMenu(menu, e.clientX, e.clientY);
   else { menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px'; menu.classList.remove('hidden'); }
   const link = brain.links.find(l => l.id === linkId);
   menu.querySelectorAll('.viz-color-swatch').forEach(sw => { sw.classList.toggle('active', sw.dataset.color === (link?.color || '')); });
   const type = (link && link.arrowType) || 'arrow';
-  menu.querySelectorAll('#brain-link-type-menu .viz-link-type-option').forEach(o => o.classList.toggle('active', o.dataset.type === type));
+  menu.querySelectorAll('#brain-link-type-menu [data-type]').forEach(o => {
+    o.classList.toggle('active', o.dataset.type === type);
+    o.setAttribute('aria-checked', String(o.dataset.type === type));
+  });
 }
 
 /** Connector Type: opens its options inside the link menu, below the row. */

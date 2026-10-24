@@ -5918,3 +5918,238 @@ body.viz-no-anim .app-sidebar {
 @media (prefers-reduced-motion: reduce) {
   .bnm-panels .viz-ctx-submenu, .bnm-tab svg { animation: none !important; }
 }
+
+/* ── Colours from the wheel ─────────────────────────────────────
+   A hex colour is data-color/data-bg "custom" with the colour in the same
+   variables the palette rules set (vizApplyNodeColor / vizApplyNodeBg). */
+.viz-node[data-color="custom"] .viz-node-inner { border-color: var(--viz-node-accent) !important; }
+.viz-globe-node[data-color="custom"] .viz-globe-circle {
+  border-color: var(--viz-node-accent) !important;
+  background: color-mix(in srgb, var(--viz-node-accent) 8%, transparent);
+}
+
+/* The rainbow swatch: a conic wheel with a white middle. */
+.viz-color-swatch.viz-swatch-wheel {
+  background:
+    radial-gradient(circle closest-side, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0) 70%),
+    conic-gradient(#ff3b3b, #ffb21f, #f7f43a, #3ad15b, #22c3f5, #5b5ff7, #c04df5, #ff3b8f, #ff3b3b) !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18), 0 2px 8px -2px rgba(0, 0, 0, 0.5);
+}
+.viz-color-swatch.viz-swatch-wheel:hover { transform: scale(1.2) rotate(90deg); }
+
+/* ── The connector menus, in the note menu's layout ──────────── */
+.bnm-menu { width: 236px; padding: 0.45rem; }
+.bnm-label {
+  padding: 0.2rem 0.3rem 0.3rem;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.bnm-menu .viz-color-picker {
+  display: grid;
+  grid-template-columns: repeat(7, 20px);
+  justify-content: space-between;
+  gap: 0.45rem 0;
+  padding: 0 0.3rem 0.5rem;
+}
+.bnm-seg {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  padding: 3px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+}
+.bnm-seg button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.38rem 0.1rem 0.3rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.6rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+.bnm-seg button svg { width: 15px; height: 15px; transition: transform 0.3s cubic-bezier(0.3, 1.5, 0.5, 1); }
+.bnm-seg button:hover { color: var(--text-primary); background: color-mix(in srgb, var(--text-primary) 7%, transparent); }
+.bnm-seg button:hover svg { transform: translateX(2px); }
+.bnm-seg button.active {
+  color: #fff;
+  background: var(--color-primary);
+  box-shadow: 0 4px 12px -6px var(--color-primary);
+}
+.bnm-seg button.active svg { animation: vtbHop 0.45s cubic-bezier(0.3, 1.5, 0.5, 1); }
+.bnm-menu .bnm-act > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bnm-menu .bnm-act svg + * { line-height: 1.2; }
+
+/* ── The colour wheel ───────────────────────────────────────── */
+.viz-wheel {
+  --vw-color: #6366f1;
+  --vw-pure: #6366f1;
+  --vw-dim: 0;
+  position: fixed;
+  z-index: 2600;
+  width: 248px;
+  padding: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--vw-color) 35%, var(--border-color));
+  border-radius: 16px;
+  background: var(--bg-elevated);
+  box-shadow: 0 24px 60px -18px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+  animation: vwIn 0.22s cubic-bezier(0.2, 0.9, 0.3, 1.2);
+  transform-origin: top left;
+  transition: border-color 0.2s ease;
+}
+.viz-wheel.is-closing { animation: vwIn 0.15s ease reverse forwards; }
+.vw-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.6rem; }
+.vw-title { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem; font-weight: 800; color: var(--text-primary); }
+.vw-title svg { width: 14px; height: 14px; color: var(--vw-color); }
+.vw-x { display: grid; place-items: center; width: 26px; height: 26px; border: 0; border-radius: 7px; background: transparent; color: var(--text-tertiary); cursor: pointer; transition: background 0.15s ease, color 0.15s ease, transform 0.2s ease; }
+.vw-x svg { width: 14px; height: 14px; }
+.vw-x:hover { color: var(--text-primary); background: color-mix(in srgb, var(--text-primary) 8%, transparent); transform: rotate(90deg); }
+/* Hue round the wheel, saturation outwards; the brightness slider dims it. */
+.vw-disc {
+  position: relative;
+  width: 196px;
+  height: 196px;
+  margin: 0 auto 0.75rem;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle closest-side, #ffffff, rgba(255, 255, 255, 0)),
+    conic-gradient(#ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1), 0 10px 26px -12px rgba(0, 0, 0, 0.7);
+  cursor: crosshair;
+  touch-action: none;
+}
+.vw-disc-dim { position: absolute; inset: 0; border-radius: 50%; background: #000; opacity: var(--vw-dim); pointer-events: none; }
+.vw-disc:focus-visible, .vw-bright:focus-visible { outline: 2px solid var(--vw-color); outline-offset: 3px; }
+.vw-thumb {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: var(--vw-color);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 3px 8px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  transition: transform 0.15s ease;
+}
+.vw-disc:active .vw-thumb { transform: scale(1.2); }
+.vw-bright {
+  position: relative;
+  height: 14px;
+  margin: 0 0.2rem 0.75rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #000000, var(--vw-pure));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  touch-action: none;
+}
+.vw-bright-thumb {
+  position: absolute;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  margin: -9px 0 0 -9px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: var(--vw-color);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35), 0 3px 8px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+.vw-row { display: flex; align-items: center; gap: 0.45rem; margin-bottom: 0.6rem; }
+.vw-preview {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--vw-color);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18), 0 6px 14px -6px var(--vw-color);
+}
+.vw-hex {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.vw-hex:focus-within { border-color: var(--vw-color); box-shadow: 0 0 0 3px color-mix(in srgb, var(--vw-color) 22%, transparent); }
+.vw-hex span { color: var(--text-tertiary); font-family: var(--font-mono); font-size: 0.85rem; }
+.vw-hex input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+}
+.vw-hex input.is-bad { color: var(--color-danger); }
+.vw-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.vw-icon svg { width: 15px; height: 15px; }
+.vw-icon:hover { color: var(--vw-color); border-color: var(--vw-color); }
+.vw-recent { display: flex; align-items: center; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.65rem; }
+.vw-recent > span { margin-right: 0.15rem; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-tertiary); }
+.vw-chip {
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+.vw-chip:hover { transform: scale(1.2); }
+.vw-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+.vw-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  height: 32px;
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.vw-btn svg { width: 14px; height: 14px; }
+.vw-btn:hover { color: var(--text-primary); border-color: color-mix(in srgb, var(--text-primary) 25%, var(--border-color)); }
+.vw-btn.is-primary { color: #fff; border-color: transparent; background: linear-gradient(135deg, var(--color-primary), #8b5cf6); }
+.vw-btn.is-primary:hover { transform: translateY(-1px); }
+@keyframes vwIn { from { opacity: 0; transform: translateY(6px) scale(0.96); } }
+@media (prefers-reduced-motion: reduce) {
+  .viz-wheel, .viz-wheel.is-closing, .bnm-seg button.active svg { animation: none !important; }
+}

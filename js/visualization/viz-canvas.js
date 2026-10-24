@@ -550,7 +550,7 @@ function vizRenderCanvas() {
     el.style.left = node.x + 'px';
     el.style.top = node.y + 'px';
     if (node.scope) el.dataset.scope = node.scope; else delete el.dataset.scope;
-    if (node.color) el.dataset.color = node.color; else delete el.dataset.color;
+    vizApplyNodeColor(el, node.color);   // a palette name or a hex code
     if (info.tint) el.style.setProperty('--viz-tint', info.tint); else el.style.removeProperty('--viz-tint');
     el.classList.toggle('viz-tinted', !!info.tint);
     if (node.isDraft) el.dataset.draft = 'true'; else delete el.dataset.draft;
@@ -640,7 +640,7 @@ function _vizRenderLinks(svg, nodesLayer, g, drawn) {
     links.forEach(link => {
       const hex = link.color ? vizColorMap(link.color) : null;
       const cls = link.locked ? 'viz-link locked' : link.isCustom ? 'viz-link custom-link' : 'viz-link';
-      const baseArrowId = link.color ? 'viz-arrowhead-col-' + link.color
+      const baseArrowId = link.color ? vizArrowheadId(link.color)
         : link.locked ? 'viz-arrowhead-locked'
           : link.isCustom ? 'viz-arrowhead-custom' : 'viz-arrowhead';
       const arrowType = link.arrowType || viz.defaultLinkArrowType || 'arrow';
@@ -712,6 +712,8 @@ function _vizBuildDefs(svg) {
   Object.keys(colors).forEach(name => {
     html += fwd('viz-arrowhead-col-' + name, colors[name]) + back('viz-arrowhead-col-' + name, colors[name]);
   });
+  // Colours from the wheel that links already use.
+  if (typeof _vizCustomHeads !== 'undefined') _vizCustomHeads.forEach(hex => { html += vizHeadMarkersHTML('viz-arrowhead-hex-' + hex.slice(1), hex); });
   const old = svg.querySelector('defs');
   if (old) old.remove();
   const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');

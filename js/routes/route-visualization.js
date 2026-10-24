@@ -34,12 +34,17 @@ function vizStripKey(e) {
 /** One colour swatch row, used by every context menu that offers colours.
  *  `extra` adds [name, css, label] swatches before Default. */
 function vizSwatchesHTML(fn, extra) {
-  // copper is the Electric Border's original colour (#dd8448).
+  // copper is the Electric Border's original colour (#dd8448). White and black
+  // are in every row now; the connector menu had neither.
   const colors = [['red', '#ef4444'], ['orange', '#f97316'], ['copper', '#dd8448'], ['yellow', '#eab308'], ['green', '#22c55e'],
-    ['blue', '#3b82f6'], ['purple', '#a855f7'], ['pink', '#ec4899'], ['cyan', '#06b6d4']];
-  return colors.concat(extra || []).map(([name, hex, label]) =>
+    ['blue', '#3b82f6'], ['purple', '#a855f7'], ['pink', '#ec4899'], ['cyan', '#06b6d4'], ['white', '#ffffff'], ['black', '#000000']];
+  const more = (extra || []).filter(([name]) => !colors.some(c => c[0] === name));
+  return colors.concat(more).map(([name, hex, label]) =>
     `<div class="viz-color-swatch" data-color="${name}" style="background:${hex};" role="button" tabindex="0"
        aria-label="${label || name}" title="${label || name}" onclick="${fn}('${name}')"></div>`).join('')
+    // The rainbow one opens the colour wheel (viz-colorwheel.js) for any colour.
+    + `<div class="viz-color-swatch viz-swatch-wheel" data-color="wheel" role="button" tabindex="0"
+       aria-label="Custom colour" title="Custom colour: a wheel, a hex code or the eyedropper" onclick="vizOpenColorWheel(event, '${fn}')"></div>`
     + `<div class="viz-color-swatch" data-color="" style="background:var(--border-color);" role="button" tabindex="0"
        aria-label="Default colour" onclick="${fn}(null)" title="Default"></div>`;
 }
@@ -455,21 +460,22 @@ function vizTemplate() {
     </div>
 
     <!-- Link Context Menu -->
-    <div id="viz-link-ctx" class="viz-link-menu hidden" role="menu">
+    <div id="viz-link-ctx" class="viz-link-menu bnm-menu hidden" role="menu">
+      <div class="bnm-label">Colour</div>
       <div class="viz-color-picker" id="viz-link-color-picker">${vizSwatchesHTML('vizCtxEditLinkColor')}</div>
-      <div class="viz-ctx-divider"></div>
-      <div style="display:flex;gap:0.25rem;padding:0.25rem 0.5rem;">
-        <button class="viz-ctx-item" style="flex:1;justify-content:center;padding:0.375rem;" title="Arrow" aria-label="Arrow" onclick="vizCtxSetLinkArrow('arrow')"><i data-lucide="arrow-right" style="width:14px;height:14px;"></i></button>
-        <button class="viz-ctx-item" style="flex:1;justify-content:center;padding:0.375rem;" title="Double Arrow" aria-label="Double arrow" onclick="vizCtxSetLinkArrow('double-arrow')"><i data-lucide="arrow-left-right" style="width:14px;height:14px;"></i></button>
-        <button class="viz-ctx-item" style="flex:1;justify-content:center;padding:0.375rem;" title="No Arrow" aria-label="No arrow" onclick="vizCtxSetLinkArrow('none')"><i data-lucide="minus" style="width:14px;height:14px;"></i></button>
+      <div class="bnm-label">Connector</div>
+      <div class="bnm-seg" role="group" aria-label="Connector type">
+        <button type="button" title="Arrow" aria-label="Arrow" onclick="vizCtxSetLinkArrow('arrow')"><i data-lucide="arrow-right"></i><span>Arrow</span></button>
+        <button type="button" title="Double Arrow" aria-label="Double arrow" onclick="vizCtxSetLinkArrow('double-arrow')"><i data-lucide="arrow-left-right"></i><span>Double</span></button>
+        <button type="button" title="No Arrow" aria-label="No arrow" onclick="vizCtxSetLinkArrow('none')"><i data-lucide="minus"></i><span>None</span></button>
       </div>
-      <div class="viz-ctx-divider"></div>
       <!-- A link carried colour, an arrow and a lock but no words. "explains",
            "needs first", "harder version of" is the reason to draw one. -->
-      <button class="viz-ctx-item" onclick="vizCtxLabelLink()"><i data-lucide="type"></i> <span id="viz-link-label-action">Add a label</span></button>
-      <button class="viz-ctx-item" data-action="toggle-lock" onclick="vizCtxToggleLock()"><i data-lucide="lock"></i> Lock</button>
-      <div class="viz-ctx-divider"></div>
-      <button class="viz-ctx-item danger" onclick="vizCtxDeleteLink()"><i data-lucide="trash-2"></i> Delete Link</button>
+      <div class="bnm-actions">
+        <button type="button" class="bnm-act" onclick="vizCtxLabelLink()" title="Label this link"><i data-lucide="type"></i><span id="viz-link-label-action">Add a label</span></button>
+        <button type="button" class="bnm-act" data-action="toggle-lock" onclick="vizCtxToggleLock()" title="Lock or unlock"><i data-lucide="lock"></i> Lock</button>
+        <button type="button" class="bnm-act danger" onclick="vizCtxDeleteLink()" title="Delete Link"><i data-lucide="trash-2"></i><span>Delete</span></button>
+      </div>
     </div>
 
     <!-- Brain Canvas Context Menu -->
@@ -574,18 +580,20 @@ function vizTemplate() {
     </div>
 
     <!-- Brain Link Context Menu -->
-    <div id="brain-link-ctx" class="viz-link-menu hidden" role="menu">
+    <!-- Brain's connector menu, laid out like the note menu: its colour, its
+         three heads as one switch you can see, and Delete. -->
+    <div id="brain-link-ctx" class="viz-link-menu bnm-menu hidden" role="menu">
+      <div class="bnm-label">Colour</div>
       <div class="viz-color-picker">${vizSwatchesHTML('brainCtxEditLinkColor')}</div>
-      <div class="viz-ctx-divider"></div>
-      <!-- The same three heads as the toolbar's link-mode dropdown, for one link. -->
-      <button class="viz-ctx-item" id="brain-link-type-toggle" aria-haspopup="menu" aria-expanded="false" onclick="brainToggleConnectorType(event)"><i data-lucide="spline"></i> Connector Type <i data-lucide="chevron-down" class="viz-ctx-sub-chev"></i></button>
-      <div class="viz-ctx-submenu hidden" id="brain-link-type-menu" role="menu">
-        <div class="viz-link-type-option" role="menuitem" data-type="arrow" onclick="brainCtxSetLinkArrow('arrow')"><i data-lucide="arrow-right"></i> Arrow</div>
-        <div class="viz-link-type-option" role="menuitem" data-type="double-arrow" onclick="brainCtxSetLinkArrow('double-arrow')"><i data-lucide="arrow-left-right"></i> Double</div>
-        <div class="viz-link-type-option" role="menuitem" data-type="none" onclick="brainCtxSetLinkArrow('none')"><i data-lucide="minus"></i> None</div>
+      <div class="bnm-label">Connector</div>
+      <div class="bnm-seg" id="brain-link-type-menu" role="radiogroup" aria-label="Connector type">
+        <button type="button" role="radio" data-type="arrow" aria-checked="false" onclick="brainCtxSetLinkArrow('arrow')" title="Arrow"><i data-lucide="arrow-right"></i><span>Arrow</span></button>
+        <button type="button" role="radio" data-type="double-arrow" aria-checked="false" onclick="brainCtxSetLinkArrow('double-arrow')" title="Double arrow"><i data-lucide="arrow-left-right"></i><span>Double</span></button>
+        <button type="button" role="radio" data-type="none" aria-checked="false" onclick="brainCtxSetLinkArrow('none')" title="No arrow"><i data-lucide="minus"></i><span>None</span></button>
       </div>
-      <div class="viz-ctx-divider"></div>
-      <button class="viz-ctx-item danger" onclick="brainCtxDeleteLink()"><i data-lucide="trash-2"></i> Delete Link</button>
+      <div class="bnm-actions">
+        <button type="button" class="bnm-act danger" onclick="brainCtxDeleteLink()" title="Delete Link"><i data-lucide="trash-2"></i><span>Delete</span></button>
+      </div>
     </div>
 
     <!-- Brain Version Context Menu -->

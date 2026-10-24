@@ -347,7 +347,61 @@ function vizToggleLinkMode() {
   if (container) container.classList.toggle('linking-mode', viz.linkModeEnabled);
 }
 
+/* A colour is a palette name ('red', 'white', ...) or, picked from the colour
+   wheel (viz-colorwheel.js), a hex code. Everything that draws one goes
+   through vizColorMap, which passes a hex code straight through. */
+function vizIsHexColor(c) { return typeof c === 'string' && /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i.test(c); }
+
+/* A node's edge colour and fill. A palette name stays a data attribute the
+   stylesheet already knows; a hex code becomes data-color/data-bg "custom"
+   with the colour in the same custom properties those rules set, which the
+   slabs, borders and electric glow already read. */
+function vizApplyNodeColor(el, color) {
+  if (!el) return;
+  el.style.removeProperty('--viz-node-accent');
+  el.style.removeProperty('--viz-node-accent-strong');
+  if (!color) { delete el.dataset.color; return; }
+  if (vizIsHexColor(color)) {
+    el.dataset.color = 'custom';
+    el.style.setProperty('--viz-node-accent', color);
+    el.style.setProperty('--viz-node-accent-strong', color);
+  } else el.dataset.color = color;
+}
+function vizApplyNodeBg(el, bg) {
+  if (!el) return;
+  el.style.removeProperty('--viz-node-bg');
+  el.style.removeProperty('--viz-node-bg-hue');
+  if (!bg) { delete el.dataset.bg; return; }
+  if (vizIsHexColor(bg)) {
+    el.dataset.bg = 'custom';
+    el.style.setProperty('--viz-node-bg', bg);
+    el.style.setProperty('--viz-node-bg-hue', bg);
+  } else el.dataset.bg = bg;
+}
+
+/* Arrowheads are SVG markers, one pair per colour, built for the palette by
+   _vizBuildDefs. A colour from the wheel gets its pair the first time a link
+   uses it, and every later rebuild of the defs includes it. */
+const _vizCustomHeads = new Set();
+function vizHeadMarkersHTML(id, fill) {
+  return `<marker id="${id}" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="${fill}"/></marker>`
+    + `<marker id="${id}-back" markerWidth="8" markerHeight="6" refX="0" refY="3" orient="auto"><polygon points="8 0, 0 3, 8 6" fill="${fill}"/></marker>`;
+}
+function vizArrowheadId(color) {
+  if (!vizIsHexColor(color)) return 'viz-arrowhead-col-' + color;
+  let hex = color.toLowerCase();
+  if (hex.length === 4) hex = '#' + hex.slice(1).split('').map(x => x + x).join('');
+  const id = 'viz-arrowhead-hex-' + hex.slice(1);
+  _vizCustomHeads.add(hex);
+  const defs = document.querySelector('#viz-canvas-svg defs');
+  if (defs && !defs.querySelector('#' + id)) {
+    try { defs.insertAdjacentHTML('beforeend', vizHeadMarkersHTML(id, hex)); } catch (e) { /* built with the next defs */ }
+  }
+  return id;
+}
+
 function vizColorMap(color) {
+  if (vizIsHexColor(color)) return color;
   const map = { red: '#ef4444', orange: '#f97316', copper: '#dd8448', yellow: '#eab308', green: '#22c55e', blue: '#3b82f6', purple: '#a855f7', pink: '#ec4899', cyan: '#06b6d4', white: '#ffffff', softwhite: '#e2e8f0', black: '#000000', charcoal: '#131313' };
   return map[color] || 'var(--text-tertiary)';
 }
