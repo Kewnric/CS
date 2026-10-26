@@ -247,3 +247,226 @@
   font-size: 0.72rem;
   flex-shrink: 0;
 }
+
+/* ============================================================
+   FOLDER VIEW (js/tree-folderview.js)
+   ============================================================ */
+.tree-container.tfv-hidden { display: none !important; }
+.tfv-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 30px;
+  padding: 0.3rem 0.75rem 0;
+}
+.tfv-bar.hidden { display: none; }
+.tfv-path { display: flex; align-items: center; gap: 0.3rem; flex: 1; min-width: 0; }
+.tfv-up,
+.tfv-seg-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.tfv-up svg,
+.tfv-seg-btn svg { width: 14px; height: 14px; }
+.tfv-up:hover:not(:disabled),
+.tfv-seg-btn:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
+.tfv-up:disabled { opacity: 0.35; cursor: default; }
+.tfv-seg {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  margin-left: auto;
+  padding: 2px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-body);
+}
+.tfv-seg-btn.is-on { color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 16%, transparent); }
+/* The path: house > folder > folder, the last one where you are. */
+.tfv-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+  min-width: 0;
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent 0, #000 0.6rem);
+  direction: rtl;   /* a long path keeps its end in view */
+}
+.tfv-crumbs > * { direction: ltr; flex: none; }
+.tfv-crumb {
+  display: inline-flex;
+  align-items: center;
+  max-width: 9rem;
+  padding: 0.12rem 0.35rem;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-tertiary);
+  font: inherit;
+  font-size: 0.74rem;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.tfv-crumb svg { width: 13px; height: 13px; }
+.tfv-crumb:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
+.tfv-crumb.is-here { color: var(--text-primary); font-weight: 800; }
+.tfv-sep { width: 11px; height: 11px; color: var(--text-tertiary); opacity: 0.6; }
+
+.tfv-view.hidden { display: none; }
+.tfv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+  gap: 0.35rem;
+  align-content: start;
+}
+.tfv-tile {
+  --tfv-c: var(--color-primary);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.7rem 0.3rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  cursor: default;
+  user-select: none;
+  outline: none;
+  animation: tfvIn 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.tfv-tile.is-item { --tfv-c: var(--text-secondary); }
+.tfv-tile:hover { background: color-mix(in srgb, var(--color-primary) 8%, transparent); }
+.tfv-tile:focus-visible,
+.tfv-tile.is-sel {
+  background: color-mix(in srgb, var(--color-primary) 15%, transparent);
+  border-color: color-mix(in srgb, var(--color-primary) 45%, transparent);
+}
+.tfv-tile.is-active { border-color: color-mix(in srgb, var(--color-primary) 70%, transparent); }
+@keyframes tfvIn { from { opacity: 0; transform: translateY(6px) scale(0.96); } }
+.tfv-grid > .tfv-tile:nth-child(2) { animation-delay: 0.02s; }
+.tfv-grid > .tfv-tile:nth-child(3) { animation-delay: 0.04s; }
+.tfv-grid > .tfv-tile:nth-child(4) { animation-delay: 0.06s; }
+.tfv-grid > .tfv-tile:nth-child(5) { animation-delay: 0.08s; }
+.tfv-grid > .tfv-tile:nth-child(n+6) { animation-delay: 0.1s; }
+
+/* A folder: a body with a tab, in the folder's colour, its own icon on it. */
+.tfv-glyph {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 50px;
+  height: 40px;
+  margin-top: 6px;
+  color: #fff;
+  transition: transform 0.25s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+.tfv-tile.is-folder .tfv-glyph {
+  border-radius: 4px 9px 9px 9px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--tfv-c) 80%, #fff), var(--tfv-c) 55%, color-mix(in srgb, var(--tfv-c) 72%, #000));
+  box-shadow: 0 6px 14px -7px var(--tfv-c), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.tfv-tab {
+  position: absolute;
+  left: 0;
+  top: -6px;
+  width: 20px;
+  height: 8px;
+  border-radius: 4px 6px 0 0;
+  background: color-mix(in srgb, var(--tfv-c) 78%, #fff);
+  transform-origin: bottom left;
+  transition: transform 0.25s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+.tfv-tile.is-folder:hover .tfv-tab { transform: rotate(-14deg); }
+.tfv-tile:hover .tfv-glyph { transform: translateY(-2px); }
+/* An item: a page with a folded corner. */
+.tfv-tile.is-item .tfv-glyph {
+  width: 36px;
+  height: 44px;
+  margin-top: 2px;
+  border-radius: 4px;
+  color: var(--tfv-c);
+  background: linear-gradient(180deg, var(--bg-surface-hover), var(--bg-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tfv-c) 35%, var(--border-color)), 0 5px 12px -8px rgba(0, 0, 0, 0.6);
+  clip-path: polygon(0 0, calc(100% - 11px) 0, 100% 11px, 100% 100%, 0 100%);
+}
+.tfv-fold {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 11px;
+  height: 11px;
+  border-bottom-left-radius: 3px;
+  background: color-mix(in srgb, var(--tfv-c) 30%, var(--border-color));
+}
+.tfv-glyph > svg { width: 18px; height: 18px; }
+.tfv-tile.is-item .tfv-glyph > svg { width: 17px; height: 17px; margin-top: 4px; }
+.tfv-mark {
+  position: absolute;
+  right: -5px;
+  bottom: -4px;
+  display: grid;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  background: var(--bg-surface);
+  box-shadow: 0 0 0 1px var(--border-color);
+}
+.tfv-mark svg { width: 10px; height: 10px; }
+.tfv-mark.is-lock { color: var(--text-tertiary); }
+.tfv-mark.is-star { left: -5px; right: auto; color: var(--color-warning); }
+.tfv-mark.is-star svg { fill: currentColor; }
+.tfv-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 0.74rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  word-break: break-word;
+  color: var(--text-primary);
+}
+.tfv-count {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  min-width: 18px;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  line-height: 15px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-tertiary);
+  background: var(--bg-surface-hover);
+}
+.tfv-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 2.5rem 1rem;
+  color: var(--text-tertiary);
+  font-size: 0.8rem;
+}
+.tfv-empty svg { width: 30px; height: 30px; opacity: 0.6; }
+@media (prefers-reduced-motion: reduce) {
+  .tfv-tile { animation: none; }
+}
