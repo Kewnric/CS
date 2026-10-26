@@ -184,7 +184,10 @@ function psetInit() {
         if (!_pset || typeof shiftTimerClock !== 'function') return;
         shiftTimerClock(_pset, delta);
         try { setSessionParam('codingSetTimeLimit', String(_pset.timeLimit)); } catch (e) { /* full */ }
-        _psetTick();
+        // The start time is only written with the autosave; write it now, or
+        // a reload before the next one would undo the change.
+        _psetAutosave();
+        if (typeof timerFlashPaused !== 'function' || !timerFlashPaused(document.getElementById('pset-timer'), _pset, _psetFmt)) _psetTick();
       }
     });
   }

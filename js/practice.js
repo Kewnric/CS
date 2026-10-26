@@ -1335,6 +1335,17 @@ function shiftTimerClock(clock, delta) {
   }
 }
 
+/* A paused clock reads PAUSED, so a change made while paused did not show at
+   all. Show the new time for a moment, then the word comes back. */
+function timerFlashPaused(el, clock, fmt) {
+  if (!el || !clock || !clock.paused) return false;
+  const elapsed = Math.floor(((clock.pausedAt || Date.now()) - clock.startTime) / 1000);
+  el.innerText = fmt(clock.timeLimit > 0 ? Math.max(0, clock.timeLimit - elapsed) : Math.max(0, elapsed));
+  clearTimeout(el._pausedFlash);
+  el._pausedFlash = setTimeout(() => { if (clock.paused && el.isConnected) el.innerText = 'PAUSED'; }, 1400);
+  return true;
+}
+
 function adjustPracticeTimer(delta) {
   const sd = state.sessionData;
   if (!sd) return;
@@ -1342,7 +1353,7 @@ function adjustPracticeTimer(delta) {
   state.timeLimit = sd.timeLimit;
   setSessionParam('timeLimit', sd.timeLimit);
   setSessionParam('practiceStartTime', sd.startTime);
-  updatePracticeTimerDisplay();
+  if (!timerFlashPaused(document.getElementById('practice-timer'), sd, formatTimeDisplay)) updatePracticeTimerDisplay();
 }
 
 function openTimerMenu(e) {

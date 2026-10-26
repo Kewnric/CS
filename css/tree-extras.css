@@ -470,3 +470,14 @@
 @media (prefers-reduced-motion: reduce) {
   .tfv-tile { animation: none; }
 }
+.tfv-results {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+.tfv-results svg { flex: none; width: 13px; height: 13px; color: var(--color-primary); }
+.tfv-results > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

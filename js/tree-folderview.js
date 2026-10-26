@@ -19,7 +19,7 @@
    ============================================================ */
 
 const TFV_KEY = 'ssp.treeView.';
-const TFV = {};   // container id -> { at, lastActive, ownClick, raf }
+const TFV = {};   // container id -> { at, lastActive, own, raf }
 
 function _tfvGet(k, dflt) { try { const v = localStorage.getItem(k); return v === null ? dflt : v; } catch (e) { return dflt; } }
 function _tfvSet(k, v) { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch (e) { /* private mode */ } }
@@ -27,7 +27,7 @@ function _tfvSet(k, v) { try { if (v) localStorage.setItem(k, v); else localStor
 function tfvMode(c) { return _tfvGet(TFV_KEY + c.id, 'list') === 'icons' ? 'icons' : 'list'; }
 
 function _tfvState(c) {
-  if (!TFV[c.id]) TFV[c.id] = { at: _tfvGet(TFV_KEY + c.id + '.at', ''), lastActive: null, ownClick: false, raf: 0 };
+  if (!TFV[c.id]) TFV[c.id] = { at: _tfvGet(TFV_KEY + c.id + '.at', ''), lastActive: null, own: null, raf: 0 };
   return TFV[c.id];
 }
 
@@ -91,7 +91,10 @@ function tfvSync(c) {
 function _tfvDrawBar(c, bar, icons) {
   const st = _tfvState(c);
   let crumbs = '';
-  if (icons) {
+  const q = icons ? _tfvQuery(c) : '';
+  if (q) {
+    crumbs = '<span class="tfv-results"><i data-lucide="search"></i><span>Matches for “' + escapeHTML(q) + '”</span></span>';
+  } else if (icons) {
     const path = [];
     let n = _tfvFind(c, st.at);
     while (n) { path.unshift(n); n = _tfvParent(n, c); }
@@ -122,20 +125,36 @@ function _tfvDraw(c, view) {
   const activeNode = activeRow && activeRow.closest('.tree-node[data-node-id]');
   const activeId = activeNode ? activeNode.getAttribute('data-node-id') : null;
   if (activeId !== st.lastActive) {
-    if (!st.ownClick && activeNode) {
+    // Ours when it is the icon just clicked -- however late the library
+    // redraws -- so a single click on a folder selects it and stays put.
+    const own = st.own && st.own.id === activeId && performance.now() - st.own.at < 1500;
+    if (!own && activeNode) {
       const home = _tfvIsFolder(activeNode) ? activeNode : _tfvParent(activeNode, c);
       st.at = home ? home.getAttribute('data-node-id') : '';
     }
+    if (own) st.own = null;
     st.lastActive = activeId;
   }
-  st.ownClick = false;
+  // A folder that is missing (a search filtered it out, or it was deleted)
+  // shows the top level, but stays the one to come back to.
   let here = _tfvFind(c, st.at);
-  if (st.at && !here) st.at = '';   // gone (deleted, or filtered out)
   if (here && !_tfvIsFolder(here)) { here = _tfvParent(here, c); st.at = here ? here.getAttribute('data-node-id') : ''; }
   _tfvSet(TFV_KEY + c.id + '.at', st.at);
 
-  const kids = _tfvNodes(c).filter(n => _tfvParent(n, c) === here);
-  const folders = kids.filter(_tfvIsFolder), items = kids.filter(n => !_tfvIsFolder(n));
+  // The eye that hides a library's items hides their icons too; and while the
+  // pane is searched, the matches are shown together, wherever they live.
+  const hideItems = c.classList.contains('hide-tree-items');
+  const q = _tfvQuery(c);
+  let folders, items;
+  if (q) {
+    const all = _tfvNodes(c);
+    items = hideItems ? [] : all.filter(n => !_tfvIsFolder(n));
+    folders = hideItems ? all.filter(_tfvIsFolder) : [];
+  } else {
+    const kids = _tfvNodes(c).filter(n => _tfvParent(n, c) === here);
+    folders = kids.filter(_tfvIsFolder);
+    items = hideItems ? [] : kids.filter(n => !_tfvIsFolder(n));
+  }
   const tile = n => {
     const id = n.getAttribute('data-node-id');
     const folder = _tfvIsFolder(n);
@@ -165,7 +184,8 @@ function _tfvDraw(c, view) {
   };
   const html = folders.length || items.length
     ? '<div class="tfv-grid">' + folders.map(tile).join('') + items.map(tile).join('') + '</div>'
-    : '<div class="tfv-empty"><i data-lucide="folder-open"></i><span>This folder is empty</span></div>';
+    : '<div class="tfv-empty"><i data-lucide="' + (q ? 'search-x' : 'folder-open') + '"></i><span>'
+      + (q ? 'Nothing here matches “' + escapeHTML(q) + '”' : 'This folder is empty') + '</span></div>';
   if (view._tfvHtml === html) return;   // nothing moved: keep focus and scroll
   const scrolled = view._tfvAt === st.at ? view.scrollTop : 0;
   view._tfvHtml = html;
@@ -186,11 +206,18 @@ function _tfvFire(row, type, e) {
 }
 
 function tfvGo(c, id) {
-  const st = _tfvState(c);
-  st.at = id || '';
-  st.ownClick = true;
+  _tfvState(c).at = id || '';
   tfvSync(c);
 }
+
+/* What the pane's search box holds: its tree is showing matches. */
+function _tfvQuery(c) {
+  const box = c.parentElement && c.parentElement.querySelector('input.search-input');
+  return box ? box.value.trim() : '';
+}
+
+/** The icon about to be clicked: when its row becomes the open one, that was us. */
+function _tfvOwn(c, n) { _tfvState(c).own = { id: n.getAttribute('data-node-id'), at: performance.now() }; }
 
 function _tfvBindView(view, c) {
   const nodeOf = el => { const t = el.closest && el.closest('.tfv-tile'); return t ? _tfvFind(c, t.getAttribute('data-tfv-id')) : null; };
@@ -199,7 +226,7 @@ function _tfvBindView(view, c) {
     if (!n) return;
     view.querySelectorAll('.tfv-tile.is-sel').forEach(t => t.classList.remove('is-sel'));
     e.target.closest('.tfv-tile').classList.add('is-sel');
-    _tfvState(c).ownClick = true;
+    _tfvOwn(c, n);
     _tfvFire(_tfvRow(n), 'click', e);
     _tfvQueue(c);   // the open row's highlight moves even if the tree did not redraw
   });
@@ -209,9 +236,11 @@ function _tfvBindView(view, c) {
   });
   view.addEventListener('contextmenu', e => {
     const n = nodeOf(e.target);
-    if (!n) return;
-    e.preventDefault();
-    _tfvFire(_tfvRow(n), 'contextmenu', e);
+    if (n) { e.preventDefault(); _tfvFire(_tfvRow(n), 'contextmenu', e); return; }
+    // The empty space is the tree's empty space: its own menu (New folder...),
+    // where the library has one; otherwise the browser's.
+    const ev = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, view: window, clientX: e.clientX, clientY: e.clientY, button: 2 });
+    if (!c.dispatchEvent(ev)) e.preventDefault();
   });
   view.addEventListener('keydown', e => {
     const t = e.target.closest && e.target.closest('.tfv-tile');
@@ -233,7 +262,7 @@ function _tfvBindView(view, c) {
         tfvGo(c, n.getAttribute('data-node-id'));
         const first = view.querySelector('.tfv-tile');
         if (first) first.focus();
-      } else if (n) { _tfvState(c).ownClick = true; _tfvFire(_tfvRow(n), 'click', e); _tfvQueue(c); }
+      } else if (n) { _tfvOwn(c, n); _tfvFire(_tfvRow(n), 'click', e); _tfvQueue(c); }
       return;
     }
     if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {

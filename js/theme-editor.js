@@ -21,11 +21,14 @@ const TE_DROPS = '.browse-head-drop-list, .timer-menu, .viz-toolbar-popup, .viz-
 const TE_ROWS = '.tree-ctx-item, .viz-ctx-item, .file-menu-item, button, [role="menuitem"], [role="option"], option';
 
 function _teRule(sel, prop) { return v => ':is(' + sel + ') { ' + prop + ': ' + v + ' !important; }'; }
+/* Rows and words a colour must not reach: a danger row keeps its red, and a
+   real button (Start, Apply) keeps its own fill and lettering. */
+const TE_KEEP = '[class*="danger"], [class*="danger"] *, .btn, .btn *';
 function _teRows(sel, prop, state) {
-  return v => ':is(' + sel + ') :is(' + TE_ROWS + ')' + (state || '') + ' { ' + prop + ': ' + v + ' !important; }';
+  return v => ':is(' + sel + ') :is(' + TE_ROWS + '):not(' + TE_KEEP + ')' + (state || '') + ' { ' + prop + ': ' + v + ' !important; }';
 }
 function _teText(sel) {
-  return v => ':is(' + sel + '), :is(' + sel + ') :is(' + TE_ROWS + ', span, label):not([class*="danger"]) { color: ' + v + ' !important; }';
+  return v => ':is(' + sel + '), :is(' + sel + ') :is(' + TE_ROWS + ', span, label):not(' + TE_KEEP + ') { color: ' + v + ' !important; }';
 }
 
 /* Each row: a theme variable (`vars`, read back through `probe`), or a rule
@@ -72,7 +75,7 @@ const THEME_EDIT_GROUPS = [
   ] },
   { id: 'dialogs', label: 'Dialogs', icon: 'app-window', items: [
     { id: 'dlg-bg', label: 'Background', rule: _teRule('.modal-content', 'background'), from: '--bg-elevated' },
-    { id: 'dlg-text', label: 'Text', rule: v => '.modal-content :is(h2, h3, p, label, span, .modal-title, .modal-desc) { color: ' + v + ' !important; }', from: '--text-primary' }
+    { id: 'dlg-text', label: 'Text', rule: v => '.modal-content :is(h2, h3, p, label, span, .modal-title, .modal-desc):not(' + TE_KEEP + ', button *) { color: ' + v + ' !important; }', from: '--text-primary' }
   ] }
 ];
 

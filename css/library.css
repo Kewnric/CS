@@ -3036,8 +3036,17 @@ body.tree-dragging [data-tree-ns]::-webkit-scrollbar { width: 0; height: 0; }
   background: linear-gradient(90deg, color-mix(in srgb, var(--color-primary) 15%, transparent), color-mix(in srgb, var(--color-primary) 4%, transparent) 75%);
   box-shadow: inset 3px 0 0 color-mix(in srgb, var(--color-primary) 75%, transparent);
 }
-.tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row .tree-node-label { font-weight: 700; color: var(--text-primary); }
-.tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row .tree-node-icon { color: var(--icon-accent, var(--color-primary)); }
+.tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row .tree-node-label { font-weight: 700; }
+/* Only where the folder has no colour of its own: one it was given wins, and
+   the colour variables inherit, so a child must not wear its parent's. */
+.tree-node:not(.has-accent):has(> .tree-children:not(.collapsed)) > .tree-node-row .tree-node-label { color: var(--text-primary); }
+.tree-node:not(.has-icon-color):has(> .tree-children:not(.collapsed)) > .tree-node-row .tree-node-icon { color: var(--color-primary); }
+/* A folder with its own colour is tinted in it when open, and keeps its own bar. */
+.tree-node.has-accent:has(> .tree-children:not(.collapsed)) > .tree-node-row:not(.active) {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--row-accent) 16%, transparent), color-mix(in srgb, var(--row-accent) 4%, transparent) 75%);
+  box-shadow: none;
+}
+.tree-node.has-accent:has(> .tree-children:not(.collapsed)) > .tree-children { border-left-color: color-mix(in srgb, var(--row-accent) 40%, var(--border-color)); }
 .tree-node:has(> .tree-children:not(.collapsed)) > .tree-children { border-left-color: color-mix(in srgb, var(--color-primary) 35%, var(--border-color)); }
 
 /* A folder or item's own icon colour (the colour dialog's Icon part). */
