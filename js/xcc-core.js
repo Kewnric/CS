@@ -26,7 +26,9 @@
    infinite loop can be killed), and the same file runs under Node for the
    pack sweep, so what is tested is what ships.
    ============================================================ */
-(function (root) {
+/* A named factory, for the same reason as xccStdioFactory: the runner's worker
+   is built from this function's source text. */
+function xccCoreFactory(root) {
   'use strict';
 
   const E = { SUCCESS: 0, BADF: 8, EXIST: 20, INVAL: 28, ISDIR: 31, NOENT: 44, NOSYS: 52, NOTDIR: 54, NOTEMPTY: 55 };
@@ -41,6 +43,7 @@
   const Stdio = root.XccStdio || (typeof require === 'function' ? require('./xcc-stdio.js') : null);
 
   class WasiExit { constructor(code) { this.code = code; } }
+  class WasiTimeout {}
 
   /* ── The zip ─────────────────────────────────────────────────
      Central directory, then each entry's local header. Deflated entries go
@@ -116,6 +119,11 @@
      the two preopens xcc's libc walks to resolve a path. */
   function makeWasi(fs, opts) {
     const args = opts.args || [];
+    /* Only when there is no worker to terminate (see xcc-runner.js): checked
+       on every write and read, so a runaway that prints or reads is stopped.
+       A loop that does neither cannot be interrupted on the page itself. */
+    const deadline = opts.deadline || 0;
+    const overdue = () => { if (deadline && Date.now() > deadline) throw new WasiTimeout(); };
     const stdin = opts.stdin || new Uint8Array(0);
     let stdinPos = 0;
     const fds = new Map([
@@ -181,6 +189,7 @@
         return E.SUCCESS;
       },
       fd_write(fd, iov, n, nwrittenPtr) {
+        overdue();
         const d = fds.get(fd);
         if (!d) return E.BADF;
         let total = 0;
@@ -201,6 +210,7 @@
         return E.SUCCESS;
       },
       fd_read(fd, iov, n, nreadPtr) {
+        overdue();
         const d = fds.get(fd);
         if (!d) return E.BADF;
         let total = 0;
@@ -376,6 +386,7 @@
       return { exitCode: 0, crash: null };
     } catch (e) {
       if (e instanceof WasiExit) return { exitCode: e.code, crash: null };
+      if (e instanceof WasiTimeout) return { exitCode: 143, crash: null, timedOut: true };
       // A trap is the program's fault -- out-of-bounds memory, unreachable,
       // division by zero, a stack too deep -- the in-browser version of a crash.
       // Exit codes as a Linux shell reports a signal, which termExitNote names:
@@ -454,12 +465,14 @@
       }
       const r = runWasi(this.fs, module, {
         args: ['main'],
+        deadline: hooks && hooks.deadline,
         stdin: enc.encode(stdinText || ''),
         onStdout: chunk => { const t = dec.decode(chunk, { stream: true }); stdout += t; if (hooks && hooks.onStdout) hooks.onStdout(t); },
         onStderr: chunk => { stderr += decErr.decode(chunk, { stream: true }); }
       });
       stdout += dec.decode(); stderr += decErr.decode();
       if (r.crash) stderr += (stderr && !stderr.endsWith('\n') ? '\n' : '') + 'Runtime error: ' + r.crash;
+      if (r.timedOut) stderr += (stderr && stderr.slice(-1) !== String.fromCharCode(10) ? String.fromCharCode(10) : '') + 'Stopped: the program was still running.';
       return { exitCode: r.exitCode, stdout, stderr };
     }
 
@@ -475,4 +488,5 @@
 
   root.XccCore = XccCore;
   if (typeof module !== 'undefined' && module.exports) module.exports = { XccCore, unzip };
-})(typeof self !== 'undefined' ? self : globalThis);
+}
+xccCoreFactory(typeof self !== 'undefined' ? self : globalThis);

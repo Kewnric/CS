@@ -1,5 +1,8 @@
 xcc (https://github.com/tyfkda/xcc), MIT licence -- see LICENSE.
-wccfiles.zip is the project's own browser build (compiler cc.wasm, wlibc,
-headers), as published by its CI at https://tyfkda.github.io/xcc/wccfiles.zip.
-Downloaded 2026-10-26; source at commit 631e318432aeaaf72d6d2dfc93085766934314a2.
-Used by js/xcc-core.js as the offline C compiler for Run Code / Check Code.
+wccfiles.js is the project's own browser build (compiler cc.wasm, wlibc,
+headers) as published by its CI at https://tyfkda.github.io/xcc/wccfiles.zip
+(downloaded 2026-10-26, sha1 e5e15b65c58b20a37c99e763a24fdf58b110d45c; source at commit
+631e318432aeaaf72d6d2dfc93085766934314a2), stored as base64 in a script so a
+page opened from disk (file://) can load it -- such a page cannot fetch files.
+Regenerate: base64 the zip into self.XCC_BUNDLE_B64 = "...".
+Used by js/xcc-runner.js as the offline C compiler for Run Code / Check Code.

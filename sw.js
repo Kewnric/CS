@@ -24,14 +24,14 @@
    Navigations stay network-first, so a new index.html — and with it a new
    worker — is noticed as soon as the network allows, with the cached shell as
    the offline fallback. */
-const CACHE = 'ssp-v456';
+const CACHE = 'ssp-v457';
 // The bundled comic font too, so comic notes letter correctly offline even
 // before one has been shown online.
 // The in-browser C compiler too (js/xcc-runner.js): it is only ever fetched
 // when Godbolt cannot be reached, which is exactly when the network is not
 // there to fetch it, so it has to be in the cache before it is needed.
 const SHELL = ['./index.html', './manifest.json', './fonts/comic-neue-bold.woff2',
-  './vendor/xcc/wccfiles.zip', './js/xcc-worker.js', './js/xcc-core.js', './js/xcc-stdio.js'];
+  './vendor/xcc/wccfiles.js', './js/xcc-core.js', './js/xcc-stdio.js'];
 
 /* Third-party libraries the page loads. Every URL in index.html pins an exact
    version, so a cached copy never goes stale and cache-first is safe. Without

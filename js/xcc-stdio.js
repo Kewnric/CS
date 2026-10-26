@@ -25,7 +25,10 @@
    parse (parseFloat is correctly rounded). Both are WebAssembly imports from
    module "ssp", answered in xcc-core.js.
    ============================================================ */
-(function (root) {
+/* A named factory rather than an anonymous IIFE: js/xcc-runner.js builds its
+   worker from this function's own source text (xccStdioFactory.toString()),
+   since a page opened from disk may not start a worker from a script file. */
+function xccStdioFactory(root) {
   'use strict';
 
   const PRELUDE = String.raw`
@@ -606,4 +609,5 @@ int sscanf(const char *restrict s, const char *restrict fmt, ...) { va_list ap; 
   const lines = PRELUDE.split('\n').length - 1;
   root.XccStdio = { PRELUDE, PRELUDE_LINES: lines, fmtFloat, parseFloatC };
   if (typeof module !== 'undefined' && module.exports) module.exports = root.XccStdio;
-})(typeof self !== 'undefined' ? self : globalThis);
+}
+xccStdioFactory(typeof self !== 'undefined' ? self : globalThis);

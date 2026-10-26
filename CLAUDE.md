@@ -119,14 +119,20 @@ nothing defines `main`, the file that does is pulled in. It deliberately does
 *not* compile every file present — that used to drag unrelated programs in.
 
 **Compilers:** Godbolt (`_godboltCompileRun`) over the network. When it cannot
-be reached, **xcc** compiles in the browser (`js/xcc-runner.js` → a Web Worker,
-`js/xcc-worker.js` → `js/xcc-core.js`): a real C compiler shipped as WebAssembly
-in `vendor/xcc/wccfiles.zip` (MIT, 166 KB), run through a small in-memory WASI
-layer. Its libc's printf/scanf are not gcc-exact, so `js/xcc-stdio.js` compiles
+be reached, **xcc** compiles in the browser (`js/xcc-runner.js` → a Web Worker
+running `js/xcc-core.js`): a real C compiler shipped as WebAssembly, stored as
+base64 in `vendor/xcc/wccfiles.js` (MIT, 166 KB zipped), run through a small
+in-memory WASI layer. **It has to work from file://** — the user opens the app
+from disk, where a page may load `<script>` tags but may not `fetch()` or start
+a Worker from a file — so the runner loads everything by script tag on first
+use and builds the worker as a blob: URL from the factories' own source text
+(`xccStdioFactory`/`xccCoreFactory.toString()`); if even that is refused it
+runs on the page with a time limit checked on each read and write. Its libc's
+printf/scanf are not gcc-exact, so `js/xcc-stdio.js` compiles
 a replacement printf/scanf family in front of every program (float digits come
 from JS BigInt, ties to even like glibc). It answers in Godbolt's result shape,
 so the terminal's input probe and Check Code work unchanged. Only if xcc cannot
-start (file://) does JSCPP (`js/JSCPP.es5.min.js`, lazy-loaded) still run.
+load at all does JSCPP (`js/JSCPP.es5.min.js`, lazy-loaded) still run.
 Measured on the pack: JSCPP ran 93/158 programs offline, xcc 157/158 — the one
 left prints `sizeof` a pointer, which is 4 on wasm32, not 8. The xcc files are
 precached by `sw.js`, because they are only fetched once the network is gone.
