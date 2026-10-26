@@ -1,0 +1,5 @@
+xcc (https://github.com/tyfkda/xcc), MIT licence -- see LICENSE.
+wccfiles.zip is the project's own browser build (compiler cc.wasm, wlibc,
+headers), as published by its CI at https://tyfkda.github.io/xcc/wccfiles.zip.
+Downloaded 2026-10-26; source at commit 631e318432aeaaf72d6d2dfc93085766934314a2.
+Used by js/xcc-core.js as the offline C compiler for Run Code / Check Code.

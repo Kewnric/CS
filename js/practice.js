@@ -3466,13 +3466,36 @@ function _termViewHistory(index) {
  * replays instantly instead of paying a round trip per prompt.
  */
 async function _termCompile(session, source, stdin) {
+  if (session.engine === 'XCC') return xccCompileRun(source, stdin, session.aborter);
   const args = termCompilerArgs();
   const key = termCacheKey(source, stdin, args);
   const hit = termCacheGet(key);
   if (hit) { session.cacheHits = (session.cacheHits || 0) + 1; return hit; }
-  const res = await _godboltCompileRun(source, stdin, session.aborter, args);
+  let res;
+  try {
+    res = await _godboltCompileRun(source, stdin, session.aborter, args);
+  } catch (err) {
+    /* Godbolt is out of reach, so compile here instead (js/xcc-runner.js). It
+       is a real C compiler, so the rest of this step -- the input probe
+       included -- works exactly as it would have online. Stop is not "out of
+       reach", and if the compiler cannot start, the caller's fallback to the
+       old interpreter still runs. Its answers stay out of the GCC cache. */
+    if (session.stopped || typeof xccCompileRun !== 'function') throw err;
+    termUseOfflineCompiler(session, 'run-code-engine', 'run-code-status');
+    return xccCompileRun(source, stdin, session.aborter);
+  }
   termCacheSet(key, res);
   return res;
+}
+
+/** Label a terminal session as running on the in-browser compiler. */
+function termUseOfflineCompiler(session, engineId, statusId) {
+  if (session.engine === 'XCC') return;
+  session.engine = 'XCC';
+  const engineEl = document.getElementById(engineId);
+  const statusEl = document.getElementById(statusId);
+  if (engineEl) engineEl.textContent = 'XCC';
+  if (statusEl) statusEl.textContent = '⚠️ Compiler offline — compiling in your browser';
 }
 
 /** Live "…1.8s" next to the status, so a slow step reads as progress. */
@@ -3559,7 +3582,7 @@ async function _termRunStep() {
     if (_term !== session || !session.running || session.engine !== 'GCC') return;
     const line = session.lines[spinIdx];
     if (!line) return;
-    line.text = '⏳ The compiler is slow to answer — retrying it, with the offline interpreter standing by...';
+    line.text = '⏳ The compiler is slow to answer — retrying it, with the in-browser compiler standing by...';
     _termRender();
   }, GODBOLT_STALL_MS);
 
@@ -3687,7 +3710,7 @@ async function _termRunStep() {
     safe = split.safe;
     waitingForInput = split.blocked;
     exact = split.instrumented;
-  } else if (session.engine === 'GCC' && interactive && resB) {
+  } else if ((session.engine === 'GCC' || session.engine === 'XCC') && interactive && resB) {
     const outB = resB.stdout || '';
     if (outA !== outB || resA.exitCode !== resB.exitCode) {
       // The next (missing) input changes behavior → the program is waiting.
@@ -4639,7 +4662,7 @@ function _rtcKey(source, stdin) {
  * the same cache entry.
  */
 async function runCompileProbe(source) {
-  const got = await _rtcRun(source, '', { useJSCPP: false });
+  const got = await _rtcRun(source, '', { offline: false });
   return got.res;
 }
 
@@ -4663,15 +4686,26 @@ async function _rtcRun(merged, stdin, engine) {
     entry = (async () => {
       let r = null, err = '', viaGcc = false;
       try {
-        if (!engine.useJSCPP) {
+        if (!engine.offline) {
           try {
             r = await _godboltCompileRun(merged, stdin);
             viaGcc = true;
           } catch (e) {
-            engine.useJSCPP = true; // Godbolt down — switch for this and the rest
+            engine.offline = true; // Godbolt down — switch for this and the rest
           }
         }
-        if (engine.useJSCPP) {
+        /* Offline: the in-browser compiler, which grades the same way gcc
+           does. Only if it cannot start at all does the old interpreter --
+           which cannot run structs, files or scanf into an array -- get a turn. */
+        if (engine.offline && !engine.noXcc && typeof xccCompileRun === 'function') {
+          try {
+            r = await xccCompileRun(merged, stdin);
+          } catch (e) {
+            if (typeof xccUnavailable === 'function' && xccUnavailable(e)) engine.noXcc = true;
+            else throw e;
+          }
+        }
+        if (engine.offline && (engine.noXcc || typeof xccCompileRun !== 'function')) {
           r = await _gradeRunJSCPP(merged, stdin);
         }
       } catch (e) {
@@ -4707,7 +4741,7 @@ async function runTestCases(tests, sourceOverride, opts) {
     });
   }
 
-  const engine = { useJSCPP: false };
+  const engine = { offline: false };
   const results = new Array(tests.length);
   let done = 0;
 

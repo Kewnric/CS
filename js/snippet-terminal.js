@@ -166,11 +166,20 @@ function _snipTermInit(code) {
 }
 
 async function _snipTermCompile(session, source, stdin) {
+  if (session.engine === 'XCC') return xccCompileRun(source, stdin, session.aborter);
   const args = termCompilerArgs();
   const key = termCacheKey(source, stdin, args);
   const hit = termCacheGet(key);
   if (hit) return hit;
-  const res = await _godboltCompileRun(source, stdin, session.aborter, args);
+  let res;
+  try {
+    res = await _godboltCompileRun(source, stdin, session.aborter, args);
+  } catch (err) {
+    // Offline: compile in the browser instead. See _termCompile in practice.js.
+    if (session.stopped || typeof xccCompileRun !== 'function') throw err;
+    termUseOfflineCompiler(session, 'snip-run-code-engine', 'snip-run-code-status');
+    return xccCompileRun(source, stdin, session.aborter);
+  }
   termCacheSet(key, res);
   return res;
 }
@@ -261,7 +270,7 @@ async function _snipTermRunStep() {
     if (_snipTerm !== session || !session.running || session.engine !== 'GCC') return;
     const line = session.lines[spinIdx];
     if (!line) return;
-    line.text = '⏳ The compiler is slow to answer — retrying it, with the offline interpreter standing by...';
+    line.text = '⏳ The compiler is slow to answer — retrying it, with the in-browser compiler standing by...';
     _snipTermRender();
   }, GODBOLT_STALL_MS);
 
@@ -362,7 +371,7 @@ async function _snipTermRunStep() {
     safe = split.safe;
     waitingForInput = split.blocked;
     exact = split.instrumented;
-  } else if (session.engine === 'GCC' && interactive && resB) {
+  } else if ((session.engine === 'GCC' || session.engine === 'XCC') && interactive && resB) {
     const outB = resB.stdout || '';
     if (outA !== outB || resA.exitCode !== resB.exitCode) {
       safe = _snipTermLCP(outA, outB);

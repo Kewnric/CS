@@ -24,10 +24,14 @@
    Navigations stay network-first, so a new index.html — and with it a new
    worker — is noticed as soon as the network allows, with the cached shell as
    the offline fallback. */
-const CACHE = 'ssp-v455';
+const CACHE = 'ssp-v456';
 // The bundled comic font too, so comic notes letter correctly offline even
 // before one has been shown online.
-const SHELL = ['./index.html', './manifest.json', './fonts/comic-neue-bold.woff2'];
+// The in-browser C compiler too (js/xcc-runner.js): it is only ever fetched
+// when Godbolt cannot be reached, which is exactly when the network is not
+// there to fetch it, so it has to be in the cache before it is needed.
+const SHELL = ['./index.html', './manifest.json', './fonts/comic-neue-bold.woff2',
+  './vendor/xcc/wccfiles.zip', './js/xcc-worker.js', './js/xcc-core.js', './js/xcc-stdio.js'];
 
 /* Third-party libraries the page loads. Every URL in index.html pins an exact
    version, so a cached copy never goes stale and cache-first is safe. Without
@@ -38,7 +42,7 @@ const CDN_HOSTS = ['cdn.jsdelivr.net', 'unpkg.com', 'cdn.quilljs.com', 'www.gsta
 
 /** Static assets are content we hold; everything else goes to the network. */
 function isStatic(url) {
-  return /\.(?:js|css|woff2?|ttf|otf|png|jpg|jpeg|svg|webp|ico|mp3|ogg|wav)$/i.test(url.pathname);
+  return /\.(?:js|css|woff2?|ttf|otf|png|jpg|jpeg|svg|webp|ico|mp3|ogg|wav|zip)$/i.test(url.pathname);
 }
 
 self.addEventListener('install', (event) => {
