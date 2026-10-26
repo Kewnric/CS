@@ -179,7 +179,13 @@ function psetInit() {
     setPracticeTimerCtx({
       active: () => !!_pset,
       getLimit: () => (_pset && _pset.timeLimit) || 0,
-      apply: (secs, restart) => psetApplyTimer(secs, restart)
+      apply: (secs, restart) => psetApplyTimer(secs, restart),
+      adjust: (delta) => {
+        if (!_pset || typeof shiftTimerClock !== 'function') return;
+        shiftTimerClock(_pset, delta);
+        try { setSessionParam('codingSetTimeLimit', String(_pset.timeLimit)); } catch (e) { /* full */ }
+        _psetTick();
+      }
     });
   }
 

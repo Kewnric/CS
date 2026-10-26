@@ -1308,8 +1308,41 @@ function practiceTimerCtx() {
   return _timerCtx || {
     active: () => !!state.sessionData,
     getLimit: () => (state.sessionData && state.sessionData.timeLimit) || 0,
-    apply: (secs, restart) => applyPracticeTimer(secs, restart)
+    apply: (secs, restart) => applyPracticeTimer(secs, restart),
+    adjust: (delta) => adjustPracticeTimer(delta)
   };
+}
+
+/**
+ * Move what a clock shows by `delta` seconds without restarting it: minus
+ * takes time off the clock, plus gives it back. A stopwatch's elapsed time
+ * moves; a countdown's time left moves -- and never to zero, which would end
+ * the attempt, and past its full length the length itself grows. Works on any
+ * clock kept as { startTime, timeLimit, paused, pausedAt }, which is how both
+ * the program screen and a practice set keep theirs.
+ */
+function shiftTimerClock(clock, delta) {
+  if (!clock || !delta) return;
+  const now = clock.paused && clock.pausedAt ? clock.pausedAt : Date.now();
+  const elapsed = (now - clock.startTime) / 1000;
+  if (clock.timeLimit > 0) {
+    const left = Math.max(1, clock.timeLimit - elapsed + delta);
+    let spent = clock.timeLimit - left;
+    if (spent < 0) { clock.timeLimit = Math.round(clock.timeLimit - spent); spent = 0; }
+    clock.startTime = now - spent * 1000;
+  } else {
+    clock.startTime = now - Math.max(0, elapsed + delta) * 1000;
+  }
+}
+
+function adjustPracticeTimer(delta) {
+  const sd = state.sessionData;
+  if (!sd) return;
+  shiftTimerClock(sd, delta);
+  state.timeLimit = sd.timeLimit;
+  setSessionParam('timeLimit', sd.timeLimit);
+  setSessionParam('practiceStartTime', sd.startTime);
+  updatePracticeTimerDisplay();
 }
 
 function openTimerMenu(e) {
@@ -1344,6 +1377,14 @@ function openTimerMenu(e) {
     <div class="timer-menu-presets" id="timer-menu-presets">
       ${[5, 15, 30, 60].map(mins => `<button type="button" class="timer-preset" data-mins="${mins}">${mins < 60 ? mins + 'm' : '1h'}</button>`).join('')}
     </div>
+    ${typeof practiceTimerCtx().adjust === 'function' ? `
+    <div class="timer-menu-adjust" id="tm-adjust">
+      <span class="timer-menu-adjust-label">Adjust the clock</span>
+      <div class="timer-menu-adjust-row">
+        ${[[-3600, '-1h'], [-600, '-10m'], [-60, '-1m'], [60, '+1m'], [600, '+10m'], [3600, '+1h']].map(([d, l]) =>
+          `<button type="button" class="timer-adjust${d < 0 ? ' is-minus' : ''}" data-delta="${d}" title="${d < 0 ? 'Take' : 'Give back'} ${l.slice(1)}">${l.replace('-', '\u2212')}</button>`).join('')}
+      </div>
+    </div>` : ''}
     <label class="timer-menu-restart">
       <input type="checkbox" id="tm-restart"> Restart the clock from zero
     </label>
@@ -1406,6 +1447,14 @@ function openTimerMenu(e) {
     };
   });
   restart.onchange = paint;
+  // Takes effect at once and keeps the menu open, so it can be pressed again.
+  el.querySelectorAll('.timer-adjust').forEach(b => {
+    b.onclick = () => {
+      const c = practiceTimerCtx();
+      if (typeof c.adjust === 'function') c.adjust(parseInt(b.dataset.delta, 10) || 0);
+      b.classList.remove('is-hit'); void b.offsetWidth; b.classList.add('is-hit');
+    };
+  });
   el.querySelector('#tm-cancel').onclick = _timerMenuClose;
   el.querySelector('#tm-apply').onclick = () => {
     const secs = picked === 'down'

@@ -14,6 +14,36 @@ let syntaxDebounceTimer;
 
 const ED_INDENT = '  ';
 
+/* The file's own indentation: a tab when its lines are indented with tabs --
+   what most code pasted from elsewhere uses -- or when nothing is indented
+   yet, and spaces when they are, in steps of two or four. Tab, Enter after a
+   brace, a closing brace and Shift+Tab all use it, so pasted tab-indented
+   code is carried on with tabs rather than mixed with spaces. */
+function edIndentUnit(textarea) {
+  const v = textarea ? textarea.value : '';
+  let tabs = 0, spaced = 0, four = true;
+  v.split('\n').forEach(line => {
+    if (line.charAt(0) === '\t') { tabs++; return; }
+    const m = /^( +)\S/.exec(line);
+    if (!m) return;
+    spaced++;
+    if (m[1].length % 4) four = false;
+  });
+  if (tabs >= spaced) return '\t';
+  return four ? '    ' : '  ';
+}
+/** How many columns an indent step is, for counting spaces against it. */
+function edIndentWidth(unit) { return unit === '\t' ? 2 : unit.length; }
+
+/** Take one indent step off the end of a run of leading whitespace. */
+function edOutdent(ws, unit) {
+  if (!ws) return ws;
+  if (ws.endsWith('\t')) return ws.slice(0, -1);
+  const w = edIndentWidth(unit);
+  const trailing = ws.length - ws.replace(/ +$/, '').length;
+  return ws.slice(0, ws.length - Math.min(trailing, ((trailing - 1) % w) + 1));
+}
+
 /**
  * Replace [from, to) with `text` while preserving the native undo stack.
  * @param {HTMLTextAreaElement} textarea
@@ -227,9 +257,12 @@ function edMoveLines(textarea, dir) {
 /** Tab / Shift+Tab across a multi-line selection. */
 function edIndentLines(textarea, dir) {
   const span = edLineSpan(textarea);
+  const unit = edIndentUnit(textarea);
   const out = span.lines.map(l => {
-    if (dir > 0) return ED_INDENT + l;
-    return l.startsWith(ED_INDENT) ? l.slice(ED_INDENT.length) : l.replace(/^\s/, '');
+    if (dir > 0) return unit + l;
+    if (l.charAt(0) === '\t') return l.slice(1);
+    const lead = l.length - l.replace(/^ +/, '').length;
+    return l.slice(Math.min(lead, edIndentWidth(unit)));
   }).join('\n');
   edReplaceRange(textarea, span.start, span.end, out, [span.start, span.start + out.length]);
 }
@@ -734,13 +767,31 @@ function edTextEntry(textarea, key, shiftKey) {
   const selectionEnd = textarea.selectionEnd;
   const bracketPairs = { '{': '}', '(': ')', '[': ']' };
 
+  // Only the keys that indent need the file's indentation worked out.
+  const unit = (key === 'Tab' || key === 'Backspace' || key === 'Enter' || key === '}' || key === ']')
+    ? edIndentUnit(textarea) : ED_INDENT;
+
   if (key === 'Tab') {
     const multiline = value.slice(selectionStart, selectionEnd).includes('\n');
     if (multiline || shiftKey) {
       edIndentLines(textarea, shiftKey ? -1 : 1);
     } else {
-      edReplaceRange(textarea, selectionStart, selectionEnd, ED_INDENT, selectionStart + ED_INDENT.length);
+      edReplaceRange(textarea, selectionStart, selectionEnd, unit, selectionStart + unit.length);
     }
+    return true;
+  }
+
+  /* Backspace in the spaces at the start of a line takes them back one indent
+     step at a time, the way a tab would go -- not one space at a time. Mid-line,
+     or over a tab, or over a single space, it is an ordinary backspace. */
+  if (key === 'Backspace') {
+    if (selectionStart !== selectionEnd || shiftKey) return false;
+    const lineStart = value.lastIndexOf('\n', selectionStart - 1) + 1;
+    const before = value.slice(lineStart, selectionStart);
+    if (!before || /[^ ]/.test(before)) return false;
+    const cut = ((before.length - 1) % edIndentWidth(unit)) + 1;
+    if (cut <= 1) return false;
+    edReplaceRange(textarea, selectionStart - cut, selectionStart, '', selectionStart - cut);
     return true;
   }
 
@@ -768,13 +819,13 @@ function edTextEntry(textarea, key, shiftKey) {
     // lands on the blank one between them.
     if ((textBefore.endsWith('{') && textAfter.startsWith('}')) ||
         (textBefore.endsWith('[') && textAfter.startsWith(']'))) {
-      const innerIndent = indent + ED_INDENT;
+      const innerIndent = indent + unit;
       edReplaceRange(textarea, selectionStart, selectionEnd,
         '\n' + innerIndent + '\n' + indent, selectionStart + 1 + innerIndent.length);
       return true;
     }
 
-    if (currentLine.trim().endsWith('{') || currentLine.trim().endsWith('[')) indent += ED_INDENT;
+    if (currentLine.trim().endsWith('{') || currentLine.trim().endsWith('[')) indent += unit;
     edReplaceRange(textarea, selectionStart, selectionEnd, '\n' + indent, selectionStart + 1 + indent.length);
     return true;
   }
@@ -786,7 +837,7 @@ function edTextEntry(textarea, key, shiftKey) {
     // mid-expression must not reindent the line under it.
     if (currentLine.trim() === '' && currentLine.length > 0) {
       const lineStart = selectionStart - currentLine.length;
-      const newIndent = currentLine.length >= ED_INDENT.length ? currentLine.slice(0, -ED_INDENT.length) : '';
+      const newIndent = edOutdent(currentLine, unit);
       edReplaceRange(textarea, lineStart, selectionEnd, newIndent + key, lineStart + newIndent.length + 1);
       return true;
     }

@@ -47,6 +47,16 @@ const EDFX_TILT_KEY = 'ssp.editorFxTilt';
    the letter spends its first fraction of a second soft and faint and resolves
    as it comes down, so it reads as arriving rather than as appearing. */
 const EDFX_BLUR_KEY = 'ssp.editorFxBlur';
+/* SPARKS off keeps just the letters. On -- the default -- a ring bursts out of
+   the character that ends a statement or closes a bracket, fast typing throws
+   sparks off each letter (more as the streak runs on), and Enter sends a glint
+   along the line you just finished. */
+const EDFX_SPARK_KEY = 'ssp.editorFxSparks';
+function edfxSparksOn() {
+  try { return localStorage.getItem(EDFX_SPARK_KEY) !== '0'; } catch (e) { return true; }
+}
+let _edfxLastKeyAt = 0;
+let _edfxStreak = 0;
 
 /** Old style: a copy over the text, both visible at once. */
 function edfxOverlayMode() {
@@ -255,6 +265,7 @@ function _edfxCharBox(offset) {
       x: box.left - host.left + pre.scrollLeft,
       y: box.top - host.top + pre.scrollTop,
       h: box.height,
+      w: box.width,
       color: owner ? getComputedStyle(owner).color : ''
     };
   } catch (e) {
@@ -381,6 +392,66 @@ function edfxTyped(ta, back) {
     _edfxApplyHoles();
     const box = _edfxCharBox(at);
     if (box) _edfxSpawn(ch === ' ' ? ' ' : ch, box, 'edfx-in', 0, at);
+    if (box) _edfxExtras(ch, box);
+  }, 0);
+}
+
+/* ── The extras ───────────────────────────────────────────────
+   Short-lived marks laid beside the letters, never in place of them: they hide
+   no character and hold no hole, so each simply removes itself. */
+function _edfxFx(cls, box, vars) {
+  const layer = _edfxLayer();
+  if (!layer || !box) return;
+  const el = document.createElement('span');
+  el.className = 'edfx-fx ' + cls;
+  el.style.left = box.x + 'px';
+  el.style.top = box.y + 'px';
+  el.style.width = (box.w || 8) + 'px';
+  el.style.height = box.h + 'px';
+  if (box.color) el.style.setProperty('--fx-c', box.color);
+  Object.keys(vars || {}).forEach(k => el.style.setProperty(k, vars[k]));
+  layer.appendChild(el);
+  const kill = () => { if (el.parentElement) el.remove(); };
+  el.addEventListener('animationend', kill, { once: true });
+  setTimeout(kill, 1000);
+}
+
+function _edfxExtras(ch, box) {
+  if (!edfxSparksOn()) return;
+  const now = performance.now();
+  _edfxStreak = now - _edfxLastKeyAt < 170 ? _edfxStreak + 1 : 0;
+  _edfxLastKeyAt = now;
+  // A statement ends, a block or call closes: a ring bursts from it.
+  if (';)]}'.indexOf(ch) !== -1) _edfxFx('edfx-ring', box);
+  // Typing fast: sparks fly off the letter, more of them the longer it lasts.
+  if (_edfxStreak >= 5 && ch.trim()) {
+    const n = Math.min(4, 1 + Math.floor((_edfxStreak - 5) / 6));
+    for (let i = 0; i < n; i++) {
+      const a = (-90 + (Math.random() - 0.5) * 140) * Math.PI / 180;
+      const d = 0.9 + Math.random() * 1.3;
+      _edfxFx('edfx-spark', box, {
+        '--sx': (Math.cos(a) * d).toFixed(2) + 'em',
+        '--sy': (Math.sin(a) * d).toFixed(2) + 'em',
+        '--sd': Math.round(Math.random() * 60) + 'ms'
+      });
+    }
+  }
+}
+
+/** Enter: a glint runs along the line just finished, from its first letter to its last. */
+function edfxLineDone(ta, breakAt) {
+  if (!edfxEnabled() || !edfxRouteWants() || !_edfxMotionOk() || !edfxSparksOn()) return;
+  const v = ta.value;
+  const lineStart = v.lastIndexOf('\n', breakAt - 1) + 1;
+  const text = v.slice(lineStart, breakAt);
+  const first = text.search(/\S/);
+  if (first === -1) return;
+  const lastAt = lineStart + text.replace(/\s+$/, '').length - 1;
+  setTimeout(() => {
+    const a = _edfxCharBox(lineStart + first);
+    const b = _edfxCharBox(lastAt);
+    if (!a || !b || Math.abs(a.y - b.y) > 2) return;   // a wrapped line: skip it
+    _edfxFx('edfx-sweep', { x: a.x, y: a.y, h: a.h, w: b.x + (b.w || 8) - a.x, color: '' });
   }, 0);
 }
 
@@ -473,6 +544,8 @@ document.addEventListener('input', function (e) {
      brackets and quotes were the only keys in the file that drew nothing.
      Only the character YOU pressed gets a ghost; the auto-closed partner
      appears without ceremony, because you did not type it. */
+  // Enter (with its auto-indent): the line it finished gets a glint.
+  if (e.data && e.data.charAt(0) === '\n') { edfxLineDone(ta, ta.selectionStart - e.data.length); return; }
   if (e.data && e.data.length > 1) {
     if (!EDFX_PAIRS[e.data]) return;
     edfxTyped(ta, 1);
@@ -543,6 +616,17 @@ function toggleEditorFxTilt() {
   if (typeof feelSync === 'function') feelSync();
 }
 
+/** The rings, sparks and glints on or off. */
+function toggleEditorFxSparks() {
+  const next = !edfxSparksOn();
+  try { localStorage.setItem(EDFX_SPARK_KEY, next ? '1' : '0'); } catch (e) { /* private mode */ }
+  _syncEditorFxBtn();
+  if (typeof toast === 'function') {
+    toast(next ? 'Rings, sparks and glints on' : 'Just the letters', { type: 'info', duration: 1800 });
+  }
+  if (typeof feelSync === 'function') feelSync();
+}
+
 function _syncEditorFxBtn() {
   const on = edfxEnabled();
   const label = on ? 'Letter animation on' : 'Letter animation off';
@@ -572,6 +656,11 @@ function _syncEditorFxBtn() {
     bl.classList.toggle('is-on', !edfxBlurOn());
     bl.setAttribute('aria-pressed', String(!edfxBlurOn()));
   }
+  const sp = document.getElementById('edfx-spark-opt');
+  if (sp) {
+    sp.classList.toggle('is-on', !edfxSparksOn());
+    sp.setAttribute('aria-pressed', String(!edfxSparksOn()));
+  }
 }
 
 /** Sits beside the typing-sound toggle — both are the same kind of switch. */
@@ -581,6 +670,7 @@ function editorFxButtonTemplate() {
   const overlay = edfxOverlayMode();
   const tilt = edfxTiltOn();
   const blur = edfxBlurOn();
+  const sparks = edfxSparksOn();
   /* The style switches live behind the same button rather than beside it.
      The strip already needs ten controls to fit on a phone, and these are set
      once and then left alone -- the same reasoning that put the typing voices
@@ -614,6 +704,13 @@ function editorFxButtonTemplate() {
                 title="Land every letter sharp, with no soft start">
           <span class="edfx-opt-name">No blur</span>
           <span class="edfx-opt-hint">letters land sharp, not resolving</span>
+        </button>
+        <button type="button" class="edfx-opt${sparks ? '' : ' is-on'}"
+                id="edfx-spark-opt" onclick="toggleEditorFxSparks()"
+                aria-pressed="${!sparks}"
+                title="Leave out the rings, sparks and line glints">
+          <span class="edfx-opt-name">No sparks</span>
+          <span class="edfx-opt-hint">no rings, sparks or line glints</span>
         </button>
       </div>
     </div>`;

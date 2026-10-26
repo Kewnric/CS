@@ -205,3 +205,70 @@
 @media (prefers-reduced-motion: reduce) {
   .edfx-ghost { display: none !important; }
 }
+
+/* ── The extras (edfxSparksOn) ─────────────────────────────────
+   Marks beside the letters, never in place of them. --fx-c is the character's
+   own syntax colour. */
+.edfx-fx {
+  position: absolute;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+/* A statement ends or a bracket closes: a ring bursts from the character. */
+.edfx-ring::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1.1em;
+  height: 1.1em;
+  margin: -0.55em 0 0 -0.55em;
+  border: 2px solid var(--fx-c, var(--color-primary));
+  border-radius: 50%;
+  box-shadow: 0 0 10px var(--fx-c, var(--color-primary));
+  animation: edfxRing 460ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+@keyframes edfxRing {
+  0%   { opacity: 0.95; transform: scale(0.35); }
+  100% { opacity: 0;    transform: scale(2.1); }
+}
+/* Fast typing: sparks thrown off the letter. */
+.edfx-spark::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: var(--fx-c, var(--color-primary));
+  box-shadow: 0 0 6px 1px var(--fx-c, var(--color-primary)), 0 0 2px #fff;
+  animation: edfxSpark 560ms cubic-bezier(0.15, 0.6, 0.3, 1) var(--sd, 0ms) both;
+}
+@keyframes edfxSpark {
+  0%   { opacity: 1; transform: translate(0, 0) scale(1); }
+  100% { opacity: 0; transform: translate(var(--sx, 0), var(--sy, -1em)) scale(0.3); }
+}
+/* Enter: a glint runs along the line just finished. */
+.edfx-sweep {
+  overflow: hidden;
+  border-radius: 3px;
+}
+.edfx-sweep::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-primary) 38%, transparent) 45%, rgba(255, 255, 255, 0.35) 50%, color-mix(in srgb, var(--color-primary) 38%, transparent) 55%, transparent);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  animation: edfxSweep 520ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+@keyframes edfxSweep {
+  0%   { background-position: -45% 0; opacity: 1; }
+  85%  { opacity: 1; }
+  100% { background-position: 145% 0; opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .edfx-fx { display: none !important; }
+}

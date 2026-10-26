@@ -515,6 +515,39 @@
   cursor: pointer;
 }
 .timer-preset:hover { color: var(--color-primary); border-color: var(--color-primary); }
+/* Adjust the clock: take time off, or give it back, without restarting. */
+.timer-menu-adjust { margin-top: 0.55rem; }
+.timer-menu-adjust-label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.timer-menu-adjust-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.25rem; }
+.timer-adjust {
+  padding: 0.24rem 0;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 10%, #161b22);
+  border: 1px solid color-mix(in srgb, var(--color-success) 35%, #30363d);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.timer-adjust.is-minus {
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 10%, #161b22);
+  border-color: color-mix(in srgb, var(--color-danger) 35%, #30363d);
+}
+.timer-adjust:hover { transform: translateY(-1px); border-color: currentColor; }
+.timer-adjust.is-hit { animation: timerAdjustHit 0.32s cubic-bezier(0.3, 1.6, 0.5, 1); }
+@keyframes timerAdjustHit { 40% { transform: scale(0.88); } }
+
 /* Count-up mode has no duration to set — grey the whole group out at once. */
 .timer-menu-fields.disabled,
 .timer-menu-presets.disabled { opacity: 0.4; pointer-events: none; }
