@@ -782,7 +782,7 @@ function brainTreeSetColor(ids) {
   if (!recs.length || typeof treeColorDialog !== 'function') return;
   treeColorDialog({
     title: recs.length > 1 ? 'Highlight colour for ' + recs.length : 'Highlight colour',
-    current: recs.length === 1 ? { text: recs[0].color || '', rail: recs[0].railColor || '' } : null,
+    current: recs.length === 1 ? { text: recs[0].color || '', rail: recs[0].railColor || '', icon: recs[0].iconColor || '' } : null,
     apply: (target, colorId) => {
       recs.forEach(r => _treeWriteColor(r, target, colorId));
       brainSave(); brainRenderSidebar();

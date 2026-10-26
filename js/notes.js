@@ -983,15 +983,15 @@ function renderNotebookFolderOverview(container) {
   let subfoldersHtml = '';
   if (childFolders.length > 0) {
     subfoldersHtml = `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem;">`;
-    childFolders.forEach(sf => {
-      const sfCount = countItemsRecursive(sf.id, 'notebook');
-      subfoldersHtml += `
-        <div class="subfolder-card" onclick="selectNotebookFolder('${sf.id}'); toggleNodeExpanded('${sf.id}');">
-          <i data-lucide="${sf.icon || 'folder'}"></i>
-          <span class="subfolder-card-label">${escapeHTML(sf.name)}</span>
-          <span class="subfolder-card-count">${sfCount} item${sfCount !== 1 ? 's' : ''}</span>
-        </div>
-      `;
+    childFolders.forEach((sf, i) => {
+      const inside = (state.notebooks || []).filter(nb => nb.parentId === sf.id).map(nb => nb.title);
+      subfoldersHtml += libFolderTileHTML({
+        folder: sf, index: i,
+        onclick: `selectNotebookFolder('${sf.id}'); toggleNodeExpanded('${sf.id}');`,
+        count: countItemsRecursive(sf.id, 'notebook'),
+        subfolders: getChildFolders(sf.id, 'notebook').length,
+        peek: inside.length ? inside : getChildFolders(sf.id, 'notebook').map(c => c.name)
+      });
     });
     subfoldersHtml += `</div>`;
   }

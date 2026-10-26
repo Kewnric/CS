@@ -3024,3 +3024,211 @@ body.tree-dragging [data-tree-ns]::-webkit-scrollbar { width: 0; height: 0; }
 .card.is-finished:focus-within {
   filter: none;
 }
+
+/* ============================================================
+   LIBRARY TREES AND FOLDER TILES, ROUND THREE
+   ============================================================ */
+/* An open folder stands out from what is inside it: a tinted row, an accent
+   bar, a heavier name, and its children's guide line in the same tint. It
+   read exactly like its own children before. (The selected row keeps its own
+   look.) */
+.tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row:not(.active) {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--color-primary) 15%, transparent), color-mix(in srgb, var(--color-primary) 4%, transparent) 75%);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--color-primary) 75%, transparent);
+}
+.tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row .tree-node-label { font-weight: 700; color: var(--text-primary); }
+.tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row .tree-node-icon { color: var(--icon-accent, var(--color-primary)); }
+.tree-node:has(> .tree-children:not(.collapsed)) > .tree-children { border-left-color: color-mix(in srgb, var(--color-primary) 35%, var(--border-color)); }
+
+/* A folder or item's own icon colour (the colour dialog's Icon part). */
+.tree-node.has-icon-color > .tree-node-row .tree-node-icon,
+.tree-node.has-icon-color > .tree-node-row > svg.tree-node-icon { color: var(--icon-accent) !important; }
+.tree-color-seg-glyph.is-icon { display: inline-grid; place-items: center; }
+.tree-color-seg-glyph.is-icon svg { width: 12px; height: 12px; }
+.tree-color-preview-icon { display: inline-grid; place-items: center; color: var(--pv-icon, var(--text-tertiary)); }
+.tree-color-preview-icon svg { width: 15px; height: 15px; }
+
+/* ── The folder tile (libFolderTileHTML) ── */
+.subfolder-card.lft {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.8rem;
+  padding: 0.85rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--lft) 20%, var(--border-color));
+  border-radius: 14px;
+  background: linear-gradient(150deg, color-mix(in srgb, var(--lft) 10%, var(--bg-surface)), var(--bg-surface) 60%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1), border-color 0.2s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+.subfolder-card.lft:hover {
+  transform: translateY(-3px);
+  border-color: color-mix(in srgb, var(--lft) 55%, var(--border-color));
+  background: linear-gradient(150deg, color-mix(in srgb, var(--lft) 16%, var(--bg-surface)), var(--bg-surface) 65%);
+  box-shadow: 0 14px 28px -18px color-mix(in srgb, var(--lft) 80%, transparent);
+}
+.subfolder-card.lft:focus-visible { outline: 2px solid var(--lft); outline-offset: 2px; }
+/* A folder you can see is a folder: a body, and a tab that lifts on hover. */
+.lft-folder {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 36px;
+  margin-top: 6px;
+  border-radius: 4px 9px 9px 9px;
+  color: #fff;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--lft) 85%, #fff), var(--lft) 55%, color-mix(in srgb, var(--lft) 75%, #000));
+  box-shadow: 0 6px 14px -6px var(--lft), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: transform 0.3s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+.lft-tab {
+  position: absolute;
+  left: 0;
+  top: -6px;
+  width: 18px;
+  height: 8px;
+  border-radius: 4px 6px 0 0;
+  background: color-mix(in srgb, var(--lft) 80%, #fff);
+  transform-origin: bottom left;
+  transition: transform 0.3s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+.subfolder-card.lft .lft-folder svg { width: 18px; height: 18px; color: #fff; }
+.subfolder-card.lft:hover .lft-folder { transform: translateY(-2px) rotate(-4deg) scale(1.05); }
+.subfolder-card.lft:hover .lft-tab { transform: rotate(-14deg); }
+.lft-body { display: flex; flex-direction: column; gap: 0.32rem; flex: 1; min-width: 0; }
+.lft-name { display: flex; align-items: center; gap: 0.35rem; min-width: 0; }
+.lft-tag {
+  flex: none;
+  padding: 0.02rem 0.36rem;
+  border-radius: 6px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--lft);
+  background: color-mix(in srgb, var(--lft) 15%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--lft) 28%, transparent);
+}
+.lft-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.88rem; font-weight: 700; color: var(--text-primary); }
+.lft-meta { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.lft-meta > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  padding: 0.02rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--lft) 9%, transparent);
+}
+.subfolder-card.lft .lft-meta svg { width: 11px; height: 11px; color: var(--lft); }
+.lft-meta > .lft-pct { color: var(--lft); }
+/* A peek at what is inside: the first few titles, quietly. */
+.lft-peek { display: flex; flex-direction: column; gap: 0.08rem; }
+.lft-peek > span {
+  position: relative;
+  padding-left: 0.65rem;
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lft-peek > span::before {
+  content: '';
+  position: absolute;
+  left: 0.12rem;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin-top: -2px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--lft) 60%, transparent);
+}
+.lft-bar { height: 4px; margin-top: 0.15rem; border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--lft) 14%, transparent); }
+.lft-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, color-mix(in srgb, var(--lft) 55%, transparent), var(--lft)); animation: lftGrow 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; transform-origin: left; }
+@keyframes lftGrow { from { transform: scaleX(0); } }
+/* Coding's to-do count keeps its corner. */
+.subfolder-card.lft .subfolder-card-todo { z-index: 1; }
+
+/* ── The icon picker's shelves ── */
+.iconpick-shelf { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.45rem; }
+.iconpick-shelf.hidden { display: none; }
+.iconpick-shelf-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: none;
+  width: 92px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.iconpick-shelf-label svg { width: 12px; height: 12px; }
+.iconpick-slots { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.iconpick-slot {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+.iconpick-slot.is-empty { border: 1.5px dashed color-mix(in srgb, var(--text-tertiary) 45%, transparent); }
+.iconpick-slot.is-filled {
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+.iconpick-slot.is-filled svg { width: 15px; height: 15px; }
+.iconpick-slot.is-filled:hover { color: var(--text-primary); border-color: var(--color-primary); transform: translateY(-1px); }
+.iconpick-slot.is-filled.is-on { color: #fff; border-color: var(--color-primary); background: var(--color-primary); }
+.iconpick-slot-x {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: none;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  font-size: 0.75rem;
+  line-height: 16px;
+  color: #fff;
+  background: var(--color-danger);
+  cursor: pointer;
+}
+.iconpick-slot:hover .iconpick-slot-x { display: block; }
+.iconpick-star {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, transform 0.25s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.iconpick-star svg { width: 15px; height: 15px; }
+.iconpick-star:hover:not(:disabled) { color: var(--color-warning); border-color: var(--color-warning); }
+.iconpick-star.is-on { color: var(--color-warning); border-color: var(--color-warning); }
+.iconpick-star.is-on svg { fill: currentColor; }
+.iconpick-star:active:not(:disabled) { transform: scale(0.85); }
+.iconpick-star:disabled { opacity: 0.4; cursor: default; }
+@media (prefers-reduced-motion: reduce) {
+  .lft-bar i { animation: none; }
+}
+.tree-color-seg:has(> [data-target="icon"]) { grid-template-columns: repeat(3, 1fr); }
+.tree-color-seg-glyph.is-icon { background: none; }
+.tree-color-preview-icon { margin-right: 0.45rem; }

@@ -462,6 +462,19 @@ function iconPickerNames() {
   return iconPickerNames._cache;
 }
 
+/* Favourite icons: eight slots you fill yourself (the star by the current
+   pick), and the last eight you confirmed. Both per device. */
+const ICON_FAVS_KEY = 'ssp.iconFavourites';
+const ICON_RECENT_KEY = 'ssp.iconRecent';
+const ICON_SLOTS = 8;
+function _iconList(key) {
+  try { const v = JSON.parse(localStorage.getItem(key) || '[]'); return Array.isArray(v) ? v.filter(x => typeof x === 'string' && x).slice(0, ICON_SLOTS) : []; }
+  catch (e) { return []; }
+}
+function _iconListSave(key, list) {
+  try { localStorage.setItem(key, JSON.stringify(list.slice(0, ICON_SLOTS))); } catch (e) { /* private mode */ }
+}
+
 /**
  * @param {string} current  the icon already set, pre-selected if it exists
  * @param {function} onConfirm  called with the chosen name, or '' to clear
@@ -484,11 +497,16 @@ function showIconPicker(title, message, current, onConfirm) {
 
   document.getElementById('dialog-actions').innerHTML =
     '<div class="iconpick">'
+    + '<div class="iconpick-shelf"><span class="iconpick-shelf-label"><i data-lucide="star"></i> Favourites</span>'
+    + '<div id="iconpick-favs" class="iconpick-slots"></div></div>'
+    + '<div class="iconpick-shelf" id="iconpick-recent-row"><span class="iconpick-shelf-label"><i data-lucide="history"></i> Recent</span>'
+    + '<div id="iconpick-recent" class="iconpick-slots"></div></div>'
     + '<input id="iconpick-q" class="form-input iconpick-search" type="search" autocomplete="off"'
     + ' placeholder="Search ' + all.length + ' icons…" />'
     + '<div id="iconpick-grid" class="iconpick-grid" role="listbox" aria-label="Icons"></div>'
     + '<div class="iconpick-foot">'
     + '<span id="iconpick-current" class="iconpick-current"></span>'
+    + '<button id="iconpick-star" class="iconpick-star" type="button" aria-pressed="false" title="Keep this icon in Favourites"><i data-lucide="star"></i></button>'
     + '<span class="iconpick-spacer"></span>'
     + '<button id="dlg-clear" class="btn btn-ghost btn-sm" type="button">No icon</button>'
     + '<button id="dlg-cancel" class="btn btn-secondary btn-sm" type="button">Cancel</button>'
@@ -537,7 +555,73 @@ function showIconPicker(title, message, current, onConfirm) {
       ? '<i data-lucide="' + picked + '"></i><code>' + escapeHTML(picked) + '</code>'
       : '<span class="iconpick-none">No icon selected</span>';
     if (picked && typeof lucide !== 'undefined') lucide.createIcons({ root: foot });
+    paintShelves();
   }
+
+  /* The shelves: eight favourite slots (empty ones wait for the star) and the
+     icons you confirmed most recently. A slot picks its icon; the x on a
+     favourite takes it off the shelf. */
+  function paintShelves() {
+    const favs = _iconList(ICON_FAVS_KEY).filter(nm => known.has(nm));
+    const recent = _iconList(ICON_RECENT_KEY).filter(nm => known.has(nm));
+    const slot = (nm, fav) =>
+      '<div class="iconpick-slot is-filled' + (nm === picked ? ' is-on' : '') + '" role="button" tabindex="0" data-icon="' + nm + '" title="' + nm + '">'
+      + '<i data-lucide="' + nm + '"></i>'
+      + (fav ? '<button type="button" class="iconpick-slot-x" data-unfav="' + nm + '" title="Remove from Favourites" aria-label="Remove ' + nm + ' from Favourites">&times;</button>' : '')
+      + '</div>';
+    const favBox = document.getElementById('iconpick-favs');
+    if (favBox) {
+      let html = favs.map(nm => slot(nm, true)).join('');
+      for (let i = favs.length; i < ICON_SLOTS; i++) {
+        html += '<span class="iconpick-slot is-empty" title="Empty. Pick an icon and press the star to keep it here."></span>';
+      }
+      favBox.innerHTML = html;
+    }
+    const recBox = document.getElementById('iconpick-recent');
+    const recRow = document.getElementById('iconpick-recent-row');
+    if (recBox) recBox.innerHTML = recent.map(nm => slot(nm, false)).join('');
+    if (recRow) recRow.classList.toggle('hidden', !recent.length);
+    const star = document.getElementById('iconpick-star');
+    if (star) {
+      const on = !!picked && favs.indexOf(picked) !== -1;
+      star.classList.toggle('is-on', on);
+      star.setAttribute('aria-pressed', String(on));
+      star.disabled = !picked;
+      star.title = on ? 'In Favourites. Press to take it off.' : 'Keep this icon in Favourites';
+    }
+    const box = document.querySelector('.iconpick');
+    if (box && typeof lucide !== 'undefined') {
+      lucide.createIcons({ root: favBox || box });
+      if (recBox) lucide.createIcons({ root: recBox });
+    }
+  }
+
+  const iconBox = document.querySelector('.iconpick');
+  iconBox.addEventListener('click', e => {
+    const x = e.target.closest && e.target.closest('[data-unfav]');
+    if (x) {
+      e.stopPropagation();
+      _iconListSave(ICON_FAVS_KEY, _iconList(ICON_FAVS_KEY).filter(nm => nm !== x.getAttribute('data-unfav')));
+      paintShelves();
+      return;
+    }
+    const sl = e.target.closest && e.target.closest('.iconpick-slot.is-filled');
+    if (sl) { picked = sl.getAttribute('data-icon'); paint(); return; }
+    if (e.target.closest && e.target.closest('#iconpick-star')) {
+      if (!picked) return;
+      const favs = _iconList(ICON_FAVS_KEY);
+      const at = favs.indexOf(picked);
+      if (at !== -1) favs.splice(at, 1);
+      else if (favs.length < ICON_SLOTS) favs.push(picked);
+      else { favs.pop(); favs.unshift(picked); }   // full: the newest takes the first slot
+      _iconListSave(ICON_FAVS_KEY, favs);
+      paintShelves();
+    }
+  });
+  const remember = nm => {
+    if (!nm) return;
+    _iconListSave(ICON_RECENT_KEY, [nm].concat(_iconList(ICON_RECENT_KEY).filter(x => x !== nm)));
+  };
 
   grid.addEventListener('click', e => {
     const cell = e.target.closest && e.target.closest('.iconpick-cell');
@@ -550,13 +634,13 @@ function showIconPicker(title, message, current, onConfirm) {
   const close = () => { modal.classList.remove('dialog-icons'); closeModalSmooth(modal); };
   document.getElementById('dlg-cancel').onclick = close;
   document.getElementById('dlg-clear').onclick = () => { close(); onConfirm(''); };
-  document.getElementById('dlg-confirm').onclick = () => { close(); onConfirm(picked); };
+  document.getElementById('dlg-confirm').onclick = () => { close(); remember(picked); onConfirm(picked); };
   q.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault();
       // Enter on an exact name takes it even without a click.
       const t = q.value.trim().toLowerCase();
       if (known.has(t)) picked = t;
-      if (picked) { close(); onConfirm(picked); }
+      if (picked) { close(); remember(picked); onConfirm(picked); }
     }
   });
 

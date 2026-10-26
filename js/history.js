@@ -1884,15 +1884,13 @@ window.renderAnalyticsFolderDetail = function(folderId, scope) {
   if (childFolders.length > 0) {
     subfoldersHtml += `<h3 style="font-size:1.1rem; font-weight:700; color:var(--text-primary); margin-bottom:0.75rem;">Folders</h3>`;
     subfoldersHtml += `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.75rem; margin-bottom: 2rem;">`;
-    childFolders.forEach(sf => {
-      const sfCount = countItemsWithHistory(sf.id, scope);
-      subfoldersHtml += `
-        <div class="subfolder-card" onclick="selectAnalyticsFolder('${sf.id}', '${scope}')" style="cursor:pointer;">
-          <i data-lucide="${sf.icon || 'folder'}"></i>
-          <span class="subfolder-card-label">${escapeHTML(sf.name)}</span>
-          <span class="subfolder-card-count">${sfCount} item${sfCount !== 1 ? 's' : ''}</span>
-        </div>
-      `;
+    childFolders.forEach((sf, i) => {
+      subfoldersHtml += libFolderTileHTML({
+        folder: sf, index: i,
+        onclick: `selectAnalyticsFolder('${sf.id}', '${scope}')`,
+        count: countItemsWithHistory(sf.id, scope),
+        subfolders: getChildFolders(sf.id, scope).filter(cf => folderHasHistory(cf.id, scope)).length
+      });
     });
     subfoldersHtml += `</div>`;
   }

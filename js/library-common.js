@@ -743,3 +743,57 @@ function libRootDropInto(ns, targetId, ids, find) {
 function libRootAcceptsDrop(ns, targetId) {
   return targetId === '__root__' && libRootMode(ns) === 'favorites';
 }
+
+/* ── A folder, as a tile in a library's second pane ─────────────
+   One tile for every library's folder view -- Coding, Notes, Snippets and
+   Analytics each drew their own, and all of them drew a plain row with the
+   same grey folder glyph whatever the folder. Now: the folder's own icon in
+   its colour, on a tile shaped like a folder (it opens on hover); its number
+   as a chip and its name; how much is in it; a peek at the first few things
+   inside; and, where the library keeps one, a progress bar.
+
+   @param {object} o
+     folder     the folder node
+     onclick    what opening it runs (an inline handler string)
+     count      items in it, all the way down
+     subfolders how many folders it holds directly
+     peek       a few titles from inside it
+     total/done progress, when the library tracks it
+     corner     extra markup pinned to the corner (Coding's to-do count)
+     index      position, for the staggered entrance */
+function libFolderColor(f) {
+  if (f && typeof treeColorOf === 'function') {
+    const c = treeColorOf(f.iconColor || f.color || '');
+    if (c && c !== 'transparent') return c;
+  }
+  if (f && typeof adminFolderHue === 'function') {
+    const h = adminFolderHue(f.id);
+    if (h && h !== '#94a3b8') return h;
+  }
+  return 'var(--color-primary)';
+}
+
+function libFolderTileHTML(o) {
+  const f = o.folder || {};
+  const name = String(f.name || 'Untitled');
+  const part = typeof adminSplitFolderName === 'function' ? adminSplitFolderName(name) : { tag: '', label: name };
+  const peek = (o.peek || []).filter(Boolean).slice(0, 3);
+  const pct = o.total ? Math.round(100 * (o.done || 0) / o.total) : null;
+  const n = o.count || 0, sub = o.subfolders || 0;
+  return `
+    <div class="subfolder-card lft" role="button" tabindex="0" style="--lft:${libFolderColor(f)};--i:${o.index || 0};"
+         onclick="${o.onclick}" onkeydown="if(event.key==='Enter'){${o.onclick}}" title="${escapeHTML(name)}">
+      ${o.corner || ''}
+      <span class="lft-folder" aria-hidden="true"><span class="lft-tab"></span><i data-lucide="${escapeHTML(f.icon || 'folder')}"></i></span>
+      <span class="lft-body">
+        <span class="lft-name">${part.tag ? `<span class="lft-tag">${escapeHTML(part.tag)}</span>` : ''}<span class="lft-label">${escapeHTML(part.label)}</span></span>
+        <span class="lft-meta">
+          <span title="${n} item${n !== 1 ? 's' : ''} inside"><i data-lucide="file-text"></i>${n}</span>
+          ${sub ? `<span title="${sub} folder${sub !== 1 ? 's' : ''} inside"><i data-lucide="folder"></i>${sub}</span>` : ''}
+          ${pct !== null ? `<span class="lft-pct" title="${o.done} of ${o.total} done">${pct}%</span>` : ''}
+        </span>
+        ${peek.length ? `<span class="lft-peek">${peek.map(t => `<span>${escapeHTML(String(t))}</span>`).join('')}</span>` : ''}
+        ${pct !== null ? `<span class="lft-bar"><i style="width:${pct}%;"></i></span>` : ''}
+      </span>
+    </div>`;
+}

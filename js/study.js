@@ -720,17 +720,15 @@ function renderSnippetFolderOverview(container) {
   let subfoldersHtml = '';
   if (childFolders.length > 0) {
     subfoldersHtml = `<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem;">`;
-    childFolders.forEach(sf => {
-      const sfCount = countItemsRecursive(sf.id, 'snippet');
-      subfoldersHtml += `
-        <div class="subfolder-card" onclick="selectSnippetFolder('${sf.id}'); toggleNodeExpanded('${sf.id}');">
-          <div style="display:flex; align-items:center; gap:0.5rem; font-weight: 600;">
-            <i data-lucide="${sf.icon || 'folder'}" style="color:var(--color-primary); width: 18px; height: 18px;"></i>
-            ${escapeHTML(sf.name)}
-          </div>
-          <span style="font-size: 0.8rem; color: var(--text-tertiary);">${sfCount} item${sfCount !== 1 ? 's' : ''}</span>
-        </div>
-      `;
+    childFolders.forEach((sf, i) => {
+      const inside = (state.snippets || []).filter(sn => sn.parentId === sf.id).map(sn => sn.title);
+      subfoldersHtml += libFolderTileHTML({
+        folder: sf, index: i,
+        onclick: `selectSnippetFolder('${sf.id}'); toggleNodeExpanded('${sf.id}');`,
+        count: countItemsRecursive(sf.id, 'snippet'),
+        subfolders: getChildFolders(sf.id, 'snippet').length,
+        peek: inside.length ? inside : getChildFolders(sf.id, 'snippet').map(c => c.name)
+      });
     });
     subfoldersHtml += `</div>`;
   }

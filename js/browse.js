@@ -1665,18 +1665,20 @@ function renderBrowseContent() {
        the same left-to-right entrance. They were an inline-styled div, which
        is why they were the one row on the page that just appeared. */
     subfoldersHtml = `<div class="card-grid subfolder-grid ${window.disableNextStagger ? '' : 'stagger-children'}">`;
-    childFolders.forEach(sf => {
+    childFolders.forEach((sf, i) => {
       const sfCount = browseCountInView(sf.id);
       const sfTodo = browseUnsolvedInView(sf.id);
-      subfoldersHtml += `
-        <div class="subfolder-card" onclick="selectBrowseNode('${sf.id}'); toggleNodeExpanded('${sf.id}');">
-          ${sfTodo ? `<span class="subfolder-card-todo" title="${sfTodo} still to solve">${sfTodo}</span>`
-            : sfCount ? `<span class="subfolder-card-todo is-done" title="All solved"><i data-lucide="check"></i></span>` : ''}
-          <i data-lucide="folder"></i>
-          <span class="subfolder-card-label">${escapeHTML(sf.name)}</span>
-          <span class="subfolder-card-count">${sfCount} item${sfCount !== 1 ? 's' : ''}</span>
-        </div>
-      `;
+      const inside = (state.challenges || []).filter(c => c.parentId === sf.id && browseInView(c)).map(c => c.title);
+      subfoldersHtml += libFolderTileHTML({
+        folder: sf, index: i,
+        onclick: `selectBrowseNode('${sf.id}'); toggleNodeExpanded('${sf.id}');`,
+        count: sfCount,
+        subfolders: getChildFolders(sf.id, 'challenge').length,
+        peek: inside.length ? inside : getChildFolders(sf.id, 'challenge').map(c => c.name),
+        total: sfCount, done: sfCount - sfTodo,
+        corner: sfTodo ? `<span class="subfolder-card-todo" title="${sfTodo} still to solve">${sfTodo}</span>`
+          : sfCount ? `<span class="subfolder-card-todo is-done" title="All solved"><i data-lucide="check"></i></span>` : ''
+      });
     });
     subfoldersHtml += `</div>`;
   }
@@ -2211,15 +2213,17 @@ function treeAccentAttrs(rec) {
   const known = id => !!id && TREE_COLORS.some(c => c.id === id);
   const text = rec && known(rec.color) ? rec.color : '';
   const rail = rec && known(rec.railColor) ? rec.railColor : '';
-  const cls = (text ? ' has-accent' : '') + (rail ? ' has-rail' : '');
+  const icon = rec && known(rec.iconColor) ? rec.iconColor : '';
+  const cls = (text ? ' has-accent' : '') + (rail ? ' has-rail' : '') + (icon ? ' has-icon-color' : '');
   const vars = (text ? '--row-accent:' + treeColorOf(text) + ';' : '')
-             + (rail ? '--rail-custom:' + treeRgbOf(rail) + ';' : '');
+             + (rail ? '--rail-custom:' + treeRgbOf(rail) + ';' : '')
+             + (icon ? '--icon-accent:' + treeColorOf(icon) + ';' : '');
   return { cls: cls, style: vars ? ' style="' + vars + '"' : '' };
 }
 
 /** Write one colour to one part of a record. An empty id clears that part and leaves the other alone. */
 function _treeWriteColor(rec, target, colorId) {
-  const key = target === 'rail' ? 'railColor' : 'color';
+  const key = target === 'rail' ? 'railColor' : target === 'icon' ? 'iconColor' : 'color';
   if (colorId) rec[key] = colorId; else delete rec[key];
 }
 
@@ -2383,7 +2387,7 @@ const TREE_COLOR_TARGET_KEY = 'ssp.treeColorTarget';
 
 /** Which part the dialog paints, remembered so it opens where you left it. */
 function _treeColorTarget() {
-  try { return localStorage.getItem(TREE_COLOR_TARGET_KEY) === 'rail' ? 'rail' : 'text'; }
+  try { const t = localStorage.getItem(TREE_COLOR_TARGET_KEY); return t === 'rail' || t === 'icon' ? t : 'text'; }
   catch (e) { return 'text'; }
 }
 
@@ -2412,8 +2416,8 @@ function treeColorDialog(o) {
   const stale = document.getElementById('tree-color-dlg');
   if (stale) stale.remove();
   let target = _treeColorTarget();
-  const cur = Object.assign({ text: '', rail: '' }, o.current || {});
-  const known = { text: !!o.current, rail: !!o.current };
+  const cur = Object.assign({ text: '', rail: '', icon: '' }, o.current || {});
+  const known = { text: !!o.current, rail: !!o.current, icon: !!o.current };
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay fd-overlay';
@@ -2428,9 +2432,13 @@ function treeColorDialog(o) {
         '<button type="button" class="tree-color-seg-btn" role="radio" data-target="rail">' +
           '<span class="tree-color-seg-glyph is-rail" aria-hidden="true"></span>Right edge' +
           '<span class="tree-color-seg-dot" aria-hidden="true"></span></button>' +
+        '<button type="button" class="tree-color-seg-btn" role="radio" data-target="icon">' +
+          '<span class="tree-color-seg-glyph is-icon" aria-hidden="true"><i data-lucide="folder"></i></span>Icon' +
+          '<span class="tree-color-seg-dot" aria-hidden="true"></span></button>' +
       '</div>' +
       '<div class="tree-color-preview" aria-hidden="true">' +
         '<span class="tree-color-preview-bar"></span>' +
+        '<span class="tree-color-preview-icon"><i data-lucide="folder"></i></span>' +
         '<span class="tree-color-preview-label">Preview</span>' +
         '<span class="tree-color-preview-rail"></span>' +
       '</div>' +
@@ -2465,6 +2473,7 @@ function treeColorDialog(o) {
     pv.style.setProperty('--pv-bar', cur.text ? treeColorOf(cur.text) : 'transparent');
     if (cur.rail) pv.style.setProperty('--pv-rail', treeRgbOf(cur.rail));
     pv.classList.toggle('has-rail', !!cur.rail);
+    pv.style.setProperty('--pv-icon', cur.icon ? treeColorOf(cur.icon) : 'var(--text-tertiary)');
   };
 
   overlay.querySelectorAll('.tree-color-seg-btn').forEach(b => {
@@ -2499,7 +2508,7 @@ function browseSetColor(id) {
   if (!it) return;
   treeColorDialog({
     title: 'Highlight colour',
-    current: { text: it.color || '', rail: it.railColor || '' },
+    current: { text: it.color || '', rail: it.railColor || '', icon: it.iconColor || '' },
     apply: (target, colorId) => {
       _treeWriteColor(it, target, colorId);
       saveData(); invalidateBrowseCache(); treeRefreshHosts();
@@ -2509,7 +2518,7 @@ function browseSetColor(id) {
 window.browseApplyColor = function (id, color, target) {
   const it = browseFindItem(id);
   if (!it) return;
-  _treeWriteColor(it, target === 'rail' ? 'rail' : 'text', color);
+  _treeWriteColor(it, target === 'rail' || target === 'icon' ? target : 'text', color);
   saveData();
   invalidateBrowseCache(); treeRefreshHosts();
 };
