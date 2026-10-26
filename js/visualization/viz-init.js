@@ -193,6 +193,18 @@ function initVisualization() {
       vizToggleZen();
       return;
     }
+    // Brain: Ctrl+C copies the selected note (unless text is highlighted, which
+    // copies as usual), Ctrl+V pastes a copy of it -- or with nothing copied,
+    // of the selected note -- under the pointer, Ctrl+D duplicates beside it.
+    if (isBrain && (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey) {
+      const k = (e.key || '').toLowerCase();
+      if (k === 'c' && brain.selectedNodeId && !String(window.getSelection ? window.getSelection() : '').trim()) {
+        if (brainCopyNode(brain.selectedNodeId)) e.preventDefault();
+        return;
+      }
+      if (k === 'v') { if (brainPasteNode()) e.preventDefault(); return; }
+      if (k === 'd' && brain.selectedNodeId) { e.preventDefault(); brainPasteNode(brain.selectedNodeId); return; }
+    }
     // Ctrl+Z is handled in the capture listener above; everything else with a
     // modifier belongs to the browser or the OS.
     if (e.ctrlKey || e.metaKey || e.altKey) return;

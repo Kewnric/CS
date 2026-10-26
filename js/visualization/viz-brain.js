@@ -1294,10 +1294,12 @@ function brainRenderCanvas() {
       let initial = true;
       const obs = new ResizeObserver(() => {
         if (initial) { initial = false; return; }
-        if (vizFitNoteHeight(inner)) {   // grew; the next callback records it
-          if (node.border === 'manhua') brainPaintBubbles();
-          return;
-        }
+        // Dragged smaller than its words, it stops at the nearest size that
+        // still fits them -- and that is the size recorded, here and now. It
+        // used to wait for the next callback, and a redraw in between (the
+        // release of the drag is also a click on the note) rebuilt the note
+        // from its old size: it sprang back to where it started.
+        vizFitNoteHeight(inner);
         brainSizeElectric(el, inner);
         if (node.shape) brainPaintShape(el, node);
         if (brainFitBubble(el, inner)) brainUpdateSVGLinks();
@@ -1484,7 +1486,72 @@ function brainNodeClick(e, nodeId) {
     return;
   }
   brain.selectedNodeId = nodeId;
+  _brainHarvestSize(nodeId);
   brainRenderCanvas();
+}
+
+/* A size dragged by the corner handle, read straight off the note before a
+   redraw replaces it. The resize observer records sizes a frame late, and the
+   release of a corner drag is also a click on the note, whose redraw rebuilt
+   it from the size it had before: it sprang back. A note dragged smaller than
+   its words is first fitted to them, so what is kept is the nearest size that
+   fits. A size the render set itself (no height of its own, or the one it was
+   given) is left alone, and so is one that typing in the editor caused. */
+function _brainHarvestSize(nodeId) {
+  const node = brain.nodes.find(n => n.id === nodeId);
+  const el = document.querySelector(`.viz-node[data-node-id="${nodeId}"]`);
+  const inner = el && el.querySelector(':scope > .viz-node-inner');
+  if (!node || !inner || !inner.style.height || !inner.offsetWidth) return;
+  if (el._liveEditAt && performance.now() - el._liveEditAt < 250) return;   // typing, not a drag
+  vizFitNoteHeight(inner);
+  const w = inner.offsetWidth, h = inner.offsetHeight;
+  if (node.userSized && w === node.w && h === node.h) return;
+  node.w = w; node.h = h; node.userSized = true;
+  brainSaveCurrentVersion();
+}
+
+/* ── Copy, paste and duplicate notes ────────────────────────────
+   Ctrl+C copies the selected note; Ctrl+V drops a copy where the pointer is
+   -- the copied note, or with nothing copied, the selected one -- and Ctrl+D
+   duplicates the selected one beside it. A copy is the whole note (text,
+   look, code, a library link) with a new id and no links. */
+let _brainClip = null;
+let _brainPointer = null;
+document.addEventListener('pointermove', e => { _brainPointer = { x: e.clientX, y: e.clientY }; }, { passive: true });
+
+function brainCopyNode(nodeId) {
+  const node = brain.nodes.find(n => n.id === nodeId);
+  if (!node) return false;
+  _brainClip = JSON.parse(JSON.stringify(node));
+  if (typeof toast === 'function') toast('Note copied. Ctrl+V pastes it.', { type: 'info' });
+  return true;
+}
+
+function brainPasteNode(fromId) {
+  const src = fromId ? brain.nodes.find(n => n.id === fromId) : (_brainClip || (brain.selectedNodeId && brain.nodes.find(n => n.id === brain.selectedNodeId)));
+  if (!src) return false;
+  brainPushUndo();
+  const copy = JSON.parse(JSON.stringify(src));
+  copy.id = 'bn_' + generateId();
+  delete copy.collapsed;
+  delete copy._collapsedChildren;
+  // Under the pointer when it is over the canvas; otherwise just down and to
+  // the right of the original, stepping further for each paste in a row.
+  const c = document.getElementById('viz-canvas-container');
+  const r = c && c.getBoundingClientRect();
+  const p = _brainPointer;
+  if (!fromId && r && p && p.x >= r.left && p.x <= r.right && p.y >= r.top && p.y <= r.bottom) {
+    copy.x = Math.round((p.x - r.left - brain.pan.x) / brain.zoom - 20);
+    copy.y = Math.round((p.y - r.top - brain.pan.y) / brain.zoom - 20);
+  } else {
+    let x = (src.x || 0) + 32, y = (src.y || 0) + 32;
+    while (brain.nodes.some(n => n.x === x && n.y === y)) { x += 32; y += 32; }
+    copy.x = x; copy.y = y;
+  }
+  brain.nodes.push(copy);
+  brain.selectedNodeId = copy.id;
+  brainRenderCanvas(); brainSaveCurrentVersion();
+  return true;
 }
 
 /* ── Dragging and panning, on pointer events ──────────────────
@@ -1757,6 +1824,10 @@ function brainAddCommentNode(x, y) {
   const id = 'bn_' + generateId();
   const node = { id, commentContent: '', color: null, x: cx + (Math.random() - 0.5) * 40, y: cy + (Math.random() - 0.5) * 40 };
   Object.assign(node, _brainLastStyle());   // the look you last gave a note
+  // ...and Code mode, if the last note you saved was code.
+  let lastCode = '';
+  try { lastCode = localStorage.getItem('ssp.brainNewNoteCode') || ''; } catch (_) { lastCode = ''; }
+  if (lastCode && BRAIN_CODE_LANGS.some(l => l[0] === lastCode)) node.codeLang = lastCode;
   brain.nodes.push(node);
   brain.selectedNodeId = id;
   brainRenderCanvas();
@@ -1957,6 +2028,11 @@ function brainOpenEditor(node) {
         if (codeLang) target.codeLang = codeLang; else delete target.codeLang;
         brainSaveCurrentVersion();
       }
+      // The next new note starts the way this one was saved: as code in this
+      // language, or as text. (A shape's label is never code.)
+      if (target && !target.shape) {
+        try { localStorage.setItem('ssp.brainNewNoteCode', codeLang || ''); } catch (_) { /* private mode */ }
+      }
       brainRenderCanvas();
     } else {
       overlay._discard();
@@ -1985,6 +2061,30 @@ function brainOpenEditor(node) {
     if (win && carry.at) win.style.translate = carry.at;
   }
 }
+
+/* Ctrl+S anywhere on the canvas page saves. The note editor caught it only
+   while the keyboard was inside its window; with the window floating and a
+   click on the canvas or the tree in between -- or a folder or canvas name
+   being typed in the tree -- Ctrl+S fell through to the browser's Save Page
+   dialog, or to nothing. Now: an open note editor saves and closes; a name
+   being typed is committed; and the canvas itself is saved. */
+document.addEventListener('keydown', e => {
+  if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || (e.key !== 's' && e.key !== 'S' && e.code !== 'KeyS')) return;
+  if (document.body.dataset.route !== 'visualization') return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (e.repeat) return;
+  const overlay = document.getElementById('viz-comment-editor-overlay');
+  const saveBtn = overlay && overlay.isConnected && document.getElementById('viz-comment-editor-save');
+  if (saveBtn) { saveBtn.click(); return; }
+  const a = document.activeElement;
+  if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA') && !a.closest('.viz-wheel')) a.blur();   // commits a name
+  if (typeof viz !== 'undefined' && viz.activeModule === 'brain') {
+    if (typeof brainSaveCurrentVersion === 'function') brainSaveCurrentVersion();
+  } else if (typeof vizSave === 'function') vizSave();
+  if (typeof _flushSaveData === 'function') _flushSaveData();
+  if (typeof toast === 'function') toast('Saved', { type: 'success' });
+}, true);
 
 /* ── The note editor as a floating window ───────────────────────
    The Run Code terminal's pattern (practice.js _termWireFloat): the dash does
