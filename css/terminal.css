@@ -274,3 +274,56 @@ button.term-engine-badge:hover {
 }
 .term-warning .term-loc:hover,
 .term-warning .term-loc:focus-visible { background: rgba(210, 153, 34, 0.14); }
+
+/* --- Text size, wrapping, and a window you can resize ---------------------
+   termApplyView sets --term-fs and .term-nowrap from Compiler options; the
+   window resizes from its bottom-right corner and termRememberSize keeps it. */
+.run-code-overlay .run-code-window {
+  resize: both;
+  min-width: 360px;
+  min-height: 260px;
+  max-width: 96vw;
+  max-height: 94vh;
+}
+.run-code-window .term-output-area { font-size: var(--term-fs, 0.9375rem); }
+.run-code-window.term-nowrap .term-output-area { overflow-x: auto; }
+.run-code-window.term-nowrap .term-line { white-space: pre; word-break: normal; overflow-wrap: normal; }
+
+.term-opt-inline { align-items: center; gap: 0.5rem; max-width: none; cursor: default; }
+.term-opt-inline > span:first-child { padding-top: 0; color: var(--text-primary); font-weight: 600; }
+.term-opt-inline em { margin-top: 0; }
+.term-opt-view .btn { padding: 0.1rem 0.45rem; font-family: var(--font-mono); }
+.term-font-size { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-tertiary); min-width: 34px; text-align: center; }
+.term-wrap-toggle { display: inline-flex; align-items: center; gap: 0.35rem; margin-left: 0.5rem; cursor: pointer; }
+.term-wrap-toggle input { accent-color: var(--color-primary); }
+
+/* --- Output arriving while a long run is still going --- */
+.term-live { color: #8b949e; opacity: 0.85; }
+
+/* --- "Matches the sample" --- */
+.term-success { color: #3fb950; font-weight: 600; }
+
+/* --- A long warning, folded --- */
+.term-more { display: inline; }
+.term-more > summary {
+  display: inline;
+  cursor: pointer;
+  list-style: none;
+  margin-left: 0.6em;
+  font-size: 0.85em;
+  color: #8b949e;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.term-more > summary::-webkit-details-marker { display: none; }
+.term-more[open] > summary { display: block; margin: 0.15rem 0; }
+
+/* --- Read aloud, not shown --- */
+.term-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

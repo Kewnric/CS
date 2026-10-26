@@ -119,6 +119,7 @@ function xccCoreFactory(root) {
      the two preopens xcc's libc walks to resolve a path. */
   function makeWasi(fs, opts) {
     const args = opts.args || [];
+    const startedAt = Date.now();
     /* Only when there is no worker to terminate (see xcc-runner.js): checked
        on every write and read, so a runaway that prints or reads is stopped.
        A loop that does neither cannot be interrupted on the page itself. */
@@ -359,7 +360,34 @@ function xccCoreFactory(root) {
         u8().set(b.subarray(0, Math.min(b.length, cap)), out);
         return b.length;
       },
-      parse_float(ptr, len) { return Stdio.parseFloatC(str(ptr, len)); }
+      parse_float(ptr, len) { return Stdio.parseFloatC(str(ptr, len)); },
+      // clock(): microseconds of this run, which is what CLOCKS_PER_SEC counts.
+      clock_us() { return (Date.now() - startedAt) * 1000; },
+      tm_from(t, utc, out) {
+        const f = Stdio.tmFields(new Date(t * 1000), !!utc);
+        const v = mem();
+        f.forEach((n, i) => v.setInt32(out + i * 4, n, true));
+      },
+      tm_to(ptr) {
+        const v = mem();
+        const g = i => v.getInt32(ptr + i * 4, true);
+        const d = new Date(g(5) + 1900, g(4), g(3), g(2), g(1), g(0));
+        // mktime normalises the fields it was given (Feb 30 -> Mar 2) and fills in the rest.
+        Stdio.tmFields(d, false).forEach((n, i) => v.setInt32(ptr + i * 4, n, true));
+        return Math.floor(d.getTime() / 1000);
+      },
+      // Not "strftime": an import named like the C function wrapping it links to that function.
+      tm_strftime(buf, max, fmtPtr, tmPtr) {
+        let end = fmtPtr;
+        const m8 = u8();
+        while (m8[end]) end++;
+        const v = mem();
+        const f = []; for (let i = 0; i < 9; i++) f.push(v.getInt32(tmPtr + i * 4, true));
+        const b = enc.encode(Stdio.strftimeJS(str(fmtPtr, end - fmtPtr), f));
+        if (b.length + 1 > max) return 0;
+        u8().set(b, buf); u8()[buf + b.length] = 0;
+        return b.length;
+      }
     };
 
     return {
@@ -376,25 +404,60 @@ function xccCoreFactory(root) {
     };
   }
 
+  /* In WebAssembly, address 0 is ordinary memory, so `int *p = NULL; *p = 5;`
+     just works -- where gcc's program dies with a segmentation fault, which is
+     the lesson. xcc leaves the first 4 KB untouched (measured: every program in
+     the pack leaves it all zero), so a byte there that is no longer zero after
+     the run was written through a NULL pointer, or a small offset from one
+     (p->field). Reads through NULL cannot be caught this way; writes can. */
+  const NULL_GUARD = 4096;
+
+  /* A trap, in the words a learner can act on. */
+  function crashText(msg) {
+    const m = String(msg || '');
+    if (/out of bounds/i.test(m)) return 'Segmentation fault: the program used memory it does not own -- an array index past the end, or a pointer that does not point anywhere.';
+    if (/divide by zero/i.test(m)) return 'Division by zero.';
+    if (/integer overflow/i.test(m)) return 'Integer overflow in a division (the smallest int divided by -1).';
+    if (/unreachable/i.test(m)) return 'The program reached code that should be impossible -- often a function that should return a value and does not.';
+    if (/indirect call|signature|table index|null function/i.test(m)) return 'Called a function through a bad function pointer.';
+    if (/stack|recursion/i.test(m)) return 'Stack overflow: a function kept calling itself -- recursion with no case that stops it?';
+    return m;
+  }
+
   /** Run one WASI program to completion. @returns {{exitCode:number, crash:?string}} */
   function runWasi(fs, module, opts) {
     const wasi = makeWasi(fs, opts);
     const instance = new WebAssembly.Instance(module, wasi.importsFor(module));
     wasi.setMemory(instance.exports.memory);
+    const low = () => new Uint8Array(instance.exports.memory.buffer, 0, NULL_GUARD);
+    const guarded = opts.guardNull && low().every(b => b === 0);
+    const nullWrite = () => {
+      if (!guarded) return -1;
+      return low().findIndex(b => b !== 0);
+    };
+    const finish = (r) => {
+      const at = nullWrite();
+      if (at >= 0 && !r.crash) {
+        return { exitCode: 139, crash: 'Segmentation fault: the program wrote through a NULL pointer'
+          + (at ? ' (at offset ' + at + ', so most likely p->something with p == NULL)' : '')
+          + '. A pointer has to point at something before you write through it.' };
+      }
+      return r;
+    };
     try {
       instance.exports._start();
-      return { exitCode: 0, crash: null };
+      return finish({ exitCode: 0, crash: null });
     } catch (e) {
-      if (e instanceof WasiExit) return { exitCode: e.code, crash: null };
+      if (e instanceof WasiExit) return finish({ exitCode: e.code, crash: null });
       if (e instanceof WasiTimeout) return { exitCode: 143, crash: null, timedOut: true };
       // A trap is the program's fault -- out-of-bounds memory, unreachable,
       // division by zero, a stack too deep -- the in-browser version of a crash.
       // Exit codes as a Linux shell reports a signal, which termExitNote names:
       // 136 is SIGFPE (integer division by zero), 139 SIGSEGV (the rest).
       if (e instanceof WebAssembly.RuntimeError) {
-        return { exitCode: /divide by zero|integer overflow/i.test(e.message) ? 136 : 139, crash: e.message };
+        return { exitCode: /divide by zero|integer overflow/i.test(e.message) ? 136 : 139, crash: crashText(e.message) };
       }
-      if (e instanceof RangeError) return { exitCode: 139, crash: 'stack overflow (' + e.message + ')' };
+      if (e instanceof RangeError) return { exitCode: 139, crash: crashText('stack ' + e.message) };
       throw e;
     }
   }
@@ -421,7 +484,7 @@ function xccCoreFactory(root) {
       const fs = this.fs;
       // "#line 1" puts the learner's first line back at 1 for every diagnostic,
       // and keeps working when the input probe adds a #line of its own.
-      fs.write(HOME + '/main.c', (Stdio ? Stdio.PRELUDE + '#line 1\n' : '') + source);
+      fs.write(HOME + '/main.c', (Stdio ? Stdio.PRELUDE + Stdio.extrasFor(source) + '#line 1\n' : '') + source);
       fs.remove(HOME + '/a.wasm');
       let errText = '';
       const dec = new TextDecoder();
@@ -461,13 +524,14 @@ function xccCoreFactory(root) {
       }
       const r = runWasi(this.fs, module, {
         args: ['main'],
+        guardNull: true,
         deadline: hooks && hooks.deadline,
         stdin: enc.encode(stdinText || ''),
         onStdout: chunk => { const t = dec.decode(chunk, { stream: true }); stdout += t; if (hooks && hooks.onStdout) hooks.onStdout(t); },
         onStderr: chunk => { stderr += decErr.decode(chunk, { stream: true }); }
       });
       stdout += dec.decode(); stderr += decErr.decode();
-      if (r.crash) stderr += (stderr && !stderr.endsWith('\n') ? '\n' : '') + 'Runtime error: ' + r.crash;
+      if (r.crash) stderr += (stderr && !stderr.endsWith('\n') ? '\n' : '') + r.crash;
       if (r.timedOut) stderr += (stderr && stderr.slice(-1) !== String.fromCharCode(10) ? String.fromCharCode(10) : '') + 'Stopped: the program was still running.';
       return { exitCode: r.exitCode, stdout, stderr };
     }
@@ -475,10 +539,14 @@ function xccCoreFactory(root) {
     /** Compile and run, in the same shape as a Godbolt answer. */
     compileRun(source, stdinText, hooks) {
       const t0 = Date.now();
+      const cached = this.cache.has(source);
       const c = this.compile(source);
-      if (!c.ok) return { didExecute: false, exitCode: -1, stdout: '', stderr: c.stderr, buildStderr: c.stderr, execTime: null };
+      const t1 = Date.now();
+      if (!c.ok) return { didExecute: false, exitCode: -1, stdout: '', stderr: c.stderr, buildStderr: c.stderr, execTime: null, compileMs: t1 - t0 };
       const r = this.run(c.module, stdinText, hooks);
-      return { didExecute: true, exitCode: r.exitCode, stdout: r.stdout, stderr: r.stderr, buildStderr: c.stderr, execTime: Date.now() - t0 };
+      const t2 = Date.now();
+      return { didExecute: true, exitCode: r.exitCode, stdout: r.stdout, stderr: r.stderr, buildStderr: c.stderr,
+               execTime: t2 - t0, compileMs: cached ? 0 : t1 - t0, runMs: t2 - t1 };
     }
   }
 

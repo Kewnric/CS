@@ -131,8 +131,13 @@ in the terminal's status bar toggles it; default `xcc`):
   `xccCoreFactory.toString()`). Its libc's printf/scanf are not gcc-exact, so
   `js/xcc-stdio.js` compiles a replacement family in front of every program,
   followed by `#line 1` (float digits come from JS BigInt, ties to even like
-  glibc). Limits: 32-bit (`long` and pointers are 4 bytes), no warnings (the
-  JS lint `termLintC` stands in), and writing through NULL does not crash.
+  glibc). It also lacks clock/time.h's struct tm family, difftime, rewind,
+  trunc and lround; `XccStdio.extrasFor(source)` adds just the ones a program
+  names. Limits: 32-bit (`long` and pointers are 4 bytes), and no warnings (the
+  JS lint `termLintC` stands in -- it must stay silent on every pack reference).
+  Address 0 is ordinary memory in wasm, so a write through NULL is caught after
+  the run instead: xcc leaves the first 4 KB all zero, and anything written
+  there is reported as a segfault (exit 139). Reads through NULL are not caught.
 - **GCC on Godbolt** (`_godboltCompileRun`): exact, `-Wall`, 1–2 s per step.
 Each falls back to the other. **Check Code grades on GCC whenever it is
 reachable** (xcc only offline), so verdicts come from the real compiler. Both

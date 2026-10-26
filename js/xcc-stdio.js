@@ -455,6 +455,99 @@ int fscanf(FILE *restrict fp, const char *restrict fmt, ...) { va_list ap; va_st
 int sscanf(const char *restrict s, const char *restrict fmt, ...) { va_list ap; va_start(ap, fmt); int r = vsscanf(s, fmt, ap); va_end(ap); return r; }
 `;
 
+  /* ── What xcc's library does not have at all ──────────────────
+     Measured against the headers it ships: no clock(), clock_t or
+     CLOCKS_PER_SEC; no struct tm, localtime, gmtime, mktime, strftime,
+     asctime or ctime; no difftime, rewind, trunc or lround. Each block below
+     is added only to a program that names something in it, so a program that
+     happens to have its own `clock` variable or `struct tm` is never handed a
+     second one. Dates come from the browser, in the learner's own timezone. */
+  const EXTRAS = [
+    { uses: /\bclock\s*\(|\bclock_t\b|\bCLOCKS_PER_SEC\b/, code: String.raw`
+typedef long clock_t;
+#define CLOCKS_PER_SEC 1000000L
+__attribute__((import_module("ssp"), import_name("clock_us")))
+double __ssp_clock_us(void);
+clock_t clock(void) { return (clock_t)__ssp_clock_us(); }
+` },
+    { uses: /\bdifftime\s*\(/, code: String.raw`
+double difftime(time_t end, time_t start) { return (double)end - (double)start; }
+` },
+    { uses: /\b(?:localtime|gmtime|mktime|strftime|asctime|ctime)\s*\(|\bstruct\s+tm\b/, code: String.raw`
+struct tm { int tm_sec, tm_min, tm_hour, tm_mday, tm_mon, tm_year, tm_wday, tm_yday, tm_isdst; };
+__attribute__((import_module("ssp"), import_name("tm_from")))
+void __ssp_tm_from(double t, int utc, struct tm *out);
+__attribute__((import_module("ssp"), import_name("tm_to")))
+double __ssp_tm_to(struct tm *tm);
+__attribute__((import_module("ssp"), import_name("tm_strftime")))
+int __ssp_strftime(char *buf, int max, const char *fmt, const struct tm *tm);
+static struct tm __ssp_tm;
+struct tm *localtime(const time_t *t) { __ssp_tm_from((double)*t, 0, &__ssp_tm); return &__ssp_tm; }
+struct tm *gmtime(const time_t *t) { __ssp_tm_from((double)*t, 1, &__ssp_tm); return &__ssp_tm; }
+time_t mktime(struct tm *tm) { return (time_t)__ssp_tm_to(tm); }
+size_t strftime(char *buf, size_t max, const char *fmt, const struct tm *tm) {
+  return (size_t)__ssp_strftime(buf, (int)max, fmt, tm);
+}
+char *asctime(const struct tm *tm) {
+  static char out[32];
+  static const char *days[] = { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
+  static const char *mons[] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+  snprintf(out, sizeof(out), "%s %s %2d %02d:%02d:%02d %d\n", days[tm->tm_wday % 7], mons[tm->tm_mon % 12],
+           tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec, tm->tm_year + 1900);
+  return out;
+}
+char *ctime(const time_t *t) { return asctime(localtime(t)); }
+` },
+    { uses: /\brewind\s*\(/, code: String.raw`
+void rewind(FILE *fp) { fseek(fp, 0L, SEEK_SET); }
+` },
+    { uses: /\btrunc\s*\(/, code: String.raw`
+double trunc(double x) { return x < 0 ? ceil(x) : floor(x); }
+` },
+    { uses: /\blround\s*\(/, code: String.raw`
+long lround(double x) { return (long)round(x); }
+` }
+  ];
+
+  /** The extra library code a given program needs (see EXTRAS). */
+  function extrasFor(source) {
+    const src = String(source || '');
+    let out = '';
+    for (const e of EXTRAS) if (e.uses.test(src)) out += e.code;
+    if (out) out = '#include <time.h>\n#include <math.h>\n' + out;
+    return out;
+  }
+
+  /* struct tm, read and written by the host: nine ints, in declaration order. */
+  function tmFields(date, utc) {
+    const g = (local, u) => (utc ? date['getUTC' + u]() : date['get' + local]());
+    const year = g('FullYear', 'FullYear');
+    const start = utc ? Date.UTC(year, 0, 1) : new Date(year, 0, 1).getTime();
+    const yday = Math.floor((date.getTime() - start) / 86400000);
+    return [g('Seconds', 'Seconds'), g('Minutes', 'Minutes'), g('Hours', 'Hours'), g('Date', 'Date'),
+            g('Month', 'Month'), year - 1900, g('Day', 'Day'), yday, 0];
+  }
+
+  /** strftime over a struct tm's fields, for the common conversions. */
+  function strftimeJS(fmt, f) {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const mons = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const p2 = n => String(n).padStart(2, '0');
+    const [sec, min, hour, mday, mon, year, wday, yday] = f;
+    const h12 = hour % 12 === 0 ? 12 : hour % 12;
+    const map = {
+      a: days[wday % 7].slice(0, 3), A: days[wday % 7], b: mons[mon % 12].slice(0, 3), B: mons[mon % 12],
+      h: mons[mon % 12].slice(0, 3), d: p2(mday), e: String(mday).padStart(2, ' '), H: p2(hour), I: p2(h12),
+      j: String(yday + 1).padStart(3, '0'), m: p2(mon + 1), M: p2(min), p: hour < 12 ? 'AM' : 'PM',
+      S: p2(sec), w: String(wday), y: p2((year + 1900) % 100), Y: String(year + 1900),
+      D: p2(mon + 1) + '/' + p2(mday) + '/' + p2((year + 1900) % 100), F: (year + 1900) + '-' + p2(mon + 1) + '-' + p2(mday),
+      T: p2(hour) + ':' + p2(min) + ':' + p2(sec), R: p2(hour) + ':' + p2(min), n: '\n', t: '\t', '%': '%'
+    };
+    map.c = map.a + ' ' + map.b + ' ' + map.e + ' ' + map.T + ' ' + map.Y;
+    map.x = map.D; map.X = map.T; map.r = map.I + ':' + map.M + ':' + map.S + ' ' + map.p;
+    return fmt.replace(/%([a-zA-Z%])/g, (m, c) => (c in map ? map[c] : m));
+  }
+
   /* ── Exact decimal digits of a double ─────────────────────────
      A finite double is mant * 2^exp exactly, so it is the fraction N / D with
      D a power of two, and every digit of it can be worked out with BigInt.
@@ -607,7 +700,7 @@ int sscanf(const char *restrict s, const char *restrict fmt, ...) { va_list ap; 
   }
 
   const lines = PRELUDE.split('\n').length - 1;
-  root.XccStdio = { PRELUDE, PRELUDE_LINES: lines, fmtFloat, parseFloatC };
+  root.XccStdio = { PRELUDE, PRELUDE_LINES: lines, fmtFloat, parseFloatC, extrasFor, tmFields, strftimeJS };
   if (typeof module !== 'undefined' && module.exports) module.exports = root.XccStdio;
 }
 xccStdioFactory(typeof self !== 'undefined' ? self : globalThis);

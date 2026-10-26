@@ -265,7 +265,7 @@ function termEchoInput(session, value) {
 
 const TERM_LINE_CLASS = {
   stdout: 'term-stdout', stdin: 'term-stdin',
-  error: 'term-error', warning: 'term-warning', info: 'term-info'
+  error: 'term-error', warning: 'term-warning', info: 'term-info', success: 'term-success'
 };
 
 /**
@@ -290,6 +290,13 @@ function termTranscriptHTML(session, pending, waiting) {
     const isLast = i === lines.length - 1;
     let inner = escapeHTML(line.text);
     if (session.linkLocations && (line.type === 'error' || line.type === 'warning')) inner = termLinkLocations(inner);
+    // A long warning shows its first line and folds the rest away.
+    if (line.type === 'warning') {
+      const parts = inner.split('\n');
+      if (parts.length > 3) {
+        inner = parts[0] + `<details class="term-more"><summary>${parts.length - 1} more lines</summary>${parts.slice(1).join('\n')}</details>`;
+      }
+    }
     if (line.echo != null) inner += `<span class="term-echo">${escapeHTML(line.echo)}</span>`;
     if (waiting && isLast && session.lineOpen && line.echo == null) inner += caret;
     html += `<div class="term-line ${TERM_LINE_CLASS[line.type] || 'term-stdout'}">${inner || '&nbsp;'}</div>`;
@@ -442,7 +449,7 @@ function termCacheClear() { _termCache.clear(); }
    is the whole difference between a puzzle and a lesson. */
 
 const TERM_OPTS_KEY = 'terminalCompilerOpts';
-const TERM_OPTS_DEFAULT = { std: 'gnu17', wextra: false, sanitize: false };
+const TERM_OPTS_DEFAULT = { std: 'gnu17', wextra: false, sanitize: false, xccLimit: 8, fontSize: 15, wrap: true };
 
 function termGetOpts() {
   try {
@@ -519,6 +526,21 @@ function termOptionsPanelHTML(idPrefix) {
           <span><strong>GCC</strong><em>Online. -Wall warnings, 64-bit, a bad pointer crashes. 1-2 s a step.</em></span>
         </label>
       </div>
+      <label class="term-opt term-opt-inline">
+        <span>Time limit</span>
+        <select class="form-select" onchange="termSetOpt('xccLimit', Number(this.value))">
+          ${[3, 8, 15, 30, 60].map(n => `<option value="${n}"${Number(o.xccLimit) === n ? ' selected' : ''}>${n} s</option>`).join('')}
+        </select>
+        <em>How long a program may run in the browser before it is stopped.</em>
+      </label>
+      <div class="term-opt term-opt-inline term-opt-view">
+        <span>Text</span>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="termNudgeFont(-1)" title="Smaller text" aria-label="Smaller text">A−</button>
+        <span class="term-font-size" data-term-font>${Number(o.fontSize) || 15}px</span>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="termNudgeFont(1)" title="Larger text" aria-label="Larger text">A+</button>
+        <label class="term-wrap-toggle"><input type="checkbox" ${o.wrap !== false ? 'checked' : ''}
+               onchange="termSetOpt('wrap', this.checked); termApplyView()" /> Wrap long lines</label>
+      </div>
       <div class="term-opt-sub">GCC options</div>
       <label class="term-opt">
         <span>Standard</span>
@@ -538,6 +560,52 @@ function termOptionsPanelHTML(idPrefix) {
       </label>
       <div class="term-opt-args"><code>${escapeHTML(termCompilerArgs())}</code></div>
     </div>`;
+}
+
+/* ── How the terminal looks: text size, wrapping, window size ── */
+
+/** Apply text size and wrapping to every open terminal window. */
+function termApplyView() {
+  const o = termGetOpts();
+  const px = Math.max(10, Math.min(24, Number(o.fontSize) || 15));
+  document.querySelectorAll('.run-code-window').forEach(w => {
+    w.style.setProperty('--term-fs', px + 'px');
+    w.classList.toggle('term-nowrap', o.wrap === false);
+  });
+  document.querySelectorAll('[data-term-font]').forEach(el => { el.textContent = px + 'px'; });
+}
+
+function termNudgeFont(delta) {
+  const o = termGetOpts();
+  termSetOpt('fontSize', Math.max(10, Math.min(24, (Number(o.fontSize) || 15) + delta)));
+  termApplyView();
+}
+
+/* The window can be resized from its bottom-right corner (CSS resize), and
+   keeps the size you gave it the next time it opens. */
+const TERM_SIZE_KEY = 'ssp.termSize';
+
+function termRememberSize(win) {
+  if (!win) return;
+  try {
+    const saved = JSON.parse(localStorage.getItem(TERM_SIZE_KEY) || 'null');
+    if (saved && saved.w > 300 && saved.h > 200) {
+      win.style.width = Math.min(saved.w, window.innerWidth - 16) + 'px';
+      win.style.height = Math.min(saved.h, window.innerHeight - 16) + 'px';
+      win.style.maxWidth = 'none';
+    }
+  } catch (e) { /* nothing saved */ }
+  if (typeof ResizeObserver !== 'function') return;
+  let first = true, timer = 0;
+  new ResizeObserver(() => {
+    if (first) { first = false; return; }          // the size it opened at
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      const r = win.getBoundingClientRect();
+      if (r.width < 300 || r.height < 200) return;
+      try { localStorage.setItem(TERM_SIZE_KEY, JSON.stringify({ w: Math.round(r.width), h: Math.round(r.height) })); } catch (e) { /* quota */ }
+    }, 250);
+  }).observe(win);
 }
 
 /* ── Queued input ──────────────────────────────────────────────
@@ -620,6 +688,21 @@ function termExitNote(exitCode) {
     139: 'segmentation fault (SIGSEGV)', 143: 'stopped at the time limit (SIGTERM)'
   };
   if (exitCode === 0) return { line: '\nProcess exited with code 0', status: '✅ Success', ok: true };
+  /* A crash is not a runaway. These used to share one sentence about loops
+     that keep going once input runs out, which is wrong for a bad pointer. */
+  const CRASH = {
+    134: 'It aborted: an assert() failed, or abort() was called.',
+    136: 'It crashed: an arithmetic error, almost always a division by zero.',
+    139: 'It crashed: it used memory it does not own -- an index past the end of\nan array, or a pointer that does not point at anything.'
+  };
+  if (CRASH[exitCode]) {
+    const named = SIGNALS[exitCode];
+    return {
+      line: '\nProcess ' + named + '. ' + CRASH[exitCode],
+      status: '⚠️ ' + named.charAt(0).toUpperCase() + named.slice(1),
+      ok: false
+    };
+  }
   const named = SIGNALS[exitCode];
   if (named) {
     return {
@@ -698,6 +781,64 @@ function termLintC(src) {
       });
     }
 
+    // if (x > 0); runs the empty statement and then the block every time.
+    const stray = /\b(if|for|while)\s*\((.*)\)\s*;\s*$/.exec(line);
+    if (stray && termBalanced(stray[2]) && !/\}\s*while\b/.test(line)) {
+      const next = (lines[i + 1] || '').trim();
+      if (stray[1] !== 'while' || next.startsWith('{')) {
+        notes.push({
+          line: at,
+          text: 'line ' + at + ': the ; right after ' + stray[1] + ' (...) ends it there.\n'
+            + 'The ' + stray[1] + ' controls nothing, so the block under it runs '
+            + (stray[1] === 'if' ? 'whether or not the\ncondition is true.' : 'once, not as a loop.')
+            + ' Remove that ;.'
+        });
+      }
+    }
+
+    // name == "bob" compares two addresses, never the letters.
+    const strEq = /([A-Za-z_][\w.\->\[\]]*)\s*(==|!=)\s*"|"\s*(==|!=)\s*([A-Za-z_]\w*)/.exec(line);
+    if (strEq && !/'/.test(strEq[0])) {
+      notes.push({
+        line: at,
+        text: 'line ' + at + ': == does not compare strings in C.\n'
+          + 'It compares two addresses, which are never the same, so this is always '
+          + (strEq[2] === '!=' || strEq[3] === '!=' ? 'true' : 'false') + '.\n'
+          + 'Use strcmp from <string.h>: strcmp(a, b) == 0 means they match.'
+      });
+    }
+
+    // printf("%d %d\n", a) reads an argument that was never passed.
+    const call = /\b(printf|scanf)\s*\(\s*"((?:[^"\\]|\\.)*)"\s*(.*)$/.exec(line);
+    if (call) {
+      const rest = termCallArgs(call[3]);
+      if (rest !== null) {
+        let want = 0;
+        const f = call[2];
+        for (let k = 0; k < f.length; k++) {
+          if (f[k] !== '%') continue;
+          const hit = conv.exec(f.slice(k + 1));
+          if (!hit) break;
+          k += hit[0].length;
+          const spec = hit[0];
+          if (spec.endsWith('%')) continue;
+          if (call[1] === 'scanf' && spec.startsWith('*')) continue;
+          want++;
+          if (call[1] === 'printf') want += (spec.match(/\*/g) || []).length;
+        }
+        if (want !== rest) {
+          notes.push({
+            line: at,
+            text: 'line ' + at + ': ' + call[1] + ' has ' + want + ' conversion' + (want === 1 ? '' : 's')
+              + ' but ' + rest + ' value' + (rest === 1 ? '' : 's') + ' after the format.\n'
+              + (want > rest
+                ? 'Each % needs its own value, in order; the missing one is read from\nwhatever happens to be there.'
+                : 'The extra values are ignored -- is a % missing from the format?')
+          });
+        }
+      }
+    }
+
     // scanf needs the address of what it writes into.
     const sc = /\bscanf\s*\(\s*"([^"]*)"\s*,\s*([^;]*)\)\s*;/.exec(line);
     if (sc && /%[-0-9.*]*(?:hh|h|ll|l|L)?[diouxXeEfFgGac]/.test(sc[1])) {
@@ -714,6 +855,42 @@ function termLintC(src) {
     }
   });
   return notes;
+}
+
+/** Brackets and quotes balanced in a fragment (so a match did not stop early). */
+function termBalanced(text) {
+  let depth = 0, str = null;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (str) { if (c === '\\') i++; else if (c === str) str = null; continue; }
+    if (c === '"' || c === "'") str = c;
+    else if (c === '(') depth++;
+    else if (c === ')') { depth--; if (depth < 0) return false; }
+  }
+  return depth === 0 && !str;
+}
+
+/**
+ * How many arguments follow the format, given the text after its closing quote
+ * (", a, b);"). null when the call does not end on this line or cannot be read.
+ */
+function termCallArgs(tail) {
+  let depth = 0, str = null, count = 0, seen = false;
+  for (let i = 0; i < tail.length; i++) {
+    const c = tail[i];
+    if (str) { if (c === '\\') i++; else if (c === str) str = null; continue; }
+    if (c === '"' || c === "'") { str = c; seen = true; continue; }
+    if (c === '(' || c === '[' || c === '{') { depth++; continue; }
+    if (c === ']' || c === '}') { depth--; continue; }
+    if (c === ')') {
+      if (depth === 0) return count;
+      depth--;
+      continue;
+    }
+    if (c === ',' && depth === 0) { count++; seen = false; continue; }
+    if (!/\s/.test(c)) seen = true;
+  }
+  return null;
 }
 
 /**

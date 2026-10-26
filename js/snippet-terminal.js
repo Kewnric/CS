@@ -28,6 +28,7 @@ function runSnippetCodeWithPiston() {
   overlay.id = 'snip-run-code-overlay';
   overlay.className = 'run-code-overlay';
   document.body.appendChild(overlay);
+  setTimeout(() => { termApplyView(); termRememberSize(overlay.querySelector('.run-code-window')); }, 0);
 
   overlay.innerHTML = `
     <div class="run-code-window">
@@ -464,7 +465,7 @@ async function _snipTermRunStep() {
   session.running = false;
   const note = termExitNote(exitCode);
   session.lines.push({ type: note.ok ? 'info' : 'warning', text: note.line });
-  if (statusEl) statusEl.textContent = note.status + (resA.execTime ? ' · ' + resA.execTime + 'ms' : '');
+  if (statusEl) statusEl.textContent = note.status + termTimingText(resA);
   _snipTermRender();
 }
 

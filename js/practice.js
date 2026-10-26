@@ -784,8 +784,23 @@ function _sampleStdin(sample) {
 function practiceRunSample(si) {
   const s = (state.activeVariant && state.activeVariant.samples || [])[si];
   if (!s) return;
+  const expected = _sampleExpected(s);
+  _termSampleNext = expected == null ? null : { title: s.title || ('Sample ' + (si + 1)), expected };
   runCodeWithPiston(_sampleStdin(s));
 }
+
+/** The text under a sample's "Output:" line, or null when it has none. */
+function _sampleExpected(sample) {
+  const plain = typeof sampleModel === 'function'
+    ? sampleModel(sample).text
+    : String((sample && sample.content) || sample || '');
+  const m = plain.replace(/\r\n/g, '\n').match(/(?:^|\n)[ \t]*output\s*:[ \t]*\n([\s\S]*)$/i);
+  return m ? m[1] : null;
+}
+
+/* Set by practiceRunSample for the run it starts, and taken by _termInit, so
+   a later plain Run is not compared against a sample. */
+let _termSampleNext = null;
 
 function switchPracticeFile(fi) { loadPracticeFile(fi); }
 
@@ -3069,6 +3084,7 @@ let _term = null;
  */
 function _termClose(byUser) {
   _term = null;
+  if (window._termKeyboardOff) { window._termKeyboardOff(); window._termKeyboardOff = null; }
   if (window._termEscHandler) {
     document.removeEventListener('keydown', window._termEscHandler);
     window._termEscHandler = null;
@@ -3078,6 +3094,23 @@ function _termClose(byUser) {
   const toast = document.getElementById('run-code-toast');
   if (toast) toast.remove();
   if (byUser && overlay) bossLockOn();
+}
+
+/* On a phone the on-screen keyboard covers the bottom of the page, and the
+   prompt you are answering with it. While it is up, the terminal is fitted
+   into the part of the screen that is still visible (visualViewport). */
+function _termFollowKeyboard(overlay) {
+  const vv = window.visualViewport;
+  if (!vv || !overlay) return;
+  const fit = () => {
+    const covered = window.innerHeight - vv.height > 120;
+    overlay.style.top = covered ? vv.offsetTop + 'px' : '';
+    overlay.style.height = covered ? vv.height + 'px' : '';
+    overlay.style.bottom = covered ? 'auto' : '';
+  };
+  vv.addEventListener('resize', fit);
+  vv.addEventListener('scroll', fit);
+  window._termKeyboardOff = () => { vv.removeEventListener('resize', fit); vv.removeEventListener('scroll', fit); };
 }
 
 /* ── The terminal as a floating window ─────────────────────────
@@ -3176,6 +3209,7 @@ function runCodeWithPiston(seedStdin) {
                or re-inserted: re-parenting a node blurs it, which silently ate
                every keystroke. -->
           <div class="term-lines" id="term-lines"></div>
+          <div class="term-sr" id="term-sr" role="status" aria-live="polite"></div>
           <input type="text" id="term-input" class="term-hidden-input" autocomplete="off"
                  autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Program input" />
         </div>
@@ -3219,6 +3253,9 @@ function runCodeWithPiston(seedStdin) {
 
   document.getElementById('run-code-close-btn').onclick = () => _termClose(true);
   _termWireFloat(overlay);
+  termApplyView();
+  termRememberSize(overlay.querySelector('.run-code-window'));
+  _termFollowKeyboard(overlay);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) _termClose(true); });
 
   const freshSource = () => {
@@ -3350,6 +3387,7 @@ function _termInit(code, seedStdin) {
     warnedLoop: false,  // "this never terminates" notice, shown at most once
     engine: termEngineLabel(termEnginePref()),
     linkLocations: true,   // "main.c:12" in an error jumps the editor there
+    sample: _termTakeSample(seed),
     exitCode: null,
     expectsInput: _termExpectsInput(merged),
     instrumented: undefined,  // probe build, compiled lazily on first step
@@ -3366,6 +3404,13 @@ function _termInit(code, seedStdin) {
   }
   _termRender();
   _termRunStep();
+}
+
+/* The sample a run was started from, if this run IS that one. */
+function _termTakeSample(seed) {
+  const s = _termSampleNext;
+  _termSampleNext = null;
+  return s && seed ? s : null;
 }
 
 /* ── Terminal controls ─────────────────────────────────────── */
@@ -3572,7 +3617,10 @@ async function _termCompile(session, source, stdin) {
      GCC takes over for the rest of this run. */
   if (session.engine === 'XCC') {
     try {
-      return await xccCompileRun(source, stdin, session.aborter);
+      // Output streams in while it runs -- from the run on the real input only;
+      // the sentinel run alongside it would show an answer nobody typed.
+      const live = stdin === session.accStdin ? (text) => _termLive(session, text) : null;
+      return await xccCompileRun(source, stdin, session.aborter, live);
     } catch (err) {
       if (session.stopped || typeof xccUnavailable !== 'function' || !xccUnavailable(err)) throw err;
       session.xccFailed = err;
@@ -3595,10 +3643,31 @@ async function _termCompile(session, source, stdin) {
     if (session.stopped || typeof xccCompileRun !== 'function') throw err;
     if (session.xccFailed) throw session.xccFailed;   // both are out: say why
     termUseOfflineCompiler(session, 'run-code-engine', 'run-code-status');
-    return xccCompileRun(source, stdin, session.aborter);
+    return xccCompileRun(source, stdin, session.aborter, stdin === session.accStdin ? (text) => _termLive(session, text) : null);
   }
   termCacheSet(key, res);
   return res;
+}
+
+/* What a long run has printed so far, shown dimmed under the transcript until
+   the run ends and the real output takes its place. Each step replays the
+   program from the start, so only what is past the already-shown output is
+   new; the probe build's read markers are stripped first. */
+function _termLive(session, text) {
+  if (_term !== session || !session.running) return;
+  const clean = termSplitAtBlockingRead(text).safe;
+  session.live = clean.startsWith(session.displayed) ? clean.slice(session.displayed.length) : '';
+  _termRender();
+}
+
+/* Read new output aloud. The transcript is rebuilt on every render, so a
+   live region on it would re-announce everything; this one only ever holds
+   what just arrived. */
+function _termAnnounce(text) {
+  const el = document.getElementById('term-sr');
+  if (!el || !text || !String(text).trim()) return;
+  el.textContent = '';
+  setTimeout(() => { el.textContent = String(text).slice(-600); }, 30);
 }
 
 /** GCC takes over: the in-browser compiler would not start. */
@@ -3625,7 +3694,17 @@ function _termStartClock(session) {
   const el = document.getElementById('term-elapsed');
   const tick = () => {
     if (!el || _term !== session || !session.running) return;
-    el.textContent = ((Date.now() - session.startedAt) / 1000).toFixed(1) + 's';
+    const secs = (Date.now() - session.startedAt) / 1000;
+    el.textContent = secs.toFixed(1) + 's';
+    // A long run on the in-browser compiler is the program, not the network.
+    if (secs > 2 && session.engine === 'XCC' && !session.saidStill) {
+      const line = session.lines[session.spinIdx];
+      if (line && line.type === 'info') {
+        session.saidStill = true;
+        line.text = '⏳ Still running... press Stop or Ctrl+C to end it.';
+        _termRender();
+      }
+    }
   };
   tick();
   session.clock = setInterval(tick, 100);
@@ -3680,6 +3759,7 @@ async function _termRunStep() {
 
   session.waiting = false;        // no caret while a run is in flight
   session.stopped = false;
+  session.live = '';
   session.aborter = new AbortController();
   _termShowStop(true);
 
@@ -3687,6 +3767,7 @@ async function _termRunStep() {
 
   // Show spinner line while compiling
   const spinIdx = session.lines.length;
+  session.spinIdx = spinIdx;
   session.lines.push({ type: 'info', text: firstRun ? '⏳ Compiling & running...' : '⏳ Running...' });
   _termRender();
 
@@ -3856,7 +3937,9 @@ async function _termRunStep() {
     delta = safe.slice(_termLCP(safe, session.displayed).length);
   }
   session.displayed = safe;
+  session.live = '';
   _termAppendStdout(delta);
+  _termAnnounce(delta);
 
   if (waitingForInput) {
     session.running = false;
@@ -3907,8 +3990,45 @@ async function _termRunStep() {
   // No cue here. The build was announced when it succeeded; a bad exit code
   // is reported in the line below and by the status, not by a second sound.
   session.lines.push({ type: note.ok ? 'info' : 'warning', text: note.line });
-  if (statusEl) statusEl.textContent = note.status + (resA.execTime ? ' · ' + resA.execTime + 'ms' : '');
+  if (statusEl) statusEl.textContent = note.status + termTimingText(resA);
+  // Run from a sample: say whether the output is the sample's.
+  if (session.sample) _termCheckSample(session);
+  _termAnnounce(note.line);
   _termRender();
+}
+
+/* " · compiled 41 ms · ran 3 ms" for the in-browser compiler (which can tell
+   them apart), " · 812 ms" for GCC (which only reports the run). */
+function termTimingText(res) {
+  if (!res) return '';
+  if (res.runMs != null) {
+    return (res.compileMs ? ' · compiled ' + res.compileMs + ' ms' : ' · compile cached') + ' · ran ' + res.runMs + ' ms';
+  }
+  return res.execTime ? ' · ' + res.execTime + ' ms' : '';
+}
+
+/* ── Did it print what the sample says? ────────────────────────
+   "Run this" on a sample feeds it the sample's input; this compares what came
+   out with the sample's Output, using the same normalisation Check Code uses,
+   and says either that it matches or where the first difference is. */
+function _termCheckSample(session) {
+  const smp = session.sample;
+  session.sample = null;
+  const want = _normalizeOutput(smp.expected).split('\n');
+  const got = _normalizeOutput(session.displayed).split('\n');
+  if (want.join('\n') === got.join('\n')) {
+    session.lines.push({ type: 'success', text: '✓ Matches the output of ' + smp.title + '.' });
+    return;
+  }
+  let i = 0;
+  while (i < want.length && i < got.length && want[i] === got[i]) i++;
+  const show = (t) => (t === undefined ? '(nothing)' : t === '' ? '(empty line)' : t);
+  session.lines.push({
+    type: 'warning',
+    text: '✗ Differs from ' + smp.title + ' at output line ' + (i + 1) + ':\n'
+      + '  expected: ' + show(want[i]) + '\n'
+      + '  yours:    ' + show(got[i])
+  });
 }
 
 /** Append raw text as stdout lines to the terminal */
@@ -3983,7 +4103,8 @@ function _termRender() {
     host.innerHTML = past
       ? `<div class="term-line term-info">— run from ${escapeHTML(past.label)}, read-only —</div>` +
         termTranscriptHTML(past, '', false)
-      : termTranscriptHTML(_term, _term.pending, _term.waiting);
+      : termTranscriptHTML(_term, _term.pending, _term.waiting)
+        + (_term.running && _term.live ? `<div class="term-line term-live">${escapeHTML(_term.live)}</div>` : '');
   }
   // A render can land while the program is waiting (e.g. the first paint after
   // a step); make sure the caret is live.

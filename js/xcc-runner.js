@@ -28,7 +28,14 @@
    user pressed Stop.
    ============================================================ */
 const XCC_SCRIPTS = ['js/xcc-stdio.js', 'js/xcc-core.js', 'vendor/xcc/wccfiles.js'];
-const XCC_RUN_LIMIT_MS = 8000;
+const XCC_RUN_LIMIT_MS = 8000;   // the default; the terminal's options can change it
+
+/** The time limit in force: Compiler options -> "Time limit", else 8 s. */
+function _xccLimitMs() {
+  const o = (typeof termGetOpts === 'function') ? termGetOpts() : null;
+  const s = o && Number(o.xccLimit);
+  return s > 0 ? s * 1000 : XCC_RUN_LIMIT_MS;
+}
 
 let _xccPrep = null;          // Promise<ArrayBuffer>: scripts loaded, bundle decoded
 let _xccBundle = null;
@@ -135,9 +142,10 @@ function _xccSpawn() {
     if (!job) return;
     if (m.type === 'start') {
       job.started = true;
-      job.timer = setTimeout(() => _xccKill(job, 'limit'), XCC_RUN_LIMIT_MS);
+      job.timer = setTimeout(() => _xccKill(job, 'limit'), job.limit);
     } else if (m.type === 'out') {
       job.out += m.text;
+      if (job.onOut) { try { job.onOut(job.out); } catch (err) { /* display only */ } }
     } else if (m.type === 'done') {
       _xccFinish(job);
       if (m.error) job.reject(new Error(m.error));
@@ -165,8 +173,9 @@ function _xccKill(job, why) {
   }
   if (why === 'limit') {
     job.resolve({
-      didExecute: true, exitCode: 143, stdout: job.out, buildStderr: '', execTime: XCC_RUN_LIMIT_MS,
-      stderr: 'Stopped after ' + (XCC_RUN_LIMIT_MS / 1000) + ' s: the program was still running.'
+      didExecute: true, exitCode: 143, stdout: job.out, buildStderr: '', execTime: job.limit,
+      stderr: 'Stopped after ' + (job.limit / 1000) + ' s: the program was still running. '
+        + 'The limit is in Compiler options.'
     });
   } else {
     job.reject(new Error('STOPPED'));
@@ -187,7 +196,7 @@ function _xccRunOnPage(job) {
     .then(core => {
       if (!_xccJobs.has(job.id)) return;
       try {
-        const result = core.compileRun(job.source, job.stdin, { deadline: Date.now() + XCC_RUN_LIMIT_MS });
+        const result = core.compileRun(job.source, job.stdin, { deadline: Date.now() + job.limit });
         _xccFinish(job);
         job.resolve(result);
       } catch (err) {
@@ -206,16 +215,18 @@ function _xccRunOnPage(job) {
  * @param {string} source  the merged program (preprocessMultiFile's output)
  * @param {string} stdin
  * @param {AbortController} [aborter]  Stop ends the run
+ * @param {function(string)} [onOut]  called with the output so far while it runs
  * @returns {Promise<{didExecute:boolean, exitCode:number, stdout:string, stderr:string, buildStderr:string, execTime:?number}>}
  */
-async function xccCompileRun(source, stdin, aborter) {
+async function xccCompileRun(source, stdin, aborter, onOut) {
   await _xccPrepare();
   return new Promise((resolve, reject) => {
     const signal = aborter ? aborter.signal : null;
     if (signal && signal.aborted) { reject(new Error('STOPPED')); return; }
     const job = {
       id: ++_xccSeq, source: String(source || ''), stdin: String(stdin || ''),
-      out: '', started: false, timer: null, resolve, reject, detach: () => {}
+      out: '', started: false, timer: null, resolve, reject, detach: () => {},
+      limit: _xccLimitMs(), onOut: typeof onOut === 'function' ? onOut : null
     };
     if (signal) {
       const onAbort = () => _xccKill(job, 'stop');
