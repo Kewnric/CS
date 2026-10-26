@@ -576,6 +576,7 @@ function vizTemplate() {
       <div class="bnm-actions">
         <button type="button" class="bnm-act" onclick="brainCtxEditComment()" title="Edit Comment"><i data-lucide="edit-2"></i><span>Edit</span></button>
         <button type="button" class="bnm-act" onclick="brainCtxStartLink()" title="Add Link"><i data-lucide="link"></i><span>Link</span></button>
+        <button type="button" class="bnm-act" id="brain-ctx-check-btn" aria-pressed="false" onclick="brainCtxToggleCheck()" title="Put a check mark on this note"><i data-lucide="circle-check"></i><span>Check</span></button>
         <button type="button" class="bnm-act" id="brain-ctx-collapse-btn" style="display:none;" onclick="brainCtxCollapseChildren()" title="Collapse Children"><i data-lucide="chevrons-up"></i><span>Collapse</span></button>
         <button type="button" class="bnm-act" id="brain-ctx-expand-btn" style="display:none;" onclick="brainCtxExpandChildren()" title="Expand Children"><i data-lucide="chevrons-down"></i><span>Expand</span></button>
         <button type="button" class="bnm-act danger" onclick="brainCtxDeleteNode()" title="Delete"><i data-lucide="trash-2"></i><span>Delete</span></button>

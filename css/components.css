@@ -3537,6 +3537,16 @@ body[data-route="visualization"] .settings-fab { display: none; }
   justify-content: center;
 }
 .subfolder-card-todo.is-done svg { width: 13px; height: 13px; stroke-width: 3; }
+/* The check is white, always: .subfolder-card svg paints every icon in a tile
+   the accent blue, and blue on green could not be seen. A dark ring sets the
+   badge off from a tile of any colour. */
+.subfolder-card .subfolder-card-todo.is-done {
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(160deg, #34d399, #10b981 60%, #059669);
+  box-shadow: 0 0 0 2px var(--bg-body), 0 4px 12px rgba(16, 185, 129, 0.5);
+}
+.subfolder-card .subfolder-card-todo.is-done svg { width: 14px; height: 14px; color: #fff; stroke: #fff; stroke-width: 3.2; }
 @media (hover: none) {
   .subfolder-card-todo { opacity: 1; transform: translateY(-50%) scale(1); }
 }

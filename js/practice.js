@@ -3251,7 +3251,10 @@ function runCodeWithPiston(seedStdin) {
 
   overlay = document.createElement('div');
   overlay.id = 'run-code-overlay';
-  overlay.className = 'run-code-overlay';
+  // Floating from its first frame when the last terminal was left that way,
+  // so the page is never blurred and then unblurred on the way in.
+  overlay.className = 'run-code-overlay'
+    + ((typeof winMemGet === 'function' && (winMemGet('runCode') || {}).floating) ? ' is-floating' : '');
   document.body.appendChild(overlay);
 
   overlay.innerHTML = `

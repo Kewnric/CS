@@ -698,7 +698,15 @@ function showInputDialog(title, message, placeholder, defaultValue, onConfirm, o
 
   document.getElementById('dlg-cancel').onclick = () => closeModalSmooth(modal);
   document.getElementById('dlg-confirm').onclick = doConfirm;
-  input.addEventListener('keydown', (e) => { if (e.key === 'Enter') doConfirm(); });
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') doConfirm();
+    // Ctrl+S (Cmd+S) is "save this": the name is confirmed, as with Enter,
+    // instead of the browser's Save Page dialog opening over it.
+    else if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 's' || e.key === 'S' || e.code === 'KeyS')) {
+      e.preventDefault();
+      if (!e.repeat) doConfirm();
+    }
+  });
 
   _dlgOpen(modal);
   lucide.createIcons({ root: modal });

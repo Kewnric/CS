@@ -1258,6 +1258,8 @@ function brainRenderCanvas() {
       if (grip) grip.addEventListener('pointerdown', e => brainBubbleResizeStart(e, node.id, el));
       // A note that links to a library item: its tag and its button (brain-libref.js).
       if (node.ref && typeof brainRefDecorate === 'function') brainRefDecorate(el, node);
+      // The check mark put on it from its menu (brainCtxToggleCheck).
+      if (node.checked) el.insertAdjacentHTML('beforeend', node.id === _brainCheckPop ? BRAIN_CHECK_BADGE.replace('brain-check-badge', 'brain-check-badge is-new') : BRAIN_CHECK_BADGE);
       if (objectTop) el.insertAdjacentHTML('beforeend', objectTop);
       if (node.shape) {
         el.insertAdjacentHTML('beforeend', '<button class="shape-rotate" type="button" title="Drag to rotate (Shift: 15° steps)" aria-label="Rotate"><i data-lucide="rotate-cw"></i></button>');
@@ -1861,7 +1863,12 @@ function brainOpenEditor(node) {
   }
   overlay = document.createElement('div');
   overlay.id = 'viz-comment-editor-overlay';
-  overlay.className = 'viz-comment-editor-overlay';
+  // Floating from its very first frame when that is how it opens. Made boxed
+  // and floated a moment later, it showed the canvas blurred and then faded
+  // the blur away (the overlay transitions its backdrop) on every new note.
+  const opensFloating = carry ? !!carry.floating
+    : !!(typeof winMemGet === 'function' && (winMemGet('brainNote') || {}).floating);
+  overlay.className = 'viz-comment-editor-overlay' + (opensFloating ? ' is-floating' : '');
   document.body.appendChild(overlay);
   overlay.innerHTML = `<div class="viz-comment-editor-window">
     <div class="viz-comment-editor-header">
@@ -2076,6 +2083,13 @@ document.addEventListener('keydown', e => {
   e.preventDefault();
   e.stopPropagation();
   if (e.repeat) return;
+  // A name being asked for (New Folder, New Canvas, Rename): Ctrl+S confirms
+  // it, as Enter does. Only a dialog with a name field -- never a yes/no one,
+  // where Confirm might delete something.
+  const dlg = document.getElementById('dialog-modal');
+  const dlgOk = dlg && !dlg.classList.contains('hidden') && dlg.style.opacity !== '0'
+    && dlg.querySelector('#dlg-input') && dlg.querySelector('#dlg-confirm');
+  if (dlgOk) { dlgOk.click(); return; }
   const overlay = document.getElementById('viz-comment-editor-overlay');
   const saveBtn = overlay && overlay.isConnected && document.getElementById('viz-comment-editor-save');
   if (saveBtn) { saveBtn.click(); return; }
@@ -2516,6 +2530,24 @@ function brainHideAllMenus() {
   document.querySelectorAll('.viz-context-menu, .viz-link-menu, #brain-canvas-ctx, #brain-node-ctx, #brain-link-ctx, #brain-version-ctx').forEach(m => m.classList.add('hidden'));
 }
 
+/* A check mark on a note: a green badge on its top-right corner, whatever its
+   border. Drawn inline (no icon pass needed) and above every border layer. */
+const BRAIN_CHECK_BADGE = '<span class="brain-check-badge" role="img" aria-label="Checked">'
+  + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span>';
+let _brainCheckPop = null;   // the note whose mark was just put on: it pops in once
+
+function brainCtxToggleCheck() {
+  const node = brain.nodes.find(n => n.id === brain.contextNodeId);
+  if (!node) return;
+  brainPushUndo();
+  if (node.checked) delete node.checked; else node.checked = true;
+  brainHideAllMenus();
+  _brainCheckPop = node.checked ? node.id : null;
+  brainRenderCanvas();
+  _brainCheckPop = null;
+  brainSaveCurrentVersion();
+}
+
 function brainNodeCtx(e, nodeId) {
   e.preventDefault(); e.stopPropagation();
   brainHideAllMenus();
@@ -2543,6 +2575,15 @@ function brainNodeCtx(e, nodeId) {
   _brainCloseNodeSubs(null);
   _brainShowColorTargetList(false);
   if (typeof brainRefSyncCtx === 'function') brainRefSyncCtx(node);   // a library link's section
+  const checkBtn = document.getElementById('brain-ctx-check-btn');
+  if (checkBtn) {
+    const on = !!(node && node.checked);
+    checkBtn.classList.toggle('is-on', on);
+    checkBtn.setAttribute('aria-pressed', String(on));
+    checkBtn.title = on ? 'Take the check mark off' : 'Put a check mark on this note';
+    const label = checkBtn.querySelector('span');
+    if (label) label.textContent = on ? 'Uncheck' : 'Check';
+  }
   if (typeof vizPositionMenu === 'function') vizPositionMenu(menu, e.clientX, e.clientY);
   else { menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px'; menu.classList.remove('hidden'); }
   _brainMarkNodeMenu();

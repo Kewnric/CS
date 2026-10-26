@@ -372,12 +372,6 @@ function edfxTyped(ta, back) {
   // Before anything else: the edit that just happened moved the characters
   // the ghosts already in flight are standing in for.
   _edfxShiftHoles(ta);
-  // `back` steps away from the caret, for a pair whose caret sits between the
-  // two characters rather than after them.
-  const at = ta.selectionStart - (back || 1);
-  if (at < 0) return;
-  const ch = ta.value.charAt(at);
-  if (!ch || ch === '\n') return;              // a newline has nothing to draw
   /* Deferred so the highlighter has repainted before the Range measures it:
      this listener is on the capture phase and runs before the editor own one.
 
@@ -388,6 +382,17 @@ function edfxTyped(ta, back) {
      moved. A zero timeout still runs after the current task, so the repaint is
      just as done, and it behaves the same whether or not anyone is looking. */
   setTimeout(() => {
+    /* Where the character is, read now and not when the input event fired.
+       The editor inserts a pair -- ( as () -- in one edit, and the event comes
+       while the caret is still after BOTH halves; it is put between them only
+       afterwards. Read then, `back` pointed at the closing half, so the ghost
+       and the ring landed one character to the right of the key pressed.
+       `back` steps away from the caret, for a pair whose caret sits between the
+       two characters rather than after them. */
+    const at = ta.selectionStart - (back || 1);
+    if (at < 0) return;
+    const ch = ta.value.charAt(at);
+    if (!ch || ch === '\n') return;              // a newline has nothing to draw
     // The repaint threw every hole away; put back the ones still in flight.
     _edfxApplyHoles();
     const box = _edfxCharBox(at);
@@ -421,8 +426,8 @@ function _edfxExtras(ch, box) {
   const now = performance.now();
   _edfxStreak = now - _edfxLastKeyAt < 170 ? _edfxStreak + 1 : 0;
   _edfxLastKeyAt = now;
-  // A statement ends, a block or call closes: a ring bursts from it.
-  if (';)]}'.indexOf(ch) !== -1) _edfxFx('edfx-ring', box);
+  // A statement ends, a bracket opens or closes: a ring bursts from it.
+  if (';(){}[]'.indexOf(ch) !== -1) _edfxFx('edfx-ring', box);
   // Typing fast: sparks fly off the letter, more of them the longer it lasts.
   if (_edfxStreak >= 5 && ch.trim()) {
     const n = Math.min(4, 1 + Math.floor((_edfxStreak - 5) / 6));
