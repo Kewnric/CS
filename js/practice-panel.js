@@ -362,7 +362,7 @@ async function ppRunAllChecks() {
   } else {
     // No tests → compile-check so the score still means something.
     let ok = false;
-    // Through runTestCases' cache, and through its Godbolt-to-JSCPP fallback,
+    // Through runTestCases' cache, and through its Godbolt-to-xcc fallback,
     // rather than a second copy of both here.
     try { const probe = await runCompileProbe(codeNow); ok = !!(probe && probe.didExecute); }
     catch (e) { ok = false; }

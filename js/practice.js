@@ -314,14 +314,18 @@ function _practiceApplyJump() {
   const jump = getSessionParam('practiceJumpLine');
   clearSessionParam('practiceJumpLine');
   if (!jump || !(jump.line > 0)) return;
+  practiceJumpToLine(jump.fileIndex || 0, jump.line);
+}
 
-  const fi = jump.fileIndex || 0;
-  if (fi > 0 && state.userFiles && fi < state.userFiles.length) loadPracticeFile(fi);
+/** Select a line in the editor, scroll it into view and mark it in the gutter. */
+function practiceJumpToLine(fileIndex, line) {
+  const fi = fileIndex || 0;
+  if (state.userFiles && fi < state.userFiles.length && fi !== state.activeFileIndex) loadPracticeFile(fi);
 
   const ta = document.getElementById('editor-textarea');
   if (!ta) return;
   const lines = ta.value.split('\n');
-  const n = Math.min(jump.line, lines.length);
+  const n = Math.min(line, lines.length);
   const start = lines.slice(0, n - 1).reduce((acc, l) => acc + l.length + 1, 0);
 
   ta.focus();
@@ -3053,26 +3057,6 @@ function goToSolution() {
   spaNavigate('solution');
 }
 
-// ── Lazy-load JSCPP on first Run Code click (Item #10) ──
-function ensureJSCPP(callback) {
-  if (typeof JSCPP !== 'undefined') { callback(); return; }
-
-  const outputEl = document.getElementById('run-code-output');
-  const statusEl = document.getElementById('run-code-status');
-  if (outputEl) outputEl.innerHTML = '<span class="run-code-compiling"><i data-lucide="loader" class="run-code-spinner"></i> Loading C interpreter…</span>';
-  if (statusEl) statusEl.textContent = '⏳ Loading interpreter (first run only)…';
-  if (typeof lucide !== 'undefined') lucide.createIcons({ root: outputEl });
-
-  const script = document.createElement('script');
-  script.src = typeof JSCPP_SRC !== 'undefined' ? JSCPP_SRC : 'js/JSCPP.es5.min.js';
-  script.onload = callback;
-  script.onerror = () => {
-    if (outputEl) { outputEl.textContent = 'Error: Could not load the C interpreter.\nCheck your network connection and try again.'; outputEl.className = 'run-code-output run-code-error'; }
-    if (statusEl) statusEl.textContent = '❌ Interpreter load failed';
-  };
-  document.head.appendChild(script);
-}
-
 // ── Interactive Terminal ──
 let _term = null;
 
@@ -3212,13 +3196,15 @@ function runCodeWithPiston(seedStdin) {
         <div class="run-code-footer-left">
           <span class="run-code-status" id="run-code-status">⏳ Compiling...</span>
           <span class="term-elapsed" id="term-elapsed"></span>
-          <span id="run-code-engine" class="term-engine-badge"></span>
+          <button type="button" id="run-code-engine" class="term-engine-badge" onclick="termToggleEngine('term')"
+                  title="Compiler for Run Code. Click to switch between instant (in browser) and GCC (online)."></button>
           <span class="term-queue-chip" id="term-queue-chip" style="display:none;"></span>
         </div>
         <div class="run-code-footer-right">
           <button class="btn btn-ghost btn-sm term-icon-btn" id="term-stdin-btn" title="Supply input up front"><i data-lucide="file-input" style="width:14px;height:14px;"></i></button>
           <button class="btn btn-ghost btn-sm term-icon-btn" id="term-opts-btn" title="Compiler options"><i data-lucide="settings-2" style="width:14px;height:14px;"></i></button>
           <button class="btn btn-ghost btn-sm term-icon-btn" id="term-history-btn" title="Previous runs"><i data-lucide="history" style="width:14px;height:14px;"></i></button>
+          <button class="btn btn-ghost btn-sm term-icon-btn" id="term-copy-btn" title="Copy the output"><i data-lucide="copy" style="width:14px;height:14px;"></i></button>
           <button class="btn btn-ghost btn-sm term-icon-btn" id="term-clear-btn" title="Clear the screen"><i data-lucide="eraser" style="width:14px;height:14px;"></i></button>
           <span class="term-footer-sep" aria-hidden="true"></span>
           <button class="btn btn-danger btn-sm" id="term-stop-btn" title="Stop this run" style="display:none;"><i data-lucide="square" style="width:13px;height:13px;"></i> Stop</button>
@@ -3249,8 +3235,24 @@ function runCodeWithPiston(seedStdin) {
     inputId: 'term-input',
     onInput: (v) => { if (_term) { _term.pending = v; _termRender(); } },
     onSubmit: (v) => _termHandleInput(v),
-    onEscape: () => _termClose(true)
+    onEscape: () => _termClose(true),
+    onInterrupt: () => _termInterrupt(),
+    history: _termInputHistory
   });
+
+  // An error's "main.c:12" takes the editor to that line.
+  const linesEl = document.getElementById('term-lines');
+  if (linesEl) {
+    const go = (e) => {
+      const loc = e.target.closest && e.target.closest('.term-loc');
+      if (!loc) return;
+      if (e.type === 'keydown' && e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      _termJumpTo(loc.dataset.file, parseInt(loc.dataset.line, 10));
+    };
+    linesEl.addEventListener('click', go);
+    linesEl.addEventListener('keydown', go);
+  }
 
   // Pasting several lines queues them instead of jamming them onto one line.
   const inputEl = document.getElementById('term-input');
@@ -3269,6 +3271,7 @@ function runCodeWithPiston(seedStdin) {
   const on = (id, fn) => { const b = document.getElementById(id); if (b) b.onclick = fn; };
   on('term-stop-btn', () => _termStop());
   on('term-clear-btn', () => _termClear());
+  on('term-copy-btn', () => _termCopyOutput());
   on('term-stdin-btn', () => _termTogglePanel('term-stdin-panel'));
   on('term-opts-btn', () => _termTogglePanel('term-opts'));
   on('term-history-btn', () => { _termRenderHistory(); _termTogglePanel('term-history-panel'); });
@@ -3345,7 +3348,8 @@ function _termInit(code, seedStdin) {
     aborter: null,      // in-flight request, so Stop can cancel it
     startedAt: 0,
     warnedLoop: false,  // "this never terminates" notice, shown at most once
-    engine: 'GCC',
+    engine: termEngineLabel(termEnginePref()),
+    linkLocations: true,   // "main.c:12" in an error jumps the editor there
     exitCode: null,
     expectsInput: _termExpectsInput(merged),
     instrumented: undefined,  // probe build, compiled lazily on first step
@@ -3391,6 +3395,103 @@ function _termStop() {
   if (!_term || !_term.running) return;
   _term.stopped = true;
   if (_term.aborter) { try { _term.aborter.abort(); } catch (e) { /* already gone */ } }
+}
+
+/* What was entered in this terminal, for ↑ / ↓ (see termBindInput). Kept
+   across runs and restarts, the way a shell keeps it across commands. */
+const _termInputHistory = [];
+
+/* Ctrl+C, as in a real terminal: a run in progress is stopped; a program
+   sitting at a prompt is ended there, with ^C where the answer would go. */
+function _termInterrupt() {
+  if (!_term || _term.completed) return;
+  if (_term.running) { _termStop(); return; }
+  termEchoInput(_term, (_term.pending || '') + '^C');
+  _term.pending = '';
+  _term.waiting = false;
+  _term.completed = true;
+  _term.running = false;
+  const input = document.getElementById('term-input');
+  if (input) input.value = '';
+  const statusEl = document.getElementById('run-code-status');
+  if (statusEl) statusEl.textContent = '■ Stopped';
+  _termRender();
+}
+
+/** Copy what the program printed and what was typed into it. */
+function _termCopyOutput() {
+  if (!_term) return;
+  const text = termTranscriptText(_term);
+  if (!text.trim()) { if (typeof toast === 'function') toast('Nothing to copy yet.', { type: 'info', duration: 1500 }); return; }
+  termCopyText(text).then(ok => {
+    if (typeof toast === 'function') {
+      toast(ok ? 'Output copied' : 'Could not copy. Select the text and press Ctrl+C.', { type: ok ? 'success' : 'warning', duration: 1800 });
+    }
+    if (_term && _term.waiting) termFocusInput('term-input');
+  });
+}
+
+/* ── Errors that point somewhere ───────────────────────────────
+   Both compilers number lines in the MERGED translation unit -- the file you
+   ran with its local headers inlined and its companion .c files appended
+   (preprocessMultiFile) -- and name it <source> (GCC) or main.c (xcc). So
+   "line 40" may really be line 6 of utils.h. These walk the merge markers to
+   put each location back on the file and line you actually wrote. */
+function termLocateMerged(merged, activeName, n) {
+  const lines = String(merged || '').split('\n');
+  const stack = [{ name: activeName, line: 0 }];
+  const BEGIN = /^\/\* ── (.+?) ── \*\/$/;
+  const END = /^\/\* ── end (.+?) ── \*\/$/;
+  for (let i = 0; i < Math.min(n, lines.length); i++) {
+    const L = lines[i];
+    const top = stack[stack.length - 1];
+    if (END.test(L)) {
+      if (stack.length > 1) stack.pop();
+      if (i + 1 === n) return null;
+      continue;
+    }
+    const b = BEGIN.exec(L);
+    if (b) {
+      // An inlined header's marker stands where its #include line was, so it
+      // is a line of the file around it; an appended file's is not.
+      const appended = / \(linked: .*\)$/.test(b[1]);
+      if (!appended) top.line++;
+      if (i + 1 === n) return appended ? null : { name: top.name, line: top.line };
+      stack.push({ name: b[1].replace(/ \(linked: .*\)$/, ''), line: 0 });
+      continue;
+    }
+    top.line++;
+    if (i + 1 === n) return { name: top.name, line: top.line };
+  }
+  return null;
+}
+
+function _termActiveFileName() {
+  const f = state.userFiles && state.userFiles[state.activeFileIndex];
+  return f ? f.name + f.ext : 'main.c';
+}
+
+/** Rewrite "<source>:40:5" / "main.c:40" to the file and line the user wrote. */
+function _termRelocate(text, session) {
+  if (!text) return text;
+  const merged = session && session.merged !== undefined ? session.merged : (session ? session.code : '');
+  const active = _termActiveFileName();
+  return String(text).replace(/(<source>|main\.c):(\d+)(?::(\d+))?/g, (m, f, l, c) => {
+    const at = termLocateMerged(merged, active, parseInt(l, 10));
+    return at ? at.name + ':' + at.line + (c ? ':' + c : '') : m;
+  });
+}
+
+/* Take the editor to a file and line, and lift the blur off the page so the
+   line can be seen with the terminal still open beside it. */
+function _termJumpTo(file, line) {
+  if (!(line > 0)) return;
+  const files = state.userFiles || [];
+  let fi = files.findIndex(f => f.name + f.ext === file);
+  if (fi < 0) fi = state.activeFileIndex || 0;
+  const overlay = document.getElementById('run-code-overlay');
+  if (overlay && !overlay.classList.contains('is-floating') && typeof _termSetFloating === 'function') _termSetFloating(overlay, true);
+  practiceJumpToLine(fi, line);
 }
 
 /** Wipe the screen without restarting the program. */
@@ -3466,7 +3567,18 @@ function _termViewHistory(index) {
  * replays instantly instead of paying a round trip per prompt.
  */
 async function _termCompile(session, source, stdin) {
-  if (session.engine === 'XCC') return xccCompileRun(source, stdin, session.aborter);
+  /* The in-browser compiler is the default (termEnginePref): it answers in
+     about 50 ms where GCC takes one to two seconds a step. If it cannot start,
+     GCC takes over for the rest of this run. */
+  if (session.engine === 'XCC') {
+    try {
+      return await xccCompileRun(source, stdin, session.aborter);
+    } catch (err) {
+      if (session.stopped || typeof xccUnavailable !== 'function' || !xccUnavailable(err)) throw err;
+      session.xccFailed = err;
+      termUseOnlineCompiler(session, 'run-code-engine');
+    }
+  }
   const args = termCompilerArgs();
   const key = termCacheKey(source, stdin, args);
   const hit = termCacheGet(key);
@@ -3481,11 +3593,19 @@ async function _termCompile(session, source, stdin) {
        reach", and if the compiler cannot start, the caller's fallback to the
        old interpreter still runs. Its answers stay out of the GCC cache. */
     if (session.stopped || typeof xccCompileRun !== 'function') throw err;
+    if (session.xccFailed) throw session.xccFailed;   // both are out: say why
     termUseOfflineCompiler(session, 'run-code-engine', 'run-code-status');
     return xccCompileRun(source, stdin, session.aborter);
   }
   termCacheSet(key, res);
   return res;
+}
+
+/** GCC takes over: the in-browser compiler would not start. */
+function termUseOnlineCompiler(session, engineId) {
+  session.engine = 'GCC';
+  const engineEl = document.getElementById(engineId);
+  if (engineEl) engineEl.textContent = 'GCC';
 }
 
 /** Label a terminal session as running on the in-browser compiler. */
@@ -3570,9 +3690,9 @@ async function _termRunStep() {
   session.lines.push({ type: 'info', text: firstRun ? '⏳ Compiling & running...' : '⏳ Running...' });
   _termRender();
 
-  if (statusEl) statusEl.textContent = firstRun ? '⏳ Compiling with GCC...' : '⏳ Re-running with input...';
-  if (engineEl) engineEl.textContent = 'GCC';
-  session.engine = 'GCC';
+  session.engine = session.xccFailed ? 'GCC' : termEngineLabel(termEnginePref());
+  if (statusEl) statusEl.textContent = firstRun ? (session.engine === 'GCC' ? '⏳ Compiling with GCC...' : '⏳ Compiling...') : '⏳ Re-running with input...';
+  if (engineEl) engineEl.textContent = session.engine;
   _termStartClock(session);
 
   /* A healthy compile takes about a second and a half. Past the stall window
@@ -3643,27 +3763,19 @@ async function _termRunStep() {
       _termRender();
       return;
     }
-    // Godbolt failed — try JSCPP fallback (its EOF abort yields an accurate
-    // partial output, so no probe run is needed).
-    session.engine = 'JSCPP';
-    if (engineEl) engineEl.textContent = 'JSCPP';
-    if (statusEl) statusEl.textContent = '⚠️ Compiler offline — using interpreter';
-    resB = null;
-    probe = null;
-    try {
-      resA = await _termRunJSCPP(session.code, session.accStdin);
-    } catch (err2) {
-      if (_term !== session) return;
-      session.lines.splice(spinIdx, 1);
-      _termCue(session, 'punch');
-      session.lines.push({ type: 'error', text: 'Error: ' + (err2.message || err2) });
-      session.completed = true;
-      session.running = false;
-      _termSetButtonsRunning(false);
-      if (statusEl) statusEl.textContent = '❌ Execution failed';
-      _termRender();
-      return;
-    }
+    // Neither compiler could run it: GCC out of reach and the in-browser
+    // compiler would not start (_termCompile tries each in turn).
+    session.lines.splice(spinIdx, 1);
+    _termCue(session, 'punch');
+    session.lines.push({ type: 'error', text: termNoCompilerText(err) });
+    session.completed = true;
+    session.running = false;
+    _termStopClock(session);
+    _termShowStop(false);
+    _termSetButtonsRunning(false);
+    if (statusEl) statusEl.textContent = '❌ Could not compile';
+    _termRender();
+    return;
   }
   if (_term !== session) return; // user restarted mid-flight — discard this run
 
@@ -3676,7 +3788,7 @@ async function _termRunStep() {
   // Handle compilation failure
   if (!resA.didExecute) {
     _termCue(session, 'punch');
-    session.lines.push({ type: 'error', text: 'Compilation Error:\n' + (termCleanDiagnostics(resA.buildStderr || resA.stderr, session.code) || 'Unknown error') });
+    session.lines.push({ type: 'error', text: 'Compilation Error:\n' + (_termRelocate(termCleanDiagnostics(resA.buildStderr || resA.stderr, session.code), session) || 'Unknown error') });
     // Kept, not just shown: see mistakes.js.
     if (typeof mistakeNoteText === 'function') mistakeNoteText(resA.buildStderr || resA.stderr);
     termPushLint(session);
@@ -3717,9 +3829,6 @@ async function _termRunStep() {
       safe = _termLCP(outA, outB);
       waitingForInput = true;
     }
-  } else if (session.engine === 'JSCPP') {
-    // _termRunJSCPP maps an EOF abort to exitCode 1 with accurate partial output.
-    waitingForInput = exitCode !== 0 && session.expectsInput;
   }
 
   // A console shows your keystrokes ON the prompt line, and the newline that
@@ -3772,7 +3881,7 @@ async function _termRunStep() {
     _termCue(session, 'punch');
     session.lines.push({ type: 'error', text: 'Runtime Error: ' + (signalMap[sig] || 'Signal ' + sig) });
     if (typeof mistakeNoteText === 'function') mistakeNoteText(signalMap[sig] || 'Signal ' + sig);
-    const errText = termCleanDiagnostics(resA.stderr, session.code);
+    const errText = _termRelocate(termCleanDiagnostics(resA.stderr, session.code), session);
     if (errText) session.lines.push({ type: 'error', text: errText });
     session.completed = true;
     session.running = false;
@@ -3781,9 +3890,9 @@ async function _termRunStep() {
     return;
   }
 
-  const errText = termCleanDiagnostics(resA.stderr, session.code);
+  const errText = _termRelocate(termCleanDiagnostics(resA.stderr, session.code), session);
     if (errText) session.lines.push({ type: 'error', text: errText });
-  const warnText = termCleanDiagnostics(resA.buildStderr, session.code);
+  const warnText = _termRelocate(termCleanDiagnostics(resA.buildStderr, session.code), session);
   if (warnText) session.lines.push({ type: 'warning', text: '⚠️ ' + warnText });
   /* A program that compiled with warnings and ran anyway is where the quiet
      mistakes live -- the stray %, the = that should have been ==. */
@@ -3882,460 +3991,6 @@ function _termRender() {
   termScrollIfFollowing(area, following);
 }
 
-/** JSCPP fallback — returns same shape as Godbolt result */
-function _termRunJSCPP(code, stdin) {
-  return new Promise((resolve, reject) => {
-    ensureJSCPP(() => {
-      let output = '';
-      /* Both of these are needed by the failure path, to put a reported line
-         number back on the line the user is actually looking at. */
-      let merged = '', processed = '';
-      try {
-        merged = preprocessMultiFile(code);
-        processed = preprocessCForJSCPP(merged);
-        const exitCode = JSCPP.run(processed, stdin || '', {
-          stdio: { write: (s) => { output += s; } },
-          unsigned_overflow: 'warn'
-        });
-        resolve({ didExecute: true, exitCode: exitCode, stdout: output, stderr: '', buildStderr: '', execTime: null });
-      } catch (err) {
-        const msg = err.message || String(err);
-        if (msg.includes('EOF') || msg.includes('Memory overflow')) {
-          // Program needs more input — partial output already captured
-          resolve({ didExecute: true, exitCode: 1, stdout: output, stderr: '', buildStderr: '', execTime: null });
-        } else if (termIsBuildFailure(msg)) {
-          /* The raw text is a forty-token dump pointing at a preprocessed line.
-             Show what it MEANS instead; the original is kept only when nothing
-             could be made of it, because "ERROR: Parsing Failure:" on its own
-             tells the reader nothing the translation has not already said. */
-          const text = termExplainJSCPP(msg, merged, processed, code) || msg;
-          resolve({ didExecute: false, exitCode: -1, stdout: '', stderr: text, buildStderr: text, execTime: null });
-        } else {
-          // Not a parse failure, but the interpreter's own limits read just as
-          // badly: "variable fopen does not exist" is not the user's mistake.
-          const said = termExplainJSCPP(msg, merged, processed, code);
-          if (said) { resolve({ didExecute: false, exitCode: -1, stdout: output, stderr: said, buildStderr: said, execTime: null }); return; }
-          reject(err);
-        }
-      }
-    });
-  });
-}
-
-/**
- * Comprehensive C → JSCPP Preprocessor.
- *
- * JSCPP is a C++ interpreter. It does NOT support:
- *   - malloc / calloc / realloc / free (no heap allocator)
- *   - sizeof (except as a compile-time literal we inject)
- *   - struct / union / enum as typedef patterns
- *   - goto, file I/O (fopen etc.)
- *
- * This preprocessor converts idiomatic C code into a form that JSCPP
- * can actually interpret, covering the patterns students encounter
- * in introductory C programming courses.
- */
-/**
- * JSCPP drops every space that immediately follows a comma inside a string
- * literal: printf("Hello, World!") prints "Hello,World!". Measured behaviour:
- *
- *   "a, b"   -> "a,b"        "a ,b"  -> "a ,b"   (only AFTER a comma)
- *   "a,  b"  -> "a,b"        "a; b"  -> "a; b"   (only commas)
- *   printf("%d, %d", 1, 2) -> "1,2"  (format strings too)
- *
- * It is the literal that is damaged, not the output: the same text printed from
- * a variable comes out intact. Writing the space as its hex escape gets it past
- * whatever splits on commas, and JSCPP unescapes \x20 back to a space itself,
- * so the program prints exactly what the author wrote.
- *
- * Only Godbolt-less runs go through here, so real GCC output is untouched.
- */
-function _jscppProtectCommaSpaces(code) {
-  let out = '';
-  let i = 0;
-  const n = code.length;
-  let inStr = false, inChar = false, inLine = false, inBlock = false;
-
-  while (i < n) {
-    const c = code[i];
-    const next = code[i + 1];
-
-    if (inLine) { out += c; if (c === '\n') inLine = false; i++; continue; }
-    if (inBlock) { out += c; if (c === '*' && next === '/') { out += next; i += 2; inBlock = false; continue; } i++; continue; }
-
-    if (!inStr && !inChar && c === '/' && next === '/') { out += c + next; i += 2; inLine = true; continue; }
-    if (!inStr && !inChar && c === '/' && next === '*') { out += c + next; i += 2; inBlock = true; continue; }
-
-    // Escapes pass through as a pair so a \" can't be mistaken for the end.
-    if ((inStr || inChar) && c === '\\') { out += c + (next || ''); i += 2; continue; }
-
-    if (!inChar && c === '"') { inStr = !inStr; out += c; i++; continue; }
-    if (!inStr && c === "'") { inChar = !inChar; out += c; i++; continue; }
-
-    if (inStr && c === ',') {
-      out += c;
-      i++;
-      let spaces = 0;
-      while (i < n && code[i] === ' ') { spaces++; i++; }
-      out += '\\x20'.repeat(spaces);
-      continue;
-    }
-
-    out += c;
-    i++;
-  }
-  return out;
-}
-
-function preprocessCForJSCPP(code) {
-  // ── 0. Work around the interpreter's comma-space bug first ──
-  code = _jscppProtectCommaSpaces(code);
-
-  // ── 1. Header mapping (C → C++) ──
-  const headerMap = {
-    '<stdio.h>': '<cstdio>',
-    '<stdlib.h>': '<cstdlib>',
-    '<string.h>': '<cstring>',
-    '<math.h>': '<cmath>',
-    '<ctype.h>': '<cctype>',
-    '<limits.h>': '<climits>',
-    '<stdbool.h>': '',
-    '<assert.h>': '<cassert>',
-    '<float.h>': '<cfloat>',
-    '<time.h>': '<ctime>',
-    '<stddef.h>': '',
-    '<errno.h>': '',
-    '<signal.h>': '',
-    '<stdarg.h>': '',
-  };
-
-  let p = code;
-
-  for (const [cH, cppH] of Object.entries(headerMap)) {
-    const re = new RegExp('#\\s*include\\s*' + escapeRegex(cH), 'g');
-    p = cppH ? p.replace(re, `#include ${cppH}`) : p.replace(new RegExp(re.source + '\\s*\\n?', 'g'), '');
-  }
-
-  // ── 2. Add 'using namespace std;' ──
-  if (!p.includes('using namespace std')) {
-    const li = p.lastIndexOf('#include');
-    if (li !== -1) {
-      const le = p.indexOf('\n', li);
-      if (le !== -1) p = p.slice(0, le + 1) + 'using namespace std;\n' + p.slice(le + 1);
-    }
-  }
-
-  // If no includes at all, add the basics
-  if (!p.includes('#include')) {
-    p = '#include <cstdio>\n#include <cstdlib>\nusing namespace std;\n' + p;
-  }
-
-  // ── 3. sizeof → numeric literals ──
-  const sizeofMap = {
-    'int': 4, 'unsigned int': 4, 'signed int': 4,
-    'short': 2, 'unsigned short': 2, 'signed short': 2,
-    'long': 4, 'unsigned long': 4, 'signed long': 4,
-    'long long': 8, 'unsigned long long': 8,
-    'char': 1, 'unsigned char': 1, 'signed char': 1,
-    'float': 4, 'double': 8,
-    'bool': 1,
-    'int*': 4, 'char*': 4, 'float*': 4, 'double*': 4, 'void*': 4,
-  };
-  // sizeof(type)
-  p = p.replace(/sizeof\s*\(\s*([^)]+?)\s*\)/g, (match, typeExpr) => {
-    const t = typeExpr.replace(/\s+/g, ' ').trim();
-    if (sizeofMap[t] !== undefined) return String(sizeofMap[t]);
-    // sizeof(type *) → 4
-    if (t.endsWith('*')) return '4';
-    // sizeof(variable) – leave as-is for JSCPP to handle, but most likely it's a type
-    return match;
-  });
-
-  // ── 4. Dynamic memory: malloc / calloc → VLA (Variable-Length Array) ──
-  // Pattern: type *name = (type*)malloc(expr * sizeof(type));
-  // → type name[expr];
-  // Also: type *name = (type*)calloc(n, sizeof(type));
-  // → type name[n]; memset-equivalent not needed, JSCPP zero-inits
-
-  // malloc with sizeof already resolved (sizeof replaced to number above)
-  // e.g. int *arr = (int*)malloc(n * 4);
-  p = p.replace(
-    /(\w[\w\s]*?)\s*\*\s*(\w+)\s*=\s*\([^)]*\)\s*malloc\s*\(\s*(.+?)\s*\*\s*\d+\s*\)\s*;/g,
-    (match, type, name, countExpr) => {
-      const t = type.trim();
-      return `${t} ${name}[${countExpr.trim()}];`;
-    }
-  );
-  // malloc with just an expression: int *arr = (int*)malloc(n);
-  p = p.replace(
-    /(\w[\w\s]*?)\s*\*\s*(\w+)\s*=\s*\([^)]*\)\s*malloc\s*\(\s*(.+?)\s*\)\s*;/g,
-    (match, type, name, expr) => {
-      const t = type.trim();
-      return `${t} ${name}[${expr.trim()}];`;
-    }
-  );
-  // malloc without cast: int *arr = malloc(expr);
-  p = p.replace(
-    /(\w[\w\s]*?)\s*\*\s*(\w+)\s*=\s*malloc\s*\(\s*(.+?)\s*\)\s*;/g,
-    (match, type, name, expr) => {
-      const t = type.trim();
-      // Try to extract count from expr like "n * sizeof(int)" → n
-      const countMatch = expr.match(/^(.+?)\s*\*\s*\d+$/);
-      const count = countMatch ? countMatch[1].trim() : expr.trim();
-      return `${t} ${name}[${count}];`;
-    }
-  );
-  // calloc: int *arr = (int*)calloc(n, sizeof(int));
-  p = p.replace(
-    /(\w[\w\s]*?)\s*\*\s*(\w+)\s*=\s*(?:\([^)]*\)\s*)?calloc\s*\(\s*(.+?)\s*,\s*(?:sizeof\s*\([^)]*\)|\d+)\s*\)\s*;/g,
-    (match, type, name, countExpr) => {
-      const t = type.trim();
-      return `${t} ${name}[${countExpr.trim()}];`;
-    }
-  );
-  // realloc – just leave the variable as-is (best-effort)
-  p = p.replace(
-    /(\w+)\s*=\s*(?:\([^)]*\)\s*)?realloc\s*\([^)]*\)\s*;/g,
-    '/* realloc not supported in browser interpreter */'
-  );
-
-  // ── 5. Remove free() calls ──
-  p = p.replace(/\bfree\s*\([^)]*\)\s*;/g, '/* free removed – browser interpreter */');
-
-  // ── 6. Remove system("pause") and similar ──
-  p = p.replace(/\bsystem\s*\(\s*"pause"\s*\)\s*;/g, '');
-  p = p.replace(/\bgetch\s*\(\s*\)\s*;/g, '');
-
-  // ── 7. Handle typedef struct patterns ──
-  // typedef struct { ... } Name;  →  (JSCPP doesn't support this)
-  // We'll try to convert simple struct usage but complex ones will still fail
-
-  // ── 8. Convert C99 bool to C++ bool ──
-  // (stdbool.h removed above, so true/false/bool should work natively)
-
-  // ── 9. Handle void main() → int main() ──
-  p = p.replace(/\bvoid\s+main\s*\(/g, 'int main(');
-
-  /* ── 10. (void) parameter lists ──────────────────────────────
-     THE most important line in this function. The interpreter cannot parse a
-     parameter list of `(void)` at all — it reports "missing declarator for
-     argument" and refuses the whole program. Which means that while Godbolt is
-     unreachable, `int main(void)` fails: the exact form this app's own course
-     teaches, and the opening line of nearly every program in the library.
-
-     Only a PARAMETER LIST is rewritten — an identifier immediately before the
-     bracket. A cast, `(void) printf(...)`, has no identifier there and is left
-     alone, and `(void *)` never matches because of the star. */
-  p = p.replace(/([A-Za-z_]\w*)\s*\(\s*void\s*\)/g, '$1()');
-
-  /* ── 11. Field widths in a scanf format ──────────────────────
-     The interpreter turns a scanf format into a regular expression, and a
-     width breaks that: `scanf("%255s", word)` dies with an internal JS error
-     ("object null is not iterable"), and so does `%3d`. A width on scanf is
-     precisely what safe C teaches — every string-reading program in this app's
-     own library uses `%255s` to keep the input inside the buffer — so without
-     this line the fallback cannot run any of them.
-
-     Dropping the width is safe here: the interpreter has no real buffer to
-     overrun, and it ignored the bound anyway. printf widths are deliberately
-     NOT touched — there a width is padding, it works, and removing it would
-     change the program's output. */
-  p = p.replace(
-    /\b(scanf|sscanf|fscanf)\s*\(\s*((?:[A-Za-z_]\w*\s*,\s*)?)"((?:[^"\\]|\\.)*)"/g,
-    (m, fn, lead, fmt) =>
-      fn + '(' + lead + '"' + fmt.replace(/%(\d+)(?=(?:hh|h|ll|l|L)?[diouxXeEfFgGacs])/g, '%') + '"'
-  );
-
-  return p;
-}
-
-function escapeRegex(string) {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
- * Execute C code in the browser using JSCPP.
- * Handles stdin consumption and echoes input values into the output
- * to mimic a real terminal experience.
- */
-function executeBrowserCode(code, stdin = '') {
-  const outputEl = document.getElementById('run-code-output');
-  const statusEl = document.getElementById('run-code-status');
-  if (!outputEl || !statusEl) return;
-
-  outputEl.innerHTML = '<span class="run-code-compiling"><i data-lucide="loader" class="run-code-spinner"></i> Compiling & Running...</span>';
-  statusEl.textContent = '⏳ Interpreting code...';
-  if (typeof lucide !== 'undefined') lucide.createIcons({ root: outputEl });
-
-  setTimeout(() => {
-    if (typeof JSCPP === 'undefined') {
-      outputEl.textContent = 'Error: JSCPP library not loaded.\n\nMake sure you have internet connection on first load\nto download the interpreter engine.';
-      outputEl.className = 'run-code-output run-code-error';
-      statusEl.textContent = '❌ Interpreter not available';
-      return;
-    }
-
-    let capturedOutput = '';
-
-    try {
-      const processedCode = preprocessCForJSCPP(code);
-
-      const exitCode = JSCPP.run(processedCode, stdin, {
-        stdio: {
-          write: function (s) {
-            capturedOutput += s;
-          }
-        },
-        unsigned_overflow: 'warn'
-      });
-
-      // ── Build terminal-style output with echoed stdin ──
-      const finalOutput = buildTerminalOutput(capturedOutput, stdin, code);
-
-      if (finalOutput.length === 0) {
-        outputEl.textContent = '(No output)\n\nProgram exited with code ' + exitCode;
-        outputEl.className = 'run-code-output run-code-success';
-      } else {
-        outputEl.textContent = finalOutput;
-        outputEl.className = 'run-code-output run-code-success';
-      }
-      statusEl.textContent = '✅ Executed Successfully (exit code: ' + exitCode + ')';
-
-    } catch (err) {
-      const errMsg = err.message || String(err);
-
-      // ── Friendly error mapping ──
-      if (errMsg.includes('parse') || errMsg.includes('unexpected') || errMsg.includes('Syntax') || errMsg.includes('missing')) {
-        outputEl.textContent = 'Compilation Error:\n\n' + errMsg;
-        outputEl.className = 'run-code-output run-code-error';
-        statusEl.textContent = '❌ Syntax / Compilation Error';
-      } else if (errMsg.includes('variable malloc does not exist') || errMsg.includes('variable calloc does not exist') || errMsg.includes('variable realloc does not exist')) {
-        outputEl.textContent = 'Unsupported Feature: Dynamic Memory Allocation\n\nThe browser interpreter does not support malloc/calloc/realloc.\nYour code has been auto-converted to use stack arrays where possible,\nbut this pattern could not be converted automatically.\n\nTip: Use fixed-size arrays instead, e.g.:\n  int arr[100]; instead of int *arr = (int*)malloc(100 * sizeof(int));';
-        outputEl.className = 'run-code-output run-code-warning';
-        statusEl.textContent = '⚠️ Unsupported Feature';
-      } else if (errMsg.includes('does not exist')) {
-        const varMatch = errMsg.match(/variable (\w+) does not exist/);
-        const varName = varMatch ? varMatch[1] : 'unknown';
-        outputEl.textContent = `Unsupported Feature:\n\n"${varName}" is not available in the browser interpreter.\n\nSupported libraries: stdio (printf, scanf, getchar, gets, puts),\nstdlib (rand, srand, atoi, abs, qsort), cmath, cstring, cctype, ctime.\n\nUnsupported: malloc/free, file I/O (fopen/fclose), threads, networking.`;
-        outputEl.className = 'run-code-output run-code-warning';
-        statusEl.textContent = '⚠️ Unsupported Feature';
-      } else if (errMsg.includes('not supported') || errMsg.includes('not implemented')) {
-        outputEl.textContent = 'Unsupported Feature:\n\n' + errMsg + '\n\n(The browser interpreter supports most standard C constructs\nbut some advanced features may not be available.)';
-        outputEl.className = 'run-code-output run-code-warning';
-        statusEl.textContent = '⚠️ Unsupported Feature';
-      } else if (errMsg.includes('Memory overflow') || errMsg.includes('EOF')) {
-        // Program ran out of stdin – show what it printed so far + blinking cursor
-        const partialOutput = buildTerminalOutput(capturedOutput, stdin, code);
-        outputEl.innerHTML = escapeHTML(partialOutput) + '<span class="run-code-cursor"></span>';
-        outputEl.className = 'run-code-output run-code-success';
-        statusEl.textContent = '⏳ Waiting for input...';
-
-        // Show floating toast
-        const existingToast = document.getElementById('run-code-toast');
-        if (existingToast) existingToast.remove();
-
-        const toast = document.createElement('div');
-        toast.id = 'run-code-toast';
-        toast.className = 'run-code-toast run-code-toast-warning';
-        toast.innerHTML = `
-          <div style="display:flex; align-items:flex-start; gap:0.5rem; line-height: 1.4;">
-            <i data-lucide="alert-triangle" style="margin-top:2px;"></i>
-            <span>Program paused: Waiting for input... Please enter it in the Standard Input box and click Run.</span>
-          </div>
-          <button onclick="this.parentElement.remove()" style="background:none; border:none; color:inherit; cursor:pointer; padding:0; margin-left:1rem; opacity:0.8;"><i data-lucide="x" style="width:16px;height:16px;"></i></button>
-        `;
-        document.body.appendChild(toast);
-        if (typeof lucide !== 'undefined') lucide.createIcons({ root: toast });
-
-        setTimeout(() => {
-          if (document.body.contains(toast)) toast.remove();
-        }, 7000);
-      } else {
-        outputEl.textContent = 'Runtime Error:\n\n' + errMsg;
-        outputEl.className = 'run-code-output run-code-error';
-        statusEl.textContent = '❌ Runtime Error';
-      }
-    }
-  }, 50);
-}
-
-/**
- * Build terminal-style output by interleaving program output with echoed stdin.
- *
- * In a real terminal, when scanf reads input, the user's typed value is echoed
- * on-screen followed by a newline (from pressing Enter). JSCPP doesn't do this,
- * so we reconstruct it by detecting where each scanf consumed a value and
- * injecting the input tokens into the output stream at the correct positions.
- */
-function buildTerminalOutput(rawOutput, stdin, originalCode) {
-  if (!stdin || !stdin.trim()) return rawOutput;
-
-  // Count how many scanf / cin reads the code has
-  const scanfMatches = originalCode.match(/scanf\s*\(/g);
-  const cinMatches = originalCode.match(/cin\s*>>/g);
-
-  if (!scanfMatches && !cinMatches) return rawOutput;
-
-  // Count the total number of format specifiers across all scanf calls
-  let totalReads = 0;
-  if (scanfMatches) {
-    // For each scanf call, count format specifiers like %d, %f, %s, %c, etc.
-    const scanfCalls = originalCode.match(/scanf\s*\(\s*"([^"]*)"/g);
-    if (scanfCalls) {
-      for (const call of scanfCalls) {
-        const fmtMatch = call.match(/"([^"]*)"/);
-        if (fmtMatch) {
-          const specs = fmtMatch[1].match(/%[*]?[0-9]*[diouxXeEfFgGaAcspn]/g);
-          totalReads += specs ? specs.length : 0;
-        }
-      }
-    }
-  }
-  if (cinMatches) {
-    totalReads += cinMatches.length;
-  }
-
-  if (totalReads === 0) return rawOutput;
-
-  // Split stdin into individual tokens (by whitespace/newlines)
-  const inputTokens = stdin.trim().split(/[\s]+/);
-  const tokensToEcho = inputTokens.slice(0, totalReads);
-
-  if (tokensToEcho.length === 0) return rawOutput;
-
-  // Strategy: Insert each input token + newline into the raw output
-  // at the boundaries where printf output segments meet.
-  // 
-  // The raw output from JSCPP contains all printf output concatenated.
-  // For a typical pattern like:
-  //   printf("Enter: "); scanf("%d",&n); printf("%d", n);
-  // The rawOutput would be: "Enter: 5"
-  // We want:                "Enter: 5\n5"
-  // 
-  // We detect printf output segments by looking at the source code structure.
-  // Simple approach: append echo after each newline-less prompt that precedes a scanf.
-
-  // Build a simple interleaved version
-  let result = rawOutput;
-
-  // For each input token, find where it appears in the output and add a newline after it
-  // This handles the common case where printf prints the value right after scanf consumed it
-  for (let i = 0; i < tokensToEcho.length; i++) {
-    const token = tokensToEcho[i];
-    // Find the first occurrence of this token in the remaining result that doesn't 
-    // already have a newline after it
-    const idx = result.indexOf(token);
-    if (idx !== -1) {
-      const afterIdx = idx + token.length;
-      // If the character right after the token is NOT already a newline, insert one
-      if (afterIdx < result.length && result[afterIdx] !== '\n') {
-        result = result.slice(0, afterIdx) + '\n' + result.slice(afterIdx);
-      }
-    }
-  }
-
-  return result;
-}
 
 // ── Remote Compiler Engine (Godbolt Compiler Explorer — free, no key) ──
 
@@ -4594,36 +4249,11 @@ function _buildSubmissionSource() {
   return preprocessMultiFile(base);
 }
 
-/** JSCPP fallback for grading — source is already merged. Same result shape as Godbolt. */
-function _gradeRunJSCPP(processedSource, stdin) {
-  return new Promise((resolve, reject) => {
-    ensureJSCPP(() => {
-      let output = '';
-      let processed = '';
-      try {
-        processed = preprocessCForJSCPP(processedSource);
-        const exitCode = JSCPP.run(processed, stdin || '', { stdio: { write: (s) => { output += s; } }, unsigned_overflow: 'warn' });
-        resolve({ didExecute: true, exitCode: exitCode, stdout: output, stderr: '', buildStderr: '' });
-      } catch (err) {
-        const msg = err.message || String(err);
-        if (msg.includes('EOF') || msg.includes('Memory overflow')) {
-          resolve({ didExecute: true, exitCode: 1, stdout: output, stderr: 'Program asked for more input than the test provided.', buildStderr: '' });
-        } else if (termIsBuildFailure(msg)) {
-          // A failed submission is the worst place to print a token dump.
-          const text = termExplainJSCPP(msg, processedSource, processed, processedSource) || msg;
-          resolve({ didExecute: false, exitCode: -1, stdout: '', stderr: text, buildStderr: text });
-        } else {
-          reject(err);
-        }
-      }
-    });
-  });
-}
 
 /**
  * Run the submission against each authored test case.
- * Prefers Godbolt (real GCC); if it's unreachable, falls back to the local JSCPP
- * interpreter for the remaining tests.
+ * Prefers Godbolt (real GCC); if it's unreachable, falls back to the in-browser
+ * compiler (xcc) for the remaining tests.
  * @param {Array} tests  [{ name, stdin, expected, hidden }]
  * @returns {Promise<Array<{name,hidden,passed,stdin,expected,actual,error}>>}
  */
@@ -4695,18 +4325,17 @@ async function _rtcRun(merged, stdin, engine) {
           }
         }
         /* Offline: the in-browser compiler, which grades the same way gcc
-           does. Only if it cannot start at all does the old interpreter --
-           which cannot run structs, files or scanf into an array -- get a turn. */
+           does on correct programs. Online, the verdict stays with real GCC. */
         if (engine.offline && !engine.noXcc && typeof xccCompileRun === 'function') {
           try {
             r = await xccCompileRun(merged, stdin);
           } catch (e) {
-            if (typeof xccUnavailable === 'function' && xccUnavailable(e)) engine.noXcc = true;
+            if (typeof xccUnavailable === 'function' && xccUnavailable(e)) engine.noXcc = e;
             else throw e;
           }
         }
-        if (engine.offline && (engine.noXcc || typeof xccCompileRun !== 'function')) {
-          r = await _gradeRunJSCPP(merged, stdin);
+        if (engine.offline && !r) {
+          throw new Error(termNoCompilerText(engine.noXcc instanceof Error ? engine.noXcc : null));
         }
       } catch (e) {
         r = null;

@@ -627,11 +627,8 @@ async function adminAutofillExpected(idx) {
   try {
     res = await _godboltCompileRun(source, v.tests[idx].stdin || '');
   } catch (e) {
-    // Offline: the in-browser compiler first, the old interpreter only if it cannot start.
+    // Offline: the in-browser compiler.
     try { res = typeof xccCompileRun === 'function' ? await xccCompileRun(source, v.tests[idx].stdin || '') : null; } catch (e1) { res = null; }
-    if (!res) {
-      try { res = await _gradeRunJSCPP(source, v.tests[idx].stdin || ''); } catch (e2) { res = null; }
-    }
   }
 
   if (!res || !res.didExecute) {

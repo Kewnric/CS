@@ -52,10 +52,12 @@ function runSnippetCodeWithPiston() {
         <div class="run-code-footer-left">
           <span class="run-code-status" id="snip-run-code-status">⏳ Compiling...</span>
           <span class="term-elapsed" id="snip-term-elapsed"></span>
-          <span id="snip-run-code-engine" style="font-size:0.6875rem;color:#484f58;font-family:var(--font-mono);background:#0d1117;padding:2px 8px;border-radius:4px;border:1px solid #21262d;"></span>
+          <button type="button" id="snip-run-code-engine" class="term-engine-badge" onclick="termToggleEngine('snip-term')"
+                  title="Compiler for Run Code. Click to switch between instant (in browser) and GCC (online)."></button>
         </div>
         <div class="run-code-footer-right">
           <button class="btn btn-ghost btn-sm term-icon-btn" id="snip-term-opts-btn" title="Compiler options"><i data-lucide="settings-2" style="width:14px;height:14px;"></i></button>
+          <button class="btn btn-ghost btn-sm term-icon-btn" id="snip-term-copy-btn" title="Copy the output"><i data-lucide="copy" style="width:14px;height:14px;"></i></button>
           <button class="btn btn-ghost btn-sm term-icon-btn" id="snip-term-clear-btn" title="Clear the screen"><i data-lucide="eraser" style="width:14px;height:14px;"></i></button>
           <span class="term-footer-sep" aria-hidden="true"></span>
           <button class="btn btn-danger btn-sm" id="snip-term-stop-btn" title="Stop this run" style="display:none;"><i data-lucide="square" style="width:13px;height:13px;"></i> Stop</button>
@@ -86,10 +88,20 @@ function runSnippetCodeWithPiston() {
     inputId: 'snip-term-input',
     onInput: (v) => { if (_snipTerm) { _snipTerm.pending = v; _snipTermRender(); } },
     onSubmit: (v) => _snipTermHandleInput(v),
-    onEscape: () => _snipTermClose()
+    onEscape: () => _snipTermClose(),
+    onInterrupt: () => _snipTermInterrupt(),
+    history: _snipTermInputHistory
   });
   const sOn = (id, fn) => { const b = document.getElementById(id); if (b) b.onclick = fn; };
   sOn('snip-term-stop-btn', () => _snipTermStop());
+  sOn('snip-term-copy-btn', () => {
+    if (!_snipTerm) return;
+    const text = termTranscriptText(_snipTerm);
+    if (!text.trim()) { if (typeof toast === 'function') toast('Nothing to copy yet.', { type: 'info', duration: 1500 }); return; }
+    termCopyText(text).then(ok => {
+      if (typeof toast === 'function') toast(ok ? 'Output copied' : 'Could not copy. Select the text and press Ctrl+C.', { type: ok ? 'success' : 'warning', duration: 1800 });
+    });
+  });
   sOn('snip-term-clear-btn', () => {
     if (!_snipTerm) return;
     _snipTerm.lines = []; _snipTerm.lineOpen = false;
@@ -143,7 +155,7 @@ function _snipTermInit(code) {
     echoCount: 0,       // how many user inputs have been echoed
     completed: false,
     running: false,
-    engine: 'GCC',
+    engine: termEngineLabel(termEnginePref()),
     exitCode: null,
     expectsInput: _snipTermExpectsInput(code),
     instrumented: undefined,
@@ -166,7 +178,16 @@ function _snipTermInit(code) {
 }
 
 async function _snipTermCompile(session, source, stdin) {
-  if (session.engine === 'XCC') return xccCompileRun(source, stdin, session.aborter);
+  // The in-browser compiler first, GCC if it will not start (see _termCompile).
+  if (session.engine === 'XCC') {
+    try {
+      return await xccCompileRun(source, stdin, session.aborter);
+    } catch (err) {
+      if (session.stopped || typeof xccUnavailable !== 'function' || !xccUnavailable(err)) throw err;
+      session.xccFailed = err;
+      termUseOnlineCompiler(session, 'snip-run-code-engine');
+    }
+  }
   const args = termCompilerArgs();
   const key = termCacheKey(source, stdin, args);
   const hit = termCacheGet(key);
@@ -177,11 +198,29 @@ async function _snipTermCompile(session, source, stdin) {
   } catch (err) {
     // Offline: compile in the browser instead. See _termCompile in practice.js.
     if (session.stopped || typeof xccCompileRun !== 'function') throw err;
+    if (session.xccFailed) throw session.xccFailed;
     termUseOfflineCompiler(session, 'snip-run-code-engine', 'snip-run-code-status');
     return xccCompileRun(source, stdin, session.aborter);
   }
   termCacheSet(key, res);
   return res;
+}
+
+/* ↑ / ↓ input history and Ctrl+C, as in the practice terminal. */
+const _snipTermInputHistory = [];
+
+function _snipTermInterrupt() {
+  if (!_snipTerm || _snipTerm.completed) return;
+  if (_snipTerm.running) { _snipTermStop(); return; }
+  termEchoInput(_snipTerm, (_snipTerm.pending || '') + '^C');
+  _snipTerm.pending = '';
+  _snipTerm.waiting = false;
+  _snipTerm.completed = true;
+  const input = document.getElementById('snip-term-input');
+  if (input) input.value = '';
+  const statusEl = document.getElementById('snip-run-code-status');
+  if (statusEl) statusEl.textContent = '■ Stopped';
+  _snipTermRender();
 }
 
 function _snipTermStop() {
@@ -259,9 +298,9 @@ async function _snipTermRunStep() {
   session.lines.push({ type: 'info', text: firstRun ? '⏳ Compiling & running...' : '⏳ Running...' });
   _snipTermRender();
 
-  if (statusEl) statusEl.textContent = firstRun ? '⏳ Compiling with GCC...' : '⏳ Re-running with input...';
-  if (engineEl) engineEl.textContent = 'GCC';
-  session.engine = 'GCC';
+  session.engine = session.xccFailed ? 'GCC' : termEngineLabel(termEnginePref());
+  if (statusEl) statusEl.textContent = firstRun ? (session.engine === 'GCC' ? '⏳ Compiling with GCC...' : '⏳ Compiling...') : '⏳ Re-running with input...';
+  if (engineEl) engineEl.textContent = session.engine;
   _snipTermStartClock(session);
 
   // See _termRunStep: past the stall window the compiler is not merely slow,
@@ -320,24 +359,15 @@ async function _snipTermRunStep() {
       return;
     }
     if (_snipTerm !== session) return;
-    session.engine = 'JSCPP';
-    if (engineEl) engineEl.textContent = 'JSCPP';
-    if (statusEl) statusEl.textContent = '⚠️ Compiler offline — using interpreter';
-    resB = null;
-    probe = null;
-    try {
-      resA = await _snipTermRunJSCPP(session.code, session.accStdin);
-    } catch (err2) {
-      if (_snipTerm !== session) return;
-      session.lines.splice(spinIdx, 1);
-      session.lines.push({ type: 'error', text: 'Error: ' + (err2.message || err2) });
-      session.completed = true;
-      session.running = false;
-      _snipTermSetButtonsRunning(false);
-      if (statusEl) statusEl.textContent = '❌ Execution failed';
-      _snipTermRender();
-      return;
-    }
+    // Neither compiler could run it (see _termCompile in practice.js).
+    session.lines.splice(spinIdx, 1);
+    session.lines.push({ type: 'error', text: termNoCompilerText(err) });
+    session.completed = true;
+    session.running = false;
+    _snipTermStopClock(session); _snipTermShowStop(false); _snipTermSetButtonsRunning(false);
+    if (statusEl) statusEl.textContent = '❌ Could not compile';
+    _snipTermRender();
+    return;
   }
   if (_snipTerm !== session) return;
 
@@ -377,8 +407,6 @@ async function _snipTermRunStep() {
       safe = _snipTermLCP(outA, outB);
       waitingForInput = true;
     }
-  } else if (session.engine === 'JSCPP') {
-    waitingForInput = exitCode !== 0 && session.expectsInput;
   }
 
   // See the matching note in practice.js: the newline that follows a blocking
@@ -466,40 +494,4 @@ function _snipTermRender() {
   if (host) host.innerHTML = termTranscriptHTML(_snipTerm, _snipTerm.pending, _snipTerm.waiting);
   if (_snipTerm && _snipTerm.waiting) termFocusInput('snip-term-input');
   termScrollIfFollowing(area, following);
-}
-
-function _snipTermRunJSCPP(code, stdin) {
-  return new Promise((resolve, reject) => {
-    ensureJSCPP(() => {
-      let output = '';
-      let processed = '';
-      try {
-        processed = preprocessCForJSCPP(code);
-        const exitCode = JSCPP.run(processed, stdin || '', {
-          stdio: { write: (s) => { output += s; } },
-          unsigned_overflow: 'warn'
-        });
-        resolve({ didExecute: true, exitCode: exitCode, stdout: output, stderr: '', buildStderr: '', execTime: null });
-      } catch (err) {
-        const msg = err.message || String(err);
-        // An interactive program comes through here on every keystroke, so the
-        // cheap check goes first and the translation only runs on real failures.
-        if (msg.includes('EOF') || msg.includes('Memory overflow')) {
-          resolve({ didExecute: true, exitCode: 1, stdout: output, stderr: '', buildStderr: '', execTime: null });
-          return;
-        }
-        // See _termRunJSCPP: the raw text points at a preprocessed line and
-        // buries the one token that matters in a forty-token list.
-        const said = termExplainJSCPP(msg, code, processed, code);
-        if (termIsBuildFailure(msg)) {
-          const text = said || msg;
-          resolve({ didExecute: false, exitCode: -1, stdout: '', stderr: text, buildStderr: text, execTime: null });
-        } else if (said) {
-          resolve({ didExecute: false, exitCode: -1, stdout: output, stderr: said, buildStderr: said, execTime: null });
-        } else {
-          reject(err);
-        }
-      }
-    });
-  });
 }

@@ -130,8 +130,49 @@ function termCleanDiagnostics(text, originalSource) {
   if (!clean.trim()) return '';
   // Drop each diagnostic block that names one of the injected helpers.
   const blocks = clean.split(/\n(?=\S)/);
-  const kept = blocks.filter(b => !/__ssp_[ipl]/.test(b)).join('\n').trim();
+  const kept = termExplainLinkErrors(blocks.filter(b => !/__ssp_[ipl]/.test(b)).join('\n').trim());
   return originalSource ? termRepointExcerpts(kept, originalSource) : kept;
+}
+
+/* ── Link errors, in words ─────────────────────────────────────
+   What the linker says when a function was never written is this:
+
+     /cefs/73/7357..._consolidated/compilers_c++_x86_gcc_13.2.0/bin/../lib/gcc/
+     x86_64-linux-gnu/13.2.0/../../../../x86_64-linux-gnu/bin/ld:
+     /lib/x86_64-linux-gnu/crt1.o: in function `_start':
+     (.text+0x1b): undefined reference to `main'
+     collect2: error: ld returned 1 exit status
+
+   and xcc says "Unresolved: env.foo". The machine paths go, and each missing
+   name becomes one sentence about what is wrong and where to look. */
+function termExplainLinkErrors(text) {
+  const names = [];
+  // xcc calls a missing main by its startup names, __main_argc_argv or __main_void.
+  const add = n => { n = /^__main_(?:argc_argv|void)$/.test(n) ? 'main' : n; if (n && !names.includes(n)) names.push(n); };
+  let m;
+  const gcc = /undefined reference to [`'\u2018"]([A-Za-z_$][\w$]*)['\u2019`"]/g;
+  while ((m = gcc.exec(text))) add(m[1]);
+  const xcc = /Unresolved: env\.([A-Za-z_$][\w$]*)/g;
+  while ((m = xcc.exec(text))) add(m[1]);
+  if (!names.length) return text;
+  const noise = /(^|\/)ld(\.exe)?: |collect2: |undefined reference to|^\s*\(\.text[^)]*\)|Unresolved: env\.|: in function [`'\u2018]/;
+  const kept = String(text).split('\n').filter(l => !noise.test(l)).join('\n').trim();
+  const said = names.map(n => n === 'main'
+    ? 'There is no main() in this program, so it has nowhere to start.\n'
+      + 'Every C program needs one: int main(void) { ... }. Check that it exists and is\n'
+      + 'spelled main -- C is case-sensitive, so Main or mian will not do.'
+    : '"' + n + '" is used but never defined.\n'
+      + 'Check the spelling (C is case-sensitive). If it is written in another .c file,\n'
+      + 'that file is only built when its matching header is #included -- utils.c\n'
+      + 'comes along with #include "utils.h".');
+  return (kept ? kept + '\n\n' : '') + said.join('\n\n');
+}
+
+/** Neither compiler could run the program. */
+function termNoCompilerText(err) {
+  const why = (err && err.message) ? String(err.message).replace(/^XCC_UNAVAILABLE:\s*/, '') : '';
+  return 'Could not compile: the online compiler is out of reach, and the in-browser\n'
+    + 'compiler did not start' + (why ? ' (' + why + ')' : '') + '. Reload the page and try again.';
 }
 
 /**
@@ -238,22 +279,60 @@ const TERM_LINE_CLASS = {
 function termTranscriptHTML(session, pending, waiting) {
   let html = '';
   const lines = session.lines || [];
+  /* Where to type was easy to miss: a prompt like "Enter Shelf ID:" with a
+     thin caret after it, in a window that does not look like it takes input.
+     Until the first answer, the caret carries a quiet note saying so. */
+  const hint = (waiting && !pending && !(session.inputs && session.inputs.length))
+    ? '<span class="term-hint">type here, then Enter</span>' : '';
+  const caret = `<span class="term-echo">${escapeHTML(pending || '')}</span><span class="run-code-cursor"></span>${hint}`;
 
   lines.forEach((line, i) => {
     const isLast = i === lines.length - 1;
     let inner = escapeHTML(line.text);
+    if (session.linkLocations && (line.type === 'error' || line.type === 'warning')) inner = termLinkLocations(inner);
     if (line.echo != null) inner += `<span class="term-echo">${escapeHTML(line.echo)}</span>`;
-    if (waiting && isLast && session.lineOpen && line.echo == null) {
-      inner += `<span class="term-echo">${escapeHTML(pending || '')}</span><span class="run-code-cursor"></span>`;
-    }
+    if (waiting && isLast && session.lineOpen && line.echo == null) inner += caret;
     html += `<div class="term-line ${TERM_LINE_CLASS[line.type] || 'term-stdout'}">${inner || '&nbsp;'}</div>`;
   });
 
   // The prompt ended with a newline, so the caret belongs on a fresh line.
-  if (waiting && !session.lineOpen) {
-    html += `<div class="term-line term-stdout"><span class="term-echo">${escapeHTML(pending || '')}</span><span class="run-code-cursor"></span></div>`;
-  }
+  if (waiting && !session.lineOpen) html += `<div class="term-line term-stdout">${caret}</div>`;
   return html;
+}
+
+/* "main.c:12:5" in an error, as something to click: it takes the editor to
+   that line. A span rather than <a href="#">, because an empty hash is a
+   navigation to the dashboard in this app's router. */
+function termLinkLocations(html) {
+  return html.replace(/([A-Za-z0-9_.\-]+\.(?:c|h|cpp)):(\d+)(?::(\d+))?/g, (m, file, line) =>
+    `<span class="term-loc" role="link" tabindex="0" data-file="${file}" data-line="${line}" title="Show line ${line} in the editor">${m}</span>`);
+}
+
+/** The transcript as plain text, for Copy: what was printed and typed. */
+function termTranscriptText(session) {
+  return (session.lines || [])
+    .filter(l => l.type !== 'info')
+    .map(l => l.text + (l.echo != null ? l.echo : ''))
+    .join('\n');
+}
+
+/** Put text on the clipboard; resolves to whether it worked. */
+function termCopyText(text) {
+  const fallback = () => {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    ta.remove();
+    return ok;
+  };
+  if (navigator.clipboard && window.isSecureContext) {
+    return navigator.clipboard.writeText(text).then(() => true, () => fallback());
+  }
+  return Promise.resolve(fallback());
 }
 
 /** Flat transcript for the read-only mirror under the editor (no caret). */
@@ -272,23 +351,52 @@ function termMirrorHTML(session) {
  * termTranscriptHTML. Clicking anywhere in the output focuses it, the way
  * clicking a terminal window does.
  *
- * @param {object} o .areaId .inputId .onInput .onSubmit .onEscape
+ * ↑ and ↓ walk back through what was entered before (o.history, an array the
+ * caller keeps, so it outlives one run), the way a shell does. Ctrl+C calls
+ * o.onInterrupt, unless text in the field is selected, which is a copy.
+ *
+ * @param {object} o .areaId .inputId .onInput .onSubmit .onEscape .onInterrupt .history
  */
 function termBindInput(o) {
   const area = document.getElementById(o.areaId);
   const input = document.getElementById(o.inputId);
   if (!area || !input) return;
+  const hist = o.history || null;
+  let hIdx = null, draft = '';
 
-  input.addEventListener('input', () => { if (o.onInput) o.onInput(input.value); });
+  input.addEventListener('input', () => { hIdx = null; if (o.onInput) o.onInput(input.value); });
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       const v = input.value;
       input.value = '';
+      if (hist && v.trim() && hist[hist.length - 1] !== v) {
+        hist.push(v);
+        if (hist.length > 50) hist.shift();
+      }
+      hIdx = null;
       if (o.onSubmit) o.onSubmit(v);
     } else if (e.key === 'Escape') {
       e.preventDefault();
       if (o.onEscape) o.onEscape();
+    } else if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && hist && hist.length && !e.altKey && !e.shiftKey) {
+      if (e.key === 'ArrowDown' && hIdx === null) return;
+      e.preventDefault();
+      if (e.key === 'ArrowUp') {
+        if (hIdx === null) { draft = input.value; hIdx = hist.length; }
+        if (hIdx > 0) hIdx--;
+      } else {
+        hIdx++;
+      }
+      let val;
+      if (hIdx >= hist.length) { hIdx = null; val = draft; } else val = hist[hIdx];
+      input.value = val;
+      input.setSelectionRange(val.length, val.length);
+      if (o.onInput) o.onInput(val);
+    } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'c' || e.key === 'C') && o.onInterrupt) {
+      if (input.selectionStart !== input.selectionEnd) return;   // a copy, not an interrupt
+      e.preventDefault();
+      o.onInterrupt();
     }
   });
 
@@ -362,11 +470,56 @@ function termCompilerArgs() {
   return args.join(' ');
 }
 
+/* ── Which compiler Run Code uses ──────────────────────────────
+   'xcc' (the default): the in-browser compiler -- about 50 ms a run, each
+   input step just as quick, and it works offline. 'gcc': real GCC over the
+   network -- -Wall warnings, 64-bit types, a NULL dereference that crashes as
+   it should -- at one to two seconds a step. Each falls back to the other when
+   it cannot run. Check Code does not follow this: it grades on GCC whenever
+   GCC can be reached, so the verdict comes from the real compiler. */
+const TERM_ENGINE_KEY = 'ssp.termEngine';
+
+function termEnginePref() {
+  try { return localStorage.getItem(TERM_ENGINE_KEY) === 'gcc' ? 'gcc' : 'xcc'; } catch (e) { return 'xcc'; }
+}
+function termSetEnginePref(v) {
+  try { localStorage.setItem(TERM_ENGINE_KEY, v === 'gcc' ? 'gcc' : 'xcc'); } catch (e) { /* private mode */ }
+}
+function termEngineLabel(pref) { return pref === 'gcc' ? 'GCC' : 'XCC'; }
+
+/** The engine badge in the status bar: click to switch, and re-run. */
+function termToggleEngine(idPrefix) {
+  termSetEnginePref(termEnginePref() === 'gcc' ? 'xcc' : 'gcc');
+  document.querySelectorAll('input[name="' + idPrefix + '-engine"]').forEach(r => { r.checked = r.value === termEnginePref(); });
+  if (typeof toast === 'function') {
+    toast(termEnginePref() === 'gcc' ? 'Run Code now uses GCC (online)' : 'Run Code now uses the instant in-browser compiler',
+      { type: 'info', duration: 1800 });
+  }
+  const changed = idPrefix === 'term' ? window._termOptsChanged : window._snipTermOptsChanged;
+  if (typeof changed === 'function') changed();
+}
+
 function termOptionsPanelHTML(idPrefix) {
   const o = termGetOpts();
   const stds = ['gnu17', 'c17', 'c11', 'c99', 'c89'];
+  const changed = idPrefix === 'term' ? '_termOptsChanged()' : '_snipTermOptsChanged()';
+  const pref = termEnginePref();
   return `
     <div class="term-opts" id="${idPrefix}-opts" style="display:none;">
+      <div class="term-opt term-opt-engine" role="radiogroup" aria-label="Compiler">
+        <span>Compiler</span>
+        <label class="term-engine-choice">
+          <input type="radio" name="${idPrefix}-engine" value="xcc" ${pref === 'xcc' ? 'checked' : ''}
+                 onchange="termSetEnginePref('xcc'); ${changed}" />
+          <span><strong>Instant</strong><em>In your browser. Works offline, no warnings, 32-bit.</em></span>
+        </label>
+        <label class="term-engine-choice">
+          <input type="radio" name="${idPrefix}-engine" value="gcc" ${pref === 'gcc' ? 'checked' : ''}
+                 onchange="termSetEnginePref('gcc'); ${changed}" />
+          <span><strong>GCC</strong><em>Online. -Wall warnings, 64-bit, a bad pointer crashes. 1-2 s a step.</em></span>
+        </label>
+      </div>
+      <div class="term-opt-sub">GCC options</div>
       <label class="term-opt">
         <span>Standard</span>
         <select class="form-select" onchange="termSetOpt('std', this.value); ${idPrefix === 'term' ? '_termOptsChanged()' : '_snipTermOptsChanged()'}">
@@ -478,220 +631,11 @@ function termExitNote(exitCode) {
   return { line: '\nProcess exited with code ' + exitCode, status: '⚠️ Exit code ' + exitCode, ok: false };
 }
 
-/* ── Reading the fallback interpreter's complaints ─────────────
-   When Godbolt is unreachable the local interpreter takes over, and what it
-   says about a program that will not parse is this, in full:
-
-     ERROR: Parsing Failure:
-     line 5 (column 3): ("Battery 87%\n")\n  return 0;\n}
-     ------------------------------------------------^
-     Expected "!=", "%", "%=", "&", "&&", "&=", "(", "*", "*=", "+", "++",
-     "+=", ",", "-", "--", "-=", "->", ".", "/", "/*", "//", "/=", ";", "<",
-     … forty tokens … but "r" found.
-
-   Three things are wrong with that. The line number is the PREPROCESSED line,
-   not the one in the editor. The excerpt is the whole rest of the file printed
-   on one row with its newlines escaped, so the caret under it points nowhere.
-   And the one token that matters — ";" — is the twenty-third item of a list
-   nobody is going to read.
-
-   Everything below turns that into the line the user actually typed, a caret
-   under the spot, and a sentence naming what is missing. */
-
-/** A thrown interpreter message that means "this never compiled". */
-function termIsBuildFailure(msg) {
-  return /pars|syntax|unexpected|missing declarator|but .{0,40}found/i.test(String(msg || ''));
-}
-
-/**
- * Where a brace went wrong: the line of a `{` that is never closed, or of a
- * `}` that closes nothing. Strings, chars and comments are skipped, so a brace
- * inside printf("}") does not count.
- * @returns {{line:number, extra:boolean}|null}
- */
-function termBraceFault(src) {
-  const s = String(src || '');
-  const open = [];
-  let line = 1, i = 0;
-  let inStr = false, inChar = false, inLine = false, inBlock = false;
-
-  while (i < s.length) {
-    const c = s[i], next = s[i + 1];
-    if (c === '\n') { line++; i++; if (inLine) inLine = false; continue; }
-    if (inLine) { i++; continue; }
-    if (inBlock) { if (c === '*' && next === '/') { i += 2; inBlock = false; } else i++; continue; }
-    if ((inStr || inChar) && c === '\\') { i += 2; continue; }
-    if (inStr) { if (c === '"') inStr = false; i++; continue; }
-    if (inChar) { if (c === "'") inChar = false; i++; continue; }
-    if (c === '/' && next === '/') { inLine = true; i += 2; continue; }
-    if (c === '/' && next === '*') { inBlock = true; i += 2; continue; }
-    if (c === '"') { inStr = true; i++; continue; }
-    if (c === "'") { inChar = true; i++; continue; }
-    if (c === '{') open.push(line);
-    else if (c === '}') { if (!open.length) return { line: line, extra: true }; open.pop(); }
-    i++;
-  }
-  return open.length ? { line: open[open.length - 1], extra: false } : null;
-}
-
-/**
- * The offending line, quoted from the user's own file with a caret under it.
- * @param {string[]} lines the source, already split
- * @param {number} lineNo 1-based; 0 means "we could not place it"
- * @param {number} column 1-based, or 0 to omit the caret
- */
-function termQuoteLine(lines, lineNo, column) {
-  if (!lineNo || lineNo < 1 || lineNo > lines.length) return '';
-  // Tabs are one character to the parser and several columns on screen, so the
-  // caret can only line up if both sides agree. Expanding them makes it agree.
-  const text = String(lines[lineNo - 1]).replace(/\t/g, '    ');
-  const shift = String(lines[lineNo - 1]).slice(0, Math.max(0, column - 1)).split('\t').length - 1;
-  const gutter = String(lineNo).padStart(4, ' ') + ' | ';
-  let out = '\n' + gutter + text;
-  if (column > 0) {
-    out += '\n' + ' '.repeat(gutter.length - 2) + '| '
-        + ' '.repeat(Math.max(0, column - 1 + shift * 3)) + '^';
-  }
-  return out;
-}
-
-/* Interpreter limits that are worth naming rather than leaking as a raw throw.
-   Each of these is something real GCC compiles happily, so the honest thing to
-   say is that the fallback cannot do it — not that the program is wrong. */
-const TERM_JSCPP_LIMITS = [
-  [/(?:variable|type) (?:FILE|fopen|fclose|fprintf|fread|fwrite|rewind|fseek|ftell|feof) (?:does not exist|is not defined)/i,
-   'File input/output is not available in the offline interpreter.\nFILE and fopen need a real filesystem, and there is none in the browser.\nThis program will run properly once the compiler is reachable again.'],
-  [/type struct/i,
-   'The offline interpreter does not support struct.\nNothing is wrong with your program — the fallback simply cannot do\nstructs. It will compile and run once the compiler is reachable again.'],
-  [/variable (?:malloc|calloc|realloc|free) does not exist/i,
-   'This use of malloc could not be converted for the offline interpreter.\nIt has no heap. Simple cases are rewritten as fixed-size arrays\nautomatically; this one was too complex to rewrite.'],
-  [/Invalid regular expression/i,
-   'That scanf format is more than the offline interpreter can handle.\nIt builds a pattern out of the format string, and %* (skip this field)\nis not something it can express. The real compiler has no trouble with it.'],
-  [/object null is not iterable/i,
-   'The offline interpreter could not read input in that format.\nA scan set — %[^\\n] and the like — is the usual cause; it does not\nsupport them. The real compiler does.'],
-  [/variable (\w+) does not exist/i,
-   'The offline interpreter does not provide "$1".\nIt is a partial implementation of C, and this is one of the gaps.\nThe real compiler has it — try again when it is reachable.'],
-  [/Memory overflow/i,
-   'The program ran out of memory in the interpreter.\nAn unbounded loop or a very large array is the usual cause.']
-];
-
-/**
- * Translate an interpreter failure into something a student can act on.
- *
- * @param {string} raw       what the interpreter threw
- * @param {string} merged    the source it was handed (all files linked together)
- * @param {string} processed the source after preprocessCForJSCPP
- * @param {string} userSource the file the editor is showing, for the quote
- * @returns {string} plain text, or '' when nothing better than the raw message
- */
-function termExplainJSCPP(raw, merged, processed, userSource) {
-  const msg = String(raw || '').replace(/^ERROR:\s*/i, '');
-  if (!msg.trim()) return '';
-
-  for (const [re, text] of TERM_JSCPP_LIMITS) {
-    const hit = re.exec(msg);
-    if (hit) return text.replace('$1', hit[1] || '');
-  }
-
-  const user = String(userSource == null ? (merged || '') : userSource);
-  const uLines = user.split('\n');
-  const mLines = String(merged || user).split('\n');
-  const pLines = String(processed || merged || user).split('\n');
-
-  /* How far down the preprocessor pushed everything. It only ever adds or
-     removes lines in the header region at the top — `using namespace std;`
-     after the last include, a header block when there are none, an unsupported
-     include dropped — and every other rewrite it does is in place, one line for
-     one line. So the drift below the headers is a single constant, and that is
-     the whole of the correction. */
-  const drift = pLines.length - mLines.length;
-
-  /** processed line (1-based) → the same line in the editor, or 0. */
-  const toUser = (pLine) => {
-    const idx = pLine - 1 - drift;
-    if (idx < 0 || idx >= mLines.length) return 0;
-    if (user === String(merged || user)) return idx + 1;
-    // Several files were linked into one unit, so the line may not be in the
-    // file on screen. Claim it only when its text appears there exactly once.
-    if (mLines[idx] === uLines[idx]) return idx + 1;
-    const want = mLines[idx].trim();
-    if (!want) return 0;
-    const hits = [];
-    uLines.forEach((l, i) => { if (l.trim() === want) hits.push(i + 1); });
-    return hits.length === 1 ? hits[0] : 0;
-  };
-
-  // "line 5 (column 3):" — a parse failure.
-  const pos = msg.match(/line\s+(\d+)\s*\(column\s+(\d+)\)/i);
-  if (pos) {
-    const pLine = parseInt(pos[1], 10);
-    const column = parseInt(pos[2], 10);
-    const expected = (msg.match(/Expected([\s\S]*?)\bbut\b/i) || ['', ''])[1];
-    const found = (msg.match(/\bbut\s+([\s\S]*?)\s*found/i) || ['', ''])[1];
-    const at = toUser(pLine);
-    // The column was measured against the preprocessed line. It only transfers
-    // if that line came through the preprocessor untouched.
-    const same = at > 0 && pLines[pLine - 1] === uLines[at - 1];
-
-    // Ran off the end of the file: a block was never closed.
-    if (/end of input/i.test(found)) {
-      const fault = termBraceFault(user);
-      if (fault && !fault.extra) {
-        return 'The { opened on line ' + fault.line + ' is never closed.\n'
-          + 'Every { needs a matching }.'
-          + termQuoteLine(uLines, fault.line, 0);
-      }
-      return 'The file ends in the middle of something.\nA closing } or ) is missing.';
-    }
-
-    // An unbalanced bracket on the marked line.
-    if (expected.indexOf('")"') !== -1) {
-      return 'A closing ) is missing on line ' + (at || pLine) + '.\n'
-        + 'Count the brackets along the line: every ( needs its ).'
-        + termQuoteLine(uLines, at, same ? column : 0);
-    }
-
-    // The classic. The parser only complains once it reaches the NEXT
-    // statement, so the semicolon belongs at the end of the line before.
-    if (expected.indexOf('";"') !== -1) {
-      let target = at - 1;
-      while (target >= 1 && !uLines[target - 1].trim()) target--;
-      if (target >= 1) {
-        const text = uLines[target - 1];
-        const col = text.replace(/\s+$/, '').length + 1;
-        return 'Missing semicolon at the end of line ' + target + '.\n'
-          + "C ends every statement with a ';'. The compiler doesn't notice until it\n"
-          + 'reaches the next one, which is why line ' + at + ' is where it stopped.'
-          + termQuoteLine(uLines, target, col);
-      }
-    }
-
-    const extra = termBraceFault(user);
-    if (extra && extra.extra) {
-      return 'There is a } on line ' + extra.line + ' that closes nothing.'
-        + termQuoteLine(uLines, extra.line, 0);
-    }
-    return 'Line ' + (at || pLine) + " doesn't parse.\n"
-      + 'Something is wrong with the punctuation here or just above — a missing\n'
-      + '; or ) or " is almost always the cause.'
-      + termQuoteLine(uLines, at, same ? column : 0);
-  }
-
-  // "3:10 missing declarator for argument" — the short form.
-  const short = msg.match(/^\s*(\d+):(\d+)\s+([\s\S]+)$/);
-  if (short) {
-    const at = toUser(parseInt(short[1], 10));
-    return short[3].trim().replace(/\s+/g, ' ')
-      + (at ? '\n' + termQuoteLine(uLines, at, 0).replace(/^\n/, '') : '');
-  }
-  return '';
-}
-
-/* ── The warnings the interpreter never gives ──────────────────
-   Godbolt compiles with -Wall, so on a normal run real GCC has already said
-   everything below. The fallback interpreter has no warnings at all: it runs
-   the program and prints whatever comes out, which is how printf("87%\n")
-   comes out looking right while being undefined behaviour.
+/* ── The warnings the in-browser compiler never gives ──────────
+   GCC compiles with -Wall, so on a GCC run it has already said everything
+   below. xcc, the in-browser compiler, gives no warnings at all: it runs the
+   program and prints whatever comes out, which is how printf("87%\n") comes
+   out looking right while being undefined behaviour.
 
    These three are the ones that produce plausible output while being wrong,
    which is exactly the kind that goes unnoticed. */
@@ -782,7 +726,7 @@ function termLintC(src) {
  * being undefined behaviour. So the check only runs when it is the one running.
  */
 function termPushLint(session) {
-  if (!session || session.engine !== 'JSCPP' || session.linted) return;
+  if (!session || session.engine !== 'XCC' || session.linted) return;
   session.linted = true;
   const notes = (typeof termLintC === 'function') ? termLintC(session.code) : [];
   notes.forEach(n => {

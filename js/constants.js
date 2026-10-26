@@ -14,8 +14,6 @@ function getCheatStorageKey() { return sessionStorage.getItem('storageMode') ===
 /** sessionStorage key prefix used by setSessionParam / getSessionParam */
 const SESSION_PREFIX = 'cm_';
 
-/** Relative path to the JSCPP interpreter bundle (lazy-loaded on first Run) */
-const JSCPP_SRC = 'js/JSCPP.es5.min.js';
 
 /** Canonical keys for cross-route sessionStorage params */
 const SESSION_KEYS = {

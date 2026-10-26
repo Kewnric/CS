@@ -419,7 +419,9 @@ function xccCoreFactory(root) {
       const hit = this.cache.get(source);
       if (hit) { this.cache.delete(source); this.cache.set(source, hit); return hit; }
       const fs = this.fs;
-      fs.write(HOME + '/main.c', (Stdio ? Stdio.PRELUDE : '') + source);
+      // "#line 1" puts the learner's first line back at 1 for every diagnostic,
+      // and keeps working when the input probe adds a #line of its own.
+      fs.write(HOME + '/main.c', (Stdio ? Stdio.PRELUDE + '#line 1\n' : '') + source);
       fs.remove(HOME + '/a.wasm');
       let errText = '';
       const dec = new TextDecoder();
@@ -441,16 +443,10 @@ function xccCoreFactory(root) {
       return result;
     }
 
-    /* The prelude sits above the learner's line 1, so xcc's "main.c(57): ..."
-       is moved back to the line they wrote, and written the way gcc writes a
-       location ("main.c:57: error: ..."), which the terminal knows how to
-       quote. */
+    /* xcc writes a location as "main.c(57): ..."; written the way gcc writes
+       one ("main.c:57: error: ...") the terminal can quote it and link it. */
     repoint(text) {
-      const shift = Stdio ? Stdio.PRELUDE_LINES : 0;
-      return String(text || '').replace(/^main\.c\((\d+)\): ?/gm, (m, n) => {
-        const line = parseInt(n, 10) - shift;
-        return line >= 1 ? 'main.c:' + line + ': error: ' : 'main.c: error: ';
-      });
+      return String(text || '').replace(/^main\.c\((\d+)\): ?/gm, (m, n) => 'main.c:' + n + ': error: ');
     }
 
     /** Run a compiled program on stdin. Output arrives through onStdout as it
