@@ -3196,15 +3196,19 @@ function _termWireFloat(overlay) {
     if (!drag || e.pointerId !== drag.id) return;
     drag = null;
     head.classList.remove('is-dragging');
+    if (typeof winMemNote === 'function') winMemNote('runCode', overlay, win);   // the next run opens here
   };
   head.addEventListener('pointerup', end);
   head.addEventListener('pointercancel', end);
 }
 
-function _termSetFloating(overlay, on) {
+/* `auto` is a float the app chose (jumping to an error line), not the user:
+   it is not remembered for the next run. */
+function _termSetFloating(overlay, on, auto) {
   overlay.classList.toggle('is-floating', on);
   const win = overlay.querySelector('.run-code-window');
   if (!on && win) win.style.translate = '';   // back to the centre
+  if (!auto && typeof winMemNote === 'function') winMemNote('runCode', overlay, win);
   const btn = document.getElementById('run-code-min-btn');
   if (btn) {
     btn.title = on ? 'Restore: blur the page and centre the terminal' : 'Unblur the page behind the terminal';
@@ -3306,6 +3310,12 @@ function runCodeWithPiston(seedStdin) {
   _termWireFloat(overlay);
   termApplyView();
   termRememberSize(overlay.querySelector('.run-code-window'));
+  // Open the way the last terminal was left: floating or boxed, and where.
+  const was = typeof winMemGet === 'function' ? winMemGet('runCode') : null;
+  if (was) {
+    if (was.floating) _termSetFloating(overlay, true, true);
+    if (was.at) winMemPlace(overlay.querySelector('.run-code-window'), was.at);
+  }
   _termFollowKeyboard(overlay);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) _termClose(true); });
 
@@ -3586,7 +3596,7 @@ function _termJumpTo(file, line) {
   let fi = files.findIndex(f => f.name + f.ext === file);
   if (fi < 0) fi = state.activeFileIndex || 0;
   const overlay = document.getElementById('run-code-overlay');
-  if (overlay && !overlay.classList.contains('is-floating') && typeof _termSetFloating === 'function') _termSetFloating(overlay, true);
+  if (overlay && !overlay.classList.contains('is-floating') && typeof _termSetFloating === 'function') _termSetFloating(overlay, true, true);
   practiceJumpToLine(fi, line);
 }
 

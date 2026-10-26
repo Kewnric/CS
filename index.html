@@ -245,6 +245,15 @@
           </span>
           <i data-lucide="chevron-right" class="settings-item-chevron" aria-hidden="true"></i>
         </button>
+        <button onclick="closeSettingsModal(); openThemeEditor()" class="settings-item" type="button" id="settings-theme-editor-item"
+                aria-label="Theme editor">
+          <span class="settings-item-icon"><i data-lucide="palette" aria-hidden="true"></i></span>
+          <span class="settings-item-info">
+            <span class="settings-item-label">Theme Editor</span>
+            <span class="settings-item-desc">Backgrounds, text, menus, dropdowns, icons</span>
+          </span>
+          <i data-lucide="chevron-right" class="settings-item-chevron" aria-hidden="true"></i>
+        </button>
         <button onclick="toggleFullscreen()" class="settings-item" type="button" id="settings-fullscreen-item"
                 aria-label="Full screen" aria-pressed="false">
           <span class="settings-item-icon"><i data-lucide="maximize" id="settings-fullscreen-icon" aria-hidden="true"></i></span>
@@ -264,6 +273,17 @@
           <span class="settings-item-info">
             <span class="settings-item-label" id="settings-hud-label">HUD Chrome On</span>
             <span class="settings-item-desc" id="settings-hud-desc">Frame, brackets and scan lines</span>
+          </span>
+          <i data-lucide="chevron-right" class="settings-item-chevron" aria-hidden="true"></i>
+        </button>
+        <!-- The Brain note editor and the Run Code terminal reopen floating or
+             boxed, where they were left. js/window-memory.js. -->
+        <button onclick="toggleWindowMemory()" class="settings-item" type="button" id="settings-winmem-item"
+                aria-label="Remember windows" aria-pressed="true">
+          <span class="settings-item-icon"><i data-lucide="app-window" aria-hidden="true"></i></span>
+          <span class="settings-item-info">
+            <span class="settings-item-label" id="settings-winmem-label">Windows Remembered</span>
+            <span class="settings-item-desc">Note editor and Run Code reopen floating or boxed, where you left them</span>
           </span>
           <i data-lucide="chevron-right" class="settings-item-chevron" aria-hidden="true"></i>
         </button>
@@ -527,6 +547,8 @@
   <script defer src="js/program-order.js"></script>
   <script defer src="js/tree-dnd.js"></script>
   <script defer src="js/tree-folderview.js"></script>
+  <script defer src="js/window-memory.js"></script>
+  <script defer src="js/theme-editor.js"></script>
   <script defer src="js/motion.js"></script>
   <script defer src="js/undo.js"></script>
   <script defer src="js/syntax.js"></script>

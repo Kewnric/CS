@@ -2055,10 +2055,12 @@ function brainOpenEditor(node) {
   overlay.classList.add('is-anchored');
   _brainCenterEditorWindow(overlay.querySelector('.viz-comment-editor-window'));
   _brainWireEditorFloat(overlay, textarea);
-  if (carry) {
-    if (carry.floating) _brainSetEditorFloating(overlay, true, textarea);
+  // Open the way the last note editor was left: floating or boxed, and where.
+  const was = carry || (typeof winMemGet === 'function' ? winMemGet('brainNote') : null);
+  if (was) {
     const win = overlay.querySelector('.viz-comment-editor-window');
-    if (win && carry.at) win.style.translate = carry.at;
+    if (win && was.at) { if (carry) win.style.translate = carry.at; else winMemPlace(win, was.at); }
+    if (was.floating) _brainSetEditorFloating(overlay, true, textarea);   // after the move, which it records
   }
 }
 
@@ -2119,6 +2121,7 @@ function _brainWireEditorFloat(overlay, textarea) {
     if (!drag || e.pointerId !== drag.id) return;
     drag = null;
     head.classList.remove('is-dragging');
+    if (typeof winMemNote === 'function') winMemNote('brainNote', overlay, win);   // the next note opens here
   };
   head.addEventListener('pointerup', end);
   head.addEventListener('pointercancel', end);
@@ -2175,6 +2178,7 @@ function _brainSetEditorFloating(overlay, on, textarea) {
   overlay.classList.toggle('is-floating', on);
   const win = overlay.querySelector('.viz-comment-editor-window');
   if (!on && win) { win.style.translate = ''; _brainCenterEditorWindow(win); }   // back to the centre, at its size now
+  if (typeof winMemNote === 'function') winMemNote('brainNote', overlay, win);
   const btn = overlay.querySelector('#viz-comment-editor-min');
   if (btn) {
     btn.title = on ? 'Restore: blur the canvas and centre the note' : 'Unblur the canvas behind the note';

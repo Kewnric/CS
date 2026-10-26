@@ -75,6 +75,7 @@ function openSettingsModal() {
   // so the row is brought up to date on open rather than only when toggled.
   if (typeof _syncFullscreenBtn === 'function') _syncFullscreenBtn();
   if (typeof _syncHudSettingsRow === 'function') _syncHudSettingsRow();
+  if (typeof winMemPaintSetting === 'function') winMemPaintSetting();
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: modal });
 }
 
