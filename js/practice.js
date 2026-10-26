@@ -3107,6 +3107,8 @@ function _termFollowKeyboard(overlay) {
     overlay.style.top = covered ? vv.offsetTop + 'px' : '';
     overlay.style.height = covered ? vv.height + 'px' : '';
     overlay.style.bottom = covered ? 'auto' : '';
+    // The keyboard hides the results sheet too, so no room is kept for it.
+    overlay.style.paddingBottom = covered ? '8px' : '';
   };
   vv.addEventListener('resize', fit);
   vv.addEventListener('scroll', fit);

@@ -586,7 +586,8 @@ function termNudgeFont(delta) {
 const TERM_SIZE_KEY = 'ssp.termSize';
 
 function termRememberSize(win) {
-  if (!win) return;
+  // A phone gets the layout mobile.css gives it, not a size saved on a desktop.
+  if (!win || window.innerWidth <= 640) return;
   try {
     const saved = JSON.parse(localStorage.getItem(TERM_SIZE_KEY) || 'null');
     if (saved && saved.w > 300 && saved.h > 200) {

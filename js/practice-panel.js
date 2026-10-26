@@ -806,6 +806,9 @@ function _ppSheetMeasure() {
   if (h <= 0) return;                       // panel is hidden; nothing to measure
   const host = panel.closest('.practice-body') || panel;
   host.style.setProperty('--pp-collapsed-h', h + 'px');
+  // The Run Code terminal is a body-level overlay and cannot see the variable
+  // above; on a phone it needs this height to stop above the sheet.
+  document.documentElement.style.setProperty('--pp-sheet-h', h + 'px');
 }
 
 function _ppSheetSet(open) {

@@ -484,7 +484,8 @@ function xccCoreFactory(root) {
       const fs = this.fs;
       // "#line 1" puts the learner's first line back at 1 for every diagnostic,
       // and keeps working when the input probe adds a #line of its own.
-      fs.write(HOME + '/main.c', (Stdio ? Stdio.PRELUDE + Stdio.extrasFor(source) + '#line 1\n' : '') + source);
+      const full = (Stdio ? Stdio.PRELUDE + Stdio.extrasFor(source) + '#line 1\n' : '') + source;
+      fs.write(HOME + '/main.c', full);
       fs.remove(HOME + '/a.wasm');
       let errText = '';
       const dec = new TextDecoder();
@@ -494,7 +495,7 @@ function xccCoreFactory(root) {
         onStdout: sink, onStderr: sink
       });
       const out = fs.read(HOME + '/a.wasm');
-      errText = this.repoint(errText);
+      errText = this.repoint(errText, full);
       let result;
       if (r.exitCode === 0 && out && !r.crash) {
         result = { ok: true, stderr: errText, module: new WebAssembly.Module(out) };
@@ -506,10 +507,60 @@ function xccCoreFactory(root) {
       return result;
     }
 
-    /* xcc writes a location as "main.c(57): ..."; written the way gcc writes
-       one ("main.c:57: error: ...") the terminal can quote it and link it. */
-    repoint(text) {
-      return String(text || '').replace(/^main\.c\((\d+)\): ?/gm, (m, n) => 'main.c:' + n + ': error: ');
+    /* xcc's diagnostics, written the way gcc writes them, so the two compilers
+       read the same and the terminal can quote and link either:
+
+         xcc:  main.c(4): `undefinedThing' undeclared      gcc-style:
+                   int y = undefinedThing + 1;              main.c:5:13: error: 'undefinedThing' undeclared
+                           ^~~~~~~~~~~~~~                       5 |     int y = undefinedThing + 1;
+                                                                  |             ^~~~~~~~~~~~~~
+       THE NUMBER IS NOT TRUSTED. Measured: after the first error in a file,
+       xcc's line numbers run one short (undefinedThing on line 5 reported as
+       4, x on 7 as 6). The line it quotes is always the right one, so the
+       location is found by looking that text up in what was compiled --
+       nearest to the reported number, honouring any #line directive (the
+       input probe adds one) so the answer is in the learner's numbering. */
+    repoint(text, source) {
+      const src = String(source || '').split('\n');
+      // Physical line -> the line number a diagnostic would give it.
+      const logical = [];
+      let n = 1;
+      for (const line of src) {
+        const d = /^\s*#\s*line\s+(\d+)/.exec(line);
+        logical.push(d ? null : n);
+        n = d ? parseInt(d[1], 10) : n + 1;
+      }
+      const bare = t => String(t).replace(/\s+$/, '');   // a carriage return, trailing spaces
+      const locate = (quoted, reported) => {
+        let best = null;
+        const want = bare(quoted);
+        for (let i = 0; i < src.length; i++) {
+          if (logical[i] === null || bare(src[i]) !== want) continue;
+          if (best === null || Math.abs(logical[i] - reported) < Math.abs(best - reported)) best = logical[i];
+        }
+        return best;
+      };
+      const words = msg => String(msg)
+        .replace(/^`([^`']+)' expected$/, "expected '$1'")
+        .replace(/`([^`']+)'/g, "'$1'");
+      const lines = String(text || '').split('\n');
+      const out = [];
+      for (let i = 0; i < lines.length; i++) {
+        const head = /^main\.c\((\d+)\): ?(.*)$/.exec(lines[i]);
+        if (!head) { out.push(lines[i]); continue; }
+        const reported = parseInt(head[1], 10);
+        const quoted = lines[i + 1], caret = lines[i + 2];
+        const hasExcerpt = quoted !== undefined && caret !== undefined && /^\s*\^~*\s*$/.test(caret);
+        const at = hasExcerpt ? (locate(quoted, reported) || reported) : reported;
+        const col = hasExcerpt ? caret.indexOf('^') + 1 : 0;
+        out.push('main.c:' + at + (col ? ':' + col : '') + ': error: ' + words(head[2]));
+        if (hasExcerpt) {
+          out.push(String(at).padStart(5) + ' | ' + quoted);
+          out.push('      | ' + caret);
+          i += 2;
+        }
+      }
+      return out.join('\n');
     }
 
     /** Run a compiled program on stdin. Output arrives through onStdout as it
