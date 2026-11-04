@@ -187,13 +187,14 @@ function initSessionState() {
     }
   }
 
+  // A new seed per attempt: it fixes the choice order for this attempt, so a
+  // re-render (or a resume) shows the options where they were.
+  npShuffleSeed = Math.floor(Math.random() * 1e9) + 1;
+  const shuffleQuestions = npShufflePrefs().questions;
+
   activeNotebook.sections.forEach((sec, idx) => {
-    if (!reviewRecord && sec.questions) {
-      // Fisher–Yates (unbiased) — `sort(() => Math.random() - 0.5)` is not uniform.
-      for (let j = sec.questions.length - 1; j > 0; j--) {
-        const k = Math.floor(Math.random() * (j + 1));
-        [sec.questions[j], sec.questions[k]] = [sec.questions[k], sec.questions[j]];
-      }
+    if (!reviewRecord && sec.questions && shuffleQuestions) {
+      sec.questions = _npShuffled(sec.questions, Math.random);
     }
 
     const ans = {};
@@ -248,6 +249,7 @@ function initSessionState() {
       sec.questions = sec.questions.filter(q => keyMap[q]);
     }
   });
+  npApplyChoiceOrder();
 }
 
 /* ----------------------------------------------------------
@@ -561,16 +563,21 @@ function npGradeEntry(userAns, keyEntry) {
 
 function formatAnswerDisplay(answer, type, keyEntry) {
   const choices = keyEntry && keyEntry.choices ? keyEntry.choices : null;
+  // Named by the letter it was shown under, so "You answered B" points at the
+  // second option on screen even when the choices were shuffled.
   const withText = (letter) => {
     const t = choices && choices[letter] ? choices[letter] : '';
-    return t ? `${letter} — ${t}` : letter;
+    const shown = npShownLetter(keyEntry, letter);
+    return t ? `${shown} — ${t}` : shown;
   };
   if (type === 'matching') {
     const pairs = keyEntry && Array.isArray(keyEntry.pairs) ? keyEntry.pairs : [];
     return pairs.length ? pairs.map(p => `${p.left} → ${p.right}`).join(' · ') : '—';
   }
   if (!answer || (Array.isArray(answer) && answer.length === 0)) return '—';
-  if (type === 'checkbox' && Array.isArray(answer)) return answer.map(withText).join(', ');
+  if (type === 'checkbox' && Array.isArray(answer)) {
+    return [...answer].sort((a, b) => npShownLetter(keyEntry, a).localeCompare(npShownLetter(keyEntry, b))).map(withText).join(', ');
+  }
   if (type === 'truefalse') return _npNormTF(answer) === 'A' ? 'True' : _npNormTF(answer) === 'B' ? 'False' : String(answer);
   if (type === 'mcq' || type === undefined) return withText(String(answer));
   return String(answer);
@@ -910,7 +917,8 @@ function npFlushProgress() {
       status: sessionStatus,
       flags: npFlags.map(set => set ? [...set] : []),
       timeRemaining: typeof timeRemaining === 'number' ? timeRemaining : null,
-      timeLimit: timeLimit || 0
+      timeLimit: timeLimit || 0,
+      shuffleSeed: npShuffleSeed
     }));
   } catch (e) { /* quota — the attempt still works, it just will not resume */ }
 }
@@ -937,6 +945,8 @@ function npApplyProgress(d) {
         sec.questions = d.order[i].slice();   // the shuffle it was taken with
       }
     });
+    // The same seed puts every question's choices back where they were.
+    if (d.shuffleSeed) { npShuffleSeed = d.shuffleSeed; npApplyChoiceOrder(); }
     if (d.answers) sessionAnswers = d.answers;
     if (d.status) sessionStatus = d.status;
     npFlags = (d.flags || []).map(arr => new Set(arr || []));
@@ -997,6 +1007,149 @@ function npUnbindKeys() {
 
    Per device rather than per notebook, because it is about how you want to
    study rather than anything about the material. */
+/* ── Shuffle ────────────────────────────────────────────────────────────────
+   Questions were always shuffled and choices never were, with no say in
+   either. Two switches now, from the shuffle button in the top bar, kept per
+   device. Either can be flipped mid-attempt without losing anything: answers
+   are stored by question number and by the choice's own letter, so only the
+   order on screen changes. */
+const NP_SHUFFLE_KEY = 'ssp.np.shuffle';
+let npShuffleSeed = 1;
+
+function npShufflePrefs() {
+  try {
+    const v = JSON.parse(localStorage.getItem(NP_SHUFFLE_KEY) || 'null');
+    if (v && typeof v === 'object') return { questions: v.questions !== false, choices: !!v.choices };
+  } catch (e) { /* private mode, or a bad value */ }
+  return { questions: true, choices: false };
+}
+
+function _npSetShufflePrefs(p) {
+  try { localStorage.setItem(NP_SHUFFLE_KEY, JSON.stringify({ questions: !!p.questions, choices: !!p.choices })); } catch (e) { /* private mode */ }
+}
+
+/** A repeatable random sequence from a string (mulberry32 over a string hash). */
+function _npRand(seedStr) {
+  const s = String(seedStr);
+  let h = 1779033703 ^ s.length;
+  for (let i = 0; i < s.length; i++) { h = Math.imul(h ^ s.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19); }
+  let a = h >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** Fisher–Yates on a copy — `sort(() => Math.random() - 0.5)` is not uniform. */
+function _npShuffled(arr, rand) {
+  const a = (arr || []).slice();
+  for (let j = a.length - 1; j > 0; j--) {
+    const k = Math.floor(rand() * (j + 1));
+    [a[j], a[k]] = [a[k], a[j]];
+  }
+  return a;
+}
+
+/** Works out the on-screen order of every choice question's options. */
+function npApplyChoiceOrder() {
+  const on = !reviewMode && !reviewRecord && npShufflePrefs().choices;
+  (answerKeys || []).forEach((keyMap, si) => Object.keys(keyMap || {}).forEach(q => {
+    const e = keyMap[q];
+    const t = (e && e.type) || 'mcq';
+    if (!e || (t !== 'mcq' && t !== 'checkbox')) return;
+    const letters = Object.keys(e.choices || {}).sort();
+    e._order = on && letters.length > 1 ? _npShuffled(letters, _npRand(npShuffleSeed + ':' + si + ':' + q)) : letters;
+  }));
+}
+
+/** A choice question's letters in the order they are shown. */
+function npChoiceOrder(entry, sec) {
+  if (entry && Array.isArray(entry._order) && entry._order.length) return entry._order;
+  const keys = entry && entry.choices ? Object.keys(entry.choices).sort() : [];
+  return keys.length ? keys : Array.from({ length: (sec && sec.choices) || 4 }, (_, i) => String.fromCharCode(65 + i));
+}
+
+/** The letter a choice is shown under: the first option on screen is always A. */
+function npShownLetter(entry, letter) {
+  const order = entry && entry._order;
+  const i = order ? order.indexOf(letter) : -1;
+  return i >= 0 ? String.fromCharCode(65 + i) : letter;
+}
+
+function npSetQuestionShuffle(on) {
+  const p = npShufflePrefs(); p.questions = !!on; _npSetShufflePrefs(p);
+  if (activeNotebook && !reviewMode) {
+    activeNotebook.sections.forEach(sec => {
+      const qs = (sec.questions || []).slice();
+      sec.questions = on ? _npShuffled(qs, Math.random) : qs.sort((a, b) => a - b);
+    });
+    renderSidebar();
+    renderQuestion();
+    npSaveProgress();
+  }
+  _npPaintShuffleBtn();
+}
+
+function npSetChoiceShuffle(on) {
+  const p = npShufflePrefs(); p.choices = !!on; _npSetShufflePrefs(p);
+  if (activeNotebook && !reviewMode) {
+    npApplyChoiceOrder();
+    renderQuestion();
+    npSaveProgress();
+  }
+  _npPaintShuffleBtn();
+}
+
+function _npPaintShuffleBtn() {
+  const btn = document.getElementById('np-shuffle-btn');
+  if (!btn) return;
+  const p = npShufflePrefs();
+  const on = p.questions || p.choices;
+  btn.classList.toggle('is-on', on);
+  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  btn.title = `Shuffle: questions ${p.questions ? 'on' : 'off'}, choices ${p.choices ? 'on' : 'off'}`;
+}
+
+function _npShuffleMenuClose() {
+  document.getElementById('np-shuffle-menu')?.remove();
+}
+
+function npShuffleMenu(e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+  if (reviewMode) return;
+  if (document.getElementById('np-shuffle-menu')) { _npShuffleMenuClose(); return; }
+  const p = npShufflePrefs();
+  const el = document.createElement('div');
+  el.id = 'np-shuffle-menu';
+  el.className = 'timer-menu np-shuffle-menu';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-label', 'Shuffle settings');
+  el.innerHTML = `
+    <div class="timer-menu-title"><i data-lucide="shuffle" style="width:13px;height:13px;"></i> Shuffle</div>
+    <label class="np-switch-row">
+      <span><strong>Questions</strong><em>A different order in each section</em></span>
+      <input type="checkbox" class="np-switch" id="np-sh-q" ${p.questions ? 'checked' : ''} onchange="npSetQuestionShuffle(this.checked)" />
+    </label>
+    <label class="np-switch-row">
+      <span><strong>Choices</strong><em>Options move around inside each question</em></span>
+      <input type="checkbox" class="np-switch" id="np-sh-c" ${p.choices ? 'checked' : ''} onchange="npSetChoiceShuffle(this.checked)" />
+    </label>
+    <p class="timer-menu-note">Kept on this device. Answers you have given stay put.</p>`;
+  document.body.appendChild(el);
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el });
+  const anchor = document.getElementById('np-shuffle-btn');
+  const r = anchor ? anchor.getBoundingClientRect() : { left: 20, right: 20, top: 40, bottom: 60 };
+  const box = el.getBoundingClientRect();
+  el.style.left = Math.max(8, Math.min(r.right - box.width, window.innerWidth - box.width - 8)) + 'px';
+  el.style.top = (r.bottom + box.height > window.innerHeight ? Math.max(8, r.top - box.height - 6) : r.bottom + 6) + 'px';
+  setTimeout(() => document.addEventListener('click', function once(ev) {
+    if (el.contains(ev.target)) { document.addEventListener('click', once, { once: true }); return; }
+    _npShuffleMenuClose();
+  }, { once: true }), 0);
+}
+
 const NP_VOICE_KEY = 'ssp.np.autoVoice';
 
 /** The question last read, so a repaint does not read it again. */
@@ -1232,14 +1385,13 @@ function renderQuestion() {
   }
   // === CHECKBOX TYPE ===
   else if (qType === 'checkbox') {
-    // Per-question adaptive choices
-    const qChoices = correctObj && correctObj.choices ? Object.keys(correctObj.choices).sort() : [];
-    const letters = qChoices.length > 0 ? qChoices : Array.from({ length: sec.choices || 4 }, (_, i) => String.fromCharCode(65 + i));
+    // Per-question adaptive choices, in the shuffled order when that is on.
+    const letters = npChoiceOrder(correctObj, sec);
     const selectedArr = Array.isArray(selected) ? selected : [];
     const correctArr = Array.isArray(correctAns) ? correctAns : [];
     const isAnswered = sessionStatus[currentSectionIdx][currentQuestionNum] === 'answered';
 
-    bubblesContainer.innerHTML = letters.map(letter => {
+    bubblesContainer.innerHTML = letters.map((letter, pos) => {
       let cls = 'ns-bubble checkbox-mode';
       const isSelected = selectedArr.includes(letter);
 
@@ -1265,7 +1417,7 @@ function renderQuestion() {
       const onclick = (reviewMode || isAnswered) ? '' : `onclick="selectAnswer('${letter}')"`;
       return `
         <div style="display:flex; flex-direction:column; gap:0.25rem; text-align:left; width: 100%;">
-          <span style="font-size:0.75rem; font-weight:700; color:var(--text-tertiary); margin-left:0.25rem;">${letter}.</span>
+          <span style="font-size:0.75rem; font-weight:700; color:var(--text-tertiary); margin-left:0.25rem;">${String.fromCharCode(65 + pos)}.</span>
           <button class="${cls}" style="width:100%; height:auto; border-radius:var(--radius-md); padding:1rem 1.25rem 1rem 2.25rem; text-align:${npTextAlignCenter ? 'center' : 'left'}; font-size:1rem; min-height:54px; display:flex; justify-content:${npTextAlignCenter ? 'center' : 'flex-start'}; align-items:center; white-space:normal; word-wrap:break-word; overflow-wrap:break-word;" ${onclick}>
             ${choiceText ? escapeHTML(choiceText) : letter}
           </button>
@@ -1394,15 +1546,14 @@ function renderQuestion() {
   }
   // === MCQ TYPE (default) ===
   else {
-    // Per-question adaptive choices
-    const qChoices = correctObj && correctObj.choices ? Object.keys(correctObj.choices).sort() : [];
-    const letters = qChoices.length > 0 ? qChoices : Array.from({ length: sec.choices || 4 }, (_, i) => String.fromCharCode(65 + i));
+    // Per-question adaptive choices, in the shuffled order when that is on.
+    const letters = npChoiceOrder(correctObj, sec);
 
     const isAnswered = sessionStatus[currentSectionIdx][currentQuestionNum] === 'answered';
     // Normalize the stored key ('b' / ' B ') so highlight matches grading
     const correctLetter = String(correctAns == null ? '' : correctAns).trim().toUpperCase();
 
-    bubblesContainer.innerHTML = letters.map(letter => {
+    bubblesContainer.innerHTML = letters.map((letter, pos) => {
       let cls = 'ns-bubble';
       if (reviewMode) {
         cls += ' review-locked';
@@ -1425,7 +1576,7 @@ function renderQuestion() {
       const onclick = (reviewMode || (sessionStatus[currentSectionIdx][currentQuestionNum] === 'answered')) ? '' : `onclick="selectAnswer('${letter}')"`;
       return `
         <div style="display:flex; flex-direction:column; gap:0.25rem; text-align:left; width: 100%;">
-          <span style="font-size:0.75rem; font-weight:700; color:var(--text-tertiary); margin-left:0.25rem;">${letter}.</span>
+          <span style="font-size:0.75rem; font-weight:700; color:var(--text-tertiary); margin-left:0.25rem;">${String.fromCharCode(65 + pos)}.</span>
           <button class="${cls}" onpointerenter="if(event.pointerType==='mouse') npHoverSpeak(this)" style="width:100%; height:auto; border-radius:var(--radius-md); padding:1rem 1.25rem; text-align:${npTextAlignCenter ? 'center' : 'left'}; font-size:1rem; min-height:54px; display:flex; justify-content:${npTextAlignCenter ? 'center' : 'flex-start'}; align-items:center; white-space:normal; word-wrap:break-word; overflow-wrap:break-word;" ${onclick}>
             ${choiceText ? escapeHTML(choiceText) : letter}
           </button>

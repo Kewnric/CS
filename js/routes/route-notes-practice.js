@@ -10,6 +10,7 @@ function notesPracticeTemplate() {
         <div class="practice-topbar-right" style="display:flex; align-items:center; gap: 1rem;">
           <button id="np-hint-btn" onclick="showHintModal()" class="tutorial-trigger-btn" title="Show Hint" style="color: silver;"><i data-lucide="lightbulb"></i></button>
           <button id="np-align-btn" onclick="toggleNpTextAlign()" class="tutorial-trigger-btn" title="Text: Centered" style="color: silver;"><i data-lucide="align-center"></i></button>
+          <button id="np-shuffle-btn" onclick="npShuffleMenu(event)" class="tutorial-trigger-btn np-shuffle-btn" title="Shuffle" aria-label="Shuffle settings" aria-haspopup="dialog" aria-pressed="false" style="color: silver;"><i data-lucide="shuffle"></i></button>
           <button id="np-flag-btn" onclick="npToggleFlag(currentSectionIdx, currentQuestionNum)" class="tutorial-trigger-btn" title="Flag for review (F)" aria-pressed="false" style="color: silver;"><i data-lucide="flag"></i></button>
           <button id="np-cheat-btn" onclick="openCheatsheet()" class="tutorial-trigger-btn" title="Cheat sheet" style="color: silver;"><i data-lucide="book-open-check"></i></button>
           <button id="np-voice-btn" onclick="npToggleAutoVoice()" class="tutorial-trigger-btn"
@@ -126,6 +127,7 @@ function notesPracticeInit() {
   // a track left playing from a previous attempt never picks back up.
   if (typeof ostMount === 'function') ostMount();
   if (typeof _npSyncVoiceBtn === 'function') _npSyncVoiceBtn();
+  if (typeof _npPaintShuffleBtn === 'function') _npPaintShuffleBtn();
   npSyncMobileChrome();
   _npChromeMq = window.matchMedia('(max-width: 640px)');
   _npChromeSync = () => npSyncMobileChrome();
@@ -148,6 +150,7 @@ function notesPracticeDestroy() {
      coding attempt has cleared all three for a while; this one never did. */
   if (typeof closeCheatsheet === 'function') closeCheatsheet();
   if (typeof _timerMenuClose === 'function') _timerMenuClose();
+  if (typeof _npShuffleMenuClose === 'function') _npShuffleMenuClose();
   if (typeof ostStop === 'function') ostStop();
   if (typeof speechStop === 'function') speechStop();
   if (typeof timerInterval !== 'undefined' && timerInterval) { clearInterval(timerInterval); timerInterval = null; }
