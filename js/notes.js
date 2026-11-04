@@ -718,6 +718,13 @@ function _notebookLastPct(nb) {
 }
 
 /** A notebook's difficulty / level, set in Admin (parity with programs). */
+/** Opens a notebook in Notes Admin, straight into its editor. */
+function notesEditNotebook(id) {
+  if (!id || typeof setSessionParam !== 'function') return;
+  setSessionParam('adminOpenNotebook', id);
+  spaNavigate('admin-notes');
+}
+
 /** Questions across every section; 0 means the notebook is still a draft. */
 function nbQuestionTotal(nb) {
   return ((nb && nb.sections) || []).reduce((n, s) => n + ((s && s.questions) || []).length, 0);
@@ -933,7 +940,9 @@ function _buildNotebookCard(nb) {
         <span class="badge badge-neutral"><i data-lucide="rotate-ccw" style="width:12px;height:12px;margin-right:2px;"></i> ${attemptsCount} Attempt${attemptsCount !== 1 ? 's' : ''}</span>
         ${best >= 0 ? `<span class="badge ${scoreClass}"><i data-lucide="${isMastered ? 'trophy' : 'target'}" style="width:12px;height:12px;margin-right:2px;"></i> Best: ${best}%</span>` : ''}
         ${slipped ? `<span class="badge lib-last-badge" title="Your most recent attempt scored lower than your best">Last: ${lastPct}%</span>` : ''}
-        <span class="badge badge-neutral"><i data-lucide="list-checks" style="width:12px;height:12px;margin-right:2px;"></i> ${questionCount} Q${questionCount !== 1 ? 's' : ''}</span>
+        ${questionCount
+          ? `<span class="badge badge-neutral"><i data-lucide="list-checks" style="width:12px;height:12px;margin-right:2px;"></i> ${questionCount} Q${questionCount !== 1 ? 's' : ''}</span>`
+          : `<span class="badge nb-draft-badge" title="No questions yet"><i data-lucide="pencil-ruler" style="width:12px;height:12px;margin-right:2px;"></i> Draft</span>`}
         ${tHtml}
       </div>
       <p class="line-clamp-2" style="font-size:0.875rem; color:var(--text-secondary); margin-bottom:0.75rem; min-height:2.5rem;">
@@ -945,8 +954,15 @@ function _buildNotebookCard(nb) {
       </div>` : ''}
       ${lastAttempt ? `<div class="card-last-attempt"><i data-lucide="clock" style="width:11px;height:11px;"></i> Last: ${lastAttempt}</div>` : ''}
       <div style="margin-top:auto; display:flex; gap:0.5rem; padding-top:0.5rem;">
+        ${questionCount ? `
         <button onclick="event.stopPropagation(); notesSelectNotebook('${nb.id}')" class="btn btn-practice" style="flex:1;">
           <i data-lucide="play" style="width:16px;height:16px;fill:currentColor;"></i> ${isMastered ? 'Review' : attemptsCount > 0 ? 'Continue' : 'Start'}
+        </button>` : `
+        <button onclick="event.stopPropagation(); notesEditNotebook('${nb.id}')" class="btn btn-secondary" style="flex:1;" title="This notebook has no questions yet">
+          <i data-lucide="clipboard-paste" style="width:16px;height:16px;"></i> Add questions
+        </button>`}
+        <button class="btn btn-ghost" title="Edit in Notes Admin" aria-label="Edit ${escapeHTML(nb.title)}" onclick="event.stopPropagation(); notesEditNotebook('${nb.id}')" style="padding:0.5rem;">
+          <i data-lucide="pencil" style="width:16px;height:16px;"></i>
         </button>
         <button class="btn btn-ghost" title="Share Link" onclick="event.stopPropagation(); shareNotebook('${nb.id}')" style="padding:0.5rem;">
           <i data-lucide="share-2" style="width:16px;height:16px;"></i>

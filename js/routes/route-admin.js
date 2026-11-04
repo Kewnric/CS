@@ -181,8 +181,8 @@ function getNotebookFormHTML() {
         <div class="af-section-body">
           <div class="af-row-2">
             <div class="af-field af-field-wide">
-              <label class="form-label">Notebook Title</label>
-              <input id="notebook-title" oninput="notebookAdminState.title = this.value" class="form-input af-input-bold" placeholder="e.g. Calculus Quiz 1" />
+              <label class="form-label" for="notebook-title">Notebook Title <span class="af-req" id="notebook-title-req">*</span></label>
+              <input id="notebook-title" required aria-required="true" oninput="notebookAdminState.title = this.value; document.getElementById('notebook-title-req')?.classList.toggle('is-filled', !!this.value.trim())" class="form-input af-input-bold" placeholder="e.g. Calculus Quiz 1" />
             </div>
             <div class="af-field">
               <label class="form-label">Category</label>
@@ -197,12 +197,15 @@ function getNotebookFormHTML() {
             </div>
             <div class="af-field af-field-wide">
               <label class="form-label">Tags</label>
-              <div class="af-tag-input-row">
-                <input id="notebook-tag-input" onkeydown="handleNotebookTagKeydown(event)" placeholder="Type a tag and press Enter..." class="form-input" />
-                <button onclick="addNotebookTag()" class="btn btn-secondary btn-sm af-add-btn"><i data-lucide="plus" style="width:13px;height:13px;"></i> Add</button>
+              <!-- The chosen tags, and a button to a full window for picking
+                   them. Typing and suggestions crammed into this column cut
+                   the Add button off. -->
+              <div class="nb-tags-field">
+                <div id="notebook-tags-list" class="nb-tags-chips"></div>
+                <button type="button" class="btn btn-secondary btn-sm nb-tags-open" onclick="nbOpenTagsWindow()">
+                  <i data-lucide="tags" style="width:14px;height:14px;"></i> <span id="nb-tags-open-label">Add tags</span>
+                </button>
               </div>
-              <div id="notebook-tag-suggestions" class="af-tag-suggestions"></div>
-              <div id="notebook-tags-list" class="af-tags-list"></div>
             </div>
           </div>
           <div class="af-row-2" style="gap:0.75rem;">
@@ -223,7 +226,7 @@ function getNotebookFormHTML() {
           </div>
           <div class="af-field">
             <label class="form-label">Description</label>
-            <textarea id="notebook-desc" oninput="notebookAdminState.description = this.value" rows="3" class="form-textarea" placeholder="Brief overview of the notebook..."></textarea>
+            <textarea id="notebook-desc" oninput="notebookAdminState.description = this.value" rows="2" class="form-textarea af-grow" style="min-height:56px;" placeholder="Brief overview of the notebook..."></textarea>
           </div>
           <div class="af-field">
             <label class="form-label"><i data-lucide="image" class="af-label-icon"></i>Cover Image <span class="af-label-hint">(optional — shown on the Home carousel)</span></label>
@@ -905,6 +908,13 @@ function adminNotesInit() {
   if (typeof bindAdminFormListeners === 'function') bindAdminFormListeners();
   if (typeof bindAdminKeyboardShortcuts === 'function') bindAdminKeyboardShortcuts();
   GuidedTutorial.init('admin-notes');
+
+  // Arrived from a notebook card's Edit button: open that notebook.
+  const editId = typeof getSessionParam === 'function' ? getSessionParam('adminOpenNotebook') : null;
+  if (editId) {
+    clearSessionParam('adminOpenNotebook');
+    if ((state.notebooks || []).some(n => n.id === editId) && typeof openNotebookForm === 'function') openNotebookForm(editId);
+  }
 }
 
 function adminNotesDestroy() {

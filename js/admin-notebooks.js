@@ -1,5 +1,5 @@
 /* ============================================================
-   ADMIN-NOTEBOOKS.JS — Training Grounds: Notebooks (MCQ) Admin
+   ADMIN-NOTEBOOKS.JS — Notes Admin: the notebook editor
    (Answer Key Modal, Given Question Modal)
    ============================================================ */
 
@@ -211,7 +211,10 @@ function renderNotebookAdmin() {
   if (!tbody) return;
 
   if (!state.notebooks || state.notebooks.length === 0) {
-    tbody.innerHTML = '<div class="empty-state" style="padding:2rem;"><p>No notebooks inside Training Grounds.</p></div>';
+    tbody.innerHTML = `<div class="empty-state nb-list-empty">
+      <p>No notebooks yet.</p>
+      <button type="button" class="btn btn-primary btn-sm" onclick="openNotebookForm('new')"><i data-lucide="plus" style="width:14px;height:14px;"></i> Create a notebook</button>
+    </div>`;
   } else {
     // Build notebook folder picker
     const nfpOpts = [];
@@ -264,9 +267,12 @@ function renderNotebookAdmin() {
               // number that actually differs and that you edit here.
               const secs = (nb.sections || []).length;
               const qs = (nb.sections || []).reduce((n, sec) => n + ((sec.questions || []).length), 0);
-              return qs
-                ? `${qs} question${qs !== 1 ? 's' : ''}` + (secs > 1 ? ` in ${secs} sections` : '')
-                : `${secs} section${secs !== 1 ? 's' : ''} · empty`;
+              if (!qs) return `<span class="nb-row-flag is-draft" title="No questions yet, so it cannot be started">Draft</span>`;
+              // How many will not grade, so a half-finished notebook is visible
+              // from the list instead of only after opening it.
+              const missing = (nb.sections || []).reduce((n, sec) => n + validateNotebookSection(sec).errors, 0);
+              return `${qs} question${qs !== 1 ? 's' : ''}` + (secs > 1 ? ` in ${secs} sections` : '') +
+                (missing ? ` <span class="nb-row-flag is-warn" title="Questions with no correct answer set">${missing} need${missing === 1 ? 's' : ''} an answer</span>` : '');
             })()}</span>
             <span class="admin-list-item-dot" aria-hidden="true">·</span>
             <button onclick="event.stopPropagation(); openListItemFolderPicker('${nb.id}', 'notebook', this)" class="ali-folder-btn" title="Move to folder" aria-label="Move to folder">
@@ -398,10 +404,13 @@ function _openNotebookFormNow(id) {
   const nbLevel = document.getElementById('notebook-level');
   if (nbLevel) nbLevel.value = notebookAdminState.level != null ? notebookAdminState.level : '';
 
+  document.getElementById('notebook-title-req')?.classList.toggle('is-filled', !!String(notebookAdminState.title || '').trim());
+
   renderNotebookTags();
-  if (typeof renderTagSuggestions === 'function') renderTagSuggestions('notebook', 'notebook');
   renderNotebookSectionsForm();
   renderNotebookCover();
+  // The description grows with its text; size it for what was loaded.
+  setTimeout(() => { if (typeof afAutosizeAll === 'function') afAutosizeAll(document.getElementById('notebook-form-container')); }, 0);
 
   if (id === 'new') {
     setTimeout(() => document.getElementById('notebook-title')?.focus(), 60);
@@ -409,6 +418,10 @@ function _openNotebookFormNow(id) {
 }
 
 function closeNotebookForm() {
+  // Its windows belong to it: they would otherwise outlive the form and edit
+  // a notebook that is no longer open.
+  if (typeof nbCloseTagsWindow === 'function') nbCloseTagsWindow();
+  if (typeof closeBulkQuestionImport === 'function') closeBulkQuestionImport();
   notebookAdminState = null;
   window.adminIsDirty = false;
   const form = document.getElementById('notebook-form-container');
@@ -604,50 +617,248 @@ function removeNotebookCategory(nodeId) {
   });
 }
 
-function handleNotebookTagKeydown(ev) {
-  if (ev.key === 'Enter') { ev.preventDefault(); addNotebookTag(); return; }
-  if (ev.key === ',') { ev.preventDefault(); addNotebookTag(); return; }
-  if (ev.key === 'Backspace' && !ev.target.value && notebookAdminState && notebookAdminState.tags.length > 0) {
-    ev.preventDefault();
+/* ============================================================
+   TAGS — chips in the form, a full window to pick them
+   ------------------------------------------------------------
+   The form used to hold a text box, an Add button and a row of suggestions in
+   one narrow column, which cut the button off. Now the form shows only what
+   is chosen; picking happens in a window big enough to show every tag the app
+   already uses, so the same few names get reused instead of retyped.
+   Clicks apply at once (the notebook's Discard still undoes all of it).
+   ============================================================ */
+
+function renderNotebookTags() {
+  const list = document.getElementById('notebook-tags-list');
+  if (!list || !notebookAdminState) return;
+  const tags = notebookAdminState.tags || [];
+  list.innerHTML = tags.length
+    ? tags.map(t => `
+      <span class="tag nb-tag-picked">
+        ${escapeHTML(t)}
+        <button type="button" data-tag="${escapeHTML(t)}" onclick="removeNotebookTag(this.dataset.tag)" title="Remove tag" aria-label="Remove tag ${escapeHTML(t)}"><i data-lucide="x" style="width:12px;height:12px;"></i></button>
+      </span>`).join('')
+    : '<span class="nb-tags-none">No tags yet</span>';
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: list });
+  const label = document.getElementById('nb-tags-open-label');
+  if (label) label.textContent = tags.length ? `Edit tags (${tags.length})` : 'Add tags';
+}
+
+function removeNotebookTag(tag) {
+  if (!notebookAdminState) return;
+  notebookAdminState.tags = (notebookAdminState.tags || []).filter(t => t !== tag);
+  renderNotebookTags();
+  if (document.getElementById('nb-tags-overlay')) _nbTagsRender();
+  nbMarkDirty();
+}
+
+/**
+ * Every tag in use, notebooks first. Keyed without case, so "Pointers" and
+ * "pointers" are offered once, in the spelling the notebooks use most.
+ * @returns {{notebook: Array<{tag,count}>, other: Array<{tag,count,where}>}}
+ */
+function _nbTagPool() {
+  const pools = [
+    ['notebook', 'Notebooks', state.notebooks],
+    ['challenge', 'Coding', state.challenges],
+    ['snippet', 'Snippets', state.snippets],
+    ['typing', 'Typing', state.typeItems]
+  ];
+  const byKey = new Map();
+  pools.forEach(([scope, where, items]) => {
+    (items || []).forEach(it => (it && it.tags || []).forEach(raw => {
+      const tag = String(raw || '').trim();
+      if (!tag) return;
+      const key = tag.toLowerCase();
+      let e = byKey.get(key);
+      if (!e) { e = { tag, nbCount: 0, count: 0, where: new Set(), spellings: new Map() }; byKey.set(key, e); }
+      e.count++;
+      if (scope === 'notebook') e.nbCount++;
+      e.where.add(where);
+      e.spellings.set(tag, (e.spellings.get(tag) || 0) + (scope === 'notebook' ? 10 : 1));
+    }));
+  });
+  const all = [...byKey.values()].map(e => {
+    e.tag = [...e.spellings.entries()].sort((a, b) => b[1] - a[1])[0][0];
+    return e;
+  });
+  const sort = (a, b) => b.count - a.count || a.tag.localeCompare(b.tag);
+  return {
+    notebook: all.filter(e => e.nbCount > 0).sort((a, b) => b.nbCount - a.nbCount || a.tag.localeCompare(b.tag)),
+    other: all.filter(e => e.nbCount === 0).sort(sort).map(e => ({ ...e, where: [...e.where].join(', ') }))
+  };
+}
+
+let _nbTagsKeys = null;
+
+function nbOpenTagsWindow() {
+  if (!notebookAdminState) return;
+  nbCloseTagsWindow();
+  const overlay = document.createElement('div');
+  overlay.id = 'nb-tags-overlay';
+  overlay.className = 'nb-tags-overlay';
+  overlay.innerHTML = `
+    <div class="nb-tags-dialog" role="dialog" aria-modal="true" aria-labelledby="nb-tags-title">
+      <div class="nb-tags-head">
+        <div class="nb-tags-titles">
+          <h3 id="nb-tags-title"><i data-lucide="tags"></i> Tags</h3>
+          <span class="nb-tags-for">${escapeHTML((notebookAdminState.title || '').trim() || 'New notebook')}</span>
+        </div>
+        <span class="nb-tags-count" id="nb-tags-count"></span>
+        <button type="button" class="btn btn-ghost btn-sm nb-tags-x" onclick="nbCloseTagsWindow()" aria-label="Close" title="Done (Esc)"><i data-lucide="x"></i></button>
+      </div>
+      <div class="nb-tags-search">
+        <i data-lucide="search"></i>
+        <input id="nb-tags-q" type="text" autocomplete="off" spellcheck="false"
+               placeholder="Find a tag, or type a new one and press Enter (commas for several)"
+               oninput="_nbTagsRender()" onkeydown="_nbTagsSearchKey(event)" aria-label="Find or create a tag" />
+      </div>
+      <div class="nb-tags-body" id="nb-tags-body"></div>
+      <div class="nb-tags-foot">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="nbTagsClearAll()" id="nb-tags-clear">Clear all</button>
+        <span class="nb-tags-tip">Click a tag to add or remove it</span>
+        <button type="button" class="btn btn-primary btn-sm" onclick="nbCloseTagsWindow()"><i data-lucide="check"></i> Done</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('mousedown', e => { if (e.target === overlay) overlay.dataset.downOutside = '1'; });
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay && overlay.dataset.downOutside === '1') nbCloseTagsWindow();
+    delete overlay.dataset.downOutside;
+  });
+  // Ahead of the admin page's Esc, which would close the notebook behind this.
+  _nbTagsKeys = (e) => {
+    if (!document.getElementById('nb-tags-overlay')) return;
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); nbCloseTagsWindow(); }
+  };
+  window.addEventListener('keydown', _nbTagsKeys, true);
+  _nbTagsRender();
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: overlay });
+  setTimeout(() => document.getElementById('nb-tags-q')?.focus(), 40);
+}
+
+function nbCloseTagsWindow() {
+  document.getElementById('nb-tags-overlay')?.remove();
+  if (_nbTagsKeys) window.removeEventListener('keydown', _nbTagsKeys, true);
+  _nbTagsKeys = null;
+  // Focus back on the button that opened it.
+  const btn = document.querySelector('.nb-tags-open');
+  if (btn && document.getElementById('notebook-form-container')) { try { btn.focus({ preventScroll: true }); } catch (e) { /* gone */ } }
+}
+
+function _nbTagChip(tag, on, sub) {
+  return `<button type="button" class="nb-tag-chip${on ? ' is-on' : ''}" data-tag="${escapeHTML(tag)}"
+            onclick="nbTagsToggle(this.dataset.tag)" aria-pressed="${on ? 'true' : 'false'}">
+            ${on ? '<i data-lucide="check"></i>' : ''}<span>${escapeHTML(tag)}</span>${sub ? `<em>${escapeHTML(String(sub))}</em>` : ''}
+          </button>`;
+}
+
+function _nbTagsRender() {
+  const body = document.getElementById('nb-tags-body');
+  if (!body || !notebookAdminState) return;
+  const chosen = notebookAdminState.tags || [];
+  const chosenKeys = new Set(chosen.map(t => t.toLowerCase()));
+  const q = (document.getElementById('nb-tags-q')?.value || '').trim();
+  const words = q.split(',').map(w => w.trim()).filter(Boolean);
+  const last = words.length ? words[words.length - 1].toLowerCase() : '';
+  const match = (t) => !last || t.toLowerCase().includes(last);
+
+  const pool = _nbTagPool();
+  const known = new Set(pool.notebook.concat(pool.other).map(e => e.tag.toLowerCase()));
+  const fresh = words.filter(w => !known.has(w.toLowerCase()) && !chosenKeys.has(w.toLowerCase()));
+
+  let html = '';
+  if (fresh.length) {
+    html += `<div class="nb-tags-group">
+      <div class="nb-tags-group-head">New</div>
+      <div class="nb-tags-chips-wrap">
+        <button type="button" class="nb-tag-chip nb-tag-create" onclick="nbTagsCreateFromQuery()">
+          <i data-lucide="plus"></i><span>Create ${fresh.map(w => '"' + escapeHTML(w) + '"').join(', ')}</span><em>Enter</em>
+        </button>
+      </div></div>`;
+  }
+  if (chosen.length) {
+    html += `<div class="nb-tags-group">
+      <div class="nb-tags-group-head">On this notebook <span>${chosen.length}</span></div>
+      <div class="nb-tags-chips-wrap">${chosen.map(t => _nbTagChip(t, true)).join('')}</div></div>`;
+  }
+  const nb = pool.notebook.filter(e => !chosenKeys.has(e.tag.toLowerCase()) && match(e.tag));
+  html += `<div class="nb-tags-group">
+    <div class="nb-tags-group-head">Used in your notebooks <span>${nb.length}</span></div>
+    <div class="nb-tags-chips-wrap">${nb.length ? nb.map(e => _nbTagChip(e.tag, false, e.nbCount)).join('') : `<span class="nb-tags-empty">${last ? 'No notebook tag matches.' : 'No other notebook has tags yet.'}</span>`}</div></div>`;
+  const other = pool.other.filter(e => !chosenKeys.has(e.tag.toLowerCase()) && match(e.tag));
+  if (other.length) {
+    html += `<div class="nb-tags-group">
+      <div class="nb-tags-group-head">From your other libraries <span>${other.length}</span></div>
+      <div class="nb-tags-chips-wrap">${other.map(e => _nbTagChip(e.tag, false, e.where)).join('')}</div></div>`;
+  }
+  body.innerHTML = html;
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: body });
+  const count = document.getElementById('nb-tags-count');
+  if (count) count.textContent = chosen.length ? `${chosen.length} selected` : 'None selected';
+  const clear = document.getElementById('nb-tags-clear');
+  if (clear) clear.disabled = !chosen.length;
+}
+
+function nbTagsToggle(tag) {
+  if (!notebookAdminState || !tag) return;
+  const tags = notebookAdminState.tags || (notebookAdminState.tags = []);
+  const i = tags.findIndex(t => t.toLowerCase() === tag.toLowerCase());
+  if (i === -1) tags.push(tag); else tags.splice(i, 1);
+  renderNotebookTags();
+  _nbTagsRender();
+  nbMarkDirty();
+}
+
+/** Adds what is typed in the search box, each comma-separated word a tag. */
+function nbTagsCreateFromQuery() {
+  const input = document.getElementById('nb-tags-q');
+  if (!input || !notebookAdminState) return;
+  const words = input.value.split(',').map(w => w.trim().replace(/\s+/g, ' ')).filter(Boolean).map(w => w.slice(0, 40));
+  if (!words.length) return;
+  const tags = notebookAdminState.tags || (notebookAdminState.tags = []);
+  // A word that already exists somewhere is reused in that spelling.
+  const pool = _nbTagPool();
+  const spelled = new Map(pool.notebook.concat(pool.other).map(e => [e.tag.toLowerCase(), e.tag]));
+  words.forEach(w => {
+    const t = spelled.get(w.toLowerCase()) || w;
+    if (!tags.some(x => x.toLowerCase() === t.toLowerCase())) tags.push(t);
+  });
+  input.value = '';
+  renderNotebookTags();
+  _nbTagsRender();
+  nbMarkDirty();
+  input.focus();
+}
+
+function _nbTagsSearchKey(e) {
+  if (e.key === 'Enter') { e.preventDefault(); nbTagsCreateFromQuery(); }
+  else if (e.key === 'Backspace' && !e.target.value && notebookAdminState && (notebookAdminState.tags || []).length) {
+    // Empty box + Backspace takes the last tag off, as in the old field.
+    e.preventDefault();
     notebookAdminState.tags.pop();
     renderNotebookTags();
+    _nbTagsRender();
     nbMarkDirty();
   }
 }
 
-function addNotebookTag() {
-  const input = document.getElementById('notebook-tag-input');
-  if (!input) return;
-  const raw = input.value.trim();
-  if (!raw) return;
-  raw.split(',').map(v => v.trim()).filter(v => v).forEach(val => {
-    if (notebookAdminState && !notebookAdminState.tags.includes(val)) {
-      notebookAdminState.tags.push(val);
-    }
-  });
-  input.value = '';
+function nbTagsClearAll() {
+  if (!notebookAdminState || !(notebookAdminState.tags || []).length) return;
+  const before = notebookAdminState.tags.slice();
+  const owner = notebookAdminState;
+  notebookAdminState.tags = [];
   renderNotebookTags();
-  if (typeof renderTagSuggestions === 'function') renderTagSuggestions('notebook', 'notebook');
+  _nbTagsRender();
   nbMarkDirty();
-}
-
-function removeNotebookTag(tag) {
-  notebookAdminState.tags = notebookAdminState.tags.filter(t => t !== tag);
-  renderNotebookTags();
-  if (typeof renderTagSuggestions === 'function') renderTagSuggestions('notebook', 'notebook');
-  nbMarkDirty();
-}
-
-function renderNotebookTags() {
-  const list = document.getElementById('notebook-tags-list');
-  if (!list) return;
-  list.innerHTML = notebookAdminState.tags.map(t => `
-    <span class="tag">
-      ${escapeHTML(t)}
-      <button onclick="removeNotebookTag('${escapeHTML(t).replace(/'/g, "\\'")}')" title="Remove tag" aria-label="Remove tag ${escapeHTML(t)}"><i data-lucide="x" style="width:12px;height:12px;"></i></button>
-    </span>
-  `).join('');
-  lucide.createIcons({ el: list });
+  if (typeof pushUndo === 'function') {
+    pushUndo(`Cleared ${before.length} tag${before.length !== 1 ? 's' : ''}`, () => {
+      if (notebookAdminState !== owner) return;
+      notebookAdminState.tags = before;
+      renderNotebookTags();
+      if (document.getElementById('nb-tags-overlay')) _nbTagsRender();
+      nbMarkDirty();
+    });
+  }
 }
 
 /** Marks the open notebook as edited. Was the same two lines in 19 places. */
@@ -876,6 +1087,8 @@ function _updateNbValidationSummary() {
 /* Which section cards are folded. Index-based and reset per form open, so it
    never survives into a different notebook. */
 const _nbCollapsedSections = new Set();
+/* Whether "Add several at once" is unfolded, kept across re-renders. */
+let _nbBulkOpen = false;
 
 function nbToggleSection(idx) {
   syncAllNotebookSections();
@@ -992,32 +1205,28 @@ function renderNotebookSectionsForm() {
     `; }).join('');
   }
 
+  // One card for adding: a name and Add, with several-at-once folded under it.
+  // Two cards of the same size made the rarely used bulk form look as
+  // important as the normal one.
   html += `
     <div class="nb-add-section-card">
-      <div class="nb-add-section-header">
-        <i data-lucide="plus-square" style="width:14px;height:14px;color:var(--color-primary);"></i>
-        <span>Add New Section</span>
-      </div>
       <div class="nb-add-section-row">
-        <input id="new-sec-label" class="form-input" placeholder="Section name..." style="flex:1; min-width:160px;" onkeydown="if(event.key==='Enter') addNotebookSection()" />
+        <i data-lucide="plus-square" class="nb-add-section-icon"></i>
+        <input id="new-sec-label" class="form-input" placeholder="New section name (optional)" style="flex:1; min-width:160px;" onkeydown="if(event.key==='Enter') addNotebookSection()" aria-label="New section name" />
         <button onclick="addNotebookSection()" class="btn btn-primary nb-add-section-btn">
-          <i data-lucide="plus" style="width:14px;height:14px;"></i> Add
+          <i data-lucide="plus" style="width:14px;height:14px;"></i> Add Section
         </button>
       </div>
-    </div>
-
-    <div class="nb-add-section-card">
-      <div class="nb-add-section-header">
-        <i data-lucide="layers" style="width:14px;height:14px;color:var(--color-accent);"></i>
-        <span>Bulk Add Sections</span>
-        <span class="af-label-hint" style="margin-left:auto;">Format: <code>Name Count (A-E)</code> · separate with <code>|</code></span>
-      </div>
-      <div class="nb-add-section-row">
-        <input id="bulk-add-sec-input" class="form-input" placeholder="Math 10 | Science 5 (A-E)" style="flex:1;" onkeydown="if(event.key==='Enter') bulkAddNotebookSections()" />
-        <button onclick="bulkAddNotebookSections()" class="btn btn-secondary nb-add-section-btn">
-          <i data-lucide="layers" style="width:14px;height:14px;"></i> Confirm
-        </button>
-      </div>
+      <details class="nb-add-bulk"${_nbBulkOpen ? ' open' : ''} ontoggle="_nbBulkOpen = this.open">
+        <summary>Add several at once</summary>
+        <div class="nb-add-section-row">
+          <input id="bulk-add-sec-input" class="form-input" placeholder="Math 10 | Science 5 (A-E) | Reading" style="flex:1;" onkeydown="if(event.key==='Enter') bulkAddNotebookSections()" aria-label="Sections to add" />
+          <button onclick="bulkAddNotebookSections()" class="btn btn-secondary nb-add-section-btn">
+            <i data-lucide="layers" style="width:14px;height:14px;"></i> Add all
+          </button>
+        </div>
+        <span class="af-label-hint">Name, then an optional number of blank questions and choices <code>(A-E)</code>. Separate sections with <code>|</code>.</span>
+      </details>
     </div>
   </div>`;
 

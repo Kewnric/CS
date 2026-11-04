@@ -2022,6 +2022,228 @@
 }
 
 /* ============================================================
+   NOTEBOOK TAGS — chips in the form, a window to pick them
+   ============================================================ */
+.nb-tags-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.nb-tags-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  flex: 1;
+  min-width: 0;
+  min-height: 34px;
+  align-items: center;
+  padding: 0.25rem 0.4rem;
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--border-color);
+}
+.nb-tags-none { font-size: 0.78rem; color: var(--text-tertiary); }
+.nb-tags-open { flex-shrink: 0; white-space: nowrap; min-height: 34px; }
+
+.nb-tags-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.nb-tags-dialog {
+  width: min(980px, 100%);
+  height: min(86vh, 780px);
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  background: var(--bg-elevated);
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+.nb-tags-head {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem 0.75rem;
+}
+.nb-tags-titles { display: flex; flex-direction: column; min-width: 0; }
+.nb-tags-titles h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.nb-tags-titles h3 svg { width: 18px; height: 18px; color: var(--color-primary); }
+.nb-tags-for {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nb-tags-count {
+  margin-left: auto;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+.nb-tags-x { padding: 0.25rem !important; }
+.nb-tags-x svg { width: 18px; height: 18px; }
+
+.nb-tags-search {
+  position: relative;
+  margin: 0 1.25rem 0.75rem;
+}
+.nb-tags-search svg {
+  position: absolute;
+  left: 0.7rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+.nb-tags-search input {
+  width: 100%;
+  padding: 0.6rem 0.75rem 0.6rem 2.2rem;
+  font: inherit;
+  font-size: 0.9rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+}
+.nb-tags-search input:focus { outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px var(--color-primary-glow, rgba(99, 102, 241, 0.25)); }
+
+.nb-tags-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.25rem 1.25rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+.nb-tags-group-head {
+  margin-bottom: 0.5rem;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.nb-tags-group-head span {
+  margin-left: 0.3rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--bg-surface-hover);
+  font-weight: 700;
+}
+.nb-tags-chips-wrap { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.nb-tags-empty { font-size: 0.8rem; color: var(--text-tertiary); }
+
+.nb-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.7rem;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+.nb-tag-chip:hover { border-color: var(--color-primary); color: var(--text-primary); }
+.nb-tag-chip:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.nb-tag-chip em {
+  font-style: normal;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+}
+.nb-tag-chip svg { width: 13px; height: 13px; }
+.nb-tag-chip.is-on {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle, rgba(99, 102, 241, 0.15));
+  color: var(--color-primary);
+}
+.nb-tag-create { border-style: dashed; color: var(--color-primary); }
+
+.nb-tags-foot {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--border-color);
+}
+.nb-tags-foot .btn svg { width: 14px; height: 14px; }
+.nb-tags-tip { margin-right: auto; font-size: 0.72rem; color: var(--text-tertiary); }
+@media (max-width: 640px) {
+  .nb-tags-overlay { padding: 0; }
+  .nb-tags-dialog { height: 100%; border-radius: 0; }
+  .nb-tags-tip { display: none; }
+  .nb-tags-foot .btn-ghost { margin-right: auto; }
+}
+
+/* ---- Add section: one card, bulk folded under it ---- */
+.nb-add-section-icon { width: 16px; height: 16px; color: var(--color-primary); flex-shrink: 0; }
+.nb-add-bulk summary {
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  width: fit-content;
+}
+.nb-add-bulk summary:hover { color: var(--text-primary); }
+.nb-add-bulk[open] summary { margin-bottom: 0.5rem; }
+.nb-add-bulk .af-label-hint { display: block; margin-top: 0.4rem; font-size: 0.7rem; }
+.nb-add-bulk code {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.7rem;
+  padding: 0 0.25rem;
+  border-radius: 3px;
+  background: var(--bg-surface-hover);
+}
+
+/* ---- Notebook list markers ---- */
+.nb-row-flag {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.nb-row-flag.is-draft { background: var(--bg-surface-hover); color: var(--text-tertiary); border: 1px dashed var(--border-color); }
+.nb-row-flag.is-warn { background: rgba(245, 158, 11, 0.14); color: var(--color-warning); }
+.nb-list-empty { padding: 2rem 1rem; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
+.nb-list-empty .btn svg { width: 14px; height: 14px; }
+
+/* ---- Library card: a notebook with no questions yet ---- */
+.nb-draft-badge {
+  background: var(--bg-surface-hover);
+  color: var(--text-tertiary);
+  border: 1px dashed var(--border-color);
+}
+
+/* ============================================================
    PROGRAM EDITOR — STEPS
    ------------------------------------------------------------
    The editor measured 3053px in a 702px pane: four screens of scrolling with
