@@ -1,0 +1,357 @@
+/* ============================================================
+   STACK-WINDOW.CSS — the execution stack (js/stack-window.js)
+   ------------------------------------------------------------
+   Dark like the editor and the terminal it sits beside, whatever the app
+   theme: it is part of the code surface. Boxes are outlined the way the
+   course draws them on the board -- white outlines, rounded corners, index
+   numbers over (or beside) the cells -- with cyan for pointers and yellow for
+   whatever the cursor's line just wrote.
+   ============================================================ */
+.sk-win {
+  --sk-bg: #0d1117;
+  --sk-panel: #161b22;
+  --sk-panel-2: #1c2128;
+  --sk-line: #30363d;
+  --sk-ink: #e6edf3;
+  --sk-ink-2: #c9d1d9;
+  --sk-mute: #8b949e;
+  --sk-ptr: #22d3ee;
+  --sk-ptr-ink: #67e8f9;
+  --sk-hot: #facc15;
+  --sk-bad: #f85149;
+  --sk-warn: #d29922;
+  --sk-str: #a5d6ff;
+  --sk-type: #7aa2ff;
+  --sk-name: #ff7b72;
+  --sk-mono: 'Consolas', 'Courier New', monospace;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--sk-bg);
+  color: var(--sk-ink);
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+.sk-win.is-docked {
+  position: relative;
+  flex: 0 0 var(--sk-dock-w, 420px);
+  width: var(--sk-dock-w, 420px);
+  min-width: 260px;
+  border-left: 1px solid var(--sk-line);
+}
+.sk-win.is-floating {
+  position: fixed;
+  z-index: 1200;
+  min-width: 300px;
+  min-height: 220px;
+  max-width: calc(100vw - 8px);
+  max-height: calc(100vh - 8px);
+  border: 1px solid var(--sk-line);
+  border-radius: 12px;
+  overflow: hidden;
+  resize: both;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
+}
+.sk-grip {
+  position: absolute;
+  left: -5px;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  cursor: col-resize;
+  z-index: 5;
+  touch-action: none;
+}
+.sk-grip::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: transparent;
+  transition: background 0.15s ease;
+}
+.sk-grip:hover::after, .sk-win.is-resizing .sk-grip::after { background: var(--sk-ptr); }
+.sk-win.is-resizing { user-select: none; }
+
+/* ── Header ── */
+.sk-head {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  height: calc(var(--ed-toolbar-h, 38px) + 1px);
+  padding: 0 0.4rem 0 0.75rem;
+  border-bottom: 1px solid var(--sk-line);
+  background: var(--sk-bg);
+  flex-shrink: 0;
+  user-select: none;
+}
+.sk-win.is-floating .sk-head { cursor: grab; touch-action: none; }
+.sk-win.is-floating .sk-head.is-dragging { cursor: grabbing; }
+.sk-head-ico { width: 15px; height: 15px; color: var(--sk-ptr); flex-shrink: 0; }
+.sk-head-title { font: 700 0.8rem var(--sk-mono); color: var(--sk-ink); white-space: nowrap; }
+.sk-head-sp { flex: 1; }
+.sk-hbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sk-mute);
+  cursor: pointer;
+}
+.sk-hbtn:hover { background: #21262d; color: var(--sk-ink); }
+.sk-hbtn.is-on { color: var(--sk-ptr); background: rgba(34, 211, 238, 0.12); }
+.sk-hbtn svg { width: 15px; height: 15px; }
+.sk-close:hover { color: var(--sk-bad); background: rgba(248, 81, 73, 0.12); }
+
+/* ── Input for scanf ── */
+.sk-input {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--sk-line);
+  background: var(--sk-panel);
+  flex-shrink: 0;
+}
+.sk-input.hidden { display: none; }
+.sk-input label { font-size: 0.7rem; color: var(--sk-mute); }
+.sk-input code { font-family: var(--sk-mono); color: var(--sk-ink-2); }
+.sk-input textarea {
+  width: 100%;
+  min-height: 52px;
+  resize: vertical;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--sk-line);
+  border-radius: 6px;
+  background: var(--sk-bg);
+  color: var(--sk-ink);
+  font: 0.8rem/1.45 var(--sk-mono);
+}
+.sk-input textarea:focus { outline: none; border-color: var(--sk-ptr); }
+.sk-link {
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--sk-ptr-ink);
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+.sk-link:hover { text-decoration: underline; }
+
+/* ── The drawing ── */
+.sk-canvas { flex: 1; min-height: 0; overflow: auto; position: relative; }
+.sk-inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  width: fit-content;
+  min-width: 100%;
+  padding: 0.75rem 0.85rem 1.25rem 1.15rem;   /* room on the left for long arrows */
+  box-sizing: border-box;
+  transition: opacity 0.2s ease;
+}
+.sk-win.is-stale .sk-inner { opacity: 0.42; filter: grayscale(0.5); }
+.sk-blank { padding: 2.5rem 1rem; text-align: center; color: var(--sk-mute); font-size: 0.82rem; }
+
+.sk-frame, .sk-heap {
+  position: relative;
+  border: 1.5px solid rgba(230, 237, 243, 0.75);
+  border-radius: 14px;
+  background: var(--sk-panel);
+  padding: 0.5rem 0.7rem 0.8rem;
+}
+.sk-frame.is-top { border-color: var(--sk-ptr); box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.25), 0 0 20px rgba(34, 211, 238, 0.1); }
+.sk-globals { border-style: dotted; }
+.sk-heap { border-style: dashed; border-color: var(--sk-mute); background: transparent; }
+.sk-frame-head { display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 0.55rem; }
+.sk-frame-title { font: 800 0.88rem var(--sk-mono); color: var(--sk-ink); }
+.sk-frame.is-top .sk-frame-title { color: var(--sk-ptr-ink); }
+.sk-frame-sub { margin-left: auto; font-size: 0.68rem; color: var(--sk-mute); white-space: nowrap; }
+.sk-empty { font-size: 0.75rem; color: var(--sk-mute); font-style: italic; }
+.sk-vars, .sk-members { display: flex; flex-wrap: wrap; gap: 0.85rem 1.1rem; align-items: flex-start; }
+
+.sk-var { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; min-width: 0; }
+.sk-lab { white-space: nowrap; line-height: 1.1; }
+.sk-lab b { font-size: 0.82rem; font-weight: 650; color: var(--sk-ink); }
+.sk-lab i { margin-left: 0.35rem; font: normal 0.66rem var(--sk-mono); color: var(--sk-mute); }
+
+.sk-box, .sk-cell {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 34px;
+  border: 1.5px solid var(--sk-ink);
+  border-radius: 9px;
+  font: 600 0.82rem var(--sk-mono);
+  color: var(--sk-ink);
+  background: var(--sk-panel);
+  white-space: nowrap;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.sk-box { min-width: 58px; padding: 0 0.55rem; }
+.sk-cell { min-width: 34px; padding: 0 0.3rem; border-radius: 8px; }
+.sk-box.is-char, .sk-cell.is-char { color: var(--sk-str); }
+.sk-box.is-unset, .sk-cell.is-unset { color: var(--sk-mute); border-color: rgba(139, 148, 158, 0.6); border-style: dashed; }
+.sk-ptr { border-color: var(--sk-ptr); color: var(--sk-ptr-ink); }
+.sk-ptr.is-null { border-color: var(--sk-mute); color: var(--sk-mute); }
+.sk-ptr.is-dangling { border-color: var(--sk-bad); color: var(--sk-bad); }
+.sk-arrname { border-color: var(--sk-ink); color: var(--sk-ink); }
+.sk-note { max-width: 240px; font-size: 0.68rem; color: var(--sk-mute); line-height: 1.3; }
+.sk-note.is-lit { font-family: var(--sk-mono); color: var(--sk-str); white-space: pre-wrap; word-break: break-all; }
+.sk-win .is-changed {
+  border-color: var(--sk-hot) !important;
+  color: var(--sk-hot);
+  background: rgba(250, 204, 21, 0.1);
+  box-shadow: 0 0 12px rgba(250, 204, 21, 0.35);
+}
+
+/* A struct is a box with its type and name on top, like "LIST L". */
+.sk-struct {
+  position: relative;
+  z-index: 1;
+  border: 1.5px solid rgba(230, 237, 243, 0.7);
+  border-radius: 12px;
+  background: var(--sk-panel-2);
+  padding: 0.4rem 0.65rem 0.7rem;
+}
+.sk-struct-title { margin-bottom: 0.45rem; font: 700 0.8rem var(--sk-mono); color: var(--sk-name); white-space: nowrap; }
+.sk-struct-title b { color: var(--sk-type); margin-right: 0.2rem; }
+
+/* Across: the name holds the address of cell 0 and points at the cells. */
+.sk-across { display: flex; align-items: flex-end; gap: 40px; }
+.sk-cells { display: flex; align-items: flex-end; gap: 2px; position: relative; z-index: 1; }
+.sk-cellwrap { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.sk-cidx { font: 0.64rem var(--sk-mono); color: var(--sk-ink-2); min-height: 0.8rem; }
+.sk-gap { border: none !important; background: transparent; color: var(--sk-mute); min-width: 22px; box-shadow: none !important; }
+
+/* Down: an "Elements" column with the indices beside it. */
+.sk-down { align-items: flex-start; }
+.sk-col-title { font: 700 0.78rem var(--sk-mono); color: var(--sk-name); text-decoration: underline; text-underline-offset: 3px; margin-left: 1.6rem; }
+.sk-col-title i { font: normal 0.66rem var(--sk-mono); color: var(--sk-mute); text-decoration: none; display: inline-block; }
+/* A grid, so the index column is as wide as its widest label ("MAX-1") and
+   every row is as wide as the widest record. */
+.sk-col { display: grid; grid-template-columns: auto minmax(96px, max-content); position: relative; z-index: 1; }
+.sk-row { display: contents; }
+.sk-row + .sk-row > .sk-cell, .sk-row + .sk-row > .sk-rec { margin-top: -1.5px; }
+.sk-ridx { padding-right: 0.4rem; text-align: right; align-self: center; font: 0.66rem var(--sk-mono); color: var(--sk-ink-2); white-space: nowrap; }
+.sk-col .sk-cell { min-width: 96px; border-radius: 0; justify-content: center; }
+.sk-col .sk-row:first-child > .sk-cell, .sk-col .sk-row:first-child > .sk-rec { border-top-left-radius: 6px; border-top-right-radius: 6px; }
+.sk-col .sk-row:last-child > .sk-cell, .sk-col .sk-row:last-child > .sk-rec { border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; }
+.sk-col .sk-gap-row > .sk-cell { border: 1.5px solid var(--sk-ink) !important; border-radius: 0; height: 40px; letter-spacing: 0.2em; }
+
+/* A struct inside an array: one record, its fields side by side. */
+.sk-rec {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 34px;
+  padding: 0.2rem 0.55rem;
+  box-sizing: border-box;
+  border: 1.5px solid var(--sk-ink);
+  background: var(--sk-panel);
+}
+.sk-rec.is-unset { border-style: dashed; border-color: rgba(139, 148, 158, 0.6); }
+.sk-rec-box { border-radius: 8px; }
+.sk-fld { display: flex; flex-direction: column; line-height: 1.15; }
+.sk-fld > i { font: normal 0.58rem var(--sk-mono); color: var(--sk-mute); }
+.sk-fv { font: 600 0.74rem var(--sk-mono); color: var(--sk-ink); white-space: nowrap; border-radius: 3px; }
+.sk-fv.is-str { color: var(--sk-str); }
+.sk-fv.is-unset { color: var(--sk-mute); }
+.sk-fv-ptr { color: var(--sk-ptr-ink); }
+.sk-fv-ptr.is-null { color: var(--sk-mute); }
+.sk-fv.is-changed { box-shadow: none; padding: 0 0.15rem; }
+
+/* 2-D arrays: a table, row numbers down the side, columns across the top. */
+.sk-grid { border-collapse: separate; border-spacing: 2px; position: relative; z-index: 1; }
+.sk-grid th { font: normal 0.64rem var(--sk-mono); color: var(--sk-ink-2); padding: 0 0.3rem; }
+.sk-grid td.sk-cell { display: table-cell; text-align: center; vertical-align: middle; }
+.sk-grid .sk-gap-row td, .sk-grid .sk-gap-row th { color: var(--sk-mute); text-align: center; }
+
+/* The heap. */
+.sk-heap-blocks { display: flex; flex-wrap: wrap; gap: 1.1rem 2.4rem; align-items: flex-start; }
+.sk-block { display: flex; flex-direction: column; gap: 0.25rem; }
+.sk-block-tag { align-self: flex-end; font: 0.64rem var(--sk-mono); color: var(--sk-mute); white-space: nowrap; }
+.sk-block-tag b { color: var(--sk-warn); font-weight: 600; }
+.sk-block.is-leaked > .sk-struct, .sk-block.is-leaked > .sk-var { opacity: 0.7; }
+
+/* Arrows over everything, never in the way of a click. */
+.sk-arrows { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; overflow: visible; }
+.sk-arrow { fill: none; stroke: var(--sk-ptr); stroke-width: 1.6; opacity: 0.95; }
+.sk-arrow.is-arr { stroke: var(--sk-ink); opacity: 0.85; }
+.sk-arrow.is-hot { stroke: var(--sk-hot); }
+.sk-arrows.has-focus .sk-arrow { opacity: 0.18; }
+.sk-arrows.has-focus .sk-arrow.is-focus { opacity: 1; stroke-width: 2.4; }
+[data-sk-arrow] { cursor: default; }
+.sk-arrowhead { fill: var(--sk-ptr); }
+.sk-arrowhead.is-arr { fill: var(--sk-ink); }
+.sk-arrowhead.is-hot { fill: var(--sk-hot); }
+
+/* ── Footer ── */
+.sk-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.75rem;
+  padding: 0.45rem 0.75rem;
+  border-top: 1px solid var(--sk-line);
+  background: var(--sk-bg);
+  font-size: 0.72rem;
+  color: var(--sk-mute);
+  flex-shrink: 0;
+  max-height: 40%;
+  overflow: auto;
+}
+.sk-foot:empty { display: none; }
+.sk-where { color: var(--sk-ink); font-weight: 700; }
+.sk-pass { display: inline-flex; align-items: center; gap: 0.3rem; font-variant-numeric: tabular-nums; }
+.sk-pbtn {
+  width: 22px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--sk-line);
+  border-radius: 4px;
+  background: var(--sk-panel);
+  color: var(--sk-ink-2);
+  font-size: 0.6rem;
+  cursor: pointer;
+}
+.sk-pbtn:hover:not(:disabled) { border-color: var(--sk-ptr); color: var(--sk-ptr-ink); }
+.sk-pbtn:disabled { opacity: 0.35; cursor: default; }
+.sk-msg { flex-basis: 100%; line-height: 1.4; }
+.sk-msg.is-error { color: var(--sk-bad); }
+.sk-msg.is-error em { color: var(--sk-mute); font-style: normal; }
+.sk-msg.is-note { color: var(--sk-warn); }
+
+@media (prefers-reduced-motion: reduce) {
+  .sk-box, .sk-cell, .sk-inner { transition: none; }
+}
+
+/* Nested two deep: one line, in a light box. */
+.sk-compact {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0.2rem 0.5rem;
+  box-sizing: border-box;
+  border: 1.5px solid rgba(230, 237, 243, 0.55);
+  border-radius: 8px;
+  background: var(--sk-panel);
+  max-width: 100%;
+  overflow: hidden;
+}
+.sk-compact.is-unset { border-style: dashed; border-color: rgba(139, 148, 158, 0.55); }

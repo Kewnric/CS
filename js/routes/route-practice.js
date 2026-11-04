@@ -168,12 +168,14 @@ function practiceInit() {
   // Also clear any tour left over from a previous page so it can't linger.
   if (typeof GuidedTutorial !== 'undefined' && GuidedTutorial.end) GuidedTutorial.end();
   initPractice();
+  if (typeof skRestore === 'function') skRestore();   // the execution stack, if it was left open
   // The sidebar is built with the route, so its crystals go in once, here. The
   // panel puts its own back after each render — see renderPracticePanel.
   if (typeof ostMount === 'function') ostMount();
 }
 function practiceDestroy() {
   if (typeof GuidedTutorial !== 'undefined' && GuidedTutorial.end) GuidedTutorial.end();
+  if (typeof skDestroy === 'function') skDestroy();
   if (typeof _stopSavedTicker === 'function') _stopSavedTicker();
   if (typeof edCloseFind === 'function') edCloseFind();
   if (typeof closeCheatsheet === 'function') closeCheatsheet();   // it lives on <body>, not in the route

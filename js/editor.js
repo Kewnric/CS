@@ -363,6 +363,11 @@ function editorToolbarTemplate() {
       <button class="ed-tool" id="ed-zen-btn" onclick="toggleZenMode()" title="Zen mode — editor only (Ctrl+\\)" aria-label="Zen mode">
         <i data-lucide="maximize-2"></i>
       </button>
+      <!-- Memory as it stands at the cursor's line: js/stack-window.js -->
+      <button class="ed-tool" id="ed-stack-btn" onclick="skToggle()" aria-pressed="false"
+              title="Execution stack — boxes for your variables, as the program has them at the cursor's line" aria-label="Execution stack">
+        <i data-lucide="layers"></i>
+      </button>
     </div>`;
 }
 

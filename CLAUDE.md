@@ -180,6 +180,23 @@ A section's `answerKeysData` holds one record per question (text, choices *and* 
 a neighbour must not reuse its top-level `const`/`let` names (a stale + fresh pair then
 throws on load); that is why the parser's constants are `_NBI_*`.
 
+**Execution stack** (the layers button in the attempt's editor toolbar): memory as it
+stands when the program reaches the cursor's line — frames, globals, heap — redrawn a
+moment after typing stops. It does not use the compiler: a small C interpreter runs
+the program quietly in the page, because only an interpreter knows which bytes are
+`you.age`. Four files:
+- `cvm-parse.js` — lexer, preprocessor (`#include "x.h"` from the other tabs, `#define`,
+  `#if`), parser. Types are gcc x86-64 sizes, so padding and `sizeof` match Run Code.
+- `cvm-run.js` — the interpreter over one byte memory with an "ever written" bit per
+  byte (garbage draws as `?`), the C library, in-memory files, snapshots at a target
+  statement. It stops with a plain message on an index past the end, NULL, use after
+  free, or a loop past 1M steps.
+- `cvm-view.js` — `targetAt` (cursor → statement) and `describe` (snapshot → boxes).
+- `stack-window.js` — the window: docked beside the code or floating, `ssp.stackWindow`.
+All three `cvm-*` files attach to one global `CVM` and run under Node. After any change
+run `node tools/test-cvm.js`: every starter-pack reference must print exactly its
+tests' expected output (366/366), plus snapshot checks.
+
 **Starter-pack switch** (`js/coding-starter*.js`): the package button in the
 Coding Library header swaps the whole library. Whatever is live is parked in
 `state.codingStash` and the other set takes its place, so `state.challenges`

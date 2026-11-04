@@ -89,6 +89,7 @@ function practiceSetTemplate() {
 function practiceSetInit() {
   if (typeof GuidedTutorial !== 'undefined' && GuidedTutorial.end) GuidedTutorial.end();
   psetInit();
+  if (typeof skRestore === 'function') skRestore();   // the execution stack, if it was left open
   // This screen renders the OST control but never mounted it, so the player
   // showed stale state here and had nothing to resume it after an exit.
   if (typeof ostMount === 'function') ostMount();
@@ -96,6 +97,7 @@ function practiceSetInit() {
 
 function practiceSetDestroy() {
   psetDestroy();
+  if (typeof skDestroy === 'function') skDestroy();
   // All of these live on <body> or on a timer, not inside the route, so the
   // route being replaced does not take them with it. The program screen has
   // torn these down for a while; this one only did the confetti.
