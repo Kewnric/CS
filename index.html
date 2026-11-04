@@ -461,37 +461,22 @@
        filterIcons() that does not exist, and its close button targeted the OTHER
        picker's modal. The working one is built by js/icon-picker.js.) -->
 
-  <div id="answer-key-modal" class="modal-overlay hidden"
-    style="backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);background-color:rgba(0,0,0,0.4);">
-    <div class="modal-content modal-content-wide nb-modal-full">
-      <div class="modal-header-row">
-        <h2 class="modal-title" style="margin:0;">Modify Answer Key</h2>
-        <button onclick="closeAnswerKeyModal()" class="btn btn-ghost" aria-label="Close answer key modal"
-          style="padding:0.25rem;"><i data-lucide="x" style="width:24px;height:24px;" aria-hidden="true"></i></button>
-      </div>
-      <div class="modal-body-scroll" id="answer-key-content"></div>
-      <div class="modal-actions modal-footer-border">
-        <button onclick="closeAnswerKeyModal()" class="btn btn-secondary">Cancel</button>
-        <button onclick="bulkAddAnswers()" class="btn btn-secondary"
-          style="border-color:var(--color-primary);color:var(--color-primary);"><i data-lucide="layers"
-            style="width:16px;height:16px;margin-right:0.5rem;" aria-hidden="true"></i>Parse and apply bulk add</button>
-        <button onclick="saveAnswerKeyModal()" class="btn btn-primary">Save Answer Key</button>
-      </div>
-    </div>
-  </div>
-
+  <!-- One window for a section's questions AND their answers
+       (js/admin-notebook-questions.js). It replaced "Modify Given Question"
+       and "Modify Answer Key", which edited the same records in two places. -->
   <div id="given-question-modal" class="modal-overlay hidden"
     style="backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px);background-color:rgba(0,0,0,0.4);">
     <div class="modal-content modal-content-wide nb-modal-full">
       <div class="modal-header-row">
-        <h2 class="modal-title" style="margin:0;">Modify Given Question</h2>
-        <button onclick="closeGivenQuestionModal()" class="btn btn-ghost" aria-label="Close given question modal"
+        <h2 class="modal-title" style="margin:0;">Questions</h2>
+        <button onclick="nbqCancel()" class="btn btn-ghost" aria-label="Close the question editor" title="Close (Esc)"
           style="padding:0.25rem;"><i data-lucide="x" style="width:24px;height:24px;" aria-hidden="true"></i></button>
       </div>
       <div class="modal-body-scroll" id="given-question-content"></div>
       <div class="modal-actions modal-footer-border">
-        <button onclick="closeGivenQuestionModal()" class="btn btn-secondary">Cancel</button>
-        <button onclick="saveGivenQuestionModal()" class="btn btn-primary">Save Given Questions</button>
+        <span class="nbq-foot-keys"><kbd>Ctrl</kbd>+<kbd>S</kbd> save &middot; <kbd>Esc</kbd> close</span>
+        <button onclick="nbqCancel()" class="btn btn-secondary">Cancel</button>
+        <button onclick="nbqSave()" class="btn btn-primary"><i data-lucide="check" style="width:16px;height:16px;margin-right:0.35rem;" aria-hidden="true"></i>Save questions</button>
       </div>
     </div>
   </div>
@@ -628,6 +613,7 @@
   <script defer src="js/admin-snippets.js"></script>
   <script defer src="js/notebook-import.js"></script>
   <script defer src="js/admin-notebooks.js"></script>
+  <script defer src="js/admin-notebook-questions.js"></script>
   <script defer src="js/admin-sets.js"></script>
   <script defer src="js/admin-cards.js"></script>
   <script defer src="js/admin-steps.js"></script>

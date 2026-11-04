@@ -168,6 +168,18 @@ against the *whole* file so a folded partner is not mismatched), `editor-fx.js`
   device in `ssp.typeConfig`.
 - **Wings** (`js/wings/`) — newer libraries sharing a schema-driven core.
 
+**Notebook editor** (route `admin-notes`), three files:
+- `admin-notebooks.js` — the list, the form, tags window, sections, Import window.
+- `admin-notebook-questions.js` — the question model (`nbApplyTypeDefaults`,
+  `nbCommitQuestions`) and the one Edit Questions window, where answers are marked
+  beside the choices. It edits a draft; the section changes only on Save.
+- `notebook-import.js` — the paste parser and the copyable AI format. No DOM; test it
+  with `node tools/test-notebook-import.js` after any change.
+A section's `answerKeysData` holds one record per question (text, choices *and* answer);
+`questions` is just `[1..n]` beside it. Files that may be cached next to an older copy of
+a neighbour must not reuse its top-level `const`/`let` names (a stale + fresh pair then
+throws on load); that is why the parser's constants are `_NBI_*`.
+
 **Starter-pack switch** (`js/coding-starter*.js`): the package button in the
 Coding Library header swaps the whole library. Whatever is live is parked in
 `state.codingStash` and the other set takes its place, so `state.challenges`
