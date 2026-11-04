@@ -67,6 +67,13 @@ function initNotesPracticeSession() {
     spaNavigate('study');
     return;
   }
+  // However it was reached (queue, resume, preview), an empty draft has
+  // nothing to show: go back and say why rather than open a blank attempt.
+  if (typeof nbQuestionTotal === 'function' && !nbQuestionTotal(origNb)) {
+    if (typeof toast === 'function') toast('"' + (origNb.title || 'This notebook') + '" has no questions yet.', { type: 'warning' });
+    spaNavigate('study');
+    return;
+  }
 
   // Clone to avoid mutating state when shuffling questions
   activeNotebook = JSON.parse(JSON.stringify(origNb));

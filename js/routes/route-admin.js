@@ -208,7 +208,7 @@ function getNotebookFormHTML() {
           <div class="af-row-2" style="gap:0.75rem;">
             <div class="af-field" style="flex:1;">
               <label class="form-label"><i data-lucide="signal" class="af-label-icon"></i>Difficulty</label>
-              <select id="notebook-difficulty" class="form-select" aria-label="Notebook difficulty" onchange="if(notebookAdminState) { notebookAdminState.difficulty = this.value || null; window.notebookIsDirty = true; setSaveStatus('notebook-save-status','unsaved'); }">
+              <select id="notebook-difficulty" class="form-select" aria-label="Notebook difficulty" onchange="if(notebookAdminState) { notebookAdminState.difficulty = this.value || null; window.adminIsDirty = true; setSaveStatus('notebook-save-status','unsaved'); }">
                 <option value="">None</option>
                 <option value="easy">Easy</option>
                 <option value="medium">Medium</option>
@@ -218,7 +218,7 @@ function getNotebookFormHTML() {
             <div class="af-field" style="flex:1;">
               <label class="form-label"><i data-lucide="trending-up" class="af-label-icon"></i>Level <span class="af-label-hint">(1–100 — orders the Library grid)</span></label>
               <input id="notebook-level" type="number" min="1" max="100" step="1" class="form-input" placeholder="1–100"
-                     oninput="if(notebookAdminState) { const v = parseInt(this.value, 10); notebookAdminState.level = (v > 0 ? Math.min(v, 100) : null); window.notebookIsDirty = true; setSaveStatus('notebook-save-status','unsaved'); }" />
+                     oninput="if(notebookAdminState) { const v = parseInt(this.value, 10); notebookAdminState.level = (v > 0 ? Math.min(v, 100) : null); window.adminIsDirty = true; setSaveStatus('notebook-save-status','unsaved'); }" />
             </div>
           </div>
           <div class="af-field">

@@ -1218,18 +1218,74 @@
   height: auto !important;
 }
 
+/* Import leads and takes the wider column; the two editors share the rest of
+   the same row. On an empty section Import is the only thing worth doing, so
+   it gets the whole first row. */
 .nb-section-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1.4fr 1fr 1fr;
   gap: 0.5rem;
+}
+.nb-section-actions.is-empty { grid-template-columns: 1fr 1fr; }
+.nb-section-actions.is-empty .nb-section-import-btn {
+  grid-column: 1 / -1;
+  min-height: 46px;
+  font-size: 0.9rem;
 }
 .nb-section-action-btn {
   border: 1px solid var(--border-color);
   background: var(--bg-surface-hover);
   font-size: 0.8125rem;
+  justify-content: center;
 }
+.nb-section-action-btn.btn-primary {
+  border-color: transparent;
+  background: var(--color-primary);
+}
+.nb-section-action-btn.btn-primary:hover { filter: brightness(1.08); }
+.nb-section-action-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 @media (max-width: 600px) {
-  .nb-section-actions { grid-template-columns: 1fr; }
+  .nb-section-actions, .nb-section-actions.is-empty { grid-template-columns: 1fr; }
+}
+
+.nb-section-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--color-primary-subtle, rgba(99, 102, 241, 0.15));
+  color: var(--color-primary);
+  font-size: 0.7rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+.nb-section-card-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.nb-sec-empty-note {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.nb-ak-qpreview {
+  flex: 1;
+  min-width: 0;
+  margin-left: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
 }
 
 .nb-add-section-card {

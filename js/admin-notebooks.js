@@ -358,10 +358,12 @@ function _openNotebookFormNow(id) {
   catSelect.innerHTML = `<option value="">Uncategorized</option>` + nbFpOpts.map(f => `<option value="${escapeHTML(f.id)}">${escapeHTML(f.label)}</option>`).join('');
 
   if (id === 'new') {
-    const firstNbFolder = state.nodes.find(n => n.type === 'folder' && n.scope === 'notebook');
+    // Always Uncategorized: it used to take the first notebook folder, so a new
+    // notebook landed somewhere you never picked. It opens with one empty
+    // section, so Import is one click away instead of two.
     notebookAdminState = {
-      id: 'new', title: '', parentId: firstNbFolder ? firstNbFolder.id : null,
-      icon: 'book', tags: [], description: '', sections: []
+      id: 'new', title: '', parentId: null,
+      icon: 'book', tags: [], description: '', sections: [nbNewSection('Section 1')]
     };
   } else {
     const existing = state.notebooks.find(n => n.id === id);
@@ -382,15 +384,13 @@ function _openNotebookFormNow(id) {
     renderCustomSelect('notebook-category-cs', _nbFpOpts, notebookAdminState.parentId || '', (val) => {
       notebookAdminState.parentId = val || null;
       document.getElementById('notebook-category').value = val;
-      window.adminIsDirty = true;
-      if (typeof setSaveStatus === 'function') setSaveStatus('notebook-save-status', 'unsaved');
+      nbMarkDirty();
     }, 'Select category...');
   }
 
   renderIconDropdown('notebook-icon-picker-container', notebookAdminState.icon || 'book', (newIcon) => {
     notebookAdminState.icon = newIcon;
-    window.adminIsDirty = true;
-    if (typeof setSaveStatus === 'function') setSaveStatus('notebook-save-status', 'unsaved');
+    nbMarkDirty();
   });
   document.getElementById('notebook-desc').value = notebookAdminState.description || '';
   const nbDiff = document.getElementById('notebook-difficulty');
@@ -454,8 +454,7 @@ function handleNotebookCoverUpload(input) {
   reader.onload = (e) => {
     _downscaleImage(e.target.result, 960, 0.82, (dataUrl) => {
       notebookAdminState.coverImage = dataUrl;
-      window.adminIsDirty = true;
-      if (typeof setSaveStatus === 'function') setSaveStatus('notebook-save-status', 'unsaved');
+      nbMarkDirty();
       renderNotebookCover();
     });
   };
@@ -465,8 +464,7 @@ function handleNotebookCoverUpload(input) {
 function removeNotebookCover() {
   if (!notebookAdminState) return;
   delete notebookAdminState.coverImage;
-  window.adminIsDirty = true;
-  if (typeof setSaveStatus === 'function') setSaveStatus('notebook-save-status', 'unsaved');
+  nbMarkDirty();
   renderNotebookCover();
 }
 
@@ -566,8 +564,9 @@ function saveNotebookForm(opts = {}) {
  */
 function nbPreviewNotebook() {
   if (!notebookAdminState) return;
-  if (!(notebookAdminState.sections || []).length) {
-    showMessage('Nothing to preview', 'Add a section with at least one question first.', true);
+  syncAllNotebookSections();
+  if (!nbQuestionTotal(notebookAdminState)) {
+    showMessage('Nothing to preview', 'Add at least one question first. Import Questions is the quickest way.', true);
     return;
   }
   if (saveNotebookForm({ silent: true, force: true }) === false) return;
@@ -612,8 +611,7 @@ function handleNotebookTagKeydown(ev) {
     ev.preventDefault();
     notebookAdminState.tags.pop();
     renderNotebookTags();
-    window.adminIsDirty = true;
-    if (typeof setSaveStatus === 'function') setSaveStatus('notebook-save-status', 'unsaved');
+    nbMarkDirty();
   }
 }
 
@@ -630,16 +628,14 @@ function addNotebookTag() {
   input.value = '';
   renderNotebookTags();
   if (typeof renderTagSuggestions === 'function') renderTagSuggestions('notebook', 'notebook');
-  window.adminIsDirty = true;
-  if (typeof setSaveStatus === 'function') setSaveStatus('notebook-save-status', 'unsaved');
+  nbMarkDirty();
 }
 
 function removeNotebookTag(tag) {
   notebookAdminState.tags = notebookAdminState.tags.filter(t => t !== tag);
   renderNotebookTags();
   if (typeof renderTagSuggestions === 'function') renderTagSuggestions('notebook', 'notebook');
-  window.adminIsDirty = true;
-  if (typeof setSaveStatus === 'function') setSaveStatus('notebook-save-status', 'unsaved');
+  nbMarkDirty();
 }
 
 function renderNotebookTags() {
@@ -654,22 +650,48 @@ function renderNotebookTags() {
   lucide.createIcons({ el: list });
 }
 
+/** Marks the open notebook as edited. Was the same two lines in 19 places. */
+function nbMarkDirty() {
+  window.adminIsDirty = true;
+  if (typeof setSaveStatus === 'function') setSaveStatus('notebook-save-status', 'unsaved');
+}
+
+/**
+ * An empty section. It used to arrive with five blank questions, so a notebook
+ * you had not touched yet already showed "5 blocking issues".
+ * @param {string} label
+ * @param {number} [count] blank questions to start with (Bulk Add asks for some)
+ * @param {number} [choices] choices per blank question
+ */
+function nbNewSection(label, count, choices) {
+  const sec = {
+    id: 'sec_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+    label: label || 'Section',
+    questions: [],
+    answerKey: '',
+    answerKeysData: []
+  };
+  const n = Math.max(0, Math.min(200, count || 0));
+  if (choices) sec.choices = choices;
+  sec.questions = Array.from({ length: n }, (_, i) => i + 1);
+  sec.answerKeysData = sec.questions.map(q => nbBlankQuestion(q, 'mcq', choices));
+  return sec;
+}
+
 function addNotebookSection() {
   syncAllNotebookSections();
   const labelEl = document.getElementById('new-sec-label');
-  const label = labelEl ? (labelEl.value.trim() || 'New Section') : 'New Section';
+  const typed = labelEl ? labelEl.value.trim() : '';
+  const label = typed || 'Section ' + (notebookAdminState.sections.length + 1);
 
-  notebookAdminState.sections.push({
-    id: 'sec_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
-    label: label,
-    questions: [1, 2, 3, 4, 5],
-    answerKey: '',
-    answerKeysData: []
-  });
+  notebookAdminState.sections.push(nbNewSection(label));
   if (labelEl) labelEl.value = '';
   renderNotebookSectionsForm();
-  window.adminIsDirty = true;
-  if (typeof setSaveStatus === 'function') setSaveStatus('notebook-save-status', 'unsaved');
+  nbMarkDirty();
+  // Land on the new card, ready to import into.
+  const cards = document.querySelectorAll('.nb-section-card');
+  const last = cards[cards.length - 1];
+  if (last) last.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 // BUG-23 FIX applied inside this function (.slice instead of .substr)
@@ -696,28 +718,22 @@ function bulkAddNotebookSections() {
       label = part.replace(choiceMatch[0], '').trim();
     }
 
-    // Extract count e.g. 10
+    // Extract count e.g. 10. No number means an empty section, like Add.
     const countMatch = label.match(/\d+$/);
-    let count = 5;
+    let count = 0;
     if (countMatch) {
       count = parseInt(countMatch[0]);
       label = label.replace(/\d+$/, '').trim();
     }
 
-    notebookAdminState.sections.push({
-      id: 'sec_' + Date.now() + Math.random().toString(36).slice(2, 7),
-      label: label || 'Section',
-      choices: choices,
-      questions: Array.from({ length: count }, (_, i) => i + 1),
-      answerKey: '',
-      answerKeysData: []
-    });
+    // The blank questions are built with the asked-for number of choices.
+    // "(A-E)" used to set sec.choices only, and every question still got A-D.
+    notebookAdminState.sections.push(nbNewSection(label || 'Section', count, choices));
   });
   const bulkInput = document.getElementById('bulk-add-sec-input');
   if (bulkInput) bulkInput.value = '';
   renderNotebookSectionsForm();
-  window.adminIsDirty = true;
-  if (typeof setSaveStatus === 'function') setSaveStatus('notebook-save-status', 'unsaved');
+  nbMarkDirty();
 }
 
 /**
@@ -735,8 +751,7 @@ function removeNotebookSection(idx) {
     const snapshot = JSON.parse(JSON.stringify(sec));
     notebookAdminState.sections.splice(idx, 1);
     renderNotebookSectionsForm();
-    window.adminIsDirty = true;
-    if (typeof setSaveStatus === 'function') setSaveStatus('notebook-save-status', 'unsaved');
+    nbMarkDirty();
     if (typeof pushUndo === 'function') {
       pushUndo(`Removed section "${snapshot.label || 'Untitled'}"`, () => {
         notebookAdminState.sections.splice(Math.min(idx, notebookAdminState.sections.length), 0, snapshot);
@@ -766,8 +781,7 @@ function duplicateNotebookSection(idx) {
   copy.label = (sec.label || 'Section') + ' (copy)';
   notebookAdminState.sections.splice(idx + 1, 0, copy);
   renderNotebookSectionsForm();
-  window.adminIsDirty = true;
-  if (typeof setSaveStatus === 'function') setSaveStatus('notebook-save-status', 'unsaved');
+  nbMarkDirty();
   if (typeof toast === 'function') toast('Section duplicated.', { type: 'success' });
 }
 
@@ -809,6 +823,8 @@ function validateNotebookSection(sec) {
 
   return {
     ok: issues.length === 0,
+    // An empty section is a draft, not a mistake: nothing to grade yet.
+    empty: qNums.length === 0,
     errors: issues.filter(i => i.level === 'error').length,
     warns: issues.filter(i => i.level === 'warn').length,
     issues
@@ -817,6 +833,9 @@ function validateNotebookSection(sec) {
 
 function _nbSecValidationInner(sec) {
   const v = validateNotebookSection(sec);
+  if (v.empty && v.ok) {
+    return `<span class="nb-sec-empty-note"><i data-lucide="inbox" style="width:13px;height:13px;"></i> No questions yet. Import them, or add them one by one.</span>`;
+  }
   if (v.ok) {
     return `<span style="display:inline-flex;align-items:center;gap:0.35rem;color:var(--color-success);font-size:0.72rem;font-weight:600;"><i data-lucide="check-circle-2" style="width:13px;height:13px;"></i> Answer key complete</span>`;
   }
@@ -829,15 +848,19 @@ function _nbSecValidationInner(sec) {
 
 function _notebookValidationSummary() {
   const secs = (notebookAdminState && notebookAdminState.sections) || [];
-  let errors = 0, warns = 0;
-  secs.forEach(s => { const v = validateNotebookSection(s); errors += v.errors; warns += v.warns; });
-  return { errors, warns };
+  let errors = 0, warns = 0, empty = 0;
+  secs.forEach(s => { const v = validateNotebookSection(s); errors += v.errors; warns += v.warns; if (v.empty) empty++; });
+  return { errors, warns, empty, total: secs.length };
 }
 
 function _nbValidationSummaryInner() {
-  const { errors, warns } = _notebookValidationSummary();
+  const { errors, warns, empty, total } = _notebookValidationSummary();
+  if (errors === 0 && warns === 0 && empty === total) {
+    return `<span class="nb-sec-empty-note" style="font-size:0.78rem;"><i data-lucide="inbox" style="width:15px;height:15px;"></i> No questions yet. Start with Import Questions.</span>`;
+  }
   if (errors === 0 && warns === 0) {
-    return `<span style="display:inline-flex;align-items:center;gap:0.4rem;color:var(--color-success);font-size:0.78rem;font-weight:600;"><i data-lucide="shield-check" style="width:15px;height:15px;"></i> All sections graded and ready</span>`;
+    const emptyNote = empty ? ` <span style="color:var(--text-tertiary);font-weight:500;">· ${empty} empty section${empty !== 1 ? 's' : ''}</span>` : '';
+    return `<span style="display:inline-flex;align-items:center;gap:0.4rem;color:var(--color-success);font-size:0.78rem;font-weight:600;"><i data-lucide="shield-check" style="width:15px;height:15px;"></i> ${empty ? 'Every question has an answer' : 'All sections graded and ready'}${emptyNote}</span>`;
   }
   const parts = [];
   if (errors) parts.push(`<span style="color:var(--color-danger);font-weight:700;">${errors} blocking issue${errors !== 1 ? 's' : ''}</span>`);
@@ -927,8 +950,9 @@ function renderNotebookSectionsForm() {
                   aria-expanded="${collapsed ? 'false' : 'true'}" aria-label="${collapsed ? 'Expand' : 'Collapse'} section ${idx + 1}">
             <i data-lucide="chevron-${collapsed ? 'right' : 'down'}"></i>
           </button>
-          <h4 class="nb-section-card-title">Section ${idx + 1}</h4>
-          <div class="nb-section-card-meta">${(sec.questions || []).length} question${(sec.questions || []).length !== 1 ? 's' : ''} · <span class="nb-type-badge" style="--nb-badge:${badge.color};">${escapeHTML(typeSummary || badge.label)}</span></div>
+          <span class="nb-section-num" aria-hidden="true">${idx + 1}</span>
+          <h4 class="nb-section-card-title" id="nb-sec-title-${idx}">${escapeHTML(sec.label || 'Section ' + (idx + 1))}</h4>
+          <div class="nb-section-card-meta">${(sec.questions || []).length} question${(sec.questions || []).length !== 1 ? 's' : ''}${akData.length ? ` · <span class="nb-type-badge" style="--nb-badge:${badge.color};">${escapeHTML(typeSummary || badge.label)}</span>` : ''}</div>
           <button onclick="syncAllNotebookSections(); duplicateNotebookSection(${idx})" class="btn btn-ghost btn-sm nb-section-dup" title="Duplicate section" aria-label="Duplicate section ${idx + 1}">
             <i data-lucide="copy" style="width:14px;height:14px;"></i>
           </button>
@@ -939,31 +963,27 @@ function renderNotebookSectionsForm() {
         <div class="nb-section-card-body${collapsed ? ' hidden' : ''}">
           <div class="nb-section-fields">
             <div class="af-field" style="flex:1; min-width:160px;">
-              <label class="form-label">Label</label>
+              <label class="form-label" for="nb-sec-label-${idx}">Section name</label>
               <input id="nb-sec-label-${idx}" class="form-input nb-input-compact" value="${escapeHTML(sec.label || '')}" oninput="syncNotebookSection(${idx})" placeholder="e.g. Math, Reading..." />
             </div>
-            <div class="af-field" style="width:120px;">
-              <label class="form-label">Type</label>
-              <!-- Was a readonly <input>: it looked editable, took a click and did
-                   nothing. It is a derived summary, so it reads as one now. -->
-              <div class="nb-type-readout" style="--nb-badge:${badge.color};" title="Auto-detected from the answer key">
-                ${escapeHTML(typeSummary || badge.label)}
-              </div>
-            </div>
-            <div class="af-field" style="width:100px;">
-              <label class="form-label">Questions</label>
-              <input id="nb-sec-count-${idx}" type="number" min="1" max="200" class="form-input nb-input-compact" value="${(sec.questions || []).length}" oninput="syncNotebookSection(${idx})" />
+            <div class="af-field" style="width:110px;">
+              <label class="form-label" for="nb-sec-count-${idx}">Questions</label>
+              <input id="nb-sec-count-${idx}" type="number" min="0" max="200" class="form-input nb-input-compact" value="${(sec.questions || []).length}" oninput="syncNotebookSection(${idx})" title="Raise it for blank questions, lower it to drop the last ones" />
             </div>
           </div>
-          <div class="nb-section-actions">
-            <button onclick="openGivenQuestionModal(${idx})" class="btn btn-secondary nb-section-action-btn">
-              <i data-lucide="file-text" style="width:16px;height:16px;"></i> Modify Given Question
-            </button>
-            <button onclick="openAnswerKeyModal(${idx})" class="btn btn-secondary nb-section-action-btn">
-              <i data-lucide="key" style="width:16px;height:16px;"></i> Modify Answer Key
-            </button>
-            <button onclick="openBulkQuestionImport(${idx})" class="btn btn-secondary nb-section-action-btn">
+          <!-- Import is the way most sections get filled, so it leads. The two
+               editors sit beside it in one row rather than wrapping onto a
+               second line on their own. -->
+          <div class="nb-section-actions${(sec.questions || []).length ? '' : ' is-empty'}">
+            <button onclick="openBulkQuestionImport(${idx})" class="btn btn-primary nb-section-action-btn nb-section-import-btn">
               <i data-lucide="clipboard-paste" style="width:16px;height:16px;"></i> Import Questions
+            </button>
+            <button onclick="openGivenQuestionModal(${idx})" class="btn btn-secondary nb-section-action-btn">
+              <i data-lucide="${(sec.questions || []).length ? 'file-pen-line' : 'plus'}" style="width:16px;height:16px;"></i> ${(sec.questions || []).length ? 'Edit Questions' : 'Add Manually'}
+            </button>
+            <button onclick="openAnswerKeyModal(${idx})" class="btn btn-secondary nb-section-action-btn"
+                    ${(sec.questions || []).length ? '' : 'disabled title="Add questions first"'}>
+              <i data-lucide="key" style="width:16px;height:16px;"></i> Answer Key
             </button>
           </div>
           <div id="nb-sec-validation-${idx}" class="nb-sec-validation" style="margin-top:0.5rem; display:flex; flex-direction:column; gap:0.2rem;">${_nbSecValidationInner(sec)}</div>
@@ -1032,8 +1052,7 @@ function nbSectionDrop(e, idx) {
   arr.splice(idx, 0, moved);
   _nbSectionDragIdx = -1;
   renderNotebookSectionsForm();
-  window.adminIsDirty = true;
-  if (typeof setSaveStatus === 'function') setSaveStatus('notebook-save-status', 'unsaved');
+  nbMarkDirty();
 }
 
 function nbSectionDragEnd(e) {
@@ -1050,7 +1069,11 @@ function syncNotebookSection(idx) {
   const labelEl = document.getElementById('nb-sec-label-' + idx);
   const choicesEl = document.getElementById('nb-sec-choices-' + idx);
   const countEl = document.getElementById('nb-sec-count-' + idx);
-  if (labelEl) sec.label = labelEl.value;
+  if (labelEl) {
+    sec.label = labelEl.value;
+    const titleEl = document.getElementById('nb-sec-title-' + idx);
+    if (titleEl) titleEl.textContent = sec.label.trim() || 'Section ' + (idx + 1);
+  }
   if (choicesEl) sec.choices = parseInt(choicesEl.value) || 4;
   if (countEl) {
     // The field accepted anything: 999 built 999 questions, -5 silently wiped
@@ -1078,11 +1101,32 @@ function syncNotebookSection(idx) {
     // Truncate/extend the records with it, so Modify Given and Modify Answer
     // Key both show exactly this many questions.
     nbNormalizeSection(sec);
+    // Crossing zero changes what the action row offers; update it in place so
+    // the field keeps focus.
+    if ((prev === 0) !== (count === 0)) _nbPaintSectionActions(idx, count);
   }
   // Live-update validation without a full re-render (keeps input focus).
   const vEl = document.getElementById('nb-sec-validation-' + idx);
   if (vEl) { vEl.innerHTML = _nbSecValidationInner(sec); if (typeof lucide !== 'undefined') lucide.createIcons({ el: vEl }); }
   if (typeof _updateNbValidationSummary === 'function') _updateNbValidationSummary();
+}
+
+/** Enables Answer Key and relabels the editor button once a section has questions. */
+function _nbPaintSectionActions(idx, count) {
+  const card = document.querySelector(`.nb-section-card[data-idx="${idx}"]`);
+  const row = card && card.querySelector('.nb-section-actions');
+  if (!row) return;
+  row.classList.toggle('is-empty', !count);
+  const btns = row.querySelectorAll('.nb-section-action-btn');
+  const edit = btns[1], key = btns[2];
+  if (edit) {
+    edit.innerHTML = `<i data-lucide="${count ? 'file-pen-line' : 'plus'}" style="width:16px;height:16px;"></i> ${count ? 'Edit Questions' : 'Add Manually'}`;
+    if (typeof lucide !== 'undefined') lucide.createIcons({ el: edit });
+  }
+  if (key) {
+    key.disabled = !count;
+    key.title = count ? '' : 'Add questions first';
+  }
 }
 
 function syncAllNotebookSections() {
@@ -1111,8 +1155,13 @@ function syncAllNotebookSections() {
    ============================================================ */
 const NB_TYPES = ['mcq', 'checkbox', 'text', 'matching', 'truefalse'];
 
-function nbBlankQuestion(qNum, type) {
+function nbBlankQuestion(qNum, type, nChoices) {
   const d = { qNum, type: type || 'mcq', question: '', hint: '', image: '', explanation: '' };
+  const n = Math.max(2, Math.min(8, nChoices || 4));
+  if (d.type === 'mcq' || d.type === 'checkbox') {
+    d.choices = {};
+    for (let i = 0; i < n; i++) d.choices[String.fromCharCode(65 + i)] = '';
+  }
   nbApplyTypeDefaults(d);
   return d;
 }
@@ -1164,7 +1213,7 @@ function nbNormalizeSection(sec) {
   const byNum = {};
   (sec.answerKeysData || []).forEach(d => { if (d && d.qNum != null) byNum[+d.qNum] = d; });
   const dropped = Object.keys(byNum).filter(n => +n > count || +n < 1).length;
-  sec.answerKeysData = sec.questions.map(q => nbApplyTypeDefaults(byNum[q] || nbBlankQuestion(q)));
+  sec.answerKeysData = sec.questions.map(q => nbApplyTypeDefaults(byNum[q] || nbBlankQuestion(q, 'mcq', sec.choices)));
   return dropped;
 }
 
@@ -1396,8 +1445,7 @@ function confirmBulkQuestionImport(idx) {
   const overlay = document.getElementById('bulk-q-import-overlay');
   if (overlay) overlay.remove();
   renderNotebookSectionsForm();
-  window.adminIsDirty = true;
-  if (typeof setSaveStatus === 'function') setSaveStatus('notebook-save-status', 'unsaved');
+  nbMarkDirty();
   if (typeof showMessage === 'function') showMessage('Imported', `Added ${res.added} question${res.added !== 1 ? 's' : ''} to this section.`);
 }
 
@@ -1441,19 +1489,11 @@ function saveAnswerKeyModal() {
   // _rightPool / _rightOrder are connector scratch space, not data.
   sec.answerKeysData = JSON.parse(JSON.stringify(currentAnswerKeysData))
     .map(d => { delete d._rightPool; delete d._rightOrder; return d; });
-
-  sec.answerKey = currentAnswerKeysData
-    .filter(d => {
-      const t = d.type || 'mcq';
-      return (t === 'mcq' || t === 'truefalse') && d.answer && typeof d.answer === 'string' && d.answer.trim() !== '';
-    })
-    .map(d => `${d.qNum}=${d.answer.trim().toUpperCase()}`)
-    .join('\n');
+  nbRebuildLegacyKey(sec);
 
   closeAnswerKeyModal();
   renderNotebookSectionsForm();
-  window.adminIsDirty = true;
-  if (typeof setSaveStatus === 'function') setSaveStatus('notebook-save-status', 'unsaved');
+  nbMarkDirty();
 }
 
 function syncAnswerKeyData() {
@@ -1480,19 +1520,6 @@ function syncAnswerKeyData() {
       if (ansEl) d.answer = ansEl.value.toUpperCase();
     }
   });
-}
-
-function addAnswerKeySample() {
-  syncAnswerKeyData();
-  const nextQ = currentAnswerKeysData.length > 0 ? Math.max(...currentAnswerKeysData.map(d => d.qNum)) + 1 : 1;
-  currentAnswerKeysData.push({ qNum: nextQ, answer: '', explanation: '' });
-  renderAnswerKeyContent();
-}
-
-function removeAnswerKeySample(idx) {
-  syncAnswerKeyData();
-  currentAnswerKeysData.splice(idx, 1);
-  renderAnswerKeyContent();
 }
 
 /* ============================================================
@@ -1836,9 +1863,10 @@ function _renderAnswerKeyContentNow() {
               <i data-lucide="clipboard-copy"></i>
             </button>
           </h4>
-          <button onclick="addAnswerKeySample()" class="btn btn-ghost btn-sm" style="color:var(--color-primary); font-weight:600;">
-            <i data-lucide="plus-circle" style="width:14px;height:14px;"></i> Add Answer
-          </button>
+          <!-- No add/remove here: questions are added and deleted in Edit
+               Questions. Doing it from the key made answers for questions that
+               did not exist, and deleting one took the question text with it. -->
+          <span style="font-size:0.72rem; color:var(--text-tertiary);">Add or delete questions in Edit Questions</span>
         </div>
 
         <div style="display:flex; flex-direction:column; gap:1rem; margin-bottom:2rem;">
@@ -1914,9 +1942,7 @@ function _renderAnswerKeyContentNow() {
             <h5 style="font-weight:700; font-size:0.875rem; margin:0;">Question ${d.qNum}</h5>
             <span style="font-size:0.6rem; font-weight:700; padding:0.125rem 0.375rem; border-radius:999px; background:${typeBadgeColors[qType]}22; color:${typeBadgeColors[qType]}; border:1px solid ${typeBadgeColors[qType]}44;">${typeLabels[qType]}</span>
           </div>
-          <button onclick="removeAnswerKeySample(${i})" class="btn btn-ghost btn-sm" title="Remove" style="padding:0.25rem;">
-            <i data-lucide="trash-2" style="width:14px;height:14px;color:var(--color-danger);"></i>
-          </button>
+          ${d.question ? `<span class="nb-ak-qpreview" title="${escapeHTML(d.question)}">${escapeHTML(d.question)}</span>` : ''}
         </div>
         <div style="display:flex; flex-direction:column; gap:0.5rem;">
           ${answerInputHtml}
@@ -2001,34 +2027,43 @@ function saveGivenQuestionModal() {
 
   syncGivenQuestionData();
 
-  // Merge currentGivenQuestionsData into sec.answerKeysData to avoid overwriting answers
-  if (!sec.answerKeysData) {
-    sec.answerKeysData = [];
-  }
-
-  currentGivenQuestionsData.forEach(gq => {
-    const existing = sec.answerKeysData.find(d => d.qNum === gq.qNum);
-    if (existing) {
-      existing.question = gq.question;
-      existing.hint = gq.hint;
-      existing.image = gq.image || '';
-      existing.type = gq.type || existing.type || 'mcq';
-      existing.choices = gq.choices || existing.choices || {};
-      existing.pairs = gq.pairs || existing.pairs || [];
-      if (gq.answer) existing.answer = gq.answer;
-    } else {
-      sec.answerKeysData.push(gq);
-    }
-  });
-
-  // sec.questions is NOT rebuilt from the records here. Doing that was what
-  // resurrected a count the user had already lowered.
-  nbNormalizeSection(sec);
+  // The draft is a full copy of the section (answers included), so it simply
+  // replaces it. It used to be merged in by question number, and since a
+  // delete renumbered nothing, deleting Q3 kept Q3 and dropped Q5 instead.
+  nbCommitQuestions(sec, currentGivenQuestionsData);
 
   closeGivenQuestionModal();
   renderNotebookSectionsForm();
-  window.adminIsDirty = true;
-  if (typeof setSaveStatus === 'function') setSaveStatus('notebook-save-status', 'unsaved');
+  nbMarkDirty();
+}
+
+/**
+ * Writes an edited question list back to its section: numbered 1..n in the
+ * order shown, the count taken from the list, and the old one-line answer key
+ * rebuilt for anything still reading it.
+ */
+function nbCommitQuestions(sec, list) {
+  const clean = JSON.parse(JSON.stringify(list || []))
+    .map((d, i) => { delete d._rightPool; delete d._rightOrder; d.qNum = i + 1; return nbApplyTypeDefaults(d); });
+  sec.answerKeysData = clean;
+  sec.questions = clean.map(d => d.qNum);
+  nbRebuildLegacyKey(sec);
+}
+
+/** The "1=A" text key the oldest attempt code falls back to. */
+function nbRebuildLegacyKey(sec) {
+  sec.answerKey = (sec.answerKeysData || [])
+    .filter(d => {
+      const t = d.type || 'mcq';
+      return (t === 'mcq' || t === 'truefalse') && d.answer && typeof d.answer === 'string' && d.answer.trim() !== '';
+    })
+    .map(d => `${d.qNum}=${d.answer.trim().toUpperCase()}`)
+    .join('\n');
+}
+
+/** Numbers the open editor's draft 1..n, in the order it is shown. */
+function _nbRenumberDraft() {
+  currentGivenQuestionsData.forEach((d, i) => { d.qNum = i + 1; });
 }
 
 function syncGivenQuestionData() {
@@ -2662,26 +2697,15 @@ function bulkAddGivenQuestions() {
     }
   });
 
+  // Numbered pastes fill those numbers; gaps ("1, 2, 7") close up on Save.
+  // Still only the draft — the section changes when the window is saved.
   currentGivenQuestionsData.sort((a, b) => a.qNum - b.qNum);
-
-  // Bulk add is an explicit authoring action, so it may GROW the section — but
-  // through the same count that everything else reads, and the field on the
-  // form is updated with it. It never silently resurrects a count you lowered.
-  const sec = notebookAdminState.sections[activeGivenQuestionSectionIdx];
-  const highest = currentGivenQuestionsData.reduce((m, d) => Math.max(m, d.qNum || 0), 0);
-  const newCount = Math.min(200, Math.max((sec.questions || []).length, highest));
-  sec.questions = Array.from({ length: newCount }, (_, i) => i + 1);
-  sec.answerKeysData = JSON.parse(JSON.stringify(currentGivenQuestionsData));
-  nbNormalizeSection(sec);
-  currentGivenQuestionsData = JSON.parse(JSON.stringify(sec.answerKeysData));
-  const countEl = document.getElementById('nb-sec-count-' + activeGivenQuestionSectionIdx);
-  if (countEl) countEl.value = String(newCount);
+  currentGivenQuestionsData = currentGivenQuestionsData.slice(0, 200).map(d => nbApplyTypeDefaults(d));
+  _nbRenumberDraft();
 
   if (textarea) textarea.value = '';
   renderGivenQuestionContent();
   _showParseReport(parsed);
-  window.adminIsDirty = true;
-  if (typeof setSaveStatus === 'function') setSaveStatus('notebook-save-status', 'unsaved');
 }
 
 function _showParseReport(parsed) {
@@ -2730,40 +2754,32 @@ function _showParseReport(parsed) {
   if (typeof lucide !== 'undefined') lucide.createIcons({ el: reportEl });
 }
 
+/* Everything below edits the window's draft only. The section itself changes
+   when you press Save, so Cancel throws all of it away. These used to write
+   sec.questions as they went, which Cancel could not undo. */
 function quickAddQuestions(type, count) {
   syncGivenQuestionData();
-  const maxQ = currentGivenQuestionsData.length > 0 ? Math.max(...currentGivenQuestionsData.map(d => d.qNum)) : 0;
+  const sec = notebookAdminState.sections[activeGivenQuestionSectionIdx];
   for (let i = 0; i < count; i++) {
-    const q = { qNum: maxQ + i + 1, type, question: '', hint: '', image: '', answer: '', explanation: '', choices: {}, pairs: [] };
-    if (type === 'mcq' || type === 'checkbox') q.choices = { A: '', B: '', C: '', D: '' };
-    else if (type === 'matching') q.pairs = [{ left: '', right: '' }, { left: '', right: '' }, { left: '', right: '' }];
-    else if (type === 'truefalse') q.choices = { A: 'True', B: 'False' };
+    const q = nbBlankQuestion(currentGivenQuestionsData.length + 1, type, sec && sec.choices);
+    if (type === 'matching') q.pairs = [{ left: '', right: '' }, { left: '', right: '' }, { left: '', right: '' }];
     currentGivenQuestionsData.push(q);
   }
-  const sec = notebookAdminState.sections[activeGivenQuestionSectionIdx];
-  sec.questions = currentGivenQuestionsData.map(d => d.qNum).sort((a, b) => a - b);
+  _nbRenumberDraft();
   renderGivenQuestionContent();
-  window.adminIsDirty = true;
-  if (typeof setSaveStatus === 'function') setSaveStatus('notebook-save-status', 'unsaved');
 }
 
 function bulkClearGivenQuestions() {
   window._bulkUndoState = JSON.parse(JSON.stringify(currentGivenQuestionsData));
   currentGivenQuestionsData = [];
-  const sec = notebookAdminState.sections[activeGivenQuestionSectionIdx];
-  sec.questions = [];
   renderGivenQuestionContent();
-  window.adminIsDirty = true;
-  if (typeof setSaveStatus === 'function') setSaveStatus('notebook-save-status', 'unsaved');
 }
 
 function bulkUndoGivenQuestions() {
   if (!window._bulkUndoState) { if (typeof showShareToast === 'function') showShareToast('Nothing to undo.'); return; }
   currentGivenQuestionsData = JSON.parse(JSON.stringify(window._bulkUndoState));
   window._bulkUndoState = null;
-  currentGivenQuestionsData.sort((a, b) => a.qNum - b.qNum);
-  const sec = notebookAdminState.sections[activeGivenQuestionSectionIdx];
-  sec.questions = currentGivenQuestionsData.map(d => d.qNum).sort((a, b) => a - b);
+  _nbRenumberDraft();
   renderGivenQuestionContent();
 }
 
@@ -2807,11 +2823,9 @@ function removeLastMatchingPair(idx) {
 function removeGivenQuestion(idx) {
   syncGivenQuestionData();
   currentGivenQuestionsData.splice(idx, 1);
-  const sec = notebookAdminState.sections[activeGivenQuestionSectionIdx];
-  sec.questions = currentGivenQuestionsData.map(d => d.qNum).sort((a, b) => a - b);
+  // The ones below move up a number, so Q4 becomes Q3 and nothing is lost.
+  _nbRenumberDraft();
   renderGivenQuestionContent();
-  window.adminIsDirty = true;
-  if (typeof setSaveStatus === 'function') setSaveStatus('notebook-save-status', 'unsaved');
 }
 
 function toggleFormatGuide() {

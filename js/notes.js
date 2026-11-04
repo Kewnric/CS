@@ -568,6 +568,12 @@ function notesStartAttempt() {
     showMessage("No Sections", "This notebook has no sections configured. Add sections in the Admin panel first.", true);
     return;
   }
+  // A notebook now starts life with one empty section, so "has sections" no
+  // longer means "has something to answer".
+  if (!nbQuestionTotal(nb)) {
+    showMessage("No questions yet", "This notebook is still a draft: none of its sections has questions. Import some in the Admin panel first.", true);
+    return;
+  }
 
   // Use the study.html's existing timer modal — repurpose it for notebooks
   const variantSelect = document.getElementById('timer-variant-select');
@@ -712,6 +718,10 @@ function _notebookLastPct(nb) {
 }
 
 /** A notebook's difficulty / level, set in Admin (parity with programs). */
+/** Questions across every section; 0 means the notebook is still a draft. */
+function nbQuestionTotal(nb) {
+  return ((nb && nb.sections) || []).reduce((n, s) => n + ((s && s.questions) || []).length, 0);
+}
 function getNotebookLevel(nb) { const n = parseInt(nb && nb.level, 10); return n > 0 ? Math.min(n, 100) : null; }
 function getNotebookDifficulty(nb) { return (nb && nb.difficulty) || null; }
 
@@ -825,8 +835,13 @@ registerLibAdapter('notebook', {
 function notesQueue() { return getSessionParam('notebookQueue') || null; }
 
 function notesRunSelectedAsSession() {
-  const ids = typeof libSelectedIds === 'function' ? libSelectedIds('notebook') : [];
-  if (ids.length < 2) return;
+  // Drafts with nothing to answer are left out of the run.
+  const ids = (typeof libSelectedIds === 'function' ? libSelectedIds('notebook') : [])
+    .filter(id => nbQuestionTotal((state.notebooks || []).find(n => n.id === id)) > 0);
+  if (ids.length < 2) {
+    if (typeof toast === 'function') toast('Pick at least two notebooks that have questions.', { type: 'warning' });
+    return;
+  }
   const titles = ids.map(id => (state.notebooks || []).find(n => n.id === id)).filter(Boolean).map(n => n.title);
   showConfirm('Run as one session',
     `${ids.length} notebooks, one after another: ${titles.slice(0, 3).join(', ')}${titles.length > 3 ? '…' : ''}. Each is still graded and recorded on its own.`,
