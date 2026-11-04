@@ -1270,183 +1270,218 @@ function parseOldAnswerKey(str) {
 }
 
 /* ============================================================
-   BULK QUESTION IMPORT — paste a block of MCQ/checkbox/TF questions
-   to populate a section's questions + answer keys at once.
+   IMPORT QUESTIONS — the main way a section gets filled
+   ------------------------------------------------------------
+   The parser is js/notebook-import.js. This is the window around it: a live
+   count of what the paste will give you before you commit, append by default
+   when the section already has questions, and an undo afterwards. It used to
+   replace the section by default, with no undo, behind a blocking "Imported"
+   popup.
    ============================================================ */
 
-/**
- * Parse pasted question blocks (separated by blank lines) into answerKeysData-shaped
- * entries (without qNum, assigned by the caller).
- * Supported per block:
- *   - question line (optionally prefixed "Q:" / "1." / "1)")
- *   - choice lines: "A) text", "A. text", "(A) text"; prefix "*" marks the correct one
- *   - "Answer: A"  (or "A, C" → multi-select; "True"/"False" → maps to A/B)
- *   - "Explanation: ..." / "Hint: ..."
- * @returns {Array<{type,question,choices,answer,explanation,hint}>}
- */
-function parseBulkQuestions(text) {
-  // The Import Questions dialog uses this parser, and it never stripped the
-  // type tag. A question written "Match these: [Match]" reached the student
-  // with the tag still in it. (_tokenizeBulkInput, used by Unified Bulk Add,
-  // strips it — the two had drifted apart.)
-  if (typeof _extractTypeTag === 'function') {
-    text = String(text || '').split(String.fromCharCode(10))
-      .map(line => _extractTypeTag(line.trim()).text || line)
-      .join(String.fromCharCode(10));
-  }
-  if (!text) return [];
-  const blocks = String(text).replace(/\r\n/g, '\n').split(/\n\s*\n+/).map(b => b.trim()).filter(Boolean);
-  const out = [];
-
-  blocks.forEach(block => {
-    const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
-    let question = '', explanation = '', hint = '';
-    const choices = {};
-    let answerLetters = [];
-    const starred = [];
-
-    lines.forEach(line => {
-      const mlAns = line.match(/^(answer|ans|correct)\s*[:=]\s*(.+)$/i);
-      if (mlAns) {
-        const raw = mlAns[2].trim();
-        const low = raw.toLowerCase();
-        if (low === 'true') answerLetters = ['A'];
-        else if (low === 'false') answerLetters = ['B'];
-        else answerLetters = raw.toUpperCase().match(/[A-H]/g) || [];
-        return;
-      }
-      const mlExp = line.match(/^(explanation|explain|exp)\s*[:=]\s*(.+)$/i);
-      if (mlExp) { explanation = mlExp[2].trim(); return; }
-      const mlHint = line.match(/^hint\s*[:=]\s*(.+)$/i);
-      if (mlHint) { hint = mlHint[1].trim(); return; }
-
-      // standalone correct-answer marker: "*A" / "*A)" / "*A." (no choice text)
-      const mstar = line.match(/^\*\s*\(?([A-Ha-h])\)?[.):]?\s*$/);
-      if (mstar) { starred.push(mstar[1].toUpperCase()); return; }
-
-      // choice line:  *A) text | (A) text | A. text | A: text
-      const mc = line.match(/^(\*?)\s*\(?([A-Ha-h])\)?\s*[).:\-]\s+(.*)$/);
-      if (mc) {
-        const letter = mc[2].toUpperCase();
-        choices[letter] = mc[3].trim();
-        if (mc[1] === '*') starred.push(letter);
-        return;
-      }
-
-      // otherwise: part of the question text (strip "Q:" / leading numbering)
-      const q = line.replace(/^q(uestion)?\s*[:.)\-]?\s*/i, '').replace(/^\d+\s*[.)\-:]\s*/, '').trim();
-      if (q) question = question ? question + ' ' + q : q;
-    });
-
-    if (starred.length) answerLetters = starred;
-    answerLetters = [...new Set(answerLetters)].filter(L => Object.keys(choices).length === 0 || choices[L] !== undefined);
-
-    if (!question && Object.keys(choices).length === 0) return; // nothing usable
-
-    const choiceVals = Object.keys(choices).sort().map(k => (choices[k] || '').toLowerCase());
-    const isTF = choiceVals.length === 2 && choiceVals.includes('true') && choiceVals.includes('false');
-
-    let type, answer;
-    if (isTF) { type = 'truefalse'; answer = answerLetters[0] || ''; }
-    else if (answerLetters.length > 1) { type = 'checkbox'; answer = answerLetters; }
-    else { type = 'mcq'; answer = answerLetters[0] || ''; }
-
-    out.push({ type, question, choices, answer, explanation, hint });
-  });
-
-  return out;
+/** A record nobody has written anything into yet (Bulk Add makes these). */
+function nbIsBlankQuestion(d) {
+  if (!d) return true;
+  const hasAnswer = Array.isArray(d.answer) ? d.answer.length > 0 : String(d.answer || '').trim() !== '';
+  const hasChoiceText = Object.values(d.choices || {}).some(v => String(v || '').trim() && !/^(true|false)$/i.test(String(v).trim()));
+  const hasPairText = (d.pairs || []).some(p => p && (String(p.left || '').trim() || String(p.right || '').trim()));
+  return !String(d.question || '').trim() && !hasAnswer && !hasChoiceText && !hasPairText && !String(d.image || '').trim();
 }
 
-/** Apply parsed questions to a section (replace or append). Returns { added }.
- *  Uses the same two-phase parser as the Given Question modal, so matching,
- *  identification, explanations and hints all work here too. */
+/** Questions in a section that hold something. */
+function nbRealQuestionCount(sec) {
+  return ((sec && sec.answerKeysData) || []).filter(d => !nbIsBlankQuestion(d)).length;
+}
+
+/** Apply parsed questions to a section (replace or append). Returns { added }. */
 function applyBulkQuestions(idx, text, append) {
   const sec = notebookAdminState.sections[idx];
   if (!sec) return { added: 0 };
-  const parsed = _assembleBulkQuestions(_tokenizeBulkInput(text));
+  const parsed = nbParseImport(text).questions;
   if (parsed.length === 0) return { added: 0 };
 
-  let base = [];
-  let startQ = 1;
-  if (append && Array.isArray(sec.answerKeysData)) {
-    base = JSON.parse(JSON.stringify(sec.answerKeysData));
-    startQ = (sec.questions || []).length + 1;
-  }
-
-  const newEntries = parsed.map((p, i) => ({
-    qNum: startQ + i, type: p.type, question: p.question || '',
+  // Blank placeholder questions are not worth keeping in front of real ones.
+  const base = append ? JSON.parse(JSON.stringify(sec.answerKeysData || [])).filter(d => !nbIsBlankQuestion(d)) : [];
+  const newEntries = parsed.map(p => ({
+    qNum: 0, type: p.type, question: p.question || '',
     choices: p.choices || {}, answer: p.answer, explanation: p.explanation || '',
     hint: p.hint || '', image: p.image || '', pairs: p.pairs || []
   }));
-
-  const all = base.concat(newEntries);
-  sec.answerKeysData = all;
-  sec.questions = Array.from({ length: all.length }, (_, i) => i + 1);
+  const all = base.concat(newEntries).slice(0, 200);
+  nbCommitQuestions(sec, all);
 
   let maxChoices = sec.choices || 4;
   all.forEach(d => { const n = Object.keys(d.choices || {}).length; if (n > maxChoices) maxChoices = n; });
   sec.choices = Math.max(2, Math.min(8, maxChoices || 4));
 
-  return { added: newEntries.length };
+  return { added: Math.min(newEntries.length, 200 - base.length) };
 }
+
+let _nbImportIdx = -1;
+let _nbImportKeys = null;
+let _nbImportTimer = null;
 
 function openBulkQuestionImport(idx) {
   syncAllNotebookSections();
-  let overlay = document.getElementById('bulk-q-import-overlay');
-  if (overlay) overlay.remove();
-  overlay = document.createElement('div');
+  closeBulkQuestionImport();
+  const sec = notebookAdminState && notebookAdminState.sections[idx];
+  if (!sec) return;
+  _nbImportIdx = idx;
+  const existing = nbRealQuestionCount(sec);
+
+  const overlay = document.createElement('div');
   overlay.id = 'bulk-q-import-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:99999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:1rem;';
-  const example = 'Q: Which function prints to stdout in C?\nA) printf()\nB) console.log()\nC) echo()\n*A\nExplanation: printf is the standard C output.\n\nSelect all valid C loop keywords\nA) for\nB) loop\nC) while\nAnswer: A, C\n\nWhat is the capital of France?\nAnswer: Paris\n\nMatch the following:\nCell -> Biology\nAtom -> Chemistry';
+  overlay.className = 'nb-import-overlay';
   overlay.innerHTML = `
-    <div style="background:var(--bg-elevated);border:1px solid var(--border-color);border-radius:var(--radius-lg);padding:1.5rem;width:640px;max-width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 24px 48px rgba(0,0,0,0.5);">
-      <h3 style="font-weight:700;margin-bottom:0.5rem;display:flex;align-items:center;gap:0.5rem;font-size:1.05rem;">
-        <i data-lucide="clipboard-paste" style="width:18px;height:18px;color:var(--color-primary);"></i> Import Questions
-        <!-- This dialog explains the format, so this is where you want to take a
-             copy of it — for your own notes, or to hand to an AI. -->
-        <button onclick="nbFormatMenu(event, 'given')" class="nb-fmt-btn" style="margin-left:auto;"
-                title="Copy this format — paste it to an AI so its questions import cleanly"
-                aria-label="Copy the import format to the clipboard">
-          <i data-lucide="clipboard-copy"></i>
+    <div class="nb-import-dialog" role="dialog" aria-modal="true" aria-labelledby="nb-import-title">
+      <div class="nb-import-head">
+        <h3 id="nb-import-title"><i data-lucide="clipboard-paste"></i> Import Questions</h3>
+        <span class="nb-import-into" title="${escapeHTML(sec.label || '')}">into ${escapeHTML(sec.label || 'Section ' + (idx + 1))}</span>
+        <button type="button" class="btn btn-ghost btn-sm nb-import-x" onclick="closeBulkQuestionImport()" aria-label="Close" title="Close (Esc)"><i data-lucide="x"></i></button>
+      </div>
+      <!-- One format, written so an AI follows it. Its reply goes in a code
+           block, so the chat's own Copy button copies only the questions. -->
+      <div class="nb-import-ai">
+        <i data-lucide="sparkles" class="nb-import-ai-icon"></i>
+        <div class="nb-import-ai-text">
+          <strong>Getting questions from an AI?</strong>
+          <span>Copy the format, fill in your topic and how many, send it, then paste the reply here.</span>
+        </div>
+        <button type="button" class="btn btn-secondary btn-sm nb-import-copy" onclick="nbCopyFormat('given')"><i data-lucide="clipboard-copy"></i> Copy format</button>
+      </div>
+      <textarea id="bulk-q-input" spellcheck="false" class="nb-import-input"
+                placeholder="${escapeHTML(_nbImportExample())}" oninput="_nbImportSchedulePreview()"></textarea>
+      <div id="bulk-q-preview" class="nb-import-preview" aria-live="polite"></div>
+      ${existing ? `
+      <label class="nb-import-append">
+        <input type="checkbox" id="bulk-q-append" checked onchange="_nbImportPreview()" />
+        Add after the ${existing} question${existing !== 1 ? 's' : ''} already here
+        <span>(untick to replace them)</span>
+      </label>` : ''}
+      <div class="nb-import-foot">
+        <span class="nb-import-keys"><kbd>Ctrl</kbd>+<kbd>Enter</kbd> import &middot; <kbd>Esc</kbd> close</span>
+        <button type="button" onclick="closeBulkQuestionImport()" class="btn btn-secondary btn-sm">Cancel</button>
+        <button type="button" id="bulk-q-go" onclick="confirmBulkQuestionImport(${idx})" class="btn btn-primary btn-sm" disabled>
+          <i data-lucide="check"></i> <span>Import</span>
         </button>
-      </h3>
-      <p style="font-size:0.78rem;color:var(--text-tertiary);margin-bottom:0.5rem;line-height:1.5;">
-        Paste questions separated by a blank line. Mark the correct choice with <code>*</code> or an <code>Answer:</code> line.
-        Two letters (<code>Answer: A, C</code>) make a multi-select; <code>True</code>/<code>False</code> auto-detects.
-        A word answer with no choices makes an <em>identification</em> question; <code>term -&gt; definition</code> lines make a <em>matching</em> question.
-        <code>Explanation:</code> and <code>Hint:</code> lines are picked up too.
-        <button onclick="nbFormatMenu(event, 'given')" class="nb-fmt-link">Copy this format</button>
-      </p>
-      <textarea id="bulk-q-input" spellcheck="false" style="width:100%;flex:1;min-height:240px;font-family:var(--font-mono);font-size:0.78rem;padding:0.6rem;border-radius:var(--radius-md);border:1px solid var(--border-color);background:var(--bg-surface);color:var(--text-primary);resize:vertical;" placeholder="${escapeHTML(example)}"></textarea>
-      <label style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;color:var(--text-secondary);margin:0.6rem 0;cursor:pointer;">
-        <input type="checkbox" id="bulk-q-append" /> Append to existing questions (otherwise replaces this section)
-      </label>
-      <div id="bulk-q-error" style="font-size:0.75rem;color:var(--color-danger);min-height:1em;margin-bottom:0.4rem;"></div>
-      <div style="display:flex;gap:0.5rem;justify-content:flex-end;">
-        <button onclick="document.getElementById('bulk-q-import-overlay').remove()" class="btn btn-secondary btn-sm">Cancel</button>
-        <button onclick="confirmBulkQuestionImport(${idx})" class="btn btn-primary btn-sm"><i data-lucide="check" style="width:14px;height:14px;"></i> Import</button>
       </div>
     </div>`;
   document.body.appendChild(overlay);
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: overlay });
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  overlay.addEventListener('mousedown', e => { if (e.target === overlay) overlay.dataset.downOutside = '1'; });
+  overlay.addEventListener('click', e => {
+    // Only a click that began outside closes it: a text selection dragged out
+    // of the box used to throw the whole paste away.
+    if (e.target === overlay && overlay.dataset.downOutside === '1') closeBulkQuestionImport();
+    delete overlay.dataset.downOutside;
+  });
+
+  // On window, capturing, so it runs before the admin page's own Esc (which
+  // closed the notebook behind this window) and its Ctrl+S.
+  _nbImportKeys = (e) => {
+    if (!document.getElementById('bulk-q-import-overlay')) return;
+    const k = String(e.key || '').toLowerCase();
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeBulkQuestionImport(); }
+    else if ((e.ctrlKey || e.metaKey) && (e.key === 'Enter' || k === 's')) {
+      e.preventDefault(); e.stopPropagation();
+      if (!e.repeat) confirmBulkQuestionImport(_nbImportIdx);
+    }
+  };
+  window.addEventListener('keydown', _nbImportKeys, true);
+
+  _nbImportPreview();
   setTimeout(() => document.getElementById('bulk-q-input')?.focus(), 50);
+}
+
+function closeBulkQuestionImport() {
+  clearTimeout(_nbImportTimer);
+  document.getElementById('bulk-q-import-overlay')?.remove();
+  if (_nbImportKeys) window.removeEventListener('keydown', _nbImportKeys, true);
+  _nbImportKeys = null;
+}
+
+function _nbImportSchedulePreview() {
+  clearTimeout(_nbImportTimer);
+  _nbImportTimer = setTimeout(_nbImportPreview, 150);
+}
+
+/** What the paste will become, before anything is changed. */
+function _nbImportPreview() {
+  const ta = document.getElementById('bulk-q-input');
+  const out = document.getElementById('bulk-q-preview');
+  const go = document.getElementById('bulk-q-go');
+  if (!ta || !out || !go) return;
+  const goLabel = go.querySelector('span');
+  const text = ta.value;
+
+  if (!text.trim()) {
+    out.innerHTML = `<span class="nb-import-hint">Paste your questions above. Leave a blank line between questions, put choices on lines starting A. B. C., and end each one with an <code>Answer:</code> line.</span>`;
+    go.disabled = true;
+    if (goLabel) goLabel.textContent = 'Import';
+    return;
+  }
+
+  const { questions, skipped } = nbParseImport(text);
+  const rep = nbImportReport(questions, skipped);
+  if (!rep.total) {
+    out.innerHTML = `<div class="nb-import-found is-bad"><i data-lucide="search-x"></i> <strong>No questions found yet.</strong> <span>Number each question or give it its own line, with its choices underneath.</span></div>`;
+    go.disabled = true;
+    if (goLabel) goLabel.textContent = 'Import';
+    if (typeof lucide !== 'undefined') lucide.createIcons({ el: out });
+    return;
+  }
+
+  const appendEl = document.getElementById('bulk-q-append');
+  const replacing = appendEl && !appendEl.checked;
+  const problems = rep.problems.map(p => `<li>${escapeHTML(p)}</li>`).join('');
+  const skippedHtml = rep.skipped.length ? `
+    <details class="nb-import-skipped">
+      <summary>${rep.skipped.length} line${rep.skipped.length !== 1 ? 's' : ''} left out (not questions)</summary>
+      <ul>${rep.skipped.slice(0, 8).map(s => `<li>${escapeHTML(s.length > 90 ? s.slice(0, 90) + '…' : s)}</li>`).join('')}</ul>
+    </details>` : '';
+  out.innerHTML = `
+    <div class="nb-import-found ${rep.problems.length ? 'is-warn' : 'is-ok'}">
+      <i data-lucide="${rep.problems.length ? 'alert-triangle' : 'check-circle-2'}"></i>
+      <strong>${rep.total} question${rep.total !== 1 ? 's' : ''} found</strong>
+      <span>${escapeHTML(rep.parts.join(', '))}</span>
+    </div>
+    ${problems ? `<ul class="nb-import-problems">${problems}</ul>` : ''}
+    ${skippedHtml}`;
+  go.disabled = false;
+  if (goLabel) goLabel.textContent = (replacing ? 'Replace with ' : 'Import ') + rep.total;
+  if (typeof lucide !== 'undefined') lucide.createIcons({ el: out });
 }
 
 function confirmBulkQuestionImport(idx) {
   const ta = document.getElementById('bulk-q-input');
-  const errEl = document.getElementById('bulk-q-error');
-  const append = !!(document.getElementById('bulk-q-append') && document.getElementById('bulk-q-append').checked);
   const text = ta ? ta.value : '';
-  if (!text.trim()) { if (errEl) errEl.textContent = 'Paste at least one question.'; return; }
-  if (_assembleBulkQuestions(_tokenizeBulkInput(text)).length === 0) { if (errEl) errEl.textContent = 'Could not find any questions — check the format against the example.'; return; }
+  if (!text.trim() || !nbParseImport(text).questions.length) { _nbImportPreview(); if (ta) ta.focus(); return; }
+  const sec = notebookAdminState && notebookAdminState.sections[idx];
+  if (!sec) return;
+  const appendEl = document.getElementById('bulk-q-append');
+  const append = appendEl ? appendEl.checked : true;
 
+  const before = JSON.parse(JSON.stringify(sec));
+  const owner = notebookAdminState;
   const res = applyBulkQuestions(idx, text, append);
-  const overlay = document.getElementById('bulk-q-import-overlay');
-  if (overlay) overlay.remove();
+  closeBulkQuestionImport();
   renderNotebookSectionsForm();
   nbMarkDirty();
-  if (typeof showMessage === 'function') showMessage('Imported', `Added ${res.added} question${res.added !== 1 ? 's' : ''} to this section.`);
+
+  const label = sec.label || 'Section ' + (idx + 1);
+  if (typeof pushUndo === 'function') {
+    pushUndo(`Imported ${res.added} question${res.added !== 1 ? 's' : ''} into "${label}"`, () => {
+      // Only into the notebook it came from; another may be open by now.
+      if (notebookAdminState !== owner) return;
+      const i = notebookAdminState.sections.findIndex(s => s.id === before.id);
+      if (i === -1) return;
+      notebookAdminState.sections[i] = before;
+      renderNotebookSectionsForm();
+      nbMarkDirty();
+    });
+  } else if (typeof toast === 'function') {
+    toast(`Imported ${res.added} question${res.added !== 1 ? 's' : ''}.`, { type: 'success' });
+  }
 }
 
 function openAnswerKeyModal(idx) {
@@ -1859,7 +1894,7 @@ function _renderAnswerKeyContentNow() {
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
           <h4 style="font-weight:700; font-size:0.75rem; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.05em; margin:0; display:flex; align-items:center; gap:0.35rem;">
             ANSWER KEYS
-            <button onclick="nbFormatMenu(event, 'answer')" class="nb-fmt-btn" title="Copy the accepted answer-key format" aria-label="Copy answer key format to clipboard">
+            <button onclick="nbCopyFormat('answer')" class="nb-fmt-btn" title="Copy the accepted answer-key format" aria-label="Copy answer key format to clipboard">
               <i data-lucide="clipboard-copy"></i>
             </button>
           </h4>
@@ -2116,552 +2151,25 @@ function changeGivenQuestionType(idx, newType) {
   renderGivenQuestionContent();
 }
 
-/* ----------------------------------------------------------
-   INTELLIGENT BULK ADD PARSER — Two-Phase Engine
-   Replaces old normalizeQuestionBulkText + bulkAddGivenQuestions
-   Supports: MCQ, Checkbox, Text/Identification, Matching, True/False
-   Per-question adaptive choices (A-Z), answer markers, headers, pairs
-   ---------------------------------------------------------- */
-
-const _BULK_HEADER_KW = /^(part|section|test|directions?|instructions?|items?|for items|note)\b/i;
-const _BULK_ROMAN = /^[IVX]+\.\s+/;
-const _BULK_ALLCAPS = /^[A-Z][A-Z\s]{2,}:\s*$/;
-const _BULK_SECTION_NAMES = ['multiple choice', 'true or false', 'identification', 'matching', 'essay', 'reading comprehension', 'enumeration', 'problem solving', 'fill in the blank', 'true/false'];
-
-function _isHeaderLine(text, hasActiveQ, seenNumQ) {
-  if (_BULK_HEADER_KW.test(text)) return true;
-  if (_BULK_ROMAN.test(text)) return true;
-  if (/^#{1,3}\s+/.test(text)) return true;
-  if (_BULK_ALLCAPS.test(text)) return true;
-  if (/^[-=]{3,}$/.test(text)) return true;
-  // Context-aware: "A. Reading Comprehension" before any question = header
-  if (!hasActiveQ) {
-    const m = text.match(/^([A-Za-z])[.)]\s+(.+)$/);
-    if (m) {
-      const content = m[2].toLowerCase();
-      if (_BULK_SECTION_NAMES.some(kw => content.includes(kw))) return true;
-      if (!seenNumQ && /^[A-E]$/i.test(m[1]) && m[2].split(/\s+/).length <= 3) return true;
-    }
-  }
-  return false;
-}
-
-function _extractAnswerMarker(text) {
-  let c = text.replace(/\s*\(correct\)\s*$/i, '');
-  if (c !== text) return { text: c.trim(), isCorrect: true };
-  c = text.replace(/\s*\[correct\]\s*$/i, '');
-  if (c !== text) return { text: c.trim(), isCorrect: true };
-  c = text.replace(/\s*[✓✔]\s*$/, '');
-  if (c !== text) return { text: c.trim(), isCorrect: true };
-  if (text.length > 1) {
-    c = text.replace(/\s*\*\s*$/, '');
-    if (c !== text) return { text: c.trim(), isCorrect: true };
-  }
-  return { text, isCorrect: false };
-}
-
-/* Phase 1 — Tokenize: classify each line */
-function _tokenizeBulkInput(text) {
-  const lines = text.split('\n');
-  const tokens = [];
-  let hasActiveQ = false, seenNumQ = false, afterBlank = false, choicesStarted = false;
-
-  for (const raw of lines) {
-    const t = raw.trim();
-
-    // 1. BLANK
-    if (!t) { tokens.push({ type: 'blank' }); afterBlank = true; continue; }
-
-    // 2. HEADER
-    if (_isHeaderLine(t, hasActiveQ, seenNumQ)) {
-      tokens.push({ type: 'header', text: t }); continue;
-    }
-
-    // 2b. STANDALONE ANSWER MARKER: "*A" or "*A, C" on its own line. The Import
-    //     dialog advertises this, but the line was falling through to the
-    //     unknown branch and starting a whole new question.
-    const starM = t.match(/^\*\s*([A-Za-z](?:\s*[,&+]\s*[A-Za-z])*)\s*$/);
-    if (starM) { tokens.push({ type: 'answer', text: starM[1].trim() }); continue; }
-
-    // 3. ANSWER LINE: "Answer: X"
-    const ansM = t.match(/^(?:Answer|Ans|Correct)\s*[:=]\s*(.+)$/i);
-    if (ansM) { tokens.push({ type: 'answer', text: ansM[1].trim() }); continue; }
-
-    // 3b. EXPLANATION / HINT LINES
-    const expM = t.match(/^(?:Explanation|Explain|Exp|Why)\s*[:=]\s*(.+)$/i);
-    if (expM) { tokens.push({ type: 'explanation', text: expM[1].trim() }); continue; }
-    const hintM = t.match(/^Hint\s*[:=]\s*(.+)$/i);
-    if (hintM) { tokens.push({ type: 'hint', text: hintM[1].trim() }); continue; }
-
-    // 4. QUESTION LINE (1-3 digits, avoids year-like numbers)
-    const qM = t.match(/^[Qq]?(\d{1,3})[.)=:]\s+(.+)$/);
-    if (qM && qM[2].trim()) {
-      hasActiveQ = true; seenNumQ = true; afterBlank = false; choicesStarted = false;
-      // A trailing [MCQ] / [T/F] / [Match] / [Ident] / [Multi] settles the type
-      // instead of leaving it to be guessed from the shape of what follows.
-      const tagged = _extractTypeTag(qM[2].trim());
-      // "1. Pick a colour?  A. red  B. blue" — all on one line, which a compact
-      // paste often produces. Split the choices off the prompt.
-      const inline = _splitInlineChoices(tagged.text);
-      tokens.push({ type: 'question', qNum: parseInt(qM[1]), text: inline.text, forcedType: tagged.type });
-      inline.choices.forEach(c => tokens.push({ type: 'choice', letter: c.letter, text: c.text, isCorrect: c.isCorrect }));
-      if (inline.choices.length) choicesStarted = true;
-      continue;
-    }
-
-    // 5a. TAB-SEPARATED PAIR — what you get pasting two columns out of a
-    //     spreadsheet or a table, which was previously read as prose.
-    if (t.includes('\t')) {
-      const cells = t.split('\t').map(c => c.trim()).filter(Boolean);
-      if (cells.length === 2) {
-        tokens.push({ type: 'pair', left: cells[0], right: cells[1] });
-        hasActiveQ = true; choicesStarted = true; continue;
-      }
-    }
-
-    // 5. MATCHING PAIR: "term -> definition"
-    const pairM = t.match(/^(?:[A-Za-z][.)]\s+)?(.+?)\s*(?:->|→|=>)\s*(.+)$/);
-    if (pairM && pairM[1].trim().length > 0 && pairM[2].trim().length > 0) {
-      tokens.push({ type: 'pair', left: pairM[1].trim(), right: pairM[2].trim() });
-      hasActiveQ = true; choicesStarted = true; continue;
-    }
-
-    // 6. CHOICE LINE (only inside a question block)
-    if (hasActiveQ) {
-      let star = false, ct = t;
-      if (/^\*\s*/.test(ct)) { star = true; ct = ct.replace(/^\*\s*/, ''); }
-
-      // (A) text
-      const cpM = ct.match(/^\(([A-Za-z])\)\s+(.+)$/);
-      if (cpM) {
-        const { text: cleaned, isCorrect } = _extractAnswerMarker(cpM[2].trim());
-        tokens.push({ type: 'choice', letter: cpM[1].toUpperCase(), text: cleaned, isCorrect: isCorrect || star });
-        choicesStarted = true; afterBlank = false; continue;
-      }
-      // A. text | A) text | A: text | A] text
-      const clM = ct.match(/^([A-Za-z])[.):\]]\s+(.+)$/);
-      if (clM) {
-        const { text: cleaned, isCorrect } = _extractAnswerMarker(clM[2].trim());
-        tokens.push({ type: 'choice', letter: clM[1].toUpperCase(), text: cleaned, isCorrect: isCorrect || star });
-        choicesStarted = true; afterBlank = false; continue;
-      }
-      // Bullet: - text, • text
-      const blM = ct.match(/^[-•]\s+(.+)$/);
-      if (blM) {
-        tokens.push({ type: 'bullet', text: blM[1].trim() });
-        choicesStarted = true; afterBlank = false; continue;
-      }
-    }
-
-    // 7. CONTINUATION (inside question, before choices start, not after blank)
-    if (hasActiveQ && !choicesStarted && !afterBlank) {
-      tokens.push({ type: 'continuation', text: t }); continue;
-    }
-
-    // 8. UNKNOWN — an unnumbered question line. It opens a block like a
-    //    numbered one does; without this, the "A." / "B." lines beneath it were
-    //    not treated as choices at all and the question came out as free text.
-    const inlineU = _splitInlineChoices(t);
-    tokens.push({ type: 'unknown', text: inlineU.text });
-    inlineU.choices.forEach(c => tokens.push({ type: 'choice', letter: c.letter, text: c.text, isCorrect: c.isCorrect }));
-    hasActiveQ = true;
-    choicesStarted = inlineU.choices.length > 0;
-    afterBlank = false;
-  }
-  return tokens;
-}
+/* The parser and the copyable format live in js/notebook-import.js. */
 
 /**
- * Pulls choices off a line that carries both the prompt and its options.
- * Only fires on two or more markers running A, B, C… in order, so an ordinary
- * sentence containing "a." or a middle initial is left alone.
- * @returns {{text: string, choices: Array<{letter,text,isCorrect}>}}
+ * One click, one format. There was a menu of four (question format, answer
+ * key format, sample block, AI prompt) and only the first one worked well
+ * when pasted to an AI. Import and Edit Questions copy the universal format;
+ * the Answer Key window copies the short answers-only format.
  */
-function _splitInlineChoices(line) {
-  const re = /(?:^|\s)\*?\(?([A-Za-z])\)?[.)]\s+/g;
-  const hits = [];
-  let m;
-  while ((m = re.exec(line)) !== null) {
-    hits.push({ letter: m[1].toUpperCase(), start: m.index + (m[0].startsWith(' ') ? 1 : 0), end: re.lastIndex,
-                starred: m[0].includes('*') });
-  }
-  // Must start at A and run consecutively, otherwise this is prose.
-  const consecutive = hits.length >= 2 && hits[0].letter === 'A' &&
-    hits.every((h, k) => h.letter.charCodeAt(0) === 65 + k);
-  if (!consecutive) return { text: line, choices: [] };
-
-  const text = line.slice(0, hits[0].start).trim();
-  if (!text) return { text: line, choices: [] };   // the whole line was choices
-
-  const choices = hits.map((h, k) => {
-    const stop = k + 1 < hits.length ? hits[k + 1].start : line.length;
-    const raw = line.slice(h.end, stop).trim();
-    const cleaned = (typeof _extractAnswerMarker === 'function') ? _extractAnswerMarker(raw) : { text: raw, isCorrect: false };
-    return { letter: h.letter, text: cleaned.text, isCorrect: cleaned.isCorrect || h.starred };
-  }).filter(c => c.text);
-
-  return choices.length >= 2 ? { text, choices } : { text: line, choices: [] };
-}
-
-/** Pulls a trailing [MCQ] / [T/F] / [Match] / [Ident] / [Multi] off a question. */
-function _extractTypeTag(text) {
-  const m = text.match(/\s*\[(mcq|multi|multiple|checkbox|tf|t\/f|truefalse|true\/false|match|matching|ident|identification|text)\]\s*$/i);
-  if (!m) return { text, type: null };
-  const raw = m[1].toLowerCase();
-  const map = {
-    mcq: 'mcq',
-    multi: 'checkbox', multiple: 'checkbox', checkbox: 'checkbox',
-    tf: 'truefalse', 't/f': 'truefalse', truefalse: 'truefalse', 'true/false': 'truefalse',
-    match: 'matching', matching: 'matching',
-    ident: 'text', identification: 'text', text: 'text'
-  };
-  return { text: text.slice(0, m.index).trim(), type: map[raw] || null };
-}
-
-/**
- * Turns whatever was written after "Answer:" into something the question can
- * actually hold. Previously only a bare letter worked, so "Answer: B) 4",
- * "Answer: printf()" and "Answer: A and C" all landed as-is and graded nothing.
- * @returns {{answer: string|string[], unresolved: boolean}}
- */
-function _resolveBulkAnswer(rawAnswer, choices, type) {
-  const raw = String(rawAnswer == null ? '' : rawAnswer).trim();
-  if (!raw) return { answer: type === 'checkbox' ? [] : '', unresolved: false };
-  const letters = Object.keys(choices || {});
-
-  if (type === 'text') return { answer: raw, unresolved: false };
-
-  if (type === 'truefalse') {
-    const v = raw.toLowerCase().replace(/[^a-z]/g, '');
-    if (['a', 'true', 't'].includes(v)) return { answer: 'A', unresolved: false };
-    if (['b', 'false', 'f'].includes(v)) return { answer: 'B', unresolved: false };
-    return { answer: '', unresolved: true };
-  }
-
-  // Split on comma / "and" / "&" / "+" so multi-answers arrive as a list.
-  const parts = raw.split(/\s*(?:,|;|\band\b|&|\+|\/)\s*/i).map(x => x.trim()).filter(Boolean);
-  const resolved = [];
-  let unresolved = false;
-
-  parts.forEach(part => {
-    // "B" or "B) 4" or "(B) 4" — take the leading letter when it names a choice.
-    const lead = part.match(/^\(?([A-Za-z])\)?[.):\]]?(?:\s|$)/);
-    if (lead && letters.includes(lead[1].toUpperCase())) {
-      resolved.push(lead[1].toUpperCase());
-      return;
-    }
-    // A number: 1 -> first choice.
-    const num = part.match(/^(\d{1,2})$/);
-    if (num) {
-      const idx = parseInt(num[1], 10) - 1;
-      if (letters[idx]) { resolved.push(letters[idx]); return; }
-    }
-    // The answer written out as the choice's own text.
-    const hit = letters.find(L => String(choices[L] || '').trim().toLowerCase() === part.toLowerCase());
-    if (hit) { resolved.push(hit); return; }
-    unresolved = true;
-  });
-
-  const unique = [...new Set(resolved)];
-  if (type === 'checkbox') return { answer: unique, unresolved: unresolved && !unique.length };
-  return { answer: unique[0] || '', unresolved: unresolved && !unique.length };
-}
-
-/* Type auto-detection */
-function _detectQuestionType(q) {
-  if (q.pairs && q.pairs.length >= 2) return 'matching';
-  const txt = q.question || '';
-  if (/true\s*(or|\/)\s*false/i.test(txt)) return 'truefalse';
-  const vals = Object.values(q.choices || {}).map(v => (v || '').toLowerCase().trim());
-  if (vals.length === 2 && vals.includes('true') && vals.includes('false')) return 'truefalse';
-  if (Array.isArray(q.answer) && q.answer.length > 1) return 'checkbox';
-  if (/select all|choose all|multiple correct|pick all|that apply|multiple answers|more than one/i.test(txt)) return 'checkbox';
-  if (/(?:choose|select|pick)\s+(?:two|three|four|five|six|seven|eight|nine|ten|\d+)/i.test(txt)) return 'checkbox';
-  if (Object.keys(q.choices || {}).length === 0 && (!q.pairs || q.pairs.length < 2)) return 'text';
-  return 'mcq';
-}
-
-/* Phase 2 — Assemble tokens into question objects */
-function _assembleBulkQuestions(tokens) {
-  const questions = [];
-  let cur = null, autoQ = 1;
-
-  function finalize() {
-    if (!cur) return;
-    const raw = cur._rawAnswer != null ? cur._rawAnswer : cur.answer;
-
-    // Resolve permissively FIRST, so type detection can see that "A and C" is
-    // two answers. Detecting first left cur.answer empty and every multi-answer
-    // question came out as a single-choice MCQ.
-    const probe = _resolveBulkAnswer(raw, cur.choices, 'checkbox');
-    cur.answer = probe.answer;
-
-    // An explicit [tag] on the question line beats the guess.
-    cur.type = cur.forcedType || _detectQuestionType(cur);
-    delete cur.forcedType;
-    if (cur.type === 'truefalse') cur.choices = { A: 'True', B: 'False' };
-
-    // Now shape it for the type that was chosen.
-    const res = _resolveBulkAnswer(raw, cur.choices, cur.type);
-    cur.answer = res.answer;
-    if (res.unresolved) cur._unresolvedAnswer = String(raw || '').trim();
-    delete cur._rawAnswer;
-    // Single pair isn't matching — merge back to question text
-    if (cur.pairs && cur.pairs.length < 2 && cur.type !== 'matching') {
-      cur.pairs.forEach(p => { cur.question += (cur.question ? ' ' : '') + p.left + ' -> ' + p.right; });
-      cur.pairs = [];
-    }
-    questions.push(cur);
-    cur = null;
-  }
-
-  function startQ(qNum, text, forcedType) {
-    finalize();
-    cur = { qNum, type: 'mcq', question: text || '', hint: '', answer: '', explanation: '',
-            choices: {}, pairs: [], forcedType: forcedType || null };
-  }
-
-  for (const tok of tokens) {
-    switch (tok.type) {
-      case 'blank': break;
-      case 'header': break;
-      case 'question':
-        startQ(tok.qNum, tok.text, tok.forcedType);
-        if (tok.qNum >= autoQ) autoQ = tok.qNum + 1;
-        break;
-      case 'choice':
-        if (!cur) startQ(autoQ++, '');
-        cur.choices[tok.letter] = tok.text;
-        if (tok.isCorrect) {
-          if (!cur.answer) cur.answer = tok.letter;
-          else if (typeof cur.answer === 'string') cur.answer = [cur.answer, tok.letter];
-          else if (Array.isArray(cur.answer)) cur.answer.push(tok.letter);
-        }
-        break;
-      case 'bullet':
-        if (!cur) startQ(autoQ++, '');
-        cur.choices[String.fromCharCode(65 + Object.keys(cur.choices).length)] = tok.text;
-        break;
-      case 'pair':
-        if (!cur) startQ(autoQ++, 'Match the following:');
-        cur.pairs.push({ left: tok.left, right: tok.right });
-        break;
-      case 'answer':
-        // Kept verbatim: finalize() resolves it once the choices are known, so
-        // "Answer: printf()" can be matched against the choice text.
-        if (cur) cur._rawAnswer = tok.text;
-        break;
-      case 'explanation':
-        if (cur) cur.explanation = cur.explanation ? cur.explanation + ' ' + tok.text : tok.text;
-        break;
-      case 'hint':
-        if (cur) cur.hint = cur.hint ? cur.hint + ' ' + tok.text : tok.text;
-        break;
-      case 'continuation':
-        if (cur) cur.question += (cur.question ? ' ' : '') + tok.text;
-        break;
-      case 'unknown':
-        startQ(autoQ++, tok.text);
-        break;
-    }
-  }
-  finalize();
-  return questions;
-}
-
-/* Main entry point: parse unified textarea and apply */
-/* ============================================================
-   FORMAT REFERENCE — copy to clipboard
-   ------------------------------------------------------------
-   The parser accepts a lot, but nothing told you what. These build a spec you
-   can paste to another model so the questions come back in a shape this
-   importer reads on the first try, rather than being hand-fixed afterwards.
-   ============================================================ */
-const NB_FMT_NL = String.fromCharCode(10);
-
-/** The exact sample this dialog shows as its placeholder. */
-function _nbImportExample() {
-  return [
-    'Q: Which function prints to stdout in C?',
-    'A) printf()', 'B) console.log()', 'C) echo()', '*A',
-    'Explanation: printf is the standard C output.',
-    '',
-    'Select all valid C loop keywords',
-    'A) for', 'B) loop', 'C) while', 'Answer: A, C',
-    '',
-    'What is the capital of France?',
-    'Answer: Paris',
-    '',
-    'Match the following:',
-    'Cell -> Biology',
-    'Atom -> Chemistry'
-  ].join(NB_FMT_NL);
-}
-
-function _nbGivenFormatSpec() {
-  const L = [
-    'QUESTION FORMAT — StudySession notebook import',
-    '',
-    'One question per block, blank line between blocks. Numbering is optional;',
-    'unnumbered blocks are numbered in the order they appear.',
-    'Add [MCQ] [Multi] [T/F] [Match] [Ident] at the end of a question line to',
-    'set its type explicitly, otherwise the type is inferred.',
-    '',
-    '--- 1. MULTIPLE CHOICE (one correct) ---',
-    '1. Which function prints to stdout in C? [MCQ]',
-    'A. printf()',
-    'B. console.log()',
-    'C. echo()',
-    'Answer: A',
-    '',
-    '--- 2. MULTI-SELECT (more than one correct) ---',
-    '2. Which of these are loops? [Multi]',
-    'A. for',
-    'B. if',
-    'C. while',
-    'Answer: A and C',
-    '',
-    '--- 3. TRUE / FALSE ---',
-    '3. The mitochondria produces ATP. [T/F]',
-    'Answer: True',
-    '',
-    '--- 4. IDENTIFICATION (typed answer) ---',
-    '4. Name the green pigment in chloroplasts. [Ident]',
-    'Answer: Chlorophyll',
-    'Hint: Starts with C.',
-    '',
-    '--- 5. MATCHING (two or more pairs) ---',
-    '5. Match the organelle to its job: [Match]',
-    'Nucleus -> Holds DNA',
-    'Ribosome -> Makes protein',
-    'Lysosome -> Digests waste',
-    '',
-    'ACCEPTED VARIATIONS',
-    '- numbering: "1." "1)" "1:" "Q1." or none at all',
-    '- choices:   "A." "A)" "(A)" "A:" — and they may sit on the question line',
-    '- correct choice may be marked with * instead of an Answer line: "*B. Whale"',
-    '- Answer accepts: a letter ("B"), letter with text ("B) 4"), the choice',
-    '  text itself ("printf()"), a position ("2"), several ("A and C", "A, C")',
-    '- matching pairs accept "->", "=>", "→" or a TAB between the two sides',
-    '- "Hint:" and "Explanation:" lines attach to the question above them',
-    '- headers like "PART I - MULTIPLE CHOICE" and "Instructions: ..." are ignored',
-    '',
-    'AVOID',
-    '- putting two questions in one block without a blank line between them',
-    '- numbering choices ("1. printf()") — numbers start a new question',
-    '- a single matching pair; matching needs at least two'
-  ];
-  return L.join(NB_FMT_NL);
-}
-
-function _nbAnswerFormatSpec() {
-  const L = [
-    'ANSWER KEY FORMAT — StudySession notebook import',
-    '',
-    'One line per question. The number must match the question it answers.',
-    '',
-    '--- MULTIPLE CHOICE --- (the letter of the correct choice)',
-    '1. B',
-    '1 = B',
-    'Answer 1: B',
-    '',
-    '--- MULTI-SELECT --- (every correct letter)',
-    '2. A, C',
-    '2 = A and C',
-    '',
-    '--- TRUE / FALSE ---',
-    '3. True',
-    '3 = T',
-    '',
-    '--- IDENTIFICATION --- (the exact expected text)',
-    '4. Chlorophyll',
-    '',
-    '--- MATCHING --- (pair each term with its match)',
-    '5. Nucleus -> Holds DNA',
-    '5. Ribosome -> Makes protein',
-    '5. Lysosome -> Digests waste',
-    '',
-    'NOTES',
-    '- an "Explanation: ..." line after an answer is stored with it',
-    '- letters are case-insensitive',
-    '- an answer for a question number that does not exist is reported, not',
-    '  silently dropped'
-  ];
-  return L.join(NB_FMT_NL);
-}
-
-/** The spec plus instructions, ready to hand to a model. */
-function _nbAiPromptSpec() {
-  const L = [
-    'You are writing quiz questions that will be pasted into StudySession Pro.',
-    'Follow this format EXACTLY. Output plain text only — no markdown, no code',
-    'fences, no commentary before or after.',
-    '',
-    'Rules:',
-    '- one question per block, one blank line between blocks',
-    '- number every question sequentially starting at 1',
-    '- put the type tag at the end of the question line',
-    '- every question except Matching must have an Answer line',
-    '- Multiple choice: 3-4 plausible options, exactly one correct',
-    '- Multi-select: at least two correct, and say so in the question',
-    '- Matching: at least two pairs, one per line, using ->',
-    '- keep each question on a single line',
-    '',
-    _nbGivenFormatSpec(),
-    '',
-    'Now generate <N> questions about <TOPIC> using the formats above.'
-  ];
-  return L.join(NB_FMT_NL);
-}
-
-/** Copies a spec, using the same clipboard path the share links use. */
 function nbCopyFormat(kind) {
-  const spec = kind === 'answer' ? _nbAnswerFormatSpec()
-             : kind === 'ai' ? _nbAiPromptSpec()
-             : kind === 'sample' ? _nbImportExample()
-             : _nbGivenFormatSpec();
-  const label = kind === 'answer' ? 'Answer key format copied'
-              : kind === 'ai' ? 'AI prompt copied — paste it to your model'
-              : kind === 'sample' ? 'Sample questions copied'
-              : 'Question format copied';
+  const isAnswer = kind === 'answer';
+  const spec = isAnswer ? nbAnswerKeyFormatSpec() : nbImportFormatSpec();
+  const label = isAnswer ? 'Answer key format copied'
+                         : 'Format copied. Fill in your topic, send it to your AI, then paste its reply.';
   if (typeof copyShareLink === 'function') copyShareLink(spec, label);
-  else if (navigator.clipboard) navigator.clipboard.writeText(spec);
-  _nbCloseFormatMenu();
-}
-
-function _nbCloseFormatMenu() {
-  document.getElementById('nb-format-menu')?.remove();
-}
-
-/** Small menu so one button covers question, answer key and the AI prompt. */
-function nbFormatMenu(ev, defaultKind) {
-  ev.stopPropagation();
-  const existing = document.getElementById('nb-format-menu');
-  if (existing) { existing.remove(); return; }
-
-  const btn = ev.currentTarget;
-  const menu = document.createElement('div');
-  menu.id = 'nb-format-menu';
-  menu.className = 'nb-format-menu';
-  const item = (kind, icon, title, sub) =>
-    `<button type="button" class="nb-format-item" onclick="nbCopyFormat('${kind}')">
-       <i data-lucide="${icon}"></i>
-       <span><strong>${title}</strong><em>${sub}</em></span>
-     </button>`;
-  menu.innerHTML =
-    item('given', 'list-checks', 'Question format', 'All five types, with examples') +
-    item('answer', 'key', 'Answer key format', 'How to write the answers') +
-    item('sample', 'file-text', 'Sample block', 'The example shown here, ready to edit') +
-    item('ai', 'sparkles', 'AI prompt', 'Format plus instructions, for a model');
-  document.body.appendChild(menu);
-  if (typeof lucide !== 'undefined') lucide.createIcons({ el: menu });
-
-  const r = btn.getBoundingClientRect();
-  const mh = menu.getBoundingClientRect().height;
-  menu.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 292)) + 'px';
-  menu.style.top = (r.bottom + mh > window.innerHeight ? Math.max(8, r.top - mh - 6) : r.bottom + 6) + 'px';
-
-  setTimeout(() => document.addEventListener('click', _nbCloseFormatMenu, { once: true }), 0);
+  else if (navigator.clipboard) {
+    navigator.clipboard.writeText(spec).then(
+      () => { if (typeof toast === 'function') toast(label, { type: 'success' }); },
+      () => { if (typeof toast === 'function') toast('Could not reach the clipboard.', { type: 'error' }); });
+  }
 }
 
 function bulkAddGivenQuestions() {
@@ -2670,16 +2178,17 @@ function bulkAddGivenQuestions() {
   const input = textarea ? textarea.value.trim() : '';
   if (!input) return;
 
-  // Save undo state
-  window._bulkUndoState = JSON.parse(JSON.stringify(currentGivenQuestionsData));
-
-  const tokens = _tokenizeBulkInput(input);
-  const parsed = _assembleBulkQuestions(tokens);
-
+  const { questions: parsed, skipped } = nbParseImport(input);
   if (parsed.length === 0) {
     if (typeof showShareToast === 'function') showShareToast('No questions detected in the input.');
     return;
   }
+  // Read the report before the merge below reshapes the records.
+  const report = nbImportReport(parsed, skipped);
+  parsed.forEach(q => { delete q._unresolvedAnswer; });
+
+  // Save undo state
+  window._bulkUndoState = JSON.parse(JSON.stringify(currentGivenQuestionsData));
 
   // Merge parsed questions into current data
   parsed.forEach(pq => {
@@ -2705,51 +2214,22 @@ function bulkAddGivenQuestions() {
 
   if (textarea) textarea.value = '';
   renderGivenQuestionContent();
-  _showParseReport(parsed);
+  _showParseReport(report);
 }
 
-function _showParseReport(parsed) {
-  const counts = {};
-  parsed.forEach(q => { counts[q.type] = (counts[q.type] || 0) + 1; });
-  const typeLabels = { mcq: 'MCQ', checkbox: 'Multi-Select', text: 'Identification', matching: 'Matching', truefalse: 'True/False' };
-  const parts = Object.entries(counts).map(([t, c]) => `${c} ${typeLabels[t] || t}`);
-
-  const hasAns = (q) => Array.isArray(q.answer) ? q.answer.length > 0 : String(q.answer || '').trim() !== '';
-  const answersFound = parsed.filter(hasAns).length;
-
-  /* The report only ever said what worked. These are the things that quietly
-     did not, and each one is a question that will not grade. */
-  const problems = [];
-  const noAnswer = parsed.filter(q => !hasAns(q) && q.type !== 'matching');
-  if (noAnswer.length) {
-    problems.push(`${noAnswer.length} with no answer (${noAnswer.slice(0, 6).map(q => 'Q' + q.qNum).join(', ')}${noAnswer.length > 6 ? '…' : ''})`);
-  }
-  const unresolved = parsed.filter(q => q._unresolvedAnswer);
-  if (unresolved.length) {
-    problems.push(`${unresolved.length} answer${unresolved.length !== 1 ? 's' : ''} that match no choice (${unresolved.slice(0, 4).map(q => 'Q' + q.qNum + ': "' + q._unresolvedAnswer + '"').join(', ')})`);
-  }
-  const emptyChoices = parsed.filter(q => (q.type === 'mcq' || q.type === 'checkbox') && Object.keys(q.choices || {}).length < 2);
-  if (emptyChoices.length) {
-    problems.push(`${emptyChoices.length} choice question${emptyChoices.length !== 1 ? 's' : ''} with fewer than 2 choices`);
-  }
-  const dupes = parsed.map(q => q.qNum).filter((n, i, a) => a.indexOf(n) !== i);
-  if (dupes.length) problems.push(`repeated question numbers: ${[...new Set(dupes)].join(', ')}`);
-  const halfPairs = parsed.filter(q => q.type === 'matching' && (q.pairs || []).some(pr => !pr.left || !pr.right));
-  if (halfPairs.length) problems.push(`${halfPairs.length} matching question${halfPairs.length !== 1 ? 's' : ''} with an incomplete pair`);
-
-  parsed.forEach(q => { delete q._unresolvedAnswer; });
-
+/** Paints nbImportReport's result under the paste box. */
+function _showParseReport(rep) {
   const reportEl = document.getElementById('gq-parse-report');
-  if (!reportEl) return;
-  const ok = problems.length === 0;
+  if (!reportEl || !rep) return;
+  const ok = rep.problems.length === 0;
   reportEl.innerHTML = `
     <div class="nb-parse-report ${ok ? 'is-ok' : 'is-warn'}">
       <div class="nb-parse-head">
         <i data-lucide="${ok ? 'check-circle' : 'alert-triangle'}" style="width:16px;height:16px;"></i>
-        <strong>${parsed.length} question${parsed.length !== 1 ? 's' : ''} parsed</strong>
+        <strong>${rep.total} question${rep.total !== 1 ? 's' : ''} parsed</strong>
       </div>
-      <div class="nb-parse-sub">${parts.join(', ')}${answersFound > 0 ? ` · ${answersFound} answer${answersFound !== 1 ? 's' : ''} filled in` : ''}</div>
-      ${problems.length ? `<ul class="nb-parse-problems">${problems.map(x => `<li>${escapeHTML(x)}</li>`).join('')}</ul>` : ''}
+      <div class="nb-parse-sub">${escapeHTML(rep.parts.join(', '))}${rep.answers > 0 ? ` · ${rep.answers} answer${rep.answers !== 1 ? 's' : ''} filled in` : ''}${rep.skipped.length ? ` · ${rep.skipped.length} line${rep.skipped.length !== 1 ? 's' : ''} left out` : ''}</div>
+      ${rep.problems.length ? `<ul class="nb-parse-problems">${rep.problems.map(x => `<li>${escapeHTML(x)}</li>`).join('')}</ul>` : ''}
     </div>`;
   if (typeof lucide !== 'undefined') lucide.createIcons({ el: reportEl });
 }
@@ -2999,7 +2479,7 @@ function _renderGivenQuestionContentNow() {
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
             <h4 style="font-weight:700; font-size:0.75rem; color:var(--text-tertiary); text-transform:uppercase; letter-spacing:0.05em; margin:0;">UNIFIED BULK ADD</h4>
             <div style="display:flex; align-items:center; gap:0.3rem;">
-              <button onclick="nbFormatMenu(event, 'given')" class="nb-fmt-btn" title="Copy the accepted format — hand it to an AI so its output pastes in cleanly" aria-label="Copy format to clipboard">
+              <button onclick="nbCopyFormat('given')" class="nb-fmt-btn" title="Copy the accepted format — hand it to an AI so its output pastes in cleanly" aria-label="Copy format to clipboard">
                 <i data-lucide="clipboard-copy"></i>
               </button>
               <button onclick="toggleFormatGuide()" class="btn btn-ghost" style="padding:0.2rem 0.4rem; font-size:0.7rem; color:var(--color-primary); font-weight:700; border:1px solid var(--color-primary)33; border-radius:var(--radius-sm);" title="Show paste format guide">?</button>
