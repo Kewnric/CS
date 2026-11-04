@@ -210,13 +210,37 @@ const Motion = (() => {
 
   /* ---------- View Transition helper ----------------------- */
   // Run a DOM-updating callback inside a View Transition when supported.
-  function withViewTransition(updateFn) {
+  //
+  // opts.rootClass: a class put on <html> for the life of THIS transition only,
+  // so CSS can change how it is captured (motion.css uses it to keep the sidebar
+  // in the page snapshot when the sidebar comes or goes). It goes on before
+  // startViewTransition, so both the old and the new capture see it, and comes
+  // off when the transition settles -- unless a newer transition has since
+  // taken over the class, in which case that one decides.
+  let vtClassSeq = 0;
+  let vtClassOn = null;
+  function withViewTransition(updateFn, opts) {
     if (prefersReducedMotion() || typeof document.startViewTransition !== 'function') {
       updateFn();
       return null;
     }
+    const rootEl = document.documentElement;
+    const rootClass = (opts && opts.rootClass) || null;
+    const classSeq = ++vtClassSeq;
+    // Starting a transition skips the one before it, so its class goes now.
+    if (vtClassOn) rootEl.classList.remove(vtClassOn);
+    vtClassOn = rootClass;
+    if (rootClass) rootEl.classList.add(rootClass);
+    const dropClass = () => {
+      if (classSeq !== vtClassSeq || !rootClass) return;
+      rootEl.classList.remove(rootClass);
+      vtClassOn = null;
+    };
     try {
       const vt = document.startViewTransition(updateFn);
+      // finished settles once the transition is over -- run, skipped or failed.
+      if (vt && vt.finished) vt.finished.then(dropClass, dropClass);
+      else dropClass();
       // Navigating again before the current transition settles aborts it, and the
       // ViewTransition promises reject. Nobody awaits them here, so an unguarded
       // reject surfaced as "Uncaught (in promise) InvalidStateError" on every fast
@@ -235,6 +259,7 @@ const Motion = (() => {
       }
       return vt;
     } catch (e) {
+      dropClass();
       updateFn();
       return null;
     }

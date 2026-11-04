@@ -265,8 +265,18 @@ const SpaRouter = (() => {
       }
     };
 
+    /* Toggling the sidebar in the same commit as the content (above) is not
+       enough on its own. The sidebar has a View Transition group of its own
+       (motion.css) that is drawn at full strength from the first frame, so
+       leaving an attempt showed the incoming sidebar, solid, over the snapshot
+       of the attempt and its Leave dialog for the whole fade. When the sidebar
+       comes or goes, it is captured as part of the page instead, and fades in
+       or out with the rest of the screen it belongs to. Read from <body>
+       rather than the previous route: that is what is on screen now, even
+       after a navigation that stood down before it rendered. */
+    const chromeSwap = document.body.classList.contains('route-focused') !== focused;
     if (window.Motion && typeof Motion.withViewTransition === 'function') {
-      Motion.withViewTransition(renderAndInit);
+      Motion.withViewTransition(renderAndInit, chromeSwap ? { rootClass: 'vt-chrome-swap' } : null);
     } else {
       renderAndInit();
     }

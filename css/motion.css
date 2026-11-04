@@ -61,6 +61,19 @@
 ::view-transition-old(ssp-sidebar) {
   display: none;
 }
+/* ...except that leaving an attempt is the other half of that, and it went
+   wrong. The incoming copy is drawn solid from the first frame, while the root
+   snapshot of the attempt -- Leave dialog and all -- is still fully opaque, so
+   the sidebar sat over the old attempt for the length of the fade. Whenever the
+   sidebar comes or goes the router flags the transition (Motion's rootClass)
+   and the sidebar stays in the page snapshot, arriving and leaving with the
+   screen it belongs to. Same-mode navigations keep the still sidebar above.
+   The HUD below is hidden on attempt screens too (hud.css), so it would have
+   arrived the same way; it gets the same exemption. */
+.vt-chrome-swap .app-sidebar,
+.vt-chrome-swap .hud-layer {
+  view-transition-name: none;
+}
 
 /* The HUD is chrome for the same reason and had the same fault: it is fixed to
    the viewport and identical before and after a navigation, but the root
