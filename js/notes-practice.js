@@ -80,6 +80,9 @@ function initNotesPracticeSession() {
 
   const titleEl = document.getElementById('np-notebook-title');
   if (titleEl) titleEl.textContent = activeNotebook.title;
+  // The whole name on hover, for a title long enough to be cut off.
+  const titleChip = document.getElementById('np-title-chip');
+  if (titleChip) titleChip.title = activeNotebook.title || '';
 
   practiceStartTime = Date.now();
   npFinishedAt = null;
@@ -782,28 +785,33 @@ function renderSidebar() {
     const isActive = idx === currentSectionIdx;
 
     // In review mode, show per-section score
+    const qList = sec.questions || [];
+    const total = qList.length;
     let scoreHtml = '';
+    let pct = 0;
+    let tone = '';
     if (reviewMode) {
       const gr = gradeResults[idx];
-      const qList = sec.questions || [];
       const correct = qList.filter(q => gr[q] === 'correct').length;
-      const total = qList.length;
-      const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
-      const color = pct === 100 ? '#10b981' : pct >= 70 ? '#fbbf24' : '#ef4444';
-      scoreHtml = `<span style="font-size:0.6875rem; font-weight:700; color:${color}; margin-left:auto;">${correct}/${total}</span>`;
+      pct = total > 0 ? Math.round((correct / total) * 100) : 0;
+      tone = pct === 100 ? 'good' : pct >= 70 ? 'warn' : 'bad';
+      scoreHtml = `<span class="np-tab-count" data-tone="${tone}">${correct}/${total}</span>`;
     } else {
-      scoreHtml = `<span style="font-size:0.6875rem; opacity:0.6; margin-top:0.125rem;">${(sec.questions || []).length} Qs</span>`;
+      const st = sessionStatus[idx] || {};
+      const done = qList.filter(q => st[q] === 'answered').length;
+      pct = total > 0 ? Math.round((done / total) * 100) : 0;
+      tone = done === total && total ? 'good' : '';
+      scoreHtml = `<span class="np-tab-count" data-tone="${tone}">${done}/${total}</span>`;
     }
 
     return `
-      <button class="np-sidebar-tab-dark ${isActive ? 'active' : ''}" onclick="switchSection(${idx})">
-        <div style="display:flex; align-items:center; gap:0.5rem; flex:1;">
-          <span style="font-family:var(--font-mono); font-size:0.6875rem; opacity:0.5;">${String(idx + 1).padStart(2, '0')}</span>
-          <span style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-            ${escapeHTML(sec.label)}
-          </span>
-        </div>
-        ${scoreHtml}
+      <button class="np-sidebar-tab-dark np-sp ${isActive ? 'active' : ''}" onclick="switchSection(${idx})" title="${escapeHTML(sec.label || ('Section ' + (idx + 1)))}">
+        <span class="np-tab-top">
+          <span class="np-tab-num">${String(idx + 1).padStart(2, '0')}</span>
+          <span class="np-tab-name">${escapeHTML(sec.label || ('Section ' + (idx + 1)))}</span>
+          ${scoreHtml}
+        </span>
+        <span class="np-tab-bar" data-tone="${tone}"><span style="width:${pct}%"></span></span>
       </button>
     `;
   }).join('');
@@ -825,7 +833,7 @@ function renderSidebar() {
   // Grid
   const sec = activeNotebook.sections[currentSectionIdx];
   const sectionTitle = document.getElementById('np-current-section-title');
-  if (sectionTitle) sectionTitle.textContent = sec.label;
+  if (sectionTitle) sectionTitle.textContent = sec.label || ('Section ' + (currentSectionIdx + 1));
 
   const gridContainer = document.getElementById('np-question-grid');
   if (!gridContainer) return;
@@ -835,7 +843,7 @@ function renderSidebar() {
   // first question but was labelled 2. Position is what the header counts, so
   // position is what the button shows; the original number is on the tooltip.
   gridContainer.innerHTML = (sec.questions || []).map((qNum, pos) => {
-    let cls = 'np-grid-box';
+    let cls = 'np-grid-box np-sp';
 
     if (reviewMode) {
       const result = gradeResults[currentSectionIdx][qNum];
@@ -861,6 +869,9 @@ function renderSidebar() {
               title="Question ${pos + 1}${flagged ? ' — flagged for review' : ''}"
               aria-label="Go to question ${pos + 1}${flagged ? ', flagged' : ''}">${pos + 1}${flagged ? '<span class="np-grid-flag"></span>' : ''}</button>`;
   }).join('');
+
+  // The title chip's counter and the rail under the topbar.
+  if (typeof npUiPaintProgress === 'function') npUiPaintProgress();
 }
 
 /* ============================================================
@@ -1173,9 +1184,15 @@ function _npSyncVoiceBtn() {
   if (!btn) return;
   const on = npAutoVoice();
   btn.setAttribute('aria-pressed', String(on));
-  btn.style.color = on ? 'var(--color-primary)' : 'silver';
-  btn.title = on ? 'Reading questions aloud' : 'Read questions aloud';
-  btn.innerHTML = '<i data-lucide="' + (on ? 'volume-2' : 'volume-x') + '"></i>';
+  btn.classList.toggle('is-on', on);
+  btn.title = on ? 'Reading questions aloud — click to stop' : 'Read questions aloud';
+  // Only the glyph is swapped; the label and the level meter beside it stay.
+  const old = btn.querySelector('svg, i[data-lucide]');
+  const icon = document.createElement('i');
+  icon.setAttribute('data-lucide', on ? 'volume-2' : 'volume-x');
+  if (old) old.replaceWith(icon); else btn.prepend(icon);
+  const label = btn.querySelector('.np-voice-label');
+  if (label) label.textContent = on ? 'Reading aloud' : 'Read aloud';
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: btn });
 }
 
@@ -1208,7 +1225,9 @@ function npSpeakQuestion(text) {
     the tap IS the answer, and reading each one on the way past would be noise. */
 function npHoverSpeak(el) {
   if (!npAutoVoice() || typeof speak !== 'function' || !el) return;
-  const said = (el.textContent || '').trim();
+  // The card also holds its keycap letter and a result mark; read the answer.
+  const textEl = el.querySelector('.np-choice-text');
+  const said = ((textEl || el).textContent || '').trim();
   if (said) speak(said);
 }
 
@@ -1250,7 +1269,10 @@ function renderQuestion() {
   // Question type badge
   const typeBadgeMap = { mcq: 'MCQ', checkbox: 'Multi-Select', text: 'Text', matching: 'Matching', truefalse: 'True/False' };
   const qLabelEl = document.getElementById('np-q-label');
-  qLabelEl.innerHTML = `Question ${escapeHTML(currentQuestionNum.toString())} <span class="np-qtype-badge ${escapeHTML(qType)}">${escapeHTML(typeBadgeMap[qType] || 'MCQ')}</span>`;
+  // Position, not the authored number: questions are shuffled, and the grid and
+  // the counter both count by position, so "Question 3" on the first card of a
+  // shuffled section disagreed with everything around it.
+  qLabelEl.innerHTML = `<span class="np-q-label-text">Question ${idx + 1}</span> <span class="np-qtype-badge ${escapeHTML(qType)}">${escapeHTML(typeBadgeMap[qType] || 'MCQ')}</span>`;
 
   // Heading text — review mode AND already-answered questions in practice mode
   // both show the outcome with the correct answer + explanation.
@@ -1265,9 +1287,9 @@ function renderQuestion() {
 
   if (reviewMode || practiceResult) {
     const result = reviewMode ? gradeResults[currentSectionIdx][currentQuestionNum] : practiceResult;
-    if (result === 'correct') { heading.textContent = 'Correct!'; heading.style.color = '#10b981'; }
-    else if (result === 'wrong') { heading.textContent = 'Incorrect'; heading.style.color = '#ef4444'; }
-    else { heading.textContent = 'Skipped'; heading.style.color = '#8b949e'; }
+    if (result === 'correct') { heading.textContent = 'Correct'; heading.dataset.tone = 'correct'; }
+    else if (result === 'wrong') { heading.textContent = 'Incorrect'; heading.dataset.tone = 'wrong'; }
+    else { heading.textContent = 'Skipped'; heading.dataset.tone = 'skipped'; }
 
     // Only show full review status when NOT in the grading animation delay
     if (!isCheckingAnswer) {
@@ -1295,7 +1317,7 @@ function renderQuestion() {
   } else {
     const headingMap = { mcq: 'Select your answer', checkbox: 'Select all correct answers', text: 'Type your answer', matching: 'Match the pairs', truefalse: 'True or False?' };
     heading.textContent = headingMap[qType] || 'Select your answer';
-    heading.style.color = '#e6edf3';
+    heading.dataset.tone = '';
     if (reviewStatus) reviewStatus.classList.add('hidden');
   }
 
@@ -1371,7 +1393,7 @@ function renderQuestion() {
     bubblesContainer.innerHTML = `
       <textarea id="np-text-answer-input" class="np-text-input-area" placeholder="Type your answer here... (Enter to submit)"
         style="border-color:${borderColor};" ${isAnswered || reviewMode ? 'disabled' : ''}>${escapeHTML(textVal)}</textarea>
-      ${!isAnswered && !reviewMode ? `<button class="np-confirm-btn" onclick="confirmTextAnswer()"><i data-lucide="check" style="width:18px;height:18px;"></i> Submit Answer</button>` : ''}
+      ${!isAnswered && !reviewMode ? `<button class="np-confirm-btn np-sp" onclick="confirmTextAnswer()"><i data-lucide="send-horizontal" style="width:18px;height:18px;"></i> Submit answer <kbd>Enter</kbd></button>` : ''}
       ${reviewMode && correctAns ? `<div class="np-text-compare" style="margin-top:0.5rem;"><span class="np-text-compare-label" style="color:#10b981;">Expected Answer</span>${escapeHTML(String(correctAns))}</div>` : ''}
     `;
     const textInput = document.getElementById('np-text-answer-input');
@@ -1391,42 +1413,29 @@ function renderQuestion() {
     const correctArr = Array.isArray(correctAns) ? correctAns : [];
     const isAnswered = sessionStatus[currentSectionIdx][currentQuestionNum] === 'answered';
 
+    const showResult = reviewMode || isCheckingAnswer || isAnswered;
     bubblesContainer.innerHTML = letters.map((letter, pos) => {
-      let cls = 'ns-bubble checkbox-mode';
       const isSelected = selectedArr.includes(letter);
-
-      if (reviewMode) {
-        cls += ' review-locked';
-        if (isSelected && correctArr.includes(letter)) cls += ' review-correct';
-        else if (isSelected && !correctArr.includes(letter)) cls += ' review-wrong';
-        else if (!isSelected && correctArr.includes(letter)) cls += ' review-correct';
-      } else {
-        const showResult = isCheckingAnswer || isAnswered;
-        if (isSelected) {
-          cls += ' selected';
-          if (showResult) {
-            if (correctArr.includes(letter)) cls += ' review-correct';
-            else cls += ' review-wrong';
-          }
-        } else if (showResult && correctArr.includes(letter)) {
-          cls += ' review-correct';
-        }
+      const isKey = correctArr.includes(letter);
+      let state = '';
+      if (showResult) {
+        // A right answer that was not ticked is still shown as right, dashed,
+        // so a partial selection reads as "missed one" rather than as correct.
+        if (isKey) state = isSelected ? 'is-correct' : 'is-correct is-missed';
+        else if (isSelected) state = 'is-wrong';
+        else state = 'is-dim';
       }
-
+      if (isSelected) state += ' is-selected';
       const choiceText = correctObj && correctObj.choices && correctObj.choices[letter] ? correctObj.choices[letter] : '';
-      const onclick = (reviewMode || isAnswered) ? '' : `onclick="selectAnswer('${letter}')"`;
-      return `
-        <div style="display:flex; flex-direction:column; gap:0.25rem; text-align:left; width: 100%;">
-          <span style="font-size:0.75rem; font-weight:700; color:var(--text-tertiary); margin-left:0.25rem;">${String.fromCharCode(65 + pos)}.</span>
-          <button class="${cls}" style="width:100%; height:auto; border-radius:var(--radius-md); padding:1rem 1.25rem 1rem 2.25rem; text-align:${npTextAlignCenter ? 'center' : 'left'}; font-size:1rem; min-height:54px; display:flex; justify-content:${npTextAlignCenter ? 'center' : 'flex-start'}; align-items:center; white-space:normal; word-wrap:break-word; overflow-wrap:break-word;" ${onclick}>
-            ${choiceText ? escapeHTML(choiceText) : letter}
-          </button>
-        </div>
-      `;
+      const locked = reviewMode || isAnswered;
+      return _npChoiceHTML({
+        letter, pos, text: choiceText, kind: 'checkbox', state, locked,
+        mark: showResult ? (isKey ? 'check' : (isSelected ? 'x' : '')) : (isSelected ? 'check' : '')
+      });
     }).join('');
 
     if (!isAnswered && !reviewMode && !isCheckingAnswer) {
-      bubblesContainer.innerHTML += `<button class="np-confirm-btn" onclick="confirmCheckboxAnswer()" ${selectedArr.length === 0 ? 'disabled' : ''}><i data-lucide="check" style="width:18px;height:18px;"></i> Confirm Selection (${selectedArr.length} chosen)</button>`;
+      bubblesContainer.innerHTML += `<button class="np-confirm-btn np-sp" onclick="confirmCheckboxAnswer()" ${selectedArr.length === 0 ? 'disabled' : ''}><i data-lucide="check-check" style="width:18px;height:18px;"></i> Confirm selection <span class="np-confirm-count">${selectedArr.length}</span></button>`;
     }
   }
   // === MATCHING TYPE ===
@@ -1450,7 +1459,7 @@ function renderQuestion() {
       const isActive = window._matchingSelectedLeft === li;
       const matchedRightIdx = userMatches[li];
       const hasMatch = matchedRightIdx !== undefined;
-      let cls = 'np-match-item np-match-left';
+      let cls = 'np-match-item np-match-left np-sp';
       if (isActive) cls += ' np-match-active';
       if (hasMatch) cls += ' np-match-connected';
       if (isAnswered || reviewMode) {
@@ -1476,7 +1485,7 @@ function renderQuestion() {
         }
       });
       const isUsed = matchingLeftIdx !== null;
-      let cls = 'np-match-item np-match-right';
+      let cls = 'np-match-item np-match-right np-sp';
       if (isUsed) cls += ' np-match-connected';
       const onclick = (reviewMode || isAnswered) ? '' : `onclick="selectMatchingRight(${item.origIdx})"`;
       
@@ -1496,7 +1505,7 @@ function renderQuestion() {
         <div class="np-matching-col"><h5 style="font-size:0.75rem; color:var(--text-tertiary); margin-bottom:0.5rem; text-transform:uppercase;">Terms</h5>${leftHtml}</div>
         <div class="np-matching-col"><h5 style="font-size:0.75rem; color:var(--text-tertiary); margin-bottom:0.5rem; text-transform:uppercase;">Definitions</h5>${rightHtml}</div>
       </div>
-      ${!isAnswered && !reviewMode && !isCheckingAnswer ? `<button class="np-confirm-btn" onclick="confirmMatchingAnswer()" ${matchedCount < pairs.length ? 'disabled' : ''}><i data-lucide="check" style="width:18px;height:18px;"></i> Confirm Matches (${matchedCount}/${pairs.length})</button>` : ''}
+      ${!isAnswered && !reviewMode && !isCheckingAnswer ? `<button class="np-confirm-btn np-sp" onclick="confirmMatchingAnswer()" ${matchedCount < pairs.length ? 'disabled' : ''}><i data-lucide="check" style="width:18px;height:18px;"></i> Confirm Matches (${matchedCount}/${pairs.length})</button>` : ''}
       ${(isAnswered || reviewMode) ? `
         <div style="margin-top:1rem; padding:0.75rem; background:var(--bg-surface); border-radius:var(--radius-sm); border:1px solid var(--border-color);">
           <h5 style="font-size:0.75rem; color:var(--text-tertiary); margin-bottom:0.5rem;">Correct Pairings:</h5>
@@ -1510,39 +1519,29 @@ function renderQuestion() {
     const isAnswered = sessionStatus[currentSectionIdx][currentQuestionNum] === 'answered';
     const correctLetter = _npNormTF(correctAns);
 
-    const buttonsHtml = ['A', 'B'].map(letter => {
-      const label = letter === 'A' ? 'True' : 'False';
-      const color = letter === 'A' ? '#10b981' : '#ef4444';
-      let cls = 'ns-bubble np-tf-bubble';
-      if (reviewMode) {
-        cls += ' review-locked';
-        if (letter === correctLetter && selected === correctLetter) cls += ' review-correct';
-        else if (letter === selected && selected !== correctLetter) cls += ' review-wrong';
-        else if (letter === correctLetter && selected !== correctLetter) cls += ' review-correct';
-      } else {
-        const showResult = isCheckingAnswer || isAnswered;
-        if (selected === letter) {
-          cls += ' selected';
-          if (showResult) {
-            cls += (letter === correctLetter) ? ' review-correct' : ' review-wrong';
-          }
-        } else if (showResult && letter === correctLetter) {
-          cls += ' review-correct';
-        }
+    const showResult = reviewMode || isCheckingAnswer || isAnswered;
+    const locked = reviewMode || isAnswered;
+    const buttonsHtml = ['A', 'B'].map((letter, pos) => {
+      const isTrue = letter === 'A';
+      let state = '';
+      if (showResult) {
+        if (letter === correctLetter) state = 'is-correct';
+        else if (letter === selected) state = 'is-wrong';
+        else state = 'is-dim';
       }
-      const onclick = (reviewMode || isAnswered) ? '' : `onclick="selectAnswer('${letter}')"`;
+      if (selected === letter) state += ' is-selected';
+      const onclick = locked ? '' : `onclick="selectAnswer('${letter}')"`;
       return `
-        <button class="${cls}" style="flex: 1; height: auto; border-radius:var(--radius-md); padding:1.5rem; text-align:center; font-size:1.25rem; font-weight:700; min-height:80px; color:${color}; border:2px solid ${color}33;" ${onclick}>
-          ${label}
-        </button>
-      `;
+        <button type="button" class="np-choice np-tf np-sp ${state}${locked ? ' is-locked' : ''}" data-tone="${isTrue ? 'true' : 'false'}"
+                style="--i:${pos}" ${onclick} aria-pressed="${selected === letter}"
+                onpointerenter="if(event.pointerType==='mouse') npHoverSpeak(this)">
+          <span class="np-choice-key" title="Press ${pos + 1}">${pos + 1}</span>
+          <span class="np-tf-icon" aria-hidden="true"><i data-lucide="${isTrue ? 'circle-check-big' : 'circle-x'}"></i></span>
+          <span class="np-choice-text">${isTrue ? 'True' : 'False'}</span>
+        </button>`;
     }).join('');
 
-    bubblesContainer.innerHTML = `
-      <div style="display: flex; flex-direction: row; gap: 1.25rem; width: 100%; max-width: 600px; justify-content: center; align-items: center; padding: 0.5rem 0;">
-        ${buttonsHtml}
-      </div>
-    `;
+    bubblesContainer.innerHTML = `<div class="np-tf-row">${buttonsHtml}</div>`;
   }
   // === MCQ TYPE (default) ===
   else {
@@ -1553,37 +1552,28 @@ function renderQuestion() {
     // Normalize the stored key ('b' / ' B ') so highlight matches grading
     const correctLetter = String(correctAns == null ? '' : correctAns).trim().toUpperCase();
 
+    const showResult = reviewMode || isCheckingAnswer || isAnswered;
     bubblesContainer.innerHTML = letters.map((letter, pos) => {
-      let cls = 'ns-bubble';
-      if (reviewMode) {
-        cls += ' review-locked';
-        if (letter === correctLetter && selected === correctLetter) cls += ' review-correct';
-        else if (letter === selected && selected !== correctLetter) cls += ' review-wrong';
-        else if (letter === correctLetter && selected !== correctLetter) cls += ' review-correct';
-      } else {
-        const showResult = isCheckingAnswer || isAnswered;
-        if (selected === letter) {
-          cls += ' selected';
-          if (showResult) {
-            if (letter === correctLetter) cls += ' review-correct';
-            else cls += ' review-wrong';
-          }
-        } else if (showResult && letter === correctLetter) {
-          cls += ' review-correct';
-        }
+      let state = '';
+      if (showResult) {
+        if (letter === correctLetter) state = 'is-correct';
+        else if (letter === selected) state = 'is-wrong';
+        else state = 'is-dim';
       }
+      if (selected === letter) state += ' is-selected';
       const choiceText = correctObj && correctObj.choices && correctObj.choices[letter] ? correctObj.choices[letter] : '';
-      const onclick = (reviewMode || (sessionStatus[currentSectionIdx][currentQuestionNum] === 'answered')) ? '' : `onclick="selectAnswer('${letter}')"`;
-      return `
-        <div style="display:flex; flex-direction:column; gap:0.25rem; text-align:left; width: 100%;">
-          <span style="font-size:0.75rem; font-weight:700; color:var(--text-tertiary); margin-left:0.25rem;">${String.fromCharCode(65 + pos)}.</span>
-          <button class="${cls}" onpointerenter="if(event.pointerType==='mouse') npHoverSpeak(this)" style="width:100%; height:auto; border-radius:var(--radius-md); padding:1rem 1.25rem; text-align:${npTextAlignCenter ? 'center' : 'left'}; font-size:1rem; min-height:54px; display:flex; justify-content:${npTextAlignCenter ? 'center' : 'flex-start'}; align-items:center; white-space:normal; word-wrap:break-word; overflow-wrap:break-word;" ${onclick}>
-            ${choiceText ? escapeHTML(choiceText) : letter}
-          </button>
-        </div>
-      `;
+      return _npChoiceHTML({
+        letter, pos, text: choiceText, kind: 'mcq', state, locked: reviewMode || isAnswered,
+        mark: showResult ? (letter === correctLetter ? 'check' : (letter === selected ? 'x' : '')) : ''
+      });
     }).join('');
   }
+
+  bubblesContainer.classList.toggle('np-align-left', !npTextAlignCenter);
+  // Grading animations (the pop on a right answer, the shake on a wrong one)
+  // belong to the moment of answering. Revisiting an answered question draws
+  // the same classes, and should not replay them.
+  bubblesContainer.classList.toggle('np-grading', !!isCheckingAnswer);
 
   // Update nav buttons
   const btnPrev = document.getElementById('np-btn-prev');
@@ -1602,6 +1592,39 @@ function renderQuestion() {
   } else {
     window.removeEventListener('resize', drawMatchingLines);
   }
+
+  // Entry animation (only when the question changed), the section meter, and
+  // the spatial hover state for whatever is now under the pointer.
+  if (typeof npUiOnRender === 'function') {
+    npUiOnRender({
+      key: currentSectionIdx + '-' + currentQuestionNum,
+      ord: currentSectionIdx * 100000 + idx,
+      pos: idx,
+      total: qList.length
+    });
+  }
+}
+
+/**
+ * One choice card, for multiple choice and multi-select.
+ *
+ * The onclick stays `selectAnswer('X')` as the first thing on the button:
+ * the keyboard handler finds the choices by that attribute prefix.
+ */
+function _npChoiceHTML(o) {
+  const shown = String.fromCharCode(65 + o.pos);
+  const onclick = o.locked ? '' : `onclick="selectAnswer('${o.letter}')"`;
+  const mark = o.mark ? `<i data-lucide="${o.mark}"></i>` : '';
+  const label = escapeHTML(o.text || o.letter);
+  return `
+    <button type="button" ${onclick} class="np-choice np-sp${o.kind === 'checkbox' ? ' np-choice-multi' : ''} ${o.state || ''}${o.locked ? ' is-locked' : ''}"
+            style="--i:${o.pos}" aria-pressed="${/\bis-selected\b/.test(o.state || '')}"
+            aria-label="${shown}: ${label}"
+            onpointerenter="if(event.pointerType==='mouse') npHoverSpeak(this)">
+      <span class="np-choice-key" title="Press ${shown} or ${o.pos + 1}">${shown}</span>
+      <span class="np-choice-text">${label}</span>
+      <span class="np-choice-mark" aria-hidden="true">${mark}</span>
+    </button>`;
 }
 
 /* Draw SVG connecting lines between matched terms and definitions */

@@ -1,0 +1,1354 @@
+/* ============================================================
+   NOTES-PRACTICE-UI.CSS — the notebook attempt, redrawn
+   ------------------------------------------------------------
+   Everything here is scoped to #np-layout (the route's root) or to the
+   body-level pieces the attempt adds (.np-ui-pop, .np-edge-flash,
+   .np-burst), so nothing leaks into the coding attempt that shares
+   .practice-layout.
+
+   The display preferences arrive as data attributes on #np-layout
+   (js/notes-practice-ui.js) and become four multipliers:
+     --np-fs   text size          --np-el   element size
+     --np-w    question width     --tone    a choice's colour
+   ============================================================ */
+
+#np-layout {
+  --np-fs: 1;
+  --np-el: 1;
+  --np-w: 820px;
+  --np-accent: var(--color-primary, #6366f1);
+  --np-accent-2: #22d3ee;
+  --np-accent-deep: color-mix(in srgb, var(--np-accent) 72%, #000);
+  --np-line: rgba(148, 163, 184, 0.14);
+  --np-glass: rgba(13, 17, 23, 0.55);
+  --np-ink: #e6edf3;
+  --np-ink-2: #c9d1d9;
+  --np-muted: #8b949e;
+  --np-faint: #6e7681;
+  --lift: 0px;
+  --sc: 1;
+}
+#np-layout[data-np-text="sm"] { --np-fs: 0.9; }
+#np-layout[data-np-text="lg"] { --np-fs: 1.16; }
+#np-layout[data-np-text="xl"] { --np-fs: 1.36; }
+#np-layout[data-np-size="compact"] { --np-el: 0.82; }
+#np-layout[data-np-size="large"] { --np-el: 1.2; }
+#np-layout[data-np-size="huge"] { --np-el: 1.42; }
+#np-layout[data-np-width="narrow"] { --np-w: 640px; }
+#np-layout[data-np-width="wide"] { --np-w: 1080px; }
+#np-layout[data-np-width="full"] { --np-w: 100%; }
+
+/* ── Topbar ─────────────────────────────────────────────────────── */
+#np-layout .np-topbar {
+  position: relative;
+  gap: 1rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent),
+    #141920;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  box-shadow: 0 10px 30px -22px rgba(0, 0, 0, 0.9);
+}
+/* The title gets every pixel the right-hand cluster does not use. Basis 0 so
+   the cluster is measured first; min-width 0 so a long name ellipsises
+   instead of pushing the buttons off the bar. */
+#np-layout .np-topbar-left {
+  flex: 1 1 0%;
+  min-width: 0;
+  gap: 0.75rem;
+}
+#np-layout .np-topbar-right {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+@media (max-width: 1024px) {
+  #np-layout .np-topbar-left { min-width: min(200px, 100%); }
+  #np-layout .np-topbar-right { flex: 0 1 auto; flex-wrap: wrap; justify-content: flex-end; }
+}
+
+#np-layout #np-back-btn {
+  height: 34px;
+  padding: 0 0.7rem 0 0.45rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+#np-layout #np-back-btn:hover {
+  background: rgba(148, 163, 184, 0.08);
+  border-color: var(--np-line);
+}
+
+.np-title-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.3rem 0.4rem 0.3rem 0.32rem;
+  border-radius: 12px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--np-accent) 16%, transparent), rgba(34, 211, 238, 0.05));
+  border: 1px solid color-mix(in srgb, var(--np-accent) 30%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 6px 22px -12px color-mix(in srgb, var(--np-accent) 80%, transparent);
+}
+.np-title-icon {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--np-accent), var(--np-accent-deep));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 4px 12px -4px var(--np-accent);
+}
+.np-title-icon svg { width: 15px; height: 15px; }
+.np-title-text {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 650;
+  font-size: 0.9rem;
+  color: var(--np-ink);
+  letter-spacing: -0.005em;
+}
+.np-title-count {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.16rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(13, 17, 23, 0.65);
+  border: 1px solid var(--np-line);
+  color: #a5b4fc;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Grouped tools: one capsule each, so twelve icons read as two sets. */
+.np-toolgroup {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 12px;
+  background: rgba(13, 17, 23, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+.np-toolgroup .ost-control { margin: 0 1px; }
+.np-tb-btn {
+  position: relative;
+  overflow: hidden;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--np-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease,
+              transform 0.22s var(--ease-expo-out, ease), box-shadow 0.2s ease;
+}
+.np-tb-btn svg { width: 17px; height: 17px; position: relative; z-index: 1; }
+.np-tb-btn:hover { color: var(--np-ink); background: rgba(148, 163, 184, 0.1); }
+.np-tb-btn:focus-visible { outline: 2px solid var(--np-accent); outline-offset: 1px; }
+.np-tb-btn.is-on,
+.np-tb-btn.is-open {
+  color: #c7d2fe;
+  background: color-mix(in srgb, var(--np-accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--np-accent) 40%, transparent);
+  box-shadow: 0 0 16px -6px var(--np-accent);
+}
+#np-layout #np-flag-btn.is-flagged {
+  background: rgba(245, 158, 11, 0.14);
+  border-color: rgba(245, 158, 11, 0.4);
+}
+
+#np-layout #np-submit-btn {
+  position: relative;
+  overflow: hidden;
+  height: 36px;
+  border-radius: 11px;
+  padding: 0 1.1rem;
+  background: linear-gradient(135deg, var(--np-accent), var(--np-accent-deep));
+  box-shadow: 0 10px 24px -12px var(--np-accent), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+/* What has been answered, as a line along the bottom of the bar. */
+.np-top-rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  pointer-events: none;
+}
+.np-top-rail span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: 0 2px 2px 0;
+  background: linear-gradient(90deg, var(--np-accent), var(--np-accent-2));
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.55);
+  transition: width 0.6s var(--ease-expo-out, ease);
+}
+
+/* ── Sidebar ────────────────────────────────────────────────────── */
+#np-layout .np-sidebar { gap: 1.25rem; }
+.np-side-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  color: var(--np-ink);
+}
+.np-side-head h2 svg { color: var(--np-accent); }
+.np-side-sub {
+  display: block;
+  margin-top: 0.3rem;
+  font-size: 0.72rem;
+  color: var(--np-faint);
+}
+.np-section-tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+#np-layout .np-sidebar-tab-dark {
+  position: relative;
+  overflow: hidden;
+  gap: 0.45rem;
+  padding: calc(0.6rem * var(--np-el)) 0.8rem;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)), rgba(13, 17, 23, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  color: #b1bac4;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease,
+              box-shadow 0.25s ease, transform 0.22s var(--ease-expo-out, ease);
+}
+#np-layout .np-sidebar-tab-dark:hover {
+  color: var(--np-ink);
+  border-color: color-mix(in srgb, var(--np-accent) 40%, transparent);
+  background: color-mix(in srgb, var(--np-accent) 8%, rgba(13, 17, 23, 0.6));
+}
+#np-layout .np-sidebar-tab-dark.active {
+  color: var(--np-ink);
+  border-color: color-mix(in srgb, var(--np-accent) 60%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--np-accent) 22%, transparent), color-mix(in srgb, var(--np-accent) 6%, transparent));
+  box-shadow: 0 10px 26px -14px var(--np-accent), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+#np-layout .np-sidebar-tab-dark.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 18%;
+  bottom: 18%;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(180deg, var(--np-accent-2), var(--np-accent));
+  box-shadow: 0 0 10px var(--np-accent-2);
+}
+.np-tab-top { display: flex; align-items: center; gap: 0.5rem; width: 100%; min-width: 0; }
+.np-tab-num { font-family: var(--font-mono); font-size: 0.68rem; color: var(--np-faint); }
+.np-tab-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: 600;
+  font-size: calc(0.86rem * var(--np-fs));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.np-tab-count {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--np-muted);
+  font-variant-numeric: tabular-nums;
+}
+.np-tab-count[data-tone="good"] { color: #34d399; }
+.np-tab-count[data-tone="warn"] { color: #fbbf24; }
+.np-tab-count[data-tone="bad"] { color: #f87171; }
+.np-tab-bar {
+  display: block;
+  width: 100%;
+  height: 3px;
+  border-radius: 99px;
+  overflow: hidden;
+  background: rgba(148, 163, 184, 0.12);
+}
+.np-tab-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--np-accent), var(--np-accent-2));
+  transition: width 0.5s var(--ease-expo-out, ease);
+}
+.np-tab-bar[data-tone="good"] > span { background: linear-gradient(90deg, #10b981, #34d399); }
+.np-tab-bar[data-tone="warn"] > span { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.np-tab-bar[data-tone="bad"] > span { background: linear-gradient(90deg, #dc2626, #f87171); }
+
+.np-grid-block {
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
+  padding-top: 1rem;
+}
+.np-grid-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--np-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#np-layout .np-grid {
+  grid-template-columns: repeat(auto-fill, minmax(calc(40px * var(--np-el)), 1fr));
+  gap: calc(0.5rem * var(--np-el));
+}
+#np-layout .np-grid-box {
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)), #0d1117;
+  color: var(--np-muted);
+  font-size: calc(0.85rem * var(--np-el));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 3px 8px -4px rgba(0, 0, 0, 0.6);
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease,
+              box-shadow 0.25s ease, transform 0.22s var(--ease-expo-out, ease);
+}
+#np-layout .np-grid-box:hover {
+  color: #e0e7ff;
+  border-color: color-mix(in srgb, var(--np-accent) 60%, transparent);
+  background: color-mix(in srgb, var(--np-accent) 12%, #0d1117);
+}
+#np-layout .np-grid-box.opened { color: var(--np-ink-2); border-color: rgba(148, 163, 184, 0.3); }
+#np-layout .np-grid-box.review-correct {
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.22), rgba(16, 185, 129, 0.08)), #0d1117 !important;
+  border-color: rgba(52, 211, 153, 0.6) !important;
+  color: #6ee7b7 !important;
+}
+#np-layout .np-grid-box.review-wrong {
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.22), rgba(239, 68, 68, 0.08)), #0d1117 !important;
+  border-color: rgba(248, 113, 113, 0.6) !important;
+  color: #fca5a5 !important;
+}
+#np-layout .np-grid-box.review-skipped {
+  background: #0d1117 !important;
+  border-color: rgba(148, 163, 184, 0.14) !important;
+  color: #565e68 !important;
+}
+#np-layout .np-grid-box.flagged { border-color: rgba(245, 158, 11, 0.7); }
+#np-layout .np-grid-box.active {
+  color: #fff !important;
+  border-color: transparent !important;
+  background: linear-gradient(135deg, var(--np-accent), var(--np-accent-deep)) !important;
+  box-shadow: 0 0 0 2px #0d1117, 0 0 0 4px color-mix(in srgb, var(--np-accent) 70%, transparent),
+              0 0 22px -2px var(--np-accent) !important;
+}
+#np-layout .np-grid-box.review-correct.active {
+  background: linear-gradient(135deg, #10b981, #047857) !important;
+  box-shadow: 0 0 0 2px #0d1117, 0 0 0 4px rgba(52, 211, 153, 0.7), 0 0 22px -2px #10b981 !important;
+}
+#np-layout .np-grid-box.review-wrong.active {
+  background: linear-gradient(135deg, #ef4444, #b91c1c) !important;
+  box-shadow: 0 0 0 2px #0d1117, 0 0 0 4px rgba(248, 113, 113, 0.7), 0 0 22px -2px #ef4444 !important;
+}
+#np-layout .np-grid-box .np-grid-flag {
+  top: 3px;
+  right: 3px;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.9);
+}
+
+.np-grid-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.85rem;
+  margin-top: 0.9rem;
+  font-size: 0.66rem;
+  color: var(--np-faint);
+}
+.np-lg {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 0.3rem;
+  border-radius: 3px;
+  vertical-align: -1px;
+}
+.np-lg-now { background: var(--np-accent); box-shadow: 0 0 6px var(--np-accent); }
+.np-lg-ok { background: #10b981; }
+.np-lg-bad { background: #ef4444; }
+.np-lg-flag { background: #f59e0b; border-radius: 50%; }
+
+/* Shortcuts, as keycaps rather than a sentence. */
+#np-layout .np-keys { padding-top: 1rem; }
+.np-keys-title {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #565e68;
+}
+.np-keys-list {
+  list-style: none;
+  margin: 0.6rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.42rem;
+}
+.np-keys-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 0.7rem;
+  color: var(--np-faint);
+}
+.np-keys-list em { font-style: normal; text-align: right; }
+#np-layout .np-keys kbd {
+  display: inline-block;
+  min-width: 1.45em;
+  margin: 0 1px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-bottom-width: 2px;
+  color: #a5adb8;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  text-align: center;
+}
+.np-keys-note { margin: 0.65rem 0 0; font-size: 0.68rem; color: #484f58; }
+#np-layout[data-np-rclick="off"] .np-keys-rclick,
+#np-layout[data-np-rclick="off"] .np-nav-hint { display: none; }
+
+/* ── The question pane ──────────────────────────────────────────── */
+#np-layout .np-question-pane {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  position: relative;
+  overflow-y: auto;
+  /* A leaning card is a little wider than its box; it must not open a
+     sideways scroll on a pane that shows no scrollbar. */
+  overflow-x: hidden;
+  background:
+    radial-gradient(900px 520px at 50% -12%, color-mix(in srgb, var(--np-accent) 13%, transparent), transparent 62%),
+    radial-gradient(700px 420px at 105% 108%, rgba(34, 211, 238, 0.07), transparent 60%),
+    radial-gradient(circle at 1px 1px, rgba(148, 163, 184, 0.07) 1px, transparent 1.5px) 0 0 / 22px 22px,
+    #0d1117;
+}
+.np-pane-inner {
+  width: 100%;
+  max-width: var(--np-w);
+  margin: auto 0;
+  padding: 2.25rem 2rem 2.5rem;
+  transition: max-width 0.35s var(--ease-expo-out, ease);
+}
+
+.np-card {
+  position: relative;
+  isolation: isolate;
+  padding: calc(1.4rem * var(--np-el)) calc(1.6rem * var(--np-el)) calc(1.7rem * var(--np-el));
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(30, 36, 48, 0.78), rgba(17, 21, 29, 0.86));
+  border: 1px solid rgba(148, 163, 184, 0.12);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 34px 70px -34px rgba(0, 0, 0, 0.85),
+    0 0 0 1px rgba(0, 0, 0, 0.25);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+/* A lit edge: a gradient drawn only in the 1px ring. */
+.np-card::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  z-index: 2;
+  padding: 1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(140deg,
+    color-mix(in srgb, var(--np-accent) 60%, transparent),
+    rgba(34, 211, 238, 0.16) 38%,
+    transparent 62%,
+    color-mix(in srgb, var(--np-accent) 28%, transparent));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+/* And a light that follows the pointer across the card. */
+.np-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(520px circle at var(--cx, 50%) var(--cy, 0%),
+    color-mix(in srgb, var(--np-accent) 12%, transparent), transparent 45%);
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+.np-card.is-lit::after { opacity: 1; }
+#np-layout[data-np-spatial="off"] .np-card::after { display: none; }
+.np-card > * { position: relative; z-index: 1; }
+
+.np-qhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+}
+.np-qhead-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  min-width: 0;
+}
+.np-q-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: calc(0.7rem * var(--np-fs));
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--np-muted);
+}
+.np-q-label-text { color: var(--np-ink-2); }
+.np-q-progress {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--np-muted);
+  padding: 0.22rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(13, 17, 23, 0.6);
+  border: 1px solid var(--np-line);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Read aloud, beside the label of the thing it reads. */
+.np-voice-btn {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 28px;
+  padding: 0 0.7rem 0 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(13, 17, 23, 0.55);
+  color: var(--np-muted);
+  font: 600 0.72rem var(--font-sans);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.2s ease, border-color 0.2s ease,
+              box-shadow 0.25s ease, transform 0.22s var(--ease-expo-out, ease);
+}
+.np-voice-btn svg { width: 14px; height: 14px; flex: 0 0 auto; }
+.np-voice-btn:hover {
+  color: var(--np-ink);
+  border-color: color-mix(in srgb, var(--np-accent) 50%, transparent);
+  background: color-mix(in srgb, var(--np-accent) 12%, transparent);
+}
+.np-voice-btn:focus-visible { outline: 2px solid var(--np-accent); outline-offset: 2px; }
+.np-voice-btn.is-on {
+  color: #e0e7ff;
+  border-color: color-mix(in srgb, var(--np-accent) 65%, transparent);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--np-accent) 30%, transparent), rgba(34, 211, 238, 0.12));
+  box-shadow: 0 0 18px -5px var(--np-accent);
+}
+.np-voice-eq { display: none; align-items: flex-end; gap: 2px; height: 11px; }
+.np-voice-btn.is-on .np-voice-eq { display: inline-flex; }
+.np-voice-eq i {
+  display: block;
+  width: 2px;
+  height: 100%;
+  border-radius: 1px;
+  background: currentColor;
+  transform-origin: bottom;
+  /* Alternating, so the loop closes on itself. */
+  animation: npEq 0.9s ease-in-out infinite alternate;
+}
+.np-voice-eq i:nth-child(2) { animation-delay: -0.3s; }
+.np-voice-eq i:nth-child(3) { animation-delay: -0.6s; }
+.np-voice-eq i:nth-child(4) { animation-delay: -0.15s; }
+@keyframes npEq { from { transform: scaleY(0.25); } to { transform: scaleY(1); } }
+
+.np-card-meter {
+  height: 3px;
+  margin-bottom: calc(1.35rem * var(--np-el));
+  border-radius: 99px;
+  overflow: hidden;
+  background: rgba(148, 163, 184, 0.1);
+}
+.np-card-meter > span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--np-accent), var(--np-accent-2));
+  box-shadow: 0 0 10px rgba(34, 211, 238, 0.5);
+  transition: width 0.55s var(--ease-expo-out, ease);
+}
+
+.np-q-image-wrap { margin: 0 0 1.25rem; text-align: center; }
+.np-q-image-wrap img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(320px * var(--np-el));
+  margin: 0 auto;
+  object-fit: contain;
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  box-shadow: 0 20px 44px -22px rgba(0, 0, 0, 0.85);
+}
+
+#np-layout .np-q-text {
+  min-height: 2rem;
+  padding: 0 0.25rem;
+  font-size: calc(1.3rem * var(--np-fs));
+  line-height: 1.55;
+  font-weight: 600;
+  color: #f0f3f6;
+  letter-spacing: -0.006em;
+  text-align: center;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+#np-layout[data-np-align="left"] .np-q-text,
+#np-layout[data-np-align="left"] .np-q-instruction { text-align: left; }
+.np-q-instruction {
+  margin-top: 0.6rem;
+  font-size: calc(0.78rem * var(--np-fs));
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--np-faint);
+  text-align: center;
+}
+.np-q-instruction[data-tone="correct"] { color: #34d399; }
+.np-q-instruction[data-tone="wrong"] { color: #f87171; }
+.np-q-instruction[data-tone="skipped"] { color: var(--np-muted); }
+
+.np-review-status {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+.np-review-status.hidden { display: none; }
+#np-layout .np-review-badge {
+  border-radius: 999px;
+  padding: 0.45rem 0.95rem;
+  font-size: calc(0.82rem * var(--np-fs));
+  box-shadow: 0 8px 22px -14px currentColor;
+}
+#np-layout .np-review-badge svg { width: 16px; height: 16px; }
+#np-layout .np-text-compare {
+  width: 100%;
+  text-align: left;
+  background: rgba(13, 17, 23, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 12px;
+  font-size: calc(0.85rem * var(--np-fs));
+}
+
+/* ── Choices ────────────────────────────────────────────────────── */
+.np-choices {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: calc(0.7rem * var(--np-el));
+  width: 100%;
+  margin-top: calc(1.5rem * var(--np-el));
+}
+
+.np-choice {
+  --tone: var(--np-accent);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: calc(0.9rem * var(--np-el));
+  width: 100%;
+  min-height: calc(58px * var(--np-el));
+  margin: 0;
+  padding: calc(0.75rem * var(--np-el)) calc(0.95rem * var(--np-el));
+  border-radius: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012)), rgba(13, 17, 23, 0.55);
+  color: #dfe6ee;
+  font-family: var(--font-sans);
+  font-size: calc(1rem * var(--np-fs));
+  font-weight: 600;
+  line-height: 1.45;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 8px 20px -14px rgba(0, 0, 0, 0.85);
+  transition: border-color 0.18s ease, background 0.2s ease, box-shadow 0.25s ease,
+              color 0.18s ease, opacity 0.3s ease, filter 0.3s ease,
+              transform 0.24s var(--ease-expo-out, ease);
+}
+.np-choice > span { position: relative; z-index: 1; }
+.np-choice-key {
+  flex: 0 0 auto;
+  width: calc(32px * var(--np-el));
+  height: calc(32px * var(--np-el));
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: rgba(13, 17, 23, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-bottom-width: 2px;
+  color: #a5adb8;
+  font-family: var(--font-mono);
+  font-size: calc(0.8rem * var(--np-fs));
+  font-weight: 700;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease,
+              box-shadow 0.25s ease, transform 0.3s var(--ease-spring, ease);
+}
+.np-choice-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.np-choices.np-align-left .np-choice-text { text-align: left; }
+.np-choice-mark {
+  flex: 0 0 auto;
+  width: calc(32px * var(--np-el));
+  height: calc(32px * var(--np-el));
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  transition: background 0.2s ease, box-shadow 0.25s ease, transform 0.3s var(--ease-spring, ease);
+}
+.np-choice-mark svg { width: 17px; height: 17px; }
+#np-layout[data-np-keys="off"] .np-choice:not(.np-tf) .np-choice-key { display: none; }
+#np-layout[data-np-keys="off"] .np-tf .np-choice-key { display: none; }
+
+/* Hover and focus, only where a click still means something. */
+.np-choice:not(.is-locked):hover {
+  color: #fff;
+  border-color: color-mix(in srgb, var(--tone) 58%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--tone) 15%, transparent), color-mix(in srgb, var(--tone) 5%, transparent)),
+    rgba(13, 17, 23, 0.6);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tone) 22%, transparent),
+              0 16px 34px -18px color-mix(in srgb, var(--tone) 85%, transparent);
+}
+.np-choice:not(.is-locked):hover .np-choice-key {
+  color: #fff;
+  background: var(--tone);
+  border-color: transparent;
+  box-shadow: 0 4px 14px -4px var(--tone);
+  transform: scale(1.06);
+}
+.np-choice:focus-visible { outline: 2px solid var(--tone); outline-offset: 2px; }
+.np-choice.is-locked { cursor: default; }
+
+/* Multi-select: the mark is a checkbox. */
+.np-choice-multi .np-choice-mark {
+  width: calc(24px * var(--np-el));
+  height: calc(24px * var(--np-el));
+  margin: 0 calc(4px * var(--np-el));
+  border-radius: 7px;
+  border: 2px solid rgba(148, 163, 184, 0.35);
+}
+.np-choice-multi .np-choice-mark svg { width: 14px; height: 14px; }
+
+.np-choice.is-selected {
+  color: #fff;
+  border-color: color-mix(in srgb, var(--tone) 75%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--tone) 22%, transparent), color-mix(in srgb, var(--tone) 8%, transparent)),
+    rgba(13, 17, 23, 0.6);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tone) 35%, transparent),
+              0 14px 30px -16px var(--tone);
+}
+.np-choice.is-selected .np-choice-key { color: #fff; background: var(--tone); border-color: transparent; }
+.np-choice-multi.is-selected .np-choice-mark { background: var(--tone); border-color: transparent; box-shadow: 0 0 12px -2px var(--tone); }
+
+.np-choice.is-correct {
+  --tone: #10b981;
+  color: #ecfdf5;
+  border-color: rgba(52, 211, 153, 0.7);
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.24), rgba(16, 185, 129, 0.08)), rgba(13, 17, 23, 0.6);
+  box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.3), 0 14px 34px -16px rgba(16, 185, 129, 0.9);
+}
+.np-choice.is-correct .np-choice-key { color: #fff; background: #10b981; border-color: transparent; }
+.np-choice.is-correct .np-choice-mark { background: #10b981; border-color: transparent; box-shadow: 0 0 14px rgba(16, 185, 129, 0.7); }
+/* Right, but not ticked: outlined rather than filled, and named. */
+.np-choice.is-missed {
+  color: #a7f3d0;
+  border-style: dashed;
+  border-color: rgba(52, 211, 153, 0.55);
+  background: rgba(16, 185, 129, 0.05);
+  box-shadow: none;
+}
+.np-choice.is-missed .np-choice-key {
+  color: #34d399;
+  background: transparent;
+  border: 1px dashed rgba(52, 211, 153, 0.6);
+}
+.np-choice.is-missed .np-choice-mark {
+  color: #34d399;
+  background: transparent;
+  border: 2px dashed rgba(52, 211, 153, 0.6);
+  box-shadow: none;
+}
+.np-choice.is-missed .np-choice-text::after {
+  content: 'missed';
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  vertical-align: 0.1em;
+  background: rgba(16, 185, 129, 0.14);
+  color: #6ee7b7;
+  font-size: 0.62em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.np-choice.is-wrong {
+  --tone: #ef4444;
+  color: #fef2f2;
+  border-color: rgba(248, 113, 113, 0.7);
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.24), rgba(239, 68, 68, 0.08)), rgba(13, 17, 23, 0.6);
+  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.3), 0 14px 34px -16px rgba(239, 68, 68, 0.9);
+}
+.np-choice.is-wrong .np-choice-key { color: #fff; background: #ef4444; border-color: transparent; }
+.np-choice.is-wrong .np-choice-mark { background: #ef4444; border-color: transparent; box-shadow: 0 0 14px rgba(239, 68, 68, 0.7); }
+.np-choice.is-dim { opacity: 0.42; filter: saturate(0.55); }
+
+/* True / False: two big cards side by side. */
+.np-tf-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: calc(1rem * var(--np-el));
+  width: 100%;
+}
+.np-choice.np-tf {
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.6rem;
+  min-height: calc(132px * var(--np-el));
+  font-size: calc(1.2rem * var(--np-fs));
+  font-weight: 750;
+}
+.np-tf[data-tone="true"] { --tone: #10b981; }
+.np-tf[data-tone="false"] { --tone: #ef4444; }
+.np-tf .np-choice-key {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 24px;
+  height: 24px;
+  font-size: 0.7rem;
+}
+.np-tf-icon {
+  width: calc(50px * var(--np-el));
+  height: calc(50px * var(--np-el));
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tone) 35%, transparent);
+  transition: transform 0.35s var(--ease-spring, ease), background 0.2s ease, color 0.2s ease;
+}
+.np-tf-icon svg { width: 55%; height: 55%; }
+.np-tf .np-choice-text { flex: 0 0 auto; color: var(--tone); }
+.np-tf:not(.is-locked):hover .np-tf-icon { transform: scale(1.12) rotate(-6deg); }
+.np-tf.is-correct .np-choice-text,
+.np-tf.is-wrong .np-choice-text,
+.np-tf.is-selected .np-choice-text { color: #fff; }
+.np-tf.is-correct .np-tf-icon,
+.np-tf.is-wrong .np-tf-icon { color: #fff; background: var(--tone); }
+
+/* Typed answers and the confirm button. */
+#np-layout .np-text-input-area {
+  min-height: calc(120px * var(--np-el));
+  padding: 1rem 1.1rem;
+  border-width: 1px;
+  border-radius: 14px;
+  background: rgba(13, 17, 23, 0.72);
+  font-size: calc(1rem * var(--np-fs));
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+#np-layout .np-text-input-area:focus {
+  border-color: var(--np-accent) !important;
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.35), 0 0 0 3px color-mix(in srgb, var(--np-accent) 28%, transparent);
+}
+#np-layout .np-confirm-btn {
+  position: relative;
+  overflow: hidden;
+  min-height: calc(48px * var(--np-el));
+  margin-top: 0.35rem;
+  border: 0;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--np-accent), var(--np-accent-deep) 65%, #0e7490);
+  color: #fff;
+  font-size: calc(0.95rem * var(--np-fs));
+  box-shadow: 0 14px 30px -16px var(--np-accent), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+#np-layout .np-confirm-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--np-accent), var(--np-accent-deep) 65%, #0e7490);
+  filter: brightness(1.1);
+  box-shadow: 0 18px 36px -16px var(--np-accent), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+#np-layout .np-confirm-btn:disabled { opacity: 0.4; filter: grayscale(0.35); }
+.np-confirm-btn > * { position: relative; z-index: 1; }
+.np-confirm-count {
+  min-width: 1.7em;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+}
+.np-confirm-btn kbd {
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+/* Matching, in the same material. */
+#np-layout .np-matching-grid { gap: 1.25rem; }
+#np-layout .np-match-item {
+  position: relative;
+  overflow: hidden;
+  border-width: 1px;
+  border-radius: 12px;
+  padding: calc(0.8rem * var(--np-el)) calc(1rem * var(--np-el));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.012)), rgba(13, 17, 23, 0.6);
+  font-size: calc(0.92rem * var(--np-fs));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 8px 20px -14px rgba(0, 0, 0, 0.85);
+  transition: border-color 0.18s ease, background 0.2s ease, box-shadow 0.25s ease,
+              transform 0.24s var(--ease-expo-out, ease);
+}
+#np-layout .np-match-item.np-match-active {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--np-accent) 30%, transparent), 0 14px 30px -16px var(--np-accent);
+}
+
+/* ── Navigation ─────────────────────────────────────────────────── */
+#np-layout .np-nav-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding: 0 0.15rem;
+}
+.np-nav-btn {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  height: calc(42px * var(--np-el));
+  padding: 0 calc(1.1rem * var(--np-el));
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(22, 27, 34, 0.75);
+  color: var(--np-ink-2);
+  font-family: var(--font-sans);
+  font-size: calc(0.875rem * var(--np-fs));
+  font-weight: 650;
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 10px 22px -16px rgba(0, 0, 0, 0.9);
+  transition: color 0.15s ease, background 0.2s ease, border-color 0.2s ease,
+              box-shadow 0.25s ease, opacity 0.2s ease, transform 0.24s var(--ease-expo-out, ease);
+}
+.np-nav-btn > * { position: relative; z-index: 1; }
+.np-nav-btn svg { width: 18px; height: 18px; transition: transform 0.25s var(--ease-spring, ease); }
+.np-nav-btn:hover:not(:disabled) {
+  color: #fff;
+  border-color: color-mix(in srgb, var(--np-accent) 50%, transparent);
+  background: color-mix(in srgb, var(--np-accent) 14%, rgba(22, 27, 34, 0.8));
+}
+#np-btn-prev:hover:not(:disabled) svg { transform: translateX(-3px); }
+.np-nav-btn-next {
+  color: #fff;
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--np-accent), var(--np-accent-deep));
+  box-shadow: 0 12px 26px -14px var(--np-accent), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.np-nav-btn.np-nav-btn-next:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--np-accent), var(--np-accent-deep));
+  filter: brightness(1.1);
+}
+.np-nav-btn-next:hover:not(:disabled) svg { transform: translateX(3px); }
+.np-nav-btn:disabled { opacity: 0.32; cursor: not-allowed; filter: grayscale(0.4); }
+.np-nav-btn:focus-visible { outline: 2px solid var(--np-accent); outline-offset: 2px; }
+.np-nav-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  font-size: 0.7rem;
+  color: var(--np-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.np-nav-hint svg { width: 13px; height: 13px; flex: 0 0 auto; }
+@media (hover: none), (max-width: 760px) {
+  .np-nav-hint { display: none !important; }
+}
+
+/* ── Spatial effects ────────────────────────────────────────────────
+   A lean toward the pointer (--rx/--ry, written per frame by the module),
+   a lift while it is there, a press that sinks, and a light where the pointer
+   is (--mx/--my). Off removes all of it, not just the lean. */
+#np-layout:is([data-np-spatial="subtle"], [data-np-spatial="full"]) .np-sp {
+  transform: perspective(800px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg))
+             translate3d(0, var(--lift), 0) scale(var(--sc));
+}
+#np-layout[data-np-spatial="subtle"] .np-sp.is-hot { --lift: -1px; }
+#np-layout[data-np-spatial="full"] .np-sp.is-hot { --lift: -3px; --sc: 1.012; }
+#np-layout[data-np-spatial="full"] .np-tb-btn.np-sp.is-hot,
+#np-layout[data-np-spatial="full"] .np-grid-box.np-sp.is-hot { --sc: 1.08; }
+#np-layout:is([data-np-spatial="subtle"], [data-np-spatial="full"]) .np-sp:active:not(:disabled):not(.is-locked) {
+  --lift: 0px;
+  --sc: 0.965;
+  transition-duration: 0.08s;
+}
+#np-layout .np-sp.is-locked,
+#np-layout .np-sp:disabled { --rx: 0deg !important; --ry: 0deg !important; --lift: 0px; --sc: 1; }
+
+/* The light. Elements without one of their own pseudo-elements only. */
+#np-layout :is(.np-choice, .np-tb-btn, .np-nav-btn, .np-confirm-btn, .np-voice-btn,
+               .np-sidebar-tab-dark, .np-match-item, #np-submit-btn, #np-back-btn)::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%),
+    rgba(255, 255, 255, 0.17), rgba(255, 255, 255, 0.04) 28%, transparent 58%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+#np-layout :is(.np-choice, .np-tb-btn, .np-nav-btn, .np-confirm-btn, .np-voice-btn,
+               .np-sidebar-tab-dark, .np-match-item, #np-submit-btn, #np-back-btn).is-hot::after { opacity: 1; }
+#np-layout[data-np-spatial="off"] :is(.np-choice, .np-tb-btn, .np-nav-btn, .np-confirm-btn, .np-voice-btn,
+               .np-sidebar-tab-dark, .np-match-item, #np-submit-btn, #np-back-btn)::after { display: none; }
+#np-layout[data-np-spatial="subtle"] :is(.np-choice, .np-tb-btn, .np-nav-btn, .np-confirm-btn, .np-voice-btn,
+               .np-sidebar-tab-dark, .np-match-item, #np-submit-btn, #np-back-btn).is-hot::after { opacity: 0.55; }
+#np-layout #np-submit-btn > *,
+#np-layout #np-back-btn > * { position: relative; z-index: 1; }
+
+/* Depth inside a leaning choice: the keycap rides a little above the card, so
+   the lean reads as a solid thing rather than a flat plane. */
+#np-layout[data-np-spatial="full"] .np-choice.is-hot:not(.is-locked) .np-choice-key {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px -4px var(--tone);
+}
+
+/* The press: a ring from where you clicked. */
+.np-burst {
+  position: fixed;
+  z-index: 9000;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  pointer-events: none;
+  border: 1.5px solid rgba(199, 210, 254, 0.9);
+  box-shadow: 0 0 14px rgba(129, 140, 248, 0.75), inset 0 0 10px rgba(129, 140, 248, 0.5);
+  animation: npBurst 0.55s var(--ease-expo-out, ease-out) forwards;
+}
+.np-burst.is-big { animation-name: npBurstBig; animation-duration: 0.65s; }
+@keyframes npBurst {
+  from { width: 8px; height: 8px; margin: -4px 0 0 -4px; opacity: 1; }
+  to { width: 64px; height: 64px; margin: -32px 0 0 -32px; opacity: 0; }
+}
+@keyframes npBurstBig {
+  from { width: 8px; height: 8px; margin: -4px 0 0 -4px; opacity: 1; }
+  to { width: 150px; height: 150px; margin: -75px 0 0 -75px; opacity: 0; }
+}
+
+/* Right-click: light the edge you went toward. */
+.np-edge-flash {
+  position: fixed;
+  z-index: 70;
+  pointer-events: none;
+  overflow: hidden;
+  animation: npEdge 0.62s ease-out forwards;
+}
+.np-edge-flash::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 42%;
+}
+.np-edge-flash.is-back::before { left: 0; background: linear-gradient(90deg, color-mix(in srgb, var(--color-primary, #6366f1) 30%, transparent), transparent); }
+.np-edge-flash.is-next::before { right: 0; background: linear-gradient(270deg, color-mix(in srgb, var(--color-primary, #6366f1) 30%, transparent), transparent); }
+.np-edge-flash.is-blocked::before { background: linear-gradient(var(--np-edge-dir, 90deg), rgba(148, 163, 184, 0.16), transparent); }
+.np-edge-flash.is-next.is-blocked::before { --np-edge-dir: 270deg; }
+.np-edge-glyph {
+  position: absolute;
+  top: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  color: #c7d2fe;
+  transform: translateY(-50%);
+}
+.np-edge-flash.is-back .np-edge-glyph { left: 1.25rem; animation: npGlyphBack 0.62s var(--ease-expo-out, ease-out) forwards; }
+.np-edge-flash.is-next .np-edge-glyph { right: 1.25rem; animation: npGlyphNext 0.62s var(--ease-expo-out, ease-out) forwards; }
+.np-edge-flash.is-blocked .np-edge-glyph { color: var(--text-tertiary, #8b949e); animation: none; }
+.np-edge-glyph svg { width: 46px; height: 46px; filter: drop-shadow(0 0 12px rgba(129, 140, 248, 0.9)); }
+.np-edge-glyph em {
+  font-style: normal;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+@keyframes npEdge { 0% { opacity: 0; } 18% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes npGlyphBack { from { transform: translate(18px, -50%); } to { transform: translate(-4px, -50%); } }
+@keyframes npGlyphNext { from { transform: translate(-18px, -50%); } to { transform: translate(4px, -50%); } }
+
+/* ── Animations ─────────────────────────────────────────────────────
+   Entry: the card slides in from the side you moved toward, and its choices
+   rise one after another. Grading: the right answer pops, a wrong one shakes.
+   Fill mode is backwards only -- a finished animation that held its last
+   frame would hold `transform: none` over the spatial lean. */
+#np-layout[data-np-motion="on"] .np-card.np-in-next { animation: npCardNext 0.52s var(--ease-expo-out, ease-out) backwards; }
+#np-layout[data-np-motion="on"] .np-card.np-in-back { animation: npCardBack 0.52s var(--ease-expo-out, ease-out) backwards; }
+#np-layout[data-np-motion="on"] .np-card.np-in-none { animation: npCardRise 0.6s var(--ease-expo-out, ease-out) backwards; }
+@keyframes npCardNext { from { opacity: 0; transform: translate3d(42px, 0, 0) scale(0.985); filter: blur(5px); } }
+@keyframes npCardBack { from { opacity: 0; transform: translate3d(-42px, 0, 0) scale(0.985); filter: blur(5px); } }
+@keyframes npCardRise { from { opacity: 0; transform: translate3d(0, 18px, 0) scale(0.98); filter: blur(5px); } }
+
+#np-layout[data-np-motion="on"] .np-choices.np-stagger > *,
+#np-layout[data-np-motion="on"] .np-choices.np-stagger > .np-tf-row > * {
+  animation: npRise 0.5s var(--ease-expo-out, ease-out) backwards;
+  animation-delay: calc(var(--i, 0) * 60ms + 140ms);
+}
+#np-layout[data-np-motion="on"] .np-choices.np-stagger > .np-tf-row { animation: none; }
+@keyframes npRise { from { opacity: 0; transform: translate3d(0, 16px, 0) scale(0.97); filter: blur(4px); } }
+
+#np-layout[data-np-motion="on"] .np-choices.np-grading .np-choice.is-correct:not(.is-missed) {
+  animation: npPop 0.6s var(--ease-spring, ease) both;
+}
+#np-layout[data-np-motion="on"] .np-choices.np-grading .np-choice.is-correct:not(.is-missed)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.28) 48%, transparent 66%);
+  transform: translateX(-100%);
+  animation: npSheen 0.9s 0.1s ease-out forwards;
+}
+#np-layout[data-np-motion="on"] .np-choices.np-grading .np-choice.is-correct .np-choice-mark {
+  animation: npMarkIn 0.5s 0.05s var(--ease-spring, ease) backwards;
+}
+#np-layout[data-np-motion="on"] .np-choices.np-grading .np-choice.is-wrong {
+  animation: npShake 0.48s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+#np-layout[data-np-motion="on"] .np-choices.np-grading .np-choice.is-wrong .np-choice-mark {
+  animation: npMarkIn 0.45s var(--ease-spring, ease) backwards;
+}
+#np-layout[data-np-motion="on"] .np-choices.np-grading .np-match-correct { animation: npPop 0.6s var(--ease-spring, ease) both; }
+#np-layout[data-np-motion="on"] .np-choices.np-grading .np-match-wrong { animation: npShake 0.48s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+@keyframes npPop {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.035); }
+  100% { transform: scale(1); }
+}
+@keyframes npSheen { to { transform: translateX(100%); } }
+@keyframes npMarkIn { from { transform: scale(0) rotate(-45deg); opacity: 0; } }
+@keyframes npShake {
+  10%, 90% { transform: translateX(-1px); }
+  20%, 80% { transform: translateX(3px); }
+  30%, 50%, 70% { transform: translateX(-6px); }
+  40%, 60% { transform: translateX(6px); }
+}
+#np-layout[data-np-motion="off"] .np-voice-eq i { animation: none; transform: scaleY(0.7); }
+
+/* ── The display panel ──────────────────────────────────────────── */
+.np-ui-pop {
+  position: fixed;
+  z-index: 1200;
+  width: min(352px, calc(100vw - 16px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 16px;
+  color: #c9d1d9;
+  background: rgba(17, 21, 29, 0.97);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: 0 28px 64px -22px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(0, 0, 0, 0.3),
+              inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  animation: npPopIn 0.24s var(--ease-expo-out, ease-out) both;
+  transform-origin: top right;
+}
+@keyframes npPopIn { from { opacity: 0; transform: translateY(-6px) scale(0.97); } }
+@media (prefers-reduced-motion: reduce) { .np-ui-pop { animation: none; } }
+.np-ui-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.8rem 0.9rem 0.7rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-primary, #6366f1) 10%, transparent), transparent);
+}
+.np-ui-title { display: flex; align-items: center; gap: 0.45rem; font-size: 0.86rem; font-weight: 700; color: #e6edf3; }
+.np-ui-title svg { width: 15px; height: 15px; color: var(--color-primary, #6366f1); }
+.np-ui-reset {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  height: 26px;
+  padding: 0 0.55rem;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: transparent;
+  color: #8b949e;
+  font: 600 0.7rem var(--font-sans);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.np-ui-reset svg { width: 12px; height: 12px; }
+.np-ui-reset:hover { color: #e6edf3; border-color: rgba(148, 163, 184, 0.35); background: rgba(148, 163, 184, 0.08); }
+.np-ui-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0.2rem 0.9rem 0.9rem;
+  scrollbar-width: thin;
+  scrollbar-color: #30363d transparent;
+}
+.np-ui-group-title {
+  margin: 0.9rem 0 0.1rem;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #565e68;
+}
+.np-ui-sec { margin-top: 0.6rem; }
+.np-ui-label {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #c9d1d9;
+}
+.np-ui-label svg { width: 14px; height: 14px; color: #8b949e; }
+.np-ui-label em { margin-left: auto; font-style: normal; font-size: 0.7rem; color: #a5b4fc; }
+.np-seg {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgba(13, 17, 23, 0.8);
+  border: 1px solid rgba(148, 163, 184, 0.12);
+}
+.np-seg-wrap { display: grid; grid-template-columns: 1fr 1fr; }
+.np-seg-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  height: 30px;
+  padding: 0 0.45rem;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #8b949e;
+  font: 600 0.74rem var(--font-sans);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.18s ease, box-shadow 0.2s ease;
+}
+.np-seg-btn svg { width: 13px; height: 13px; }
+.np-seg-btn:hover { color: #e6edf3; background: rgba(148, 163, 184, 0.09); }
+.np-seg-btn:focus-visible { outline: 2px solid var(--color-primary, #6366f1); outline-offset: 1px; }
+.np-seg-btn.is-on {
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-primary, #6366f1), color-mix(in srgb, var(--color-primary, #6366f1) 72%, #000));
+  box-shadow: 0 4px 14px -6px var(--color-primary, #6366f1), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+.np-ui-switches {
+  margin-top: 0.6rem;
+  padding: 0 0.75rem;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  background: rgba(13, 17, 23, 0.45);
+}
+.np-ui-switch {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.62rem 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.08);
+  cursor: pointer;
+}
+.np-ui-switch:first-child { border-top: 0; }
+.np-ui-switch > span { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
+.np-ui-switch strong { font-size: 0.8rem; font-weight: 600; color: #e6edf3; }
+.np-ui-switch em { font-style: normal; font-size: 0.68rem; color: #6e7681; }
+.np-ui-note { margin: 0.9rem 0 0; font-size: 0.68rem; color: #6e7681; text-align: center; }
+
+/* ── Phones ─────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  #np-layout .np-topbar-left { min-width: 0; }
+  #np-layout .np-title-count { display: none; }
+  #np-layout .np-toolgroup { padding: 2px; }
+  #np-layout .np-tb-btn { width: 32px; height: 32px; }
+  .np-grid-legend { display: none; }
+  .np-card { padding: 1.05rem 1rem 1.2rem; border-radius: 18px; }
+  #np-layout .np-q-text { font-size: calc(1.12rem * var(--np-fs)); }
+  .np-choice { min-height: calc(52px * var(--np-el)); }
+  .np-choice.np-tf { min-height: calc(104px * var(--np-el)); }
+  .np-voice-label { display: none; }
+  .np-voice-btn { padding: 0 0.55rem; }
+}

@@ -1,36 +1,41 @@
 /* Route: notes-practice */
 function notesPracticeTemplate() {
   return `
-    <div class="practice-layout" style="height: 100%; border-radius: 0; border: none;">
-      <div class="practice-topbar" id="np-topbar-practice">
-        <div class="practice-topbar-left">
-          <button onclick="spaNavigate('study')" class="btn-back-dark" id="np-back-btn"><i data-lucide="chevron-left" style="width:18px;height:18px;"></i> Back</button>
-          <span id="np-notebook-title" class="practice-title-badge">Loading Notebook...</span>
+    <div class="practice-layout np-layout" id="np-layout" style="height: 100%; border-radius: 0; border: none;">
+      <div class="practice-topbar np-topbar" id="np-topbar-practice">
+        <div class="practice-topbar-left np-topbar-left">
+          <button onclick="spaNavigate('study')" class="btn-back-dark np-sp" id="np-back-btn"><i data-lucide="chevron-left" style="width:18px;height:18px;"></i> Back</button>
+          <!-- The title takes whatever the right-hand cluster leaves. It used to
+               carry .practice-title-badge, whose max-width:42% resolved against
+               a parent that was itself sized to the title -- a cycle that cut a
+               five-letter name to "sda...". The full name is on the tooltip. -->
+          <div class="np-title-chip" id="np-title-chip">
+            <span class="np-title-icon" aria-hidden="true"><i data-lucide="notebook-pen"></i></span>
+            <span id="np-notebook-title" class="np-title-text">Loading notebook…</span>
+            <span class="np-title-count" id="np-title-count" title="Questions answered">0 / 0</span>
+          </div>
         </div>
-        <div class="practice-topbar-right" style="display:flex; align-items:center; gap: 1rem;">
-          <button id="np-hint-btn" onclick="showHintModal()" class="tutorial-trigger-btn" title="Show Hint" style="color: silver;"><i data-lucide="lightbulb"></i></button>
-          <button id="np-align-btn" onclick="toggleNpTextAlign()" class="tutorial-trigger-btn" title="Text: Centered" style="color: silver;"><i data-lucide="align-center"></i></button>
-          <button id="np-shuffle-btn" onclick="npShuffleMenu(event)" class="tutorial-trigger-btn np-shuffle-btn" title="Shuffle" aria-label="Shuffle settings" aria-haspopup="dialog" aria-pressed="false" style="color: silver;"><i data-lucide="shuffle"></i></button>
-          <button id="np-flag-btn" onclick="npToggleFlag(currentSectionIdx, currentQuestionNum)" class="tutorial-trigger-btn" title="Flag for review (F)" aria-pressed="false" style="color: silver;"><i data-lucide="flag"></i></button>
-          <button id="np-cheat-btn" onclick="openCheatsheet()" class="tutorial-trigger-btn" title="Cheat sheet" style="color: silver;"><i data-lucide="book-open-check"></i></button>
-          <button id="np-voice-btn" onclick="npToggleAutoVoice()" class="tutorial-trigger-btn"
-                  title="Read questions aloud" aria-label="Read questions aloud" aria-pressed="false"
-                  style="color: silver;"><i data-lucide="volume-x"></i></button>
-          <!-- Shared with the coding attempt. Both templates read their state
-               from the same modules, so they need no wiring here beyond the
-               ostMount/ostStop pair below: feel-panel keeps itself in step
-               through feelSync, and the OST audio element lives on <body>. -->
-          ${typeof feelButtonTemplate === 'function' ? feelButtonTemplate() : ''}
-          ${typeof ostButtonTemplate === 'function' ? ostButtonTemplate() : ''}
-          <button id="np-fullscreen-btn" onclick="toggleFullscreen()" class="tutorial-trigger-btn" title="Full screen" aria-label="Full screen" style="color: silver;"><i data-lucide="maximize"></i></button>
-          <select id="theme-selector" class="form-select" onchange="changeTheme(this.value)" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; width: auto;">
-            <option value="dark">Night</option><option value="light">Day</option><option value="purple">Purple</option><option value="green">Green</option>
-          </select>
+        <div class="practice-topbar-right np-topbar-right">
+          <div class="np-toolgroup" role="toolbar" aria-label="Question tools">
+            <button id="np-hint-btn" onclick="showHintModal()" class="np-tb-btn np-sp" title="Show hint (H)" aria-label="Show hint"><i data-lucide="lightbulb"></i></button>
+            <button id="np-shuffle-btn" onclick="npShuffleMenu(event)" class="np-tb-btn np-sp np-shuffle-btn" title="Shuffle" aria-label="Shuffle settings" aria-haspopup="dialog" aria-pressed="false"><i data-lucide="shuffle"></i></button>
+            <button id="np-flag-btn" onclick="npToggleFlag(currentSectionIdx, currentQuestionNum)" class="np-tb-btn np-sp" title="Flag for review (F)" aria-label="Flag for review" aria-pressed="false"><i data-lucide="flag"></i></button>
+            <button id="np-cheat-btn" onclick="openCheatsheet()" class="np-tb-btn np-sp" title="Cheat sheet" aria-label="Cheat sheet"><i data-lucide="book-open-check"></i></button>
+          </div>
+          <div class="np-toolgroup" role="toolbar" aria-label="Screen">
+            <!-- Spatial effects: one click on, one click off. The level and the
+                 rest of the display options are in the panel beside it. -->
+            <button id="np-spatial-btn" onclick="npUiToggleSpatial()" class="np-tb-btn np-sp" title="Spatial effects" aria-label="Spatial effects" aria-pressed="false"><i data-lucide="rotate-3d"></i></button>
+            <button id="np-display-btn" onclick="npUiTogglePanel(event)" class="np-tb-btn np-sp" title="Display settings" aria-label="Display settings" aria-haspopup="dialog" aria-expanded="false"><i data-lucide="sliders-horizontal"></i></button>
+            ${typeof ostButtonTemplate === 'function' ? ostButtonTemplate() : ''}
+            <button id="np-fullscreen-btn" onclick="toggleFullscreen()" class="np-tb-btn np-sp" title="Full screen" aria-label="Full screen"><i data-lucide="maximize"></i></button>
+          </div>
           <div id="np-timer-container" class="timer-display" oncontextmenu="npTimerMenu(event)" title="Right-click to change the timer"><i data-lucide="clock"></i><span id="np-timer-display">--:--</span></div>
-          <button onclick="npSubmitAttempt()" class="btn-submit" id="np-submit-btn"><i data-lucide="check" style="width:16px;height:16px;"></i> Submit</button>
+          <button onclick="npSubmitAttempt()" class="btn-submit np-sp" id="np-submit-btn"><i data-lucide="check" style="width:16px;height:16px;"></i> Submit</button>
         </div>
+        <div class="np-top-rail" aria-hidden="true"><span id="np-top-rail-fill"></span></div>
       </div>
-      <div class="practice-topbar np-review-topbar hidden" id="np-topbar-review">
+      <div class="practice-topbar np-topbar np-review-topbar hidden" id="np-topbar-review">
         <div class="practice-topbar-left">
           <button onclick="exitReview()" class="btn-back-dark"><i data-lucide="arrow-left" style="width:18px;height:18px;"></i> Back to Notes Library</button>
           <span class="practice-title-badge" style="background:rgba(16,185,129,0.15); color:#10b981; border-color:rgba(16,185,129,0.3);"><i data-lucide="check-circle-2" style="width:14px;height:14px;"></i> Review Mode</span>
@@ -38,37 +43,67 @@ function notesPracticeTemplate() {
         <div class="practice-topbar-right"><div id="np-review-score" style="display:flex; align-items:center; gap:0.75rem; font-weight:700; font-size:1rem;"></div></div>
       </div>
       <div class="practice-body">
-        <div class="practice-sidebar" style="width: 320px; min-width: 320px;">
-          <div style="margin-bottom: 1rem;"><h2 style="display: flex; align-items: center; gap: 0.5rem;"><i data-lucide="layers" style="width:18px;height:18px;color:var(--color-primary);"></i> Sections</h2></div>
-          <div id="np-sections-tabs" style="display: flex; flex-direction: column; gap: 0.375rem; margin-bottom: 1.5rem;"></div>
-          <div style="border-top: 1px solid #21262d; padding-top: 1rem; margin-bottom: 1rem;">
-            <h3 style="font-size: 0.8125rem; font-weight: 700; color: #8b949e; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.75rem;" id="np-current-section-title">Section</h3>
-            <div id="np-question-grid" class="np-grid"></div>
+        <!-- The sidebar's four children stay in this order: mobile.css and
+             layout.css address them as :first-child and :nth-child(3). -->
+        <div class="practice-sidebar np-sidebar" style="width: 320px; min-width: 320px;">
+          <div class="np-side-head">
+            <h2><i data-lucide="layers" style="width:18px;height:18px;"></i> Sections</h2>
+            <span class="np-side-sub" id="np-side-sub"></span>
           </div>
-          <div class="practice-footer" id="np-footer-text"><p>Keys: <kbd>1-9</kbd>/<kbd>A-E</kbd> answer &middot; <kbd>N</kbd>/<kbd>P</kbd> or arrows move &middot; <kbd>F</kbd> flag &middot; <kbd>H</kbd> hint. Right-click the timer to change it.</p></div>
-        </div>
-        <div class="np-question-pane" style="flex: 1; display: flex; align-items: flex-start; justify-content: center; background: #0d1117; position: relative; overflow-y: auto;">
-          <div style="position: absolute; top: 1rem; left: 1.25rem; font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-tertiary); opacity: 0.8; z-index: 1;" id="np-q-progress">0 / 0</div>
-          <div style="width: 100%; max-width: 900px; padding: 2.5rem 2rem; margin: auto 0;">
-            <div style="text-align: center; margin-bottom: 2.5rem; position: relative;">
-              <!-- Question Image at the very top -->
-              <div id="np-q-image-container" class="hidden" style="margin-top: 0; margin-bottom: 1.5rem; text-align: center; width: 100%;">
-                <img id="np-q-image" src="" alt="Question Image" style="max-width: 100%; max-height: 320px; border-radius: var(--radius-md); border: 1px solid var(--border-color); box-shadow: 0 4px 12px rgba(0,0,0,0.15); object-fit: contain; margin: 0 auto; display: block;" />
-              </div>
-              
-              <!-- Question label and heading below the image -->
-              <div style="margin-bottom: 0.5rem;">
-                <div style="font-size: 0.6875rem; color: var(--text-tertiary); font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;" id="np-q-label">Question 1</div>
-              </div>
-              <h2 style="display:none; color: var(--text-primary);" id="np-q-heading">Select your answer</h2>
-              <div id="np-q-text" class="hidden" style="font-size: 1.125rem; line-height: 1.6; color: var(--text-primary); margin-top: 1rem; text-align: center; padding: 0 1rem; min-height: 2rem; word-wrap: break-word; overflow-wrap: break-word;"></div>
-              <div id="np-review-status" class="hidden" style="margin-top: 1rem;"></div>
-
+          <div id="np-sections-tabs" class="np-section-tabs"></div>
+          <div class="np-grid-block">
+            <h3 class="np-grid-title" id="np-current-section-title">Section</h3>
+            <div id="np-question-grid" class="np-grid"></div>
+            <div class="np-grid-legend" aria-hidden="true">
+              <span><i class="np-lg np-lg-now"></i>Current</span>
+              <span><i class="np-lg np-lg-ok"></i>Correct</span>
+              <span><i class="np-lg np-lg-bad"></i>Wrong</span>
+              <span><i class="np-lg np-lg-flag"></i>Flagged</span>
             </div>
-            <div id="np-bubbles-container" style="display:flex; flex-direction:column; gap:0.75rem; align-items:center; width:100%;"></div>
-            <div id="np-nav-row" style="display:flex; justify-content:space-between; margin-top:2.5rem; padding-top:1.5rem; border-top:1px solid #21262d;">
-              <button id="np-btn-prev" onclick="npPrevQuestion()" class="btn btn-ghost" style="font-weight:600;"><i data-lucide="chevron-left" style="width:18px;height:18px;"></i> Previous</button>
-              <button id="np-btn-next" onclick="npNextQuestion()" class="btn btn-ghost" style="font-weight:600;">Next <i data-lucide="chevron-right" style="width:18px;height:18px;"></i></button>
+          </div>
+          <div class="practice-footer np-keys" id="np-footer-text">
+            <div class="np-keys-title">Shortcuts</div>
+            <ul class="np-keys-list">
+              <li><span><kbd>1</kbd>–<kbd>9</kbd> or <kbd>A</kbd>–<kbd>E</kbd></span><em>answer</em></li>
+              <li><span><kbd>←</kbd><kbd>→</kbd> or <kbd>P</kbd><kbd>N</kbd></span><em>move</em></li>
+              <li class="np-keys-rclick"><span><kbd class="np-kbd-wide">Right-click</kbd></span><em>left half back, right half on</em></li>
+              <li><span><kbd>F</kbd> <kbd>H</kbd></span><em>flag, hint</em></li>
+            </ul>
+            <p class="np-keys-note">Right-click the timer to change it.</p>
+          </div>
+        </div>
+        <div class="np-question-pane" id="np-question-area">
+          <div class="np-pane-inner">
+            <article class="np-card np-sp-card" id="np-card">
+              <header class="np-qhead">
+                <div class="np-qhead-main">
+                  <div class="np-q-label" id="np-q-label">Question 1</div>
+                  <!-- Read aloud sits with the question it reads, not in the
+                       topbar. Same switch as before: on, each question speaks
+                       as it arrives and an answer speaks under the pointer. -->
+                  <button id="np-voice-btn" onclick="npToggleAutoVoice()" class="np-voice-btn np-sp"
+                          title="Read questions aloud" aria-label="Read questions aloud" aria-pressed="false">
+                    <i data-lucide="volume-x"></i><span class="np-voice-label">Read aloud</span>
+                    <span class="np-voice-eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+                  </button>
+                </div>
+                <div class="np-qhead-side">
+                  <span class="np-q-progress" id="np-q-progress">0 / 0</span>
+                </div>
+              </header>
+              <div class="np-card-meter" aria-hidden="true"><span id="np-card-meter-fill"></span></div>
+              <div id="np-q-image-container" class="hidden np-q-image-wrap">
+                <img id="np-q-image" src="" alt="Question image" />
+              </div>
+              <div id="np-q-text" class="hidden np-q-text"></div>
+              <div class="np-q-instruction" id="np-q-heading">Select your answer</div>
+              <div id="np-review-status" class="hidden np-review-status"></div>
+              <div id="np-bubbles-container" class="np-choices"></div>
+            </article>
+            <div id="np-nav-row" class="np-nav-row">
+              <button id="np-btn-prev" onclick="npPrevQuestion()" class="np-nav-btn np-sp"><i data-lucide="chevron-left"></i><span>Previous</span></button>
+              <div class="np-nav-hint" id="np-nav-hint"><i data-lucide="mouse"></i><span>Right-click either half to move</span></div>
+              <button id="np-btn-next" onclick="npNextQuestion()" class="np-nav-btn np-nav-btn-next np-sp"><span>Next</span><i data-lucide="chevron-right"></i></button>
             </div>
           </div>
         </div>
@@ -121,6 +156,9 @@ function npSyncMobileChrome() {
 }
 
 function notesPracticeInit() {
+  // Display preferences first, so the first question is drawn at the chosen
+  // size rather than drawn once and then resized under the reader.
+  if (typeof npUiMount === 'function') npUiMount();
   initNotesPracticeSession();
   // The topbar is built with the route, so the OST transport is mounted once
   // here -- the same call practiceInit makes. Without it the disc is drawn but
@@ -151,6 +189,7 @@ function notesPracticeDestroy() {
   if (typeof closeCheatsheet === 'function') closeCheatsheet();
   if (typeof _timerMenuClose === 'function') _timerMenuClose();
   if (typeof _npShuffleMenuClose === 'function') _npShuffleMenuClose();
+  if (typeof npUiUnmount === 'function') npUiUnmount();
   if (typeof ostStop === 'function') ostStop();
   if (typeof speechStop === 'function') speechStop();
   if (typeof timerInterval !== 'undefined' && timerInterval) { clearInterval(timerInterval); timerInterval = null; }

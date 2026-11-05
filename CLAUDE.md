@@ -180,6 +180,15 @@ A section's `answerKeysData` holds one record per question (text, choices *and* 
 a neighbour must not reuse its top-level `const`/`let` names (a stale + fresh pair then
 throws on load); that is why the parser's constants are `_NBI_*`.
 
+**Notebook attempt** (route `notes-practice`): `notes-practice.js` owns the attempt (answers,
+grading, timer, resume); `notes-practice-ui.js` + `css/notes-practice-ui.css` own how it looks
+and moves — display prefs in `ssp.np.ui` (text size, element size, width, spatial level,
+animations, keycaps, right-click nav) written as `data-np-*` on `#np-layout`, the spatial
+lean/glare on anything `.np-sp`, right-click left/right half of the pane = Previous/Next, and
+the Display panel. The Feel panel is not on this screen (its options are all code-editor ones).
+Choices are `.np-choice` with `is-selected / is-correct / is-wrong / is-missed / is-dim /
+is-locked`; their onclick must stay `selectAnswer('X')`, which the keyboard handler matches on.
+
 **Execution stack** (the layers button in the attempt's editor toolbar): memory as it
 stands when the program reaches the cursor's line — frames, globals, heap — redrawn a
 moment after typing stops. It does not use the compiler: a small C interpreter runs
