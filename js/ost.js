@@ -39,9 +39,12 @@ const OST_KEY_POS = 'ssp.ost.pos';
 const OST_KEY_MODE = 'ssp.ost.mode';     // 'all' | 'one' | 'shuffle'
 const OST_KEY_AUTO = 'ssp.ost.autoplay';
 
-/** Start on load? On by default. */
+/** Start on load? Off by default: an attempt opens quiet, and music starts
+    when you press play or switch "Start with the page" on in the player. Only
+    an explicit '1' (that switch) turns it on, so the default holds on every
+    attempt screen -- coding, practice sets and notebooks share this one key. */
 function ostAutoplayOn() {
-  try { return localStorage.getItem(OST_KEY_AUTO) !== '0'; } catch (e) { return true; }
+  try { return localStorage.getItem(OST_KEY_AUTO) === '1'; } catch (e) { return false; }
 }
 
 function toggleOstAutoplay() {

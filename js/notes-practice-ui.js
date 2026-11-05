@@ -32,6 +32,7 @@ const NP_UI_OPTIONS = {
   size:    [['compact', 'Compact'], ['comfy', 'Comfy', 'Comfortable'], ['large', 'Large'], ['huge', 'Huge']],
   width:   [['narrow', 'Narrow'], ['normal', 'Normal'], ['wide', 'Wide'], ['full', 'Full']],
   grid:    [['sm', 'S', 'Small'], ['md', 'M', 'Medium'], ['lg', 'L', 'Large'], ['xl', 'XL', 'Extra large']],
+  answers: [['same', 'Same', 'Same as the question'], ['narrow', 'Narrow'], ['medium', 'Medium'], ['wide', 'Wide']],
   reveal:  [['off', 'Off', 'Shown at once'], ['fast', 'Fast'], ['normal', 'Normal'], ['slow', 'Slow']],
   spatial: [['off', 'Off'], ['subtle', 'Subtle'], ['full', 'Full']],
   theme:   [['app', 'App', 'Same as the app'], ['dark', 'Night'], ['light', 'Day'], ['purple', 'Purple'], ['green', 'Green']]
@@ -45,7 +46,7 @@ function _npUiReducedMotion() {
 function _npUiDefaults() {
   const calm = _npUiReducedMotion();
   return {
-    text: 'md', size: 'comfy', width: 'normal', grid: 'md',
+    text: 'md', size: 'comfy', width: 'normal', grid: 'md', answers: 'same',
     reveal: calm ? 'off' : 'normal', theme: 'app',
     spatial: calm ? 'off' : 'full', lastSpatial: 'full',
     motion: !calm, keys: true, rclick: true
@@ -60,7 +61,7 @@ function npUiPrefs() {
   const pick = (k) => (NP_UI_OPTIONS[k].some(o => o[0] === v[k]) ? v[k] : d[k]);
   return {
     text: pick('text'), size: pick('size'), width: pick('width'), spatial: pick('spatial'),
-    grid: pick('grid'), reveal: pick('reveal'), theme: pick('theme'),
+    grid: pick('grid'), reveal: pick('reveal'), theme: pick('theme'), answers: pick('answers'),
     lastSpatial: (v.lastSpatial === 'subtle' || v.lastSpatial === 'full') ? v.lastSpatial : d.lastSpatial,
     motion: typeof v.motion === 'boolean' ? v.motion : d.motion,
     keys: typeof v.keys === 'boolean' ? v.keys : d.keys,
@@ -86,7 +87,7 @@ function npUiSet(key, value) {
     try { window.npQuestionAnimator.complete(); } catch (e) { /* already done */ }
   }
   // The lines follow sizes through their ResizeObserver; this is the fallback.
-  if ((key === 'text' || key === 'size' || key === 'width') && typeof drawMatchingLines === 'function') {
+  if ((key === 'text' || key === 'size' || key === 'width' || key === 'answers') && typeof drawMatchingLines === 'function') {
     setTimeout(drawMatchingLines, 380);
   }
   _npUiRenderPanel();
@@ -141,6 +142,7 @@ function npUiApply() {
   root.dataset.npSize = p.size;
   root.dataset.npWidth = p.width;
   root.dataset.npGrid = p.grid;
+  root.dataset.npAnswers = p.answers;
   root.dataset.npSpatial = p.spatial;
   root.dataset.npMotion = p.motion ? 'on' : 'off';
   root.dataset.npKeys = p.keys ? 'on' : 'off';
@@ -362,7 +364,7 @@ function npUiOnRender(info) {
     _npKb.idx = -1;
   }
 
-  // A wrong answer: a red X drops onto what was picked.
+  // A wrong answer: crosses rain out of what was picked, once per grading.
   if (info && info.grading && info.result === 'wrong' && _npUiXKey !== info.key) {
     _npUiXKey = info.key;
     _npUiDropX(info.type);
@@ -399,40 +401,26 @@ function npKbMove(delta) {
   return true;
 }
 
-/* ── The falling X ──────────────────────────────────────────────
-   A wrong answer used to shake. Now a red X falls onto the choice that was
-   picked, lands with a thump and drops away. Body-level, because grading
-   re-renders the choices underneath it. */
+/* ── Wrong answer: the cross rain ───────────────────────────────── */
 let _npUiXKey = '';
 
 function _npUiDropX(type) {
   const root = _npUiRoot;
   if (!root || root.dataset.npMotion === 'off') return;
+  /* The coding attempt's own failed-test effect (practice-panel.js
+     _ppCrossRain): a shower of small crosses falling out of the thing that
+     was wrong. Called, not copied, so the two screens can never drift apart.
+     Its layer is fixed over the whole window, so the choices re-rendering
+     underneath it during grading does not cut it short. */
+  if (typeof _ppCrossRain !== 'function') return;
   let targets = Array.from(document.querySelectorAll('#np-bubbles-container .np-choice.is-wrong'));
   if (!targets.length && type === 'checkbox') targets = Array.from(document.querySelectorAll('#np-bubbles-container .np-choice.is-missed'));
   if (!targets.length && type === 'matching') targets = Array.from(document.querySelectorAll('#np-bubbles-container .np-match-left.np-match-wrong'));
   if (!targets.length && type === 'text') targets = [document.getElementById('np-text-answer-input')].filter(Boolean);
   targets.slice(0, 4).forEach((t, i) => {
     const r = t.getBoundingClientRect();
-    if (!r.width) return;
-    const size = Math.round(Math.max(40, Math.min(76, r.height * 1.05)));
-    const x = document.createElement('div');
-    x.className = 'np-xfall';
-    x.style.left = (r.left + r.width / 2) + 'px';
-    x.style.top = (r.top + r.height / 2) + 'px';
-    x.style.width = size + 'px';
-    x.style.height = size + 'px';
-    x.style.animationDelay = (i * 90) + 'ms';
-    x.innerHTML = '<svg viewBox="0 0 48 48" aria-hidden="true">'
-      + '<path d="M12 12 L36 36 M36 12 L12 36" /></svg>';
-    document.body.appendChild(x);
-    setTimeout(() => x.remove(), 1500 + i * 90);
-    // The card takes the hit as the X lands.
-    setTimeout(() => {
-      t.classList.remove('np-hit');
-      void t.offsetWidth;
-      t.classList.add('np-hit');
-    }, 380 + i * 90);
+    if (!r.width || r.bottom < 0 || r.top > window.innerHeight) return;
+    setTimeout(() => _ppCrossRain(r), i * 90);
   });
 }
 
@@ -626,47 +614,92 @@ function _npUiNameOf(key, id) {
   return o ? (o[2] || o[1]) : '';
 }
 
-function _npUiPanelHTML() {
-  const p = npUiPrefs();
+/* The panel is four short pages rather than one long column. Stacked, its
+   twelve settings ran past 1000px and read as a wall of labels; a page is a
+   single decision ("how big is the text", "how wide is the layout") and fits
+   without scrolling. The header steps through them (‹ › or ← →), and the
+   tabs under it jump straight to one. */
+const NP_UI_PAGES = [
+  { id: 'text',    name: 'Text',    icon: 'type' },
+  { id: 'layout',  name: 'Layout',  icon: 'layout-template' },
+  { id: 'effects', name: 'Effects', icon: 'sparkles' },
+  { id: 'look',    name: 'Look',    icon: 'palette' }
+];
+// Kept across opens: coming back to the page you were on is nearly always right.
+let _npUiPage = 0;
+
+function npUiPageGo(delta) {
+  const n = NP_UI_PAGES.length;
+  _npUiPage = ((_npUiPage + delta) % n + n) % n;
+  _npUiRenderPanel();
+}
+
+function npUiPageSet(i) {
+  if (i < 0 || i >= NP_UI_PAGES.length) return;
+  _npUiPage = i;
+  _npUiRenderPanel();
+}
+
+function _npUiPageBody(id, p) {
   const center = typeof npTextAlignCenter === 'undefined' ? true : npTextAlignCenter;
+  if (id === 'text') {
+    const alignSeg = '<div class="np-seg" role="radiogroup">'
+      + '<button type="button" role="radio" aria-checked="' + center + '" class="np-seg-btn' + (center ? ' is-on' : '') + '" onclick="npUiSetAlign(true)"><i data-lucide="align-center"></i> Centre</button>'
+      + '<button type="button" role="radio" aria-checked="' + !center + '" class="np-seg-btn' + (!center ? ' is-on' : '') + '" onclick="npUiSetAlign(false)"><i data-lucide="align-left"></i> Left</button>'
+      + '</div>';
+    return _npUiRow('a-large-small', 'Text size', _npUiNameOf('text', p.text), _npUiSeg('text', p.text, NP_UI_OPTIONS.text))
+      + _npUiRow('text-quote', 'Alignment', center ? 'Centre' : 'Left', alignSeg)
+      + _npUiRow('text-cursor-input', 'Question typing effect', _npUiNameOf('reveal', p.reveal), _npUiSeg('reveal', p.reveal, NP_UI_OPTIONS.reveal))
+      + '<div class="np-ui-switches">'
+      + _npUiSwitch('keys', p.keys, 'Letter keys on choices', 'The A, B, C you can press')
+      + '</div>';
+  }
+  if (id === 'layout') {
+    return _npUiRow('scaling', 'Element size', _npUiNameOf('size', p.size), _npUiSeg('size', p.size, NP_UI_OPTIONS.size))
+      + _npUiRow('stretch-horizontal', 'Question width', _npUiNameOf('width', p.width), _npUiSeg('width', p.width, NP_UI_OPTIONS.width))
+      + _npUiRow('rows-3', 'Answer width', _npUiNameOf('answers', p.answers), _npUiSeg('answers', p.answers, NP_UI_OPTIONS.answers))
+      + _npUiRow('grid-3x3', 'Question grid boxes', _npUiNameOf('grid', p.grid), _npUiSeg('grid', p.grid, NP_UI_OPTIONS.grid));
+  }
+  if (id === 'effects') {
+    return _npUiRow('rotate-3d', 'Spatial effects', _npUiNameOf('spatial', p.spatial), _npUiSeg('spatial', p.spatial, NP_UI_OPTIONS.spatial))
+      + '<div class="np-ui-switches">'
+      + _npUiSwitch('motion', p.motion, 'Animations', 'Cards slide in, answers pop')
+      + _npUiSwitch('rclick', p.rclick, 'Right-click to move', 'Left half back, right half on')
+      + '</div>';
+  }
+  // look
   const ambOn = typeof ambEnabled === 'function' && ambEnabled();
   const ambCur = typeof ambTheme === 'function' ? ambTheme() : '';
   const backs = [['off', 'Off']].concat(typeof AMB_THEMES !== 'undefined' ? AMB_THEMES.map(t => [t.id, t.name]) : []);
   const backCur = ambOn ? ambCur : 'off';
-
-  const themeSeg = _npUiSeg('theme', p.theme, NP_UI_OPTIONS.theme, 'np-seg-5');
   const backSeg = '<div class="np-seg np-seg-wrap" role="radiogroup">' + backs.map(b =>
     '<button type="button" role="radio" aria-checked="' + (b[0] === backCur) + '" class="np-seg-btn' + (b[0] === backCur ? ' is-on' : '') + '"'
     + ' onclick="npUiSetBackground(\'' + b[0] + '\')">' + escapeHTML(b[1]) + '</button>').join('') + '</div>';
-  const alignSeg = '<div class="np-seg" role="radiogroup">'
-    + '<button type="button" role="radio" aria-checked="' + center + '" class="np-seg-btn' + (center ? ' is-on' : '') + '" onclick="npUiSetAlign(true)"><i data-lucide="align-center"></i> Centre</button>'
-    + '<button type="button" role="radio" aria-checked="' + !center + '" class="np-seg-btn' + (!center ? ' is-on' : '') + '" onclick="npUiSetAlign(false)"><i data-lucide="align-left"></i> Left</button>'
-    + '</div>';
+  return _npUiRow('palette', 'Theme in this attempt', _npUiNameOf('theme', p.theme), _npUiSeg('theme', p.theme, NP_UI_OPTIONS.theme, 'np-seg-5'))
+    + _npUiRow('sparkles', 'Background', backCur === 'off' ? 'Off' : (backs.find(b => b[0] === backCur) || [, ''])[1], backSeg);
+}
 
+function _npUiPanelHTML() {
+  const p = npUiPrefs();
+  const page = NP_UI_PAGES[_npUiPage] || NP_UI_PAGES[0];
+  const tabs = NP_UI_PAGES.map((pg, i) =>
+    '<button type="button" role="tab" class="np-ui-tab' + (i === _npUiPage ? ' is-on' : '') + '"'
+    + ' aria-selected="' + (i === _npUiPage) + '" onclick="npUiPageSet(' + i + ')">'
+    + '<i data-lucide="' + pg.icon + '"></i><span>' + pg.name + '</span></button>').join('');
   return '<div class="np-ui-head">'
     + '<span class="np-ui-title"><i data-lucide="sliders-horizontal"></i> Display</span>'
     + '<button type="button" class="np-ui-reset" onclick="npUiReset()" title="Back to the defaults"><i data-lucide="rotate-ccw"></i> Reset</button>'
     + '</div>'
-    + '<div class="np-ui-scroll">'
-    + '<div class="np-ui-group-title">Reading</div>'
-    + _npUiRow('a-large-small', 'Text size', _npUiNameOf('text', p.text), _npUiSeg('text', p.text, NP_UI_OPTIONS.text))
-    + _npUiRow('scaling', 'Element size', _npUiNameOf('size', p.size), _npUiSeg('size', p.size, NP_UI_OPTIONS.size))
-    + _npUiRow('stretch-horizontal', 'Question width', _npUiNameOf('width', p.width), _npUiSeg('width', p.width, NP_UI_OPTIONS.width))
-    + _npUiRow('grid-3x3', 'Question grid boxes', _npUiNameOf('grid', p.grid), _npUiSeg('grid', p.grid, NP_UI_OPTIONS.grid))
-    + _npUiRow('text-quote', 'Alignment', center ? 'Centre' : 'Left', alignSeg)
-    + '<div class="np-ui-group-title">Effects</div>'
-    + _npUiRow('text-cursor-input', 'Question typing effect', _npUiNameOf('reveal', p.reveal), _npUiSeg('reveal', p.reveal, NP_UI_OPTIONS.reveal))
-    + _npUiRow('rotate-3d', 'Spatial effects', _npUiNameOf('spatial', p.spatial), _npUiSeg('spatial', p.spatial, NP_UI_OPTIONS.spatial))
-    + '<div class="np-ui-switches">'
-    + _npUiSwitch('motion', p.motion, 'Animations', 'Cards slide in, answers pop and shake')
-    + _npUiSwitch('keys', p.keys, 'Letter keys on choices', 'The A, B, C you can press')
-    + _npUiSwitch('rclick', p.rclick, 'Right-click to move', 'Left half back, right half on')
+    + '<div class="np-ui-pager">'
+    + '<button type="button" class="np-ui-step" onclick="npUiPageGo(-1)" title="Previous page (←)" aria-label="Previous page"><i data-lucide="chevron-left"></i></button>'
+    + '<div class="np-ui-tabs" role="tablist" aria-label="Display settings pages">' + tabs + '</div>'
+    + '<button type="button" class="np-ui-step" onclick="npUiPageGo(1)" title="Next page (→)" aria-label="Next page"><i data-lucide="chevron-right"></i></button>'
     + '</div>'
-    + '<div class="np-ui-group-title">Look</div>'
-    + _npUiRow('palette', 'Theme in this attempt', _npUiNameOf('theme', p.theme), themeSeg)
-    + _npUiRow('sparkles', 'Background', '', backSeg)
-    + '<p class="np-ui-note">Kept on this device.</p>'
-    + '</div>';
+    + '<div class="np-ui-scroll" role="tabpanel" aria-label="' + page.name + '">'
+    + '<div class="np-ui-page" data-page="' + page.id + '">' + _npUiPageBody(page.id, p) + '</div>'
+    + '</div>'
+    + '<div class="np-ui-foot"><span>' + (_npUiPage + 1) + ' of ' + NP_UI_PAGES.length + '</span>'
+    + '<span>Kept on this device</span></div>';
 }
 
 function _npUiRenderPanel() {
@@ -708,6 +741,13 @@ function _npUiOutside(e) {
 }
 
 function _npUiPanelKey(e) {
+  // While the panel is open, left and right turn its pages (as the Feel panel's do).
+  if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    npUiPageGo(e.key === 'ArrowRight' ? 1 : -1);
+    return;
+  }
   if (e.key === 'Escape') {
     e.preventDefault();
     e.stopPropagation();
@@ -806,5 +846,5 @@ function npUiUnmount() {
   _npUiHot = null;
   _npUiPt = null;
   clearTimeout(_npUiStaggerTimer);
-  document.querySelectorAll('.np-edge-flash, .np-burst, .np-xfall').forEach(n => n.remove());
+  document.querySelectorAll('.np-edge-flash, .np-burst').forEach(n => n.remove());
 }

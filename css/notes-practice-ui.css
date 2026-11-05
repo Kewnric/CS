@@ -692,6 +692,16 @@
 }
 
 /* ── Choices ────────────────────────────────────────────────────── */
+#np-layout { --np-aw: 100%; }
+#np-layout[data-np-answers="narrow"] { --np-aw: 560px; }
+#np-layout[data-np-answers="medium"] { --np-aw: 760px; }
+#np-layout[data-np-answers="wide"] { --np-aw: 980px; }
+#np-layout .np-choices > :not(.np-tf-row) {
+  width: 100%;
+  max-width: var(--np-aw);
+  margin-left: auto;
+  margin-right: auto;
+}
 .np-choices {
   display: flex;
   flex-direction: column;
@@ -1224,15 +1234,17 @@
   overflow: hidden;
   animation: npEdge 0.62s ease-out forwards;
 }
+/* A band along the edge you moved toward, not half the pane: at 42% the
+   light reached the middle of the screen and read as the page flashing. */
 .np-edge-flash::before {
   content: '';
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 42%;
+  width: clamp(56px, 7%, 110px);
 }
-.np-edge-flash.is-back::before { left: 0; background: linear-gradient(90deg, color-mix(in srgb, var(--color-primary, #6366f1) 30%, transparent), transparent); }
-.np-edge-flash.is-next::before { right: 0; background: linear-gradient(270deg, color-mix(in srgb, var(--color-primary, #6366f1) 30%, transparent), transparent); }
+.np-edge-flash.is-back::before { left: 0; background: linear-gradient(90deg, color-mix(in srgb, var(--color-primary, #6366f1) 42%, transparent), transparent); box-shadow: inset 2px 0 0 color-mix(in srgb, var(--color-primary, #6366f1) 70%, transparent); }
+.np-edge-flash.is-next::before { right: 0; background: linear-gradient(270deg, color-mix(in srgb, var(--color-primary, #6366f1) 42%, transparent), transparent); box-shadow: inset -2px 0 0 color-mix(in srgb, var(--color-primary, #6366f1) 70%, transparent); }
 .np-edge-flash.is-blocked::before { background: linear-gradient(var(--np-edge-dir, 90deg), rgba(148, 163, 184, 0.16), transparent); }
 .np-edge-flash.is-next.is-blocked::before { --np-edge-dir: 270deg; }
 .np-edge-glyph {
@@ -1245,13 +1257,13 @@
   color: #c7d2fe;
   transform: translateY(-50%);
 }
-.np-edge-flash.is-back .np-edge-glyph { left: 1.25rem; animation: npGlyphBack 0.62s var(--ease-expo-out, ease-out) forwards; }
-.np-edge-flash.is-next .np-edge-glyph { right: 1.25rem; animation: npGlyphNext 0.62s var(--ease-expo-out, ease-out) forwards; }
+.np-edge-flash.is-back .np-edge-glyph { left: 0.35rem; animation: npGlyphBack 0.62s var(--ease-expo-out, ease-out) forwards; }
+.np-edge-flash.is-next .np-edge-glyph { right: 0.35rem; animation: npGlyphNext 0.62s var(--ease-expo-out, ease-out) forwards; }
 .np-edge-flash.is-blocked .np-edge-glyph { color: var(--text-tertiary, #8b949e); animation: none; }
-.np-edge-glyph svg { width: 46px; height: 46px; filter: drop-shadow(0 0 12px rgba(129, 140, 248, 0.9)); }
+.np-edge-glyph svg { width: 34px; height: 34px; filter: drop-shadow(0 0 12px rgba(129, 140, 248, 0.9)); }
 .np-edge-glyph em {
   font-style: normal;
-  font-size: 0.68rem;
+  font-size: 0.58rem;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1296,48 +1308,14 @@
 #np-layout[data-np-motion="on"] .np-choices.np-grading .np-choice.is-correct .np-choice-mark {
   animation: npMarkIn 0.5s 0.05s var(--ease-spring, ease) backwards;
 }
-/* Wrong: no shake. The red X falling onto it (js: _npUiDropX) is the event;
-   the choice only flinches as it lands (.np-hit), and its own mark arrives
-   after the X has gone. */
+/* Wrong: no shake. The coding attempt's cross rain (_ppCrossRain, styled by
+   .pp-cross in editor.css) falls out of the pick, and the pick's own mark
+   arrives once the shower has started. */
 #np-layout[data-np-motion="on"] .np-choices.np-grading .np-choice.is-wrong .np-choice-mark {
-  animation: npMarkIn 0.45s 0.75s var(--ease-spring, ease) backwards;
+  animation: npMarkIn 0.45s 0.35s var(--ease-spring, ease) backwards;
 }
 #np-layout[data-np-motion="on"] .np-choices.np-grading .np-match-correct { animation: npPop 0.6s var(--ease-spring, ease) both; }
-#np-layout[data-np-motion="on"] .np-hit { animation: npHit 0.55s cubic-bezier(0.2, 0.9, 0.3, 1); }
-@keyframes npHit {
-  0% { transform: translateY(0) scale(1); filter: brightness(1); }
-  22% { transform: translateY(3px) scale(0.985, 0.97); filter: brightness(1.55) saturate(1.3); }
-  60% { transform: translateY(-1px) scale(1.005); filter: brightness(1.1); }
-  100% { transform: translateY(0) scale(1); filter: brightness(1); }
-}
 
-/* The X itself: drops from above with gravity, lands with a squash, holds a
-   beat, then falls on past and out. Fixed to the viewport, centred on the
-   choice it was dropped onto. */
-.np-xfall {
-  position: fixed;
-  z-index: 9000;
-  pointer-events: none;
-  transform: translate(-50%, -50%);
-  animation: npXFall 1.35s linear both;
-}
-.np-xfall svg { width: 100%; height: 100%; overflow: visible; }
-.np-xfall path {
-  fill: none;
-  stroke: #ef4444;
-  stroke-width: 7;
-  stroke-linecap: round;
-  filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.95)) drop-shadow(0 6px 10px rgba(0, 0, 0, 0.6));
-}
-@keyframes npXFall {
-  0%   { transform: translate(-50%, calc(-50% - 170px)) rotate(-28deg) scale(0.7); opacity: 0; animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45); }
-  8%   { opacity: 1; }
-  30%  { transform: translate(-50%, -50%) rotate(4deg) scale(1.08, 0.86); animation-timing-function: ease-out; }
-  40%  { transform: translate(-50%, calc(-50% - 10px)) rotate(-2deg) scale(0.96, 1.06); animation-timing-function: ease-in; }
-  50%  { transform: translate(-50%, -50%) rotate(0deg) scale(1); }
-  72%  { transform: translate(-50%, -50%) rotate(0deg) scale(1); opacity: 1; animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45); }
-  100% { transform: translate(-50%, calc(-50% + 140px)) rotate(24deg) scale(0.85); opacity: 0; }
-}
 @keyframes npPop {
   0% { transform: scale(1); }
   35% { transform: scale(1.035); }
@@ -1749,4 +1727,81 @@
   .np-wrong-card { padding: 1.5rem 1.1rem 1.1rem; }
   .np-wrong-actions { flex-direction: column-reverse; }
   .np-wrong-stay { width: 100%; }
+}
+
+/* ── The display panel's pages ──────────────────────────────────── */
+.np-ui-pager {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.55rem 0.6rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+.np-ui-step {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(13, 17, 23, 0.6);
+  color: #8b949e;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.np-ui-step svg { width: 15px; height: 15px; }
+.np-ui-step:hover { color: #e6edf3; border-color: rgba(148, 163, 184, 0.35); background: rgba(148, 163, 184, 0.08); }
+.np-ui-tabs {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: rgba(13, 17, 23, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+.np-ui-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 42px;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #8b949e;
+  font: 600 0.64rem var(--font-sans);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.18s ease, box-shadow 0.2s ease;
+}
+.np-ui-tab svg { width: 15px; height: 15px; }
+.np-ui-tab span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.np-ui-tab:hover { color: #e6edf3; background: rgba(148, 163, 184, 0.08); }
+.np-ui-tab.is-on {
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-primary, #6366f1), color-mix(in srgb, var(--color-primary, #6366f1) 72%, #000));
+  box-shadow: 0 4px 14px -6px var(--color-primary, #6366f1), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+.np-ui-tab:focus-visible, .np-ui-step:focus-visible { outline: 2px solid var(--color-primary, #6366f1); outline-offset: 1px; }
+.np-ui-page { padding-top: 0.3rem; animation: npPageIn 0.22s var(--ease-expo-out, ease-out) both; }
+@keyframes npPageIn { from { opacity: 0; transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) { .np-ui-page { animation: none; } }
+.np-ui-page .np-ui-sec:first-child { margin-top: 0.4rem; }
+.np-ui-foot {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0.9rem 0.6rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.08);
+  font-size: 0.64rem;
+  color: #565e68;
 }
