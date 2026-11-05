@@ -37,6 +37,11 @@
 #np-layout[data-np-width="narrow"] { --np-w: 640px; }
 #np-layout[data-np-width="wide"] { --np-w: 1080px; }
 #np-layout[data-np-width="full"] { --np-w: 100%; }
+/* The question grid has its own size, apart from the choices. */
+#np-layout { --np-gs: 1; }
+#np-layout[data-np-grid="sm"] { --np-gs: 0.82; }
+#np-layout[data-np-grid="lg"] { --np-gs: 1.25; }
+#np-layout[data-np-grid="xl"] { --np-gs: 1.5; }
 
 /* ── Topbar ─────────────────────────────────────────────────────── */
 #np-layout .np-topbar {
@@ -318,15 +323,15 @@
   white-space: nowrap;
 }
 #np-layout .np-grid {
-  grid-template-columns: repeat(auto-fill, minmax(calc(40px * var(--np-el)), 1fr));
-  gap: calc(0.5rem * var(--np-el));
+  grid-template-columns: repeat(auto-fill, minmax(calc(40px * var(--np-gs)), 1fr));
+  gap: calc(0.5rem * var(--np-gs));
 }
 #np-layout .np-grid-box {
-  border-radius: 10px;
+  border-radius: calc(10px * var(--np-gs));
   border: 1px solid rgba(148, 163, 184, 0.16);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)), #0d1117;
   color: var(--np-muted);
-  font-size: calc(0.85rem * var(--np-el));
+  font-size: calc(0.85rem * var(--np-gs));
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04), 0 3px 8px -4px rgba(0, 0, 0, 0.6);
   transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease,
               box-shadow 0.25s ease, transform 0.22s var(--ease-expo-out, ease);
@@ -336,7 +341,13 @@
   border-color: color-mix(in srgb, var(--np-accent) 60%, transparent);
   background: color-mix(in srgb, var(--np-accent) 12%, #0d1117);
 }
-#np-layout .np-grid-box.opened { color: var(--np-ink-2); border-color: rgba(148, 163, 184, 0.3); }
+/* Opened but not answered: the whole box greys over, not just its number,
+   which on its own was too small a change to see across a fifty-box grid. */
+#np-layout .np-grid-box.opened {
+  color: #d0d7de;
+  border-color: rgba(148, 163, 184, 0.42);
+  background: linear-gradient(180deg, rgba(148, 163, 184, 0.3), rgba(148, 163, 184, 0.2)), #161b22;
+}
 #np-layout .np-grid-box.review-correct {
   background: linear-gradient(180deg, rgba(16, 185, 129, 0.22), rgba(16, 185, 129, 0.08)), #0d1117 !important;
   border-color: rgba(52, 211, 153, 0.6) !important;
@@ -353,20 +364,22 @@
   color: #565e68 !important;
 }
 #np-layout .np-grid-box.flagged { border-color: rgba(245, 158, 11, 0.7); }
+/* The question on screen is a white box with dark text, whatever its state,
+   so it is the one thing in the grid that reads at a glance. Its state stays
+   visible as the colour of the ring around it. */
 #np-layout .np-grid-box.active {
-  color: #fff !important;
-  border-color: transparent !important;
-  background: linear-gradient(135deg, var(--np-accent), var(--np-accent-deep)) !important;
-  box-shadow: 0 0 0 2px #0d1117, 0 0 0 4px color-mix(in srgb, var(--np-accent) 70%, transparent),
-              0 0 22px -2px var(--np-accent) !important;
+  color: #0d1117 !important;
+  border-color: #fff !important;
+  background: linear-gradient(180deg, #ffffff, #e6edf3) !important;
+  font-weight: 800;
+  box-shadow: 0 0 0 2px #0d1117, 0 0 0 4px color-mix(in srgb, var(--np-accent) 80%, transparent),
+              0 0 22px -4px rgba(255, 255, 255, 0.55) !important;
 }
 #np-layout .np-grid-box.review-correct.active {
-  background: linear-gradient(135deg, #10b981, #047857) !important;
-  box-shadow: 0 0 0 2px #0d1117, 0 0 0 4px rgba(52, 211, 153, 0.7), 0 0 22px -2px #10b981 !important;
+  box-shadow: 0 0 0 2px #0d1117, 0 0 0 4px #10b981, 0 0 22px -4px rgba(16, 185, 129, 0.8) !important;
 }
 #np-layout .np-grid-box.review-wrong.active {
-  background: linear-gradient(135deg, #ef4444, #b91c1c) !important;
-  box-shadow: 0 0 0 2px #0d1117, 0 0 0 4px rgba(248, 113, 113, 0.7), 0 0 22px -2px #ef4444 !important;
+  box-shadow: 0 0 0 2px #0d1117, 0 0 0 4px #ef4444, 0 0 22px -4px rgba(239, 68, 68, 0.8) !important;
 }
 #np-layout .np-grid-box .np-grid-flag {
   top: 3px;
@@ -390,7 +403,7 @@
   border-radius: 3px;
   vertical-align: -1px;
 }
-.np-lg-now { background: var(--np-accent); box-shadow: 0 0 6px var(--np-accent); }
+.np-lg-now { background: #fff; box-shadow: 0 0 6px rgba(255, 255, 255, 0.6); }
 .np-lg-ok { background: #10b981; }
 .np-lg-bad { background: #ef4444; }
 .np-lg-flag { background: #f59e0b; border-radius: 50%; }
@@ -436,8 +449,7 @@
   text-align: center;
 }
 .np-keys-note { margin: 0.65rem 0 0; font-size: 0.68rem; color: #484f58; }
-#np-layout[data-np-rclick="off"] .np-keys-rclick,
-#np-layout[data-np-rclick="off"] .np-nav-hint { display: none; }
+#np-layout[data-np-rclick="off"] .np-keys-rclick { display: none; }
 
 /* ── The question pane ──────────────────────────────────────────── */
 #np-layout .np-question-pane {
@@ -772,7 +784,41 @@
   box-shadow: 0 4px 14px -4px var(--tone);
   transform: scale(1.06);
 }
-.np-choice:focus-visible { outline: 2px solid var(--tone); outline-offset: 2px; }
+/* The keyboard cursor (arrow keys): lit like a hover, with a ring and a
+   marker at the edge, so it is clear which one Enter will take. */
+.np-choice:focus-visible {
+  outline: none;
+  color: #fff;
+  border-color: var(--tone);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--tone) 18%, transparent), color-mix(in srgb, var(--tone) 6%, transparent)),
+    rgba(13, 17, 23, 0.6);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tone) 55%, transparent),
+              0 16px 34px -16px var(--tone);
+}
+.np-choice:focus-visible .np-choice-key {
+  color: #fff;
+  background: var(--tone);
+  border-color: transparent;
+  transform: scale(1.08);
+}
+.np-choice:focus-visible::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 22%;
+  bottom: 22%;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--tone);
+  box-shadow: 0 0 10px var(--tone);
+  z-index: 2;
+}
+#np-layout .np-confirm-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #0d1117, 0 0 0 4px color-mix(in srgb, var(--np-accent) 80%, transparent),
+              0 18px 36px -16px var(--np-accent);
+}
 .np-choice.is-locked { cursor: default; }
 
 /* Multi-select: the mark is a checkbox. */
@@ -947,7 +993,89 @@
 }
 
 /* Matching, in the same material. */
-#np-layout .np-matching-grid { gap: 1.25rem; }
+/* The columns used to sit 20px apart, so a connector was a 20px squiggle and
+   two crossed ones read as a stray X. The channel between them is the lines'
+   room now. */
+#np-layout .np-matching-grid { gap: clamp(3rem, 9%, 6rem); }
+#np-layout .np-matching-col { min-width: 0; }
+.np-match-head {
+  margin: 0 0 0.55rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--np-faint);
+}
+#np-layout .np-matching-grid:not(.is-locked) .np-match-item {
+  cursor: grab;
+  /* A press on an item is a drag, not a scroll. */
+  touch-action: none;
+}
+#np-layout .np-matching-grid.is-dragging .np-match-item { cursor: grabbing; }
+#np-layout.np-dragging .np-match-item.np-sp { transform: none !important; }
+#np-layout .np-match-item.is-drag-src {
+  border-color: var(--np-accent) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--np-accent) 35%, transparent), 0 14px 30px -16px var(--np-accent);
+}
+#np-layout .np-match-item.is-drop {
+  border-color: var(--np-accent-2) !important;
+  background: color-mix(in srgb, var(--np-accent-2) 14%, rgba(13, 17, 23, 0.6)) !important;
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.3), 0 14px 30px -16px var(--np-accent-2);
+}
+.np-match-drag {
+  stroke: var(--np-accent-2, #22d3ee);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 7 6;
+  filter: drop-shadow(0 0 5px rgba(34, 211, 238, 0.8));
+  animation: npDash 0.6s linear infinite;
+}
+.np-match-drag.is-on-target { stroke-dasharray: none; stroke-width: 3.5; }
+/* One whole dash period per loop (7 + 6), so the restart is seamless. */
+@keyframes npDash { to { stroke-dashoffset: -13; } }
+.np-match-tip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-top: 0.9rem;
+  font-size: 0.72rem;
+  color: var(--np-faint);
+}
+.np-match-tip svg { width: 13px; height: 13px; }
+.np-pairs-key {
+  margin-top: 1rem;
+  padding: 0.8rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid var(--np-line);
+  background: rgba(13, 17, 23, 0.6);
+  text-align: left;
+}
+.np-pairs-key-title {
+  margin-bottom: 0.5rem;
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--np-faint);
+}
+.np-pairs-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.4rem 0.2rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.08);
+  font-size: calc(0.86rem * var(--np-fs));
+  color: var(--np-ink-2);
+}
+.np-pairs-row:first-of-type { border-top: 0; }
+.np-pairs-row > svg { width: 15px; height: 15px; }
+.np-pairs-row.is-ok > svg { color: #34d399; }
+.np-pairs-row.is-bad > svg { color: #f87171; }
+.np-pairs-arrow { color: var(--np-faint); }
+.np-pairs-right { display: flex; flex-wrap: wrap; gap: 0.15rem 0.5rem; }
+.np-pairs-yours { color: #f87171; text-decoration: line-through; opacity: 0.8; }
 #np-layout .np-match-item {
   position: relative;
   overflow: hidden;
@@ -1014,21 +1142,6 @@
 .np-nav-btn-next:hover:not(:disabled) svg { transform: translateX(3px); }
 .np-nav-btn:disabled { opacity: 0.32; cursor: not-allowed; filter: grayscale(0.4); }
 .np-nav-btn:focus-visible { outline: 2px solid var(--np-accent); outline-offset: 2px; }
-.np-nav-hint {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  min-width: 0;
-  font-size: 0.7rem;
-  color: var(--np-faint);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.np-nav-hint svg { width: 13px; height: 13px; flex: 0 0 auto; }
-@media (hover: none), (max-width: 760px) {
-  .np-nav-hint { display: none !important; }
-}
 
 /* ── Spatial effects ────────────────────────────────────────────────
    A lean toward the pointer (--rx/--ry, written per frame by the module),
@@ -1183,14 +1296,48 @@
 #np-layout[data-np-motion="on"] .np-choices.np-grading .np-choice.is-correct .np-choice-mark {
   animation: npMarkIn 0.5s 0.05s var(--ease-spring, ease) backwards;
 }
-#np-layout[data-np-motion="on"] .np-choices.np-grading .np-choice.is-wrong {
-  animation: npShake 0.48s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
-}
+/* Wrong: no shake. The red X falling onto it (js: _npUiDropX) is the event;
+   the choice only flinches as it lands (.np-hit), and its own mark arrives
+   after the X has gone. */
 #np-layout[data-np-motion="on"] .np-choices.np-grading .np-choice.is-wrong .np-choice-mark {
-  animation: npMarkIn 0.45s var(--ease-spring, ease) backwards;
+  animation: npMarkIn 0.45s 0.75s var(--ease-spring, ease) backwards;
 }
 #np-layout[data-np-motion="on"] .np-choices.np-grading .np-match-correct { animation: npPop 0.6s var(--ease-spring, ease) both; }
-#np-layout[data-np-motion="on"] .np-choices.np-grading .np-match-wrong { animation: npShake 0.48s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+#np-layout[data-np-motion="on"] .np-hit { animation: npHit 0.55s cubic-bezier(0.2, 0.9, 0.3, 1); }
+@keyframes npHit {
+  0% { transform: translateY(0) scale(1); filter: brightness(1); }
+  22% { transform: translateY(3px) scale(0.985, 0.97); filter: brightness(1.55) saturate(1.3); }
+  60% { transform: translateY(-1px) scale(1.005); filter: brightness(1.1); }
+  100% { transform: translateY(0) scale(1); filter: brightness(1); }
+}
+
+/* The X itself: drops from above with gravity, lands with a squash, holds a
+   beat, then falls on past and out. Fixed to the viewport, centred on the
+   choice it was dropped onto. */
+.np-xfall {
+  position: fixed;
+  z-index: 9000;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  animation: npXFall 1.35s linear both;
+}
+.np-xfall svg { width: 100%; height: 100%; overflow: visible; }
+.np-xfall path {
+  fill: none;
+  stroke: #ef4444;
+  stroke-width: 7;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.95)) drop-shadow(0 6px 10px rgba(0, 0, 0, 0.6));
+}
+@keyframes npXFall {
+  0%   { transform: translate(-50%, calc(-50% - 170px)) rotate(-28deg) scale(0.7); opacity: 0; animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45); }
+  8%   { opacity: 1; }
+  30%  { transform: translate(-50%, -50%) rotate(4deg) scale(1.08, 0.86); animation-timing-function: ease-out; }
+  40%  { transform: translate(-50%, calc(-50% - 10px)) rotate(-2deg) scale(0.96, 1.06); animation-timing-function: ease-in; }
+  50%  { transform: translate(-50%, -50%) rotate(0deg) scale(1); }
+  72%  { transform: translate(-50%, -50%) rotate(0deg) scale(1); opacity: 1; animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45); }
+  100% { transform: translate(-50%, calc(-50% + 140px)) rotate(24deg) scale(0.85); opacity: 0; }
+}
 @keyframes npPop {
   0% { transform: scale(1); }
   35% { transform: scale(1.035); }
@@ -1198,12 +1345,7 @@
 }
 @keyframes npSheen { to { transform: translateX(100%); } }
 @keyframes npMarkIn { from { transform: scale(0) rotate(-45deg); opacity: 0; } }
-@keyframes npShake {
-  10%, 90% { transform: translateX(-1px); }
-  20%, 80% { transform: translateX(3px); }
-  30%, 50%, 70% { transform: translateX(-6px); }
-  40%, 60% { transform: translateX(6px); }
-}
+
 #np-layout[data-np-motion="off"] .np-voice-eq i { animation: none; transform: scaleY(0.7); }
 
 /* ── The display panel ──────────────────────────────────────────── */
@@ -1351,4 +1493,260 @@
   .np-choice.np-tf { min-height: calc(104px * var(--np-el)); }
   .np-voice-label { display: none; }
   .np-voice-btn { padding: 0 0.55rem; }
+}
+
+/* ── The Incorrect sheet ────────────────────────────────────────── */
+.np-wrong-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: radial-gradient(ellipse at 50% 40%, rgba(127, 29, 29, 0.28), rgba(2, 6, 12, 0.78) 70%);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: npFade 0.22s ease-out both;
+}
+@keyframes npFade { from { opacity: 0; } }
+.np-wrong-card {
+  position: relative;
+  width: min(520px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  padding: 2rem 1.6rem 1.4rem;
+  border-radius: 22px;
+  text-align: center;
+  color: #c9d1d9;
+  background: linear-gradient(180deg, rgba(36, 22, 28, 0.96), rgba(17, 21, 29, 0.98) 38%);
+  border: 1px solid rgba(248, 113, 113, 0.28);
+  box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(0, 0, 0, 0.35),
+              inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 0 60px -20px rgba(239, 68, 68, 0.45);
+  animation: npSheetIn 0.42s var(--ease-expo-out, ease-out) both;
+  scrollbar-width: thin;
+}
+@keyframes npSheetIn { from { opacity: 0; transform: translateY(18px) scale(0.96); } }
+.np-wrong-badge {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  margin: 0 auto 0.9rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 35% 30%, #f87171, #dc2626 70%);
+  box-shadow: 0 10px 30px -8px rgba(239, 68, 68, 0.9), inset 0 2px 0 rgba(255, 255, 255, 0.25);
+  animation: npBadgeIn 0.5s 0.08s var(--ease-spring, ease) both;
+}
+.np-wrong-badge svg { width: 34px; height: 34px; overflow: visible; }
+.np-wrong-badge path {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-dasharray: 46;
+  stroke-dashoffset: 46;
+  animation: npDraw 0.45s 0.3s ease-out forwards;
+}
+.np-wrong-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid rgba(248, 113, 113, 0.6);
+  animation: npRing 1.6s 0.2s ease-out infinite;
+}
+@keyframes npBadgeIn { from { transform: scale(0.2) rotate(-30deg); opacity: 0; } }
+@keyframes npDraw { to { stroke-dashoffset: 0; } }
+/* Fades to nothing at full size and restarts from nothing: the loop closes. */
+@keyframes npRing { from { transform: scale(0.9); opacity: 0.9; } to { transform: scale(1.5); opacity: 0; } }
+.np-wrong-kicker {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8b949e;
+}
+.np-wrong-title {
+  margin: 0.25rem 0 0.4rem;
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #fff;
+}
+.np-wrong-q {
+  margin: 0 auto 1.1rem;
+  max-width: 44ch;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #a5adb8;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.np-wrong-compare { display: grid; gap: 0.55rem; text-align: left; }
+.np-wrong-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid;
+  animation: npRise 0.45s var(--ease-expo-out, ease-out) backwards;
+}
+.np-wrong-row.is-yours {
+  border-color: rgba(248, 113, 113, 0.4);
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.16), rgba(239, 68, 68, 0.06));
+  animation-delay: 0.18s;
+}
+.np-wrong-row.is-right {
+  border-color: rgba(52, 211, 153, 0.45);
+  background: linear-gradient(180deg, rgba(16, 185, 129, 0.18), rgba(16, 185, 129, 0.06));
+  animation-delay: 0.28s;
+}
+.np-wrong-ico {
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+}
+.np-wrong-ico svg { width: 16px; height: 16px; }
+.is-yours .np-wrong-ico { background: #ef4444; box-shadow: 0 0 14px rgba(239, 68, 68, 0.6); }
+.is-right .np-wrong-ico { background: #10b981; box-shadow: 0 0 14px rgba(16, 185, 129, 0.6); }
+.np-wrong-txt { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.np-wrong-txt em {
+  font-style: normal;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #8b949e;
+}
+.np-wrong-txt strong { font-size: 0.95rem; font-weight: 650; color: #f0f3f6; overflow-wrap: anywhere; }
+.np-wrong-pairs { display: grid; gap: 0.4rem; text-align: left; }
+.np-wrong-pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(13, 17, 23, 0.55);
+  font-size: 0.86rem;
+  animation: npRise 0.4s var(--ease-expo-out, ease-out) backwards;
+}
+.np-wrong-pair:nth-child(2) { animation-delay: 0.06s; }
+.np-wrong-pair:nth-child(3) { animation-delay: 0.12s; }
+.np-wrong-pair:nth-child(n+4) { animation-delay: 0.18s; }
+.np-wrong-pair > svg { width: 14px; height: 14px; color: #6e7681; }
+.np-wrong-pair.is-ok { border-color: rgba(52, 211, 153, 0.3); }
+.np-wrong-pair.is-bad { border-color: rgba(248, 113, 113, 0.35); background: rgba(239, 68, 68, 0.06); }
+.np-wrong-pair-right { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.np-wrong-pair-right s { color: #f87171; font-size: 0.78rem; }
+.np-wrong-pair-right b { color: #6ee7b7; font-weight: 650; }
+.np-wrong-pair.is-ok .np-wrong-pair-right b { color: #e6edf3; }
+.np-wrong-pair .np-wrong-pair-mark { color: #34d399; }
+.np-wrong-pair.is-bad .np-wrong-pair-mark { color: #f87171; }
+.np-wrong-expl {
+  margin-top: 0.9rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: 14px;
+  text-align: left;
+  border: 1px solid rgba(129, 140, 248, 0.25);
+  background: rgba(99, 102, 241, 0.08);
+}
+.np-wrong-expl-title {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #a5b4fc;
+}
+.np-wrong-expl-title svg { width: 13px; height: 13px; }
+.np-wrong-expl-body { font-size: 0.88rem; line-height: 1.55; color: #c9d1d9; }
+.np-wrong-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1.25rem;
+}
+.np-wrong-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 46px;
+  border-radius: 13px;
+  font: 700 0.92rem var(--font-sans);
+  cursor: pointer;
+  transition: filter 0.15s ease, background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+.np-wrong-actions button:active { transform: scale(0.97); }
+.np-wrong-stay {
+  flex: 0 0 auto;
+  padding: 0 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(13, 17, 23, 0.6);
+  color: #c9d1d9;
+}
+.np-wrong-stay:hover { border-color: rgba(148, 163, 184, 0.4); background: rgba(148, 163, 184, 0.08); }
+.np-wrong-go {
+  flex: 1 1 auto;
+  border: 0;
+  color: #fff;
+  background: linear-gradient(135deg, var(--color-primary, #6366f1), color-mix(in srgb, var(--color-primary, #6366f1) 72%, #000));
+  box-shadow: 0 14px 30px -14px var(--color-primary, #6366f1), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+.np-wrong-go:hover { filter: brightness(1.1); }
+.np-wrong-go:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.np-wrong-go svg { width: 17px; height: 17px; }
+.np-wrong-actions kbd {
+  padding: 1px 6px;
+  border-radius: 5px;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+.np-wrong-stay kbd { background: rgba(148, 163, 184, 0.1); border-color: rgba(148, 163, 184, 0.25); }
+@media (prefers-reduced-motion: reduce) {
+  .np-wrong-overlay, .np-wrong-card, .np-wrong-badge, .np-wrong-row, .np-wrong-pair, .np-wrong-ring { animation: none; }
+  .np-wrong-badge path { animation: none; stroke-dashoffset: 0; }
+}
+
+/* ── The sidebar's seam ─────────────────────────────────────────── */
+#np-layout .np-sidebar {
+  flex: 0 0 auto;
+  min-width: 220px;
+  max-width: 60vw;
+}
+.np-seg-5 .np-seg-btn { padding: 0 0.3rem; font-size: 0.7rem; }
+
+@media (max-width: 640px) {
+  /* Stacked on a phone: there is no seam to drag, and a sidebar folded away on
+     the desktop must not take the question grid with it here. */
+  #np-layout .np-divider { display: none; }
+  #np-layout.hide-left .practice-sidebar {
+    width: auto !important;
+    flex-basis: auto !important;
+    padding: 0.75rem 1rem !important;
+    border-width: 0 0 1px !important;
+    opacity: 1;
+    overflow-y: auto;
+    pointer-events: auto;
+    visibility: visible;
+  }
+  #np-layout .np-sidebar { max-width: none; }
+  #np-layout .np-matching-grid { gap: 1.6rem; }
+  .np-wrong-card { padding: 1.5rem 1.1rem 1.1rem; }
+  .np-wrong-actions { flex-direction: column-reverse; }
+  .np-wrong-stay { width: 100%; }
 }

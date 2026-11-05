@@ -575,7 +575,18 @@ function formatAnswerDisplay(answer, type, keyEntry) {
   };
   if (type === 'matching') {
     const pairs = keyEntry && Array.isArray(keyEntry.pairs) ? keyEntry.pairs : [];
-    return pairs.length ? pairs.map(p => `${p.left} → ${p.right}`).join(' · ') : '—';
+    if (!pairs.length) return '—';
+    // A student's answer is a map { leftIdx: rightIdx }. This used to print the
+    // KEY's pairs whatever it was given, so "You answered" showed the correct
+    // pairing beside an Incorrect verdict.
+    if (answer && typeof answer === 'object' && !Array.isArray(answer)) {
+      return pairs.map((p, i) => {
+        const ri = parseInt(answer[i], 10);
+        const to = Number.isInteger(ri) && pairs[ri] ? pairs[ri].right : '—';
+        return `${p.left} → ${to}`;
+      }).join(' · ');
+    }
+    return pairs.map(p => `${p.left} → ${p.right}`).join(' · ');
   }
   if (!answer || (Array.isArray(answer) && answer.length === 0)) return '—';
   if (type === 'checkbox' && Array.isArray(answer)) {
@@ -736,6 +747,27 @@ function gradeAndAdvance() {
 }
 
 function showWrongAnswerPopup(keyEntry, explanation, qType) {
+  // The attempt's own sheet: your answer beside the right one, Enter to go on.
+  if (typeof npUiShowWrong === 'function') {
+    const type = qType || 'mcq';
+    const userAns = sessionAnswers[currentSectionIdx][currentQuestionNum];
+    const sec = activeNotebook.sections[currentSectionIdx];
+    const qList = sec.questions || [];
+    const pairs = keyEntry && Array.isArray(keyEntry.pairs) ? keyEntry.pairs : [];
+    npUiShowWrong({
+      type,
+      position: (qList.indexOf(currentQuestionNum) + 1) + ' of ' + qList.length,
+      question: (keyEntry && keyEntry.question) || '',
+      yours: type === 'matching' ? '' : formatAnswerDisplay(userAns, type, keyEntry),
+      correct: type === 'matching' ? '' : formatAnswerDisplay(keyEntry ? keyEntry.answer : null, type, keyEntry),
+      pairs: type === 'matching' ? pairs.map((p, i) => {
+        const ri = parseInt((userAns || {})[i], 10);
+        return { left: p.left, right: p.right, yours: Number.isInteger(ri) && pairs[ri] ? pairs[ri].right : '', ok: ri === i };
+      }) : null,
+      explanation: explanation || ''
+    });
+    return;
+  }
   const dialogIcon = document.getElementById('dialog-icon');
   const dialogTitle = document.getElementById('dialog-title');
   const dialogMsg = document.getElementById('dialog-msg');
@@ -771,6 +803,7 @@ function showWrongAnswerPopup(keyEntry, explanation, qType) {
 function closeWrongAnswerPopupAndNext() {
   const modal = document.getElementById('dialog-modal');
   if (modal) modal.classList.add('hidden');
+  if (typeof npUiCloseWrong === 'function') npUiCloseWrong();
   npNextQuestion();
 }
 
@@ -947,6 +980,32 @@ function npReadProgress() {
   } catch (e) { return null; }
 }
 
+/** True when an answer has actually been given (not null, '', [] or {}). */
+function _npHasAnswer(v) {
+  if (v == null || v === '') return false;
+  if (Array.isArray(v)) return v.length > 0;
+  if (typeof v === 'object') return Object.keys(v).length > 0;
+  return true;
+}
+
+/**
+ * Make "answered" mean answered. A question is only locked and only shows its
+ * key once it has an answer AND a grade; one that was skipped stays open, so
+ * going back to it lets you answer it.
+ */
+function _npHealAnswered(si, q) {
+  if (reviewMode || !sessionStatus[si] || sessionStatus[si][q] !== 'answered') return;
+  if (!gradeResults[si]) gradeResults[si] = {};
+  const g = gradeResults[si][q];
+  if (g === 'correct' || g === 'wrong') return;
+  const ans = sessionAnswers[si] ? sessionAnswers[si][q] : null;
+  if (_npHasAnswer(ans)) {
+    gradeResults[si][q] = npGradeEntry(ans, answerKeys[si] && answerKeys[si][q]) ? 'correct' : 'wrong';
+  } else {
+    sessionStatus[si][q] = 'opened';
+  }
+}
+
 /** Puts a saved attempt back exactly where it was. */
 function npApplyProgress(d) {
   if (!d || !activeNotebook) return false;
@@ -960,6 +1019,14 @@ function npApplyProgress(d) {
     if (d.shuffleSeed) { npShuffleSeed = d.shuffleSeed; npApplyChoiceOrder(); }
     if (d.answers) sessionAnswers = d.answers;
     if (d.status) sessionStatus = d.status;
+    /* The grades are not in the draft, and were never worked out again, so a
+       resumed attempt showed every question you had answered as "Skipped" --
+       locked, with the right answer on display. They are re-graded from the
+       answers here; anything marked answered with no answer behind it goes
+       back to being a question you can answer. */
+    (activeNotebook.sections || []).forEach((sec, si) => {
+      (sec.questions || []).forEach(q => _npHealAnswered(si, q));
+    });
     npFlags = (d.flags || []).map(arr => new Set(arr || []));
     currentSectionIdx = d.sectionIdx || 0;
     currentQuestionNum = d.questionNum != null ? d.questionNum : null;
@@ -986,6 +1053,25 @@ function npBindKeys() {
     if (typing && e.key !== 'Escape') return;
 
     const k = e.key.toLowerCase();
+    /* Up and down walk the choices; Enter (or Space) takes the one you are on.
+       Focus does the work: the choices are buttons, so a focused one answers
+       to Enter by itself, and its ring is the cursor. For multi-select the
+       Confirm button is the last stop, and Enter with no choice focused
+       confirms whatever is ticked. */
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (typeof npKbMove === 'function' && npKbMove(e.key === 'ArrowDown' ? 1 : -1)) e.preventDefault();
+      return;
+    }
+    if (e.key === 'Enter') {
+      const inChoices = el && el.closest && el.closest('#np-bubbles-container');
+      // Only when nothing else has focus: Enter on a topbar button is that button's.
+      const free = !el || el === document.body || (el.closest && el.closest('#np-question-area'));
+      if (!inChoices && free && getQuestionType(currentSectionIdx, currentQuestionNum) === 'checkbox') {
+        e.preventDefault();
+        confirmCheckboxAnswer();
+      }
+      return;
+    }
     if (k === 'n' || e.key === 'ArrowRight') { e.preventDefault(); npNextQuestion(); }
     else if (k === 'p' || e.key === 'ArrowLeft') { e.preventDefault(); npPrevQuestion(); }
     else if (k === 'f') { e.preventDefault(); npToggleFlag(currentSectionIdx, currentQuestionNum); }
@@ -1106,6 +1192,11 @@ function npSetQuestionShuffle(on) {
 function npSetChoiceShuffle(on) {
   const p = npShufflePrefs(); p.choices = !!on; _npSetShufflePrefs(p);
   if (activeNotebook && !reviewMode) {
+    /* A fresh seed each time it is switched on. The seed was fixed for the
+       attempt, so off-then-on brought back exactly the order it had before,
+       which is not a shuffle. It is saved with the progress, so a resume
+       still shows the order you left. */
+    if (on) npShuffleSeed = Math.floor(Math.random() * 1e9) + 1;
     npApplyChoiceOrder();
     renderQuestion();
     npSaveProgress();
@@ -1248,6 +1339,9 @@ function renderQuestion() {
     return;
   }
 
+  // Never show a key for a question that has no graded answer (see _npHealAnswered).
+  _npHealAnswered(currentSectionIdx, currentQuestionNum);
+
   // Mark as opened if not answered (practice mode only)
   if (!reviewMode && sessionStatus[currentSectionIdx][currentQuestionNum] === 'unopened') {
     sessionStatus[currentSectionIdx][currentQuestionNum] = 'opened';
@@ -1297,7 +1391,19 @@ function renderQuestion() {
       const userDisp = formatAnswerDisplay(userAns, qType, correctObj);
       const correctDisp = formatAnswerDisplay(correctAns, qType, correctObj);
       let statusHtml = '';
-      if (result === 'correct') {
+      if (qType === 'matching') {
+        // A sentence listing every pair twice was a paragraph of red text; the
+        // count says it, and the pair list below the columns shows which.
+        const pairs = (correctObj && correctObj.pairs) || [];
+        const map = (selected && typeof selected === 'object') ? selected : {};
+        const right = pairs.filter((_, i) => parseInt(map[i], 10) === i).length;
+        const tone = result === 'correct' ? 'correct' : (result === 'wrong' ? 'wrong' : 'skipped');
+        const icon = tone === 'correct' ? 'check-circle-2' : (tone === 'wrong' ? 'x-circle' : 'minus-circle');
+        const said = result === 'skipped' || !Object.keys(map).length
+          ? 'Not answered'
+          : `${right} of ${pairs.length} pair${pairs.length === 1 ? '' : 's'} matched correctly`;
+        statusHtml = `<div class="np-review-badge np-review-badge-${tone}"><i data-lucide="${icon}" style="width:16px;height:16px;"></i> ${escapeHTML(said)}</div>`;
+      } else if (result === 'correct') {
         statusHtml = `<div class="np-review-badge np-review-badge-correct"><i data-lucide="check-circle-2" style="width:16px;height:16px;"></i> You answered ${escapeHTML(userDisp)} — Correct!</div>`;
       } else if (result === 'wrong') {
         statusHtml = `<div class="np-review-badge np-review-badge-wrong"><i data-lucide="x-circle" style="width:16px;height:16px;"></i> You answered ${escapeHTML(userDisp)} · Correct: ${escapeHTML(correctDisp)}</div>`;
@@ -1347,15 +1453,39 @@ function renderQuestion() {
       const qTrackerId = currentSectionIdx + '-' + currentQuestionNum;
       if (qTextDiv.dataset.currentQId !== qTrackerId) {
         qTextDiv.dataset.currentQId = qTrackerId;
-        qTextDiv.textContent = '';
         qTextDiv.classList.remove('hidden');
         if (window.npQuestionAnimator) { window.npQuestionAnimator.abort(); window.npQuestionAnimator.removeCursor(); }
-        window.npQuestionAnimator = new TextAnimator(qTextDiv, {
-          speed: 7, blur: true, glow: false, chromatic: false, cursor: true,
-          onComplete: () => { window.npQuestionAnimator.removeCursor(); }
-        });
-        window.npQuestionAnimator.createdAt = Date.now();
-        window.npQuestionAnimator.type(correctObj.question);
+        // The reveal is a display preference: Off shows the question at once.
+        const reveal = typeof npUiPrefs === 'function' ? npUiPrefs().reveal : 'normal';
+        const speed = { fast: 3, normal: 7, slow: 16 }[reveal];
+        if (!speed || typeof TextAnimator === 'undefined') {
+          window.npQuestionAnimator = null;
+          qTextDiv.style.minHeight = '';
+          qTextDiv.textContent = correctObj.question;
+        } else {
+          /* Hold the space the finished question will take. Typed a word at a
+             time it grew a line at a time, and everything under it -- the
+             choices, the matching grid and its lines -- slid down as it went. */
+          qTextDiv.style.minHeight = '';
+          qTextDiv.textContent = correctObj.question;
+          qTextDiv.style.minHeight = qTextDiv.offsetHeight + 'px';
+          qTextDiv.textContent = '';
+          /* The callback answers only for its own animator. An aborted one
+             (the question you just left) still finishes and calls back, and
+             it used to act on whichever animator was current -- removing the
+             new question's cursor and dropping its reserved height mid-type. */
+          const anim = new TextAnimator(qTextDiv, {
+            speed, blur: true, glow: false, chromatic: false, cursor: true,
+            onComplete: () => {
+              if (window.npQuestionAnimator !== anim) return;
+              anim.removeCursor();
+              qTextDiv.style.minHeight = '';
+            }
+          });
+          window.npQuestionAnimator = anim;
+          window.npQuestionAnimator.createdAt = Date.now();
+          window.npQuestionAnimator.type(correctObj.question);
+        }
       }
     } else {
       qTextDiv.dataset.currentQId = '';
@@ -1497,19 +1627,30 @@ function renderQuestion() {
       return `<div id="np-match-right-${item.origIdx}" class="${cls}" ${inlineStyle} ${onclick}>${escapeHTML(item.text)}</div>`;
     }).join('');
 
+    const locked = isAnswered || reviewMode;
     bubblesContainer.innerHTML = `
-      <div class="np-matching-grid" style="position: relative;">
+      <div class="np-matching-grid${locked ? ' is-locked' : ''}" style="position: relative;">
         <!-- SVG Canvas for Connecting Lines -->
-        <svg id="np-matching-svg" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5;"></svg>
-        
-        <div class="np-matching-col"><h5 style="font-size:0.75rem; color:var(--text-tertiary); margin-bottom:0.5rem; text-transform:uppercase;">Terms</h5>${leftHtml}</div>
-        <div class="np-matching-col"><h5 style="font-size:0.75rem; color:var(--text-tertiary); margin-bottom:0.5rem; text-transform:uppercase;">Definitions</h5>${rightHtml}</div>
+        <svg id="np-matching-svg" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; overflow: visible;"></svg>
+
+        <div class="np-matching-col"><h5 class="np-match-head">Terms</h5>${leftHtml}</div>
+        <div class="np-matching-col"><h5 class="np-match-head">Definitions</h5>${rightHtml}</div>
       </div>
-      ${!isAnswered && !reviewMode && !isCheckingAnswer ? `<button class="np-confirm-btn np-sp" onclick="confirmMatchingAnswer()" ${matchedCount < pairs.length ? 'disabled' : ''}><i data-lucide="check" style="width:18px;height:18px;"></i> Confirm Matches (${matchedCount}/${pairs.length})</button>` : ''}
-      ${(isAnswered || reviewMode) ? `
-        <div style="margin-top:1rem; padding:0.75rem; background:var(--bg-surface); border-radius:var(--radius-sm); border:1px solid var(--border-color);">
-          <h5 style="font-size:0.75rem; color:var(--text-tertiary); margin-bottom:0.5rem;">Correct Pairings:</h5>
-          ${pairs.map((p, i) => `<div style="font-size:0.85rem; padding:0.2rem 0;">${escapeHTML(p.left)} <span style="color:#f472b6; font-weight:700;">→</span> ${escapeHTML(p.right)}</div>`).join('')}
+      ${!locked && !isCheckingAnswer ? `<div class="np-match-tip"><i data-lucide="mouse-pointer-2"></i> Drag a term onto its definition, or click one then the other</div><button class="np-confirm-btn np-sp" onclick="confirmMatchingAnswer()" ${matchedCount < pairs.length ? 'disabled' : ''}><i data-lucide="check" style="width:18px;height:18px;"></i> Confirm matches <span class="np-confirm-count">${matchedCount}/${pairs.length}</span></button>` : ''}
+      ${locked ? `
+        <div class="np-pairs-key">
+          <div class="np-pairs-key-title">Correct pairings</div>
+          ${pairs.map((p, i) => {
+            const ok = parseInt(userMatches[i], 10) === i;
+            const ri = parseInt(userMatches[i], 10);
+            const theirs = Number.isInteger(ri) && pairs[ri] && !ok ? `<span class="np-pairs-yours">${escapeHTML(pairs[ri].right)}</span>` : '';
+            return `<div class="np-pairs-row ${ok ? 'is-ok' : 'is-bad'}">
+              <i data-lucide="${ok ? 'check' : 'x'}"></i>
+              <span class="np-pairs-left">${escapeHTML(p.left)}</span>
+              <span class="np-pairs-arrow">→</span>
+              <span class="np-pairs-right">${theirs}${escapeHTML(p.right)}</span>
+            </div>`;
+          }).join('')}
         </div>
       ` : ''}
     `;
@@ -1585,22 +1726,33 @@ function renderQuestion() {
   if (typeof lucide !== 'undefined') lucide.createIcons(questionArea ? { root: questionArea } : undefined);
 
   // Trigger SVG lines for matching questions
+  // Drawn now, from layout offsets, so they are right on the first frame; the
+  // observer keeps them right as anything above or beside them resizes.
   if (qType === 'matching') {
-    setTimeout(drawMatchingLines, 40);
+    drawMatchingLines();
+    _npWatchMatching(true);
     window.removeEventListener('resize', drawMatchingLines);
     window.addEventListener('resize', drawMatchingLines);
   } else {
+    _npWatchMatching(false);
     window.removeEventListener('resize', drawMatchingLines);
   }
 
-  // Entry animation (only when the question changed), the section meter, and
-  // the spatial hover state for whatever is now under the pointer.
+  // The flag button describes the question on screen. It was only repainted
+  // when the flag was toggled, so it stayed lit on the next question.
+  npPaintFlagBtn();
+
+  // Entry animation (only when the question changed), the section meter, the
+  // falling X on a wrong answer, and the spatial hover state under the pointer.
   if (typeof npUiOnRender === 'function') {
     npUiOnRender({
       key: currentSectionIdx + '-' + currentQuestionNum,
       ord: currentSectionIdx * 100000 + idx,
       pos: idx,
-      total: qList.length
+      total: qList.length,
+      type: qType,
+      grading: !!isCheckingAnswer,
+      result: gradeResults[currentSectionIdx] ? gradeResults[currentSectionIdx][currentQuestionNum] : null
     });
   }
 }
@@ -1627,89 +1779,242 @@ function _npChoiceHTML(o) {
     </button>`;
 }
 
-/* Draw SVG connecting lines between matched terms and definitions */
+/* Draw SVG connecting lines between matched terms and definitions.
+
+   Positions come from the layout (offsetLeft/offsetTop up to the grid), not
+   from getBoundingClientRect. A rect is the box as painted, so it moved with
+   everything that animates here: the card sliding in, the grid rising, the
+   lean on a hovered term. The lines used to be measured 40ms into that slide
+   and sat in the wrong place until a later redraw. Layout offsets ignore
+   transforms, and the SVG lives inside the grid, so the lines are right from
+   the first frame and ride along with the animation instead of fighting it. */
+function _npMatchPos(el, grid) {
+  let x = 0, y = 0, n = el;
+  while (n && n !== grid) {
+    x += n.offsetLeft;
+    y += n.offsetTop;
+    n = n.offsetParent;
+  }
+  if (n !== grid) {
+    // An unexpected offsetParent chain; fall back to painted boxes.
+    const g = grid.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    return { x: r.left - g.left, y: r.top - g.top, w: r.width, h: r.height };
+  }
+  return { x, y, w: el.offsetWidth, h: el.offsetHeight };
+}
+
+/** The anchor a line leaves from: the inner edge of a term or a definition. */
+function _npMatchAnchor(el, grid) {
+  const p = _npMatchPos(el, grid);
+  const isLeft = el.classList.contains('np-match-left');
+  return { x: isLeft ? p.x + p.w : p.x, y: p.y + p.h / 2 };
+}
+
+function _npMatchCurve(a, b) {
+  const dx = (b.x - a.x) * 0.5;
+  return `M ${a.x} ${a.y} C ${a.x + dx} ${a.y}, ${b.x - dx} ${b.y}, ${b.x} ${b.y}`;
+}
+
+const NP_MATCH_COLORS = ['#818cf8', '#34d399', '#fbbf24', '#38bdf8', '#fb7185', '#c084fc'];
+
 function drawMatchingLines() {
   const svg = document.getElementById('np-matching-svg');
   if (!svg) return;
-  svg.innerHTML = ''; // Clear previous lines
+  const grid = svg.closest('.np-matching-grid');
+  if (!grid || !activeNotebook) return;
+  const drag = svg.querySelector('#np-match-drag');
+  svg.innerHTML = '';
 
-  const grid = document.querySelector('.np-matching-grid');
-  if (!grid) return;
-  const gridRect = grid.getBoundingClientRect();
-
-  const sec = activeNotebook.sections[currentSectionIdx];
-  const pairs = answerKeys[currentSectionIdx][currentQuestionNum]?.pairs || [];
   const userMatches = sessionAnswers[currentSectionIdx][currentQuestionNum] || {};
   const isAnswered = sessionStatus[currentSectionIdx][currentQuestionNum] === 'answered';
-
-  const MATCH_PAIR_COLORS = [
-    { border: '#818cf8', bg: 'rgba(99, 102, 241, 0.08)' }, // Indigo
-    { border: '#34d399', bg: 'rgba(52, 211, 153, 0.08)' }, // Emerald
-    { border: '#fbbf24', bg: 'rgba(251, 191, 36, 0.08)' }, // Amber
-    { border: '#38bdf8', bg: 'rgba(56, 189, 248, 0.08)' }, // Sky
-    { border: '#fb7185', bg: 'rgba(251, 113, 133, 0.08)' }, // Rose
-    { border: '#c084fc', bg: 'rgba(192, 132, 252, 0.08)' }  // Purple
-  ];
+  const NS = 'http://www.w3.org/2000/svg';
 
   Object.keys(userMatches).forEach(leftKey => {
-    const li = parseInt(leftKey);
-    const ri = userMatches[leftKey];
-    if (ri === undefined || ri === null) return;
-
+    const li = parseInt(leftKey, 10);
+    const ri = parseInt(userMatches[leftKey], 10);
+    if (!Number.isInteger(li) || !Number.isInteger(ri)) return;
     const elLeft = document.getElementById(`np-match-left-${li}`);
     const elRight = document.getElementById(`np-match-right-${ri}`);
+    if (!elLeft || !elRight) return;
 
-    if (elLeft && elRight) {
-      const rectLeft = elLeft.getBoundingClientRect();
-      const rectRight = elRight.getBoundingClientRect();
+    const a = _npMatchAnchor(elLeft, grid);
+    const b = _npMatchAnchor(elRight, grid);
+    let stroke = NP_MATCH_COLORS[li % NP_MATCH_COLORS.length];
+    if (isAnswered || reviewMode) stroke = ri === li ? '#10b981' : '#ef4444';
 
-      // Start point: center-right edge of left item
-      const x1 = rectLeft.right - gridRect.left;
-      const y1 = (rectLeft.top + rectLeft.bottom) / 2 - gridRect.top;
-
-      // End point: center-left edge of right item
-      const x2 = rectRight.left - gridRect.left;
-      const y2 = (rectRight.top + rectRight.bottom) / 2 - gridRect.top;
-
-      // Bezier curve calculations for a smooth S-curve
-      const cx1 = x1 + (x2 - x1) * 0.45;
-      const cy1 = y1;
-      const cx2 = x2 - (x2 - x1) * 0.45;
-      const cy2 = y2;
-
-      // Determine match line color
-      let strokeColor = MATCH_PAIR_COLORS[li % MATCH_PAIR_COLORS.length].border;
-      if (isAnswered || reviewMode) {
-        const isCorrect = ri === li;
-        strokeColor = isCorrect ? '#10b981' : '#ef4444'; // Green for correct, Red for wrong
-      }
-
-      // Create smooth Bezier path
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('d', `M ${x1} ${y1} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${x2} ${y2}`);
-      path.setAttribute('stroke', strokeColor);
-      path.setAttribute('stroke-width', '3');
-      path.setAttribute('fill', 'none');
-      path.setAttribute('style', `filter: drop-shadow(0 0 2px ${strokeColor}66); transition: stroke 0.3s ease;`);
-      svg.appendChild(path);
-
-      // Start circle anchor
-      const dot1 = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      dot1.setAttribute('cx', x1);
-      dot1.setAttribute('cy', y1);
-      dot1.setAttribute('r', '4.5');
-      dot1.setAttribute('fill', strokeColor);
-      svg.appendChild(dot1);
-
-      // End circle anchor
-      const dot2 = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      dot2.setAttribute('cx', x2);
-      dot2.setAttribute('cy', y2);
-      dot2.setAttribute('r', '4.5');
-      dot2.setAttribute('fill', strokeColor);
-      svg.appendChild(dot2);
-    }
+    const path = document.createElementNS(NS, 'path');
+    path.setAttribute('d', _npMatchCurve(a, b));
+    path.setAttribute('stroke', stroke);
+    path.setAttribute('stroke-width', '3');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('fill', 'none');
+    path.setAttribute('class', 'np-match-line');
+    path.setAttribute('style', `filter: drop-shadow(0 0 4px ${stroke}88);`);
+    svg.appendChild(path);
+    [a, b].forEach(pt => {
+      const dot = document.createElementNS(NS, 'circle');
+      dot.setAttribute('cx', pt.x);
+      dot.setAttribute('cy', pt.y);
+      dot.setAttribute('r', '5');
+      dot.setAttribute('fill', stroke);
+      dot.setAttribute('stroke', '#0d1117');
+      dot.setAttribute('stroke-width', '2');
+      svg.appendChild(dot);
+    });
   });
+  // A drag in progress keeps its line through a redraw.
+  if (drag) svg.appendChild(drag);
+}
+
+/* Redrawn whenever anything changes size: the question text typing itself
+   out above, a font arriving, the sidebar being dragged wider, a text-size
+   change. The old resize listener only caught the window. */
+let _npMatchRO = null;
+function _npWatchMatching(on) {
+  if (_npMatchRO) { _npMatchRO.disconnect(); _npMatchRO = null; }
+  if (!on || typeof ResizeObserver === 'undefined') return;
+  const grid = document.querySelector('#np-bubbles-container .np-matching-grid');
+  if (!grid) return;
+  let raf = 0;
+  _npMatchRO = new ResizeObserver(() => {
+    if (raf) return;
+    raf = requestAnimationFrame(() => { raf = 0; drawMatchingLines(); });
+  });
+  _npMatchRO.observe(grid);
+  grid.querySelectorAll('.np-match-item').forEach(el => _npMatchRO.observe(el));
+}
+
+/** Pair a term with a definition directly (the drag's drop). */
+function npMatchPair(li, ri) {
+  if (reviewMode || currentQuestionNum === null || isCheckingAnswer) return;
+  if (sessionStatus[currentSectionIdx][currentQuestionNum] === 'answered') return;
+  let current = sessionAnswers[currentSectionIdx][currentQuestionNum];
+  if (typeof current !== 'object' || current === null) current = {};
+  // One definition per term and one term per definition.
+  Object.keys(current).forEach(k => { if (parseInt(current[k], 10) === ri) delete current[k]; });
+  current[li] = ri;
+  sessionAnswers[currentSectionIdx][currentQuestionNum] = current;
+  sessionStatus[currentSectionIdx][currentQuestionNum] = 'opened';
+  window._matchingSelectedLeft = null;
+  npSaveProgress();
+  renderQuestion();
+}
+
+/* ── Drag to match ──────────────────────────────────────────────
+   Press on a term (or a definition) and drag: a connector leaves its edge and
+   stays on the pointer, the item under the pointer on the other side lights
+   up, and letting go there makes the pair. A press that does not travel is a
+   click, which still works the old way. */
+let _npDrag = null;
+let _npDragEatClick = false;
+
+function _npDragIdx(el) {
+  const m = /np-match-(left|right)-(\d+)/.exec(el.id || '');
+  return m ? { side: m[1], idx: parseInt(m[2], 10) } : null;
+}
+
+function npDragDown(e) {
+  if (e.button !== 0 || reviewMode || isCheckingAnswer) return;
+  const item = e.target.closest && e.target.closest('.np-match-item');
+  const grid = item && item.closest('.np-matching-grid');
+  if (!item || !grid || grid.classList.contains('is-locked')) return;
+  const id = _npDragIdx(item);
+  if (!id) return;
+  _npDrag = { item, grid, id, x0: e.clientX, y0: e.clientY, pid: e.pointerId, live: false, target: null };
+  document.addEventListener('pointermove', _npDragMove);
+  document.addEventListener('pointerup', _npDragUp);
+  document.addEventListener('pointercancel', _npDragCancel);
+}
+
+function _npDragMove(e) {
+  const d = _npDrag;
+  if (!d || e.pointerId !== d.pid) return;
+  if (!d.live) {
+    if (Math.hypot(e.clientX - d.x0, e.clientY - d.y0) < 6) return;
+    d.live = true;
+    try { d.item.setPointerCapture(d.pid); } catch (err) { /* already released */ }
+    d.item.classList.add('is-drag-src');
+    d.grid.classList.add('is-dragging');
+    const layout = document.getElementById('np-layout');
+    if (layout) layout.classList.add('np-dragging');
+    const svg = document.getElementById('np-matching-svg');
+    if (svg) {
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.id = 'np-match-drag';
+      path.setAttribute('class', 'np-match-drag');
+      path.setAttribute('fill', 'none');
+      svg.appendChild(path);
+    }
+  }
+  e.preventDefault();
+  // What is under the pointer, on the other side.
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  let target = under && under.closest ? under.closest('.np-match-item') : null;
+  const tid = target ? _npDragIdx(target) : null;
+  if (!tid || tid.side === d.id.side || !d.grid.contains(target)) target = null;
+  if (target !== d.target) {
+    if (d.target) d.target.classList.remove('is-drop');
+    if (target) target.classList.add('is-drop');
+    d.target = target;
+  }
+  const path = document.getElementById('np-match-drag');
+  if (path) {
+    const g = d.grid.getBoundingClientRect();
+    const a = _npMatchAnchor(d.item, d.grid);
+    // On the pointer the whole way; it snaps to the target's edge once you are on it.
+    const b = target ? _npMatchAnchor(target, d.grid) : { x: e.clientX - g.left, y: e.clientY - g.top };
+    path.setAttribute('d', d.id.side === 'left' ? _npMatchCurve(a, b) : _npMatchCurve(b, a));
+    path.classList.toggle('is-on-target', !!target);
+  }
+}
+
+function _npDragEnd() {
+  const d = _npDrag;
+  _npDrag = null;
+  document.removeEventListener('pointermove', _npDragMove);
+  document.removeEventListener('pointerup', _npDragUp);
+  document.removeEventListener('pointercancel', _npDragCancel);
+  if (!d) return null;
+  try { d.item.releasePointerCapture(d.pid); } catch (err) { /* not captured */ }
+  d.item.classList.remove('is-drag-src');
+  d.grid.classList.remove('is-dragging');
+  if (d.target) d.target.classList.remove('is-drop');
+  const layout = document.getElementById('np-layout');
+  if (layout) layout.classList.remove('np-dragging');
+  const path = document.getElementById('np-match-drag');
+  if (path) path.remove();
+  return d;
+}
+
+function _npDragUp(e) {
+  const d = _npDrag;
+  if (!d || e.pointerId !== d.pid) return;
+  const live = d.live;
+  const target = d.target;
+  _npDragEnd();
+  if (!live) return;               // a plain click: the onclick handles it
+  _npDragEatClick = true;          // the click that follows a drag is not a click
+  setTimeout(() => { _npDragEatClick = false; }, 0);
+  if (target) {
+    const a = d.id;
+    const b = _npDragIdx(target);
+    const li = a.side === 'left' ? a.idx : b.idx;
+    const ri = a.side === 'left' ? b.idx : a.idx;
+    npMatchPair(li, ri);
+  } else {
+    drawMatchingLines();
+  }
+}
+
+function _npDragCancel() { if (_npDragEnd()) drawMatchingLines(); }
+
+/** Capture-phase click on the choices: swallows the click a drag leaves behind. */
+function npDragClick(e) {
+  if (!_npDragEatClick) return;
+  _npDragEatClick = false;
+  e.stopPropagation();
+  e.preventDefault();
 }
 
 /* ----------------------------------------------------------

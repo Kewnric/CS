@@ -188,6 +188,12 @@ lean/glare on anything `.np-sp`, right-click left/right half of the pane = Previ
 the Display panel. The Feel panel is not on this screen (its options are all code-editor ones).
 Choices are `.np-choice` with `is-selected / is-correct / is-wrong / is-missed / is-dim /
 is-locked`; their onclick must stay `selectAnswer('X')`, which the keyboard handler matches on.
+Matching connectors are measured from layout offsets up to the grid (`_npMatchPos`), never
+from `getBoundingClientRect`, so the card's slide-in and the hover lean cannot misplace them;
+a ResizeObserver redraws them. The attempt's theme (`ssp.np.ui` `theme`) is set on `<html>`
+while the route is up and the app's own `theme` key is put back on unmount — never call
+`changeTheme` from here, it saves app-wide. A question is locked and shows its key only with an
+answer AND a grade (`_npHealAnswered`); the resume draft stores no grades, so they are re-derived.
 
 **Execution stack** (the layers button in the attempt's editor toolbar): memory as it
 stands when the program reaches the cursor's line — frames, globals, heap — redrawn a

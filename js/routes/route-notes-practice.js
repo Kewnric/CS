@@ -45,7 +45,7 @@ function notesPracticeTemplate() {
       <div class="practice-body">
         <!-- The sidebar's four children stay in this order: mobile.css and
              layout.css address them as :first-child and :nth-child(3). -->
-        <div class="practice-sidebar np-sidebar" style="width: 320px; min-width: 320px;">
+        <div class="practice-sidebar np-sidebar" style="width: 320px;">
           <div class="np-side-head">
             <h2><i data-lucide="layers" style="width:18px;height:18px;"></i> Sections</h2>
             <span class="np-side-sub" id="np-side-sub"></span>
@@ -65,12 +65,21 @@ function notesPracticeTemplate() {
             <div class="np-keys-title">Shortcuts</div>
             <ul class="np-keys-list">
               <li><span><kbd>1</kbd>–<kbd>9</kbd> or <kbd>A</kbd>–<kbd>E</kbd></span><em>answer</em></li>
+              <li><span><kbd>↑</kbd><kbd>↓</kbd> then <kbd class="np-kbd-wide">Enter</kbd></span><em>choose, confirm</em></li>
               <li><span><kbd>←</kbd><kbd>→</kbd> or <kbd>P</kbd><kbd>N</kbd></span><em>move</em></li>
               <li class="np-keys-rclick"><span><kbd class="np-kbd-wide">Right-click</kbd></span><em>left half back, right half on</em></li>
               <li><span><kbd>F</kbd> <kbd>H</kbd></span><em>flag, hint</em></li>
             </ul>
             <p class="np-keys-note">Right-click the timer to change it.</p>
           </div>
+        </div>
+        <!-- The coding attempt's seam (editor.js paneDividerTemplate): drag to
+             size the sidebar, or the arrow that fades in to fold it away. It
+             has its own toggle so the two screens keep separate folds. -->
+        <div class="resizer-divider np-divider" data-side="left" onmousedown="initResizerDrag(event, this)">
+          <button class="rz-collapse" id="np-rz-btn" type="button"
+                  onmousedown="event.stopPropagation()" onclick="npUiTogglePane()"
+                  tabindex="-1" aria-hidden="true"><i data-lucide="chevron-left"></i></button>
         </div>
         <div class="np-question-pane" id="np-question-area">
           <div class="np-pane-inner">
@@ -102,7 +111,6 @@ function notesPracticeTemplate() {
             </article>
             <div id="np-nav-row" class="np-nav-row">
               <button id="np-btn-prev" onclick="npPrevQuestion()" class="np-nav-btn np-sp"><i data-lucide="chevron-left"></i><span>Previous</span></button>
-              <div class="np-nav-hint" id="np-nav-hint"><i data-lucide="mouse"></i><span>Right-click either half to move</span></div>
               <button id="np-btn-next" onclick="npNextQuestion()" class="np-nav-btn np-nav-btn-next np-sp"><span>Next</span><i data-lucide="chevron-right"></i></button>
             </div>
           </div>
