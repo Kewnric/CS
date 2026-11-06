@@ -334,6 +334,16 @@
           </span>
           <span class="settings-vol-label" id="settings-vol-label">100%</span>
         </div>
+        <!-- How much of the browser's space the app is using, and how much is
+             left (js/storage-meter.js). Filled in each time Settings opens. -->
+        <div class="settings-item settings-item-slider settings-storage" id="settings-storage-row">
+          <span class="settings-item-icon"><i data-lucide="hard-drive" aria-hidden="true"></i></span>
+          <span class="settings-item-info">
+            <span class="settings-item-label">Storage</span>
+            <span class="sto-block" id="sto-local"></span>
+            <span class="sto-block" id="sto-other"></span>
+          </span>
+        </div>
         <button onclick="handleDataExport()" class="settings-item" type="button" id="export-btn-sidebar" aria-label="Export data backup">
           <span class="settings-item-icon"><i data-lucide="download" aria-hidden="true"></i></span>
           <span class="settings-item-info">
@@ -727,6 +737,7 @@
   <script defer src="js/routes/route-visualization.js"></script>
   <script defer src="js/routes/route-quests.js"></script>
   <script defer src="js/stickers.js"></script>
+  <script defer src="js/storage-meter.js"></script>
   <script defer src="js/routes/register.js"></script>
   <script defer src="js/firebase-auth.js"></script>
 

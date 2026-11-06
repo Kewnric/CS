@@ -355,13 +355,17 @@ function _ambScene(host) {
  */
 function ambSetContent(host, html) {
   if (!host) return;
-  const isLayer = n => n.nodeType === 1 && n.classList.contains('amb-pin');
+  // Sticker layers (js/stickers.js) stay too: rebuilt, they blink out for a frame.
+  const isLayer = n => n.nodeType === 1 && (n.classList.contains('amb-pin') || n.classList.contains('stk-layer'));
   const nodes = Array.from(host.childNodes);
   if (!nodes.some(isLayer)) { host.innerHTML = html; return; }
   nodes.forEach(n => { if (!isLayer(n)) n.remove(); });
   const tpl = document.createElement('template');
   tpl.innerHTML = html;
   host.appendChild(tpl.content);
+  // Sticker layers go back to the end, where they always are: the pane's own
+  // children keep their :first-child / :nth-child places.
+  host.querySelectorAll(':scope > .stk-layer').forEach(L => host.appendChild(L));
 }
 
 /** Put the shards back wherever they are missing, or take them all away. */

@@ -798,10 +798,13 @@ h3 {
    context, and a trap for any menu inside it. An !important on a shared list is
    exactly the kind of rule that keeps winning an argument nobody remembers
    having, so the fix is to take the selector out rather than fight it. */
+.heatmap-cell is not in it either. Its one animation (cellAppear, the
+   dashboard heatmap) ends on the cell's resting style, and a forwards fill
+   held all 371 cells transformed for good -- 371 composited layers on the
+   dashboard, and a hover scale that the held transform overrode. */
 .animate-fade-in,
 .fade-in-up,
 .pulse-highlight,
-.heatmap-cell,
 .home-activity-item {
   animation-fill-mode: forwards !important;
 }

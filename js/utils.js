@@ -751,6 +751,42 @@ function fuzzyMatch(str, pattern) {
   return patternIdx === pattern.length;
 }
 
+/* Lucide 0.408's createIcons takes neither `root` nor `el` -- it reads only
+   { icons, nameAttr, attrs } -- and it redraws EVERY icon on the page each
+   time: a drawn <svg> keeps its data-lucide, so the next call finds it again
+   and replaces it with an identical copy. Every call in the app (hundreds,
+   many with `el:`/`root:` that did nothing) rebuilt every icon on screen; the
+   dashboard's stat card alone did it three times every four seconds.
+
+   This keeps Lucide's own drawing and skips the icons that are already drawn
+   with the name they carry now. An <i data-lucide> placeholder, or an <svg>
+   whose data-lucide was changed to swap the glyph, is drawn as before; the
+   whole document is still searched, so nothing that rendered before stops
+   rendering. Only the redundant redraws are gone. */
+(function () {
+  if (typeof lucide === 'undefined' || !lucide.createIcons || lucide.createIcons.__drawnOnly) return;
+  const draw = lucide.createIcons;
+  const PENDING = 'data-lucide-pending';
+  const fast = function (opts) {
+    const o = opts || {};
+    if (o.nameAttr && o.nameAttr !== 'data-lucide') return draw(o);
+    const todo = [];
+    document.querySelectorAll('[data-lucide]').forEach(el => {
+      const name = el.getAttribute('data-lucide');
+      if (el.__lucideDrawn !== name || el.tagName.toLowerCase() !== 'svg') todo.push([el, name]);
+    });
+    if (!todo.length) return;
+    todo.forEach(([el, name]) => el.setAttribute(PENDING, name));
+    draw({ icons: o.icons, attrs: o.attrs || {}, nameAttr: PENDING });
+    document.querySelectorAll('[' + PENDING + ']').forEach(el => {
+      if (el.tagName.toLowerCase() === 'svg') el.__lucideDrawn = el.getAttribute(PENDING);
+      el.removeAttribute(PENDING);
+    });
+  };
+  fast.__drawnOnly = true;
+  lucide.createIcons = fast;
+})();
+
 /** @param {Element} [root] scope icon scan to a subtree; omit for full document */
 function refreshIcons(root) {
   if (typeof lucide === 'undefined') return;

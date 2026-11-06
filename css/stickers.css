@@ -21,6 +21,15 @@
   position: relative;
 }
 
+/* The wrapper clips and does nothing else. NO z-index: as a stacking context
+   it was composited as one layer the size of the pane's whole content. The
+   stickers carry their own z-index instead (-1 behind, 40 in front), so the
+   behind ones paint above the pane's background and its ambient scene (the
+   pane's first child, also -1) and under every card and line of text.
+
+   overflow: clip, not hidden: a hidden box is still a scroll container that
+   scrollIntoView, focus and find-in-page can scroll, which slid every sticker
+   in it sideways. A clip box cannot be scrolled at all. */
 .stk-layer {
   position: absolute;
   left: 0;
@@ -28,19 +37,8 @@
   width: 0;
   height: 0;
   overflow: hidden;
+  overflow: clip;
   pointer-events: none;
-}
-
-/* Above the pane's background (and its ambient scene, which is earlier in
-   the pane and also -1), under every card and line of text in it. */
-.stk-layer-back {
-  z-index: -1;
-}
-
-/* Over the content, under anything in the pane that lifts itself higher
-   (an open menu, a sticky header with its own z-index above 40). */
-.stk-layer-front {
-  z-index: 40;
 }
 
 /* Spill-over stickers, and a sticker being carried between panes. Over the
@@ -50,6 +48,7 @@
   inset: 0;
   z-index: 150;
   overflow: hidden;
+  overflow: clip;
   pointer-events: none;
 }
 
@@ -78,9 +77,19 @@
   cursor: default;
 }
 
+/* Carried: moved by transform on its own layer, and out of the way of the
+   lookup for the pane under the pointer. No drop-shadow — a filter on a large
+   picture was redrawn on every frame of the drag. */
 .stk-sticker.is-lifted {
+  pointer-events: none;
+}
+
+body.stk-drag-move {
   cursor: grabbing;
-  filter: drop-shadow(0 14px 22px rgba(0, 0, 0, 0.45));
+}
+
+body.stk-dragging #stk-ui .stk-frame {
+  pointer-events: none;
 }
 
 /* Sticker mode: everything can be picked, locked ones included, and each one
@@ -109,10 +118,13 @@ body.stk-editing .stk-sticker.is-locked::after {
   border: 1px solid var(--border-color);
 }
 
-body.stk-dragging,
-body.stk-dragging * {
-  user-select: none !important;
-  -webkit-user-select: none !important;
+/* On <body> only, never `body.stk-dragging *`: a universal rule switched on
+   at the start of a drag restyled every element of the page at once, which
+   on the dashboard was the slowest frame of the whole gesture. user-select
+   reaches the children through `auto`; cursor is inherited. */
+body.stk-dragging {
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* ── Selection frame, handles and the pane outline ───────── */
@@ -531,10 +543,12 @@ body.stk-dragging * {
 /* A picture on its way from the tray to the page. */
 .stk-ghost {
   position: fixed;
+  left: 0;
+  top: 0;
   z-index: 970;
   opacity: 0.85;
   pointer-events: none;
-  filter: drop-shadow(0 14px 22px rgba(0, 0, 0, 0.45));
+  will-change: transform;
 }
 
 .stk-ghost img {

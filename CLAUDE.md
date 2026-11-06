@@ -291,14 +291,23 @@ multi-problem, SQL, notebook), or Alt+Shift+S anywhere.
   library's **detail pane** shows (`STK_SUBS`: browse folder/program/set, notebook folder, …).
   The tree pane and single-pane pages have no `sub`, so one set each. Attempt routes have no
   `sub`, which is why every attempt of a kind shares its stickers.
-- **Cut at edges** stickers live inside their pane in `.stk-layer-back` (z -1, the pane isolated)
-  or `.stk-layer-front` (z 40), appended last, sized by JS to the pane's scroll content and
-  `overflow:hidden`, so they scroll natively and never grow the scrollbar. **Spill over** ones
-  live in fixed `#stk-float` (z 150) and follow their pane's scroll from a listener.
+- **Cut at edges** stickers live inside their pane in `.stk-layer-back` / `.stk-layer-front`,
+  appended last, `overflow: clip` (not hidden -- a hidden box can be scrolled by scrollIntoView),
+  so they scroll natively and never grow the scrollbar. The wrappers have NO z-index: as a
+  stacking context one was composited as a single page-sized layer. Each sticker carries its own
+  (-1 behind, 40 in front; document order breaks ties). Wrapper height = the content's height,
+  read from the pane's children's boxes in a ResizeObserver -- never by collapsing it and reading
+  scrollHeight, which forced a full layout on every DOM change. **Spill over** ones live in fixed
+  `#stk-float` (z 150) and follow their pane by transform from a scroll listener.
 - A pane gets `.stk-host` (+ `.stk-host-rel` if it was static) only while it holds a sticker.
-  A MutationObserver on `#spa-content` puts layers back after a pane re-renders.
-- Placements: localStorage `ssp.stickers`. Pictures: IndexedDB `ssp-stickers` (device only, not
-  in the data export). Huge pictures are scaled to 2000px once, as WebP.
+  A MutationObserver on `#spa-content` puts layers back after a pane re-renders (`ambSetContent`
+  keeps them). Drags do their work once per frame, move by transform, and look up the pane under
+  the pointer at most every 90 ms -- that lookup was 91% of a drag's cost.
+- Placements: localStorage `ssp.stickers` (other tabs follow via the `storage` event). Pictures:
+  IndexedDB `ssp-stickers` (device only, not in the data export; Reset Data clears both). Huge
+  pictures are scaled to 2000px once, as WebP.
+- Settings' Storage row (`js/storage-meter.js`): localStorage against ~5 MB (measured in Chrome:
+  5,242,773 characters) and `navigator.storage.estimate()` for IndexedDB + the offline cache.
 
 ---
 
@@ -320,6 +329,12 @@ naive scan will be wrong three ways:
 With all three handled, all 1281 inline handlers resolve and there are no dead
 buttons.
 
+- **Lucide 0.408's `createIcons` ignores `root` and `el`** and redrew every icon on the page on every
+  call (a drawn `<svg>` keeps `data-lucide`). `js/utils.js` wraps it to draw only placeholders and
+  icons whose `data-lucide` changed, still through Lucide. Scoping a call does nothing; do not rely on it.
+- **A finished animation with `fill: forwards` that touches transform, opacity or filter keeps its
+  element composited for good.** Home had 470 such layers (heatmap cells, hero letters). Rest on the
+  final keyframe and fill `backwards`. Count layers with CDP `LayerTree` when a page feels slow.
 - **Browser-pane artefacts:** `requestAnimationFrame` does not fire while the
   pane is hidden; timers throttle; CSS transitions mean `getComputedStyle` right
   after a class change returns the *old* value; styles inside a

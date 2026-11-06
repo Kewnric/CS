@@ -15,22 +15,28 @@
    whatever the program.
 
    STUCK TO THE PAGE, NOT THE WINDOW. A cut-off sticker lives INSIDE its pane,
-   in one of two layers that are the size of the pane's whole scrollable
-   content, so the browser scrolls it with the cards and text around it on the
-   same frame. Behind = z-index -1 in a pane made a stacking context, which is
-   above the pane's own background and under everything in it. In front = a
-   layer over the content. The layers are overflow:hidden and sized to the
-   content, so a sticker hanging past the end cannot grow the pane's scrollbar.
+   so the browser scrolls it with the cards and text around it on the same
+   frame. Behind = z-index -1 in a pane made a stacking context: above the
+   pane's own background, under everything in it. In front = z-index 40.
+
+   Each pane's stickers sit in a wrapper that is sized to the pane's content
+   and clips (overflow: clip), so a sticker hanging past the end cannot grow
+   the pane's scrollbars. The wrapper is NOT a stacking context, on purpose:
+   one was, and Chrome then composited it as a single layer the size of the
+   whole page (2 megapixels on Home). Without one, a sticker that needs a
+   layer gets one the size of the sticker.
+
+   The wrapper's height comes from a ResizeObserver on the pane and its
+   children, read from their boxes. It used to be re-measured after DOM
+   changes by collapsing the wrapper and reading scrollHeight, which forced a
+   layout of the whole page several times a second on a busy screen.
 
    A sticker that spills over the edges cannot live inside the pane (a scroll
    container always clips what is in it), so it goes in one fixed layer over
-   the whole app and is moved to follow its pane's scroll.
+   the whole app and follows its pane's scroll by transform.
 
    STORAGE. Placements are small and live in localStorage (ssp.stickers).
    Pictures are big and live in IndexedDB, on this device only.
-
-   Nothing here runs per frame: work happens on a DOM change (one rAF later),
-   on scroll (spill-over stickers and the selection frame only), and on input.
    ============================================================ */
 
 const STK_KEY = 'ssp.stickers';
@@ -50,6 +56,8 @@ const STK_VOLATILE = /^(is-|has-|stk-|amb-|route-|fade|stagger|active$|open$|hid
 let _stkItems = [];                 // every placed sticker, on every page
 const _stkImgs = new Map();         // picture id -> { id, url, w, h, name }
 const _stkEls = new Map();          // sticker id -> its element (kept while off screen)
+const _stkHosts = new Set();        // panes holding a sticker layer right now
+const _stkKidsDirty = new Set();    // hosts whose direct children changed since the last sync
 let _stkReady = false;
 let _stkMode = false;               // the tray is open and every sticker can be picked
 let _stkSel = null;                 // id of the selected sticker
@@ -57,12 +65,11 @@ let _stkDrag = null;                // the gesture in progress
 let _stkQueued = false;
 let _stkScrollQueued = false;
 let _stkSaveTimer = null;
+let _stkSaveWarned = false;
 let _stkDbPromise = null;
 let _stkRo = null;
 let _stkLastPage = null;            // what the tray's page strip last showed; null = draw it next sync
-const _stkSizeAt = new WeakMap();   // host -> last time its layers were measured
-let _stkSizeTimer = null;
-const _stkSizePending = new Set();
+let _stkTargetShown = null;         // the pane outlined while something is carried
 
 /* ── Small helpers ───────────────────────────────────────── */
 
@@ -113,8 +120,16 @@ function _stkSave() {
 function _stkSaveNow() {
   clearTimeout(_stkSaveTimer);
   _stkSaveTimer = null;
-  try { localStorage.setItem(STK_KEY, JSON.stringify({ v: 1, items: _stkItems })); }
-  catch (e) { console.warn('[Stickers] Could not save placements:', e); }
+  try {
+    localStorage.setItem(STK_KEY, JSON.stringify({ v: 1, items: _stkItems }));
+    _stkSaveWarned = false;
+  } catch (e) {
+    console.warn('[Stickers] Could not save placements:', e);
+    if (!_stkSaveWarned && typeof toast === 'function') {
+      _stkSaveWarned = true;
+      toast('Stickers could not be saved: the app\'s storage in this browser is full. Settings shows how much is used.', { type: 'error', duration: 7000 });
+    }
+  }
 }
 
 /* ── Storage: pictures (IndexedDB) ───────────────────────── */
@@ -151,10 +166,11 @@ function _stkRememberImg(rec) {
   _stkImgs.set(rec.id, { id: rec.id, url: URL.createObjectURL(rec.blob), w: rec.w, h: rec.h, name: rec.name || '', added: rec.added || 0 });
 }
 
-async function _stkLoadImages() {
+/** Read the pictures in. With `onlyNew`, keep the ones already in memory (another tab added some). */
+async function _stkLoadImages(onlyNew) {
   try {
     const all = await _stkIdb('readonly', st => st.getAll());
-    (all || []).forEach(_stkRememberImg);
+    (all || []).forEach(rec => { if (!onlyNew || !_stkImgs.has(rec.id)) _stkRememberImg(rec); });
   } catch (e) {
     console.warn('[Stickers] Pictures could not be read:', e);
   }
@@ -215,6 +231,28 @@ async function _stkForgetImage(id) {
   try { await _stkIdb('readwrite', st => st.delete(id)); } catch (e) { /* already gone */ }
 }
 
+/** How many bytes the sticker pictures take (Settings' storage meter). */
+function stkPictureBytes() {
+  return _stkIdb('readonly', st => st.getAll())
+    .then(all => (all || []).reduce((n, r) => n + ((r && r.blob && r.blob.size) || 0), 0))
+    .catch(() => 0);
+}
+
+/** Every sticker and every picture, gone. Reset Data calls this. */
+function stkResetAll() {
+  clearTimeout(_stkSaveTimer);
+  _stkSaveTimer = null;
+  _stkItems = [];
+  _stkSel = null;
+  _stkEls.forEach(el => el.remove());
+  _stkEls.clear();
+  _stkImgs.forEach(m => { if (m.url) URL.revokeObjectURL(m.url); });
+  _stkImgs.clear();
+  try { localStorage.removeItem(STK_KEY); localStorage.removeItem(STK_TRAY_KEY); } catch (e) { /* nothing to remove */ }
+  _stkSync();
+  return _stkIdb('readwrite', st => st.clear()).catch(() => {});
+}
+
 /* ── Hosts: which pane a sticker belongs to ──────────────── */
 
 function _stkIsHost(el) {
@@ -225,14 +263,23 @@ function _stkIsHost(el) {
   return el.clientWidth >= 280 && el.clientHeight >= 200;
 }
 
-/** The pane under a point: the nearest large scroll container or known pane, else the whole page. */
-function _stkHostAt(x, y) {
+/** The pane under a point: the nearest large scroll container or known pane, else the whole page.
+ *  `cache` (a Map) remembers which elements are panes for the length of one drag. */
+function _stkHostAt(x, y, cache) {
   const root = _stkRoot();
   if (!root) return null;
-  const stack = document.elementsFromPoint(x, y);
-  let el = stack.find(e => root.contains(e) && e !== root && !e.closest('.stk-layer'));
+  // The topmost element is enough unless something outside the page is on top.
+  let el = document.elementFromPoint(x, y);
+  if (!el || !root.contains(el) || el === root) {
+    el = document.elementsFromPoint(x, y).find(e => root.contains(e) && e !== root);
+  }
   for (; el && el !== root; el = el.parentElement) {
-    if (_stkIsHost(el)) return el;
+    let ok = cache ? cache.get(el) : undefined;
+    if (ok === undefined) {
+      ok = _stkIsHost(el);
+      if (cache) cache.set(el, ok);
+    }
+    if (ok) return el;
   }
   return root;
 }
@@ -325,7 +372,7 @@ function _stkVisible() {
   return out;
 }
 
-/* ── Rendering ───────────────────────────────────────────── */
+/* ── Panes that hold stickers ────────────────────────────── */
 
 function _stkFloat() {
   let f = document.getElementById('stk-float');
@@ -346,55 +393,77 @@ function _stkLayer(host, which) {
     L.setAttribute('aria-hidden', 'true');
     // Last, not first: some panes' children are styled by :first-child and
     // :nth-child, and the layers are absolute so their place in the list does
-    // not move anything. The back layer still paints over .amb-pin, which is
-    // also z-index -1 and earlier in the list.
+    // not move anything. Behind-stickers still paint over .amb-pin, which is
+    // also z-index -1 and the pane's first child.
     host.appendChild(L);
-  }
-  if (!host.classList.contains('stk-host')) {
-    host.classList.add('stk-host');
-    if (getComputedStyle(host).position === 'static') host.classList.add('stk-host-rel');
-    if (_stkRo) _stkRo.observe(host);
+    _stkSizeLayers(host);
   }
   return L;
 }
 
-function _stkUnhost(host) {
-  host.querySelectorAll(':scope > .stk-layer').forEach(L => { if (!L.firstChild) L.remove(); });
-  if (!host.querySelector(':scope > .stk-layer')) {
-    host.classList.remove('stk-host', 'stk-host-rel', 'stk-host-back');
-    if (_stkRo) _stkRo.unobserve(host);
-  }
+function _stkAttach(host) {
+  _stkHosts.add(host);
+  host.classList.add('stk-host');
+  if (getComputedStyle(host).position === 'static') host.classList.add('stk-host-rel');
+  if (_stkRo) _stkRo.observe(host);
+  _stkObserveKids(host);
+  _stkSizeLayers(host);
 }
 
-/** Size a host's layers to its whole content, so they scroll with it and clip at its end. */
+function _stkDetach(host) {
+  _stkHosts.delete(host);
+  _stkKidsDirty.delete(host);
+  host.querySelectorAll(':scope > .stk-layer').forEach(L => L.remove());
+  host.classList.remove('stk-host', 'stk-host-rel', 'stk-host-back');
+  if (_stkRo) {
+    _stkRo.unobserve(host);
+    (host._stkObs || []).forEach(c => _stkRo.unobserve(c));
+  }
+  host._stkObs = null;
+}
+
+/** Watch the host's own children: their size is the content's size, so they say when the layers must grow or shrink. */
+function _stkObserveKids(host) {
+  if (!_stkRo) return;
+  const now = new Set(Array.from(host.children).filter(c => !c.classList.contains('stk-layer')));
+  const was = host._stkObs || new Set();
+  was.forEach(c => { if (!now.has(c)) _stkRo.unobserve(c); });
+  now.forEach(c => { if (!was.has(c)) _stkRo.observe(c); });
+  host._stkObs = now;
+}
+
+/** How tall a host's content is, from its children's boxes — never by collapsing the layers and reading scrollHeight. */
+function _stkContentHeight(host) {
+  const cs = getComputedStyle(host);
+  let h = host.clientHeight;
+  if (!/(auto|scroll)/.test(cs.overflowY)) return h;
+  const pb = parseFloat(cs.paddingBottom) || 0;
+  const visit = (parent) => {
+    for (const c of parent.children) {
+      if (c.classList.contains('stk-layer')) continue;
+      const ccs = getComputedStyle(c);
+      if (ccs.display === 'none' || ccs.position === 'fixed') continue;
+      if (ccs.display === 'contents') { visit(c); continue; }
+      const flowing = ccs.position !== 'absolute';
+      h = Math.max(h, c.offsetTop + c.offsetHeight + (flowing ? (parseFloat(ccs.marginBottom) || 0) + pb : 0));
+    }
+  };
+  visit(host);
+  return Math.ceil(h);
+}
+
 function _stkSizeLayers(host) {
   const layers = host.querySelectorAll(':scope > .stk-layer');
   if (!layers.length) return;
-  _stkSizeAt.set(host, performance.now());
-  const scrolls = /(auto|scroll)/.test(getComputedStyle(host).overflowY);
-  let h = host.clientHeight;
-  if (scrolls) {
-    // Out of the way first, or a layer sized last time holds the content open.
-    layers.forEach(L => { L.style.height = '0px'; });
-    h = Math.max(host.scrollHeight, host.clientHeight);
-  }
   const w = host.clientWidth;
-  layers.forEach(L => { L.style.width = w + 'px'; L.style.height = h + 'px'; });
+  const h = _stkContentHeight(host);
+  layers.forEach(L => {
+    if (L._w !== w) { L._w = w; L.style.width = w + 'px'; }
+    if (L._h !== h) { L._h = h; L.style.height = h + 'px'; }
+  });
 }
 
-/** Measuring forces a layout, and typing in the editor changes the DOM on every key; at most every 250 ms per pane. */
-function _stkSizeSoon(host) {
-  const last = _stkSizeAt.get(host) || 0;
-  const L = host.querySelector(':scope > .stk-layer');
-  if (!last || (L && !L.style.height) || performance.now() - last > 250) { _stkSizeLayers(host); return; }
-  _stkSizePending.add(host);
-  if (_stkSizeTimer) return;
-  _stkSizeTimer = setTimeout(() => {
-    _stkSizeTimer = null;
-    _stkSizePending.forEach(h => { if (h.isConnected) _stkSizeLayers(h); });
-    _stkSizePending.clear();
-  }, 260);
-}
+/* ── Sticker elements ────────────────────────────────────── */
 
 function _stkEl(it) {
   let el = _stkEls.get(it.id);
@@ -402,6 +471,7 @@ function _stkEl(it) {
     el = document.createElement('div');
     el.className = 'stk-sticker';
     el.dataset.stk = it.id;
+    el._stk = {};
     const im = document.createElement('img');
     im.alt = '';
     im.draggable = false;
@@ -414,26 +484,70 @@ function _stkEl(it) {
   return el;
 }
 
-function _stkApply(it, el, host) {
+function _stkSpillTf(it, o) {
+  return 'translate(' + (o.x + it.x) + 'px,' + (o.y + it.y) + 'px)' + (it.rot ? ' rotate(' + it.rot + 'deg)' : '');
+}
+
+/** Bring an element in line with its record, writing only what changed. */
+function _stkApply(it, el) {
+  const c = el._stk || (el._stk = {});
+  const set = (k, v, write) => { if (c[k] !== v) { c[k] = v; write(v); } };
   const img = _stkImgs.get(it.img);
-  const im = el.firstChild;
-  if (img && im.getAttribute('src') !== img.url) im.setAttribute('src', img.url);
-  el.style.width = it.w + 'px';
-  el.style.height = it.h + 'px';
-  el.style.transform = it.rot ? 'rotate(' + it.rot + 'deg)' : '';
-  el.style.opacity = String(it.op == null ? 1 : it.op);
-  el.style.zIndex = String(it.z || 1);
-  el.classList.toggle('is-locked', !!it.lock);
-  el.classList.toggle('is-selected', it.id === _stkSel);
-  el.classList.toggle('is-behind', it.edge !== 'spill' && it.layer === 'back');
-  if (it.edge === 'spill') {
-    const o = host ? _stkOrigin(host) : { x: 0, y: 0 };
-    el.style.left = (o.x + it.x) + 'px';
-    el.style.top = (o.y + it.y) + 'px';
-  } else {
-    el.style.left = it.x + 'px';
-    el.style.top = it.y + 'px';
+  if (img) set('src', img.url, v => el.firstChild.setAttribute('src', v));
+  set('w', it.w, v => { el.style.width = v + 'px'; });
+  set('h', it.h, v => { el.style.height = v + 'px'; });
+  set('op', it.op == null ? 1 : it.op, v => { el.style.opacity = String(v); });
+  const spill = it.edge === 'spill';
+  const back = !spill && it.layer === 'back';
+  set('zi', spill ? String(it.z || 1) : (back ? '-1' : '40'), v => { el.style.zIndex = v; });
+  set('lock', !!it.lock, v => el.classList.toggle('is-locked', v));
+  set('sel', it.id === _stkSel, v => el.classList.toggle('is-selected', v));
+  set('behind', back, v => el.classList.toggle('is-behind', v));
+  set('pos', spill ? 'spill' : 'clip', v => {
+    if (v === 'spill') {
+      // Placed by transform alone, so following a scroll moves no boxes.
+      el.style.left = '0px';
+      el.style.top = '0px';
+      el.style.willChange = 'transform';
+      // Over a spill-over sticker the wheel would scroll nothing — it lives outside the pane.
+      el.addEventListener('wheel', _stkOnWheel, { passive: false });
+      c.x = c.y = c.tf = undefined;
+    } else {
+      el.style.willChange = '';
+      el.removeEventListener('wheel', _stkOnWheel, { passive: false });
+      c.stf = undefined;
+    }
+  });
+  if (!spill) {
+    set('x', it.x, v => { el.style.left = v + 'px'; });
+    set('y', it.y, v => { el.style.top = v + 'px'; });
+    set('tf', it.rot ? 'rotate(' + it.rot + 'deg)' : '', v => { el.style.transform = v; });
   }
+}
+
+/** Spill-over stickers follow their panes: every origin read first, then every transform written. */
+function _stkPlaceSpill() {
+  const f = document.getElementById('stk-float');
+  if (!f || !f.firstElementChild) return;
+  const origins = new Map();
+  const todo = [];
+  for (const el of f.children) {
+    if (_stkDrag && _stkDrag.lifted && _stkDrag.id === el.dataset.stk) continue;
+    const it = _stkById(el.dataset.stk);
+    if (!it || it.edge !== 'spill') continue;
+    let o = origins.get(it.host);
+    if (o === undefined) {
+      const h = _stkFindHost(it.host);
+      o = h ? _stkOrigin(h) : null;
+      origins.set(it.host, o);
+    }
+    if (o) todo.push([el, it, o]);
+  }
+  todo.forEach(([el, it, o]) => {
+    const v = _stkSpillTf(it, o);
+    const c = el._stk || (el._stk = {});
+    if (c.stf !== v) { c.stf = v; el.style.transform = v; }
+  });
 }
 
 function _stkQueue() {
@@ -446,38 +560,65 @@ function _stkQueue() {
 function _stkSync() {
   _stkQueued = false;
   if (!_stkReady) return;
+  // Panes that went away with a re-render or a route change.
+  _stkHosts.forEach(h => { if (!h.isConnected) _stkDetach(h); });
+  _stkKidsDirty.forEach(h => { if (h.isConnected && _stkHosts.has(h)) _stkObserveKids(h); });
+  _stkKidsDirty.clear();
+
   const vis = _stkVisible();
   const shown = new Set();
-  const hostsUsed = new Set();
-  for (const { it, host } of vis) {
-    shown.add(it.id);
-    const el = _stkEl(it);
-    if (_stkDrag && _stkDrag.id === it.id && _stkDrag.lifted) continue;   // being carried
-    if (it.edge === 'spill') {
-      const f = _stkFloat();
+  const used = new Map();       // host -> { back: [], front: [] }
+  const spill = [];
+  for (const v of vis) {
+    shown.add(v.it.id);
+    if (_stkDrag && _stkDrag.id === v.it.id && _stkDrag.lifted) continue;   // being carried
+    if (v.it.edge === 'spill') { spill.push(v.it); continue; }
+    let u = used.get(v.host);
+    if (!u) used.set(v.host, u = { back: [], front: [] });
+    u[v.it.layer === 'back' ? 'back' : 'front'].push(v.it);
+  }
+
+  // Each pane: its two layers, stickers in stacking order (document order
+  // settles the tie between stickers on the same z-index).
+  used.forEach((u, host) => {
+    if (!_stkHosts.has(host)) _stkAttach(host);
+    ['back', 'front'].forEach(which => {
+      const list = u[which].sort((a, b) => (a.z || 0) - (b.z || 0));
+      let L = host.querySelector(':scope > .stk-layer-' + which);
+      if (!list.length) { if (L) L.remove(); return; }
+      if (!L) L = _stkLayer(host, which);
+      list.forEach((it, i) => {
+        const el = _stkEl(it);
+        if (L.children[i] !== el) L.insertBefore(el, L.children[i] || null);
+        _stkApply(it, el);
+      });
+      while (L.children.length > list.length) L.lastElementChild.remove();
+    });
+    const hasBack = u.back.length > 0;
+    if (host.classList.contains('stk-host-back') !== hasBack) host.classList.toggle('stk-host-back', hasBack);
+  });
+
+  if (spill.length) {
+    const f = _stkFloat();
+    spill.sort((a, b) => (a.z || 0) - (b.z || 0)).forEach(it => {
+      const el = _stkEl(it);
       if (el.parentElement !== f) f.appendChild(el);
-    } else {
-      hostsUsed.add(host);
-      const L = _stkLayer(host, it.layer === 'back' ? 'back' : 'front');
-      if (el.parentElement !== L) L.appendChild(el);
-    }
-    _stkApply(it, el, host);
+      _stkApply(it, el);
+    });
   }
   _stkEls.forEach((el, id) => { if (!shown.has(id) && el.parentElement && !(_stkDrag && _stkDrag.id === id)) el.remove(); });
-  document.querySelectorAll('.stk-host').forEach(h => { if (!hostsUsed.has(h)) _stkUnhost(h); });
-  hostsUsed.forEach(h => {
-    // A layer emptied by a sticker moving to the other one goes too.
-    h.querySelectorAll(':scope > .stk-layer').forEach(L => { if (!L.firstChild) L.remove(); });
-    h.classList.toggle('stk-host-back', !!h.querySelector(':scope > .stk-layer-back'));
-    _stkSizeSoon(h);
-  });
+  _stkHosts.forEach(h => { if (!used.has(h)) _stkDetach(h); });
   const f = document.getElementById('stk-float');
   if (f && !f.firstChild && !_stkDrag) f.remove();
+  _stkPlaceSpill();
+
   if (_stkSel && !shown.has(_stkSel)) _stkSel = null;
-  _stkUiUpdate();
+  if (_stkSel || document.querySelector('#stk-ui .stk-frame:not([hidden])')) _stkUiUpdate();
   _stkButtonsSync();
-  const sig = vis.map(v => v.it.id + (v.it.lock ? 'L' : '') + v.it.layer + v.it.edge).join(',');
-  if (sig !== _stkLastPage) { _stkLastPage = sig; _stkTrayPageRender(vis); }
+  if (_stkMode) {
+    const sig = vis.map(v => v.it.id + (v.it.lock ? 'L' : '') + v.it.layer + v.it.edge).join(',');
+    if (sig !== _stkLastPage) { _stkLastPage = sig; _stkTrayPageRender(vis); }
+  }
 }
 
 /** Scroll moves spill-over stickers and the selection frame; everything else scrolls by itself. */
@@ -487,20 +628,24 @@ function _stkOnScroll() {
   _stkScrollQueued = true;
   requestAnimationFrame(() => {
     _stkScrollQueued = false;
-    const f = document.getElementById('stk-float');
-    if (f) {
-      for (const el of f.children) {
-        const it = _stkById(el.dataset.stk);
-        if (!it || (_stkDrag && _stkDrag.id === it.id && _stkDrag.lifted)) continue;
-        const host = _stkFindHost(it.host);
-        if (!host) continue;
-        const o = _stkOrigin(host);
-        el.style.left = (o.x + it.x) + 'px';
-        el.style.top = (o.y + it.y) + 'px';
-      }
-    }
-    _stkUiUpdate();
+    _stkPlaceSpill();
+    if (_stkSel) _stkUiUpdate();
   });
+}
+
+/** The wheel over the selection frame or a spill-over sticker scrolls the pane the sticker belongs to. */
+function _stkOnWheel(e) {
+  const t = e.currentTarget;
+  const id = t.classList.contains('stk-frame') ? _stkSel : t.dataset.stk;
+  const it = id && _stkById(id);
+  if (!it) return;
+  let h = _stkFindHost(it.host);
+  const scrolls = el => el.scrollHeight > el.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(el).overflowY);
+  while (h && h !== document.body && !scrolls(h)) h = h.parentElement;
+  if (!h || h === document.body) return;
+  const k = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? h.clientHeight : 1;
+  h.scrollBy(e.deltaX * k, e.deltaY * k);
+  e.preventDefault();
 }
 
 /* ── Selection frame and toolbar ─────────────────────────── */
@@ -533,6 +678,7 @@ function _stkUi() {
     document.body.appendChild(ui);
     const frame = ui.querySelector('.stk-frame');
     frame.addEventListener('pointerdown', _stkOnFrameDown);
+    frame.addEventListener('wheel', _stkOnWheel, { passive: false });
     frame.querySelector('.stk-rot').addEventListener('dblclick', e => {
       e.stopPropagation();
       const it = _stkById(_stkSel);
@@ -548,38 +694,51 @@ function _stkUi() {
       it.op = Math.max(0.05, Math.min(1, range.value / 100));
       bar.querySelector('.stk-op-val').textContent = Math.round(it.op * 100) + '%';
       const el = _stkEls.get(it.id);
-      if (el) el.style.opacity = String(it.op);
+      if (el) _stkApply(it, el);
       _stkSave();
     });
   }
   return ui;
 }
 
-/** The selected sticker's box on screen: top-left, size, angle. */
+/** The selected sticker's box on screen: top-left, size, angle. No layout is read while a gesture runs. */
 function _stkScreenBox(it) {
   const d = _stkDrag;
-  if (d && d.id === it.id && d.lifted) return { x: d.left, y: d.top, w: it.w, h: it.h, rot: it.rot || 0 };
+  if (d && d.id === it.id) {
+    if (d.lifted) return { x: d.left, y: d.top, w: it.w, h: it.h, rot: it.rot || 0 };
+    return { x: d.ox + it.x, y: d.oy + it.y, w: it.w, h: it.h, rot: it.rot || 0 };
+  }
   const host = _stkFindHost(it.host);
   if (!host) return null;
   const o = _stkOrigin(host);
-  return { x: o.x + it.x, y: o.y + it.y, w: it.w, h: it.h, rot: it.rot || 0 };
+  return { x: o.x + it.x, y: o.y + it.y, w: it.w, h: it.h, rot: it.rot || 0, host };
 }
 
 function _stkUiUpdate() {
   const ui = document.getElementById('stk-ui');
   const it = _stkSel ? _stkById(_stkSel) : null;
-  if (!it) {
-    if (ui) {
-      ui.querySelector('.stk-frame').hidden = true;
-      ui.querySelector('.stk-bar').hidden = true;
-    }
-    return;
-  }
+  const hide = () => {
+    if (!ui) return;
+    const fr = ui.querySelector('.stk-frame'), br = ui.querySelector('.stk-bar');
+    if (!fr.hidden) fr.hidden = true;
+    if (!br.hidden) br.hidden = true;
+  };
+  if (!it) { hide(); return; }
   const box = _stkScreenBox(it);
+  if (!box) { hide(); return; }
+  const th = (box.rot || 0) * Math.PI / 180;
+  const bw = Math.abs(box.w * Math.cos(th)) + Math.abs(box.h * Math.sin(th));
+  const bh = Math.abs(box.w * Math.sin(th)) + Math.abs(box.h * Math.cos(th));
+  const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+  // A cut-off sticker scrolled out of its pane takes its frame with it, rather
+  // than leaving the frame and toolbar floating over the next pane.
+  if (box.host && it.edge !== 'spill') {
+    const r = box.host.getBoundingClientRect();
+    if (cx + bw / 2 < r.left || cx - bw / 2 > r.right || cy + bh / 2 < r.top || cy - bh / 2 > r.bottom) { hide(); return; }
+  }
   const u = _stkUi();
   const frame = u.querySelector('.stk-frame');
   const bar = u.querySelector('.stk-bar');
-  if (!box) { frame.hidden = true; bar.hidden = true; return; }
   frame.hidden = false;
   frame.classList.toggle('is-locked', !!it.lock);
   frame.style.left = box.x + 'px';
@@ -588,14 +747,11 @@ function _stkUiUpdate() {
   frame.style.height = box.h + 'px';
   frame.style.transform = box.rot ? 'rotate(' + box.rot + 'deg)' : '';
 
-  bar.hidden = !!(_stkDrag && _stkDrag.active);
-  if (bar.hidden) return;
+  const busy = !!(_stkDrag && _stkDrag.active);
+  if (bar.hidden !== busy) bar.hidden = busy;
+  if (busy) return;
   _stkBarState(bar, it);
   // Above the sticker's rotated bounds, or under them when there is no room.
-  const th = (box.rot || 0) * Math.PI / 180;
-  const bw = Math.abs(box.w * Math.cos(th)) + Math.abs(box.h * Math.sin(th));
-  const bh = Math.abs(box.w * Math.sin(th)) + Math.abs(box.h * Math.cos(th));
-  const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
   const barW = bar.offsetWidth || 360, barH = bar.offsetHeight || 40;
   let top = cy - bh / 2 - barH - 44;
   if (top < 8) top = cy + bh / 2 + 14;
@@ -634,7 +790,6 @@ function _stkBarState(bar, it) {
   lock.title = it.lock ? 'Locked: clicks go through it. Click to unlock' : 'Lock in place: it stops moving and clicks go through it';
   lock.setAttribute('aria-label', it.lock ? 'Unlock' : 'Lock');
   lock.setAttribute('aria-pressed', it.lock ? 'true' : 'false');
-  bar.querySelector('[data-act=dup]').disabled = false;
 }
 
 function _stkOnBarClick(e) {
@@ -724,7 +879,11 @@ function _stkStep(it, dir) {
 
 function stkSelect(id) {
   _stkSel = id;
-  _stkEls.forEach((el, k) => el.classList.toggle('is-selected', k === id));
+  _stkEls.forEach((el, k) => {
+    const on = k === id;
+    const c = el._stk || (el._stk = {});
+    if (c.sel !== on) { c.sel = on; el.classList.toggle('is-selected', on); }
+  });
   document.querySelectorAll('#stk-page-list .stk-mini').forEach(b => b.classList.toggle('is-on', b.dataset.pick === id));
   _stkUiUpdate();
 }
@@ -763,6 +922,7 @@ function _stkBegin(e, it, kind, handle) {
   const d = {
     id: it.id, kind, pid: e.pointerId, sx: e.clientX, sy: e.clientY, host, ox: o.x, oy: o.y,
     x0: it.x, y0: it.y, w0: it.w, h0: it.h, rot0: it.rot || 0, moved: false, active: false, lifted: false,
+    ev: null, raf: 0, target: host, hostAt: 0, hx: e.clientX, hy: e.clientY, isHost: new Map(),
   };
   d.cx = o.x + it.x + it.w / 2;
   d.cy = o.y + it.y + it.h / 2;
@@ -774,39 +934,62 @@ function _stkBegin(e, it, kind, handle) {
   window.addEventListener('pointercancel', _stkOnUp, true);
 }
 
+/** Pointer moves only record where the pointer is; the work happens once per frame. */
 function _stkOnMove(e) {
   const d = _stkDrag;
   if (!d || e.pointerId !== d.pid) return;
+  if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 3) return;
+  e.preventDefault();
+  d.ev = { x: e.clientX, y: e.clientY, shift: e.shiftKey };
+  if (!d.raf) d.raf = requestAnimationFrame(_stkDragFrame);
+}
+
+function _stkDragFrame() {
+  const d = _stkDrag;
+  if (!d) return;
+  d.raf = 0;
+  const ev = d.ev;
   const it = _stkById(d.id);
   const el = _stkEls.get(d.id);
-  if (!it || !el) return;
-  const dx = e.clientX - d.sx, dy = e.clientY - d.sy;
-  if (!d.moved && Math.hypot(dx, dy) < 3) return;
-  e.preventDefault();
+  if (!ev || !it || !el) return;
   if (!d.moved) {
     d.moved = true;
     d.active = true;
     document.body.classList.add('stk-dragging');
+    if (d.kind === 'move') document.body.classList.add('stk-drag-move');
   }
+  const dx = ev.x - d.sx, dy = ev.y - d.sy;
   if (d.kind === 'move') {
+    // Reads first, while the layout from the last frame is still good.
+    // Finding the pane under the pointer is the costly part of a drag, so it
+    // is asked again only when the pointer has gone some way or some time.
+    const now = performance.now();
+    if (now - d.hostAt > 90 || Math.abs(ev.x - d.hx) + Math.abs(ev.y - d.hy) > 40) {
+      d.hostAt = now; d.hx = ev.x; d.hy = ev.y;
+      d.target = _stkHostAt(ev.x, ev.y, d.isHost) || d.host;
+    }
     if (!d.lifted) {
-      // Carried over the whole app, so it can be dropped into another pane.
+      // Carried over the whole app, so it can be dropped into another pane,
+      // and moved by transform alone, so carrying it lays nothing out.
       d.lifted = true;
       el.classList.add('is-lifted');
       _stkFloat().appendChild(el);
+      el.style.left = (d.ox + d.x0) + 'px';
+      el.style.top = (d.oy + d.y0) + 'px';
+      el.style.zIndex = '1000';
+      el.style.willChange = 'transform';
+      el._stk = {};
     }
     d.left = d.ox + d.x0 + dx;
     d.top = d.oy + d.y0 + dy;
-    el.style.left = d.left + 'px';
-    el.style.top = d.top + 'px';
-    d.target = _stkHostAt(e.clientX, e.clientY) || d.host;
+    el.style.transform = 'translate(' + dx + 'px,' + dy + 'px)' + (it.rot ? ' rotate(' + it.rot + 'deg)' : '');
     _stkShowTarget(d.target);
   } else if (d.kind === 'resize') {
     const th = d.rot0 * Math.PI / 180, cos = Math.cos(th), sin = Math.sin(th);
     // The corner across from the handle stays where it is.
     const lx = -d.sgx * d.w0 / 2, ly = -d.sgy * d.h0 / 2;
     const Ox = d.cx + lx * cos - ly * sin, Oy = d.cy + lx * sin + ly * cos;
-    const px = e.clientX - Ox, py = e.clientY - Oy;
+    const px = ev.x - Ox, py = ev.y - Oy;
     const qx = px * cos + py * sin, qy = -px * sin + py * cos;
     const diag = d.w0 * d.w0 + d.h0 * d.h0;
     let s = (qx * d.sgx * d.w0 + qy * d.sgy * d.h0) / diag;
@@ -817,31 +1000,46 @@ function _stkOnMove(e) {
     it.w = w; it.h = h;
     it.x = ncx - d.ox - w / 2;
     it.y = ncy - d.oy - h / 2;
-    _stkApply(it, el, d.host);
+    _stkApplyLive(it, el, d);
   } else if (d.kind === 'rotate') {
-    const a = Math.atan2(e.clientY - d.cy, e.clientX - d.cx);
+    const a = Math.atan2(ev.y - d.cy, ev.x - d.cx);
     let r = d.rot0 + (a - d.a0) * 180 / Math.PI;
-    if (e.shiftKey) r = Math.round(r / 15) * 15;
+    if (ev.shift) r = Math.round(r / 15) * 15;
     r = ((r % 360) + 540) % 360 - 180;
     it.rot = Math.round(r * 10) / 10;
-    _stkApply(it, el, d.host);
+    _stkApplyLive(it, el, d);
   }
   _stkUiUpdate();
 }
 
+/** During a resize or turn: the record's new size and angle, placed from the origin read when the gesture began. */
+function _stkApplyLive(it, el, d) {
+  _stkApply(it, el);
+  if (it.edge === 'spill') {
+    const v = _stkSpillTf(it, { x: d.ox, y: d.oy });
+    el._stk.stf = v;
+    el.style.transform = v;
+  }
+}
+
 function _stkOnUp(e) {
   const d = _stkDrag;
-  if (!d || (e.pointerId !== undefined && e.pointerId !== d.pid)) return;
+  if (!d || (e && e.pointerId !== undefined && e.pointerId !== d.pid)) return;
+  const cancel = !!(e && e.type === 'pointercancel');
+  // Land where the pointer last was, not a frame behind it.
+  if (d.raf) { cancelAnimationFrame(d.raf); d.raf = 0; if (!cancel) _stkDragFrame(); }
   window.removeEventListener('pointermove', _stkOnMove, true);
   window.removeEventListener('pointerup', _stkOnUp, true);
   window.removeEventListener('pointercancel', _stkOnUp, true);
-  document.body.classList.remove('stk-dragging');
+  document.body.classList.remove('stk-dragging', 'stk-drag-move');
   _stkShowTarget(null);
   const it = _stkById(d.id);
   const el = _stkEls.get(d.id);
   if (it && d.moved) {
-    if (d.kind === 'move' && e.type !== 'pointercancel') {
-      const host = (d.target && d.target.isConnected) ? d.target : d.host;
+    if (d.kind === 'move' && !cancel) {
+      const at = d.ev || { x: d.sx, y: d.sy };
+      let host = _stkHostAt(at.x, at.y) || d.host;
+      if (!host.isConnected) host = d.host;
       const o = _stkOrigin(host);
       it.x = d.left - o.x;
       it.y = d.top - o.y;
@@ -851,19 +1049,26 @@ function _stkOnUp(e) {
         it.z = _stkTopZ(it) + 1;
       }
     }
-    if (e.type === 'pointercancel' && d.kind !== 'move') {
+    if (cancel && d.kind !== 'move') {
       it.x = d.x0; it.y = d.y0; it.w = d.w0; it.h = d.h0; it.rot = d.rot0;
     }
     it.x = Math.round(it.x); it.y = Math.round(it.y);
     it.w = Math.round(it.w); it.h = Math.round(it.h);
     _stkSave();
   }
-  if (el) el.classList.remove('is-lifted');
+  if (el && d.lifted) {
+    el.classList.remove('is-lifted');
+    el.style.willChange = '';
+    el.style.transform = '';
+    el._stk = {};          // rewritten in full by the sync below
+  }
   _stkDrag = null;
   _stkSync();
 }
 
 function _stkShowTarget(host) {
+  if (host === _stkTargetShown) return;
+  _stkTargetShown = host;
   const ui = _stkUi();
   const t = ui.querySelector('.stk-target');
   if (!host) { t.hidden = true; return; }
@@ -933,7 +1138,7 @@ function stkRemove(id) {
   _stkSave();
   _stkSync();
   if (typeof toast === 'function') {
-    toast('Sticker removed.', { type: 'info', duration: 4000, action: { label: 'Undo', onClick: () => { _stkItems.splice(i, 0, gone); _stkSave(); _stkSync(); } } });
+    toast('Sticker removed.', { type: 'info', duration: 4000, action: { label: 'Undo', onClick: () => { _stkItems.splice(Math.min(i, _stkItems.length), 0, gone); _stkSave(); _stkSync(); } } });
   }
 }
 
@@ -941,7 +1146,8 @@ function _stkNudge(it, dx, dy) {
   it.x += dx; it.y += dy;
   _stkSave();
   const el = _stkEls.get(it.id);
-  if (el) _stkApply(it, el, _stkFindHost(it.host));
+  if (el) _stkApply(it, el);
+  _stkPlaceSpill();
   _stkUiUpdate();
 }
 
@@ -965,6 +1171,7 @@ function stkToggleMode(on) {
 
 function _stkButtonsSync() {
   document.querySelectorAll('[data-stk-toggle]').forEach(b => {
+    if (b.classList.contains('is-on') === _stkMode) return;
     b.classList.toggle('is-on', _stkMode);
     b.setAttribute('aria-pressed', _stkMode ? 'true' : 'false');
   });
@@ -1051,6 +1258,16 @@ function _stkTrayPageRender(vis) {
   }).join('');
 }
 
+/** Bring a sticker into view in its own pane, without scrolling anything else. */
+function _stkReveal(it) {
+  const host = _stkFindHost(it.host);
+  if (!host || !/(auto|scroll)/.test(getComputedStyle(host).overflowY)) return;
+  const top = it.y, bottom = it.y + it.h;
+  if (top < host.scrollTop || bottom > host.scrollTop + host.clientHeight) {
+    host.scrollTo({ top: Math.max(0, top - Math.max(16, (host.clientHeight - it.h) / 2)), behavior: 'smooth' });
+  }
+}
+
 function _stkOnTrayClick(e) {
   const btn = e.target.closest('[data-tray]');
   if (btn) {
@@ -1062,11 +1279,10 @@ function _stkOnTrayClick(e) {
   if (forget) { _stkAskForget(forget.dataset.forget); return; }
   const pick = e.target.closest('[data-pick]');
   if (pick) {
-    stkSelect(pick.dataset.pick);
-    const el = _stkEls.get(pick.dataset.pick);
-    if (el && el.scrollIntoView) el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
-    _stkLastPage = null;
-    _stkSync();
+    const it = _stkById(pick.dataset.pick);
+    if (!it) return;
+    stkSelect(it.id);
+    _stkReveal(it);
   }
 }
 
@@ -1091,15 +1307,20 @@ function _stkOnTrayDown(e) {
     e.preventDefault();
     const r = tray.getBoundingClientRect();
     const dx = e.clientX - r.left, dy = e.clientY - r.top;
-    const move = ev => {
-      const x = Math.max(8, Math.min(window.innerWidth - r.width - 8, ev.clientX - dx));
-      const y = Math.max(8, Math.min(window.innerHeight - r.height - 8, ev.clientY - dy));
+    let raf = 0, last = null;
+    const frame = () => {
+      raf = 0;
+      if (!last) return;
+      const x = Math.max(8, Math.min(window.innerWidth - r.width - 8, last.x - dx));
+      const y = Math.max(8, Math.min(window.innerHeight - r.height - 8, last.y - dy));
       tray.style.left = x + 'px';
       tray.style.top = y + 'px';
     };
+    const move = ev => { last = { x: ev.clientX, y: ev.clientY }; if (!raf) raf = requestAnimationFrame(frame); };
     const up = () => {
       window.removeEventListener('pointermove', move, true);
       window.removeEventListener('pointerup', up, true);
+      if (raf) { cancelAnimationFrame(raf); frame(); }
       try { localStorage.setItem(STK_TRAY_KEY, JSON.stringify({ x: parseFloat(tray.style.left), y: parseFloat(tray.style.top) })); } catch (err) { /* position is a nicety */ }
     };
     window.addEventListener('pointermove', move, true);
@@ -1113,11 +1334,14 @@ function _stkOnTrayDown(e) {
   const img = _stkImgs.get(imgId);
   if (!img) return;
   const sx = e.clientX, sy = e.clientY;
-  let ghost = null;
+  let ghost = null, raf = 0, last = null, overTray = false, hostAt = 0, hostCache = new Map();
   const k = Math.min(1, STK_START_SIDE / Math.max(img.w, img.h));
   const gw = Math.max(24, img.w * k), gh = Math.max(24, img.h * k);
-  const move = ev => {
-    if (!ghost && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 5) return;
+  const trayRect = tray.getBoundingClientRect();
+  const inTray = (x, y) => x >= trayRect.left && x <= trayRect.right && y >= trayRect.top && y <= trayRect.bottom;
+  const frame = () => {
+    raf = 0;
+    if (!last) return;
     if (!ghost) {
       ghost = document.createElement('div');
       ghost.className = 'stk-ghost';
@@ -1127,26 +1351,32 @@ function _stkOnTrayDown(e) {
       document.body.appendChild(ghost);
       document.body.classList.add('stk-dragging');
     }
-    ghost.style.left = (ev.clientX - gw / 2) + 'px';
-    ghost.style.top = (ev.clientY - gh / 2) + 'px';
-    const overTray = tray.contains(document.elementFromPoint(ev.clientX, ev.clientY));
+    overTray = inTray(last.x, last.y);
+    const now = performance.now();
+    if (overTray) _stkShowTarget(null);
+    else if (now - hostAt > 90) { hostAt = now; _stkShowTarget(_stkHostAt(last.x, last.y, hostCache)); }
+    ghost.style.transform = 'translate(' + (last.x - gw / 2) + 'px,' + (last.y - gh / 2) + 'px)';
     ghost.classList.toggle('is-cancel', overTray);
-    _stkShowTarget(overTray ? null : _stkHostAt(ev.clientX, ev.clientY));
+  };
+  const move = ev => {
+    if (!ghost && !last && Math.hypot(ev.clientX - sx, ev.clientY - sy) < 5) return;
+    last = { x: ev.clientX, y: ev.clientY };
+    if (!raf) raf = requestAnimationFrame(frame);
   };
   const up = ev => {
     window.removeEventListener('pointermove', move, true);
     window.removeEventListener('pointerup', up, true);
     window.removeEventListener('pointercancel', up, true);
+    if (raf) { cancelAnimationFrame(raf); raf = 0; }
     document.body.classList.remove('stk-dragging');
     _stkShowTarget(null);
-    if (!ghost) {
+    if (!ghost && !last) {
       if (ev.type !== 'pointercancel') { const c = _stkCentre(); _stkPlace(imgId, c.x, c.y); }
       return;
     }
-    ghost.remove();
+    if (ghost) ghost.remove();
     if (ev.type === 'pointercancel') return;
-    const overTray = tray.contains(document.elementFromPoint(ev.clientX, ev.clientY));
-    if (!overTray) _stkPlace(imgId, ev.clientX, ev.clientY);
+    if (!inTray(ev.clientX, ev.clientY)) _stkPlace(imgId, ev.clientX, ev.clientY);
   };
   window.addEventListener('pointermove', move, true);
   window.addEventListener('pointerup', up, true);
@@ -1162,6 +1392,7 @@ function _stkOnKey(e) {
     stkToggleMode();
     return;
   }
+  if (!_stkSel && !_stkMode) return;
   if (_stkTyping()) return;
   // A dialog that is open owns its keys (Escape closes it, not the selection).
   if (document.querySelector('.modal-overlay:not(.hidden), #dialog-modal:not(.hidden)')) return;
@@ -1189,12 +1420,66 @@ function _stkOnKey(e) {
 }
 
 function _stkOnDocDown(e) {
-  if (!_stkSel) return;
   const t = e.target;
-  if (t.closest && (t.closest('.stk-sticker') || t.closest('#stk-ui .stk-frame') || t.closest('#stk-ui .stk-bar') ||
-      t.closest('#stk-tray') || t.closest('.mx-toast') || t.closest('#dialog-modal'))) return;
+  const ours = !!(t.closest && (t.closest('.stk-sticker') || t.closest('#stk-ui .stk-frame') || t.closest('#stk-ui .stk-bar') ||
+      t.closest('#stk-tray') || t.closest('.mx-toast') || t.closest('#dialog-modal')));
+  if (!ours && _stkMode && e.button === 0) {
+    const hit = _stkBehindAt(e.clientX, e.clientY);
+    if (hit) {
+      e.preventDefault();
+      e.stopPropagation();
+      _stkSwallowClick();
+      if (_stkTyping()) document.activeElement.blur();
+      stkSelect(hit.id);
+      if (!hit.lock) _stkBegin(e, hit, 'move');
+      return;
+    }
+  }
+  if (!_stkSel || ours) return;
   _stkSel = null;
   _stkSync();
+}
+
+/* A behind-sticker sits under its pane's own boxes — even a transparent grid
+   or wrapper covers it — so the pointer never reaches it. In sticker mode it
+   is found by where it is instead: the topmost one whose (turned) box holds
+   the point, inside the part of its pane that shows. */
+function _stkBehindAt(x, y) {
+  let best = null;
+  _stkEls.forEach((el, id) => {
+    if (!el.isConnected || !el.classList.contains('is-behind')) return;
+    const it = _stkById(id);
+    if (!it) return;
+    const r = el.getBoundingClientRect();
+    if (x < r.left || x > r.right || y < r.top || y > r.bottom) return;
+    const th = -(it.rot || 0) * Math.PI / 180;
+    const dx = x - (r.left + r.width / 2), dy = y - (r.top + r.height / 2);
+    const lx = dx * Math.cos(th) - dy * Math.sin(th), ly = dx * Math.sin(th) + dy * Math.cos(th);
+    if (Math.abs(lx) > it.w / 2 || Math.abs(ly) > it.h / 2) return;
+    const host = el.parentElement && el.parentElement.parentElement;
+    if (host) {
+      const hr = host.getBoundingClientRect();
+      if (x < hr.left || x > hr.right || y < hr.top || y > hr.bottom) return;
+    }
+    if (!best || (it.z || 0) >= (best.z || 0)) best = it;
+  });
+  return best;
+}
+
+/** The click that follows a pointerdown taken for a sticker is not the card's to have (it would open it). */
+function _stkSwallowClick() {
+  let timer = 0;
+  const off = () => {
+    clearTimeout(timer);
+    window.removeEventListener('click', kill, true);
+    window.removeEventListener('pointerup', later, true);
+  };
+  const kill = ev => { ev.preventDefault(); ev.stopPropagation(); off(); };
+  // The click comes straight after pointerup, in the same turn; one tick later it is not coming.
+  const later = () => { setTimeout(off, 0); };
+  window.addEventListener('click', kill, true);
+  window.addEventListener('pointerup', later, true);
+  timer = setTimeout(off, 10000);
 }
 
 function _stkHasFiles(e) {
@@ -1202,10 +1487,14 @@ function _stkHasFiles(e) {
   return !!(dt && Array.from(dt.types || []).indexOf('Files') >= 0);
 }
 
+let _stkDragOverAt = 0;
 function _stkOnDragOver(e) {
   if (!_stkMode || !_stkHasFiles(e)) return;
   e.preventDefault();
   e.dataTransfer.dropEffect = 'copy';
+  const now = performance.now();
+  if (now - _stkDragOverAt < 90) return;
+  _stkDragOverAt = now;
   _stkShowTarget(_stkHostAt(e.clientX, e.clientY));
 }
 
@@ -1232,6 +1521,18 @@ async function _stkOnPaste(e) {
   ids.forEach((id, n) => _stkPlace(id, c.x + n * 24, c.y + n * 24));
 }
 
+/** Another tab changed the stickers: take its list, and any pictures it added, rather than later saving over them. */
+function _stkOnStorage(e) {
+  if (e.key !== STK_KEY) return;
+  _stkLoad();
+  const missing = _stkItems.some(s => !_stkImgs.has(s.img));
+  (missing ? _stkLoadImages(true) : Promise.resolve()).then(() => {
+    _stkTrayRender();
+    _stkLastPage = null;
+    _stkSync();
+  });
+}
+
 /* ── Start up ────────────────────────────────────────────── */
 
 function _stkOwnNode(n) {
@@ -1244,21 +1545,31 @@ async function stkInit() {
   _stkReady = true;
 
   if (typeof ResizeObserver !== 'undefined') {
+    // Fires after layout, so reading boxes here costs nothing extra.
     _stkRo = new ResizeObserver(entries => {
-      entries.forEach(en => { if (en.target.isConnected) _stkSizeSoon(en.target); });
+      const hosts = new Set();
+      entries.forEach(en => {
+        const t = en.target;
+        if (_stkHosts.has(t)) hosts.add(t);
+        else if (t.parentElement && _stkHosts.has(t.parentElement)) hosts.add(t.parentElement);
+      });
+      hosts.forEach(h => { if (h.isConnected) _stkSizeLayers(h); });
       _stkOnScroll();
     });
   }
   // A page or pane rebuilt by its own code takes the layers with it; put them back.
   const mo = new MutationObserver(recs => {
+    let again = false;
     for (const r of recs) {
-      if (r.type === 'attributes') { _stkQueue(); return; }
-      if (r.target.closest && r.target.closest('.stk-layer')) continue;
+      if (r.type === 'attributes') { again = true; continue; }
+      const t = r.target;
+      if (t.classList && (t.classList.contains('stk-layer') || (t.closest && t.closest('.stk-layer')))) continue;
       const nodes = Array.from(r.addedNodes).concat(Array.from(r.removedNodes));
       if (nodes.length && nodes.every(_stkOwnNode)) continue;
-      _stkQueue();
-      return;
+      if (_stkHosts.has(t)) _stkKidsDirty.add(t);
+      again = true;
     }
+    if (again) _stkQueue();
   });
   const root = _stkRoot();
   if (root) mo.observe(root, { childList: true, subtree: true });
@@ -1277,6 +1588,10 @@ async function stkInit() {
   window.addEventListener('dragleave', e => { if (_stkMode && !e.relatedTarget) _stkShowTarget(null); });
   window.addEventListener('drop', _stkOnDrop);
   window.addEventListener('paste', _stkOnPaste);
+  window.addEventListener('storage', _stkOnStorage);
+  // A gesture whose pointerup never arrives (the window lost focus mid-drag)
+  // ends where it is instead of leaving the sticker stuck to the pointer.
+  window.addEventListener('blur', () => { if (_stkDrag) _stkOnUp({ type: 'pointerup' }); });
   // Write a gesture's last state before the tab goes.
   window.addEventListener('pagehide', () => { if (_stkSaveTimer) _stkSaveNow(); });
   _stkSync();

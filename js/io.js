@@ -295,6 +295,8 @@ function handleDataReset() {
       Object.keys(localStorage).forEach(key => {
         if (key.startsWith('tutorial_done_')) localStorage.removeItem(key);
       });
+      // Stickers: their placements and every picture (IndexedDB).
+      if (typeof stkResetAll === 'function') stkResetAll();
       const savedStorageMode = sessionStorage.getItem('storageMode');
       sessionStorage.clear();
       if (savedStorageMode) sessionStorage.setItem('storageMode', savedStorageMode);

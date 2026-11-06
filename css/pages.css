@@ -9,11 +9,14 @@
    ============================================================ */
 
 /* ======================== MISIDE TEXT SYSTEM ======================== */
+/* Rests visible and fills BACKWARDS. It used to rest at opacity 0 / blur(8px)
+   and fill forwards, which kept every finished letter transformed and
+   filtered for as long as it was on screen -- each one its own composited
+   layer (99 on the dashboard alone). The last keyframe is the resting style,
+   so ending the animation changes nothing you can see. */
 .miside-char {
   display: inline-block;
-  animation: letterFocus 0.45s cubic-bezier(0.23, 1, 0.32, 1) forwards;
-  opacity: 0;
-  filter: blur(8px);
+  animation: letterFocus 0.45s cubic-bezier(0.23, 1, 0.32, 1) backwards;
 }
 .miside-char.space { width: 0.3em; }
 
