@@ -279,12 +279,7 @@ const TERM_LINE_CLASS = {
 function termTranscriptHTML(session, pending, waiting) {
   let html = '';
   const lines = session.lines || [];
-  /* Where to type was easy to miss: a prompt like "Enter Shelf ID:" with a
-     thin caret after it, in a window that does not look like it takes input.
-     Until the first answer, the caret carries a quiet note saying so. */
-  const hint = (waiting && !pending && !(session.inputs && session.inputs.length))
-    ? '<span class="term-hint">type here, then Enter</span>' : '';
-  const caret = `<span class="term-echo">${escapeHTML(pending || '')}</span><span class="run-code-cursor"></span>${hint}`;
+  const caret = `<span class="term-echo">${escapeHTML(pending || '')}</span><span class="run-code-cursor"></span>`;
 
   lines.forEach((line, i) => {
     const isLast = i === lines.length - 1;
@@ -425,7 +420,7 @@ const TERM_CACHE_MAX = 40;
 const _termCache = new Map();
 
 function termCacheKey(code, stdin, args) {
-  return (args || '') + ' ' + (stdin || '') + ' ' + code;
+  return (args || '') + '\x00' + (stdin || '') + '\x00' + code;
 }
 
 function termCacheGet(key) {
