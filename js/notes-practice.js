@@ -25,6 +25,35 @@ let answerKeys = [];       // answerKeys[secIdx] = { qNum: { answer: 'A', explan
 let reviewRecord = null;   // The saved record for review
 let npTextAlignCenter = localStorage.getItem('npTextAlign') !== 'left'; // default centered
 
+/* Text typed into an answer box but not submitted yet, per section and
+   question. It used to live only in the textarea, so moving to another
+   question or reloading emptied it. Saved with the progress, put back when
+   the question is shown, and graded at submission if it was never sent. */
+let npTextDrafts = [];
+
+/* Chosen at the start (notes.js notesConfirmStart): no going back to a
+   question once it is behind you, and optionally a number of seconds for each
+   one. The per-question clock only exists with no backtracking -- with
+   backtracking, running out could be undone by coming back. */
+let npNoBack = false;
+let npQSec = 0;
+let npQLeft = 0;        // seconds left on the question in npQKey
+let npQKey = '';
+let npQTimer = null;
+
+/* Paused from the clock in the topbar. Both clocks stop, the question is
+   veiled, and the paused stretch is taken out of the recorded duration. */
+let npPaused = false;
+let _npPausedAt = 0;
+
+/* "Confirm before grading": the picked choice, waiting for a second press. */
+let npPendingPick = null;   // { key: 'sec-q', letter }
+
+/* Set once the attempt is submitted. Leaving the screen (and pagehide) saves
+   the progress draft; after a submission that wrote the finished attempt back
+   as "unfinished", and the next visit offered to resume it. */
+let npSubmitted = false;
+
 /* ----------------------------------------------------------
    INITIALIZATION
    ---------------------------------------------------------- */
@@ -55,6 +84,15 @@ function initNotesPracticeSession() {
   }
 
   timeLimit = getSessionParam('notebookTimeLimit') || 0;
+  // Read once and cleared, so a drill or a preview started later does not
+  // inherit them; a resumed attempt gets them back from its draft.
+  npNoBack = !reviewRecordId && !!getSessionParam('notebookNoBack');
+  npQSec = npNoBack ? Math.max(0, Math.min(600, parseInt(getSessionParam('notebookQSec'), 10) || 0)) : 0;
+  clearSessionParam('notebookNoBack');
+  clearSessionParam('notebookQSec');
+  npQLeft = 0; npQKey = ''; npPendingPick = null; npSubmitted = false;
+  npPaused = false; _npPausedAt = 0;
+  if (npQTimer) { clearInterval(npQTimer); npQTimer = null; }
   const _npResume = reviewRecordId ? null : npReadProgress();
 
   if (!nbId || !state.notebooks) {
@@ -130,13 +168,8 @@ function initNotesPracticeSession() {
     const mins = Math.max(1, Math.round((Date.now() - (_npResume.savedAt || Date.now())) / 60000));
     const answered = (_npResume.answers || []).reduce(
       (n, sec) => n + Object.values(sec || {}).filter(v => v != null && v !== '').length, 0);
-    _showThreeButtonDialog('Unfinished attempt',
-      `You left "${_npResume.title || activeNotebook.title}" about ${mins} minute${mins !== 1 ? 's' : ''} ago with ${answered} question${answered !== 1 ? 's' : ''} answered.`,
-      [
-        { label: 'Resume', primary: true, action: 'resume' },
-        { label: 'Start over', danger: true, action: 'fresh' }
-      ],
-      (choice) => {
+    const ask = typeof npUiSheet === 'function' ? npUiSheet : null;
+    const onChoice = (choice) => {
         if (choice === 'resume' && npApplyProgress(_npResume)) {
           initTimer(true);
           renderSidebar();
@@ -146,7 +179,21 @@ function initNotesPracticeSession() {
         } else {
           npClearProgress();
         }
+      };
+    const said = `You left "${_npResume.title || activeNotebook.title}" about ${mins} minute${mins !== 1 ? 's' : ''} ago with ${answered} question${answered !== 1 ? 's' : ''} answered.`;
+    if (ask) {
+      ask({
+        icon: 'history', tone: 'info', title: 'Unfinished attempt', body: escapeHTML(said), dismissable: false,
+        actions: [
+          { label: 'Start over', kind: 'ghost', value: 'fresh' },
+          { label: 'Resume', kind: 'primary', value: 'resume', key: 'Enter' }
+        ],
+        onChoose: onChoice
       });
+    } else {
+      _showThreeButtonDialog('Unfinished attempt', said,
+        [{ label: 'Resume', primary: true, action: 'resume' }, { label: 'Start over', danger: true, action: 'fresh' }], onChoice);
+    }
   } else if (_npResume) {
     npClearProgress();   // a draft for a different notebook is stale
   }
@@ -243,7 +290,7 @@ function npApplyNotebookUpdate(nb) {
   // A drill is the questions missed last time: it takes edits to those, and
   // does not grow back the ones it left out.
   const drill = !!activeNotebook.isDrill;
-  const ans = [], st = [], gr = [], keys = [], flags = [];
+  const ans = [], st = [], gr = [], keys = [], flags = [], drafts = [];
   const kept = [];
   (fresh.sections || []).forEach((sec, i) => {
     let oi = sec.id ? oldSecs.findIndex(o => o.id === sec.id) : -1;
@@ -265,6 +312,9 @@ function npApplyNotebookUpdate(nb) {
       else if (s[q] === 'answered') s[q] = 'opened';
     });
     ans.push(a); st.push(s); gr.push(g); keys.push(keyMap);
+    const dr = {};
+    if (oi >= 0 && npTextDrafts[oi]) sec.questions.forEach(q => { if (typeof npTextDrafts[oi][q] === 'string') dr[q] = npTextDrafts[oi][q]; });
+    drafts.push(dr);
     flags.push(new Set(oi >= 0 && npFlags[oi] ? [...npFlags[oi]].filter(q => sec.questions.includes(q)) : []));
   });
 
@@ -272,7 +322,7 @@ function npApplyNotebookUpdate(nb) {
   fresh.sections = kept;
   if (drill) fresh.isDrill = true;
   activeNotebook = fresh;
-  sessionAnswers = ans; sessionStatus = st; gradeResults = gr; answerKeys = keys; npFlags = flags;
+  sessionAnswers = ans; sessionStatus = st; gradeResults = gr; answerKeys = keys; npFlags = flags; npTextDrafts = drafts;
   npApplyChoiceOrder();
 
   // Stay on the same question if it is still there.
@@ -300,6 +350,7 @@ function npApplyNotebookUpdate(nb) {
 }
 
 function initSessionState() {
+  npTextDrafts = [];
   sessionAnswers = [];
   sessionStatus = [];
   answerKeys = [];
@@ -349,6 +400,7 @@ function initSessionState() {
       }
     });
     sessionAnswers.push(ans);
+    npTextDrafts.push({});
     sessionStatus.push(st);
     gradeResults.push(gr);
 
@@ -386,6 +438,7 @@ function initTimer(keep) {
     if (!kept) timeRemaining = 0;
     updateTimerDisplay();
     timerInterval = setInterval(() => {
+      if (npPaused) return;
       timeRemaining++;
       updateTimerDisplay();
     }, 1000);
@@ -396,6 +449,7 @@ function initTimer(keep) {
   updateTimerDisplay();
 
   timerInterval = setInterval(() => {
+    if (npPaused) return;
     timeRemaining--;
     if (timeRemaining <= 0) {
       clearInterval(timerInterval);
@@ -554,6 +608,7 @@ function _npPauseTimerIfDone() {
    NAVIGATION
    ---------------------------------------------------------- */
 function switchSection(idx) {
+  if (npNoBack && idx < currentSectionIdx) { _npNoBackSay(); return; }
   if (gradeAdvanceTimer !== null) {
     clearTimeout(gradeAdvanceTimer);
     gradeAdvanceTimer = null;
@@ -571,6 +626,11 @@ function switchSection(idx) {
 }
 
 function jumpToQuestion(qNum) {
+  // No backtracking: only forward, within the section on screen.
+  if (npNoBack) {
+    const list = (activeNotebook.sections[currentSectionIdx].questions || []);
+    if (list.indexOf(qNum) < list.indexOf(currentQuestionNum)) { _npNoBackSay(); return; }
+  }
   npSaveProgress();
   // Cancel any pending auto-advance timer so it doesn't double-skip
   if (gradeAdvanceTimer !== null) {
@@ -583,7 +643,16 @@ function jumpToQuestion(qNum) {
   renderQuestion();
 }
 
+/** Said once in a while, not on every blocked press. */
+let _npNoBackSaid = 0;
+function _npNoBackSay() {
+  if (Date.now() - _npNoBackSaid < 2500) return;
+  _npNoBackSaid = Date.now();
+  if (typeof toast === 'function') toast('No backtracking in this attempt', { type: 'info', duration: 1800 });
+}
+
 function npPrevQuestion() {
+  if (npNoBack) { _npNoBackSay(); return; }
   // Cancel any pending auto-advance timer
   if (gradeAdvanceTimer !== null) {
     clearTimeout(gradeAdvanceTimer);
@@ -720,7 +789,7 @@ function formatAnswerDisplay(answer, type, keyEntry) {
    ANSWER SELECTION (Practice Mode Only)
    ---------------------------------------------------------- */
 function selectAnswer(letter) {
-  if (reviewMode || currentQuestionNum === null || isCheckingAnswer) return;
+  if (reviewMode || currentQuestionNum === null || isCheckingAnswer || npPaused) return;
   if (sessionStatus[currentSectionIdx][currentQuestionNum] === 'answered') return;
 
   const qType = getQuestionType(currentSectionIdx, currentQuestionNum);
@@ -739,10 +808,30 @@ function selectAnswer(letter) {
     return;
   }
 
+  /* Confirm before grading (Display > Text): the first press only picks, a
+     second press on the same choice -- or Enter, or the Confirm button --
+     grades it. Without it a stray click was a graded wrong answer. */
+  const pickKey = currentSectionIdx + '-' + currentQuestionNum;
+  if (typeof npUiPrefs === 'function' && npUiPrefs().confirm
+      && !(npPendingPick && npPendingPick.key === pickKey && npPendingPick.letter === letter)) {
+    npPendingPick = { key: pickKey, letter };
+    if (typeof npUiSfx === 'function') npUiSfx('tick');
+    renderQuestion();
+    return;
+  }
+  npPendingPick = null;
+
   // MCQ: immediate grade
   sessionAnswers[currentSectionIdx][currentQuestionNum] = letter; npSaveProgress();
   sessionStatus[currentSectionIdx][currentQuestionNum] = 'answered';
   gradeAndAdvance();
+}
+
+/** The Confirm button (or Enter) for a picked choice. */
+function npConfirmPick() {
+  const key = currentSectionIdx + '-' + currentQuestionNum;
+  if (!npPendingPick || npPendingPick.key !== key) return;
+  selectAnswer(npPendingPick.letter);
 }
 
 function confirmCheckboxAnswer() {
@@ -761,6 +850,7 @@ function confirmTextAnswer() {
   if (!ta || !ta.value.trim()) return;
   sessionAnswers[currentSectionIdx][currentQuestionNum] = ta.value.trim(); npSaveProgress();
   sessionStatus[currentSectionIdx][currentQuestionNum] = 'answered';
+  if (npTextDrafts[currentSectionIdx]) delete npTextDrafts[currentSectionIdx][currentQuestionNum];
   gradeAndAdvance();
 }
 
@@ -848,13 +938,20 @@ function gradeAndAdvance() {
   renderQuestion();
 
   if (isCorrect) {
-    if (typeof confetti === 'function') confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+    const prefs = typeof npUiPrefs === 'function' ? npUiPrefs() : { motion: true, advance: 'normal' };
+    // Animations off means no confetti either; it was the one effect that
+    // ignored the switch.
+    if (prefs.motion && typeof confetti === 'function') confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+    /* Auto-advance (Display > Text): Normal moves on after 1.5s, Slow after
+       3s, Off stays so the explanation can be read and Next moves on. */
+    const wait = prefs.advance === 'off' ? 900 : prefs.advance === 'slow' ? 3000 : 1500;
     gradeAdvanceTimer = setTimeout(() => {
       gradeAdvanceTimer = null;
       isCheckingAnswer = false;
       renderSidebar();
-      npNextQuestion();
-    }, 1500);
+      if (prefs.advance === 'off') renderQuestion();
+      else npNextQuestion();
+    }, wait);
   } else {
     const hurtOverlay = document.getElementById('hurt-overlay');
     if (hurtOverlay) { hurtOverlay.classList.remove('hurt-active'); void hurtOverlay.offsetWidth; hurtOverlay.classList.add('hurt-active'); }
@@ -959,7 +1056,7 @@ function renderSidebar() {
     }
 
     return `
-      <button class="np-sidebar-tab-dark np-sp ${isActive ? 'active' : ''}" onclick="switchSection(${idx})" title="${escapeHTML(sec.label || ('Section ' + (idx + 1)))}">
+      <button class="np-sidebar-tab-dark np-sp ${isActive ? 'active' : ''}${npNoBack && !reviewMode && idx < currentSectionIdx ? ' is-past' : ''}" onclick="switchSection(${idx})" title="${escapeHTML(sec.label || ('Section ' + (idx + 1)))}">
         <span class="np-tab-top">
           <span class="np-tab-num">${String(idx + 1).padStart(2, '0')}</span>
           <span class="np-tab-name">${escapeHTML(sec.label || ('Section ' + (idx + 1)))}</span>
@@ -1017,6 +1114,7 @@ function renderSidebar() {
 
     if (qNum === currentQuestionNum) cls += ' active';
     if (npIsFlagged(currentSectionIdx, qNum)) cls += ' flagged';
+    if (npNoBack && !reviewMode && pos < (sec.questions || []).indexOf(currentQuestionNum)) cls += ' is-past';
 
     const flagged = npIsFlagged(currentSectionIdx, qNum);
     return `<button class="${cls}" onclick="jumpToQuestion(${qNum})"
@@ -1069,7 +1167,7 @@ function npSaveProgress() {
 }
 
 function npFlushProgress() {
-  if (reviewMode || !activeNotebook) return;
+  if (reviewMode || !activeNotebook || npSubmitted) return;
   try {
     localStorage.setItem(NP_RESUME_KEY, JSON.stringify({
       notebookId: activeNotebook.id,
@@ -1083,7 +1181,12 @@ function npFlushProgress() {
       flags: npFlags.map(set => set ? [...set] : []),
       timeRemaining: typeof timeRemaining === 'number' ? timeRemaining : null,
       timeLimit: timeLimit || 0,
-      shuffleSeed: npShuffleSeed
+      shuffleSeed: npShuffleSeed,
+      textDrafts: npTextDrafts,
+      noBack: npNoBack,
+      qSec: npQSec,
+      qLeft: npQLeft,
+      qKey: npQKey
     }));
     // The "Saved just now" chip beside the shortcuts, as the coding attempt has.
     if (typeof npUiMarkSaved === 'function') npUiMarkSaved();
@@ -1140,6 +1243,13 @@ function npApplyProgress(d) {
     });
     // The same seed puts every question's choices back where they were.
     if (d.shuffleSeed) { npShuffleSeed = d.shuffleSeed; npApplyChoiceOrder(); }
+    if (Array.isArray(d.textDrafts)) npTextDrafts = d.textDrafts.map(x => (x && typeof x === 'object') ? x : {});
+    while (npTextDrafts.length < (activeNotebook.sections || []).length) npTextDrafts.push({});
+    // The rules it was started under, and where its question clock had got to.
+    npNoBack = !!d.noBack;
+    npQSec = npNoBack ? (parseInt(d.qSec, 10) || 0) : 0;
+    npQKey = d.qKey || '';
+    npQLeft = typeof d.qLeft === 'number' ? d.qLeft : 0;
     if (d.answers) sessionAnswers = d.answers;
     if (d.status) sessionStatus = d.status;
     /* The grades are not in the draft, and were never worked out again, so a
@@ -1178,6 +1288,7 @@ function npBindKeys() {
     if (reviewMode) return;
     // The notebook editor drawer is open: its keys are the form's.
     if (document.getElementById('np-edit')) return;
+    if (npPaused) return;
     const el = document.activeElement;
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((el || {}).tagName || '') || (el || {}).isContentEditable;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -1197,6 +1308,7 @@ function npBindKeys() {
       const inChoices = el && el.closest && el.closest('#np-bubbles-container');
       // Only when nothing else has focus: Enter on a topbar button is that button's.
       const free = !el || el === document.body || (el.closest && el.closest('#np-question-area'));
+      if (!inChoices && free && npPendingPick) { e.preventDefault(); npConfirmPick(); return; }
       if (!inChoices && free && getQuestionType(currentSectionIdx, currentQuestionNum) === 'checkbox') {
         e.preventDefault();
         confirmCheckboxAnswer();
@@ -1650,6 +1762,9 @@ function renderQuestion() {
 
     let textVal = '';
     if (typeof selected === 'string') textVal = selected;
+    else if (npTextDrafts[currentSectionIdx] && typeof npTextDrafts[currentSectionIdx][currentQuestionNum] === 'string') {
+      textVal = npTextDrafts[currentSectionIdx][currentQuestionNum];
+    }
 
     bubblesContainer.innerHTML = `
       <textarea id="np-text-answer-input" class="np-text-input-area" placeholder="Type your answer here... (Enter to submit)"
@@ -1659,6 +1774,12 @@ function renderQuestion() {
     `;
     const textInput = document.getElementById('np-text-answer-input');
     if (textInput && !isAnswered && !reviewMode) {
+      const draftSec = currentSectionIdx, draftQ = currentQuestionNum;
+      textInput.addEventListener('input', () => {
+        if (!npTextDrafts[draftSec]) npTextDrafts[draftSec] = {};
+        npTextDrafts[draftSec][draftQ] = textInput.value;
+        npSaveProgress();
+      });
       textInput.addEventListener('keydown', (e) => {
         // Enter submits, Shift+Enter inserts a newline
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); confirmTextAnswer(); return; }
@@ -1819,7 +1940,7 @@ function renderQuestion() {
         else if (letter === selected) state = 'is-wrong';
         else state = 'is-dim';
       }
-      if (selected === letter) state += ' is-selected';
+      if (selected === letter || (!showResult && _npIsPending(letter))) state += ' is-selected';
       const onclick = locked ? '' : `onclick="selectAnswer('${letter}')"`;
       return `
         <button type="button" class="np-choice np-tf np-sp ${state}${locked ? ' is-locked' : ''}" data-tone="${isTrue ? 'true' : 'false'}"
@@ -1831,7 +1952,7 @@ function renderQuestion() {
         </button>`;
     }).join('');
 
-    bubblesContainer.innerHTML = `<div class="np-tf-row">${buttonsHtml}</div>`;
+    bubblesContainer.innerHTML = `<div class="np-tf-row">${buttonsHtml}</div>` + _npPendingConfirmHTML(showResult);
   }
   // === MCQ TYPE (default) ===
   else {
@@ -1850,13 +1971,13 @@ function renderQuestion() {
         else if (letter === selected) state = 'is-wrong';
         else state = 'is-dim';
       }
-      if (selected === letter) state += ' is-selected';
+      if (selected === letter || (!showResult && _npIsPending(letter))) state += ' is-selected';
       const choiceText = correctObj && correctObj.choices && correctObj.choices[letter] ? correctObj.choices[letter] : '';
       return _npChoiceHTML({
         letter, pos, text: choiceText, kind: 'mcq', state, locked: reviewMode || isAnswered,
         mark: showResult ? (letter === correctLetter ? 'check' : (letter === selected ? 'x' : '')) : ''
       });
-    }).join('');
+    }).join('') + _npPendingConfirmHTML(showResult);
   }
 
   bubblesContainer.classList.toggle('np-align-left', !npTextAlignCenter);
@@ -1868,7 +1989,10 @@ function renderQuestion() {
   // Update nav buttons
   const btnPrev = document.getElementById('np-btn-prev');
   const btnNext = document.getElementById('np-btn-next');
-  if (btnPrev) btnPrev.disabled = (currentSectionIdx === 0 && idx === 0);
+  if (btnPrev) {
+    btnPrev.disabled = npNoBack || (currentSectionIdx === 0 && idx === 0);
+    btnPrev.title = npNoBack ? 'No backtracking in this attempt' : '';
+  }
   if (btnNext) btnNext.disabled = (currentSectionIdx === activeNotebook.sections.length - 1 && idx === qList.length - 1);
 
   const questionArea = document.getElementById('np-question-area') || document.getElementById('main-content');
@@ -1891,6 +2015,19 @@ function renderQuestion() {
   // when the flag was toggled, so it stayed lit on the next question.
   npPaintFlagBtn();
 
+  // An open hint belongs to the question it was opened on.
+  const hintInline = document.getElementById('np-hint-inline');
+  if (hintInline && hintInline.dataset.qid && hintInline.dataset.qid !== currentSectionIdx + '-' + currentQuestionNum) {
+    hintInline.classList.remove('is-open');
+    hintInline.innerHTML = '';
+    hintInline.dataset.qid = '';
+    const hb = document.getElementById('np-hint-btn');
+    if (hb) hb.classList.remove('is-on');
+  }
+
+  // The per-question clock (no backtracking only).
+  _npQClockSync();
+
   // Entry animation (only when the question changed), the section meter, the
   // falling X on a wrong answer, and the spatial hover state under the pointer.
   if (typeof npUiOnRender === 'function') {
@@ -1904,6 +2041,18 @@ function renderQuestion() {
       result: gradeResults[currentSectionIdx] ? gradeResults[currentSectionIdx][currentQuestionNum] : null
     });
   }
+}
+
+/** Is this letter the one picked and waiting for confirmation, on this question? */
+function _npIsPending(letter) {
+  return !!npPendingPick && npPendingPick.key === currentSectionIdx + '-' + currentQuestionNum
+    && npPendingPick.letter === letter;
+}
+
+/** The Confirm button for a waiting pick (Confirm before grading). */
+function _npPendingConfirmHTML(showResult) {
+  if (showResult || reviewMode || !npPendingPick || npPendingPick.key !== currentSectionIdx + '-' + currentQuestionNum) return '';
+  return `<button class="np-confirm-btn np-sp np-pick-confirm" onclick="npConfirmPick()"><i data-lucide="check" style="width:18px;height:18px;"></i> Confirm answer <kbd>Enter</kbd></button>`;
 }
 
 /**
@@ -2172,29 +2321,75 @@ function npDragClick(e) {
    ---------------------------------------------------------- */
 function npSubmitAttempt(force = false) {
   if (reviewMode) return;
+  if (force) { processSubmission(); return; }
 
-  if (!force) {
-    let unanswered = 0;
-    sessionStatus.forEach(st => Object.values(st).forEach(s => { if (s !== 'answered') unanswered++; }));
+  // Unanswered, by section, in the order they are on screen. A typed but
+  // unsent text answer counts as answered: it is graded at submission.
+  const missing = [];
+  let flagged = 0;
+  activeNotebook.sections.forEach((sec, si) => {
+    const list = [];
+    (sec.questions || []).forEach((q, pos) => {
+      const st = sessionStatus[si] && sessionStatus[si][q];
+      const draft = npTextDrafts[si] && String(npTextDrafts[si][q] || '').trim();
+      if (st !== 'answered' && !draft) list.push({ q, pos });
+    });
+    if (list.length) missing.push({ si, label: sec.label || ('Section ' + (si + 1)), list });
+    flagged += npFlags[si] ? npFlags[si].size : 0;
+  });
+  const count = missing.reduce((n, m) => n + m.list.length, 0);
 
-    if (unanswered > 0) {
-      showConfirm('Unanswered Questions', `You have ${unanswered} unanswered question${unanswered !== 1 ? 's' : ''}. Submit anyway?`, () => {
-        processSubmission();
-      }, { tone: 'primary', confirmLabel: 'Submit' });
-      return;
-    }
-
-    showConfirm('Submit Attempt', 'Are you sure you want to submit your answers?', () => {
-      processSubmission();
-    }, { tone: 'primary', confirmLabel: 'Submit' });
+  if (typeof npUiSheet !== 'function') {
+    showConfirm(count ? 'Unanswered Questions' : 'Submit Attempt',
+      count ? `You have ${count} unanswered question${count !== 1 ? 's' : ''}. Submit anyway?` : 'Are you sure you want to submit your answers?',
+      () => processSubmission(), { tone: 'primary', confirmLabel: 'Submit' });
     return;
   }
 
-  processSubmission();
+  if (!count) {
+    npUiSheet({
+      icon: 'send', tone: 'info', title: 'Submit attempt?',
+      body: 'Every question is answered.' + (flagged ? ` ${flagged} still flagged for review.` : ''),
+      actions: [
+        { label: 'Keep going', kind: 'ghost', value: 'stay', key: 'Escape' },
+        { label: 'Submit', kind: 'primary', value: 'submit', key: 'Enter' }
+      ],
+      onChoose: (v) => { if (v === 'submit') processSubmission(); }
+    });
+    return;
+  }
+
+  const list = missing.map(m => '<div class="np-sheet-row"><b>' + escapeHTML(m.label) + '</b><span>'
+    + m.list.slice(0, 24).map(x => 'Q' + (x.pos + 1)).join(', ') + (m.list.length > 24 ? ', \u2026' : '')
+    + '</span></div>').join('');
+  // The first one still reachable: anywhere, or only ahead with no backtracking.
+  const curPos = (activeNotebook.sections[currentSectionIdx].questions || []).indexOf(currentQuestionNum);
+  const reach = missing.map(m => ({ si: m.si, hit: m.list.find(x => !npNoBack || m.si > currentSectionIdx || (m.si === currentSectionIdx && x.pos >= curPos)) }))
+    .find(r => r.hit && (!npNoBack || r.si >= currentSectionIdx));
+  const actions = [{ label: 'Submit anyway', kind: 'ghost', value: 'submit' }];
+  if (reach) actions.push({ label: 'Go to Q' + (reach.hit.pos + 1), kind: 'primary', value: 'go', key: 'Enter', icon: 'arrow-right' });
+  else actions.push({ label: 'Keep going', kind: 'primary', value: 'stay', key: 'Enter' });
+  npUiSheet({
+    icon: 'circle-help', tone: 'warn',
+    title: count + ' unanswered question' + (count !== 1 ? 's' : ''),
+    body: '<div class="np-sheet-list">' + list + '</div>'
+      + (flagged ? '<p class="np-sheet-note">' + flagged + ' flagged for review.</p>' : '')
+      + (npNoBack ? '<p class="np-sheet-note">No backtracking: only the ones ahead can still be answered.</p>' : ''),
+    actions,
+    onChoose: (v) => {
+      if (v === 'submit') processSubmission();
+      else if (v === 'go' && reach) {
+        if (reach.si !== currentSectionIdx) switchSection(reach.si);
+        jumpToQuestion(reach.hit.q);
+      }
+    }
+  });
 }
 
 function processSubmission() {
   if (timerInterval) clearInterval(timerInterval);
+  _npQClockStop();
+  if (npPaused && typeof npTogglePause === 'function') npTogglePause();
 
   // If the timer paused when the last question was answered, the recorded
   // duration ends there too — browsing before pressing Submit costs nothing.
@@ -2215,6 +2410,9 @@ function processSubmission() {
     // the id, which silently breaks the moment the id format changes.
     submitTime: Date.now(),
     duration: elapsed,
+    // How it was taken, for the history.
+    noBacktracking: npNoBack || undefined,
+    secondsPerQuestion: npQSec || undefined,
     sections: []
   };
 
@@ -2227,7 +2425,10 @@ function processSubmission() {
 
     qList.forEach(qNum => {
       const keyEntry = keyMap[qNum];
-      const userAns = userAnswers[qNum];
+      let userAns = userAnswers[qNum];
+      // Typed into the box and never sent: it is still your answer.
+      const draft = npTextDrafts[idx] && typeof npTextDrafts[idx][qNum] === 'string' ? npTextDrafts[idx][qNum].trim() : '';
+      if (!userAns && draft && keyEntry && keyEntry.type === 'text') { userAns = draft; userAnswers[qNum] = draft; }
       if (userAns && npGradeEntry(userAns, keyEntry)) {
         gradeResults[idx][qNum] = 'correct';
         correct++;
@@ -2264,7 +2465,10 @@ function processSubmission() {
   if (typeof langRunEarnStamina === 'function') langRunEarnStamina(1);
   state.notebookHistory.unshift(record);
   saveData();
-  // The attempt is finished, so the in-progress copy is no longer wanted.
+  // The attempt is finished, so the in-progress copy is no longer wanted --
+  // and nothing may write it back (see npSubmitted).
+  npSubmitted = true;
+  clearTimeout(_npSaveTimer);
   npClearProgress();
   npUnbindKeys();
 
@@ -2282,6 +2486,79 @@ function processSubmission() {
 }
 
 /* ----------------------------------------------------------
+   PER-QUESTION CLOCK (no backtracking only)
+   ----------------------------------------------------------
+   Each question you reach gets npQSec seconds. The count is shown on the
+   card; run out and the question is left unanswered and the attempt moves
+   on -- on the last question, it is submitted. Answering stops it. Kept in
+   the progress draft, so reloading does not hand you a fresh count. */
+function _npQClockStop() {
+  if (npQTimer) { clearInterval(npQTimer); npQTimer = null; }
+}
+
+function _npQClockSync() {
+  const pill = document.getElementById('np-qclock');
+  if (!npNoBack || !npQSec || reviewMode || currentQuestionNum === null) {
+    _npQClockStop();
+    if (pill) pill.hidden = true;
+    return;
+  }
+  const key = currentSectionIdx + '-' + currentQuestionNum;
+  const answered = sessionStatus[currentSectionIdx] && sessionStatus[currentSectionIdx][currentQuestionNum] === 'answered';
+  if (key !== npQKey) { npQKey = key; npQLeft = npQSec; }
+  if (answered || isCheckingAnswer) _npQClockStop();
+  else if (!npQTimer) npQTimer = setInterval(_npQClockTick, 1000);
+  if (pill) pill.hidden = false;
+  _npQClockPaint(answered);
+}
+
+function _npQClockTick() {
+  if (npPaused || isCheckingAnswer) return;
+  npQLeft = Math.max(0, npQLeft - 1);
+  _npQClockPaint(false);
+  if (npQLeft > 0 && npQLeft <= 3 && typeof npUiSfx === 'function') npUiSfx('untick');
+  if (npQLeft <= 0) { _npQClockStop(); _npQTimeUp(); }
+}
+
+function _npQClockPaint(done) {
+  const pill = document.getElementById('np-qclock');
+  if (!pill) return;
+  const n = pill.querySelector('b');
+  if (n) n.textContent = Math.max(0, npQLeft);
+  pill.style.setProperty('--np-qfrac', npQSec ? (Math.max(0, npQLeft) / npQSec).toFixed(3) : '0');
+  pill.classList.toggle('is-low', !done && npQLeft <= 5);
+  pill.classList.toggle('is-done', !!done);
+  pill.title = done ? 'Answered' : npQLeft + ' seconds left on this question';
+}
+
+function _npQTimeUp() {
+  if (reviewMode) return;
+  if (typeof npUiSfx === 'function') npUiSfx('wrong');
+  if (typeof toast === 'function') toast("Time's up on that one", { type: 'warning', duration: 1600 });
+  const sec = activeNotebook.sections[currentSectionIdx];
+  const list = sec.questions || [];
+  const last = currentSectionIdx === activeNotebook.sections.length - 1 && list.indexOf(currentQuestionNum) === list.length - 1;
+  npPendingPick = null;
+  npSaveProgress();
+  if (last) processSubmission();
+  else npNextQuestion();
+}
+
+/* The pause: click the clock. */
+function npTogglePause() {
+  if (reviewMode) return;
+  npPaused = !npPaused;
+  if (npPaused) {
+    _npPausedAt = Date.now();
+  } else if (_npPausedAt) {
+    // The paused stretch is not time spent on the attempt.
+    if (practiceStartTime) practiceStartTime += Date.now() - _npPausedAt;
+    _npPausedAt = 0;
+  }
+  if (typeof npUiPaintPause === 'function') npUiPaintPause(npPaused);
+}
+
+/* ----------------------------------------------------------
    RESULTS OVERLAY
    ---------------------------------------------------------- */
 function showResultsOverlay(correct, total, accuracy, elapsed, record) {
@@ -2291,62 +2568,20 @@ function showResultsOverlay(correct, total, accuracy, elapsed, record) {
   // finishing fanfare otherwise.
   if (typeof npUiSfx === 'function') npUiSfx(total > 0 && correct === total ? 'perfect' : 'finish');
 
-  const iconEl = document.getElementById('np-results-icon');
-  const titleEl = document.getElementById('np-results-title');
-  const descEl = document.getElementById('np-results-desc');
-  const breakdownEl = document.getElementById('np-results-breakdown');
-
-  // Icon
-  let iconColor, iconName, titleText;
-  if (accuracy === 100) {
-    iconColor = 'var(--color-success)';
-    iconName = 'trophy';
-    titleText = 'Perfect Score! 🎉';
-  } else if (accuracy >= 80) {
-    iconColor = 'var(--color-success)';
-    iconName = 'check-circle-2';
-    titleText = 'Great Job!';
-  } else if (accuracy >= 50) {
-    iconColor = 'var(--color-warning)';
-    iconName = 'alert-circle';
-    titleText = 'Good Effort';
-  } else {
-    iconColor = 'var(--color-danger)';
-    iconName = 'x-circle';
-    titleText = 'Keep Practicing';
-  }
-
-  iconEl.innerHTML = `<i data-lucide="${iconName}" style="width:56px;height:56px;color:${iconColor};"></i>`;
-  titleEl.textContent = titleText;
-  titleEl.style.color = iconColor;
-  descEl.innerHTML = `You scored <strong style="font-size:1.25em;color:${iconColor};">${correct}/${total}</strong> (${accuracy}%) in ${formatTimeDisplay(elapsed)}`;
-
-  // Section breakdown
-  let breakdownHtml = '<div style="display:flex; flex-direction:column; gap:0.5rem;">';
-  record.sections.forEach(sec => {
-    const pct = sec.total > 0 ? Math.round((sec.correct / sec.total) * 100) : 0;
-    const barColor = pct === 100 ? 'var(--color-success)' : pct >= 70 ? 'var(--color-warning)' : 'var(--color-danger)';
-    breakdownHtml += `
-      <div style="background:var(--bg-surface-hover); border:1px solid var(--border-color); border-radius:var(--radius-md); padding:0.625rem 0.875rem;">
-        <div style="display:flex; justify-content:space-between; margin-bottom:0.375rem;">
-          <span style="font-weight:600; font-size:0.8125rem;">${escapeHTML(sec.label)}</span>
-          <span style="font-weight:700; font-size:0.8125rem; color:${barColor};">${sec.correct}/${sec.total}</span>
-        </div>
-        <div style="height:4px; background:var(--border-color); border-radius:4px; overflow:hidden;">
-          <div style="height:100%; width:${pct}%; background:${barColor}; border-radius:4px; transition:width 0.5s ease;"></div>
-        </div>
-      </div>
-    `;
-  });
-  breakdownHtml += '</div>';
+  let wrong = 0, skipped = 0;
+  (record.sections || []).forEach(sec => Object.values(sec.results || {}).forEach(r => {
+    if (r === 'wrong') wrong++;
+    else if (r === 'skipped') skipped++;
+  }));
 
   // Multi-notebook session: say where you are and offer the next one, rather
   // than dropping you back at the library after every notebook.
+  let queueHtml = '';
   const queue = typeof getSessionParam === 'function' ? getSessionParam('notebookQueue') : null;
   if (queue && Array.isArray(queue.ids)) {
     const at = (queue.index || 0) + 1;
     const last = at >= queue.ids.length;
-    breakdownHtml += `
+    queueHtml = `
       <div class="np-queue-bar">
         <span><i data-lucide="layout-grid" style="width:14px;height:14px;"></i> Session — notebook ${at} of ${queue.ids.length}</span>
         <div>
@@ -2357,11 +2592,59 @@ function showResultsOverlay(correct, total, accuracy, elapsed, record) {
         </div>
       </div>`;
   }
-  breakdownEl.innerHTML = breakdownHtml;
 
+  if (typeof npUiResultsHTML === 'function') {
+    overlay.innerHTML = npUiResultsHTML({
+      correct, total, wrong, skipped, missed: wrong + skipped,
+      time: formatTimeDisplay(elapsed), sections: record.sections, queue: queueHtml
+    });
+  }
   overlay.classList.remove('hidden');
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: overlay });
+  const first = overlay.querySelector('.np-res-btn.is-primary');
+  if (first) setTimeout(() => first.focus({ preventScroll: true }), 60);
 }
+
+/* Again, from the results. Same time limit and rules as this attempt.
+
+   Retry missed is a drill over what was wrong or skipped. The drill is keyed
+   by the notebook's OWN section order, and this attempt may itself have been
+   a drill over fewer sections, so each section is found again by id (or
+   label) before its questions are listed. */
+function _npRestartWith(drill) {
+  const id = activeNotebook && activeNotebook.id;
+  if (!id) return;
+  setSessionParam('activeNotebook', id);
+  setSessionParam('notebookTimeLimit', timeLimit || 0);
+  setSessionParam('notebookNoBack', npNoBack);
+  setSessionParam('notebookQSec', npQSec);
+  if (drill) setSessionParam('notebookDrill', drill);
+  else clearSessionParam('notebookDrill');
+  // A query keeps the router from treating it as the screen already open.
+  spaNavigate('notes-practice?again=' + Date.now());
+}
+
+function npRetryMissed() {
+  if (!reviewRecord || !activeNotebook) return;
+  const full = (state.notebooks || []).find(n => n.id === activeNotebook.id);
+  if (!full) return;
+  const bySection = {};
+  let count = 0;
+  (reviewRecord.sections || []).forEach((rs, i) => {
+    const live = activeNotebook.sections[i] || {};
+    let fi = live.id ? full.sections.findIndex(s => s.id === live.id) : -1;
+    if (fi < 0) fi = full.sections.findIndex(s => s.label === rs.label);
+    if (fi < 0) return;
+    const list = Object.keys(rs.results || {}).filter(q => rs.results[q] !== 'correct').map(q => parseInt(q, 10));
+    if (!list.length) return;
+    bySection[fi] = (bySection[fi] || []).concat(list).sort((a, b) => a - b);
+    count += list.length;
+  });
+  if (!count) return;
+  _npRestartWith({ notebookId: full.id, bySection, count });
+}
+
+function npTryAgain() { _npRestartWith(null); }
 
 /* ----------------------------------------------------------
    REVIEW MODE
@@ -2387,11 +2670,16 @@ function enterReviewMode() {
       totalQs += s.total || 0;
     });
     const accuracy = totalQs > 0 ? Math.round((totalCorrect / totalQs) * 100) : 0;
-    const color = accuracy === 100 ? '#10b981' : accuracy >= 70 ? '#fbbf24' : '#ef4444';
+    // Amber for a partial score, never red: there is no failed state.
+    const tone = accuracy === 100 ? 'perfect' : accuracy >= 80 ? 'good' : 'warn';
+    scoreEl.className = 'np-review-score';
+    scoreEl.removeAttribute('style');
+    scoreEl.dataset.tone = tone;
     scoreEl.innerHTML = `
-      <span style="color:#8b949e;">Score:</span>
-      <span style="font-family:var(--font-mono); font-size:1.25rem; color:${color};">${totalCorrect}/${totalQs}</span>
-      <span style="font-family:var(--font-mono); color:${color};">(${accuracy}%)</span>
+      <span class="np-rs-label">Score</span>
+      <span class="np-rs-num">${totalCorrect}<em>/ ${totalQs}</em></span>
+      <span class="np-rs-bar"><i style="width:${accuracy}%"></i></span>
+      <span class="np-rs-pct">${accuracy}%</span>
     `;
   }
 
@@ -2424,6 +2712,20 @@ function exitReview() {
 function showHintModal() {
   const correctObj = answerKeys[currentSectionIdx][currentQuestionNum];
   if (!correctObj || !correctObj.hint) return;
+  // Inline, under the question it is a hint for. The modal covered the very
+  // question you needed it for; it is kept only as a fallback.
+  const inline = document.getElementById('np-hint-inline');
+  if (inline) {
+    const open = inline.classList.toggle('is-open');
+    inline.innerHTML = open
+      ? '<i data-lucide="lightbulb"></i><span>' + escapeHTML(correctObj.hint).replace(/\n/g, '<br/>') + '</span>'
+      : '';
+    inline.dataset.qid = open ? currentSectionIdx + '-' + currentQuestionNum : '';
+    const btn = document.getElementById('np-hint-btn');
+    if (btn) btn.classList.toggle('is-on', open);
+    if (open && typeof lucide !== 'undefined') lucide.createIcons({ root: inline });
+    return;
+  }
 
   const textEl = document.getElementById('hint-modal-text');
   if (textEl) {

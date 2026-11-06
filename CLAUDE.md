@@ -199,6 +199,10 @@ A reload resumes silently: session param `npLive` is set while the attempt is up
 the draft and the clock current). The pencil in Display opens the admin notebook form in a drawer
 (`npUiOpenEditor`); the attempt follows its draft live through `npApplyNotebookUpdate`, which keeps
 answers and regrades them, and falls back to the saved notebook when the drawer closes.
+Start options (`notes.js notesConfirmStart`, the `#np-start-opts` block in the shared
+`#timer-modal`): No backtracking (`notebookNoBack`) and seconds per question (`notebookQSec`,
+only with no backtracking). Read once at init, cleared, and kept in the progress draft with the
+question clock (`npQKey`/`npQLeft`). `npSubmitted` stops anything re-saving a finished attempt.
 
 **Execution stack** (the layers button in the attempt's editor toolbar): memory as it
 stands when the program reaches the cursor's line — frames, globals, heap — redrawn a

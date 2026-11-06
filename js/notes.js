@@ -609,6 +609,17 @@ function notesStartAttempt() {
   document.getElementById('timer-s').value = '0';
   if (typeof timerPresetSync === 'function') timerPresetSync();
 
+  // No backtracking and seconds per question: a notebook's own options.
+  const opts = document.getElementById('np-start-opts');
+  if (opts) {
+    opts.classList.remove('hidden');
+    const nb = document.getElementById('setup-nb-noback');
+    const qs = document.getElementById('setup-nb-qsec');
+    if (nb) nb.checked = false;
+    if (qs) qs.value = '0';
+    notesStartOptsSync();
+  }
+
   // Swap the confirm button action
   const confirmBtn = timerModal.querySelector('button[onclick="confirmStartPractice()"]');
   if (confirmBtn) confirmBtn.setAttribute('onclick', 'notesConfirmStart()');
@@ -623,9 +634,12 @@ function notesConfirmStart() {
   const s = parseInt(document.getElementById('timer-s').value) || 0;
   const totalSeconds = (h * 3600) + (m * 60) + s;
 
+  const noBack = !!document.getElementById('setup-nb-noback')?.checked;
+  const qSec = noBack ? Math.max(0, Math.min(600, parseInt(document.getElementById('setup-nb-qsec')?.value, 10) || 0)) : 0;
   const timerModal = document.getElementById('timer-modal');
   if (timerModal) {
     timerModal.classList.add('hidden');
+    document.getElementById('np-start-opts')?.classList.add('hidden');
     // Restore the variant select visibility and confirm button
     const variantSelect = document.getElementById('timer-variant-select');
     if (variantSelect) variantSelect.closest('div').style.display = '';
@@ -641,7 +655,43 @@ function notesConfirmStart() {
 
   setSessionParam('activeNotebook', activeNotebookId);
   setSessionParam('notebookTimeLimit', totalSeconds);
+  setSessionParam('notebookNoBack', noBack);
+  setSessionParam('notebookQSec', qSec);
   spaNavigate('notes-practice');
+}
+
+/* Seconds per question only means something with no backtracking (with
+   backtracking a timed-out question could just be gone back to), so the
+   field is greyed out until No backtracking is on. */
+function notesStartOptsSync() {
+  const on = !!document.getElementById('setup-nb-noback')?.checked;
+  const row = document.getElementById('np-start-qsec-row');
+  const qs = document.getElementById('setup-nb-qsec');
+  const presets = document.querySelector('#np-start-opts .np-qsec-presets');
+  if (row) row.classList.toggle('is-off', !on);
+  if (qs) qs.disabled = !on;
+  if (row) row.querySelectorAll('button').forEach(b => { b.disabled = !on; });
+  if (presets) {
+    presets.classList.toggle('is-off', !on);
+    presets.querySelectorAll('button').forEach(b => { b.disabled = !on; });
+  }
+  notesQSecPresetPaint();
+}
+
+function notesQSecPreset(sec) {
+  const qs = document.getElementById('setup-nb-qsec');
+  if (!qs || qs.disabled) return;
+  qs.value = String(sec);
+  notesQSecPresetPaint();
+}
+
+function notesQSecPresetPaint() {
+  const qs = document.getElementById('setup-nb-qsec');
+  const v = qs ? (parseInt(qs.value, 10) || 0) : 0;
+  document.querySelectorAll('#np-start-opts .np-qsec-presets .ss-preset').forEach(b => {
+    const m = /(\d+)/.exec(b.textContent);
+    b.classList.toggle('is-on', (m ? parseInt(m[1], 10) : 0) === v);
+  });
 }
 
 // ============================================================

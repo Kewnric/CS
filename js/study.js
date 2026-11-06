@@ -1233,6 +1233,8 @@ function promptTimer(challengeId) {
     if (vsel && vsel.closest('div')) vsel.closest('div').style.display = '';
     const setupRows = timerModal.querySelector('.setup-constraints');
     if (setupRows) setupRows.style.display = '';
+    // The notebook's own options never show for a coding attempt.
+    document.getElementById('np-start-opts')?.classList.add('hidden');
     const cBtn = timerModal.querySelector('button[onclick="notesConfirmStart()"]');
     if (cBtn) cBtn.setAttribute('onclick', 'confirmStartPractice()');
     const mTitle = timerModal.querySelector('.modal-title');

@@ -36,7 +36,11 @@ const NP_UI_OPTIONS = {
   skin:    [['system', 'System', 'System window'], ['glass', 'Glass', 'Glass card']],
   reveal:  [['off', 'Off', 'Shown at once'], ['fast', 'Fast'], ['normal', 'Normal'], ['slow', 'Slow']],
   spatial: [['off', 'Off'], ['subtle', 'Subtle'], ['full', 'Full']],
-  theme:   [['app', 'App', 'Same as the app'], ['dark', 'Night'], ['light', 'Day'], ['purple', 'Purple'], ['green', 'Green']]
+  /* No Day: the attempt is drawn dark throughout (the System window most of
+     all), so a light theme only ever changed its accent and read as broken.
+     Purple and Green recolour the whole attempt (css .np-pal-*). */
+  theme:   [['app', 'App', 'Same as the app'], ['dark', 'Night'], ['purple', 'Purple'], ['green', 'Green']],
+  advance: [['normal', 'Move on', 'Next question after 1.5s'], ['slow', 'Wait', 'Next question after 3s'], ['off', 'Stay', 'Stay; press Next to move on']]
 };
 
 function _npUiReducedMotion() {
@@ -50,7 +54,8 @@ function _npUiDefaults() {
     text: 'md', size: 'comfy', width: 'normal', grid: 'md', answers: 'same', skin: 'system',
     reveal: calm ? 'off' : 'normal', theme: 'app',
     spatial: calm ? 'off' : 'full', lastSpatial: 'full',
-    motion: !calm, keys: true, rclick: true, sfx: true
+    motion: !calm, keys: true, rclick: true, sfx: true,
+    confirm: false, advance: 'normal', vol: 100
   };
 }
 
@@ -67,7 +72,10 @@ function npUiPrefs() {
     motion: typeof v.motion === 'boolean' ? v.motion : d.motion,
     keys: typeof v.keys === 'boolean' ? v.keys : d.keys,
     rclick: typeof v.rclick === 'boolean' ? v.rclick : d.rclick,
-    sfx: typeof v.sfx === 'boolean' ? v.sfx : d.sfx
+    sfx: typeof v.sfx === 'boolean' ? v.sfx : d.sfx,
+    confirm: typeof v.confirm === 'boolean' ? v.confirm : d.confirm,
+    advance: NP_UI_OPTIONS.advance.some(o => o[0] === v.advance) ? v.advance : d.advance,
+    vol: Number.isFinite(+v.vol) ? Math.max(0, Math.min(150, +v.vol)) : d.vol
   };
 }
 
@@ -119,6 +127,8 @@ function _npUiApplyTheme() {
   const t = want && want !== 'app' ? want : _npUiAppTheme();
   const root = document.documentElement;
   if (root.getAttribute('data-theme') !== t) root.setAttribute('data-theme', t);
+  const layout = document.getElementById('np-layout');
+  if (layout) layout.dataset.npPal = (t === 'purple' || t === 'green') ? t : 'night';
 }
 
 function _npUiRestoreTheme() {
@@ -308,7 +318,7 @@ function _npUiEdgeFlash(rect, back, blocked) {
   el.style.width = rect.width + 'px';
   el.style.height = rect.height + 'px';
   el.innerHTML = '<span class="np-edge-glyph"><i data-lucide="' + (blocked ? 'ban' : (back ? 'chevron-left' : 'chevron-right')) + '"></i>'
-    + '<em>' + (blocked ? (back ? 'First question' : 'Last question') : (back ? 'Previous' : 'Next')) + '</em></span>';
+    + '<em>' + (blocked ? (back ? (typeof npNoBack !== 'undefined' && npNoBack ? 'No going back' : 'First question') : 'Last question') : (back ? 'Previous' : 'Next')) + '</em></span>';
   document.body.appendChild(el);
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: el });
   setTimeout(() => el.remove(), 650);
@@ -374,8 +384,10 @@ function npUiOnRender(info) {
     if (info.result === 'wrong') {
       npUiSfx('wrong');
       _npUiDropX(info.type);
+      _npUiSay('Incorrect.');
     } else {
       npUiSfx(_npUiAllCorrectSoFar() ? 'streak' : 'correct');
+      _npUiSay('Correct.');
     }
   } else if (info && !info.grading) {
     _npUiXKey = '';
@@ -506,7 +518,7 @@ function npUiShowWrong(o) {
     : '';
   const ov = document.createElement('div');
   ov.id = 'np-wrong';
-  ov.className = 'np-wrong-overlay';
+  ov.className = 'np-wrong-overlay' + (_npUiIsSystem() ? ' is-system' : '');
   ov.setAttribute('role', 'dialog');
   ov.setAttribute('aria-modal', 'true');
   ov.setAttribute('aria-labelledby', 'np-wrong-title');
@@ -729,7 +741,9 @@ function _npUiPageBody(id, p) {
       + _npUiRow('text-cursor-input', 'Question typing effect', _npUiNameOf('reveal', p.reveal), _npUiSeg('reveal', p.reveal, NP_UI_OPTIONS.reveal))
       + '<div class="np-ui-switches">'
       + _npUiSwitch('keys', p.keys, 'Letter keys on choices', 'The A, B, C you can press')
-      + '</div>';
+      + _npUiSwitch('confirm', p.confirm, 'Confirm before grading', 'Pick, then press again or Enter')
+      + '</div>'
+      + _npUiRow('skip-forward', 'After a right answer', _npUiNameOf('advance', p.advance), _npUiSeg('advance', p.advance, NP_UI_OPTIONS.advance));
   }
   if (id === 'layout') {
     return _npUiRow('scaling', 'Element size', _npUiNameOf('size', p.size), _npUiSeg('size', p.size, NP_UI_OPTIONS.size))
@@ -743,7 +757,11 @@ function _npUiPageBody(id, p) {
       + _npUiSwitch('motion', p.motion, 'Animations', 'Cards slide in, answers pop')
       + _npUiSwitch('rclick', p.rclick, 'Right-click to move', 'Left half back, right half on')
       + _npUiSwitch('sfx', p.sfx, 'Sound effects', 'Right, wrong, ticks and the finish')
-      + '</div>';
+      + '</div>'
+      + _npUiRow('volume-2', 'Sound volume', p.vol + '%',
+          '<div class="np-ui-vol"><input type="range" min="0" max="150" step="5" value="' + p.vol + '"'
+          + ' aria-label="Sound volume" oninput="npUiSetVolume(this.value)" onchange="npUiSfx(\'correct\')"'
+          + (p.sfx ? '' : ' disabled') + '></div>');
   }
   // look
   const ambOn = typeof ambEnabled === 'function' && ambEnabled();
@@ -880,8 +898,13 @@ function npUiTogglePanel(e) {
    this screen, and a notebook should not go silent because of a keyboard
    setting made somewhere else. */
 function npUiSfx(kind) {
-  if (!npUiPrefs().sfx || typeof psfxTone !== 'function') return;
-  const t = (o) => psfxTone(o);
+  const prefs = npUiPrefs();
+  if (!prefs.sfx || typeof psfxTone !== 'function') return;
+  // Its own volume, on top of the engine's (which follows the coding
+  // attempt's typing slider, not reachable from here).
+  const v = prefs.vol / 100;
+  if (v <= 0) return;
+  const t = (o) => psfxTone(Object.assign({}, o, { gain: (o.gain || 0.1) * v }));
   try {
     if (kind === 'correct' || kind === 'streak') {
       // A rising major triad, bright and short; a streak adds the octave.
@@ -915,6 +938,15 @@ function npUiSfx(kind) {
       }
     }
   } catch (e) { /* no audio here; the attempt does not depend on it */ }
+}
+
+/** The volume slider: saved as it moves, without rebuilding the panel under the thumb. */
+function npUiSetVolume(val) {
+  const p = npUiPrefs();
+  p.vol = Math.max(0, Math.min(150, parseInt(val, 10) || 0));
+  _npUiSave(p);
+  const em = document.querySelector('#np-ui-pop .np-ui-vol')?.closest('.np-ui-sec')?.querySelector('.np-ui-label em');
+  if (em) em.textContent = p.vol + '%';
 }
 
 /** Three or more answered and not one of them wrong. */
@@ -1157,6 +1189,163 @@ function _npUiDropEditor() {
   window.saveCurrentAdminForm = null;
 }
 
+/* ── Said aloud by screen readers (an aria-live region in the template) ── */
+function _npUiSay(text) {
+  const el = document.getElementById('np-live');
+  if (!el) return;
+  el.textContent = '';
+  setTimeout(() => { el.textContent = text; }, 30);
+}
+
+function _npUiIsSystem() {
+  const r = document.getElementById('np-layout');
+  return !!r && r.dataset.npSkin === 'system';
+}
+
+/* ── One sheet for the attempt's questions to you ──────────────────
+   "Submit?", "Unfinished attempt", and anything else that needs a choice,
+   in the attempt's own look instead of the app's shared dialog. Enter and
+   Escape map to the actions that name them; nothing behind it takes keys. */
+let _npUiSheetDone = null;
+
+function npUiSheet(o) {
+  npUiCloseSheet();
+  const tone = o.tone || 'info';
+  const ov = document.createElement('div');
+  ov.id = 'np-sheet';
+  ov.className = 'np-sheet-overlay' + (_npUiIsSystem() ? ' is-system' : '');
+  ov.setAttribute('role', 'dialog');
+  ov.setAttribute('aria-modal', 'true');
+  ov.setAttribute('aria-labelledby', 'np-sheet-title');
+  const acts = (o.actions || []).map((a, i) =>
+    '<button type="button" class="np-sheet-btn is-' + (a.kind || 'ghost') + '" data-i="' + i + '">'
+    + escapeHTML(a.label) + (a.key ? ' <kbd>' + (a.key === 'Escape' ? 'Esc' : a.key) + '</kbd>' : '')
+    + (a.icon ? '<i data-lucide="' + a.icon + '"></i>' : '') + '</button>').join('');
+  ov.innerHTML = '<div class="np-sheet-card" data-tone="' + tone + '">'
+    + '<div class="np-sheet-badge"><i data-lucide="' + (o.icon || 'info') + '"></i></div>'
+    + '<h2 class="np-sheet-title" id="np-sheet-title">' + escapeHTML(o.title || '') + '</h2>'
+    + (o.body ? '<div class="np-sheet-body">' + o.body + '</div>' : '')
+    + '<div class="np-sheet-actions">' + acts + '</div></div>';
+  const choose = (i) => {
+    const a = (o.actions || [])[i];
+    npUiCloseSheet();
+    if (a && typeof o.onChoose === 'function') o.onChoose(a.value);
+  };
+  ov.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('.np-sheet-btn');
+    if (b) { choose(parseInt(b.dataset.i, 10)); return; }
+    if (e.target === ov && o.dismissable !== false) npUiCloseSheet();
+  });
+  _npUiSheetDone = (e) => {
+    if (!document.getElementById('np-sheet')) return;
+    const acts2 = o.actions || [];
+    if (e.key === 'Enter' || e.key === 'Escape') {
+      const i = acts2.findIndex(a => a.key === e.key);
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (i >= 0) choose(i);
+      else if (e.key === 'Escape' && o.dismissable !== false) npUiCloseSheet();
+    } else if (e.key !== 'Tab') {
+      e.stopImmediatePropagation();
+    }
+  };
+  document.addEventListener('keydown', _npUiSheetDone, true);
+  document.body.appendChild(ov);
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: ov });
+  const first = ov.querySelector('.np-sheet-btn.is-primary') || ov.querySelector('.np-sheet-btn');
+  if (first) setTimeout(() => first.focus({ preventScroll: true }), 30);
+}
+
+function npUiCloseSheet() {
+  if (_npUiSheetDone) document.removeEventListener('keydown', _npUiSheetDone, true);
+  _npUiSheetDone = null;
+  const ov = document.getElementById('np-sheet');
+  if (ov) ov.remove();
+}
+
+/* ── Question images, enlarged ───────────────────────────────────── */
+function npUiZoomImage(img) {
+  if (!img || !img.src) return;
+  const ov = document.createElement('div');
+  ov.id = 'np-zoom';
+  ov.className = 'np-zoom-overlay';
+  ov.setAttribute('role', 'dialog');
+  ov.setAttribute('aria-label', 'Question image, enlarged');
+  ov.innerHTML = '<img src="' + img.src.replace(/"/g, '&quot;') + '" alt="' + escapeHTML(img.alt || 'Question image') + '">'
+    + '<button type="button" class="np-zoom-close" aria-label="Close"><i data-lucide="x"></i></button>';
+  const close = () => { ov.remove(); document.removeEventListener('keydown', key, true); };
+  const key = (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); close(); } };
+  ov.addEventListener('click', close);
+  document.addEventListener('keydown', key, true);
+  document.body.appendChild(ov);
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: ov });
+}
+
+/* ── The pause, drawn ────────────────────────────────────────────── */
+function npUiPaintPause(on) {
+  const veil = document.getElementById('np-pause-veil');
+  if (veil) veil.hidden = !on;
+  const root = document.getElementById('np-layout');
+  if (root) root.classList.toggle('np-paused', !!on);
+  const clock = document.getElementById('np-timer-container');
+  if (clock) {
+    clock.classList.toggle('is-paused', !!on);
+    clock.title = on ? 'Paused — click to resume' : 'Click to pause · right-click to change the timer';
+    const old = clock.querySelector('svg, i[data-lucide]');
+    const icon = document.createElement('i');
+    icon.setAttribute('data-lucide', on ? 'pause' : 'clock');
+    if (old) old.replaceWith(icon); else clock.prepend(icon);
+    if (typeof lucide !== 'undefined') lucide.createIcons({ root: clock });
+  }
+  if (on) {
+    const go = document.querySelector('#np-pause-veil .np-pause-go');
+    if (go) setTimeout(() => go.focus({ preventScroll: true }), 30);
+    if (typeof lucide !== 'undefined' && veil) lucide.createIcons({ root: veil });
+  }
+  _npUiSay(on ? 'Paused.' : 'Resumed.');
+}
+
+/* ── The results ────────────────────────────────────────────────────
+   A score ring, the counts, the time, each section, and what to do next:
+   retry what you missed, take it again, review, or go back. Partial scores
+   are amber and never red -- there is no failed state in this app. */
+function npUiResultsHTML(o) {
+  const pct = o.total ? Math.round((o.correct / o.total) * 100) : 0;
+  const tone = pct === 100 ? 'perfect' : pct >= 80 ? 'good' : 'warn';
+  const title = pct === 100 ? 'Perfect score' : pct >= 80 ? 'Great work' : pct >= 50 ? 'Good effort' : 'Keep going';
+  const sub = pct === 100 ? 'Every question right.'
+    : o.missed ? o.missed + ' to go over again — retry just those, or take the whole set.' : '';
+  const C = 2 * Math.PI * 52;
+  const secs = (o.sections || []).map(sec => {
+    const sp = sec.total ? Math.round((sec.correct / sec.total) * 100) : 0;
+    const st = sp === 100 ? 'perfect' : sp >= 80 ? 'good' : 'warn';
+    return '<div class="np-res-sec" data-tone="' + st + '"><div class="np-res-sec-top"><span>' + escapeHTML(sec.label || 'Section')
+      + '</span><b>' + sec.correct + '/' + sec.total + '</b></div><span class="np-res-sec-bar"><i style="width:' + sp + '%"></i></span></div>';
+  }).join('');
+  const stat = (cls, icon, n, label) => '<div class="np-res-stat ' + cls + '"><i data-lucide="' + icon + '"></i><b>' + n + '</b><em>' + label + '</em></div>';
+  return '<div class="np-res-card' + (_npUiIsSystem() ? ' is-system' : '') + '" data-tone="' + tone + '">'
+    + '<div class="np-res-ring" style="--np-res-c:' + C.toFixed(2) + ';--np-res-off:' + (C * (1 - pct / 100)).toFixed(2) + '">'
+    + '<svg viewBox="0 0 120 120" aria-hidden="true"><circle class="np-res-track" cx="60" cy="60" r="52"></circle>'
+    + '<circle class="np-res-fill" cx="60" cy="60" r="52"></circle></svg>'
+    + '<div class="np-res-pct"><b>' + pct + '<small>%</small></b><em>' + o.correct + ' of ' + o.total + '</em></div></div>'
+    + '<h2 class="np-res-title" id="np-results-title">' + title + '</h2>'
+    + (sub ? '<p class="np-res-sub">' + sub + '</p>' : '')
+    + '<div class="np-res-stats">'
+    + stat('is-ok', 'check', o.correct, 'right')
+    + stat('is-bad', 'x', o.wrong, 'wrong')
+    + stat('is-skip', 'minus', o.skipped, 'skipped')
+    + stat('is-time', 'clock', o.time, 'time')
+    + '</div>'
+    + (secs ? '<div class="np-res-secs">' + secs + '</div>' : '')
+    + (o.queue || '')
+    + '<div class="np-res-actions">'
+    + (o.missed ? '<button type="button" class="np-res-btn is-primary" onclick="npRetryMissed()"><i data-lucide="rotate-ccw"></i> Retry the ' + o.missed + ' missed</button>' : '')
+    + '<button type="button" class="np-res-btn ' + (o.missed ? 'is-ghost' : 'is-primary') + '" onclick="npTryAgain()"><i data-lucide="repeat"></i> Try again</button>'
+    + '<button type="button" class="np-res-btn is-ghost" onclick="enterReviewMode()"><i data-lucide="eye"></i> Review answers</button>'
+    + '<button type="button" class="np-res-btn is-quiet" onclick="spaNavigate(\'study\')"><i data-lucide="arrow-left"></i> Back to the library</button>'
+    + '</div></div>';
+}
+
 /* ── Mount / unmount, from the route ──────────────────────────── */
 
 function npUiMount() {
@@ -1191,6 +1380,8 @@ function npUiMount() {
 function npUiUnmount() {
   _npUiPanelClose();
   npUiCloseWrong();
+  npUiCloseSheet();
+  document.getElementById('np-zoom')?.remove();
   if (_npUiRoot) {
     _npUiRoot.removeEventListener('pointermove', _npUiMove);
     _npUiRoot.removeEventListener('pointerleave', _npUiLeave);

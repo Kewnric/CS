@@ -2,6 +2,7 @@
 function notesPracticeTemplate() {
   return `
     <div class="practice-layout np-layout" id="np-layout" style="height: 100%; border-radius: 0; border: none;">
+      <div id="np-live" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
       <div class="practice-topbar np-topbar" id="np-topbar-practice">
         <div class="practice-topbar-left np-topbar-left">
           <button onclick="spaNavigate('study')" class="btn-back-dark np-sp" id="np-back-btn"><i data-lucide="chevron-left" style="width:18px;height:18px;"></i> Back</button>
@@ -30,7 +31,7 @@ function notesPracticeTemplate() {
             ${typeof ostButtonTemplate === 'function' ? ostButtonTemplate() : ''}
             <button id="np-fullscreen-btn" onclick="toggleFullscreen()" class="np-tb-btn np-sp" title="Full screen" aria-label="Full screen"><i data-lucide="maximize"></i></button>
           </div>
-          <div id="np-timer-container" class="timer-display" oncontextmenu="npTimerMenu(event)" title="Right-click to change the timer"><i data-lucide="clock"></i><span id="np-timer-display">--:--</span></div>
+          <div id="np-timer-container" class="timer-display" role="button" tabindex="0" onclick="npTogglePause()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();npTogglePause();}" oncontextmenu="npTimerMenu(event)" title="Click to pause · right-click to change the timer"><i data-lucide="clock"></i><span id="np-timer-display">--:--</span></div>
           <button onclick="npSubmitAttempt()" class="btn-submit np-sp" id="np-submit-btn"><i data-lucide="check" style="width:16px;height:16px;"></i> Submit</button>
         </div>
         <div class="np-top-rail" aria-hidden="true"><span id="np-top-rail-fill"></span></div>
@@ -120,6 +121,15 @@ function notesPracticeTemplate() {
               <i class="np-fd-corners"></i><i class="np-fd-rails"></i>
               <i class="np-fd-mark"></i><i class="np-fd-hatch"></i><i class="np-fd-foot"></i>
             </span>
+            <!-- Paused: the question is hidden until you come back to it. -->
+            <div class="np-pause-veil" id="np-pause-veil" hidden>
+              <div class="np-pause-box">
+                <i data-lucide="pause"></i>
+                <b>Paused</b>
+                <span>The clocks are stopped and the question is hidden.</span>
+                <button type="button" class="np-pause-go" onclick="npTogglePause()"><i data-lucide="play"></i> Resume</button>
+              </div>
+            </div>
             <article class="np-card np-sp-card" id="np-card">
               <header class="np-qhead">
                 <div class="np-qhead-main">
@@ -134,15 +144,23 @@ function notesPracticeTemplate() {
                   </button>
                 </div>
                 <div class="np-qhead-side">
+                  <!-- Seconds left on this question: only with "No backtracking"
+                       and a per-question limit set when the attempt started. -->
+                  <span class="np-qclock" id="np-qclock" hidden>
+                    <svg viewBox="0 0 36 36" aria-hidden="true"><circle class="np-qclock-track" cx="18" cy="18" r="15"></circle><circle class="np-qclock-fill" cx="18" cy="18" r="15"></circle></svg>
+                    <b>0</b><em>s</em>
+                  </span>
                   <span class="np-q-progress" id="np-q-progress">0 / 0</span>
                 </div>
               </header>
               <div class="np-card-meter" aria-hidden="true"><span id="np-card-meter-fill"></span></div>
               <div id="np-q-image-container" class="hidden np-q-image-wrap">
-                <img id="np-q-image" src="" alt="Question image" />
+                <img id="np-q-image" src="" alt="Question image" onclick="npUiZoomImage(this)" title="Click to enlarge" />
               </div>
               <div id="np-q-text" class="hidden np-q-text"></div>
               <div class="np-q-instruction" id="np-q-heading">Select your answer</div>
+              <!-- The hint, opened under the question rather than over it. -->
+              <div class="np-hint-inline" id="np-hint-inline"></div>
               <div id="np-review-status" class="hidden np-review-status"></div>
               <div id="np-bubbles-container" class="np-choices"></div>
             </article>
@@ -251,6 +269,7 @@ function notesPracticeDestroy() {
   if (typeof ostStop === 'function') ostStop();
   if (typeof speechStop === 'function') speechStop();
   if (typeof timerInterval !== 'undefined' && timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  if (typeof _npQClockStop === 'function') _npQClockStop();
   if (typeof gradeAdvanceTimer !== 'undefined' && gradeAdvanceTimer) { clearTimeout(gradeAdvanceTimer); gradeAdvanceTimer = null; }
   // Leaving mid-attempt keeps the draft; the keys go with the page.
   if (typeof npFlushProgress === 'function') npFlushProgress();

@@ -428,6 +428,34 @@
           </span>
         </label>
       </div>
+      <!-- Notebook attempts only (notes.js notesStartAttempt shows it). -->
+      <div class="setup-constraints np-start-opts hidden" id="np-start-opts">
+        <div class="ss-label">Options</div>
+        <label class="setup-row" for="setup-nb-noback">
+          <span class="setup-row-icon"><i data-lucide="arrow-right-to-line"></i></span>
+          <span class="setup-row-main"><strong>No backtracking</strong><em>Once you move past a question you
+            cannot go back to it, as in a sit-down exam.</em></span>
+          <input type="checkbox" id="setup-nb-noback" class="setup-check" role="switch" onchange="notesStartOptsSync()" />
+        </label>
+        <label class="setup-row np-start-qsec" for="setup-nb-qsec" id="np-start-qsec-row">
+          <span class="setup-row-icon"><i data-lucide="timer"></i></span>
+          <span class="setup-row-main"><strong>Seconds per question</strong><em>Each question counts down on its
+            card; at zero it is left unanswered and the next one opens. Zero for none.</em></span>
+          <span class="ss-stepper">
+            <button type="button" onclick="timerStep('setup-nb-qsec', -5); notesQSecPresetPaint()" aria-label="Five seconds fewer">&minus;</button>
+            <input type="number" id="setup-nb-qsec" min="0" max="600" step="5" value="0" class="setup-num" oninput="notesQSecPresetPaint()"
+                   aria-label="Seconds per question, 0 for none" />
+            <button type="button" onclick="timerStep('setup-nb-qsec', 5); notesQSecPresetPaint()" aria-label="Five seconds more">+</button>
+          </span>
+        </label>
+        <div class="ss-presets np-qsec-presets" role="group" aria-label="Quick seconds per question">
+          <button type="button" class="ss-preset" onclick="notesQSecPreset(0)">Off</button>
+          <button type="button" class="ss-preset" onclick="notesQSecPreset(15)">15s</button>
+          <button type="button" class="ss-preset" onclick="notesQSecPreset(30)">30s</button>
+          <button type="button" class="ss-preset" onclick="notesQSecPreset(60)">60s</button>
+          <button type="button" class="ss-preset" onclick="notesQSecPreset(90)">90s</button>
+        </div>
+      </div>
       <div class="modal-actions">
         <button onclick="closeTimerModal()" class="btn btn-secondary">Cancel</button>
         <button onclick="confirmStartPractice()" class="btn btn-primary"><i data-lucide="play"
