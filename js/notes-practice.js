@@ -106,13 +106,26 @@ function initNotesPracticeSession() {
   const _npAutoResume = getSessionParam('npAutoResume');
   if (_npAutoResume) clearSessionParam('npAutoResume');
 
-  if (_npResume && _npResume.notebookId === activeNotebook.id && !reviewRecord && _npAutoResume) {
+  /* A REFRESH IS NOT LEAVING. `npLive` is set while this attempt is on screen
+     and cleared when the route is left (notesPracticeDestroy), and it lives
+     in sessionStorage -- so it survives a reload of this tab and nothing
+     else. Finding it set for this notebook means the page was reloaded mid-
+     attempt: carry on where it was, with no question asked. */
+  const _npReloaded = !reviewRecord && getSessionParam('npLive') === activeNotebook.id;
+  // Nothing worth offering back: no answers and no flags. Start clean, quietly.
+  const _npDraftEmpty = !!_npResume && !_npResume.answers?.some(sec => Object.values(sec || {}).some(_npHasAnswer))
+    && !(_npResume.flags || []).some(f => f && f.length);
+
+  if (_npResume && _npResume.notebookId === activeNotebook.id && !reviewRecord && (_npAutoResume || _npReloaded)) {
     if (npApplyProgress(_npResume)) {
-      initTimer();
+      initTimer(true);
       renderSidebar();
       renderQuestion();
       npPaintFlagBtn();
+      _npPauseTimerIfDone();
     }
+  } else if (_npResume && _npResume.notebookId === activeNotebook.id && !reviewRecord && _npDraftEmpty) {
+    npClearProgress();
   } else if (_npResume && _npResume.notebookId === activeNotebook.id && !reviewRecord) {
     const mins = Math.max(1, Math.round((Date.now() - (_npResume.savedAt || Date.now())) / 60000));
     const answered = (_npResume.answers || []).reduce(
@@ -125,10 +138,11 @@ function initNotesPracticeSession() {
       ],
       (choice) => {
         if (choice === 'resume' && npApplyProgress(_npResume)) {
-          initTimer();
+          initTimer(true);
           renderSidebar();
           renderQuestion();
           npPaintFlagBtn();
+          _npPauseTimerIfDone();
         } else {
           npClearProgress();
         }
@@ -146,6 +160,8 @@ function initNotesPracticeSession() {
 
   if (reviewRecord) {
     enterReviewMode();
+  } else {
+    setSessionParam('npLive', activeNotebook.id);
   }
 }
 
@@ -165,6 +181,123 @@ document.addEventListener('click', (e) => {
     window.npQuestionAnimator.complete();
   }
 });
+
+/**
+ * One section's answer key, by question number. Shared by the start of an
+ * attempt and by the live edit (npApplyNotebookUpdate), which passes the old
+ * map so a matching question whose pairs did not change keeps the column
+ * order the student is already looking at.
+ */
+function _npBuildKeyMap(sec, oldMap) {
+  const keyMap = {};
+  if (sec.answerKeysData && sec.answerKeysData.length > 0) {
+    sec.answerKeysData.forEach(d => {
+      const entry = { answer: d.answer, type: d.type || 'mcq', explanation: d.explanation, question: d.question, hint: d.hint, image: d.image || '', choices: d.choices || {}, pairs: d.pairs || [] };
+      // Matching: build shuffled right-column order
+      if (entry.type === 'matching' && entry.pairs.length > 0) {
+        const prev = oldMap && oldMap[d.qNum];
+        const same = prev && prev.type === 'matching' && Array.isArray(prev._shuffledRight)
+          && prev.pairs && prev.pairs.length === entry.pairs.length;
+        if (same) {
+          entry._shuffledRight = prev._shuffledRight.map(it => ({ text: entry.pairs[it.origIdx].right, origIdx: it.origIdx }));
+        } else {
+          const rightItems = entry.pairs.map((p, i) => ({ text: p.right, origIdx: i }));
+          for (let j = rightItems.length - 1; j > 0; j--) {
+            const k = Math.floor(Math.random() * (j + 1));
+            [rightItems[j], rightItems[k]] = [rightItems[k], rightItems[j]];
+          }
+          entry._shuffledRight = rightItems;
+        }
+      }
+      keyMap[d.qNum] = entry;
+    });
+  } else {
+    const keyText = (sec.answerKey || '').trim();
+    keyText.split('\n').forEach(line => {
+      const match = line.trim().match(/^(\d+)\s*[=:]\s*([A-Ea-e])$/);
+      if (match) keyMap[parseInt(match[1])] = { answer: match[2].toUpperCase(), explanation: '' };
+    });
+  }
+  return keyMap;
+}
+
+/**
+ * The notebook was edited while this attempt is open (the editor drawer):
+ * bring the attempt in line without losing anything already done.
+ *
+ * Sections are matched by id where both sides have one, by position
+ * otherwise. Inside a section the order on screen is kept for questions that
+ * still exist; new ones are added at the end, removed ones go. Answers stay,
+ * and anything already answered is graded again against the new key -- so
+ * fixing a wrong key fixes the mark.
+ */
+function npApplyNotebookUpdate(nb) {
+  if (!activeNotebook || !nb || nb.id !== activeNotebook.id || reviewMode) return false;
+  const fresh = JSON.parse(JSON.stringify(nb));
+  const oldSecs = activeNotebook.sections || [];
+  const curSecId = oldSecs[currentSectionIdx] && oldSecs[currentSectionIdx].id;
+  const curQ = currentQuestionNum;
+  const oldText = answerKeys[currentSectionIdx] && answerKeys[currentSectionIdx][curQ]
+    ? answerKeys[currentSectionIdx][curQ].question : null;
+
+  // A drill is the questions missed last time: it takes edits to those, and
+  // does not grow back the ones it left out.
+  const drill = !!activeNotebook.isDrill;
+  const ans = [], st = [], gr = [], keys = [], flags = [];
+  const kept = [];
+  (fresh.sections || []).forEach((sec, i) => {
+    let oi = sec.id ? oldSecs.findIndex(o => o.id === sec.id) : -1;
+    if (oi < 0 && !sec.id && i < oldSecs.length && !oldSecs[i].id) oi = i;
+    if (drill && oi < 0) return;
+    kept.push(sec);
+    const keyMap = _npBuildKeyMap(sec, oi >= 0 ? answerKeys[oi] : null);
+    const valid = (sec.questions || []).filter(q => keyMap[q]);
+    const prevOrder = oi >= 0 ? (oldSecs[oi].questions || []) : [];
+    sec.questions = prevOrder.filter(q => valid.includes(q))
+      .concat(drill ? [] : valid.filter(q => !prevOrder.includes(q)));
+    const a = {}, s = {}, g = {};
+    sec.questions.forEach(q => {
+      const had = oi >= 0 && sessionStatus[oi] && q in sessionStatus[oi];
+      a[q] = had ? sessionAnswers[oi][q] : null;
+      s[q] = had ? sessionStatus[oi][q] : 'unopened';
+      g[q] = 'skipped';
+      if (s[q] === 'answered' && _npHasAnswer(a[q])) g[q] = npGradeEntry(a[q], keyMap[q]) ? 'correct' : 'wrong';
+      else if (s[q] === 'answered') s[q] = 'opened';
+    });
+    ans.push(a); st.push(s); gr.push(g); keys.push(keyMap);
+    flags.push(new Set(oi >= 0 && npFlags[oi] ? [...npFlags[oi]].filter(q => sec.questions.includes(q)) : []));
+  });
+
+  if (!kept.length) return false;    // nothing left to show; keep what is on screen
+  fresh.sections = kept;
+  if (drill) fresh.isDrill = true;
+  activeNotebook = fresh;
+  sessionAnswers = ans; sessionStatus = st; gradeResults = gr; answerKeys = keys; npFlags = flags;
+  npApplyChoiceOrder();
+
+  // Stay on the same question if it is still there.
+  let si = curSecId ? fresh.sections.findIndex(s => s.id === curSecId) : -1;
+  if (si < 0) si = Math.min(currentSectionIdx, fresh.sections.length - 1);
+  currentSectionIdx = Math.max(0, si);
+  const qs = (fresh.sections[currentSectionIdx] && fresh.sections[currentSectionIdx].questions) || [];
+  currentQuestionNum = qs.includes(curQ) ? curQ : (qs.length ? qs[0] : null);
+
+  const titleEl = document.getElementById('np-notebook-title');
+  if (titleEl) titleEl.textContent = fresh.title;
+  const chip = document.getElementById('np-title-chip');
+  if (chip) chip.title = fresh.title || '';
+  // Re-type the question only if its words changed.
+  const nowText = currentQuestionNum != null && answerKeys[currentSectionIdx][currentQuestionNum]
+    ? answerKeys[currentSectionIdx][currentQuestionNum].question : null;
+  const qTextDiv = document.getElementById('np-q-text');
+  if (qTextDiv && (nowText !== oldText || currentQuestionNum !== curQ)) qTextDiv.dataset.currentQId = '';
+
+  renderSidebar();
+  renderQuestion();
+  npPaintFlagBtn();
+  npSaveProgress();
+  return true;
+}
 
 function initSessionState() {
   sessionAnswers = [];
@@ -220,28 +353,7 @@ function initSessionState() {
     gradeResults.push(gr);
 
     // Parse answer key
-    const keyMap = {};
-    if (sec.answerKeysData && sec.answerKeysData.length > 0) {
-      sec.answerKeysData.forEach(d => {
-        const entry = { answer: d.answer, type: d.type || 'mcq', explanation: d.explanation, question: d.question, hint: d.hint, image: d.image || '', choices: d.choices || {}, pairs: d.pairs || [] };
-        // Matching: build shuffled right-column order
-        if (entry.type === 'matching' && entry.pairs.length > 0) {
-          const rightItems = entry.pairs.map((p, i) => ({ text: p.right, origIdx: i }));
-          for (let j = rightItems.length - 1; j > 0; j--) {
-            const k = Math.floor(Math.random() * (j + 1));
-            [rightItems[j], rightItems[k]] = [rightItems[k], rightItems[j]];
-          }
-          entry._shuffledRight = rightItems;
-        }
-        keyMap[d.qNum] = entry;
-      });
-    } else {
-      const keyText = (sec.answerKey || '').trim();
-      keyText.split('\n').forEach(line => {
-        const match = line.trim().match(/^(\d+)\s*[=:]\s*([A-Ea-e])$/);
-        if (match) keyMap[parseInt(match[1])] = { answer: match[2].toUpperCase(), explanation: '' };
-      });
-    }
+    const keyMap = _npBuildKeyMap(sec);
     answerKeys.push(keyMap);
 
     // Reconcile questions[] with the answer key: drop question numbers that have
@@ -258,13 +370,20 @@ function initSessionState() {
 /* ----------------------------------------------------------
    TIMER
    ---------------------------------------------------------- */
-function initTimer() {
+/**
+ * @param {boolean} [keep] carry on from the restored clock instead of starting
+ *   over. Resuming used to call this straight after putting the saved time
+ *   back, and it reset it -- so a refresh restarted the count-up at 00:00 and
+ *   a countdown at its full limit.
+ */
+function initTimer(keep) {
   if (timerInterval) clearInterval(timerInterval);
   const display = document.getElementById('np-timer-display');
   if (!display) return;
+  const kept = keep && typeof timeRemaining === 'number' && timeRemaining >= 0;
 
   if (timeLimit <= 0) {
-    timeRemaining = 0;
+    if (!kept) timeRemaining = 0;
     updateTimerDisplay();
     timerInterval = setInterval(() => {
       timeRemaining++;
@@ -273,7 +392,7 @@ function initTimer() {
     return;
   }
 
-  timeRemaining = timeLimit;
+  if (!kept || timeRemaining > timeLimit) timeRemaining = timeLimit;
   updateTimerDisplay();
 
   timerInterval = setInterval(() => {
@@ -615,6 +734,7 @@ function selectAnswer(letter) {
     else current.push(letter);
     sessionAnswers[currentSectionIdx][currentQuestionNum] = current; npSaveProgress();
     sessionStatus[currentSectionIdx][currentQuestionNum] = 'opened';
+    if (typeof npUiSfx === 'function') npUiSfx(idx >= 0 ? 'untick' : 'tick');
     renderQuestion();
     return;
   }
@@ -697,6 +817,7 @@ function selectMatchingRight(rightOrigIdx) {
   sessionAnswers[currentSectionIdx][currentQuestionNum] = current; npSaveProgress();
   sessionStatus[currentSectionIdx][currentQuestionNum] = 'opened';
   window._matchingSelectedLeft = null;
+  if (typeof npUiSfx === 'function') npUiSfx('link');
   renderQuestion();
 }
 
@@ -1032,9 +1153,15 @@ function npApplyProgress(d) {
     npFlags = (d.flags || []).map(arr => new Set(arr || []));
     currentSectionIdx = d.sectionIdx || 0;
     currentQuestionNum = d.questionNum != null ? d.questionNum : null;
-    if (d.timeLimit > 0 && typeof d.timeRemaining === 'number') {
-      timeLimit = d.timeLimit;
+    /* The clock, both kinds. The count-up's elapsed seconds were saved but
+       never read back, so it always restarted; and the start time the saved
+       duration is worked out from is moved back to match, or a resumed
+       attempt would report only the time since the refresh. */
+    if (typeof d.timeRemaining === 'number' && d.timeRemaining >= 0) {
+      if (d.timeLimit > 0) timeLimit = d.timeLimit;
       timeRemaining = d.timeRemaining;
+      const elapsed = timeLimit > 0 ? Math.max(0, timeLimit - timeRemaining) : timeRemaining;
+      practiceStartTime = Date.now() - elapsed * 1000;
     }
     return true;
   } catch (e) { return false; }
@@ -1049,6 +1176,8 @@ function npBindKeys() {
   if (_npKeyHandler) return;
   _npKeyHandler = (e) => {
     if (reviewMode) return;
+    // The notebook editor drawer is open: its keys are the form's.
+    if (document.getElementById('np-edit')) return;
     const el = document.activeElement;
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((el || {}).tagName || '') || (el || {}).isContentEditable;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
@@ -1918,6 +2047,7 @@ function npMatchPair(li, ri) {
   sessionStatus[currentSectionIdx][currentQuestionNum] = 'opened';
   window._matchingSelectedLeft = null;
   npSaveProgress();
+  if (typeof npUiSfx === 'function') npUiSfx('link');
   renderQuestion();
 }
 
@@ -2157,6 +2287,9 @@ function processSubmission() {
 function showResultsOverlay(correct, total, accuracy, elapsed, record) {
   const overlay = document.getElementById('np-results-overlay');
   if (!overlay) return;
+  // The end of the attempt: a full sweep of bells for a perfect score, the
+  // finishing fanfare otherwise.
+  if (typeof npUiSfx === 'function') npUiSfx(total > 0 && correct === total ? 'perfect' : 'finish');
 
   const iconEl = document.getElementById('np-results-icon');
   const titleEl = document.getElementById('np-results-title');

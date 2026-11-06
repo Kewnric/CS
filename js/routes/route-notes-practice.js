@@ -42,6 +42,13 @@ function notesPracticeTemplate() {
         </div>
         <div class="practice-topbar-right"><div id="np-review-score" style="display:flex; align-items:center; gap:0.75rem; font-weight:700; font-size:1rem;"></div></div>
       </div>
+      <!-- The topbar folds away like the coding attempt's (layout.css .tb-seam):
+           an arrow on the seam under it, and a tab hanging from the top edge to
+           bring it back. Its own key, so the two screens fold separately. -->
+      <div class="tb-seam np-tb-seam">
+        <button class="rz-collapse tb-collapse" id="np-rz-top-btn" type="button"
+                onclick="npUiToggleTop()" tabindex="-1" aria-hidden="true" title="Collapse the top bar"><i data-lucide="chevron-up"></i></button>
+      </div>
       <div class="practice-body">
         <!-- The sidebar's four children stay in this order: mobile.css and
              layout.css address them as :first-child and :nth-child(3). -->
@@ -49,6 +56,12 @@ function notesPracticeTemplate() {
           <div class="np-side-head">
             <h2><i data-lucide="layers" style="width:18px;height:18px;"></i> Sections</h2>
             <span class="np-side-sub" id="np-side-sub"></span>
+            <!-- Live score: right over everything, a bar of right and wrong, and the percentage. -->
+            <div class="np-score" id="np-score">
+              <span class="np-score-num"><b id="np-score-correct">0</b><em>/ <span id="np-score-total">0</span></em></span>
+              <span class="np-score-bar" aria-hidden="true"><i class="np-score-ok" id="np-score-ok"></i><i class="np-score-bad" id="np-score-bad"></i></span>
+              <span class="np-score-pct" id="np-score-pct">0%</span>
+            </div>
           </div>
           <div id="np-sections-tabs" class="np-section-tabs"></div>
           <div class="np-grid-block">
@@ -140,6 +153,10 @@ function notesPracticeTemplate() {
             </div>
           </div>
         </div>
+        <div class="tb-dock np-tb-dock" id="np-tb-dock">
+          <button class="rz-collapse tb-collapse" id="np-rz-top-dock-btn" type="button"
+                  onclick="npUiToggleTop()" tabindex="-1" aria-hidden="true" title="Show the top bar"><i data-lucide="chevron-down"></i></button>
+        </div>
       </div>
     </div>
     <div id="np-results-overlay" class="modal-overlay hidden" style="z-index:10000;">
@@ -188,11 +205,19 @@ function npSyncMobileChrome() {
   }
 }
 
+/* Saves are debounced (npSaveProgress waits 400ms) and the clock is only
+   written with them, so a refresh straight after answering, or any refresh at
+   all for the timer, lost the newest state. pagehide fires on reload, tab
+   close and navigating away -- write everything then. */
+let _npPageHide = null;
+
 function notesPracticeInit() {
   // Display preferences first, so the first question is drawn at the chosen
   // size rather than drawn once and then resized under the reader.
   if (typeof npUiMount === 'function') npUiMount();
   initNotesPracticeSession();
+  _npPageHide = () => { if (typeof npFlushProgress === 'function') npFlushProgress(); };
+  window.addEventListener('pagehide', _npPageHide);
   // The topbar is built with the route, so the OST transport is mounted once
   // here -- the same call practiceInit makes. Without it the disc is drawn but
   // a track left playing from a previous attempt never picks back up.
@@ -230,6 +255,10 @@ function notesPracticeDestroy() {
   // Leaving mid-attempt keeps the draft; the keys go with the page.
   if (typeof npFlushProgress === 'function') npFlushProgress();
   if (typeof npUnbindKeys === 'function') npUnbindKeys();
+  // Leaving the screen on purpose: the next visit asks about the draft again.
+  // (A reload never gets here, which is how the attempt tells the two apart.)
+  if (typeof clearSessionParam === 'function') clearSessionParam('npLive');
+  if (_npPageHide) { window.removeEventListener('pagehide', _npPageHide); _npPageHide = null; }
   if (_npChromeMq && _npChromeSync) {
     if (_npChromeMq.removeEventListener) _npChromeMq.removeEventListener('change', _npChromeSync);
     else if (_npChromeMq.removeListener) _npChromeMq.removeListener(_npChromeSync);

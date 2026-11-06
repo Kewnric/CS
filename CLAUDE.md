@@ -194,6 +194,11 @@ a ResizeObserver redraws them. The attempt's theme (`ssp.np.ui` `theme`) is set 
 while the route is up and the app's own `theme` key is put back on unmount — never call
 `changeTheme` from here, it saves app-wide. A question is locked and shows its key only with an
 answer AND a grade (`_npHealAnswered`); the resume draft stores no grades, so they are re-derived.
+A reload resumes silently: session param `npLive` is set while the attempt is up and cleared in
+`notesPracticeDestroy`, so finding it on init means the tab was reloaded (a `pagehide` flush keeps
+the draft and the clock current). The pencil in Display opens the admin notebook form in a drawer
+(`npUiOpenEditor`); the attempt follows its draft live through `npApplyNotebookUpdate`, which keeps
+answers and regrades them, and falls back to the saved notebook when the drawer closes.
 
 **Execution stack** (the layers button in the attempt's editor toolbar): memory as it
 stands when the program reaches the cursor's line — frames, globals, heap — redrawn a

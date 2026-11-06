@@ -50,7 +50,7 @@ function _npUiDefaults() {
     text: 'md', size: 'comfy', width: 'normal', grid: 'md', answers: 'same', skin: 'system',
     reveal: calm ? 'off' : 'normal', theme: 'app',
     spatial: calm ? 'off' : 'full', lastSpatial: 'full',
-    motion: !calm, keys: true, rclick: true
+    motion: !calm, keys: true, rclick: true, sfx: true
   };
 }
 
@@ -66,7 +66,8 @@ function npUiPrefs() {
     lastSpatial: (v.lastSpatial === 'subtle' || v.lastSpatial === 'full') ? v.lastSpatial : d.lastSpatial,
     motion: typeof v.motion === 'boolean' ? v.motion : d.motion,
     keys: typeof v.keys === 'boolean' ? v.keys : d.keys,
-    rclick: typeof v.rclick === 'boolean' ? v.rclick : d.rclick
+    rclick: typeof v.rclick === 'boolean' ? v.rclick : d.rclick,
+    sfx: typeof v.sfx === 'boolean' ? v.sfx : d.sfx
   };
 }
 
@@ -366,10 +367,16 @@ function npUiOnRender(info) {
     _npKb.idx = -1;
   }
 
-  // A wrong answer: crosses rain out of what was picked, once per grading.
-  if (info && info.grading && info.result === 'wrong' && _npUiXKey !== info.key) {
+  // The moment of grading, once per answer: a sound either way, and for a
+  // wrong one the crosses raining out of what was picked.
+  if (info && info.grading && (info.result === 'wrong' || info.result === 'correct') && _npUiXKey !== info.key) {
     _npUiXKey = info.key;
-    _npUiDropX(info.type);
+    if (info.result === 'wrong') {
+      npUiSfx('wrong');
+      _npUiDropX(info.type);
+    } else {
+      npUiSfx(_npUiAllCorrectSoFar() ? 'streak' : 'correct');
+    }
   } else if (info && !info.grading) {
     _npUiXKey = '';
   }
@@ -607,15 +614,22 @@ function npUiPaintProgress() {
   if (typeof activeNotebook === 'undefined' || !activeNotebook) return;
   let done = 0;
   let total = 0;
+  let right = 0;
+  let wrong = 0;
   (activeNotebook.sections || []).forEach((sec, si) => {
     (sec.questions || []).forEach(q => {
       total++;
+      const g = gradeResults[si] && gradeResults[si][q];
       const answered = (typeof reviewMode !== 'undefined' && reviewMode)
-        ? (gradeResults[si] && gradeResults[si][q] && gradeResults[si][q] !== 'skipped')
+        ? (g && g !== 'skipped')
         : (sessionStatus[si] && sessionStatus[si][q] === 'answered');
-      if (answered) done++;
+      if (!answered) return;
+      done++;
+      if (g === 'correct') right++;
+      else if (g === 'wrong') wrong++;
     });
   });
+  _npUiPaintScore(right, wrong, total);
   const count = document.getElementById('np-title-count');
   if (count) count.textContent = done + ' / ' + total;
   const rail = document.getElementById('np-top-rail-fill');
@@ -624,6 +638,27 @@ function npUiPaintProgress() {
   if (sub) {
     const n = (activeNotebook.sections || []).length;
     sub.textContent = n + (n === 1 ? ' section' : ' sections') + ' · ' + total + (total === 1 ? ' question' : ' questions');
+  }
+}
+
+/** The live score in the sidebar head: right over all, a bar, the percentage. */
+function _npUiPaintScore(right, wrong, total) {
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('np-score-correct', right);
+  set('np-score-total', total);
+  const pct = total ? Math.round((right / total) * 100) : 0;
+  set('np-score-pct', pct + '%');
+  const ok = document.getElementById('np-score-ok');
+  const bad = document.getElementById('np-score-bad');
+  if (ok) ok.style.width = (total ? (right / total) * 100 : 0).toFixed(2) + '%';
+  if (bad) bad.style.width = (total ? (wrong / total) * 100 : 0).toFixed(2) + '%';
+  const box = document.getElementById('np-score');
+  if (box) {
+    const answered = right + wrong;
+    const acc = answered ? Math.round((right / answered) * 100) : 0;
+    box.title = right + ' right, ' + wrong + ' wrong, ' + (total - answered) + ' to go'
+      + (answered ? ' — ' + acc + '% of answered' : '');
+    box.dataset.tone = !answered ? '' : (acc >= 80 ? 'good' : acc >= 50 ? 'warn' : 'bad');
   }
 }
 
@@ -707,6 +742,7 @@ function _npUiPageBody(id, p) {
       + '<div class="np-ui-switches">'
       + _npUiSwitch('motion', p.motion, 'Animations', 'Cards slide in, answers pop')
       + _npUiSwitch('rclick', p.rclick, 'Right-click to move', 'Left half back, right half on')
+      + _npUiSwitch('sfx', p.sfx, 'Sound effects', 'Right, wrong, ticks and the finish')
       + '</div>';
   }
   // look
@@ -731,7 +767,10 @@ function _npUiPanelHTML() {
     + '<i data-lucide="' + pg.icon + '"></i><span>' + pg.name + '</span></button>').join('');
   return '<div class="np-ui-head">'
     + '<span class="np-ui-title"><i data-lucide="sliders-horizontal"></i> Display</span>'
+    + '<span class="np-ui-head-actions">'
+    + '<button type="button" class="np-ui-edit" onclick="npUiOpenEditor()" title="Edit this notebook" aria-label="Edit this notebook"><i data-lucide="pencil"></i></button>'
     + '<button type="button" class="np-ui-reset" onclick="npUiReset()" title="Back to the defaults"><i data-lucide="rotate-ccw"></i> Reset</button>'
+    + '</span>'
     + '</div>'
     + '<div class="np-ui-pager">'
     + '<button type="button" class="np-ui-step" onclick="npUiPageGo(-1)" title="Previous page (←)" aria-label="Previous page"><i data-lucide="chevron-left"></i></button>'
@@ -834,6 +873,290 @@ function npUiTogglePanel(e) {
   window.addEventListener('resize', _npUiPlacePanel);
 }
 
+/* ── Sound ──────────────────────────────────────────────────────
+   Built from the coding attempt's tone engine (practice-sfx.js psfxTone), so
+   they share its bus and its volume. Their own switch, though: the shared one
+   lives with the typing sound in the coding editor's panel, which is not on
+   this screen, and a notebook should not go silent because of a keyboard
+   setting made somewhere else. */
+function npUiSfx(kind) {
+  if (!npUiPrefs().sfx || typeof psfxTone !== 'function') return;
+  const t = (o) => psfxTone(o);
+  try {
+    if (kind === 'correct' || kind === 'streak') {
+      // A rising major triad, bright and short; a streak adds the octave.
+      t({ freq: 659, type: 'triangle', dur: 0.1, gain: 0.12 });
+      t({ freq: 784, type: 'triangle', dur: 0.1, gain: 0.11, at: 0.07 });
+      t({ freq: 1047, type: 'triangle', dur: 0.2, gain: 0.12, at: 0.14 });
+      t({ freq: 2093, type: 'sine', dur: 0.25, gain: 0.035, at: 0.16 });
+      if (kind === 'streak') t({ freq: 1319, type: 'sine', dur: 0.32, gain: 0.07, at: 0.26 });
+    } else if (kind === 'wrong') {
+      // Falling and detuned, as the coding attempt's failed test is, but softer.
+      t({ freq: 330, to: 247, type: 'sawtooth', dur: 0.2, gain: 0.1, lowpass: 1300 });
+      t({ freq: 220, to: 165, type: 'square', dur: 0.26, gain: 0.06, lowpass: 800, at: 0.06 });
+    } else if (kind === 'tick') {
+      t({ freq: 1250, type: 'sine', dur: 0.045, gain: 0.05 });
+    } else if (kind === 'untick') {
+      t({ freq: 880, type: 'sine', dur: 0.045, gain: 0.04 });
+    } else if (kind === 'link') {
+      t({ freq: 880, type: 'triangle', dur: 0.06, gain: 0.07 });
+      t({ freq: 1175, type: 'triangle', dur: 0.09, gain: 0.07, at: 0.05 });
+    } else if (kind === 'finish' || kind === 'perfect') {
+      // A sweep up, then a short fanfare landing on the octave.
+      t({ freq: 196, to: 784, type: 'sawtooth', dur: 0.42, gain: 0.08, lowpass: 2600 });
+      t({ freq: 392, to: 1568, type: 'triangle', dur: 0.42, gain: 0.06 });
+      [523, 659, 784].forEach((f, i) => t({ freq: f, type: 'triangle', dur: 0.16, gain: 0.1, at: 0.45 + i * 0.1 }));
+      t({ freq: 1047, type: 'triangle', dur: 0.5, gain: 0.11, at: 0.78 });
+      if (kind === 'perfect') {
+        const bells = [1319, 1568, 2093, 1760];
+        for (let i = 0; i < 10; i++) {
+          t({ freq: bells[i % bells.length], type: 'sine', dur: 0.26, gain: 0.045, at: 0.95 + Math.random() * 1.1 });
+        }
+      }
+    }
+  } catch (e) { /* no audio here; the attempt does not depend on it */ }
+}
+
+/** Three or more answered and not one of them wrong. */
+function _npUiAllCorrectSoFar() {
+  if (typeof gradeResults === 'undefined' || !activeNotebook) return false;
+  let right = 0;
+  for (let si = 0; si < (activeNotebook.sections || []).length; si++) {
+    const sec = activeNotebook.sections[si];
+    for (const q of (sec.questions || [])) {
+      if (!sessionStatus[si] || sessionStatus[si][q] !== 'answered') continue;
+      if (gradeResults[si][q] === 'wrong') return false;
+      if (gradeResults[si][q] === 'correct') right++;
+    }
+  }
+  return right >= 3;
+}
+
+/* ── The topbar folds away ──────────────────────────────────────
+   The coding attempt's seam and dock (practice.js togglePracticeTopbar), on
+   this screen's own key. The dock hangs from the top of the question pane;
+   it is placed by measuring the pane, because the sidebar beside it is
+   resizable and can be folded away too. */
+const NP_TOP_KEY = 'ssp.np.paneTop';
+
+function npUiToggleTop() {
+  const root = document.getElementById('np-layout');
+  if (!root) return;
+  if (typeof _tbPrepareFold === 'function') _tbPrepareFold(root);
+  const on = !root.classList.contains('hide-top');
+  root.classList.toggle('hide-top', on);
+  try { localStorage.setItem(NP_TOP_KEY, on ? '1' : '0'); } catch (e) { /* private mode */ }
+  _npUiSyncTop();
+  window.dispatchEvent(new Event('resize'));
+}
+
+function _npUiSyncTop() {
+  const root = document.getElementById('np-layout');
+  if (!root) return;
+  const hidden = root.classList.contains('hide-top');
+  root.classList.toggle('tb-folded', hidden);
+  ['np-rz-top-btn', 'np-rz-top-dock-btn'].forEach(id => {
+    const b = document.getElementById(id);
+    if (b && document.activeElement === b) b.blur();
+  });
+  _npUiPlaceDock();
+}
+
+function _npUiPlaceDock() {
+  const pane = document.getElementById('np-question-area');
+  const dock = document.getElementById('np-tb-dock');
+  if (!pane || !dock) return;
+  dock.style.left = (pane.offsetLeft + pane.offsetWidth / 2) + 'px';
+}
+
+function _npUiRestoreTop() {
+  const root = document.getElementById('np-layout');
+  if (!root) return;
+  let hidden = false;
+  try { hidden = localStorage.getItem(NP_TOP_KEY) === '1'; } catch (e) { /* private mode */ }
+  root.classList.toggle('hide-top', hidden);
+  _npUiSyncTop();
+}
+
+/* ── Edit this notebook, without leaving it ─────────────────────
+   The admin's own notebook form (route-admin.js getNotebookFormHTML, filled
+   by admin-notebooks.js _openNotebookFormNow) in a drawer over the attempt.
+   The attempt follows the form LIVE: every change to the form's draft is
+   applied to what is on screen (npApplyNotebookUpdate keeps answers and
+   regrades them). Saving keeps the changes; closing without saving puts the
+   attempt back on the saved notebook.
+
+   Three things in the form act on the admin page and are taken over here:
+   Back (it would go to the admin list), Preview (it would restart this very
+   attempt) and Escape. Save, Discard and the X are the form's own. */
+let _npEdit = null;
+
+function npUiOpenEditor() {
+  if (typeof getNotebookFormHTML !== 'function' || typeof _openNotebookFormNow !== 'function'
+      || typeof activeNotebook === 'undefined' || !activeNotebook) {
+    if (typeof toast === 'function') toast('The notebook editor is not available here', { type: 'warning' });
+    return;
+  }
+  if (typeof reviewMode !== 'undefined' && reviewMode) {
+    if (typeof toast === 'function') toast('Editing is off while you review an attempt', { type: 'info' });
+    return;
+  }
+  if (!(state.notebooks || []).some(n => n.id === activeNotebook.id)) return;
+  _npUiPanelClose();
+  if (document.getElementById('np-edit')) return;
+
+  const ov = document.createElement('div');
+  ov.id = 'np-edit';
+  ov.className = 'np-edit-overlay';
+  ov.innerHTML = '<div class="np-edit-backdrop"></div>'
+    + '<aside class="np-edit-drawer" role="dialog" aria-modal="true" aria-label="Edit this notebook">'
+    + '<div class="np-edit-bar">'
+    + '<span class="np-edit-bar-title"><i data-lucide="pencil"></i> Editing while you practise</span>'
+    + '<span class="np-edit-live" title="Changes show in the attempt as you make them. Save keeps them; closing without saving puts it back.">'
+    + '<i></i> Live</span>'
+    + '</div>'
+    + '<div class="np-edit-scroll">' + getNotebookFormHTML() + '</div>'
+    + '</aside>';
+  document.body.appendChild(ov);
+  ov.querySelector('.np-edit-backdrop').addEventListener('click', () => npUiCloseEditor());
+
+  try { _openNotebookFormNow(activeNotebook.id); }
+  catch (e) {
+    ov.remove();
+    if (typeof toast === 'function') toast('Could not open the editor', { type: 'error' });
+    return;
+  }
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: ov });
+
+  const form = document.getElementById('notebook-form-container');
+  const obs = new MutationObserver(() => {
+    if (form && form.classList.contains('hidden')) npUiCloseEditor(true);
+  });
+  if (form) obs.observe(form, { attributes: true, attributeFilter: ['class'] });
+
+  _npEdit = { ov, obs, sig: _npUiDraftSig(), timer: setInterval(_npUiEditSync, 600) };
+  ov.addEventListener('click', _npUiEditClick, true);
+  ov.addEventListener('input', _npUiEditSoon, true);
+  ov.addEventListener('change', _npUiEditSoon, true);
+  document.addEventListener('keydown', _npUiEditKey, true);
+}
+
+/** A cheap fingerprint of the draft, to tell when it changed. */
+function _npUiDraftSig() {
+  if (typeof notebookAdminState === 'undefined' || !notebookAdminState) return '';
+  try { return JSON.stringify([notebookAdminState.title, notebookAdminState.sections]); } catch (e) { return ''; }
+}
+
+let _npUiEditSoonTimer = null;
+function _npUiEditSoon() {
+  /* The admin page marks a form dirty through listeners it binds on its own
+     route (bindAdminFormListeners), which are not bound here. Without this,
+     closing the drawer would drop an edit without asking first. */
+  window.adminIsDirty = true;
+  clearTimeout(_npUiEditSoonTimer);
+  _npUiEditSoonTimer = setTimeout(_npUiEditSync, 250);
+}
+
+/* Polled as well as event-driven: the Edit Questions and Import windows are
+   separate dialogs, and they write the draft when they close rather than as
+   you type in this drawer. */
+function _npUiEditSync() {
+  if (!_npEdit || typeof notebookAdminState === 'undefined' || !notebookAdminState) return;
+  const sig = _npUiDraftSig();
+  if (sig === _npEdit.sig) return;
+  _npEdit.sig = sig;
+  // A change made in one of the form's own windows (Edit Questions, Import).
+  window.adminIsDirty = true;
+  const draft = JSON.parse(JSON.stringify(notebookAdminState));
+  if (typeof npApplyNotebookUpdate === 'function' && npApplyNotebookUpdate(draft)) {
+    const live = _npEdit.ov.querySelector('.np-edit-live');
+    if (live) { live.classList.remove('is-pulse'); void live.offsetWidth; live.classList.add('is-pulse'); }
+  }
+}
+
+function _npUiEditClick(e) {
+  const t = e.target;
+  if (!t || !t.closest) return;
+  // Back would leave for the admin list; here it closes the drawer instead.
+  if (t.closest('.af-back-btn')) {
+    e.preventDefault();
+    e.stopPropagation();
+    npUiCloseEditor();
+  }
+}
+
+function _npUiEditKey(e) {
+  if (!_npEdit) return;
+  // A dialog of the form's own (unsaved changes, tags, import, questions) is
+  // up: it has the keys.
+  if (document.querySelector('#dialog-modal:not(.hidden), .modal-overlay:not(.hidden):not(#np-results-overlay), #nb-tags-overlay, .nb-import-overlay, .cs-backdrop')) return;
+  if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (typeof saveNotebookForm === 'function' && saveNotebookForm({ silent: true }) !== false) {
+      _npUiEditSync();
+      if (typeof toast === 'function') toast('Notebook saved', { type: 'success', duration: 1600 });
+    }
+    return;
+  }
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    e.stopPropagation();
+    npUiCloseEditor();
+  }
+  // Everything else reaches the form untouched. The attempt's own shortcuts
+  // stand down while the drawer is open (npBindKeys checks for #np-edit).
+}
+
+/**
+ * Close the drawer. From the backdrop, Back or Escape it goes through the
+ * form's own unsaved-changes question; once the form has closed itself
+ * (`formClosed`), the drawer goes and the attempt is put on the saved copy.
+ */
+function npUiCloseEditor(formClosed) {
+  if (!_npEdit) return;
+  if (!formClosed) {
+    if (typeof confirmCloseAdminForm === 'function' && typeof closeNotebookForm === 'function') {
+      confirmCloseAdminForm(closeNotebookForm, typeof saveNotebookForm === 'function' ? saveNotebookForm : null);
+    } else {
+      npUiCloseEditor(true);
+    }
+    return;
+  }
+  const ed = _npEdit;
+  _npEdit = null;
+  clearInterval(ed.timer);
+  clearTimeout(_npUiEditSoonTimer);
+  ed.obs.disconnect();
+  ed.ov.removeEventListener('click', _npUiEditClick, true);
+  document.removeEventListener('keydown', _npUiEditKey, true);
+  if (typeof nbCloseTagsWindow === 'function') nbCloseTagsWindow();
+  if (typeof closeBulkQuestionImport === 'function') closeBulkQuestionImport();
+  ed.ov.remove();
+  if (typeof notebookAdminState !== 'undefined') notebookAdminState = null;
+  window.adminIsDirty = false;
+  window.saveCurrentAdminForm = null;
+  // Whatever was saved is what the attempt runs on now; an unsaved draft goes.
+  const saved = typeof activeNotebook !== 'undefined' && activeNotebook
+    ? (state.notebooks || []).find(n => n.id === activeNotebook.id) : null;
+  if (saved && typeof npApplyNotebookUpdate === 'function') npApplyNotebookUpdate(saved);
+}
+
+/** Leaving the attempt with the drawer open: no questions asked, nothing kept. */
+function _npUiDropEditor() {
+  if (!_npEdit) return;
+  const ed = _npEdit;
+  _npEdit = null;
+  clearInterval(ed.timer);
+  clearTimeout(_npUiEditSoonTimer);
+  ed.obs.disconnect();
+  document.removeEventListener('keydown', _npUiEditKey, true);
+  ed.ov.remove();
+  if (typeof notebookAdminState !== 'undefined') notebookAdminState = null;
+  window.adminIsDirty = false;
+  window.saveCurrentAdminForm = null;
+}
+
 /* ── Mount / unmount, from the route ──────────────────────────── */
 
 function npUiMount() {
@@ -849,6 +1172,7 @@ function npUiMount() {
   npUiApply();
   _npUiApplyTheme();
   _npUiRestorePane();
+  _npUiRestoreTop();
   root.addEventListener('pointermove', _npUiMove, { passive: true });
   root.addEventListener('pointerleave', _npUiLeave);
   root.addEventListener('pointerdown', _npUiDown);
@@ -861,6 +1185,7 @@ function npUiMount() {
     if (typeof npDragClick === 'function') choices.addEventListener('click', npDragClick, true);
   }
   window.addEventListener('resize', _npUiSaveSideWidth);
+  window.addEventListener('resize', _npUiPlaceDock);
 }
 
 function npUiUnmount() {
@@ -883,6 +1208,8 @@ function npUiUnmount() {
   if (typeof _npDragCancel === 'function') _npDragCancel();
   if (typeof _npWatchMatching === 'function') _npWatchMatching(false);
   window.removeEventListener('resize', _npUiSaveSideWidth);
+  window.removeEventListener('resize', _npUiPlaceDock);
+  _npUiDropEditor();
   _npUiStopSaved();
   if (_npUiFrame) cancelAnimationFrame(_npUiFrame);
   _npUiFrame = 0;

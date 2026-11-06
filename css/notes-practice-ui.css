@@ -2229,3 +2229,153 @@
   100% { box-shadow: 0 0 0 10px rgba(143, 180, 255, 0); }
 }
 @media (prefers-reduced-motion: reduce) { #np-layout .np-nav-btn.np-nudge { animation: none; outline: 2px solid rgba(143, 180, 255, 0.8); } }
+
+/* ── Live score, in the sidebar head ────────────────────────────── */
+.np-score {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)), rgba(13, 17, 23, 0.55);
+}
+.np-score-num {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.np-score-num b { font-size: 1.05rem; font-weight: 800; color: #e6edf3; }
+.np-score-num em { font-style: normal; font-size: 0.72rem; color: #8b949e; }
+/* Right in green from the left, wrong in red after it, the rest still to go. */
+.np-score-bar {
+  flex: 1 1 auto;
+  min-width: 40px;
+  height: 6px;
+  display: flex;
+  border-radius: 99px;
+  overflow: hidden;
+  background: rgba(148, 163, 184, 0.14);
+}
+.np-score-bar > i {
+  display: block;
+  height: 100%;
+  width: 0;
+  transition: width 0.5s var(--ease-expo-out, ease-out);
+}
+.np-score-ok { background: linear-gradient(90deg, #10b981, #34d399); box-shadow: 0 0 8px rgba(16, 185, 129, 0.6); }
+.np-score-bad { background: linear-gradient(90deg, #dc2626, #f87171); }
+.np-score-pct {
+  flex: 0 0 auto;
+  min-width: 2.8em;
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: #c9d1d9;
+  font-variant-numeric: tabular-nums;
+}
+.np-score[data-tone="good"] .np-score-pct { color: #34d399; }
+.np-score[data-tone="warn"] .np-score-pct { color: #fbbf24; }
+.np-score[data-tone="bad"] .np-score-pct { color: #f87171; }
+
+/* ── The topbar's fold: the tab that brings it back ─────────────── */
+#np-layout .practice-body { position: relative; }
+/* Placed over the question pane's centre by _npUiPlaceDock (left), and shown
+   only while the bar is folded (layout.css .tb-folded .tb-dock). */
+#np-layout .np-tb-dock {
+  position: absolute;
+  top: 0;
+  margin-left: -17px;
+}
+@media (hover: none) { #np-layout .np-tb-dock { margin-left: -22px; } }
+
+/* ── Edit this notebook: the drawer ─────────────────────────────── */
+.np-ui-head-actions { display: inline-flex; align-items: center; gap: 0.35rem; }
+.np-ui-edit {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  background: transparent;
+  color: #8b949e;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.np-ui-edit svg { width: 13px; height: 13px; }
+.np-ui-edit:hover { color: #fff; border-color: var(--color-primary, #6366f1); background: color-mix(in srgb, var(--color-primary, #6366f1) 20%, transparent); }
+
+/* Below the app's dialogs (1000+), so the form's own windows -- unsaved
+   changes, tags, import, Edit Questions -- open over it. */
+.np-edit-overlay { position: fixed; inset: 0; z-index: 950; }
+.np-edit-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(2, 6, 12, 0.45);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  animation: npFade 0.2s ease-out both;
+}
+.np-edit-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(900px, 96vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-body, #0b0f17);
+  border-left: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: -30px 0 80px -20px rgba(0, 0, 0, 0.8);
+  animation: npDrawerIn 0.32s var(--ease-expo-out, ease-out) both;
+}
+@keyframes npDrawerIn { from { transform: translateX(40px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .np-edit-drawer, .np-edit-backdrop { animation: none; } }
+.np-edit-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 1rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-primary, #6366f1) 12%, transparent), transparent);
+  font-size: 0.75rem;
+  color: #c9d1d9;
+}
+.np-edit-bar-title { display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 700; }
+.np-edit-bar-title svg { width: 14px; height: 14px; color: var(--color-primary, #6366f1); }
+.np-edit-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  color: #6ee7b7;
+  font-weight: 700;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: help;
+}
+.np-edit-live i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 8px #34d399;
+}
+/* A blink each time the attempt takes a change from the form. */
+.np-edit-live.is-pulse i { animation: npLivePulse 0.7s ease-out; }
+@keyframes npLivePulse { 30% { transform: scale(2.2); box-shadow: 0 0 14px #34d399; } }
+.np-edit-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+/* Preview would restart this very attempt; the drawer is already the preview. */
+.np-edit-overlay [onclick^="nbPreviewNotebook"] { display: none !important; }
