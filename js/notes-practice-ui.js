@@ -33,6 +33,7 @@ const NP_UI_OPTIONS = {
   width:   [['narrow', 'Narrow'], ['normal', 'Normal'], ['wide', 'Wide'], ['full', 'Full']],
   grid:    [['sm', 'S', 'Small'], ['md', 'M', 'Medium'], ['lg', 'L', 'Large'], ['xl', 'XL', 'Extra large']],
   answers: [['same', 'Same', 'Same as the question'], ['narrow', 'Narrow'], ['medium', 'Medium'], ['wide', 'Wide']],
+  skin:    [['system', 'System', 'System window'], ['glass', 'Glass', 'Glass card']],
   reveal:  [['off', 'Off', 'Shown at once'], ['fast', 'Fast'], ['normal', 'Normal'], ['slow', 'Slow']],
   spatial: [['off', 'Off'], ['subtle', 'Subtle'], ['full', 'Full']],
   theme:   [['app', 'App', 'Same as the app'], ['dark', 'Night'], ['light', 'Day'], ['purple', 'Purple'], ['green', 'Green']]
@@ -46,7 +47,7 @@ function _npUiReducedMotion() {
 function _npUiDefaults() {
   const calm = _npUiReducedMotion();
   return {
-    text: 'md', size: 'comfy', width: 'normal', grid: 'md', answers: 'same',
+    text: 'md', size: 'comfy', width: 'normal', grid: 'md', answers: 'same', skin: 'system',
     reveal: calm ? 'off' : 'normal', theme: 'app',
     spatial: calm ? 'off' : 'full', lastSpatial: 'full',
     motion: !calm, keys: true, rclick: true
@@ -61,7 +62,7 @@ function npUiPrefs() {
   const pick = (k) => (NP_UI_OPTIONS[k].some(o => o[0] === v[k]) ? v[k] : d[k]);
   return {
     text: pick('text'), size: pick('size'), width: pick('width'), spatial: pick('spatial'),
-    grid: pick('grid'), reveal: pick('reveal'), theme: pick('theme'), answers: pick('answers'),
+    grid: pick('grid'), reveal: pick('reveal'), theme: pick('theme'), answers: pick('answers'), skin: pick('skin'),
     lastSpatial: (v.lastSpatial === 'subtle' || v.lastSpatial === 'full') ? v.lastSpatial : d.lastSpatial,
     motion: typeof v.motion === 'boolean' ? v.motion : d.motion,
     keys: typeof v.keys === 'boolean' ? v.keys : d.keys,
@@ -143,6 +144,7 @@ function npUiApply() {
   root.dataset.npWidth = p.width;
   root.dataset.npGrid = p.grid;
   root.dataset.npAnswers = p.answers;
+  root.dataset.npSkin = p.skin;
   root.dataset.npSpatial = p.spatial;
   root.dataset.npMotion = p.motion ? 'on' : 'off';
   root.dataset.npKeys = p.keys ? 'on' : 'off';
@@ -675,7 +677,8 @@ function _npUiPageBody(id, p) {
   const backSeg = '<div class="np-seg np-seg-wrap" role="radiogroup">' + backs.map(b =>
     '<button type="button" role="radio" aria-checked="' + (b[0] === backCur) + '" class="np-seg-btn' + (b[0] === backCur ? ' is-on' : '') + '"'
     + ' onclick="npUiSetBackground(\'' + b[0] + '\')">' + escapeHTML(b[1]) + '</button>').join('') + '</div>';
-  return _npUiRow('palette', 'Theme in this attempt', _npUiNameOf('theme', p.theme), _npUiSeg('theme', p.theme, NP_UI_OPTIONS.theme, 'np-seg-5'))
+  return _npUiRow('panels-top-left', 'Card style', _npUiNameOf('skin', p.skin), _npUiSeg('skin', p.skin, NP_UI_OPTIONS.skin))
+    + _npUiRow('palette', 'Theme in this attempt', _npUiNameOf('theme', p.theme), _npUiSeg('theme', p.theme, NP_UI_OPTIONS.theme, 'np-seg-5'))
     + _npUiRow('sparkles', 'Background', backCur === 'off' ? 'Off' : (backs.find(b => b[0] === backCur) || [, ''])[1], backSeg);
 }
 

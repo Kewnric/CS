@@ -83,6 +83,15 @@ function notesPracticeTemplate() {
         </div>
         <div class="np-question-pane" id="np-question-area">
           <div class="np-pane-inner">
+            <!-- The window frame (System card style): corner ticks and guide
+                 lines drawn just outside the card, a marker and hatch on the
+                 top edge. Decoration only, and it stays put while the card
+                 slides in and out of it. -->
+            <div class="np-frame">
+            <span class="np-frame-deco" aria-hidden="true">
+              <i class="np-fd-corners"></i><i class="np-fd-rails"></i>
+              <i class="np-fd-mark"></i><i class="np-fd-hatch"></i><i class="np-fd-foot"></i>
+            </span>
             <article class="np-card np-sp-card" id="np-card">
               <header class="np-qhead">
                 <div class="np-qhead-main">
@@ -109,6 +118,7 @@ function notesPracticeTemplate() {
               <div id="np-review-status" class="hidden np-review-status"></div>
               <div id="np-bubbles-container" class="np-choices"></div>
             </article>
+            </div>
             <div id="np-nav-row" class="np-nav-row">
               <button id="np-btn-prev" onclick="npPrevQuestion()" class="np-nav-btn np-sp"><i data-lucide="chevron-left"></i><span>Previous</span></button>
               <button id="np-btn-next" onclick="npNextQuestion()" class="np-nav-btn np-nav-btn-next np-sp"><span>Next</span><i data-lucide="chevron-right"></i></button>

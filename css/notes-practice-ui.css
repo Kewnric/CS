@@ -1805,3 +1805,410 @@
   font-size: 0.64rem;
   color: #565e68;
 }
+
+/* ============================================================
+   CARD STYLE: SYSTEM
+   ------------------------------------------------------------
+   The question as a window in a game HUD: a square-cornered navy panel
+   with a bright edge that glows at its sides, a title centred over a rule,
+   compact list rows (icon, label, a round slot at the end), and a frame of
+   corner ticks and guide lines just outside it. Chosen in Display > Look >
+   Card style; Glass is the earlier card and is left untouched -- every rule
+   here is under [data-np-skin="system"].
+
+   Blue on purpose, whatever the app theme: the look is the colour. The
+   accent is set on the frame and the nav row only, so the topbar, sidebar
+   and grid keep the theme's own.
+   ============================================================ */
+.np-frame { position: relative; }
+.np-frame-deco { display: none; }
+
+#np-layout[data-np-skin="system"] .np-frame,
+#np-layout[data-np-skin="system"] .np-nav-row {
+  --np-accent: #6f9cf5;
+  --np-accent-2: #a9c8ff;
+  --np-sys-line: rgba(143, 180, 255, 0.9);
+  --np-sys-faint: rgba(143, 180, 255, 0.28);
+  --np-sys-font: 'Barlow Semi Condensed', var(--font-sans);
+}
+
+/* ── The frame outside the card ─────────────────────────────────── */
+#np-layout[data-np-skin="system"] .np-frame-deco {
+  display: block;
+  position: absolute;
+  inset: -12px;
+  z-index: 0;
+  pointer-events: none;
+}
+.np-frame-deco > i { position: absolute; display: block; }
+/* Four L-shaped ticks, one per corner. */
+.np-fd-corners {
+  inset: 0;
+  --c: var(--np-sys-line);
+  --l: 18px;
+  --t: 1.5px;
+  background:
+    linear-gradient(var(--c), var(--c)) left top / var(--l) var(--t) no-repeat,
+    linear-gradient(var(--c), var(--c)) left top / var(--t) var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) right top / var(--l) var(--t) no-repeat,
+    linear-gradient(var(--c), var(--c)) right top / var(--t) var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) left bottom / var(--l) var(--t) no-repeat,
+    linear-gradient(var(--c), var(--c)) left bottom / var(--t) var(--l) no-repeat,
+    linear-gradient(var(--c), var(--c)) right bottom / var(--l) var(--t) no-repeat,
+    linear-gradient(var(--c), var(--c)) right bottom / var(--t) var(--l) no-repeat;
+  filter: drop-shadow(0 0 4px rgba(111, 156, 245, 0.8));
+}
+/* Faint guide lines down both sides, stopping short of the ticks. */
+.np-fd-rails {
+  top: 30px;
+  bottom: 30px;
+  left: 0;
+  right: 0;
+  background:
+    linear-gradient(var(--np-sys-faint), var(--np-sys-faint)) left center / 1px 100% no-repeat,
+    linear-gradient(var(--np-sys-faint), var(--np-sys-faint)) right center / 1px 100% no-repeat;
+}
+/* A marker on the top edge, a hatched strip after it, and a rule that fades. */
+.np-fd-mark {
+  top: -3px;
+  left: 34px;
+  width: 7px;
+  height: 7px;
+  background: #8fb4ff;
+  box-shadow: 0 0 8px rgba(111, 156, 245, 0.95);
+}
+.np-fd-mark::after {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: -2px;
+  width: 2px;
+  height: 11px;
+  background: rgba(143, 180, 255, 0.85);
+}
+.np-fd-hatch {
+  top: 5px;
+  left: 34px;
+  width: 120px;
+  height: 4px;
+  background: repeating-linear-gradient(135deg, rgba(143, 180, 255, 0.75) 0 2px, transparent 2px 5px);
+  -webkit-mask: linear-gradient(90deg, #000 60%, transparent);
+  mask: linear-gradient(90deg, #000 60%, transparent);
+}
+.np-fd-hatch::after {
+  content: '';
+  position: absolute;
+  left: 130px;
+  top: -5px;
+  width: 140px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--np-sys-line), transparent);
+}
+/* And a small one at the bottom right, so the frame is not lopsided. */
+.np-fd-foot {
+  right: 34px;
+  bottom: -2px;
+  width: 64px;
+  height: 3px;
+  background: repeating-linear-gradient(90deg, rgba(143, 180, 255, 0.8) 0 8px, transparent 8px 12px);
+}
+
+/* ── The window ─────────────────────────────────────────────────── */
+#np-layout[data-np-skin="system"] .np-card {
+  z-index: 1;
+  border-radius: 3px;
+  border: 1.5px solid #6f9cf5;
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.014) 0 1px, transparent 1px 3px),
+    radial-gradient(140% 55% at 50% 0%, rgba(77, 116, 214, 0.24), transparent 62%),
+    linear-gradient(180deg, #1b2448 0%, #141c3a 45%, #0f1630 100%);
+  box-shadow:
+    0 0 0 1px rgba(111, 156, 245, 0.16),
+    0 0 22px rgba(74, 128, 255, 0.42),
+    0 0 70px -12px rgba(74, 128, 255, 0.35),
+    inset 0 0 28px rgba(74, 128, 255, 0.16),
+    inset 0 1px 0 rgba(190, 215, 255, 0.25);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+/* The edge brightens toward the middle of each side, as if lit from behind. */
+#np-layout[data-np-skin="system"] .np-card::before {
+  inset: -2px;
+  padding: 0;
+  border-radius: 3px;
+  -webkit-mask: none;
+  mask: none;
+  background:
+    linear-gradient(180deg, transparent 4%, rgba(200, 222, 255, 1) 50%, transparent 96%) left center / 3px 100% no-repeat,
+    linear-gradient(180deg, transparent 4%, rgba(200, 222, 255, 1) 50%, transparent 96%) right center / 3px 100% no-repeat,
+    linear-gradient(90deg, transparent 20%, rgba(160, 198, 255, 0.55) 50%, transparent 80%) center top / 100% 1.5px no-repeat;
+  filter: drop-shadow(0 0 5px rgba(110, 165, 255, 1)) drop-shadow(0 0 14px rgba(74, 128, 255, 0.85));
+}
+/* Light spilling off the bright sides into the pane, strongest mid-height. */
+#np-layout[data-np-skin="system"] .np-frame::before,
+#np-layout[data-np-skin="system"] .np-frame::after {
+  content: '';
+  position: absolute;
+  top: 12%;
+  bottom: 12%;
+  width: 60px;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(closest-side, rgba(74, 128, 255, 0.32), transparent);
+}
+#np-layout[data-np-skin="system"] .np-frame::before { left: -30px; }
+#np-layout[data-np-skin="system"] .np-frame::after { right: -30px; }
+#np-layout[data-np-skin="system"] .np-card::after {
+  background: radial-gradient(520px circle at var(--cx, 50%) var(--cy, 0%), rgba(120, 165, 255, 0.11), transparent 45%);
+}
+
+/* Title bar: the question number centred over a rule, chips either side. */
+#np-layout[data-np-skin="system"] .np-qhead { min-height: 34px; margin-bottom: 0.75rem; }
+#np-layout[data-np-skin="system"] .np-q-label-text {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-family: var(--np-sys-font);
+  font-size: calc(1.2rem * var(--np-fs));
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: none;
+  color: #f2f5fc;
+  white-space: nowrap;
+  text-shadow: 0 0 14px rgba(120, 160, 255, 0.45);
+  pointer-events: none;
+}
+#np-layout[data-np-skin="system"] .np-qtype-badge {
+  border-radius: 2px;
+  font-family: var(--np-sys-font);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  padding: 0.16rem 0.5rem;
+}
+#np-layout[data-np-skin="system"] .np-voice-btn {
+  border-radius: 2px;
+  border-color: rgba(170, 190, 235, 0.32);
+  background: rgba(8, 12, 30, 0.55);
+  font-family: var(--np-sys-font);
+  font-size: 0.78rem;
+}
+#np-layout[data-np-skin="system"] .np-voice-btn.is-on {
+  border-color: rgba(160, 195, 255, 0.85);
+  background: linear-gradient(180deg, rgba(70, 110, 220, 0.5), rgba(40, 70, 170, 0.5));
+}
+/* The counter is set like the field in a game window: a hard white edge. */
+#np-layout[data-np-skin="system"] .np-q-progress {
+  min-width: 86px;
+  padding: 0.32rem 0.8rem;
+  border-radius: 2px;
+  border: 1px solid rgba(214, 224, 248, 0.75);
+  background: rgba(6, 10, 26, 0.75);
+  color: #f2f5fc;
+  font-family: var(--np-sys-font);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: center;
+}
+/* The meter becomes the rule under the title, its fill a lit segment. */
+#np-layout[data-np-skin="system"] .np-card-meter {
+  height: 1px;
+  margin: 0 0 calc(1.25rem * var(--np-el));
+  border-radius: 0;
+  overflow: visible;
+  background: rgba(140, 165, 220, 0.3);
+}
+#np-layout[data-np-skin="system"] .np-card-meter > span {
+  height: 2px;
+  margin-top: -0.5px;
+  border-radius: 0;
+  background: linear-gradient(90deg, #6f9cf5, #b8d2ff);
+  box-shadow: 0 0 10px rgba(111, 156, 245, 0.95);
+}
+#np-layout[data-np-skin="system"] .np-q-text {
+  font-family: var(--np-sys-font);
+  font-size: calc(1.42rem * var(--np-fs));
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #f4f7fd;
+  text-shadow: 0 0 18px rgba(110, 150, 255, 0.25);
+}
+#np-layout[data-np-skin="system"] .np-q-instruction {
+  font-family: var(--np-sys-font);
+  font-size: calc(0.82rem * var(--np-fs));
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(170, 186, 224, 0.6);
+}
+
+/* ── Rows ───────────────────────────────────────────────────────── */
+#np-layout[data-np-skin="system"] .np-choices { gap: calc(0.42rem * var(--np-el)); }
+#np-layout[data-np-skin="system"] .np-choice {
+  --tone: #6f9cf5;
+  min-height: calc(48px * var(--np-el));
+  padding: calc(0.5rem * var(--np-el)) calc(0.85rem * var(--np-el));
+  gap: calc(0.8rem * var(--np-el));
+  border-radius: 2px;
+  border: 1px solid rgba(130, 150, 200, 0.1);
+  background: linear-gradient(180deg, rgba(56, 66, 98, 0.66), rgba(40, 48, 76, 0.66));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  font-family: var(--np-sys-font);
+  font-size: calc(1.1rem * var(--np-fs));
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: #e9eef9;
+}
+/* Rows read left to right, label against the icon, as a list does. */
+#np-layout[data-np-skin="system"] .np-choice:not(.np-tf) .np-choice-text { text-align: left; }
+#np-layout[data-np-skin="system"] .np-choice-key {
+  width: calc(26px * var(--np-el));
+  height: calc(26px * var(--np-el));
+  border-radius: 2px;
+  border: 1px solid rgba(170, 190, 235, 0.42);
+  border-bottom-width: 1px;
+  background: rgba(8, 12, 30, 0.45);
+  color: #c6d2ee;
+  font-family: var(--np-sys-font);
+  font-size: calc(0.82rem * var(--np-fs));
+}
+/* The round slot at the end of a row. */
+#np-layout[data-np-skin="system"] .np-choice-mark {
+  width: calc(24px * var(--np-el));
+  height: calc(24px * var(--np-el));
+  border: 1px solid rgba(170, 190, 235, 0.2);
+  background: rgba(255, 255, 255, 0.07);
+}
+#np-layout[data-np-skin="system"] .np-choice-mark svg { width: 14px; height: 14px; }
+#np-layout[data-np-skin="system"] .np-choice-multi .np-choice-mark { border-radius: 3px; border-width: 1.5px; }
+
+#np-layout[data-np-skin="system"] .np-choice:not(.is-locked):hover,
+#np-layout[data-np-skin="system"] .np-choice:focus-visible {
+  color: #fff;
+  border-color: rgba(143, 180, 255, 0.55);
+  background: linear-gradient(90deg, rgba(96, 138, 236, 0.34), rgba(62, 84, 146, 0.58) 42%, rgba(46, 56, 90, 0.72));
+  box-shadow: inset 3px 0 0 #8fb4ff, 0 0 18px -4px rgba(111, 156, 245, 0.75);
+}
+#np-layout[data-np-skin="system"] .np-choice:not(.is-locked):hover .np-choice-key,
+#np-layout[data-np-skin="system"] .np-choice:focus-visible .np-choice-key {
+  color: #fff;
+  border-color: transparent;
+  background: #6f9cf5;
+  box-shadow: 0 0 10px rgba(111, 156, 245, 0.85);
+}
+#np-layout[data-np-skin="system"] .np-choice:focus-visible::before { display: none; }
+#np-layout[data-np-skin="system"] .np-choice.is-selected {
+  color: #fff;
+  border-color: rgba(143, 180, 255, 0.7);
+  background: linear-gradient(90deg, rgba(96, 138, 236, 0.42), rgba(62, 84, 146, 0.6) 45%, rgba(46, 56, 90, 0.74));
+  box-shadow: inset 3px 0 0 #8fb4ff, 0 0 20px -4px rgba(111, 156, 245, 0.8);
+}
+#np-layout[data-np-skin="system"] .np-choice.is-correct {
+  --tone: #34d399;
+  color: #f0fdf7;
+  border-color: rgba(52, 211, 153, 0.6);
+  background: linear-gradient(90deg, rgba(16, 185, 129, 0.36), rgba(16, 120, 100, 0.24) 45%, rgba(40, 48, 76, 0.66));
+  box-shadow: inset 3px 0 0 #34d399, 0 0 20px -4px rgba(16, 185, 129, 0.85);
+}
+#np-layout[data-np-skin="system"] .np-choice.is-missed {
+  border-style: dashed;
+  background: rgba(16, 185, 129, 0.08);
+  box-shadow: inset 3px 0 0 rgba(52, 211, 153, 0.5);
+}
+#np-layout[data-np-skin="system"] .np-choice.is-wrong {
+  --tone: #f87171;
+  color: #fff5f5;
+  border-color: rgba(248, 113, 113, 0.6);
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.36), rgba(150, 40, 60, 0.26) 45%, rgba(40, 48, 76, 0.66));
+  box-shadow: inset 3px 0 0 #f87171, 0 0 20px -4px rgba(239, 68, 68, 0.85);
+}
+#np-layout[data-np-skin="system"] .np-choice.is-dim { opacity: 0.38; }
+/* The keycap takes the row's verdict too. */
+#np-layout[data-np-skin="system"] .np-choice.is-selected .np-choice-key { color: #fff; border-color: transparent; background: #6f9cf5; }
+#np-layout[data-np-skin="system"] .np-choice.is-correct:not(.is-missed) .np-choice-key { color: #fff; border-color: transparent; background: #10b981; box-shadow: 0 0 10px rgba(16, 185, 129, 0.7); }
+#np-layout[data-np-skin="system"] .np-choice.is-wrong .np-choice-key { color: #fff; border-color: transparent; background: #ef4444; box-shadow: 0 0 10px rgba(239, 68, 68, 0.7); }
+#np-layout[data-np-skin="system"] .np-choice.is-missed .np-choice-key { color: #34d399; border: 1px dashed rgba(52, 211, 153, 0.7); background: transparent; }
+#np-layout[data-np-skin="system"] .np-choice::after {
+  background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%),
+    rgba(170, 200, 255, 0.18), rgba(170, 200, 255, 0.04) 30%, transparent 60%);
+}
+
+/* True / False keeps its two big tiles, in the same material. */
+#np-layout[data-np-skin="system"] .np-choice.np-tf {
+  min-height: calc(116px * var(--np-el));
+  font-size: calc(1.3rem * var(--np-fs));
+  letter-spacing: 0.04em;
+}
+#np-layout[data-np-skin="system"] .np-tf .np-choice-key { top: 8px; left: 8px; }
+/* Each tile keeps its own colour until it is graded, when right and wrong take over. */
+#np-layout[data-np-skin="system"] .np-tf[data-tone="true"]:not(.is-correct):not(.is-wrong) { --tone: #34d399; }
+#np-layout[data-np-skin="system"] .np-tf[data-tone="false"]:not(.is-correct):not(.is-wrong) { --tone: #f87171; }
+#np-layout[data-np-skin="system"] .np-tf:not(.is-locked):hover {
+  border-color: color-mix(in srgb, var(--tone) 60%, transparent);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--tone) 22%, transparent), rgba(40, 48, 76, 0.7));
+  box-shadow: inset 0 3px 0 var(--tone), 0 0 20px -4px var(--tone);
+}
+#np-layout[data-np-skin="system"] .np-tf:not(.is-locked):hover .np-choice-key { background: var(--tone); }
+
+/* Typed answers, matching and the buttons share the window's hard edges. */
+#np-layout[data-np-skin="system"] .np-text-input-area {
+  border-radius: 2px;
+  border-color: rgba(170, 190, 235, 0.35);
+  background: rgba(6, 10, 26, 0.72);
+}
+#np-layout[data-np-skin="system"] .np-match-item {
+  border-radius: 2px;
+  background: linear-gradient(180deg, rgba(56, 66, 98, 0.66), rgba(40, 48, 76, 0.66));
+  font-family: var(--np-sys-font);
+  font-size: calc(1.02rem * var(--np-fs));
+  font-weight: 600;
+}
+#np-layout[data-np-skin="system"] .np-match-head,
+#np-layout[data-np-skin="system"] .np-pairs-key-title { font-family: var(--np-sys-font); letter-spacing: 0.12em; }
+#np-layout[data-np-skin="system"] .np-pairs-key,
+#np-layout[data-np-skin="system"] .np-text-compare,
+#np-layout[data-np-skin="system"] .np-review-badge { border-radius: 2px; }
+#np-layout[data-np-skin="system"] .np-review-badge { font-family: var(--np-sys-font); font-size: calc(0.92rem * var(--np-fs)); }
+
+#np-layout[data-np-skin="system"] .np-confirm-btn,
+#np-layout[data-np-skin="system"] .np-nav-btn-next {
+  border-radius: 2px;
+  border: 1px solid rgba(165, 198, 255, 0.85);
+  background: linear-gradient(180deg, rgba(72, 112, 222, 0.62), rgba(40, 70, 170, 0.62));
+  box-shadow: 0 0 18px -2px rgba(90, 140, 255, 0.7), inset 0 0 14px rgba(140, 180, 255, 0.28);
+  font-family: var(--np-sys-font);
+  letter-spacing: 0.05em;
+}
+#np-layout[data-np-skin="system"] .np-confirm-btn:hover:not(:disabled),
+#np-layout[data-np-skin="system"] .np-nav-btn.np-nav-btn-next:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(86, 128, 236, 0.72), rgba(48, 80, 186, 0.72));
+  filter: none;
+  box-shadow: 0 0 24px -2px rgba(90, 140, 255, 0.85), inset 0 0 16px rgba(160, 195, 255, 0.35);
+}
+#np-layout[data-np-skin="system"] .np-nav-btn {
+  border-radius: 2px;
+  border-color: rgba(190, 205, 240, 0.42);
+  background: rgba(12, 18, 40, 0.78);
+  font-family: var(--np-sys-font);
+  font-size: calc(0.95rem * var(--np-fs));
+  letter-spacing: 0.04em;
+}
+#np-layout[data-np-skin="system"] .np-nav-btn:hover:not(:disabled) {
+  border-color: rgba(165, 198, 255, 0.8);
+  background: rgba(40, 62, 130, 0.55);
+}
+
+@media (max-width: 640px) {
+  #np-layout[data-np-skin="system"] .np-frame-deco { inset: -7px; }
+  /* The pane's gutter is 16px here; the spill would reach past it. */
+  #np-layout[data-np-skin="system"] .np-frame::before { left: -14px; width: 28px; }
+  #np-layout[data-np-skin="system"] .np-frame::after { right: -14px; width: 28px; }
+  .np-fd-hatch { width: 70px; }
+  .np-fd-hatch::after { display: none; }
+  /* No room to centre the title between the chips: it sits in the row. */
+  #np-layout[data-np-skin="system"] .np-q-label-text {
+    position: static;
+    transform: none;
+    font-size: calc(1.05rem * var(--np-fs));
+  }
+}
