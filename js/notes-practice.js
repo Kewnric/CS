@@ -1530,7 +1530,25 @@ function renderQuestion() {
     if (textInput && !isAnswered && !reviewMode) {
       textInput.addEventListener('keydown', (e) => {
         // Enter submits, Shift+Enter inserts a newline
-        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); confirmTextAnswer(); }
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); confirmTextAnswer(); return; }
+        /* The box takes focus by itself, so left and right were swallowed by
+           it and the question could not be changed from the keyboard. Now an
+           arrow that has nowhere left to go -- the box is empty, or the caret
+           is already at that end -- steps OUT of the box instead, and the
+           next press moves question as it does everywhere else. Inside the
+           text the arrows still move the caret. Escape always steps out. */
+        const ta = e.currentTarget;
+        const caretAt = ta.selectionStart === ta.selectionEnd ? ta.selectionStart : -1;
+        const atEdge = (e.key === 'ArrowRight' && caretAt === ta.value.length)
+                    || (e.key === 'ArrowLeft' && caretAt === 0);
+        if (atEdge || e.key === 'Escape') {
+          e.preventDefault();
+          // Not this press as well: the page's own handler would see the box
+          // already blurred and move on the same keystroke.
+          e.stopPropagation();
+          ta.blur();
+          if (typeof npUiNudgeNav === 'function' && e.key !== 'Escape') npUiNudgeNav(e.key === 'ArrowRight' ? 1 : -1);
+        }
       });
       textInput.focus();
     }

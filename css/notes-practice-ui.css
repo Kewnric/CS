@@ -1241,7 +1241,7 @@
   position: absolute;
   top: 0;
   bottom: 0;
-  width: clamp(56px, 7%, 110px);
+  width: clamp(84px, 11%, 170px);
 }
 .np-edge-flash.is-back::before { left: 0; background: linear-gradient(90deg, color-mix(in srgb, var(--color-primary, #6366f1) 42%, transparent), transparent); box-shadow: inset 2px 0 0 color-mix(in srgb, var(--color-primary, #6366f1) 70%, transparent); }
 .np-edge-flash.is-next::before { right: 0; background: linear-gradient(270deg, color-mix(in srgb, var(--color-primary, #6366f1) 42%, transparent), transparent); box-shadow: inset -2px 0 0 color-mix(in srgb, var(--color-primary, #6366f1) 70%, transparent); }
@@ -2212,3 +2212,13 @@
     font-size: calc(1.05rem * var(--np-fs));
   }
 }
+
+/* Stepped out of the answer box with an arrow: the button the next press
+   will take pulses once, so the second press is expected rather than a guess. */
+#np-layout .np-nav-btn.np-nudge { animation: npNudge 0.85s var(--ease-expo-out, ease-out); }
+@keyframes npNudge {
+  0%   { box-shadow: 0 0 0 0 rgba(143, 180, 255, 0.85); }
+  45%  { box-shadow: 0 0 0 6px rgba(143, 180, 255, 0.25), 0 0 22px rgba(111, 156, 245, 0.7); }
+  100% { box-shadow: 0 0 0 10px rgba(143, 180, 255, 0); }
+}
+@media (prefers-reduced-motion: reduce) { #np-layout .np-nav-btn.np-nudge { animation: none; outline: 2px solid rgba(143, 180, 255, 0.8); } }

@@ -403,6 +403,16 @@ function npKbMove(delta) {
   return true;
 }
 
+/** Stepping out of the answer box: light the button the next arrow will press. */
+function npUiNudgeNav(dir) {
+  const btn = document.getElementById(dir > 0 ? 'np-btn-next' : 'np-btn-prev');
+  if (!btn || btn.disabled) return;
+  btn.classList.remove('np-nudge');
+  void btn.offsetWidth;
+  btn.classList.add('np-nudge');
+  setTimeout(() => btn.classList.remove('np-nudge'), 900);
+}
+
 /* ── Wrong answer: the cross rain ───────────────────────────────── */
 let _npUiXKey = '';
 
