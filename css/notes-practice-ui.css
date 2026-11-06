@@ -387,14 +387,20 @@
   box-shadow: 0 0 8px rgba(245, 158, 11, 0.9);
 }
 
+/* The grid's colour key, now the first thing inside the shortcuts dropdown. */
 .np-grid-legend {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem 0.85rem;
-  margin-top: 0.9rem;
-  font-size: 0.66rem;
-  color: var(--np-faint);
+  margin: 0.15rem 0 0.7rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  font-size: 0.68rem;
+  color: #8b949e;
+  animation: kbdSheetIn 0.26s cubic-bezier(0.16, 1, 0.3, 1);
 }
+@media (prefers-reduced-motion: reduce) { .np-grid-legend { animation: none; } }
+.np-review-note { margin: 0 0 0.6rem; font-size: 0.72rem; line-height: 1.45; color: #34d399; }
 .np-lg {
   display: inline-block;
   width: 9px;
@@ -407,6 +413,7 @@
 .np-lg-ok { background: #10b981; }
 .np-lg-bad { background: #ef4444; }
 .np-lg-flag { background: #f59e0b; border-radius: 50%; }
+.np-lg-open { background: rgba(148, 163, 184, 0.45); }
 
 /* Shortcuts, as keycaps rather than a sentence. */
 #np-layout .np-keys { padding-top: 1rem; }

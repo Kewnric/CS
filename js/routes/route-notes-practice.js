@@ -54,23 +54,38 @@ function notesPracticeTemplate() {
           <div class="np-grid-block">
             <h3 class="np-grid-title" id="np-current-section-title">Section</h3>
             <div id="np-question-grid" class="np-grid"></div>
-            <div class="np-grid-legend" aria-hidden="true">
-              <span><i class="np-lg np-lg-now"></i>Current</span>
-              <span><i class="np-lg np-lg-ok"></i>Correct</span>
-              <span><i class="np-lg np-lg-bad"></i>Wrong</span>
-              <span><i class="np-lg np-lg-flag"></i>Flagged</span>
-            </div>
           </div>
-          <div class="practice-footer np-keys" id="np-footer-text">
-            <div class="np-keys-title">Shortcuts</div>
-            <ul class="np-keys-list">
-              <li><span><kbd>1</kbd>–<kbd>9</kbd> or <kbd>A</kbd>–<kbd>E</kbd></span><em>answer</em></li>
-              <li><span><kbd>↑</kbd><kbd>↓</kbd> then <kbd class="np-kbd-wide">Enter</kbd></span><em>choose, confirm</em></li>
-              <li><span><kbd>←</kbd><kbd>→</kbd> or <kbd>P</kbd><kbd>N</kbd></span><em>move</em></li>
-              <li class="np-keys-rclick"><span><kbd class="np-kbd-wide">Right-click</kbd></span><em>left half back, right half on</em></li>
-              <li><span><kbd>F</kbd> <kbd>H</kbd></span><em>flag, hint</em></li>
-            </ul>
-            <p class="np-keys-note">Right-click the timer to change it.</p>
+          <!-- The coding attempt's footer (route-practice.js
+               practiceShortcutsTemplate): a "Keyboard shortcuts" dropdown with
+               the autosave chip beside it. Same classes, so it looks and
+               opens the same. The grid's colour key lives in the dropdown too,
+               rather than always taking a row under the grid. -->
+          <div class="practice-footer" id="np-footer-text">
+            <div class="practice-footer-row">
+              <details class="practice-shortcuts">
+                <summary><i data-lucide="keyboard" style="width:13px;height:13px;"></i> Keyboard shortcuts</summary>
+                <div class="np-grid-legend" aria-label="Question grid colours">
+                  <span><i class="np-lg np-lg-now"></i>Current</span>
+                  <span><i class="np-lg np-lg-open"></i>Opened</span>
+                  <span><i class="np-lg np-lg-ok"></i>Correct</span>
+                  <span><i class="np-lg np-lg-bad"></i>Wrong</span>
+                  <span><i class="np-lg np-lg-flag"></i>Flagged</span>
+                </div>
+                <div class="practice-kbd-grid">
+                  <span class="practice-kbd-row"><span class="practice-kbd-keys"><kbd>1-9</kbd><kbd>A-E</kbd></span><em>Answer</em></span>
+                  <span class="practice-kbd-row"><span class="practice-kbd-keys"><kbd>↑</kbd><kbd>↓</kbd></span><em>Choose</em></span>
+                  <span class="practice-kbd-row"><span class="practice-kbd-keys"><kbd>Enter</kbd></span><em>Confirm</em></span>
+                  <span class="practice-kbd-row"><span class="practice-kbd-keys"><kbd>←</kbd><kbd>→</kbd></span><em>Prev / next</em></span>
+                  <span class="practice-kbd-row"><span class="practice-kbd-keys"><kbd>P</kbd><kbd>N</kbd></span><em>Prev / next</em></span>
+                  <span class="practice-kbd-row"><span class="practice-kbd-keys"><kbd>F</kbd></span><em>Flag</em></span>
+                  <span class="practice-kbd-row"><span class="practice-kbd-keys"><kbd>H</kbd></span><em>Hint</em></span>
+                  <span class="practice-kbd-row"><span class="practice-kbd-keys"><kbd>Esc</kbd></span><em>Leave box</em></span>
+                  <span class="practice-kbd-row np-keys-rclick"><span class="practice-kbd-keys"><kbd>R-click</kbd></span><em>Half: move</em></span>
+                  <span class="practice-kbd-row"><span class="practice-kbd-keys"><kbd>R-click</kbd></span><em>Timer: edit</em></span>
+                </div>
+              </details>
+              <span class="ed-save-state" id="np-save-state" title="Your answers are saved on this device as you go"></span>
+            </div>
           </div>
         </div>
         <!-- The coding attempt's seam (editor.js paneDividerTemplate): drag to

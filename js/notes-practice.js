@@ -964,6 +964,8 @@ function npFlushProgress() {
       timeLimit: timeLimit || 0,
       shuffleSeed: npShuffleSeed
     }));
+    // The "Saved just now" chip beside the shortcuts, as the coding attempt has.
+    if (typeof npUiMarkSaved === 'function') npUiMarkSaved();
   } catch (e) { /* quota — the attempt still works, it just will not resume */ }
 }
 
@@ -2261,8 +2263,12 @@ function enterReviewMode() {
   }
 
   // Update footer
+  // A note above the shortcuts dropdown, not in place of it: the grid's
+  // colour key is in there, and review is when right and wrong matter most.
   const footer = document.getElementById('np-footer-text');
-  if (footer) footer.innerHTML = '<p style="color:#10b981;">Review mode — navigate questions to see correct answers highlighted.</p>';
+  if (footer && !footer.querySelector('.np-review-note')) {
+    footer.insertAdjacentHTML('afterbegin', '<p class="np-review-note">Review mode — move through the questions to see the right answers marked.</p>');
+  }
 
   // Re-render with review styling
   currentSectionIdx = 0;

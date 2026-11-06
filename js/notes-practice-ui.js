@@ -403,6 +403,36 @@ function npKbMove(delta) {
   return true;
 }
 
+/* ── "Saved · Ns ago", beside the shortcuts ─────────────────────
+   The coding attempt's chip (practice.js _bossMarkSaved / _renderSavedState),
+   with its own clock so the two screens never share a timestamp. */
+let _npUiSavedAt = 0;
+let _npUiSavedTick = null;
+
+function npUiMarkSaved() {
+  // Leaving the attempt saves one last time after the screen is torn down;
+  // that save must not start a ticker for a chip that no longer exists.
+  if (!_npUiRoot) return;
+  _npUiSavedAt = Date.now();
+  _npUiPaintSaved();
+  if (!_npUiSavedTick) _npUiSavedTick = setInterval(_npUiPaintSaved, 5000);
+}
+
+function _npUiPaintSaved() {
+  const el = document.getElementById('np-save-state');
+  if (!el) return;
+  if (!_npUiSavedAt) { el.textContent = ''; return; }
+  const secs = Math.round((Date.now() - _npUiSavedAt) / 1000);
+  const when = secs < 5 ? 'just now' : secs < 60 ? secs + 's ago' : Math.round(secs / 60) + 'm ago';
+  el.innerHTML = '<i data-lucide="check-circle-2" style="width:12px;height:12px;"></i> Saved ' + when;
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: el });
+}
+
+function _npUiStopSaved() {
+  if (_npUiSavedTick) { clearInterval(_npUiSavedTick); _npUiSavedTick = null; }
+  _npUiSavedAt = 0;
+}
+
 /** Stepping out of the answer box: light the button the next arrow will press. */
 function npUiNudgeNav(dir) {
   const btn = document.getElementById(dir > 0 ? 'np-btn-next' : 'np-btn-prev');
@@ -853,6 +883,7 @@ function npUiUnmount() {
   if (typeof _npDragCancel === 'function') _npDragCancel();
   if (typeof _npWatchMatching === 'function') _npWatchMatching(false);
   window.removeEventListener('resize', _npUiSaveSideWidth);
+  _npUiStopSaved();
   if (_npUiFrame) cancelAnimationFrame(_npUiFrame);
   _npUiFrame = 0;
   _npUiRoot = null;
