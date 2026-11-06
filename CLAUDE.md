@@ -280,6 +280,28 @@ rebuilding them restarts every phase, and that reads as the background snapping.
 
 ---
 
+## Stickers
+
+`js/stickers.js` + `css/stickers.css`: your own pictures placed on any screen. Opened from the
+small icon at the foot of the sidebar, the sticker button in the attempt topbars (coding,
+multi-problem, SQL, notebook), or Alt+Shift+S anywhere.
+
+- **Where one belongs:** `route` (body `data-route`), `host` (the pane it was dropped in, named by
+  id or tag+first stable class, `@n` if not unique; `page` = `#spa-content`) and `sub` — what a
+  library's **detail pane** shows (`STK_SUBS`: browse folder/program/set, notebook folder, …).
+  The tree pane and single-pane pages have no `sub`, so one set each. Attempt routes have no
+  `sub`, which is why every attempt of a kind shares its stickers.
+- **Cut at edges** stickers live inside their pane in `.stk-layer-back` (z -1, the pane isolated)
+  or `.stk-layer-front` (z 40), appended last, sized by JS to the pane's scroll content and
+  `overflow:hidden`, so they scroll natively and never grow the scrollbar. **Spill over** ones
+  live in fixed `#stk-float` (z 150) and follow their pane's scroll from a listener.
+- A pane gets `.stk-host` (+ `.stk-host-rel` if it was static) only while it holds a sticker.
+  A MutationObserver on `#spa-content` puts layers back after a pane re-renders.
+- Placements: localStorage `ssp.stickers`. Pictures: IndexedDB `ssp-stickers` (device only, not
+  in the data export). Huge pictures are scaled to 2000px once, as WebP.
+
+---
+
 ## Traps that have already cost time
 
 **Verify by measuring, not reasoning — then check the measurement.** Every

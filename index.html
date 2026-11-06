@@ -62,6 +62,7 @@
   <link rel="stylesheet" href="css/mobile.css">
   <link rel="stylesheet" href="css/motion.css">
   <link rel="stylesheet" href="css/hud.css">
+  <link rel="stylesheet" href="css/stickers.css">
 
   <!-- Pixel faces, used only by the Language run screen. -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -207,6 +208,13 @@
         </button>
       </div>
 
+      <!-- Stickers: your own pictures on any page (js/stickers.js). -->
+      <div class="sidebar-foot">
+        <button class="sidebar-stk-btn" id="sidebar-stk-btn" type="button" onclick="stkToggleMode()" data-stk-toggle
+                title="Stickers (Alt+Shift+S)" aria-label="Stickers" aria-pressed="false">
+          <i data-lucide="sticker" aria-hidden="true"></i>
+        </button>
+      </div>
     </nav>
 
     <main id="spa-content" tabindex="-1" role="main"></main>
@@ -718,6 +726,7 @@
   <script defer src="js/routes/route-notes-solution.js"></script>
   <script defer src="js/routes/route-visualization.js"></script>
   <script defer src="js/routes/route-quests.js"></script>
+  <script defer src="js/stickers.js"></script>
   <script defer src="js/routes/register.js"></script>
   <script defer src="js/firebase-auth.js"></script>
 

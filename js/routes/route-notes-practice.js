@@ -29,6 +29,7 @@ function notesPracticeTemplate() {
             <button id="np-spatial-btn" onclick="npUiToggleSpatial()" class="np-tb-btn np-sp" title="Spatial effects" aria-label="Spatial effects" aria-pressed="false"><i data-lucide="rotate-3d"></i></button>
             <button id="np-display-btn" onclick="npUiTogglePanel(event)" class="np-tb-btn np-sp" title="Display settings" aria-label="Display settings" aria-haspopup="dialog" aria-expanded="false"><i data-lucide="sliders-horizontal"></i></button>
             ${typeof ostButtonTemplate === 'function' ? ostButtonTemplate() : ''}
+            <button id="np-stk-btn" onclick="stkToggleMode()" class="np-tb-btn np-sp" title="Stickers (Alt+Shift+S)" aria-label="Stickers" aria-pressed="false" data-stk-toggle><i data-lucide="sticker"></i></button>
             <button id="np-fullscreen-btn" onclick="toggleFullscreen()" class="np-tb-btn np-sp" title="Full screen" aria-label="Full screen"><i data-lucide="maximize"></i></button>
           </div>
           <div id="np-timer-container" class="timer-display" role="button" tabindex="0" onclick="npTogglePause()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();npTogglePause();}" oncontextmenu="npTimerMenu(event)" title="Click to pause · right-click to change the timer"><i data-lucide="clock"></i><span id="np-timer-display">--:--</span></div>

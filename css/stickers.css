@@ -1,0 +1,608 @@
+/* ============================================================
+   STICKERS — pictures placed on any screen (js/stickers.js)
+   ============================================================
+
+   A pane that holds stickers is made the containing block for them and, so
+   that "behind" can mean behind its content and still above its background,
+   a stacking context. Only while it holds one: a page with no stickers is
+   exactly as it was. The page itself (#spa-content) is isolated only while it
+   holds a sticker behind its content, because an isolated page would keep its
+   own overlays under the sidebar.
+
+   The layers never grow a pane's scrollbars: js sizes them to the content and
+   they clip what hangs past the end. */
+
+.stk-host:not(#spa-content),
+#spa-content.stk-host-back {
+  isolation: isolate;
+}
+
+.stk-host-rel {
+  position: relative;
+}
+
+.stk-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Above the pane's background (and its ambient scene, which is earlier in
+   the pane and also -1), under every card and line of text in it. */
+.stk-layer-back {
+  z-index: -1;
+}
+
+/* Over the content, under anything in the pane that lifts itself higher
+   (an open menu, a sticky header with its own z-index above 40). */
+.stk-layer-front {
+  z-index: 40;
+}
+
+/* Spill-over stickers, and a sticker being carried between panes. Over the
+   sidebar, under the settings button, toasts and every modal. */
+#stk-float {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.stk-sticker {
+  position: absolute;
+  pointer-events: auto;
+  transform-origin: 50% 50%;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+}
+
+.stk-sticker > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+/* Locked: it stays put and every click goes straight through it. */
+.stk-sticker.is-locked {
+  pointer-events: none;
+  cursor: default;
+}
+
+.stk-sticker.is-lifted {
+  cursor: grabbing;
+  filter: drop-shadow(0 14px 22px rgba(0, 0, 0, 0.45));
+}
+
+/* Sticker mode: everything can be picked, locked ones included, and each one
+   shows where its box is. */
+body.stk-editing .stk-sticker {
+  pointer-events: auto;
+  outline: 1px dashed var(--color-accent);
+  outline-offset: 2px;
+}
+
+body.stk-editing .stk-sticker.is-locked {
+  cursor: pointer;
+  outline-color: var(--text-tertiary);
+}
+
+body.stk-editing .stk-sticker.is-locked::after {
+  content: '';
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  background: var(--bg-elevated) center / 11px 11px no-repeat
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='11' width='18' height='11' rx='2'/%3E%3Cpath d='M7 11V7a5 5 0 0 1 10 0v4'/%3E%3C/svg%3E");
+  border: 1px solid var(--border-color);
+}
+
+body.stk-dragging,
+body.stk-dragging * {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+/* ── Selection frame, handles and the pane outline ───────── */
+
+#stk-ui {
+  position: fixed;
+  inset: 0;
+  z-index: 960;
+  pointer-events: none;
+}
+
+.stk-frame {
+  position: absolute;
+  box-sizing: border-box;
+  border: 1.5px solid var(--color-accent);
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  transform-origin: 50% 50%;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: move;
+}
+
+.stk-frame[hidden],
+.stk-bar[hidden],
+.stk-target[hidden] {
+  display: none;
+}
+
+.stk-frame.is-locked {
+  border-style: dashed;
+  border-color: var(--text-tertiary);
+  cursor: default;
+}
+
+.stk-frame.is-locked .stk-h,
+.stk-frame.is-locked .stk-rot {
+  display: none;
+}
+
+.stk-h {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  background: #fff;
+  border: 2px solid var(--color-accent);
+  border-radius: 3px;
+  touch-action: none;
+}
+
+.stk-h[data-h="nw"] { left: -7px;  top: -7px;    cursor: nwse-resize; }
+.stk-h[data-h="ne"] { right: -7px; top: -7px;    cursor: nesw-resize; }
+.stk-h[data-h="sw"] { left: -7px;  bottom: -7px; cursor: nesw-resize; }
+.stk-h[data-h="se"] { right: -7px; bottom: -7px; cursor: nwse-resize; }
+
+.stk-rot {
+  position: absolute;
+  left: 50%;
+  top: -34px;
+  width: 16px;
+  height: 16px;
+  margin-left: -8px;
+  box-sizing: border-box;
+  border-radius: var(--radius-full);
+  background: var(--bg-elevated);
+  border: 2px solid var(--color-accent);
+  cursor: grab;
+  touch-action: none;
+}
+
+.stk-rot::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 14px;
+  width: 1.5px;
+  height: 18px;
+  margin-left: -0.75px;
+  background: var(--color-accent);
+}
+
+/* The pane a sticker will land in, while one is carried. */
+.stk-target {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px dashed var(--color-accent);
+  background: rgba(34, 211, 238, 0.05);
+  pointer-events: none;
+}
+
+.stk-target-label {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  color: var(--color-accent);
+  font: 700 11px/1.6 var(--font-sans);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ── The selected sticker's toolbar ──────────────────────── */
+
+.stk-bar {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg), inset 0 1px 1px rgba(255, 255, 255, 0.03);
+  pointer-events: auto;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+}
+
+.stk-bar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: 600 12px/1 var(--font-sans);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.stk-bar button:hover:not(:disabled) {
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--text-primary);
+}
+
+.stk-bar button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.stk-bar button.is-on {
+  color: var(--color-accent);
+  background: rgba(34, 211, 238, 0.12);
+}
+
+.stk-bar button.is-danger:hover {
+  color: var(--color-danger);
+  background: var(--color-danger-bg);
+}
+
+.stk-bar .stk-pill {
+  padding: 0 10px;
+  border: 1px solid var(--border-color);
+}
+
+.stk-sep {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--border-color);
+}
+
+.stk-op {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px;
+  color: var(--text-secondary);
+}
+
+.stk-op input[type="range"] {
+  width: 84px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.stk-op-val {
+  min-width: 34px;
+  font: 600 11px/1 var(--font-mono);
+  color: var(--text-tertiary);
+  text-align: right;
+}
+
+/* ── Sticker mode's tray ─────────────────────────────────── */
+
+.stk-tray {
+  position: fixed;
+  z-index: 965;
+  width: min(640px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 0.75rem 0.875rem 0.625rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl), inset 0 1px 1px rgba(255, 255, 255, 0.03);
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+}
+
+.stk-tray[hidden] {
+  display: none;
+}
+
+.stk-tray-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.stk-tray-head > * {
+  white-space: nowrap;
+}
+
+.stk-tray-grip {
+  display: inline-flex;
+  padding: 4px;
+  border-radius: 6px;
+  color: var(--text-tertiary);
+  cursor: grab;
+  touch-action: none;
+}
+
+.stk-tray-grip:hover {
+  color: var(--text-primary);
+  background: rgba(148, 163, 184, 0.15);
+}
+
+.stk-tray-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.stk-tray-title svg {
+  color: var(--color-accent);
+}
+
+.stk-tray-count {
+  font: 600 11px/1 var(--font-mono);
+  color: var(--text-tertiary);
+}
+
+.stk-tray-gap {
+  flex: 1;
+}
+
+.stk-tray-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font: 600 0.8125rem/1 var(--font-sans);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.stk-tray-btn:hover {
+  color: var(--text-primary);
+  background: rgba(148, 163, 184, 0.12);
+}
+
+.stk-tray-btn.is-primary {
+  border-color: transparent;
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+  color: var(--text-on-primary);
+  box-shadow: 0 2px 8px var(--color-primary-glow);
+}
+
+.stk-tray-btn.is-primary:hover {
+  background: linear-gradient(135deg, var(--color-primary-hover), var(--color-primary));
+}
+
+.stk-tray-label {
+  margin: 0.375rem 0 0.375rem;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.stk-strip {
+  display: flex;
+  gap: 8px;
+  min-height: 64px;
+  padding: 2px 2px 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.stk-strip-page {
+  min-height: 46px;
+}
+
+/* A faint check behind each picture, so a see-through one reads as such. */
+.stk-thumb,
+.stk-mini {
+  position: relative;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-surface);
+  background-image:
+    linear-gradient(45deg, rgba(148, 163, 184, 0.08) 25%, transparent 25%, transparent 75%, rgba(148, 163, 184, 0.08) 75%),
+    linear-gradient(45deg, rgba(148, 163, 184, 0.08) 25%, transparent 25%, transparent 75%, rgba(148, 163, 184, 0.08) 75%);
+  background-size: 12px 12px;
+  background-position: 0 0, 6px 6px;
+  cursor: grab;
+  touch-action: none;
+  transition: border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.stk-thumb {
+  width: 64px;
+  height: 64px;
+  padding: 5px;
+}
+
+.stk-mini {
+  width: 44px;
+  height: 44px;
+  padding: 4px;
+  cursor: pointer;
+}
+
+.stk-thumb:hover,
+.stk-mini:hover {
+  border-color: var(--color-accent);
+  transform: translateY(-1px);
+}
+
+.stk-mini.is-on {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+.stk-thumb img,
+.stk-mini img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.stk-thumb-x {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.stk-thumb:hover .stk-thumb-x,
+.stk-thumb:focus-within .stk-thumb-x {
+  display: inline-flex;
+}
+
+.stk-thumb-x:hover {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.stk-mini-tags {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  display: inline-flex;
+  gap: 1px;
+  padding: 1px 2px;
+  border-radius: 4px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+
+.stk-empty {
+  align-self: center;
+  font-size: 0.8125rem;
+  color: var(--text-tertiary);
+}
+
+.stk-tray-hint {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}
+
+/* A picture on its way from the tray to the page. */
+.stk-ghost {
+  position: fixed;
+  z-index: 970;
+  opacity: 0.85;
+  pointer-events: none;
+  filter: drop-shadow(0 14px 22px rgba(0, 0, 0, 0.45));
+}
+
+.stk-ghost img {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.stk-ghost.is-cancel {
+  opacity: 0.35;
+}
+
+/* ── The buttons that open sticker mode ──────────────────── */
+
+/* Sidebar: one small icon at the foot of the rail, under the menu. */
+.sidebar-foot {
+  flex-shrink: 0;
+  padding: 0.5rem 0.5rem 1rem;
+}
+
+.sidebar-stk-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  margin-left: 8px;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.sidebar-stk-btn svg,
+.sidebar-stk-btn i {
+  width: 20px;
+  height: 20px;
+}
+
+.sidebar-stk-btn:hover {
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--text-primary);
+}
+
+[data-stk-toggle].is-on {
+  color: var(--color-accent);
+  background: rgba(34, 211, 238, 0.12);
+}
+
+@media (max-width: 640px) {
+  .stk-tray-count {
+    display: none;
+  }
+  .stk-bar {
+    flex-wrap: wrap;
+    max-width: calc(100vw - 16px);
+  }
+  .stk-op input[type="range"] {
+    width: 64px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stk-thumb,
+  .stk-mini {
+    transition: none;
+  }
+}

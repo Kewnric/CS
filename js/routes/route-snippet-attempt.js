@@ -30,6 +30,10 @@ function snippetAttemptTemplate() {
           <button class="btn btn-ghost practice-icon-btn" onclick="toggleFullscreen()" title="Full screen" id="fullscreen-toggle-btn" aria-label="Full screen" aria-pressed="false">
             <i data-lucide="maximize" style="width:16px;height:16px;" aria-hidden="true"></i>
           </button>
+          <!-- Stickers: the same set on every attempt of this kind (js/stickers.js). -->
+          <button class="btn btn-ghost practice-icon-btn" onclick="stkToggleMode()" title="Stickers (Alt+Shift+S)" aria-label="Stickers" aria-pressed="false" data-stk-toggle>
+            <i data-lucide="sticker" style="width:16px;height:16px;" aria-hidden="true"></i>
+          </button>
           <div class="timer-display">
             <i data-lucide="clock"></i><span id="sqa-timer">00:00</span>
             <button class="btn-pause-timer" id="sqa-pause-btn" onclick="sqaTogglePause()" title="Pause/Resume Timer">
