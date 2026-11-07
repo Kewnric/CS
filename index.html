@@ -570,6 +570,9 @@
        reading the library back depends on it, offline and from file:// too. -->
   <script defer src="vendor/fflate/fflate.min.js"></script>
   <script defer src="js/store-codec.js"></script>
+  <!-- Uploaded pictures (covers, question and cheat-sheet images) live in IndexedDB,
+       not in the 5 MB localStorage budget (js/media-store.js). -->
+  <script defer src="js/media-store.js"></script>
   <script defer src="js/constants.js"></script>
   <script defer src="js/state.js"></script>
   <script defer src="js/utils.js"></script>

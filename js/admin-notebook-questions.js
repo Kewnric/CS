@@ -429,18 +429,23 @@ function nbqUndo() {
   nbqRerender();
 }
 
-/* ---- Images ---- */
+/* ---- Images ----
+   Uploads go to the picture store (js/media-store.js); the question keeps its
+   reference. A pasted web address is kept as it is. */
+(window.MEDIA_READERS = window.MEDIA_READERS || {})['admin-notebook-questions'] = true;
+
 function nbqUploadImage(i, input) {
   const file = input.files && input.files[0];
   if (!file || !nbqDraft[i]) return;
   if (!/^image\//.test(file.type)) { if (typeof toast === 'function') toast('Please choose an image file.', { type: 'error' }); return; }
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const done = (url) => { if (nbqDraft[i]) { nbqDraft[i].image = url; nbqRerender(); } };
-    if (typeof _downscaleImage === 'function') _downscaleImage(e.target.result, 800, 0.72, done);
-    else done(e.target.result);
-  };
-  reader.readAsDataURL(file);
+  const target = nbqDraft[i];
+  input.value = '';
+  mediaUpload(file).then((ref) => {
+    // The same question, even if it moved or the list was rebuilt meanwhile.
+    if (nbqDraft.indexOf(target) === -1) return;
+    target.image = ref;
+    nbqRerender();
+  }).catch(() => { if (typeof toast === 'function') toast('That picture could not be read.', { type: 'error' }); });
 }
 
 function nbqSetImageUrl(i, value) {
@@ -607,7 +612,7 @@ function _nbqCardHtml(d, i, n) {
           <span>Image</span>
           ${img ? `
             <div class="nbq-image-set">
-              <img src="${escapeHTML(img)}" alt="" />
+              <img src="${escapeHTML(mediaSrc(img, 'thumb'))}" alt="" />
               <button type="button" class="btn btn-ghost btn-sm" onclick="document.getElementById('nbq-file-${i}').click()">Replace</button>
               <button type="button" class="btn btn-ghost btn-sm nbq-image-remove" onclick="nbqClearImage(${i})">Remove</button>
             </div>` : `

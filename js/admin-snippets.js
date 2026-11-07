@@ -243,10 +243,12 @@ function openStudyForm(id) {
   }
 }
 
-/* ---- Snippet cover image (a downscaled data URL, as the notebooks do) ----
+/* ---- Snippet cover image (in the picture store, as the notebooks do) ----
    Deliberately the same three functions and the same markup: two libraries
    already had this and a third variant of it would only be a third thing to
-   keep in step. _downscaleImage is shared. */
+   keep in step. mediaUpload (js/media-store.js) is shared. */
+(window.MEDIA_READERS = window.MEDIA_READERS || {})['admin-snippets'] = true;
+
 function renderStudyCover() {
   const host = document.getElementById('study-cover-field');
   if (!host || !studyModeState) return;
@@ -255,7 +257,7 @@ function renderStudyCover() {
     <input type="file" id="study-cover-input" accept="image/*" class="hidden" onchange="handleStudyCoverUpload(this)" />
     ${img ? `
       <div class="nb-cover-preview">
-        <img src="${img}" alt="Cover preview" />
+        <img src="${mediaSrc(img, 'thumb')}" alt="Cover preview" />
         <div class="nb-cover-actions">
           <button type="button" class="btn btn-sm" onclick="document.getElementById('study-cover-input').click()"><i data-lucide="repeat" style="width:13px;height:13px;"></i> Replace</button>
           <button type="button" class="btn btn-sm nb-cover-remove" onclick="removeStudyCover()"><i data-lucide="trash-2" style="width:13px;height:13px;"></i> Remove</button>
@@ -265,7 +267,7 @@ function renderStudyCover() {
       <button type="button" class="nb-cover-drop" onclick="document.getElementById('study-cover-input').click()">
         <i data-lucide="image-plus"></i>
         <span>Upload a cover image</span>
-        <small>PNG / JPG — automatically resized to keep your data small</small>
+        <small>PNG, JPG or WebP. Kept with your pictures, not in your 5 MB of data</small>
       </button>
     `}
   `;
@@ -279,16 +281,17 @@ function handleStudyCoverUpload(input) {
     if (typeof showMessage === 'function') showMessage('Error', 'Please choose an image file.', true);
     return;
   }
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    _downscaleImage(e.target.result, 960, 0.82, (dataUrl) => {
-      studyModeState.coverImage = dataUrl;
-      window.adminIsDirty = true;
-      if (typeof setSaveStatus === 'function') setSaveStatus('study-save-status', 'unsaved');
-      renderStudyCover();
-    });
-  };
-  reader.readAsDataURL(file);
+  const target = studyModeState;
+  input.value = '';
+  mediaUpload(file).then((ref) => {
+    if (studyModeState !== target) return;
+    studyModeState.coverImage = ref;
+    window.adminIsDirty = true;
+    if (typeof setSaveStatus === 'function') setSaveStatus('study-save-status', 'unsaved');
+    renderStudyCover();
+  }).catch(() => {
+    if (typeof showMessage === 'function') showMessage('Error', 'That picture could not be read. Try a PNG, JPG or WebP file.', true);
+  });
 }
 
 function removeStudyCover() {

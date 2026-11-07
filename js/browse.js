@@ -9,6 +9,9 @@ let ctxTargetNodeId = null; // For context menu
 let _browseContainerCtxHandler = null; // Named reference for removing duplicate listeners
 let _browseSearchTimer = null;
 
+// Covers are picture-store references (js/media-store.js), drawn through mediaSrc.
+(window.MEDIA_READERS = window.MEDIA_READERS || {})['browse'] = true;
+
 /** Debounced browse search — avoids re-rendering the entire tree on every keystroke. */
 function debouncedBrowseSearch() {
   clearTimeout(_browseSearchTimer);
@@ -666,7 +669,7 @@ function _buildChallengeCard(c, query) {
   // whenever the two disagree.
   const slipped = lastScore >= 0 && bestScore >= 0 && lastScore < bestScore;
   const coverHtml = c.coverImage
-    ? `<div class="nb-card-cover"><img src="${c.coverImage}" alt="" loading="lazy" /></div>`
+    ? `<div class="nb-card-cover"><img src="${mediaSrc(c.coverImage, 'thumb')}" alt="" loading="lazy" decoding="async" /></div>`
     : libCoverFallbackHTML(c.title, 'file-code-2');
   const resumable = browseHasResumable(c);
   const selecting = libSelectMode('browse');
@@ -1381,7 +1384,7 @@ function _renderProgramDetail(container, c) {
   breadcrumbHtml += `<span class="breadcrumb-current">${escapeHTML(c.title)}</span></nav>`;
 
   const coverHtml = c.coverImage
-    ? `<div class="prog-detail-cover"><img src="${c.coverImage}" alt="" /></div>`
+    ? `<div class="prog-detail-cover"><img src="${mediaSrc(c.coverImage)}" alt="" decoding="async" /></div>`
     : '';
 
   const variantsHtml = (c.variants || []).map((v, i) => {

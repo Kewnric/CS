@@ -6,6 +6,9 @@ let activeHistoryChallengeId = null;
 let activeHistorySetId = null;
 let activeAnalyticsTab = 'training';
 let activeNotebookHistoryId = null;
+
+// Covers are picture-store references (js/media-store.js), drawn through mediaSrc.
+(window.MEDIA_READERS = window.MEDIA_READERS || {})['history'] = true;
 let activeSnippetHistoryId = null;
 let _snippetHistoryItemMap = {};
 let activeAnalyticsFolderId = null;
@@ -1965,7 +1968,7 @@ window.renderAnalyticsFolderDetail = function(folderId, scope) {
       const bestScore = attemptsCount > 0 ? Math.max(...logs.map(l => l.score)) : -1;
       const isPerfect = bestScore === 100;
       const scoreClass = bestScore === 100 ? 'score-perfect' : bestScore >= 50 ? 'score-partial' : 'score-low';
-      const coverHtml = c.coverImage ? `<div class="nb-card-cover"><img src="${c.coverImage}" alt="" loading="lazy" /></div>` : '';
+      const coverHtml = c.coverImage ? `<div class="nb-card-cover"><img src="${mediaSrc(c.coverImage, 'thumb')}" alt="" loading="lazy" decoding="async" /></div>` : '';
 
       cardsHtml += `
         <div class="card card-enhanced${c.coverImage ? ' has-cover' : ''}" onclick="showHistoryDetail('${c.id}')" style="cursor: pointer;">
@@ -1998,7 +2001,7 @@ window.renderAnalyticsFolderDetail = function(folderId, scope) {
       const bestScore = getBestNotebookScore(logs);
       const isPerfect = bestScore === 100;
       const scoreClass = bestScore >= 80 ? 'score-perfect' : bestScore >= 50 ? 'score-partial' : 'score-low';
-      const coverHtml = nb.coverImage ? `<div class="nb-card-cover"><img src="${nb.coverImage}" alt="" loading="lazy" /></div>` : '';
+      const coverHtml = nb.coverImage ? `<div class="nb-card-cover"><img src="${mediaSrc(nb.coverImage, 'thumb')}" alt="" loading="lazy" decoding="async" /></div>` : '';
 
       cardsHtml += `
         <div class="card card-enhanced${nb.coverImage ? ' has-cover' : ''}" onclick="showNotebookHistoryDetail('${nb.id}')" style="cursor: pointer;">

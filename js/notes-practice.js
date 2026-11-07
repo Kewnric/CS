@@ -6,6 +6,9 @@ let activeNotebook = null;
 let timeLimit = 0;
 let timeRemaining = 0;
 let timerInterval = null;
+
+// Question pictures are picture-store references (js/media-store.js), drawn through mediaSrc.
+(window.MEDIA_READERS = window.MEDIA_READERS || {})['notes-practice'] = true;
 let practiceStartTime = null;
 let npFinishedAt = null;   // set when every question is answered — timer pauses here
 
@@ -1675,7 +1678,7 @@ function renderQuestion() {
   const qImage = document.getElementById('np-q-image');
   if (qImageContainer && qImage) {
     if (correctObj && correctObj.image && correctObj.image.trim() !== '') {
-      qImage.src = correctObj.image.trim();
+      qImage.src = mediaSrc(correctObj.image.trim());
       qImageContainer.classList.remove('hidden');
     } else {
       qImage.src = '';

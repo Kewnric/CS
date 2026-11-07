@@ -105,7 +105,11 @@ function openAdminForm(id) {
   }
 }
 
-/* ---- Program cover image (stored as a downscaled data URL, like notebooks) ---- */
+/* ---- Program cover image ----
+   Stored in the picture store (js/media-store.js); the program keeps only its
+   reference, so a cover no longer counts against the 5 MB of saved data. */
+(window.MEDIA_READERS = window.MEDIA_READERS || {})['admin-form'] = true;
+
 function renderAdminCover() {
   const host = document.getElementById('admin-cover-field');
   if (!host || !adminState) return;
@@ -114,7 +118,7 @@ function renderAdminCover() {
     <input type="file" id="admin-cover-input" accept="image/*" class="hidden" onchange="handleAdminCoverUpload(this)" />
     ${img ? `
       <div class="nb-cover-preview">
-        <img src="${img}" alt="Cover preview" />
+        <img src="${mediaSrc(img, 'thumb')}" alt="Cover preview" />
         <div class="nb-cover-actions">
           <button type="button" class="btn btn-sm" onclick="document.getElementById('admin-cover-input').click()"><i data-lucide="repeat" style="width:13px;height:13px;"></i> Replace</button>
           <button type="button" class="btn btn-sm nb-cover-remove" onclick="removeAdminCover()"><i data-lucide="trash-2" style="width:13px;height:13px;"></i> Remove</button>
@@ -124,7 +128,7 @@ function renderAdminCover() {
       <button type="button" class="nb-cover-drop" onclick="document.getElementById('admin-cover-input').click()">
         <i data-lucide="image-plus"></i>
         <span>Upload a cover image</span>
-        <small>PNG / JPG — automatically resized to keep your data small</small>
+        <small>PNG, JPG or WebP. Kept with your pictures, not in your 5 MB of data</small>
       </button>
     `}
   `;
@@ -138,16 +142,18 @@ function handleAdminCoverUpload(input) {
     if (typeof showMessage === 'function') showMessage('Error', 'Please choose an image file.', true);
     return;
   }
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    _downscaleImage(e.target.result, 960, 0.82, (dataUrl) => {
-      adminState.coverImage = dataUrl;
-      window.adminIsDirty = true;
-      setSaveStatus('admin-save-status', 'unsaved');
-      renderAdminCover();
-    });
-  };
-  reader.readAsDataURL(file);
+  // The form may have moved to another program by the time the picture is stored.
+  const target = adminState;
+  input.value = '';
+  mediaUpload(file).then((ref) => {
+    if (adminState !== target) return;
+    adminState.coverImage = ref;
+    window.adminIsDirty = true;
+    setSaveStatus('admin-save-status', 'unsaved');
+    renderAdminCover();
+  }).catch(() => {
+    if (typeof showMessage === 'function') showMessage('Error', 'That picture could not be read. Try a PNG, JPG or WebP file.', true);
+  });
 }
 
 function removeAdminCover() {

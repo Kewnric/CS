@@ -59,14 +59,28 @@ function handleDataExport() {
   if (typeof questState !== 'undefined') {
     data.quests = { quests: questState.quests, player: questState.player, lastLoginDate: questState.lastLoginDate };
   }
-  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `code_platform_backup_${new Date().toISOString().split('T')[0]}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
-  showMessage("Export Complete", "Your data has been downloaded as a JSON backup file.");
+  const finish = (json) => {
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `code_platform_backup_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showMessage("Export Complete", "Your data has been downloaded as a JSON backup file.");
+  };
+  /* Covers and other pictures are saved as references to the picture store
+     (js/media-store.js), which only this device has. The backup gets the
+     pictures themselves, so it is complete on its own. */
+  const json = JSON.stringify(data);
+  if (typeof mediaInlineText === 'function' && json.indexOf('media:') !== -1) {
+    mediaInlineText(json).then(finish, (err) => {
+      console.warn('[Export] Pictures could not be added; exporting without them.', err);
+      finish(json);
+    });
+  } else {
+    finish(json);
+  }
 }
 
 function handleDataImport(e) {
@@ -92,7 +106,7 @@ function handleDataImport(e) {
       showMessage("Error", "Failed to read the file. Please try again.", true);
     };
 
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       try {
         let parsed;
         try {
@@ -122,6 +136,13 @@ function handleDataImport(e) {
           showMessage("Error", "Invalid backup file: one or more fields have unexpected types. The file may be corrupted.", true);
           if (exportBtn) exportBtn.disabled = false;
           return;
+        }
+
+        /* Pictures in the backup go to the picture store before anything is
+           written, so a backup with many of them still fits the 5 MB of saved
+           data (js/media-store.js). On any failure they simply stay inline. */
+        if (typeof mediaAbsorbBackup === 'function') {
+          try { await mediaAbsorbBackup(parsed); } catch (err) { console.warn('[Import] Pictures stay inside the save:', err); }
         }
 
         /* The state below replaces whatever could not be read, so this is the

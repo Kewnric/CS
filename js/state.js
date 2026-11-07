@@ -440,6 +440,10 @@ function _flushSaveData(opts) {
     }
   };
   const json = JSON.stringify(dataToSave);
+  /* A picture still saved inline -- an import, a cloud copy from an older
+     device, an older cached upload form -- is moved to the picture store
+     (js/media-store.js). Checked before the write, which it may be filling. */
+  if (json.indexOf('data:image/') !== -1 && typeof mediaSweepSoon === 'function') mediaSweepSoon();
   /* Stored compressed (js/store-codec.js). The ordinary, debounced save is
      compressed and checked in the background so the page does not stall; a
      save made as the tab hides or closes, or by any caller that needs it

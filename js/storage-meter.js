@@ -10,9 +10,10 @@
      5,242,880 characters), counted in characters, not bytes. This is the one
      that can run out, so it is shown first, with what is using it.
 
-   - Everything else — IndexedDB (the sticker pictures) and Cache Storage (the
-     offline copy of the app) — shares a far larger allowance, a part of the
-     disk, which navigator.storage.estimate() reports.
+   - Everything else — IndexedDB (the pictures: covers, question and
+     cheat-sheet images from js/media-store.js, and the stickers) and Cache
+     Storage (the offline copy of the app) — shares a far larger allowance, a
+     part of the disk, which navigator.storage.estimate() reports.
 
    Painted when Settings opens. Nothing here runs otherwise.
    ============================================================ */
@@ -96,18 +97,24 @@ async function storageMeterPaint() {
     return;
   }
   try {
-    const [est, pics] = await Promise.all([
+    const [est, pics, media, kept] = await Promise.all([
       navigator.storage.estimate(),
       typeof stkPictureBytes === 'function' ? stkPictureBytes() : Promise.resolve(0),
+      typeof mediaUsage === 'function' ? mediaUsage().catch(() => null) : Promise.resolve(null),
+      navigator.storage.persisted ? navigator.storage.persisted().catch(() => null) : Promise.resolve(null),
     ]);
     const used = est.usage || 0, quota = est.quota || 0;
     const d = est.usageDetails || {};
     const notes = [_stoSize(Math.max(0, quota - used)) + ' left'];
+    if (media && media.count) notes.push('Covers and images ' + _stoSize(media.bytes));
     if (pics) notes.push('Sticker pictures ' + _stoSize(pics));
     if (d.caches) notes.push('Offline copy ' + _stoSize(d.caches));
     otherBox.innerHTML = _stoBlock('Pictures and offline copy', used, quota, _stoSize(quota), notes);
-    otherBox.title = 'Sticker pictures and the copy of the app kept for working offline. ' +
-      'The browser lets this grow to a share of the disk.';
+    otherBox.title = 'Covers, question and cheat-sheet images, sticker pictures, and the copy of the app kept ' +
+      'for working offline. The browser lets this grow to a share of the disk.' +
+      (media && media.count ? '\n' + media.count + ' cover and image file' + (media.count === 1 ? '' : 's') + ', ' + _stoSize(media.bytes) + '.' : '') +
+      (kept === true ? '\nProtected: the browser will not clear it to free up disk space.'
+        : kept === false ? '\nNot protected: if the disk gets nearly full the browser may clear this site\'s storage. Export a backup now and then.' : '');
   } catch (e) {
     otherBox.innerHTML = '<span class="sto-note">Pictures and the offline copy: not available here.</span>';
   }

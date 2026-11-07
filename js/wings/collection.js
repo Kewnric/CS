@@ -51,7 +51,7 @@ wingRegister('collection', {
     return wingShell(w, `
       <div class="wing-cat-cover">
         ${cover
-          ? `<img src="${escapeHTML(cover)}" alt="" loading="lazy" />`
+          ? `<img src="${escapeHTML(mediaSrc(cover, 'thumb'))}" alt="" loading="lazy" decoding="async" />`
           : (typeof libCoverFallbackHTML === 'function'
               ? libCoverFallbackHTML(w.title, WING_MEDIUM_ICONS[medium] || 'box')
               : '')}
@@ -103,3 +103,6 @@ wingSeedRegister('collection', [
       data: { medium: 'Other', creator: 'Rich Hickey', year: '2011', rating: 5, status: 'Backlog' },
       tags: ['design'] }
   ]);
+
+// The cover field holds a picture-store reference (js/media-store.js), drawn through mediaSrc.
+(window.MEDIA_READERS = window.MEDIA_READERS || {})['wings-collection'] = true;

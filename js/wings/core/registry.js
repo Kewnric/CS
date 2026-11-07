@@ -272,16 +272,16 @@ function wingFieldEditorHTML(f, w) {
   }
 
   /* An image field, for the one wing that catalogues things with covers.
-     The value is a downscaled data URL held on the preview element, read back
-     by wingReadFieldValues — the same shape and the same _downscaleImage the
-     other libraries' covers use, rather than a second way of storing a
-     picture. */
+     The value is a picture-store reference (js/media-store.js) held on the
+     preview element, read back by wingReadFieldValues — the same shape and the
+     same mediaUpload the other libraries' covers use, rather than a second way
+     of storing a picture. */
   if (f.type === 'image') {
     const cur = raw || '';
     return `<div class="af-field af-field-wide">${label}
       <div class="wing-img-field" id="${id}" data-value="${escapeHTML(cur)}">
         <div class="wing-img-preview">
-          ${cur ? `<img src="${escapeHTML(cur)}" alt="" />`
+          ${cur ? `<img src="${escapeHTML(mediaSrc(cur, 'thumb'))}" alt="" />`
                 : `<span class="wing-img-empty"><i data-lucide="image"></i> No image</span>`}
         </div>
         <div class="wing-img-actions">
@@ -718,20 +718,15 @@ function wingImagePick(key, input) {
     if (typeof toast === 'function') toast('That is not an image file.', { type: 'warning' });
     return;
   }
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    const done = (dataUrl) => {
-      host.dataset.value = dataUrl;
-      const prev = host.querySelector('.wing-img-preview');
-      if (prev) prev.innerHTML = `<img src="${dataUrl}" alt="" />`;
-      const rm = host.querySelector('.wing-img-actions button');
-      if (rm) rm.disabled = false;
-      if (typeof wingMarkDirty === 'function') wingMarkDirty();
-    };
-    if (typeof _downscaleImage === 'function') _downscaleImage(e.target.result, 640, 0.82, done);
-    else done(e.target.result);
-  };
-  reader.readAsDataURL(file);
+  mediaUpload(file).then((ref) => {
+    if (!host.isConnected) return;       // the form was closed meanwhile
+    host.dataset.value = ref;
+    const prev = host.querySelector('.wing-img-preview');
+    if (prev) prev.innerHTML = `<img src="${escapeHTML(mediaSrc(ref, 'thumb'))}" alt="" />`;
+    const rm = host.querySelector('.wing-img-actions button');
+    if (rm) rm.disabled = false;
+    if (typeof wingMarkDirty === 'function') wingMarkDirty();
+  }).catch(() => { if (typeof toast === 'function') toast('That picture could not be read.', { type: 'warning' }); });
   input.value = '';        // so choosing the same file twice still fires
 }
 
@@ -746,3 +741,6 @@ function wingImageClear(key) {
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: host });
   if (typeof wingMarkDirty === 'function') wingMarkDirty();
 }
+
+// Image fields hold picture-store references (js/media-store.js), drawn through mediaSrc.
+(window.MEDIA_READERS = window.MEDIA_READERS || {})['wings-registry'] = true;

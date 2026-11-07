@@ -6,6 +6,9 @@ let activeSnippetId = null;
 let activeSnippetFolderId = getSessionParam('studyOpenCat') || null;
 let currentSnippetVariants = [];
 let activeExampleIndex = 0;
+
+// Covers are picture-store references (js/media-store.js), drawn through mediaSrc.
+(window.MEDIA_READERS = window.MEDIA_READERS || {})['study'] = true;
 let tryCodingTargetCodes = [];
 let tryCodingTargetStarterCode = '';
 let snippetCtxTargetNodeId = null;
@@ -788,7 +791,7 @@ function renderSnippetFolderOverview(container) {
             // fallback when there is no image — since they were built. Without
             // one the snippet grid was the odd shape out on the Library page.
             const coverHtml = s.coverImage
-              ? `<div class="nb-card-cover"><img src="${s.coverImage}" alt="" loading="lazy" /></div>`
+              ? `<div class="nb-card-cover"><img src="${mediaSrc(s.coverImage, 'thumb')}" alt="" loading="lazy" decoding="async" /></div>`
               : (typeof libCoverFallbackHTML === 'function' ? libCoverFallbackHTML(s.title, 'code') : '');
             return `
               <div class="card card-enhanced has-cover${libIsSelected('snippet', s.id) ? ' lib-selected' : ''}"

@@ -2,6 +2,9 @@
    HOME.JS — Dashboard Homepage Rendering
    ============================================================ */
 
+// Covers are picture-store references (js/media-store.js), drawn through mediaSrc.
+(window.MEDIA_READERS = window.MEDIA_READERS || {})['home'] = true;
+
 // Local date helper — avoids UTC timezone shift from toISOString()
 const _toLocalDate = (d) => {
   const dt = new Date(d);
@@ -762,7 +765,7 @@ function _buildCarouselSlide(item, srcKey) {
   const hue = _notebookHue(item.title || item.id || '');
   const hasCover = !!item.coverImage;
   const bgStyle = hasCover
-    ? `background-image:url('${item.coverImage}');`
+    ? `background-image:url('${mediaSrc(item.coverImage)}');`
     : `background-image:linear-gradient(135deg, hsl(${hue} 70% 48%) 0%, hsl(${(hue + 45) % 360} 72% 38%) 100%);`;
 
   if (srcKey === 'coding') {

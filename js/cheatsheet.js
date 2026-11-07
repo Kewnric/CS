@@ -38,6 +38,9 @@ const cs = {
 
 const csNL = String.fromCharCode(10);   // newline, spelled out
 
+// Image blocks hold picture-store references (js/media-store.js), drawn through mediaSrc.
+(window.MEDIA_READERS = window.MEDIA_READERS || {}).cheatsheet = true;
+
 function csEsc(s) { return typeof escapeHTML === 'function' ? escapeHTML(String(s)) : String(s); }
 function csId(p) { return p + '_' + (typeof generateId === 'function' ? generateId() : Math.random().toString(36).slice(2)); }
 
@@ -61,7 +64,11 @@ function csLoad() {
 }
 
 function csSave() {
-  try { localStorage.setItem(csKey(), JSON.stringify({ sheets: cs.sheets })); }
+  const json = JSON.stringify({ sheets: cs.sheets });
+  // A picture still saved inline (an import, an older copy of this file) is
+  // moved to the picture store -- before the write, which it may be filling.
+  if (json.indexOf('data:image/') !== -1 && typeof mediaSweepSoon === 'function') mediaSweepSoon();
+  try { localStorage.setItem(csKey(), json); }
   catch (e) {
     // A silent failure here loses written notes, which is the worst thing this
     // file could do quietly.
@@ -324,30 +331,10 @@ function csMarkdown(src) {
 }
 
 /* ── Images ────────────────────────────────────────────────────
-   Stored as data URIs, so a couple of phone screenshots could fill the whole
-   quota. Downscaled on the way in rather than warned about afterwards. */
-const CS_IMG_MAX = 1400;
-
-function csReadImageScaled(file, done) {
-  const r = new FileReader();
-  r.onload = () => {
-    const img = new Image();
-    img.onload = () => {
-      const scale = Math.min(1, CS_IMG_MAX / Math.max(img.width, img.height));
-      if (scale === 1 && r.result.length < 400000) { done(r.result); return; }
-      const c = document.createElement('canvas');
-      c.width = Math.round(img.width * scale);
-      c.height = Math.round(img.height * scale);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      let out;
-      try { out = c.toDataURL('image/jpeg', 0.82); } catch (e) { out = r.result; }
-      done(out.length < r.result.length ? out : r.result);
-    };
-    img.onerror = () => done(r.result);
-    img.src = r.result;
-  };
-  r.readAsDataURL(file);
-}
+   These used to be data URIs inside the sheet, so a couple of phone
+   screenshots could fill the whole quota -- and each revision snapshot held
+   another copy. They are now in the picture store (js/media-store.js), scaled
+   once on the way in; the block and its snapshots hold a short reference. */
 
 /* ── Library view ──────────────────────────────────────────── */
 
@@ -748,7 +735,7 @@ function csBlockHTML(b, i, ro) {
       </div>`}`;
   } else if (b.type === 'image') {
     body = b.src
-      ? `<img class="cs-img" src="${csEsc(b.src)}" alt="${csEsc(b.caption || '')}">
+      ? `<img class="cs-img" src="${csEsc(mediaSrc(b.src))}" alt="${csEsc(b.caption || '')}" decoding="async">
          <div class="cs-cap" ${ce} data-b="${i}" data-f="caption" data-ph="Caption">${csEsc(b.caption || '')}</div>`
       : `<div class="cs-drop" ondragover="event.preventDefault()" ondrop="csDropImage(event,${i})">
            <i data-lucide="image"></i>
@@ -1378,10 +1365,14 @@ window.csDropImage = function (e, i) {
   if (f) csReadImage(f, i);
 };
 function csReadImage(file, i) {
-  csReadImageScaled(file, (src) => {
-    const b = csPage().blocks[i];
-    if (b) { b.src = src; csTouch(); csRender(); }
-  });
+  const target = csPage().blocks[i];
+  if (!target) return;
+  mediaUpload(file).then((src) => {
+    // Still the same block: the page may have been switched or edited meanwhile.
+    const p = csPage();
+    if (!p || p.blocks.indexOf(target) === -1) return;
+    target.src = src; csTouch(); csRender();
+  }).catch(() => { if (typeof toast === 'function') toast((file.name || 'That file') + ' could not be read as a picture.', { type: 'error' }); });
 }
 window.csAddNote = function () {
   const p = csPage();

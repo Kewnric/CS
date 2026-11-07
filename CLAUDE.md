@@ -331,6 +331,31 @@ multi-problem, SQL, notebook), or Alt+Shift+S anywhere.
 
 ---
 
+## Uploaded pictures (covers, question and cheat-sheet images)
+
+`js/media-store.js`. Program, snippet, notebook and Collection-wing covers, notebook question
+pictures and cheat-sheet image blocks are kept in IndexedDB `ssp-media` (the disk-sized
+allowance, beside the sticker pictures), not in the 5 MB localStorage saves. A saved field holds
+`media:m<length>_<hash>`; the id is a hash of the bytes, so one picture used twice is stored once
+and the same picture migrated on two devices gets the same id.
+- **Draw every such field through `mediaSrc(value[, 'thumb'])`.** Non-references (old data: URLs,
+  web addresses) pass through unchanged. `'thumb'` is the 640px copy kept for cards. Before the
+  pictures are read at start it returns a tagged see-through pixel that `_mdPatch` fills in.
+- **Uploads go through `mediaUpload(file)`** (scaled to 1600px, WebP; GIF/SVG kept as they are). It
+  falls back to a small inline data: URL only where IndexedDB is refused.
+- **Old inline pictures are moved by `mediaSweep`** about 4 s after start, and after any save whose
+  JSON still contains `data:image/`. It only runs once every drawing file has set its name in
+  `window.MEDIA_READERS` (`MEDIA_READER_FILES`). A new file that draws these fields must join that
+  list. Fields are listed in `_mdSlots`. Cheat-sheet revision snapshots are JSON text, so it
+  rewrites inside them too.
+- Export writes the pictures back in (`mediaInlineText`). Import moves them out before writing
+  (`mediaAbsorbBackup`). Cloud sync carries only the references.
+- Unused pictures: `mediaGc` runs once a day and deletes only those that no localStorage save mentions
+  for 14 days running (signing out removes the cloud copy of the library from this device).
+  Reset Data leaves the pictures for that to clear.
+
+---
+
 ## Traps that have already cost time
 
 **Verify by measuring, not reasoning — then check the measurement.** Every

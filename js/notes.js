@@ -7,6 +7,9 @@ let activeNotebookFolderId = getSessionParam('studyOpenCat') || null;
 let notebookCtxTargetNodeId = null; // Phase 4 FIX: Added Context Menu Target
 let _notebookContainerCtxHandler = null;
 
+// Covers are picture-store references (js/media-store.js), drawn through mediaSrc.
+(window.MEDIA_READERS = window.MEDIA_READERS || {})['notes'] = true;
+
 // --- Init & Render ---
 function notesInit() {
   /* Arrive with the tree closed, exactly as the coding library does. The
@@ -961,7 +964,7 @@ function _buildNotebookCard(nb) {
   const questionCount = (nb.sections || []).reduce((sum, s) => sum + (s.questions || []).length, 0);
   const tHtml = (nb.tags || []).map(t => libTagBadgeHTML('notebook', t)).join('');
   const coverHtml = nb.coverImage
-    ? `<div class="nb-card-cover"><img src="${nb.coverImage}" alt="" loading="lazy" /></div>`
+    ? `<div class="nb-card-cover"><img src="${mediaSrc(nb.coverImage, 'thumb')}" alt="" loading="lazy" decoding="async" /></div>`
     : libCoverFallbackHTML(nb.title, nb.icon || 'book');
   const lastPct = _notebookLastPct(nb);
   const slipped = lastPct >= 0 && best >= 0 && lastPct < best;

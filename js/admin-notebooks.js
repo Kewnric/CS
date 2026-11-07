@@ -430,7 +430,9 @@ function closeNotebookForm() {
   if (emptyState) emptyState.classList.remove('hidden');
 }
 
-/* ---- Notebook cover image (stored as a downscaled data URL) ---- */
+/* ---- Notebook cover image (in the picture store, js/media-store.js) ---- */
+(window.MEDIA_READERS = window.MEDIA_READERS || {})['admin-notebooks'] = true;
+
 function renderNotebookCover() {
   const host = document.getElementById('notebook-cover-field');
   if (!host || !notebookAdminState) return;
@@ -439,7 +441,7 @@ function renderNotebookCover() {
     <input type="file" id="notebook-cover-input" accept="image/*" class="hidden" onchange="handleNotebookCoverUpload(this)" />
     ${img ? `
       <div class="nb-cover-preview">
-        <img src="${img}" alt="Cover preview" />
+        <img src="${mediaSrc(img, 'thumb')}" alt="Cover preview" />
         <div class="nb-cover-actions">
           <button type="button" class="btn btn-sm" onclick="document.getElementById('notebook-cover-input').click()"><i data-lucide="repeat" style="width:13px;height:13px;"></i> Replace</button>
           <button type="button" class="btn btn-sm nb-cover-remove" onclick="removeNotebookCover()"><i data-lucide="trash-2" style="width:13px;height:13px;"></i> Remove</button>
@@ -449,7 +451,7 @@ function renderNotebookCover() {
       <button type="button" class="nb-cover-drop" onclick="document.getElementById('notebook-cover-input').click()">
         <i data-lucide="image-plus"></i>
         <span>Upload a cover image</span>
-        <small>PNG / JPG — automatically resized to keep your data small</small>
+        <small>PNG, JPG or WebP. Kept with your pictures, not in your 5 MB of data</small>
       </button>
     `}
   `;
@@ -463,15 +465,16 @@ function handleNotebookCoverUpload(input) {
     if (typeof showMessage === 'function') showMessage('Error', 'Please choose an image file.', true);
     return;
   }
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    _downscaleImage(e.target.result, 960, 0.82, (dataUrl) => {
-      notebookAdminState.coverImage = dataUrl;
-      nbMarkDirty();
-      renderNotebookCover();
-    });
-  };
-  reader.readAsDataURL(file);
+  const target = notebookAdminState;
+  input.value = '';
+  mediaUpload(file).then((ref) => {
+    if (notebookAdminState !== target) return;
+    notebookAdminState.coverImage = ref;
+    nbMarkDirty();
+    renderNotebookCover();
+  }).catch(() => {
+    if (typeof showMessage === 'function') showMessage('Error', 'That picture could not be read. Try a PNG, JPG or WebP file.', true);
+  });
 }
 
 function removeNotebookCover() {
@@ -482,6 +485,8 @@ function removeNotebookCover() {
 }
 
 // Resize a data-URL image to a max width via canvas, returning a JPEG data URL.
+// No longer used by this app's uploads (they go through mediaUpload); kept for
+// an older cached copy of a neighbouring file that still calls it.
 function _downscaleImage(src, maxW, quality, cb) {
   const im = new Image();
   im.onload = () => {
