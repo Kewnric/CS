@@ -210,7 +210,7 @@ function _localDataSummary() {
   catch (e) { return null; }
   if (!raw) return null;
   try {
-    const d = JSON.parse(raw);
+    const d = JSON.parse(storeDecode(raw));
     const n = (d.notebooks || []).length;
     const c = (d.challenges || []).length;
     const s2 = (d.snippets || []).length;
@@ -580,7 +580,7 @@ async function loadFromFirestore(uid) {
     try {
       const cached = localStorage.getItem(getAppStorageKey());
       if (cached) {
-        const parsed = JSON.parse(cached);
+        const parsed = JSON.parse(storeDecode(cached));
         state.challenges = migrateLegacyData(parsed.challenges || []);
         state.snippets = parsed.snippets || [];
         state.notebooks = parsed.notebooks || [];
@@ -940,7 +940,7 @@ function _flushAllInMemoryDomains() {
 function _cacheAllToLocalStorage() {
   // App
   try {
-    localStorage.setItem(getAppStorageKey(), JSON.stringify({
+    storeSetJSON(getAppStorageKey(), ({
       categories: getNodeNamesForScope('challenge'),
       snippetCategories: getNodeNamesForScope('snippet'),
       notebookCategories: getNodeNamesForScope('notebook'),
@@ -963,7 +963,7 @@ function _cacheAllToLocalStorage() {
   // Viz
   if (typeof viz !== 'undefined') {
     try {
-      localStorage.setItem(getVizStorageKey(), JSON.stringify({
+      storeSetJSON(getVizStorageKey(), ({
         nodes: viz.nodes, links: viz.links, pan: viz.pan, zoom: viz.zoom,
         fogEnabled: viz.fogEnabled, panesSwapped: viz.panesSwapped,
         tabsCollapsed: viz.tabsCollapsed, toolbarCollapsed: viz.toolbarCollapsed,
@@ -976,7 +976,7 @@ function _cacheAllToLocalStorage() {
   // Brain
   if (typeof brain !== 'undefined') {
     try {
-      localStorage.setItem(getBrainStorageKey(), JSON.stringify({
+      storeSetJSON(getBrainStorageKey(), ({
         versions: brain.versions, folders: brain.folders, activeVersionId: brain.activeVersionId
       }));
     } catch (e) { /* ignore */ }

@@ -94,6 +94,18 @@ it does not write immediately; `_flushSaveData()` is the real write.
 touches folders must filter by scope or it will move another library's tree.
 
 39 `localStorage` keys, mostly per-feature preferences (`ssp.*` for newer ones).
+
+**The big saves are stored compressed** (`js/store-codec.js`, `vendor/fflate`, MIT): the library
+(`codePlatformData`, `_online`) and the Visualize canvas and brain. Format
+`~z1:<deflated bytes>:<original chars>:<FNV-1a of the deflated bytes>:<packed>`, 15 bits per char
+below the surrogate range; anything without the `~z1:` tag is plain JSON and reads as it is. About
+13x fewer characters (the 5 MB budget counts characters). **Never `JSON.parse` these keys directly**:
+read through `storeDecode(raw)` / `storeGetText(key)`, write through `storeSetJSON` / `storeWriteSync`.
+The debounced `saveData` compresses and verifies in fflate's background workers
+(`_flushSaveData({ background: true })`); a newer write to a key always wins, and hiding or closing
+the tab writes synchronously over anything still in flight (`storeBusy()`). Old plain saves are
+packed once, ~4 s after start, only if nothing has written the key since. An unreadable compressed
+save goes down the same path as unreadable JSON: copy set aside, saving paused.
 `storageMode` chooses local vs cloud; Firebase auth is optional and the app
 works fully offline.
 

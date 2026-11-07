@@ -566,6 +566,10 @@
   <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
+  <!-- Big saves are stored compressed (js/store-codec.js). Local, not a CDN:
+       reading the library back depends on it, offline and from file:// too. -->
+  <script defer src="vendor/fflate/fflate.min.js"></script>
+  <script defer src="js/store-codec.js"></script>
   <script defer src="js/constants.js"></script>
   <script defer src="js/state.js"></script>
   <script defer src="js/utils.js"></script>

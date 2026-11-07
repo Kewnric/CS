@@ -36,7 +36,7 @@ let _brainSaveFailed = false;
 
 function brainSave() {
   try {
-    localStorage.setItem(getBrainStorageKey(), JSON.stringify({
+    storeSetJSON(getBrainStorageKey(), ({
       versions: brain.versions,
       folders: brain.folders,
       activeVersionId: brain.activeVersionId,
@@ -70,12 +70,16 @@ function brainLoad() {
   const raw = localStorage.getItem(getBrainStorageKey());
   if (!raw) return;
   try {
-    const d = JSON.parse(raw);
+    const d = JSON.parse(storeDecode(raw));
     brain.versions = d.versions || [];
     brain.folders = d.folders || [];
     brain.activeVersionId = d.activeVersionId || null;
     brain.rootOpen = d.rootOpen !== false;
-  } catch (e) { console.warn('[Brain] load failed', e); }
+  } catch (e) {
+    console.warn('[Brain] load failed', e);
+    // The next save would write an empty brain over it; keep a copy first.
+    if (typeof storeSetAside === 'function') storeSetAside(getBrainStorageKey(), raw);
+  }
 }
 
 function brainSaveCurrentVersion() {
@@ -2098,7 +2102,9 @@ document.addEventListener('keydown', e => {
   if (typeof viz !== 'undefined' && viz.activeModule === 'brain') {
     if (typeof brainSaveCurrentVersion === 'function') brainSaveCurrentVersion();
   } else if (typeof vizSave === 'function') vizSave();
-  if (typeof _flushSaveData === 'function') _flushSaveData();
+  // In the background, like every other save: a stall on Ctrl+S is felt, and a
+  // save still in flight is written synchronously if the tab closes first.
+  if (typeof _flushSaveData === 'function') _flushSaveData({ background: true });
   if (typeof toast === 'function') toast('Saved', { type: 'success' });
 }, true);
 

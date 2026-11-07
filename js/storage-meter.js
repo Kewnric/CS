@@ -21,7 +21,7 @@ const STO_LOCAL_LIMIT = 5 * 1024 * 1024;   // characters (see above)
 
 /* Which saved keys belong to what, in words. First match wins. */
 const STO_GROUPS = [
-  [/^codePlatformData.*\.corrupt\./, 'Old recovery copies'],
+  [/\.corrupt\./, 'Old recovery copies'],
   [/^codePlatformData/, 'Library and history'],
   [/^(vizCanvasData|brainCanvasData)/, 'Visualize boards'],
   [/^questBoardData/, 'Quest Board'],
@@ -40,20 +40,22 @@ function _stoSize(n) {
 
 function _stoEsc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
 
-/** Characters in localStorage, in total and by what they are. */
+/** Characters in localStorage, in total and by what they are, and how long it all would be unpacked. */
 function _stoLocalUse() {
   const groups = new Map();
-  let total = 0;
+  let total = 0, unpacked = 0;
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i) || '';
-      const n = k.length + (localStorage.getItem(k) || '').length;
+      const v = localStorage.getItem(k) || '';
+      const n = k.length + v.length;
       total += n;
+      unpacked += k.length + (typeof storeOriginalLength === 'function' ? storeOriginalLength(v) : v.length);
       const g = (STO_GROUPS.find(([re]) => re.test(k)) || [null, 'Settings and other'])[1];
       groups.set(g, (groups.get(g) || 0) + n);
     }
   } catch (e) { return null; }
-  return { total, groups: Array.from(groups.entries()).sort((a, b) => b[1] - a[1]) };
+  return { total, unpacked, groups: Array.from(groups.entries()).sort((a, b) => b[1] - a[1]) };
 }
 
 function _stoBlock(name, used, limit, limitText, notes) {
@@ -79,8 +81,10 @@ async function storageMeterPaint() {
     localBox.innerHTML = '<span class="sto-note">This browser will not say how much it is keeping.</span>';
   } else {
     const left = Math.max(0, STO_LOCAL_LIMIT - local.total);
-    const notes = [_stoSize(left) + ' left'].concat(
-      local.groups.slice(0, 3).filter(g => g[1] > 0).map(g => g[0] + ' ' + _stoSize(g[1])));
+    const notes = [_stoSize(left) + ' left'];
+    // The big saves are kept compressed (store-codec.js); say what that is worth.
+    if (local.unpacked > local.total * 1.2) notes.push('compressed from ' + _stoSize(local.unpacked));
+    notes.push(...local.groups.slice(0, 3).filter(g => g[1] > 0).map(g => g[0] + ' ' + _stoSize(g[1])));
     localBox.innerHTML = _stoBlock('Your data', local.total, STO_LOCAL_LIMIT, 'about 5 MB', notes);
     localBox.title = 'Your library, history, boards and settings. Browsers allow a site about 5 MB of this.\n' +
       local.groups.map(g => g[0] + ': ' + _stoSize(g[1])).join('\n');

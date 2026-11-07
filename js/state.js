@@ -165,7 +165,8 @@ function loadData() {
   const saved = localStorage.getItem(getAppStorageKey());
   if (saved) {
     try {
-      const parsed = JSON.parse(saved);
+      // Compressed since store-codec.js; an older plain save reads as it is.
+      const parsed = JSON.parse(storeDecode(saved));
       state.categories = parsed.categories || state.categories;
       state.snippetCategories = parsed.snippetCategories || state.snippetCategories;
       state.categoryRequirements = parsed.categoryRequirements || {};
@@ -345,20 +346,22 @@ function startFreshAfterUnreadableSave() {
 }
 
 window.addEventListener('beforeunload', () => {
-  if (_saveDataPending) { clearTimeout(saveTimeout); _flushSaveData(); }
+  // A background save still in flight would not land before the page goes.
+  if (_saveDataPending || (typeof storeBusy === 'function' && storeBusy())) { clearTimeout(saveTimeout); _flushSaveData(); }
 });
 
 /* beforeunload does not fire when a phone backgrounds the tab and later
    discards it, which is how most mobile sessions end. Becoming hidden is the
    last moment the page reliably runs, so flush there too. */
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState !== 'hidden' || !_saveDataPending) return;
+  if (document.visibilityState !== 'hidden') return;
+  if (!_saveDataPending && !(typeof storeBusy === 'function' && storeBusy())) return;
   clearTimeout(saveTimeout);
   _flushSaveData();
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 });
 
-function _flushSaveData() {
+function _flushSaveData(opts) {
   _saveDataPending = false;
   /* Compact the record before it is written anywhere. Done here rather than
      at the point of grading because it has to catch imported and merged
@@ -420,9 +423,7 @@ function _flushSaveData() {
      when the load failed, so this would be the write that turns a recoverable
      file into an empty one. */
   if (_loadFailed) return;
-  try {
-    localStorage.setItem(getAppStorageKey(), JSON.stringify(dataToSave));
-  } catch (e) {
+  const failed = (e) => {
     console.error("Storage Error:", e);
     // Don't let a quota failure pass silently — the user could lose work.
     if (!_quotaWarned) {
@@ -433,7 +434,21 @@ function _flushSaveData() {
           true);
       }
     }
+  };
+  const json = JSON.stringify(dataToSave);
+  /* Stored compressed (js/store-codec.js). The ordinary, debounced save is
+     compressed and checked in the background so the page does not stall; a
+     save made as the tab hides or closes, or by any caller that needs it
+     stored before it returns, is synchronous -- and takes over from any
+     background save still in flight, so the newest state is what lands. */
+  if (opts && opts.background && typeof storeWriteAsync === 'function') {
+    storeWriteAsync(getAppStorageKey(), json, (err) => { if (err) failed(err); });
+    return;
   }
+  try {
+    if (typeof storeWriteSync === 'function') storeWriteSync(getAppStorageKey(), json);
+    else localStorage.setItem(getAppStorageKey(), json);
+  } catch (e) { failed(e); }
 }
 
 /** Debounced localStorage persist — also clears the breadcrumb path cache. */
@@ -442,7 +457,7 @@ function saveData() {
   _saveDataPending = true;
   clearTimeout(saveTimeout);
   saveTimeout = setTimeout(() => {
-    _flushSaveData();
+    _flushSaveData({ background: true });
     if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
   }, DEBOUNCE_SAVE_MS);
 }

@@ -242,7 +242,7 @@ let _vizSaveFailed = false;
 function vizSaveNow() {
   if (_vizSaveTimer) { clearTimeout(_vizSaveTimer); _vizSaveTimer = null; }
   try {
-    localStorage.setItem(getVizStorageKey(), JSON.stringify(_vizSnapshot()));
+    storeSetJSON(getVizStorageKey(), _vizSnapshot());
     _vizSaveFailed = false;
   } catch (e) {
     // A full quota used to be a console warning and nothing else, so losing
@@ -267,7 +267,7 @@ function vizLoad() {
   const raw = localStorage.getItem(getVizStorageKey());
   if (raw) {
     try {
-      const d = JSON.parse(raw);
+      const d = JSON.parse(storeDecode(raw));
       viz.nodes = d.nodes || [];
       viz.links = d.links || [];
       viz.pan = d.pan || { x: 0, y: 0 };
@@ -300,7 +300,11 @@ function vizLoad() {
       // showing three of your 181 nodes with no visible reason why is worse
       // than losing the focus.
       viz.focusNodeId = null;
-    } catch (e) { console.warn('[Viz] load failed', e); }
+    } catch (e) {
+      console.warn('[Viz] load failed', e);
+      // The next save would write an empty canvas over it; keep a copy first.
+      if (typeof storeSetAside === 'function') storeSetAside(getVizStorageKey(), raw);
+    }
   }
 }
 
