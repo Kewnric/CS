@@ -5274,8 +5274,9 @@ body.is-resizing .practice-panel { transition: none; }
    editor's box in the editor's own metrics, so matching lines land exactly
    where they already were; only the differences show. */
 .code-peek {
-  position: fixed;
-  z-index: 10001;
+  position: absolute;
+  inset: 0;
+  z-index: 50;
   background: #0d1117;
   color: #d4d4d4;
   overflow: hidden;

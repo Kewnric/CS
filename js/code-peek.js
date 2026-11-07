@@ -221,18 +221,16 @@ function peekPairHTML(uToks, rToks) {
 
 function peekRowsHTML(rows) {
   return rows.map(r => {
-    let code, cls = 'cp-row', ln = '';
+    let code, cls = 'cp-row';
     if (r.kind === 'ghost') {
       cls += ' cp-row-ghost';
       code = peekHL(peekJoin(r.rToks)) || ' ';
-      ln = '+';
     } else {
-      ln = String(r.u + 1);
       if (r.kind === 'pair') { cls += ' cp-row-diff'; code = peekPairHTML(r.uToks, r.rToks); }
       else if (r.kind === 'extra') { cls += ' cp-row-diff'; code = '<span class="cp-wrong">' + peekHL(peekJoin(r.uToks)) + '</span>'; }
       else code = peekHL(peekJoin(r.uToks));
     }
-    return `<div class="${cls}"${r.u >= 0 ? ` data-u="${r.u}"` : ''}><span class="cp-ln">${ln}</span><span class="cp-code">${code || ' '}</span></div>`;
+    return `<div class="${cls}"${r.u >= 0 ? ` data-u="${r.u}"` : ''}><span class="cp-ln"></span><span class="cp-code">${code || ' '}</span></div>`;
   }).join('');
 }
 
@@ -267,17 +265,25 @@ function codePeekShow() {
   const missing = rows.filter(r => r.kind === 'ghost' && peekKey(r.rToks)).length;
   const differ = rows.filter(r => r.kind === 'pair' || r.kind === 'extra').length;
 
-  /* Drawn in the editor's own metrics, so a line that matches lands exactly
-     where it already was. Fixed and above everything (the Run Code terminal
-     included), sized to the editor's box. */
-  const cs = getComputedStyle(ta);
-  const rect = box.getBoundingClientRect();
+  /* Drawn INSIDE the editor's own box and in the metrics of the text you
+     actually see (the highlight layer), so a line that matches lands exactly
+     where it already was, at exactly its size -- whatever scaling or font
+     setting the editor is under applies to this too. It was a fixed layer on
+     the page body before, and outside the editor's box its text could come
+     out a different size. */
+  /* The font is read from the <code> inside the highlight layer, which is the
+     text on screen; its <pre> wrapper keeps the browser's default monospace
+     and measured 8% narrower. Padding comes from the <pre>, which owns it. */
+  const pre = document.getElementById('editor-pre') || ta;
+  const text = document.getElementById('editor-code') || pre;
+  const ps = getComputedStyle(pre), ts = getComputedStyle(text);
+  const cs = { paddingTop: ps.paddingTop, paddingLeft: ps.paddingLeft, fontFamily: ts.fontFamily,
+               fontSize: ts.fontSize, lineHeight: ts.lineHeight, tabSize: ts.tabSize };
   const el = document.createElement('div');
   el.id = 'code-peek';
   el.className = 'code-peek' + ((typeof edGetWrap === 'function' && edGetWrap()) ? ' cp-wrap' : '');
   el.setAttribute('aria-hidden', 'true');
-  el.style.cssText = `left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;`
-    + `--cp-gutter:${gutter && gutter.offsetWidth ? gutter.offsetWidth : 0}px;`
+  el.style.cssText = `--cp-gutter:${gutter && gutter.offsetWidth ? gutter.offsetWidth : 0}px;`
     + `--cp-pad-top:${cs.paddingTop};--cp-pad-left:${cs.paddingLeft};`
     + `font-family:${cs.fontFamily};font-size:${cs.fontSize};line-height:${cs.lineHeight};tab-size:${cs.tabSize};`;
   el.innerHTML = `
@@ -287,30 +293,42 @@ function codePeekShow() {
       <span class="cp-badge-hint">release to go back</span>
     </div>
     <div class="cp-scroll"><div class="cp-rows">${peekRowsHTML(rows)}</div></div>`;
-  document.body.appendChild(el);
+  box.appendChild(el);
   _peekEl = el;
 
-  // Start where you were looking: your top visible line stays at the top.
+  /* The same place on screen. The line at the top of your view is drawn at
+     exactly the height it is at in the editor; lines the target adds above it
+     push only what is above, never what you were looking at. */
   const scroller = el.querySelector('.cp-scroll');
   const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.5 || 21;
   const pad = parseFloat(cs.paddingTop) || 0;
-  const top = Math.max(0, ta.scrollTop - pad);
-  const firstLine = Math.floor(top / lh);
+  const firstLine = Math.max(0, Math.floor((ta.scrollTop - pad) / lh));
   const row = el.querySelector(`.cp-row[data-u="${firstLine}"]`)
     || [...el.querySelectorAll('.cp-row[data-u]')].find(r => Number(r.dataset.u) >= firstLine);
-  if (row) scroller.scrollTop = row.offsetTop - pad + (top % lh);
+  if (row) {
+    const atInEditor = pad + Number(row.dataset.u) * lh - ta.scrollTop;   // that line's top in the editor
+    scroller.scrollTop = row.offsetTop - atInEditor;
+  } else {
+    scroller.scrollTop = ta.scrollTop;
+  }
   scroller.scrollLeft = ta.scrollLeft;
 
-  // Holding Ctrl turns the wheel into page zoom; here it scrolls the peek.
-  el.addEventListener('wheel', (e) => {
+  /* Holding Ctrl turns the mouse wheel into page zoom, anywhere on the page.
+     While the peek is up the wheel scrolls it instead, and never zooms. */
+  _peekWheel = (e) => {
+    if (!e.ctrlKey && !el.contains(e.target)) return;
     e.preventDefault();
     const k = e.deltaMode === 1 ? lh : 1;
     scroller.scrollTop += e.deltaY * k;
     scroller.scrollLeft += e.deltaX * k;
-  }, { passive: false });
+  };
+  window.addEventListener('wheel', _peekWheel, { passive: false, capture: true });
 }
 
+let _peekWheel = null;
+
 function codePeekHide() {
+  if (_peekWheel) { window.removeEventListener('wheel', _peekWheel, { capture: true }); _peekWheel = null; }
   if (!_peekEl) return;
   _peekEl.remove();
   _peekEl = null;
