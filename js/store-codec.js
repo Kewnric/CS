@@ -199,7 +199,10 @@ function storeWriteAsync(key, json, done, opts) {
   const gen = yieldToOthers ? (_storeGen[key] || 0) : (_storeGen[key] = (_storeGen[key] || 0) + 1);
   let settled = false;
   const finish = (err) => { if (settled) return; settled = true; _storeInFlight--; if (done) done(err || null); };
-  const current = () => _storeGen[key] === gen;
+  // `|| 0`: a key not written yet this session has no number at all, and
+  // `undefined === 0` is false -- which made every re-store of an untouched
+  // key think a newer write had overtaken it, and quietly skip.
+  const current = () => (_storeGen[key] || 0) === gen;
   const put = (text) => {
     if (!current()) { finish(null); return; }
     try {
@@ -256,23 +259,51 @@ function storeSetAside(key, raw) {
 }
 
 /* Saves written before this are plain until something changes them. The big
-   ones are packed once, shortly after start, in the background: the same
-   text re-stored, never re-built from the app's state -- so a save that would
-   not parse is kept exactly as it was, and nothing is sent to the cloud. If
-   the app saves the same key meanwhile, its newer write wins. */
-function storeCompactExisting() {
-  const keys = ['codePlatformData', 'codePlatformData_online', 'vizCanvasData', 'vizCanvasData_online',
-    'brainCanvasData', 'brainCanvasData_online'];
-  keys.forEach(k => {
+   ones are packed once, shortly after start (or from "Compress now" in
+   Settings), in the background: the same text re-stored, never re-built from
+   the app's state -- so a save that would not parse is kept exactly as it
+   was, and nothing is sent to the cloud. If the app saves the same key
+   meanwhile, its newer write wins.
+
+   ONLY WHEN EVERY READER OF THE KEY IS THIS VERSION. The first load after an
+   update can be half old: index.html comes from the network, but the service
+   worker still hands out its cached copies of the other scripts until the new
+   worker takes over. This file and fflate are new, so they arrive fresh --
+   and packing the library under an old state.js would leave the next load
+   that is still old looking at a save it cannot read. Each reader declares
+   itself (STATE_READS_PACKED and friends); a key is packed only when all of
+   its readers have. */
+const STORE_COMPACT_GROUPS = [
+  { keys: ['codePlatformData', 'codePlatformData_online'],
+    ready: () => typeof STATE_READS_PACKED !== 'undefined' && typeof FB_READS_PACKED !== 'undefined' },
+  { keys: ['vizCanvasData', 'vizCanvasData_online'], ready: () => typeof VIZ_READS_PACKED !== 'undefined' },
+  { keys: ['brainCanvasData', 'brainCanvasData_online'], ready: () => typeof BRAIN_READS_PACKED !== 'undefined' },
+];
+
+/** Saves that are big and still plain: { key, chars, ready } for each. */
+function storeUnpackedSaves() {
+  const out = [];
+  STORE_COMPACT_GROUPS.forEach(g => g.keys.forEach(k => {
     let raw = null;
     try { raw = localStorage.getItem(k); } catch (e) { return; }
-    if (!raw || storeIsPacked(raw) || raw.length < STORE_Z_MIN) return;
-    storeWriteAsync(k, raw, (err) => {
-      if (err) return;
-      const now = localStorage.getItem(k);
-      if (storeIsPacked(now)) console.log('[store] packed ' + k + ': ' + Math.round(raw.length / 1024) + ' KB -> ' + Math.round(now.length / 1024) + ' KB');
+    if (raw && !storeIsPacked(raw) && raw.length >= STORE_Z_MIN) out.push({ key: k, chars: raw.length, ready: g.ready() });
+  }));
+  return out;
+}
+
+/** Pack every big plain save whose readers are all this version. Resolves once each has landed (or stood aside). */
+function storeCompactExisting() {
+  const jobs = storeUnpackedSaves().filter(u => u.ready).map(u => new Promise(resolve => {
+    let raw = null;
+    try { raw = localStorage.getItem(u.key); } catch (e) { resolve(); return; }
+    if (!raw || storeIsPacked(raw)) { resolve(); return; }
+    storeWriteAsync(u.key, raw, (err) => {
+      const now = !err && localStorage.getItem(u.key);
+      if (storeIsPacked(now)) console.log('[store] packed ' + u.key + ': ' + Math.round(raw.length / 1024) + ' KB -> ' + Math.round(now.length / 1024) + ' KB');
+      resolve();
     }, { ifUnchanged: true });
-  });
+  }));
+  return Promise.all(jobs);
 }
 
 document.addEventListener('DOMContentLoaded', () => {

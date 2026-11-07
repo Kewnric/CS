@@ -3044,6 +3044,36 @@ body[data-route="visualization"] .settings-fab { display: none; }
   line-height: 1.4;
   color: var(--text-tertiary);
 }
+.sto-act {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-top: 2px;
+  padding: 0.4rem 0.5rem 0.4rem 0.65rem;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-hover);
+}
+.sto-act-text {
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+.sto-act-btn {
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+  color: var(--text-on-primary);
+  font: 600 0.75rem/1 var(--font-sans);
+  cursor: pointer;
+  box-shadow: 0 2px 8px var(--color-primary-glow);
+}
+.sto-act-btn:hover:not(:disabled) { filter: brightness(1.1); }
+.sto-act-btn:disabled { opacity: 0.7; cursor: default; }
 
 /* ── A dialog that asks something, rather than confirming it ──
    The default dialog is 420px and centres a row of buttons, which is right

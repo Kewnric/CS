@@ -161,6 +161,10 @@ function migrateCategoriesToNodes(parsed) {
 }
 
 // --- Data Persistence ---
+/* This file reads compressed saves (store-codec.js). The codec packs an old
+   plain save only once every reader of it says so -- see storeCompactExisting. */
+const STATE_READS_PACKED = true;
+
 function loadData() {
   const saved = localStorage.getItem(getAppStorageKey());
   if (saved) {

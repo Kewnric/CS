@@ -203,6 +203,9 @@ function _pickerRemember() {
   return !!(cb && cb.checked);
 }
 
+/* Reads compressed saves (store-codec.js); see storeCompactExisting. */
+const FB_READS_PACKED = true;
+
 /** What is already on this device, so the choice isn't blind. */
 function _localDataSummary() {
   let raw = null;

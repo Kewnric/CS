@@ -263,6 +263,9 @@ function vizSave() {
   _vizSaveTimer = setTimeout(() => { _vizSaveTimer = null; vizSaveNow(); }, 400);
 }
 
+/* Reads compressed saves (store-codec.js); see storeCompactExisting. */
+const VIZ_READS_PACKED = true;
+
 function vizLoad() {
   const raw = localStorage.getItem(getVizStorageKey());
   if (raw) {

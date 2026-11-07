@@ -104,7 +104,12 @@ read through `storeDecode(raw)` / `storeGetText(key)`, write through `storeSetJS
 The debounced `saveData` compresses and verifies in fflate's background workers
 (`_flushSaveData({ background: true })`); a newer write to a key always wins, and hiding or closing
 the tab writes synchronously over anything still in flight (`storeBusy()`). Old plain saves are
-packed once, ~4 s after start, only if nothing has written the key since. An unreadable compressed
+packed ~4 s after start (or by **Compress now** in Settings > Storage), only if nothing has written
+the key since, and **only once every reader of that key declares it can read packed saves**
+(`STATE_READS_PACKED`, `FB_READS_PACKED`, `VIZ_READS_PACKED`, `BRAIN_READS_PACKED`): the first load
+after a release can run the new codec beside the service worker's cached old `state.js`, and packing
+under it would leave the next old load unable to read the library. A new reader of these keys must
+declare itself and be added to `STORE_COMPACT_GROUPS`. An unreadable compressed
 save goes down the same path as unreadable JSON: copy set aside, saving paused.
 `storageMode` chooses local vs cloud; Firebase auth is optional and the app
 works fully offline.

@@ -88,6 +88,7 @@ async function storageMeterPaint() {
     localBox.innerHTML = _stoBlock('Your data', local.total, STO_LOCAL_LIMIT, 'about 5 MB', notes);
     localBox.title = 'Your library, history, boards and settings. Browsers allow a site about 5 MB of this.\n' +
       local.groups.map(g => g[0] + ': ' + _stoSize(g[1])).join('\n');
+    _stoCompressOffer(localBox, local.total);
   }
 
   if (!navigator.storage || !navigator.storage.estimate) {
@@ -110,4 +111,37 @@ async function storageMeterPaint() {
   } catch (e) {
     otherBox.innerHTML = '<span class="sto-note">Pictures and the offline copy: not available here.</span>';
   }
+}
+
+/* Saves from before compression are packed on their own a few seconds after
+   the app starts. This is the same thing on demand, with the result shown --
+   and, while an update is still half installed, the reason it cannot yet. */
+function _stoCompressOffer(box, totalBefore) {
+  const pending = typeof storeUnpackedSaves === 'function' ? storeUnpackedSaves() : [];
+  if (!pending.length) return;
+  const chars = pending.reduce((n, u) => n + u.chars, 0);
+  const ready = pending.every(u => u.ready);
+  const row = document.createElement('span');
+  row.className = 'sto-act';
+  row.innerHTML = '<span class="sto-act-text"></span>' +
+    (ready ? '<button type="button" class="sto-act-btn">Compress now</button>' : '');
+  row.querySelector('.sto-act-text').textContent = ready
+    ? _stoSize(chars) + ' of this is not compressed yet.'
+    : 'The update is still installing. Reload the app once more, then compress.';
+  box.appendChild(row);
+  const btn = row.querySelector('.sto-act-btn');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.textContent = 'Compressing…';
+    try { await storeCompactExisting(); } catch (e) { console.error('[storage] compress failed', e); }
+    await storageMeterPaint();
+    const after = _stoLocalUse();
+    if (after && typeof toast === 'function') {
+      const smaller = after.total < totalBefore;
+      toast(smaller
+        ? 'Compressed. Your data now takes ' + _stoSize(after.total) + ' instead of ' + _stoSize(totalBefore) + '.'
+        : 'Nothing could be compressed right now. Your data is unchanged.', { type: smaller ? 'success' : 'info' });
+    }
+  });
 }

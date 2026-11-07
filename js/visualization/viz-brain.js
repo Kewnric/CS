@@ -66,6 +66,9 @@ function brainSave() {
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 }
 
+/* Reads compressed saves (store-codec.js); see storeCompactExisting. */
+const BRAIN_READS_PACKED = true;
+
 function brainLoad() {
   const raw = localStorage.getItem(getBrainStorageKey());
   if (!raw) return;
