@@ -596,6 +596,21 @@ body.stk-dragging {
   color: var(--text-primary);
 }
 
+/* The same button on the storage picker, at the spot it has in the sidebar
+   (which the picker hides). The picker is z 9999 (css/auth.css), so while it
+   is up the sticker layers and tools go above it. */
+.smp-stk-btn {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  margin-left: 0;
+  z-index: 2;
+}
+body.picker-open #stk-float { z-index: 10000; }
+body.picker-open #stk-ui { z-index: 10010; }
+body.picker-open .stk-tray { z-index: 10015; }
+body.picker-open .stk-ghost { z-index: 10020; }
+
 [data-stk-toggle].is-on {
   color: var(--color-accent);
   background: rgba(34, 211, 238, 0.12);

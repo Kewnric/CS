@@ -40,10 +40,19 @@
    the library from this device, and its covers must still be here when you
    sign back in.
 
-   Device only, like the sticker pictures: cloud sync carries the references,
-   not the bytes (a Firestore document is capped at 1 MB, which ten covers
-   would fill). Export writes the pictures back in as data: URLs, so a backup
-   is complete on its own, and import moves them out again.
+   RICH TEXT (snippet descriptions and comments, program descriptions): a
+   picture in the HTML is saved as src="media:<id>". sanitizeHTML (utils.js)
+   lets it through DOMPurify as a tagged pixel and swaps in the blob: URL
+   after; the Quill editors load it through mediaHtml and hand it back through
+   mediaHtmlOut, which turns the blob: URLs into references again.
+
+   THE CLOUD: the library documents carry only the references (a Firestore
+   document is capped at 1 MB, which a few covers would fill). Each picture
+   the signed-in library uses is copied to its own document,
+   users/<uid>/media/<id>, after a cloud save (mediaCloudPush), and a device
+   that loads the library fetches the ones it lacks (mediaCloudPull). Export
+   writes the pictures back in as data: URLs, so a backup is complete on its
+   own, and import moves them out again.
    ============================================================ */
 
 const MEDIA_DB_NAME = 'ssp-media';
@@ -56,10 +65,15 @@ const MEDIA_MAX_SIDE = 1600;     // longest side kept for an upload
 const MEDIA_THUMB_W = 640;       // cards are ~300px wide; this is sharp at 2x
 const MEDIA_ORPHAN_DAYS = 14;
 const MEDIA_GC_KEY = 'ssp.media.gc';
+const MEDIA_CLOUD_KEY = 'ssp.media.cloud.';   // + uid: ids known to be in that account's cloud
+const MEDIA_CLOUD_MAX = 1000000;              // bytes; a Firestore document holds 1 MiB in all
+const MEDIA_SRC_REF_RE = /(\bsrc\s*=\s*)(["'])media:(m[0-9a-z]+_[0-9a-z]+)\2/gi;
+const MEDIA_SRC_BLOB_RE = /(\bsrc\s*=\s*)(["'])(blob:[^"']+)\2/gi;
 /* Every file that draws one of these pictures. Each sets its own name in
    window.MEDIA_READERS; old saves are moved over only when all of them have. */
 const MEDIA_READER_FILES = ['admin-form', 'admin-snippets', 'admin-notebooks', 'admin-notebook-questions',
-  'browse', 'history', 'home', 'notes', 'study', 'notes-practice', 'cheatsheet', 'wings-registry', 'wings-collection'];
+  'browse', 'history', 'home', 'notes', 'study', 'notes-practice', 'cheatsheet', 'wings-registry', 'wings-collection',
+  'utils', 'admin-variants', 'practice'];
 
 let _mdDbPromise = null;
 const _mdPics = new Map();       // id -> { full, thumb, w, h, bytes }
@@ -68,6 +82,8 @@ let _mdReadyPromise = null;
 let _mdSweepTimer = null;
 let _mdSweeping = false;
 let _mdKeepAsked = false;
+let _mdCloudBusy = false;
+let _mdCloudAgain = null;        // uid to push for once the running push ends
 
 /* ── IndexedDB ───────────────────────────────────────────── */
 
@@ -138,12 +154,74 @@ function mediaSrc(v, size) {
   const id = v.slice(MEDIA_PREFIX.length);
   const p = _mdPics.get(id);
   if (p) return (size === 'thumb' && p.thumb) || p.full;
-  if (_mdReady) return MEDIA_PIXEL;              // not on this device
+  // Not read yet, or not on this device yet (the cloud copy may still arrive):
+  // a see-through pixel that _mdPatch can find again.
   return MEDIA_PIXEL + '#media=' + id + (size === 'thumb' ? ';thumb' : '');
 }
 
 function _mdUntag(s) {
   return s.replace(MEDIA_TAG_RE, (m, id, th) => mediaSrc(MEDIA_PREFIX + id, th ? 'thumb' : ''));
+}
+
+/* ── Pictures inside rich text ───────────────────────────── */
+
+/** Before sanitizing: each src="media:…" as a tagged pixel, which DOMPurify keeps (a blob: URL it would drop). */
+function mediaTagHtml(html) {
+  if (typeof html !== 'string' || html.indexOf(MEDIA_PREFIX) === -1) return html;
+  return html.replace(MEDIA_SRC_REF_RE, (m, a, q, id) => a + q + MEDIA_PIXEL + '#media=' + id + q);
+}
+
+/** After sanitizing: tagged pixels become the pictures. */
+function mediaUntagHtml(html) {
+  return typeof html === 'string' && html.indexOf('#media=') !== -1 ? _mdUntag(html) : html;
+}
+
+/** Rich HTML to show or to load into an editor: each reference as its picture. */
+function mediaHtml(html) {
+  return mediaUntagHtml(mediaTagHtml(html));
+}
+
+/** An editor's HTML back to what is saved: its pictures' blob: URLs (and any
+ *  pixel still waiting for one) as references again. */
+function mediaHtmlOut(html) {
+  if (typeof html !== 'string' || (html.indexOf('blob:') === -1 && html.indexOf('#media=') === -1)) return html;
+  const back = new Map();
+  _mdPics.forEach((p, id) => { back.set(p.full, id); if (p.thumb) back.set(p.thumb, id); });
+  return html
+    .replace(MEDIA_SRC_BLOB_RE, (m, a, q, url) => (back.has(url) ? a + q + MEDIA_PREFIX + back.get(url) + q : m))
+    .replace(MEDIA_TAG_RE, (m, id) => MEDIA_PREFIX + id);
+}
+
+/* Quill 1.3.7 lets an image's src be http, https or data only, and turns
+   anything else into "//:0" -- which would blank every stored picture the
+   moment an editor opened. A blob: URL is this page's own; let it through. */
+(function _mdQuillAllowBlob() {
+  try {
+    if (typeof Quill === 'undefined' || !Quill.import) return;
+    const Img = Quill.import('formats/image');
+    if (!Img || Img._mdBlobOk) return;
+    const orig = Img.sanitize;
+    Img.sanitize = function (url) { return /^blob:/i.test(url || '') ? url : orig.call(this, url); };
+    Img._mdBlobOk = true;
+  } catch (e) { /* Quill missing: there is no editor to fix */ }
+})();
+
+/** Quill toolbar handler for the image button: store the picture, then insert it. */
+function mediaQuillImageHandler() {
+  const quill = this.quill;
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = 'image/*';
+  inp.onchange = () => {
+    const f = inp.files && inp.files[0];
+    if (!f) return;
+    mediaUpload(f).then((ref) => {
+      const r = quill.getSelection(true) || { index: quill.getLength() };
+      quill.insertEmbed(r.index, 'image', mediaSrc(ref), 'user');
+      quill.setSelection(r.index + 1, 0, 'silent');
+    }).catch(() => { if (typeof toast === 'function') toast('That picture could not be read.', { type: 'error' }); });
+  };
+  inp.click();
 }
 
 /** Fill in pictures drawn before they had been read. */
@@ -343,11 +421,22 @@ function _mdSlots(app, sheets, fn) {
   const covers = list => {
     if (Array.isArray(list)) list.forEach(o => { if (o && typeof o === 'object') fn(o, 'coverImage'); });
   };
+  // Rich text: the pictures sit inside the HTML, and are replaced there.
+  const rich = (list, keys) => {
+    if (Array.isArray(list)) list.forEach(o => { if (o && typeof o === 'object') keys.forEach(k => fn(o, k)); });
+  };
+  const programs = list => {
+    rich(list, ['description']);
+    if (Array.isArray(list)) list.forEach(c => { if (c) rich(c.variants, ['description']); });
+  };
   if (app && typeof app === 'object') {
     covers(app.challenges);
     if (app.codingStash) covers(app.codingStash.challenges);
     covers(app.snippets);
     covers(app.notebooks);
+    programs(app.challenges);
+    if (app.codingStash) programs(app.codingStash.challenges);
+    rich(app.snippets, ['description', 'comments']);
     (app.notebooks || []).forEach(nb => ((nb && nb.sections) || []).forEach(sec =>
       ((sec && sec.answerKeysData) || []).forEach(d => { if (d && typeof d === 'object') fn(d, 'image'); })));
     const wings = app.wings && typeof app.wings === 'object' ? app.wings : {};
@@ -484,7 +573,8 @@ function _mdUsedIds() {
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (!k || k === MEDIA_GC_KEY) continue;
+      // This file's own bookkeeping lists ids without using them.
+      if (!k || k.lastIndexOf('ssp.media.', 0) === 0) continue;
       const raw = localStorage.getItem(k) || '';
       scan(typeof storeDecode === 'function' ? storeDecode(raw) : raw);
     }
@@ -501,31 +591,166 @@ function _mdUsedIds() {
     typeof nbqDraft !== 'undefined' ? nbqDraft : null,
   ];
   live.forEach(o => { if (o) { try { scan(JSON.stringify(o)); } catch (e) { /* circular: skip */ } } });
+  // Open forms not saved yet: a wing's picture field, and any rich-text editor.
+  try {
+    document.querySelectorAll('.wing-img-field[data-value]').forEach(el => scan(el.dataset.value));
+    document.querySelectorAll('.ql-editor').forEach(el => scan(mediaHtmlOut(el.innerHTML)));
+  } catch (e) { /* no document */ }
   return used;
 }
 
 /**
  * Mark the pictures nothing uses, and delete those unused for
- * MEDIA_ORPHAN_DAYS. Resolves to { removed, unused, unusedBytes }.
+ * MEDIA_ORPHAN_DAYS -- or, with opts.now, every one unused right now (the
+ * Clean up button, Reset Data). Signed in, the cloud copies of the deleted
+ * ones go too. Resolves to { removed, removedBytes, unused, unusedBytes }.
  */
-async function mediaGc() {
+async function mediaGc(opts) {
   await mediaReady();
   const g = _mdGcState();
-  const out = { removed: 0, unused: 0, unusedBytes: 0 };
+  const out = { removed: 0, removedBytes: 0, unused: 0, unusedBytes: 0 };
   if (typeof _loadFailed !== 'undefined' && _loadFailed) return out;
   const used = _mdUsedIds();
   if (!used) return out;
   const now = Date.now(), orphans = {}, doomed = [];
+  const all = !!(opts && opts.now);
   _mdPics.forEach((p, id) => {
     if (used.has(id)) return;
     orphans[id] = g.orphans[id] || now;
-    if (now - orphans[id] >= MEDIA_ORPHAN_DAYS * 86400000) doomed.push(id);
+    if (all || now - orphans[id] >= MEDIA_ORPHAN_DAYS * 86400000) { doomed.push(id); out.removedBytes += p.bytes; }
     else { out.unused++; out.unusedBytes += p.bytes; }
   });
   for (const id of doomed) { await mediaForget(id); delete orphans[id]; }
   out.removed = doomed.length;
   _mdGcSave({ last: now, orphans });
+  if (doomed.length) await _mdCloudForget(doomed);
   return out;
+}
+
+/** The pictures nothing uses right now, without marking or deleting any: { count, bytes }. */
+async function mediaUnused() {
+  await mediaReady();
+  const used = _mdUsedIds();
+  const out = { count: 0, bytes: 0 };
+  if (!used) return out;
+  _mdPics.forEach((p, id) => { if (!used.has(id)) { out.count++; out.bytes += p.bytes; } });
+  return out;
+}
+
+/* ── The cloud copy ──────────────────────────────────────── */
+
+/** The signed-in account whose library is the one on screen, or null. */
+function _mdCloudUid() {
+  try {
+    if (typeof storageMode === 'undefined' || storageMode !== 'online') return null;
+    if (typeof currentFirebaseUser === 'undefined' || !currentFirebaseUser || !currentFirebaseUser.uid) return null;
+    if (typeof fbDb === 'undefined' || typeof firebase === 'undefined' || !firebase.firestore || !firebase.firestore.Blob) return null;
+    return currentFirebaseUser.uid;
+  } catch (e) { return null; }
+}
+
+function _mdCloudCol(uid) { return fbDb.collection('users').doc(uid).collection('media'); }
+
+function _mdCloudKnown(uid) {
+  try { return new Set(JSON.parse(localStorage.getItem(MEDIA_CLOUD_KEY + uid) || '[]')); }
+  catch (e) { return new Set(); }
+}
+
+function _mdCloudRemember(uid, set) {
+  try { localStorage.setItem(MEDIA_CLOUD_KEY + uid, JSON.stringify(Array.from(set))); } catch (e) { /* full: asked again next time */ }
+}
+
+/** Ids the library on screen uses (memory, not storage: this is what gets synced). */
+function _mdLiveIds() {
+  const used = new Set();
+  const scan = s => {
+    if (typeof s !== 'string' || s.indexOf(MEDIA_PREFIX) === -1) return;
+    let m;
+    MEDIA_REF_RE.lastIndex = 0;
+    while ((m = MEDIA_REF_RE.exec(s))) used.add(m[1]);
+  };
+  [typeof state !== 'undefined' ? state : null, typeof cs !== 'undefined' && cs ? cs.sheets : null]
+    .forEach(o => { if (o) { try { scan(JSON.stringify(o)); } catch (e) { /* skip */ } } });
+  return used;
+}
+
+/**
+ * After a cloud save: copy each picture the library uses, and the cloud does
+ * not have yet, to users/<uid>/media/<id>. One document per picture, so the
+ * 1 MB cap is per picture; a bigger one stays on this device.
+ */
+async function mediaCloudPush(uid) {
+  uid = uid || _mdCloudUid();
+  if (!uid || uid !== _mdCloudUid()) return 0;
+  if (_mdCloudBusy) { _mdCloudAgain = uid; return 0; }
+  _mdCloudBusy = true;
+  let sent = 0;
+  try {
+    await mediaReady();
+    const known = _mdCloudKnown(uid);
+    for (const id of _mdLiveIds()) {
+      if (known.has(id) || !_mdPics.has(id)) continue;
+      const rec = await _mdIdb('readonly', st => st.get(id));
+      if (!rec || !rec.blob) continue;
+      if (rec.blob.size > MEDIA_CLOUD_MAX) { console.warn('[media] ' + id + ' is over 1 MB, so it stays on this device only.'); continue; }
+      const bytes = await _mdBytesOf(rec.blob);
+      await _mdCloudCol(uid).doc(id).set({
+        bytes: firebase.firestore.Blob.fromUint8Array(bytes),
+        type: rec.type || rec.blob.type || '', w: rec.w || 0, h: rec.h || 0, added: rec.added || Date.now()
+      });
+      known.add(id);
+      _mdCloudRemember(uid, known);
+      sent++;
+    }
+    if (sent) console.log('[media] Copied', sent, 'picture(s) to the cloud.');
+  } catch (e) {
+    console.warn('[media] Pictures could not be copied to the cloud; tried again after the next save.', e);
+  } finally {
+    _mdCloudBusy = false;
+    if (_mdCloudAgain) { const again = _mdCloudAgain; _mdCloudAgain = null; mediaCloudPush(again); }
+  }
+  return sent;
+}
+
+/** After a cloud load: fetch each picture the library uses that this device lacks. */
+async function mediaCloudPull(uid) {
+  uid = uid || _mdCloudUid();
+  if (!uid || uid !== _mdCloudUid()) return 0;
+  await mediaReady();
+  const known = _mdCloudKnown(uid);
+  let got = 0;
+  for (const id of _mdLiveIds()) {
+    if (_mdPics.has(id)) { known.add(id); continue; }
+    try {
+      const doc = await _mdCloudCol(uid).doc(id).get();
+      if (!doc.exists) continue;
+      const d = doc.data() || {};
+      const bytes = d.bytes && d.bytes.toUint8Array ? d.bytes.toUint8Array() : null;
+      // The id is the hash of the bytes: anything else is not this picture.
+      if (!bytes || 'm' + bytes.length.toString(36) + '_' + _mdHash(bytes) !== id) continue;
+      await mediaPut(new Blob([bytes], { type: d.type || 'image/webp' }), d.w, d.h);
+      known.add(id);
+      got++;
+    } catch (e) {
+      console.warn('[media] A picture could not be fetched from the cloud:', id, e);
+    }
+  }
+  _mdCloudRemember(uid, known);
+  if (got) { console.log('[media] Fetched', got, 'picture(s) from the cloud.'); _mdPatch(); }
+  return got;
+}
+
+/** Delete the cloud copies of pictures removed here, when signed in to the library they came from. */
+async function _mdCloudForget(ids) {
+  const uid = _mdCloudUid();
+  if (!uid) return;
+  const known = _mdCloudKnown(uid);
+  for (const id of ids) {
+    if (!known.has(id)) continue;
+    try { await _mdCloudCol(uid).doc(id).delete(); known.delete(id); }
+    catch (e) { console.warn('[media] Cloud copy not deleted:', id, e); }
+  }
+  _mdCloudRemember(uid, known);
 }
 
 /** How many pictures, and how many bytes, are stored (Settings' storage meter). */

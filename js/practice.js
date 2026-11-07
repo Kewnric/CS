@@ -4861,8 +4861,9 @@ window.practiceEditDescription = function (target) {
     if (typeof formatToolbarPolish === 'function') formatToolbarPolish(bar);
     _pdQuill = q;
     const current = _pdTarget.read() || '';
-    q.clipboard.dangerouslyPasteHTML(
-      typeof afDescToHTML === 'function' ? afDescToHTML(current) : current, 'silent');
+    const html0 = typeof afDescToHTML === 'function' ? afDescToHTML(current) : current;
+    // Saved pictures are picture-store references (js/media-store.js), shown as blob: URLs.
+    q.clipboard.dangerouslyPasteHTML(typeof mediaHtml === 'function' ? mediaHtml(html0) : html0, 'silent');
     if (typeof afLabelToolbar === 'function') afLabelToolbar(q.getModule('toolbar').container);
     q.focus();
   }
@@ -4877,7 +4878,8 @@ window.practiceSaveDescription = function () {
   if (_pdQuill) {
     // Same rule as the admin form: an empty Quill document is "<p><br></p>",
     // which would read as a description that exists and says nothing.
-    html = _pdQuill.getText().trim() ? _pdQuill.root.innerHTML : '';
+    html = _pdQuill.getText().trim() || _pdQuill.root.querySelector('img') ? _pdQuill.root.innerHTML : '';
+    if (typeof mediaHtmlOut === 'function') html = mediaHtmlOut(html);
     target.write(html);
   }
   if (typeof saveData === 'function') saveData();
@@ -5108,3 +5110,6 @@ function _termCue(session, which) {
   session.cuedBad = true;
   if (typeof psfxPunch === 'function') psfxPunch();
 }
+
+// The description editor reads and writes picture-store references (js/media-store.js).
+(window.MEDIA_READERS = window.MEDIA_READERS || {}).practice = true;

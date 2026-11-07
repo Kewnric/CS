@@ -243,7 +243,8 @@ function getGlobalCommands() {
     // The one library the palette could not see into.
     ...((() => {
       let sheets = [];
-      try { sheets = (JSON.parse(localStorage.getItem(typeof getCheatStorageKey === 'function' ? getCheatStorageKey() : 'cheatsheetLibrary')) || {}).sheets || []; } catch (e) { sheets = []; }
+      const ck = typeof getCheatStorageKey === 'function' ? getCheatStorageKey() : 'cheatsheetLibrary';
+      try { sheets = (JSON.parse((typeof storeDecode === 'function' ? storeDecode(localStorage.getItem(ck)) : localStorage.getItem(ck))) || {}).sheets || []; } catch (e) { sheets = []; }
       return sheets.slice(0, 40).map(sh => ({
         id: 'cs_' + sh.id,
         icon: sh.icon || 'book-marked',
@@ -508,3 +509,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+
+// Reads the cheat sheets through storeDecode: they may be stored compressed (store-codec.js).
+const NAV_READS_PACKED_CS = true;

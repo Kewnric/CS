@@ -120,7 +120,8 @@ function libraryInit() {
     // Read straight from the cheat-sheet store; it is not part of `state`.
     let cheatCount = 0, cheatPages = 0;
     try {
-      const raw = JSON.parse(localStorage.getItem(typeof getCheatStorageKey === 'function' ? getCheatStorageKey() : 'cheatsheetLibrary')) || {};
+      const ck = typeof getCheatStorageKey === 'function' ? getCheatStorageKey() : 'cheatsheetLibrary';
+      const raw = JSON.parse((typeof storeDecode === 'function' ? storeDecode(localStorage.getItem(ck)) : localStorage.getItem(ck))) || {};
       cheatCount = (raw.sheets || []).length;
       cheatPages = (raw.sheets || []).reduce((n, x) => n + ((x.pages || []).length), 0);
     } catch (e) { /* nothing saved yet */ }
@@ -581,3 +582,6 @@ function libraryComingSoon(key) {
 }
 
 function libraryDestroy() { }
+
+// Reads the cheat sheets through storeDecode: they may be stored compressed (store-codec.js).
+const LIB_READS_PACKED_CS = true;

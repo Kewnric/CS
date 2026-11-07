@@ -410,6 +410,17 @@ function calculateSimilarity(s1, s2) {
 // unavailable (e.g. offline first-load before the CDN script is cached).
 function sanitizeHTML(html) {
   if (html == null) return '';
+  /* Pictures saved in the picture store (js/media-store.js) are src="media:<id>".
+     DOMPurify would drop that, and the blob: URL it stands for: it goes through
+     as a tagged see-through pixel and becomes the picture afterwards. */
+  if (typeof mediaTagHtml === 'function' && String(html).indexOf('media:') !== -1) {
+    return mediaUntagHtml(_sanitizeHTMLRaw(mediaTagHtml(String(html))));
+  }
+  return _sanitizeHTMLRaw(html);
+}
+(window.MEDIA_READERS = window.MEDIA_READERS || {}).utils = true;
+
+function _sanitizeHTMLRaw(html) {
   if (typeof DOMPurify !== 'undefined' && DOMPurify && typeof DOMPurify.sanitize === 'function') {
     return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
   }

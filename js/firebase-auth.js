@@ -304,6 +304,7 @@ function showStorageModePicker() {
   // The HUD layer lives on <body>, outside .app-layout, so hiding the app above
   // leaves its chrome painting around the dialog. See css/hud.css.
   document.body.classList.add('picker-open');
+  if (typeof _stkQueue === 'function') _stkQueue();   // the picker's own stickers (js/stickers.js)
   _showSigninChooseView();
   _paintPicker();
 
@@ -326,6 +327,7 @@ function hideStorageModePicker() {
   const appLayout = document.querySelector('.app-layout');
   if (appLayout) { appLayout.style.visibility = ''; appLayout.removeAttribute('aria-hidden'); }
   document.body.classList.remove('picker-open');
+  if (typeof _stkQueue === 'function') _stkQueue();   // back to the page's stickers
   document.removeEventListener('keydown', _pickerKeydown, true);
   if (_pickerOnlineHandler) {
     window.removeEventListener('online', _pickerOnlineHandler);
@@ -566,6 +568,8 @@ async function loadFromFirestore(uid) {
       _cloudBaseline = _stampOf(rootData.lastSaved);
       _rerenderActiveRoute();
       console.log('[Firebase] Loaded cloud data for', uid);
+      // The pictures this library uses that this device has not got (js/media-store.js).
+      if (typeof mediaCloudPull === 'function') mediaCloudPull(uid).catch(() => {});
     } else {
       console.log('[Firebase] No cloud data for this account. Seeding defaults.');
       seedDefaultData();
@@ -615,10 +619,11 @@ async function loadFromFirestore(uid) {
 
 /** The cheat sheets, read straight from their store when cheatsheet.js has
     not loaded its copy yet. */
+const FB_READS_PACKED_CS = true;   // the cheat sheets may be stored compressed (store-codec.js)
 function _cheatSheetsFromStorage() {
   try {
     const key = typeof getCheatStorageKey === 'function' ? getCheatStorageKey() : 'cheatsheetLibrary';
-    return (JSON.parse(localStorage.getItem(key)) || {}).sheets || [];
+    return (JSON.parse((typeof storeDecode === 'function' ? storeDecode(localStorage.getItem(key)) : localStorage.getItem(key))) || {}).sheets || [];
   } catch (e) { return []; }
 }
 
@@ -1296,6 +1301,8 @@ async function saveToFirestore(uid) {
     _cloudBaseline = _lastCloudSaveAt;
     _updateCloudStatusUI();
     showCloudToast('Saved to cloud');
+    // Then the pictures the library uses, each its own document (js/media-store.js).
+    if (typeof mediaCloudPush === 'function') mediaCloudPush(uid).catch(() => {});
     // Notify other tabs that cloud data changed
     if (_syncChannel) {
       try { _syncChannel.postMessage({ type: 'cloud-saved', tabId: _tabId, at: Date.now() }); } catch (e) {}

@@ -44,16 +44,24 @@ const csNL = String.fromCharCode(10);   // newline, spelled out
 function csEsc(s) { return typeof escapeHTML === 'function' ? escapeHTML(String(s)) : String(s); }
 function csId(p) { return p + '_' + (typeof generateId === 'function' ? generateId() : Math.random().toString(36).slice(2)); }
 
+/* Stored compressed (js/store-codec.js) once every reader of the key reads
+   packed saves -- see storeCheatsReadPacked. Never JSON.parse the key directly. */
+const CS_READS_PACKED = true;
+function _csRead(key) {
+  const raw = localStorage.getItem(key);
+  return JSON.parse(typeof storeDecode === 'function' ? storeDecode(raw) : raw);
+}
+
 function csLoad() {
   try { const v = localStorage.getItem('csView'); if (v === 'list' || v === 'grid') cs.view = v; } catch (e) { /* none */ }
   try {
     const key = csKey();
-    let raw = JSON.parse(localStorage.getItem(key));
+    let raw = _csRead(key);
     // One-time carry-over: the library used to be shared by both modes. An
     // online account reading for the first time inherits what was there
     // rather than opening onto an empty shelf.
     if (!raw && key !== 'cheatsheetLibrary') {
-      const shared = JSON.parse(localStorage.getItem('cheatsheetLibrary'));
+      const shared = _csRead('cheatsheetLibrary');
       if (shared && shared.sheets && shared.sheets.length) {
         raw = shared;
         try { localStorage.setItem(key, JSON.stringify({ sheets: shared.sheets })); } catch (e) { /* full */ }
@@ -68,15 +76,35 @@ function csSave() {
   // A picture still saved inline (an import, an older copy of this file) is
   // moved to the picture store -- before the write, which it may be filling.
   if (json.indexOf('data:image/') !== -1 && typeof mediaSweepSoon === 'function') mediaSweepSoon();
-  try { localStorage.setItem(csKey(), json); }
-  catch (e) {
-    // A silent failure here loses written notes, which is the worst thing this
-    // file could do quietly.
-    if (typeof toast === 'function') toast('Could not save — browser storage is full.', { type: 'error', duration: 10000 });
-    return;
+  // A silent failure here loses written notes, which is the worst thing this
+  // file could do quietly.
+  const full = () => { if (typeof toast === 'function') toast('Could not save — browser storage is full.', { type: 'error', duration: 10000 }); };
+  const key = csKey();
+  if (_csCanPack()) {
+    // Compressed and checked off the page; the tab hiding writes it at once.
+    _csPending = { key, json };
+    storeWriteAsync(key, json, (err) => {
+      if (_csPending && _csPending.json === json) _csPending = null;
+      if (err) full();
+    });
+  } else {
+    try { localStorage.setItem(key, json); }
+    catch (e) { full(); return; }
   }
   if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
 }
+
+/* Packed only once every reader can read it back; until then, plain as before. */
+function _csCanPack() {
+  return typeof storeWriteAsync === 'function' && typeof storeCheatsReadPacked === 'function' && storeCheatsReadPacked();
+}
+let _csPending = null;      // { key, json } of a compressed save not landed yet
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'hidden' || !_csPending) return;
+  const p = _csPending;
+  _csPending = null;
+  try { storeWriteSync(p.key, p.json); } catch (e) { /* full: the in-flight write reports it */ }
+});
 
 /* ── Model ─────────────────────────────────────────────────── */
 

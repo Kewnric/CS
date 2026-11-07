@@ -96,7 +96,8 @@ touches folders must filter by scope or it will move another library's tree.
 39 `localStorage` keys, mostly per-feature preferences (`ssp.*` for newer ones).
 
 **The big saves are stored compressed** (`js/store-codec.js`, `vendor/fflate`, MIT): the library
-(`codePlatformData`, `_online`) and the Visualize canvas and brain. Format
+(`codePlatformData`, `_online`), the Visualize canvas and brain, and the cheat sheets (`cheatsheetLibrary`,
+`_online`; readers `CS_`, `FB_`, `IO_`, `NAV_`, `LIB_READS_PACKED_CS`, see `storeCheatsReadPacked`). Format
 `~z1:<deflated bytes>:<original chars>:<FNV-1a of the deflated bytes>:<packed>`, 15 bits per char
 below the surrogate range; anything without the `~z1:` tag is plain JSON and reads as it is. About
 13x fewer characters (the 5 MB budget counts characters). **Never `JSON.parse` these keys directly**:
@@ -327,7 +328,12 @@ multi-problem, SQL, notebook), or Alt+Shift+S anywhere.
   IndexedDB `ssp-stickers` (device only, not in the data export; Reset Data clears both). Huge
   pictures are scaled to 2000px once, as WebP.
 - Settings' Storage row (`js/storage-meter.js`): localStorage against ~5 MB (measured in Chrome:
-  5,242,773 characters) and `navigator.storage.estimate()` for IndexedDB + the offline cache.
+  5,242,773 characters) and `navigator.storage.estimate()` for IndexedDB + the offline cache. Its
+  action rows: Compress now, old recovery copies (Download / Delete), unused pictures (Clean up now),
+  and whether storage is protected (`navigator.storage.persist`).
+- **The storage picker is a sticker page too.** While `body.picker-open`, `_stkRoot()` is
+  `#storage-mode-popup` and `_stkRoute()` is `'picker'`. The picker has its own copy of the sidebar's
+  button (`.smp-stk-btn`) at the same spot, and the sticker layers and tools go above its z 9999.
 
 ---
 
@@ -348,11 +354,21 @@ and the same picture migrated on two devices gets the same id.
   `window.MEDIA_READERS` (`MEDIA_READER_FILES`). A new file that draws these fields must join that
   list. Fields are listed in `_mdSlots`. Cheat-sheet revision snapshots are JSON text, so it
   rewrites inside them too.
+- **Rich text** (snippet description/comments, program and variant descriptions) saves
+  `src="media:<id>"`. `sanitizeHTML` (utils.js) passes it through DOMPurify as a tagged pixel and
+  swaps in the blob: URL after. The Quill editors load through `mediaHtml` and save through
+  `mediaHtmlOut`. Quill's image sanitize is patched to allow blob:. Never turn description HTML into
+  text with a detached `<div>`'s innerHTML: that loads every `<img>`. Use DOMParser.
 - Export writes the pictures back in (`mediaInlineText`). Import moves them out before writing
-  (`mediaAbsorbBackup`). Cloud sync carries only the references.
+  (`mediaAbsorbBackup`).
+- **Cloud:** the library documents carry only references. After a cloud save, `mediaCloudPush` copies
+  each picture the library uses to its own document, `users/<uid>/media/<id>` (1 MB each at most).
+  After a cloud load, `mediaCloudPull` fetches the missing ones and `_mdPatch` fills them in.
+  `ssp.media.cloud.<uid>` lists what is up there.
 - Unused pictures: `mediaGc` runs once a day and deletes only those that no localStorage save mentions
   for 14 days running (signing out removes the cloud copy of the library from this device).
-  Reset Data leaves the pictures for that to clear.
+  `mediaGc({ now: true })` is Settings' **Clean up now** and Reset Data's clean-up. Signed in, the
+  cloud copies of deleted pictures go too.
 
 ---
 

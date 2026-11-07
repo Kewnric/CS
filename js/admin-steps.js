@@ -58,8 +58,10 @@ function afStepIssues() {
 function afPlainText(value) {
   const raw = String(value == null ? '' : value);
   if (raw.indexOf('<') === -1) return raw.trim();
-  const el = document.createElement('div');
-  el.innerHTML = raw;
+  // DOMParser, not a detached <div>: setting a div's innerHTML starts loading
+  // every <img> in it -- a stored picture's "media:" reference included, which
+  // the browser cannot load at all. A parsed document fetches nothing.
+  const el = new DOMParser().parseFromString(raw, 'text/html').body;
   return (el.textContent || '').replace(/ /g, ' ').trim();
 }
 window.afPlainText = afPlainText;

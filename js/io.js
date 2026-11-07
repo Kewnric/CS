@@ -2,6 +2,8 @@
    IO.JS — Import / Export Handlers
    ============================================================ */
 
+const IO_READS_PACKED_CS = true;   // the cheat sheets may be stored compressed (store-codec.js)
+
 function handleDataExport() {
   const data = {
     // New tree system
@@ -47,7 +49,8 @@ function handleDataExport() {
   // `state`, which is exactly why they were missing from every backup taken
   // so far. They are a library on the Library board like any other.
   try {
-    const cheats = JSON.parse(localStorage.getItem(typeof getCheatStorageKey === 'function' ? getCheatStorageKey() : 'cheatsheetLibrary'));
+    const ck = typeof getCheatStorageKey === 'function' ? getCheatStorageKey() : 'cheatsheetLibrary';
+    const cheats = JSON.parse((typeof storeDecode === 'function' ? storeDecode(localStorage.getItem(ck)) : localStorage.getItem(ck)));
     if (cheats && cheats.sheets) data.cheatsheets = cheats.sheets;
   } catch (e) { /* nothing saved yet */ }
   if (typeof viz !== 'undefined') {
@@ -323,7 +326,16 @@ function handleDataReset() {
       if (savedStorageMode) sessionStorage.setItem('storageMode', savedStorageMode);
 
       showMessage("Success", "Data has been reset to defaults. The page will now reload.");
-      setTimeout(() => window.location.reload(), 1200);
+      /* The covers and images the reset library no longer uses (js/media-store.js):
+         written first, so the clean-up sees the empty library rather than the old
+         one, and finished before the reload. A library this reset did not touch
+         (the other storage mode's) keeps its pictures. */
+      try { _flushSaveData(); } catch (e) { /* the reload's own save covers it */ }
+      // Their key is gone; the copy in memory must not keep their pictures alive (or be saved back).
+      if (typeof cs !== 'undefined' && cs) cs.sheets = [];
+      const pictures = typeof mediaGc === 'function'
+        ? mediaGc({ now: true }).catch(e => console.warn('[Reset] pictures not cleared', e)) : Promise.resolve();
+      Promise.all([pictures, new Promise(r => setTimeout(r, 1200))]).then(() => window.location.reload());
     }); // inner confirm
   }); // outer confirm
 }

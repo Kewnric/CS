@@ -278,7 +278,16 @@ const STORE_COMPACT_GROUPS = [
     ready: () => typeof STATE_READS_PACKED !== 'undefined' && typeof FB_READS_PACKED !== 'undefined' },
   { keys: ['vizCanvasData', 'vizCanvasData_online'], ready: () => typeof VIZ_READS_PACKED !== 'undefined' },
   { keys: ['brainCanvasData', 'brainCanvasData_online'], ready: () => typeof BRAIN_READS_PACKED !== 'undefined' },
+  // The cheat sheets: read by their own file, the cloud sync, export, the
+  // command palette and the Library board.
+  { keys: ['cheatsheetLibrary', 'cheatsheetLibrary_online'], ready: storeCheatsReadPacked },
 ];
+
+function storeCheatsReadPacked() {
+  return typeof CS_READS_PACKED !== 'undefined' && typeof FB_READS_PACKED_CS !== 'undefined' &&
+    typeof IO_READS_PACKED_CS !== 'undefined' && typeof NAV_READS_PACKED_CS !== 'undefined' &&
+    typeof LIB_READS_PACKED_CS !== 'undefined';
+}
 
 /** Saves that are big and still plain: { key, chars, ready } for each. */
 function storeUnpackedSaves() {

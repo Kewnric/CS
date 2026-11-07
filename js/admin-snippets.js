@@ -25,7 +25,8 @@ function initQuill() {
 
     studyQuillEditor.on('text-change', function (delta, oldDelta, source) {
       if (!studyModeState) return;
-      studyModeState.description = studyQuillEditor.root.innerHTML;
+      // Pictures show as blob: URLs in the editor and are saved as references.
+      studyModeState.description = _studyHtmlOut(studyQuillEditor.root.innerHTML);
       // Only user edits mark the form dirty — Quill also fires text-change while
       // we programmatically load content into a freshly-opened form.
       if (source !== 'user') return;
@@ -36,18 +37,22 @@ function initQuill() {
     studyCommentsQuillEditor = new Quill('#study-comments-editor', {
       theme: 'snow',
       modules: {
-        toolbar: [
-          ['bold', 'italic', 'underline', 'strike'],
-          [{ 'color': [] }, { 'background': [] }],
-          [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'indent': '-1' }, { 'indent': '+1' }],
-          ['image', 'clean']
-        ]
+        toolbar: {
+          container: [
+            ['bold', 'italic', 'underline', 'strike'],
+            [{ 'color': [] }, { 'background': [] }],
+            [{ 'list': 'ordered' }, { 'list': 'bullet' }, { 'indent': '-1' }, { 'indent': '+1' }],
+            ['image', 'clean']
+          ],
+          // The picture goes to the picture store (js/media-store.js), not into the text as a data: URL.
+          handlers: typeof mediaQuillImageHandler === 'function' ? { image: mediaQuillImageHandler } : {}
+        }
       }
     });
 
     studyCommentsQuillEditor.on('text-change', function (delta, oldDelta, source) {
       if (!studyModeState) return;
-      studyModeState.comments = studyCommentsQuillEditor.root.innerHTML;
+      studyModeState.comments = _studyHtmlOut(studyCommentsQuillEditor.root.innerHTML);
       if (source !== 'user') return;
       window.adminIsDirty = true;
       if (typeof setSaveStatus === 'function') setSaveStatus('study-save-status', 'unsaved');
@@ -212,8 +217,8 @@ function openStudyForm(id) {
   // Load via the Quill API with source 'silent' — writing root.innerHTML directly
   // is picked up by Quill's MutationObserver as a *user* edit, which marked every
   // freshly-opened form dirty and triggered spurious unsaved-changes prompts.
-  if (studyQuillEditor) studyQuillEditor.clipboard.dangerouslyPasteHTML(studyModeState.description || '', 'silent');
-  if (studyCommentsQuillEditor) studyCommentsQuillEditor.clipboard.dangerouslyPasteHTML(studyModeState.comments || '', 'silent');
+  if (studyQuillEditor) studyQuillEditor.clipboard.dangerouslyPasteHTML(_studyHtmlIn(studyModeState.description || ''), 'silent');
+  if (studyCommentsQuillEditor) studyCommentsQuillEditor.clipboard.dangerouslyPasteHTML(_studyHtmlIn(studyModeState.comments || ''), 'silent');
 
   if (typeof loadSqlPracticeForm === 'function') loadSqlPracticeForm();
 
@@ -248,6 +253,10 @@ function openStudyForm(id) {
    already had this and a third variant of it would only be a third thing to
    keep in step. mediaUpload (js/media-store.js) is shared. */
 (window.MEDIA_READERS = window.MEDIA_READERS || {})['admin-snippets'] = true;
+
+/* The two rich-text editors: saved references in, blob: URLs back out as references. */
+function _studyHtmlIn(html) { return typeof mediaHtml === 'function' ? mediaHtml(html) : html; }
+function _studyHtmlOut(html) { return typeof mediaHtmlOut === 'function' ? mediaHtmlOut(html) : html; }
 
 function renderStudyCover() {
   const host = document.getElementById('study-cover-field');
@@ -327,8 +336,8 @@ function saveStudyForm(opts = {}) {
   const lvEl = document.getElementById('study-level');
   if (lvEl) { const lv = parseInt(lvEl.value, 10); studyModeState.level = lv > 0 ? Math.min(lv, 100) : null; }
 
-  if (studyQuillEditor) studyModeState.description = studyQuillEditor.root.innerHTML;
-  if (studyCommentsQuillEditor) studyModeState.comments = studyCommentsQuillEditor.root.innerHTML;
+  if (studyQuillEditor) studyModeState.description = _studyHtmlOut(studyQuillEditor.root.innerHTML);
+  if (studyCommentsQuillEditor) studyModeState.comments = _studyHtmlOut(studyCommentsQuillEditor.root.innerHTML);
 
   const title = studyModeState.title.trim();
   if (!title) {

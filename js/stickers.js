@@ -73,8 +73,13 @@ let _stkTargetShown = null;         // the pane outlined while something is carr
 
 /* ── Small helpers ───────────────────────────────────────── */
 
-function _stkRoot() { return document.getElementById('spa-content'); }
-function _stkRoute() { return (document.body && document.body.dataset.route) || ''; }
+/* The storage picker covers the whole app while it is up, so it is a page of
+   its own: its stickers belong to route 'picker', on the picker itself. */
+function _stkPicker() {
+  return !!(document.body && document.body.classList.contains('picker-open')) && document.getElementById('storage-mode-popup');
+}
+function _stkRoot() { return _stkPicker() || document.getElementById('spa-content'); }
+function _stkRoute() { return _stkPicker() ? 'picker' : ((document.body && document.body.dataset.route) || ''); }
 function _stkById(id) { return _stkItems.find(s => s.id === id) || null; }
 function _stkUid(p) { return p + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 

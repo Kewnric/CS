@@ -90,6 +90,7 @@ async function storageMeterPaint() {
     localBox.title = 'Your library, history, boards and settings. Browsers allow a site about 5 MB of this.\n' +
       local.groups.map(g => g[0] + ': ' + _stoSize(g[1])).join('\n');
     _stoCompressOffer(localBox, local.total);
+    _stoRecoveryOffer(localBox);
   }
 
   if (!navigator.storage || !navigator.storage.estimate) {
@@ -112,12 +113,131 @@ async function storageMeterPaint() {
     otherBox.innerHTML = _stoBlock('Pictures and offline copy', used, quota, _stoSize(quota), notes);
     otherBox.title = 'Covers, question and cheat-sheet images, sticker pictures, and the copy of the app kept ' +
       'for working offline. The browser lets this grow to a share of the disk.' +
-      (media && media.count ? '\n' + media.count + ' cover and image file' + (media.count === 1 ? '' : 's') + ', ' + _stoSize(media.bytes) + '.' : '') +
-      (kept === true ? '\nProtected: the browser will not clear it to free up disk space.'
-        : kept === false ? '\nNot protected: if the disk gets nearly full the browser may clear this site\'s storage. Export a backup now and then.' : '');
+      (media && media.count ? '\n' + media.count + ' cover and image file' + (media.count === 1 ? '' : 's') + ', ' + _stoSize(media.bytes) + '.' : '');
+    await _stoUnusedOffer(otherBox);
+    _stoProtectRow(otherBox, kept);
   } catch (e) {
     otherBox.innerHTML = '<span class="sto-note">Pictures and the offline copy: not available here.</span>';
   }
+}
+
+/* One row under a meter: some words and, optionally, buttons. */
+function _stoActRow(box, text, buttons) {
+  const row = document.createElement('span');
+  row.className = 'sto-act';
+  const t = document.createElement('span');
+  t.className = 'sto-act-text';
+  t.textContent = text;
+  row.appendChild(t);
+  if (buttons && buttons.length) {
+    const g = document.createElement('span');
+    g.className = 'sto-act-btns';
+    buttons.forEach(b => {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'sto-act-btn' + (b.quiet ? ' is-quiet' : '');
+      el.textContent = b.label;
+      el.addEventListener('click', () => b.run(el));
+      g.appendChild(el);
+    });
+    row.appendChild(g);
+  }
+  box.appendChild(row);
+  return row;
+}
+
+/* A save that could not be read is copied aside (<key>.corrupt.<time>) before
+   anything can overwrite it, and the copy stays until someone deletes it --
+   which, before this, nobody could do from inside the app. */
+function _stoRecoveryOffer(box) {
+  const keys = [];
+  let chars = 0;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i) || '';
+      if (/\.corrupt\./.test(k)) { keys.push(k); chars += k.length + (localStorage.getItem(k) || '').length; }
+    }
+  } catch (e) { return; }
+  if (!keys.length) return;
+  _stoActRow(box, (keys.length === 1 ? '1 old recovery copy takes ' : keys.length + ' old recovery copies take ') + _stoSize(chars) +
+    '. Each is a save that could not be read, kept in case it was needed.', [
+    { label: 'Download', quiet: true, run: () => {
+      const out = {};
+      keys.forEach(k => { try { out[k] = localStorage.getItem(k); } catch (e) { /* gone */ } });
+      const url = URL.createObjectURL(new Blob([JSON.stringify(out)], { type: 'application/json' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'studysession-recovery-copies-' + new Date().toISOString().split('T')[0] + '.json';
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } },
+    { label: 'Delete', run: () => {
+      const go = () => {
+        keys.forEach(k => { try { localStorage.removeItem(k); } catch (e) { /* gone */ } });
+        storageMeterPaint();
+        if (typeof toast === 'function') toast('Recovery copies deleted. ' + _stoSize(chars) + ' freed.', { type: 'success' });
+      };
+      if (typeof showConfirm === 'function') {
+        showConfirm('Delete recovery copies?',
+          'These are copies of saves that could not be read, kept so nothing was lost. Your library does not use them. ' +
+          'Download them first if you are not sure. This cannot be undone.', go, { confirmLabel: 'Delete' });
+      } else if (confirm('Delete the recovery copies? This cannot be undone.')) go();
+    } },
+  ]);
+}
+
+/* Pictures nothing uses any more are cleared on their own after two weeks
+   (js/media-store.js). This is the same, now. */
+async function _stoUnusedOffer(box) {
+  if (typeof mediaUnused !== 'function') return;
+  let u;
+  try { u = await mediaUnused(); } catch (e) { return; }
+  if (!u || !u.count) return;
+  _stoActRow(box, (u.count === 1 ? '1 picture is' : u.count + ' pictures are') + ' not used by anything any more (' +
+    _stoSize(u.bytes) + '). They are cleared on their own after two weeks.', [
+    { label: 'Clean up now', run: (btn) => {
+      const go = async () => {
+        btn.disabled = true;
+        btn.textContent = 'Cleaning…';
+        let r = null;
+        try { r = await mediaGc({ now: true }); } catch (e) { console.error('[storage] clean-up failed', e); }
+        await storageMeterPaint();
+        if (typeof toast === 'function') {
+          toast(r && r.removed ? 'Removed ' + r.removed + ' unused picture' + (r.removed === 1 ? '' : 's') + ' (' + _stoSize(r.removedBytes) + ').'
+            : 'Nothing was removed.', { type: r && r.removed ? 'success' : 'info' });
+        }
+      };
+      if (typeof showConfirm === 'function') {
+        showConfirm('Remove unused pictures?',
+          'Covers and images that no program, snippet, notebook, cheat sheet or open form uses any more. This cannot be undone.',
+          go, { confirmLabel: 'Remove' });
+      } else go();
+    } },
+  ]);
+}
+
+/* Whether the browser may clear this site's storage when the disk runs low.
+   Chrome and Edge decide by themselves, from how much the site is used
+   (installed as an app or bookmarked counts); Firefox asks. */
+function _stoProtectRow(box, kept) {
+  if (kept === true) {
+    _stoActRow(box, 'Protected: the browser will not clear your data or pictures to free up disk space.').classList.add('is-ok');
+    return;
+  }
+  if (kept !== false || !navigator.storage || !navigator.storage.persist) return;
+  _stoActRow(box, 'Not protected: if the disk gets nearly full, the browser may clear this site\'s storage, pictures and all.', [
+    { label: 'Protect', run: async (btn) => {
+      btn.disabled = true;
+      let ok = false;
+      try { ok = await navigator.storage.persist(); } catch (e) { ok = false; }
+      await storageMeterPaint();
+      if (typeof toast === 'function') {
+        toast(ok ? 'Protected. The browser will keep this site\'s storage when the disk runs low.'
+          : 'The browser said not yet. Chrome and Edge decide from how much you use the site: installing it as an app or bookmarking it usually changes the answer. Export a backup meanwhile.',
+          { type: ok ? 'success' : 'info', duration: ok ? 4000 : 9000 });
+      }
+    } },
+  ]);
 }
 
 /* Saves from before compression are packed on their own a few seconds after

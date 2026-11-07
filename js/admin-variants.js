@@ -946,7 +946,9 @@ window.afInitDescEditor = function () {
 
   // 'silent' — loading the saved value must not read as typing, or opening a
   // program would mark it unsaved before anything had been touched.
-  q.clipboard.dangerouslyPasteHTML(afDescToHTML(hidden.value), 'silent');
+  // Pictures are saved as picture-store references (js/media-store.js) and shown as blob: URLs.
+  const html0 = afDescToHTML(hidden.value);
+  q.clipboard.dangerouslyPasteHTML(typeof mediaHtml === 'function' ? mediaHtml(html0) : html0, 'silent');
 
   afLabelToolbar(q.getModule('toolbar').container);
 
@@ -954,7 +956,8 @@ window.afInitDescEditor = function () {
     // An empty Quill document is "<p><br></p>" — a non-empty string that says
     // nothing. Stored as-is, the asterisk and the step rail would both report
     // the instruction as written while the box sat blank.
-    const html = q.getText().trim() ? q.root.innerHTML : '';
+    const raw = q.getText().trim() || q.root.querySelector('img') ? q.root.innerHTML : '';
+    const html = typeof mediaHtmlOut === 'function' ? mediaHtmlOut(raw) : raw;
     hidden.value = html;
     if (source !== 'user') return;
     updateActiveVariantField('description', html);
@@ -1012,3 +1015,6 @@ function afLabelToolbar(toolbarEl) {
       item.setAttribute('title', v || 'Default');
     });
 }
+
+// The description editor reads and writes picture-store references (js/media-store.js).
+(window.MEDIA_READERS = window.MEDIA_READERS || {})['admin-variants'] = true;
