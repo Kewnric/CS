@@ -5268,3 +5268,80 @@ body.is-resizing .practice-panel { transition: none; }
   width: 0;
   height: 0;
 }
+
+/* ── Peek at the target (js/code-peek.js) ──────────────────────
+   Held with Ctrl+Space or the eye in the editor toolbar. Drawn over the
+   editor's box in the editor's own metrics, so matching lines land exactly
+   where they already were; only the differences show. */
+.code-peek {
+  position: fixed;
+  z-index: 10001;
+  background: #0d1117;
+  color: #d4d4d4;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(88, 166, 255, 0.35);
+  animation: cpIn 0.08s ease-out;
+}
+@keyframes cpIn { from { opacity: 0; } to { opacity: 1; } }
+.code-peek .cp-scroll {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  padding: var(--cp-pad-top) 0;
+  scrollbar-width: none;
+}
+.code-peek .cp-scroll::-webkit-scrollbar { display: none; }
+.code-peek .cp-rows { display: inline-block; min-width: 100%; }
+.cp-row { display: flex; }
+.cp-ln {
+  flex: 0 0 var(--cp-gutter);
+  box-sizing: border-box;
+  padding-right: 12px;
+  text-align: right;
+  color: #484f58;
+  user-select: none;
+}
+.cp-code {
+  flex: 1 0 auto;
+  padding: 0 var(--cp-pad-left);
+  white-space: pre;
+}
+.code-peek.cp-wrap .cp-code { flex: 1 1 auto; min-width: 0; white-space: pre-wrap; overflow-wrap: break-word; }
+
+/* A line the target has and you do not: faint, with a quiet green edge. */
+.cp-row-ghost { background: rgba(63, 185, 80, 0.06); box-shadow: inset 2px 0 0 rgba(63, 185, 80, 0.45); }
+.cp-row-ghost .cp-code { opacity: 0.4; }
+.cp-row-ghost .cp-ln { color: #3fb950; opacity: 0.7; }
+/* Missing pieces inside a line of yours. */
+.cp-ghost { opacity: 0.4; }
+/* What is different from the target. */
+.cp-wrong {
+  text-decoration: underline wavy #f85149;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  text-decoration-skip-ink: none;
+}
+.cp-row-diff .cp-ln { color: #f85149; }
+
+.cp-badge {
+  /* Bottom corner: the top of the editor is the first lines of code. */
+  position: absolute;
+  bottom: 10px;
+  right: 14px;
+  z-index: 2;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(248, 81, 73, 0.4);
+  background: rgba(13, 17, 23, 0.92);
+  color: #f0a8a3;
+  font-family: var(--font-sans, sans-serif);
+  font-size: 0.72rem;
+  font-weight: 700;
+  pointer-events: none;
+}
+.cp-badge-ok { border-color: rgba(63, 185, 80, 0.45); color: #7ee787; }
+.cp-badge-hint { margin-left: 8px; font-weight: 400; color: #8b949e; }
+
+@media (prefers-reduced-motion: reduce) {
+  .code-peek { animation: none; }
+}

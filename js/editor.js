@@ -360,6 +360,11 @@ function editorToolbarTemplate() {
         <span class="ed-font-label" id="ed-font-label">14</span>
         <button class="ed-tool" onclick="edChangeFontSize(1)" title="Larger text" aria-label="Larger text"><i data-lucide="plus"></i></button>
       </span>
+      <!-- Hold to see your code against the target: js/code-peek.js -->
+      <button class="ed-tool" id="ed-peek-btn" onpointerdown="codePeekHold(event)"
+              title="Peek at the target code: hold this, or hold Ctrl+Space" aria-label="Peek at the target code">
+        <i data-lucide="eye"></i>
+      </button>
       <button class="ed-tool" id="ed-zen-btn" onclick="toggleZenMode()" title="Zen mode — editor only (Ctrl+\\)" aria-label="Zen mode">
         <i data-lucide="maximize-2"></i>
       </button>

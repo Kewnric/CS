@@ -8,12 +8,12 @@ function practiceShortcutsTemplate(isSet) {
        ['Alt', '← →', 'Switch problem'], ['Ctrl', 'B', 'Boss bar'],
        ['Ctrl', 'F', 'Find'], ['Ctrl', '/', 'Comment'],
        ['Ctrl', 'D', 'Duplicate line'], ['Alt', '↑ ↓', 'Move line'],
-       ['Ctrl', '\\', 'Zen mode']]
+       ['Ctrl', '\\', 'Zen mode'], ['Ctrl', 'Space', 'Hold: peek at target']]
     : [['Ctrl', '↵', 'Check code'], ['Ctrl', '⇧ ↵', 'Finish attempt'],
        ['Ctrl', '⇧ R', 'Retry'], ['Ctrl', 'B', 'Boss bar'],
        ['Ctrl', 'F', 'Find'], ['Ctrl', '/', 'Comment'],
        ['Ctrl', 'D', 'Duplicate line'], ['Alt', '↑ ↓', 'Move line'],
-       ['Ctrl', '\\', 'Zen mode'], ['Esc', '', 'Back']];
+       ['Ctrl', '\\', 'Zen mode'], ['Ctrl', 'Space', 'Hold: peek at target'], ['Esc', '', 'Back']];
   // The autosave chip sits beside the toggle and yields to the expanded sheet
   // (see .practice-shortcuts[open] ~ .ed-save-state in editor.css).
   return `

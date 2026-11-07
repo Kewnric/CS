@@ -169,7 +169,10 @@ exist; the challenge definition only supplies each file's starter code.
 **Editor extras:** `fold.js` (folding — parks text in a module, so it is the only
 thing between the user and lost code), `brackets.js` (pair highlight, matched
 against the *whole* file so a folded partner is not mismatched), `editor-fx.js`
-(per-character animation; hides the real glyph while its ghost flies).
+(per-character animation; hides the real glyph while its ghost flies), and
+`code-peek.js` (hold Ctrl+Space or the toolbar eye: your code merged with the
+reference `code` -- missing lines faint, wrong tokens wavy-red, compared as C
+tokens so spacing and comments never count; off in Recall mode).
 
 ---
 
