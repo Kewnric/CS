@@ -448,8 +448,14 @@ function _mdSlots(app, sheets, fn) {
     programs(app.challenges);
     if (app.codingStash) programs(app.codingStash.challenges);
     rich(app.snippets, ['description', 'comments']);
-    // Folder banners (folder-banner.js): every library's folders share app.nodes.
-    (app.nodes || []).forEach(n => { if (n && n.banner && typeof n.banner === 'object') fn(n.banner, 'src'); });
+    // Folder banners (folder-banner.js): every library's folders share app.nodes;
+    // a backup also carries the parked starter-pack library and Brain's folders.
+    const banners = list => {
+      if (Array.isArray(list)) list.forEach(n => { if (n && n.banner && typeof n.banner === 'object') fn(n.banner, 'src'); });
+    };
+    banners(app.nodes);
+    if (app.codingStash) banners(app.codingStash.nodes);
+    if (app.brain && typeof app.brain === 'object') banners(app.brain.folders);
     (app.notebooks || []).forEach(nb => ((nb && nb.sections) || []).forEach(sec =>
       ((sec && sec.answerKeysData) || []).forEach(d => { if (d && typeof d === 'object') fn(d, 'image'); })));
     const wings = app.wings && typeof app.wings === 'object' ? app.wings : {};

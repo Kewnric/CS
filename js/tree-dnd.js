@@ -855,6 +855,8 @@ function treeSyncExpansion(container) {
     const chevron = row.querySelector('.tree-node-chevron');
     if (chevron) chevron.classList.toggle('expanded', open);
   });
+  // A hovered folder that just opened (or closed) starts (or stops) its GIF banner.
+  if (typeof folderBannerSyncPlay === 'function') folderBannerSyncPlay(container);
 }
 
 /** The always-present drop target under a tree that means "top level". */

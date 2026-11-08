@@ -325,6 +325,8 @@ function brainSetFolderOpen(id, open) {
   if (chev) chev.classList.toggle('expanded', open);
   // Toggling in place used to leave the accessible state stale.
   if (row && row.hasAttribute('aria-expanded')) row.setAttribute('aria-expanded', String(open));
+  // Clicking a Brain folder only opens it, so this is where its GIF banner starts.
+  if (row && typeof folderBannerSyncPlay === 'function') folderBannerSyncPlay(row);
   return true;
 }
 

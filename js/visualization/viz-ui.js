@@ -1574,6 +1574,8 @@ function vizContentToggleFolder(folderId) {
     if (row && row.hasAttribute('aria-expanded')) row.setAttribute('aria-expanded', String(expanded));
     if (childrenContainer) childrenContainer.classList.toggle('collapsed', !expanded);
     if (chevron) chevron.classList.toggle('expanded', expanded);
+    // A hovered folder that just opened (or closed) starts (or stops) its GIF banner.
+    if (row && typeof folderBannerSyncPlay === 'function') folderBannerSyncPlay(row);
   } else {
     vizRenderContentPane();
   }
