@@ -1065,7 +1065,7 @@ function hasPendingShare() {
    than dropped.
    ============================================================ */
 function repairDataIntegrity() {
-  const report = { orphans: 0, duplicateIds: 0, deadSetProblems: 0, deadLocks: 0, emptyVariants: 0 };
+  const report = { orphans: 0, duplicateIds: 0, deadSetProblems: 0, deadLocks: 0, emptyVariants: 0, brokenSections: 0 };
   if (!state) return report;
 
   const folderIds = new Set((state.nodes || []).filter(n => n && n.type === 'folder').map(n => n.id));
@@ -1136,6 +1136,19 @@ function repairDataIntegrity() {
     }
   });
 
+  // Notebooks opened from a share link before the import was fixed hold {id}
+  // objects where the question numbers belong, so an attempt found 0 questions.
+  if (typeof nbQuestionNumbers === 'function') {
+    (state.notebooks || []).forEach(nb => {
+      (nb && nb.sections || []).forEach(sec => {
+        if (!sec || !Array.isArray(sec.questions)) return;
+        if (sec.questions.every(q => typeof q === 'number')) return;
+        sec.questions = nbQuestionNumbers(sec);
+        report.brokenSections++;
+      });
+    });
+  }
+
   const total = Object.values(report).reduce((a, b) => a + b, 0);
   if (total > 0) {
     saveData();
@@ -1145,6 +1158,7 @@ function repairDataIntegrity() {
     if (report.deadSetProblems) bits.push(report.deadSetProblems + ' set problem' + (report.deadSetProblems !== 1 ? 's' : '') + ' dropped');
     if (report.deadLocks) bits.push(report.deadLocks + ' stale prerequisite' + (report.deadLocks !== 1 ? 's' : '') + ' cleared');
     if (report.emptyVariants) bits.push(report.emptyVariants + ' program' + (report.emptyVariants !== 1 ? 's' : '') + ' given a version');
+    if (report.brokenSections) bits.push(report.brokenSections + ' shared notebook section' + (report.brokenSections !== 1 ? 's' : '') + ' given back its questions');
     console.warn('[Repair]', bits.join('; '));
     if (typeof toast === 'function') {
       toast('Fixed some damaged data: ' + bits.join('; ') + '.', { type: 'warning', duration: 8000 });

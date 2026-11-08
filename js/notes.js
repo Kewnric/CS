@@ -1211,6 +1211,18 @@ function checkSharedNotebook() {
 }
 
 /** Files a shared notebook into the current workspace and opens it. */
+/**
+ * A section's question numbers. Anything that is not a number (the {id}
+ * objects the old share import wrote) is rebuilt from the answer key.
+ * @param {object} sec @returns {number[]}
+ */
+function nbQuestionNumbers(sec) {
+  const qs = Array.isArray(sec && sec.questions) ? sec.questions : [];
+  if (qs.every(q => typeof q === 'number' && q > 0)) return qs.slice();
+  const nums = (sec.answerKeysData || []).map(d => +d.qNum).filter(q => q > 0);
+  return [...new Set(nums)].sort((a, b) => a - b);
+}
+
 function importSharedNotebook(shared) {
   if (!shared) return null;
   const tempId = 'shared_notebook_' + Date.now();
@@ -1224,7 +1236,10 @@ function importSharedNotebook(shared) {
     sections: (shared.sections || []).map(sec => ({
       ...sec,
       id: sec.id || generateId(),
-      questions: (sec.questions || []).map(q => ({ ...q, id: q.id || generateId() }))
+      // Question numbers, matched against answerKeysData[].qNum. This used to
+      // map each one to {...q, id}, and spreading a number gives {}, so every
+      // question became {id} and the attempt found none of them in the key.
+      questions: nbQuestionNumbers(sec)
     }))
   };
 
