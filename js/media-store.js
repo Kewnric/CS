@@ -125,6 +125,7 @@ function _mdRemember(rec) {
     full: URL.createObjectURL(rec.blob),
     thumb: rec.thumb ? URL.createObjectURL(rec.thumb) : null,
     w: rec.w || 0, h: rec.h || 0,
+    type: (rec.blob && rec.blob.type) || rec.type || '',
     bytes: (rec.blob ? rec.blob.size : 0) + (rec.thumb ? rec.thumb.size : 0)
   });
 }
@@ -146,6 +147,16 @@ function mediaReady() {
 
 function mediaIsRef(v) {
   return typeof v === 'string' && v.lastIndexOf(MEDIA_PREFIX, 0) === 0;
+}
+
+/**
+ * A stored picture's type and size, or null when the value is not a reference
+ * or its picture is not read on this device (folder banners draw plain then).
+ */
+function mediaInfo(v) {
+  if (!mediaIsRef(v)) return null;
+  const p = _mdPics.get(v.slice(MEDIA_PREFIX.length));
+  return p ? { type: p.type || '', w: p.w || 0, h: p.h || 0 } : null;
 }
 
 /** What to put in src= (or url()) for a saved picture value. */
@@ -437,6 +448,8 @@ function _mdSlots(app, sheets, fn) {
     programs(app.challenges);
     if (app.codingStash) programs(app.codingStash.challenges);
     rich(app.snippets, ['description', 'comments']);
+    // Folder banners (folder-banner.js): every library's folders share app.nodes.
+    (app.nodes || []).forEach(n => { if (n && n.banner && typeof n.banner === 'object') fn(n.banner, 'src'); });
     (app.notebooks || []).forEach(nb => ((nb && nb.sections) || []).forEach(sec =>
       ((sec && sec.answerKeysData) || []).forEach(d => { if (d && typeof d === 'object') fn(d, 'image'); })));
     const wings = app.wings && typeof app.wings === 'object' ? app.wings : {};
