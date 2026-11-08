@@ -169,7 +169,7 @@ function renderNotebookTreeRecursive(parentId, depth, query, itemsOnly, rootList
                ${treeRowAttrs({ ns: 'notes', id: folder.id, kind: 'folder', level: depth, expanded: expanded })}
                style="padding-left: calc(0.5rem + 0rem)"
                oncontextmenu="treeContextMenu(event, '${folder.id}', 'notes')"
-               onclick="selectNotebookFolder('${folder.id}')">
+               onclick="selectNotebookFolder('${folder.id}')">${typeof folderBannerHTML === 'function' ? folderBannerHTML(folder) : ''}
             <i data-lucide="chevron-right" class="tree-node-chevron ${chevronClass}" onclick="toggleNotebookFolder('${folder.id}', event)"></i>
             <i data-lucide="${folder.icon || 'folder'}" class="tree-node-icon folder-icon-color"></i>
             <span class="tree-node-label">${escapeHTML(folder.name)}</span>

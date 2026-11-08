@@ -431,7 +431,7 @@ function brainRenderSidebar(opts) {
                  ${treeRowAttrs({ ns: 'brain', id: n.id, kind: 'folder', level: depth, expanded: open })}
                  style="padding-left: calc(0.75rem + 0rem)"
                  oncontextmenu="treeContextMenu(event, '${n.id}', 'brain')"
-                 onclick="brainToggleFolder('${n.id}')">
+                 onclick="brainToggleFolder('${n.id}')">${typeof folderBannerHTML === 'function' ? folderBannerHTML(n) : ''}
               <i data-lucide="chevron-right" class="tree-node-chevron ${hasKids ? (open ? 'expanded' : '') : 'invisible'}"
                  onclick="brainToggleFolder('${n.id}', event)"></i>
               <i data-lucide="${escapeHTML(n.icon || 'folder')}" class="tree-node-icon folder-icon-color"></i>

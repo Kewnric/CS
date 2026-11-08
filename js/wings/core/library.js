@@ -187,7 +187,7 @@ function wingRenderSidebar() {
           <div class="tree-node-row ${_wingFolderId === f.id ? 'active' : ''}"
                style="padding-left: calc(0.5rem + ${depth * 0.75}rem)"
                onclick="wingSelectFolder('${f.id}')"
-               oncontextmenu="event.preventDefault(); wingFolderMenu('${f.id}')">
+               oncontextmenu="event.preventDefault(); wingFolderMenu('${f.id}', event)">${typeof folderBannerHTML === 'function' ? folderBannerHTML(f) : ''}
             <i class="tree-node-chevron invisible"></i>
             <i data-lucide="${f.icon || 'folder'}" class="tree-node-icon" style="width:14px;height:14px;"></i>
             <span class="tree-node-label">${escapeHTML(f.name)}</span>
@@ -201,6 +201,7 @@ function wingRenderSidebar() {
 
   host.innerHTML = rows.join('');
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: host });
+  if (typeof folderBannerHydrate === 'function') folderBannerHydrate(host);
 }
 
 function wingSelectFolder(id) {
@@ -613,7 +614,27 @@ function wingNewFolder() {
   });
 }
 
-function wingFolderMenu(id) {
+/**
+ * Right-click on a wing folder: a small menu with the rename/delete dialog
+ * and the folder banner entries. Without the event (or the shared menu),
+ * straight to the dialog as before.
+ */
+function wingFolderMenu(id, e) {
+  const node = state.nodes.find(n => n.id === id);
+  if (!node) return;
+  if (e && typeof _treeShowMenu === 'function' && typeof folderBannerMenuItems === 'function') {
+    const commit = () => { saveData(); wingRenderSidebar(); };
+    _treeShowMenu(e, [
+      { icon: 'pencil', label: 'Rename or delete…', fn: () => wingFolderRenameDialog(id) },
+      { sep: true },
+      ...folderBannerMenuItems(node, commit)
+    ]);
+    return;
+  }
+  wingFolderRenameDialog(id);
+}
+
+function wingFolderRenameDialog(id) {
   const node = state.nodes.find(n => n.id === id);
   if (!node) return;
   showInputDialog('Rename folder', 'Leave empty to delete this folder (its entries move to Uncategorized).',

@@ -1244,7 +1244,7 @@ function _vizFolderRow(o) {
   })}
            style="padding-left: calc(0.75rem + 0rem)"
            oncontextmenu="treeContextMenu(event, '${o.id}', 'viz')"
-           onclick="${o.head || o.id === '__root__' ? `vizContentToggleFolder('${o.id}')` : `vizContentClickFolder('${o.id}')`}">
+           onclick="${o.head || o.id === '__root__' ? `vizContentToggleFolder('${o.id}')` : `vizContentClickFolder('${o.id}')`}">${o.banner || ''}
         <i data-lucide="chevron-right" class="tree-node-chevron ${o.kids ? (o.open ? 'expanded' : '') : 'invisible'}"
            onclick="event.stopPropagation();vizContentToggleFolder('${o.id}')"></i>
         <i data-lucide="${o.icon}" class="tree-node-icon ${o.head ? 'viz-gen-head-icon' : 'folder-icon-color'}"${o.head ? '' : ' style="width:14px;height:14px;"'}></i>
@@ -1366,6 +1366,7 @@ function vizRenderContentPane() {
           lock: _vizFolderLock(n.id),
           tier: typeof getTierBadgeHTML === 'function' ? getTierBadgeHTML(n.tier) : '',
           acc: typeof treeAccentAttrs === 'function' ? treeAccentAttrs(n) : null,
+          banner: typeof folderBannerHTML === 'function' ? folderBannerHTML(n) : '',
           open: viz.expandedFolderIds.has(n.id) || narrowed,
           children: renderUnder(n.id, scope, level + 1)
         });

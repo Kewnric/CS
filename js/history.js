@@ -289,8 +289,8 @@ function renderAnalyticsTreeRecursive(parentId, scope, depth, query) {
         <div class="tree-node-row ${isActive ? 'active' : ''}" 
              data-node-id="${folder.id}"
              style="padding-left: calc(0.75rem + ${indent}rem)"
-             onclick="selectAnalyticsFolder('${folder.id}', '${scope}')">
-          <i data-lucide="chevron-right" 
+             onclick="selectAnalyticsFolder('${folder.id}', '${scope}')">${typeof folderBannerHTML === 'function' ? folderBannerHTML(folder) : ''}
+          <i data-lucide="chevron-right"
              class="tree-node-chevron ${chevronClass}"
              onclick="toggleAnalyticsExpand('${folder.id}', '${scope}', event)"></i>
           <i data-lucide="${folder.icon || 'folder'}" class="tree-node-icon folder-icon-color"></i>
@@ -787,6 +787,7 @@ function renderHistory() {
 
   container.innerHTML = sidebarHTML;
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: container });
+  if (typeof folderBannerHydrate === 'function') folderBannerHydrate(container);
   // (The old updateAnalyticsSummary() call was removed — it targeted ids that
   // don't exist. Each renderXAnalytics() calls updateAnalyticsSubSummary(type).)
 }
