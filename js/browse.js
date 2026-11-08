@@ -473,7 +473,7 @@ function renderTreeRecursive(parentId, scope, depth, query, activeId, itemsOnly,
                ${treeRowAttrs({ ns: 'browse', id: folder.id, kind: 'folder', level: depth, expanded })}
                style="padding-left: calc(0.75rem + 0rem)"
                oncontextmenu="treeContextMenu(event, '${folder.id}', 'browse')"
-               onclick="selectBrowseNode('${folder.id}')">
+               onclick="selectBrowseNode('${folder.id}')">${typeof folderBannerHTML === 'function' ? folderBannerHTML(folder) : ''}
             <i data-lucide="chevron-right"
                class="tree-node-chevron ${chevronClass}"
                onclick="toggleBrowseExpand('${folder.id}', event)"></i>

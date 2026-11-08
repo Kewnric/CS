@@ -674,6 +674,8 @@ function treeCommit(container, html, selectedId) {
     container.innerHTML = html;
     _treeMarkup.set(container, html);
     treeStaggerIn(container);
+    // GIF folder banners get their still frame (folder-banner.js).
+    if (typeof folderBannerHydrate === 'function') folderBannerHydrate(container);
   }
   treeApplySelection(container, selectedId);
   return rebuilt;
@@ -769,6 +771,8 @@ function treeApplySelection(container, selectedId) {
     if (tickable) row.setAttribute('aria-checked', ticked ? 'true' : 'false');
     else row.removeAttribute('aria-checked');
   });
+  // A selected folder's GIF banner plays; the one it left stops.
+  if (typeof folderBannerSyncPlay === 'function') folderBannerSyncPlay(container);
 }
 
 /* ── Picking several rows at once ──────────────────────────────
