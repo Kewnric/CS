@@ -183,6 +183,110 @@ if (typeof document !== 'undefined') {
   document.addEventListener('focusout', e => _fbHostEvent(e, false));
 }
 
+/* ── Setting one: the right-click menu ───────────────────── */
+
+const FOLDER_BANNER_MAX_BYTES = 25 * 1024 * 1024;
+const FOLDER_BANNER_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+
+function _fbWarn(msg) {
+  if (typeof toast === 'function') toast(msg, { type: 'warning' });
+}
+
+/**
+ * Check a chosen file and store it in the picture store. Resolves to its
+ * media: reference, or null after telling the user why not. A banner never
+ * keeps a data: URL in the save, so a browser that refuses the picture
+ * store gets no banner rather than a 5 MB-budget one.
+ */
+async function folderBannerUpload(file) {
+  if (!file) return null;
+  if (FOLDER_BANNER_TYPES.indexOf(file.type) === -1) {
+    _fbWarn('A banner has to be a PNG, JPG, GIF or WebP picture.');
+    return null;
+  }
+  if (file.size > FOLDER_BANNER_MAX_BYTES) {
+    _fbWarn('That picture is over 25 MB. Pick a smaller one for the banner.');
+    return null;
+  }
+  let ref = null;
+  try { ref = await mediaUpload(file); } catch (e) { ref = null; }
+  if (!mediaIsRef(ref)) {
+    _fbWarn('This browser would not store the picture, so the banner was not set.');
+    return null;
+  }
+  return ref;
+}
+
+/** The folder's own row on screen, for the crop window's size and count. */
+function _fbRowFor(id) {
+  try {
+    return document.querySelector('.tree-node[data-node-id="' + CSS.escape(String(id)) + '"] > .tree-node-row');
+  } catch (e) { return null; }
+}
+
+function _fbOpenCrop(rec, banner, commit) {
+  const row = _fbRowFor(rec.id);
+  const badge = row && row.querySelector('.tree-node-badge, .tree-node-count');
+  bannerCropOpen({
+    banner,
+    label: rec.name || '',
+    icon: rec.icon || 'folder',
+    count: badge ? badge.textContent.trim() : '',
+    rowEl: row,
+    onSave: (b) => { rec.banner = b; commit(); },
+    onCancel: () => {}
+  });
+}
+
+/** A file chosen for a folder: checked, stored, then the crop window. */
+async function folderBannerPickFile(rec, commit, file) {
+  const ref = await folderBannerUpload(file);
+  if (!ref) return;
+  _fbOpenCrop(rec, { src: ref, x: 50, y: 50, zoom: 1, dim: rec.banner && isFinite(rec.banner.dim) ? rec.banner.dim : 0.3 }, commit);
+}
+
+/** Change banner…: ask for a picture file. */
+function folderBannerPick(rec, commit) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = FOLDER_BANNER_TYPES.join(',');
+  input.style.display = 'none';
+  input.addEventListener('change', () => {
+    const file = input.files && input.files[0];
+    input.remove();
+    if (file) folderBannerPickFile(rec, commit, file);
+  });
+  document.body.appendChild(input);
+  input.click();
+}
+
+/** Adjust banner…: the crop window over the picture already set. */
+function folderBannerAdjust(rec, commit) {
+  const b = rec && rec.banner;
+  if (!b || !mediaInfo(b.src)) return;
+  _fbOpenCrop(rec, { src: b.src, x: b.x, y: b.y, zoom: b.zoom, dim: b.dim }, commit);
+}
+
+function folderBannerRemove(rec, commit) {
+  if (!rec) return;
+  delete rec.banner;
+  commit();
+}
+
+/**
+ * The menu entries for one folder record. `commit` saves wherever that
+ * record lives and redraws its tree.
+ */
+function folderBannerMenuItems(rec, commit) {
+  const items = [{ icon: 'image-plus', label: 'Change banner…', fn: () => folderBannerPick(rec, commit) }];
+  const b = rec && rec.banner;
+  if (b) {
+    if (mediaInfo(b.src)) items.push({ icon: 'crop', label: 'Adjust banner…', fn: () => folderBannerAdjust(rec, commit) });
+    items.push({ icon: 'image-off', label: 'Remove banner', fn: () => folderBannerRemove(rec, commit) });
+  }
+  return items;
+}
+
 /* Rows drawn before the pictures were read came out plain; draw them again. */
 if (typeof mediaReady === 'function') {
   mediaReady().then(() => { if (typeof treeRefreshHosts === 'function') treeRefreshHosts(); });

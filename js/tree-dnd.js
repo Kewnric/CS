@@ -941,6 +941,17 @@ function treeContextMenu(e, id, ns) {
   actions.push({ icon: 'folder-input', label: 'Move to…', fn: () => treeMovePrompt(id, ns) });
   // Anything only this tree can offer (duplicate, share, pin, compare…).
   if (host.extraActions) (host.extraActions(id, found.kind) || []).forEach(a => actions.push(a));
+  // A picture behind the folder's row (folder-banner.js). Saved wherever the
+  // record lives: Brain's folders are not state.nodes.
+  if (isFolder && !found.pseudo && found.node && typeof folderBannerMenuItems === 'function') {
+    const commit = () => {
+      if (ns === 'brain' && typeof brainSave === 'function') brainSave(); else saveData();
+      if (typeof invalidateBrowseCache === 'function') invalidateBrowseCache();
+      treeRefreshHosts();
+    };
+    actions.push({ sep: true });
+    folderBannerMenuItems(found.node, commit).forEach(a => actions.push(a));
+  }
   if (isFolder && host.onNewSubfolder && !lead.some(a => a.subfolder)) {
     actions.push({ icon: 'folder-plus', label: 'New subfolder', fn: () => host.onNewSubfolder(id) });
   }

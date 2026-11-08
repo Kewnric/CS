@@ -96,3 +96,65 @@
     transition-duration: 0.12s;
   }
 }
+
+/* ── The crop window (js/banner-crop.js) ───────────────────── */
+.dialog-banner .modal-content { max-width: 560px; }
+.bc { display: grid; gap: 0.85rem; text-align: left; }
+.bc-stage {
+  display: flex;
+  justify-content: center;
+  padding: 1rem 0.75rem;
+  border-radius: var(--radius-md, 10px);
+  background: var(--bg-surface, rgba(15, 23, 42, 0.6));
+  overflow: hidden;
+}
+.bc-node { max-width: 100%; }
+.bc-row {
+  max-width: 100%;
+  cursor: grab;
+  touch-action: none;
+  flex: none;
+}
+.bc-row.is-dragging { cursor: grabbing; }
+/* The preview is still while you work on it: no hover shuffle. */
+.bc .tree-node-row:hover,
+.bc .tree-node-row.active:hover { transform: none; }
+.bc-kids { display: none; }
+.bc-side { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.bc-seg {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--bg-surface, rgba(15, 23, 42, 0.6));
+  border: 1px solid var(--border-color, rgba(148, 163, 184, 0.2));
+}
+.bc-seg-btn {
+  padding: 0.3rem 0.8rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-secondary, #94a3b8);
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.bc-seg-btn.is-on { background: var(--color-primary, #6366f1); color: #fff; }
+.bc-tile { pointer-events: none; }
+.bc-field {
+  display: grid;
+  grid-template-columns: 3.5rem 1fr 3rem;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #94a3b8);
+}
+.bc-field input[type="range"] { width: 100%; accent-color: var(--color-primary, #6366f1); }
+.bc-field output { text-align: right; font-variant-numeric: tabular-nums; }
+.bc-foot { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+/* .modal-actions .btn shares the width out (flex: 1), which clipped labels. */
+.bc-foot .btn { flex: 0 0 auto; padding: 0.55rem 0.9rem; white-space: nowrap; }
+.bc-spacer { flex: 1; }
+@media (max-width: 480px) {
+  .bc-side { flex-direction: column; align-items: stretch; }
+  .bc-tile { align-self: center; }
+}
