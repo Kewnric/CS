@@ -378,7 +378,7 @@ function nbqPairKey(e, i, pi) {
 function nbqAdd(type, count) {
   const sec = nbqSection();
   const n = Math.max(1, Math.min(50, count || 1));
-  for (let k = 0; k < n && nbqDraft.length < 200; k++) {
+  for (let k = 0; k < n && nbqDraft.length < NB_MAX_QUESTIONS; k++) {
     const q = nbBlankQuestion(nbqDraft.length + 1, type, sec && sec.choices);
     nbqDraft.push(q);
   }
@@ -401,7 +401,7 @@ function nbqMove(i, dir) {
 
 function nbqDuplicate(i) {
   const d = nbqDraft[i];
-  if (!d || nbqDraft.length >= 200) return;
+  if (!d || nbqDraft.length >= NB_MAX_QUESTIONS) return;
   nbqDraft.splice(i + 1, 0, JSON.parse(JSON.stringify(d)));
   nbqRerender();
 }
@@ -710,7 +710,7 @@ function nbqPasteQuestions() {
     qNum: 0, type: p.type, question: p.question || '', choices: p.choices || {}, answer: p.answer,
     explanation: p.explanation || '', hint: p.hint || '', image: p.image || '', pairs: p.pairs || []
   }));
-  nbqDraft = keep.concat(added).slice(0, 200);
+  nbqDraft = keep.concat(added).slice(0, NB_MAX_QUESTIONS);
   if (ta) ta.value = '';
   nbqRender();
   _showParseReport(report);

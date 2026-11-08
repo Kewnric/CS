@@ -872,6 +872,9 @@ function nbMarkDirty() {
   if (typeof setSaveStatus === 'function') setSaveStatus('notebook-save-status', 'unsaved');
 }
 
+/** Most questions one notebook section can hold (count field, Bulk Add, paste, the editor). */
+const NB_MAX_QUESTIONS = 500;
+
 /**
  * An empty section. It used to arrive with five blank questions, so a notebook
  * you had not touched yet already showed "5 blocking issues".
@@ -887,7 +890,7 @@ function nbNewSection(label, count, choices) {
     answerKey: '',
     answerKeysData: []
   };
-  const n = Math.max(0, Math.min(200, count || 0));
+  const n = Math.max(0, Math.min(NB_MAX_QUESTIONS, count || 0));
   if (choices) sec.choices = choices;
   sec.questions = Array.from({ length: n }, (_, i) => i + 1);
   sec.answerKeysData = sec.questions.map(q => nbBlankQuestion(q, 'mcq', choices));
@@ -1186,7 +1189,7 @@ function renderNotebookSectionsForm() {
             </div>
             <div class="af-field" style="width:110px;">
               <label class="form-label" for="nb-sec-count-${idx}">Questions</label>
-              <input id="nb-sec-count-${idx}" type="number" min="0" max="200" class="form-input nb-input-compact" value="${(sec.questions || []).length}" oninput="syncNotebookSection(${idx})" title="Raise it for blank questions, lower it to drop the last ones" />
+              <input id="nb-sec-count-${idx}" type="number" min="0" max="${NB_MAX_QUESTIONS}" class="form-input nb-input-compact" value="${(sec.questions || []).length}" oninput="syncNotebookSection(${idx})" title="Raise it for blank questions, lower it to drop the last ones" />
             </div>
           </div>
           <!-- Import is the way most sections get filled, so it leads. Questions
@@ -1287,9 +1290,9 @@ function syncNotebookSection(idx) {
   if (choicesEl) sec.choices = parseInt(choicesEl.value) || 4;
   if (countEl) {
     // The field accepted anything: 999 built 999 questions, -5 silently wiped
-    // the section. Clamp to the same 1-200 the input advertises.
+    // the section. Clamp to the same 0-NB_MAX_QUESTIONS the input advertises.
     const raw = parseInt(countEl.value, 10);
-    const count = isNaN(raw) ? 0 : Math.max(0, Math.min(200, raw));
+    const count = isNaN(raw) ? 0 : Math.max(0, Math.min(NB_MAX_QUESTIONS, raw));
     if (!isNaN(raw) && raw !== count) countEl.value = String(count);
 
     const prev = (sec.questions || []).length;
@@ -1381,14 +1384,14 @@ function applyBulkQuestions(idx, text, append) {
     choices: p.choices || {}, answer: p.answer, explanation: p.explanation || '',
     hint: p.hint || '', image: p.image || '', pairs: p.pairs || []
   }));
-  const all = base.concat(newEntries).slice(0, 200);
+  const all = base.concat(newEntries).slice(0, NB_MAX_QUESTIONS);
   nbCommitQuestions(sec, all);
 
   let maxChoices = sec.choices || 4;
   all.forEach(d => { const n = Object.keys(d.choices || {}).length; if (n > maxChoices) maxChoices = n; });
   sec.choices = Math.max(2, Math.min(8, maxChoices || 4));
 
-  return { added: Math.min(newEntries.length, 200 - base.length) };
+  return { added: Math.min(newEntries.length, NB_MAX_QUESTIONS - base.length) };
 }
 
 let _nbImportIdx = -1;
