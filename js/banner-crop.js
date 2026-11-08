@@ -21,7 +21,8 @@ function _bcClampB(b) {
     x: r(c(b.x, 0, 100, 50)),
     y: r(c(b.y, 0, 100, 50)),
     zoom: r(c(b.zoom, 1, 4, 1)),
-    dim: r(c(b.dim, 0, 0.7, 0.3))
+    dim: r(c(b.dim, 0, 0.7, 0.3)),
+    tint: r(c(b.tint, 0, 1, 1))     // the selected row's cyan wash over the picture
   };
 }
 
@@ -78,6 +79,8 @@ function bannerCropOpen(opts) {
     + '</div>'
     + '<label class="bc-field"><span>Zoom</span><input id="bc-zoom" type="range" min="100" max="400" step="5"><output id="bc-zoom-v"></output></label>'
     + '<label class="bc-field"><span>Dim</span><input id="bc-dim" type="range" min="0" max="70" step="1"><output id="bc-dim-v"></output></label>'
+    + '<label class="bc-field" title="The cyan tint over the picture while the folder is selected. 0% turns it off.">'
+    +   '<span>Highlight</span><input id="bc-tint" type="range" min="0" max="100" step="5"><output id="bc-tint-v"></output></label>'
     + '<div class="bc-foot">'
     +   '<button id="bc-auto" class="btn btn-ghost btn-sm" type="button"><i data-lucide="scan"></i> Auto</button>'
     +   '<button id="bc-swap" class="btn btn-ghost btn-sm" type="button"><i data-lucide="image-plus"></i> Change picture</button>'
@@ -93,6 +96,11 @@ function bannerCropOpen(opts) {
   const $ = id => document.getElementById(id);
   $('bc-zoom').addEventListener('input', e => { st.b.zoom = Number(e.target.value) / 100; _bcPaint(); });
   $('bc-dim').addEventListener('input', e => { st.b.dim = Number(e.target.value) / 100; _bcPaint(); });
+  $('bc-tint').addEventListener('input', e => {
+    st.b.tint = Number(e.target.value) / 100;
+    _bcPreviewAs('sel');   // the highlight only shows on a selected row
+    _bcPaint();
+  });
   $('bc-auto').onclick = () => { st.b.x = 50; st.b.y = 50; st.b.zoom = 1; _bcPaint(); };
   $('bc-swap').onclick = _bcChooseAnother;
   $('bc-as-sel').onclick = () => _bcPreviewAs('sel');
@@ -143,9 +151,12 @@ function _bcPaint() {
   const z = document.getElementById('bc-zoom'), d = document.getElementById('bc-dim');
   if (z) z.value = String(Math.round(st.b.zoom * 100));
   if (d) d.value = String(Math.round(st.b.dim * 100));
-  const zv = document.getElementById('bc-zoom-v'), dv = document.getElementById('bc-dim-v');
+  const t = document.getElementById('bc-tint');
+  if (t) t.value = String(Math.round(st.b.tint * 100));
+  const zv = document.getElementById('bc-zoom-v'), dv = document.getElementById('bc-dim-v'), tv = document.getElementById('bc-tint-v');
   if (zv) zv.textContent = Math.round(st.b.zoom * 100) + '%';
   if (dv) dv.textContent = Math.round(st.b.dim * 100) + '%';
+  if (tv) tv.textContent = Math.round(st.b.tint * 100) + '%';
 }
 
 function _bcPreviewAs(mode) {
@@ -241,7 +252,7 @@ async function _bcUseFile(file) {
   if (!st || !file) return;
   const ref = await folderBannerUpload(file);
   if (!ref || _bcLive !== st || st.done) return;
-  st.b = { src: ref, x: 50, y: 50, zoom: 1, dim: st.b.dim };
+  st.b = { src: ref, x: 50, y: 50, zoom: 1, dim: st.b.dim, tint: st.b.tint };
   _bcPaintPicture();
   _bcPaint();
 }

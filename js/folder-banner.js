@@ -34,13 +34,18 @@ function _fbClamp(v, lo, hi, dflt) {
 }
 function _fbNum(v) { return String(Math.round(v * 100) / 100); }
 
-/** The CSS variables for a banner's position, zoom and dim, clamped. */
+/**
+ * The CSS variables for a banner's position, zoom, dim and highlight, clamped.
+ * tint (0-1) is how strongly the selected row's cyan wash shows over the
+ * picture; banners saved before it existed read as 1, the full wash.
+ */
 function folderBannerVars(b) {
   b = b || {};
   return '--fb-x:' + _fbNum(_fbClamp(b.x, 0, 100, 50)) + '%;'
     + '--fb-y:' + _fbNum(_fbClamp(b.y, 0, 100, 50)) + '%;'
     + '--fb-z:' + _fbNum(_fbClamp(b.zoom, 1, 4, 1)) + ';'
-    + '--fb-dim:' + _fbNum(_fbClamp(b.dim, 0, 0.7, 0.3));
+    + '--fb-dim:' + _fbNum(_fbClamp(b.dim, 0, 0.7, 0.3)) + ';'
+    + '--fb-tint:' + _fbNum(_fbClamp(b.tint, 0, 1, 1));
 }
 
 function _fbIsGif(ref) {
@@ -242,7 +247,12 @@ function _fbOpenCrop(rec, banner, commit) {
 async function folderBannerPickFile(rec, commit, file) {
   const ref = await folderBannerUpload(file);
   if (!ref) return;
-  _fbOpenCrop(rec, { src: ref, x: 50, y: 50, zoom: 1, dim: rec.banner && isFinite(rec.banner.dim) ? rec.banner.dim : 0.3 }, commit);
+  const old = rec.banner || {};
+  _fbOpenCrop(rec, {
+    src: ref, x: 50, y: 50, zoom: 1,
+    dim: isFinite(old.dim) ? old.dim : 0.3,
+    tint: isFinite(old.tint) ? old.tint : 1
+  }, commit);
 }
 
 /** Change banner…: ask for a picture file. */
@@ -264,7 +274,7 @@ function folderBannerPick(rec, commit) {
 function folderBannerAdjust(rec, commit) {
   const b = rec && rec.banner;
   if (!b || !mediaInfo(b.src)) return;
-  _fbOpenCrop(rec, { src: b.src, x: b.x, y: b.y, zoom: b.zoom, dim: b.dim }, commit);
+  _fbOpenCrop(rec, { src: b.src, x: b.x, y: b.y, zoom: b.zoom, dim: b.dim, tint: b.tint }, commit);
 }
 
 function folderBannerRemove(rec, commit) {

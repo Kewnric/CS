@@ -94,7 +94,8 @@
 .tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row > .fb-layer > .fb-img {
   transform: scale(var(--fb-z, 1));
 }
-.tree-node-row.active > .fb-layer::after { opacity: 1; }
+/* Its strength is the banner's own Highlight setting (0 = no cyan at all). */
+.tree-node-row.active > .fb-layer::after { opacity: var(--fb-tint, 1); }
 
 /* The row's text over a showing picture: light, with a soft shadow. */
 /* (Not the count badge: it is a pill with its own background, already readable,
