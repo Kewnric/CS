@@ -77,8 +77,10 @@
 .tree-node-row.active > .fb-layer::after { opacity: 1; }
 
 /* The row's text over a showing picture: light, with a soft shadow. */
-.tree-node-row.active:has(> .fb-layer) :is(.tree-node-label, .tree-node-badge, .tree-node-count),
-.tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row:has(> .fb-layer) :is(.tree-node-label, .tree-node-badge, .tree-node-count) {
+/* (Not the count badge: it is a pill with its own background, already readable,
+   and white text on the light themes' white pill disappeared.) */
+.tree-node-row.active:has(> .fb-layer) :is(.tree-node-label, .tree-node-count),
+.tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row:has(> .fb-layer) :is(.tree-node-label, .tree-node-count) {
   color: #f8fbff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
