@@ -57,11 +57,16 @@
   user-select: none;
 }
 
-/* Readability: a dark fade from the left, under the name, over the dim. */
+/* Readability: a dark fade from the left, under the name, over the dim.
+   Both overlays reach 1px past the layer on every side, so the layer's clip
+   cuts them on the same line as the picture. Stopping exactly at the edge,
+   the overlay's smoothed edge could fall a fraction of a pixel inside the
+   picture's, and once the fade had finished the GPU drew the last pixel row
+   of the picture undimmed: a light line along the bottom. */
 .fb-layer::before {
   content: '';
   position: absolute;
-  inset: 0;
+  inset: -1px;
   z-index: 1;
   background:
     linear-gradient(90deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0) 70%),
@@ -72,7 +77,7 @@
 .fb-layer::after {
   content: '';
   position: absolute;
-  inset: 0;
+  inset: -1px;
   z-index: 2;
   background: radial-gradient(circle at right center, rgba(34, 211, 238, 0.22) 0%, rgba(34, 211, 238, 0) 72%);
   opacity: 0;
