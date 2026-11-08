@@ -1208,6 +1208,7 @@ function _stkTrayOpen() {
     document.body.appendChild(tray);
     tray.addEventListener('pointerdown', _stkOnTrayDown);
     tray.addEventListener('click', _stkOnTrayClick);
+    tray.addEventListener('contextmenu', _stkOnTrayContext);
     tray.querySelector('#stk-file').addEventListener('change', async e => {
       const ids = await _stkAddFiles(e.target.files);
       e.target.value = '';
@@ -1289,6 +1290,38 @@ function _stkOnTrayClick(e) {
     stkSelect(it.id);
     _stkReveal(it);
   }
+}
+
+/**
+ * Right-click on a sticker under "On this page": a small menu for that
+ * sticker -- find it, duplicate it, lock it, or delete it (Delete keeps the
+ * Undo toast stkRemove gives). Uses the tree's menu, which sits above the
+ * tray. The context-menu key opens it at the thumbnail.
+ */
+function _stkOnTrayContext(e) {
+  const pick = e.target.closest('[data-pick]');
+  if (!pick) return;
+  const it = _stkById(pick.dataset.pick);
+  if (!it) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const act = (fn) => () => { fn(); _stkSave(); _stkSync(); };
+  const actions = [
+    { icon: 'locate', label: 'Find on page', fn: () => { stkSelect(it.id); _stkReveal(it); } },
+    { icon: 'copy', label: 'Duplicate', fn: () => _stkDuplicate(it) },
+    { icon: it.lock ? 'lock-open' : 'lock', label: it.lock ? 'Unlock' : 'Lock', fn: act(() => { it.lock = !it.lock; }) },
+    { sep: true },
+    { icon: 'trash-2', label: 'Delete', danger: true, fn: () => stkRemove(it.id) }
+  ];
+  if (typeof _treeShowMenu !== 'function') { stkRemove(it.id); return; }
+  if (typeof treeCloseMenu === 'function') treeCloseMenu();
+  let at = e;
+  if (!e.clientX && !e.clientY) {
+    // From the keyboard: open beside the thumbnail, not in the corner.
+    const r = pick.getBoundingClientRect();
+    at = { clientX: r.left + r.width / 2, clientY: r.bottom };
+  }
+  _treeShowMenu(at, actions);
 }
 
 function _stkAskForget(imgId) {
