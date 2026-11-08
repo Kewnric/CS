@@ -158,3 +158,65 @@
   .bc-side { flex-direction: column; align-items: stretch; }
   .bc-tile { align-self: center; }
 }
+
+/* ── Folders view: the tile opens to show the picture (tree-folderview.js) ──
+   At rest the tile is exactly today's folder: the picture waits, hidden,
+   behind a front flap drawn in the folder's own colours. On hover or focus
+   the flap tips forward and the picture rises out of the folder. */
+.tfv-tile.has-photo .tfv-glyph { overflow: visible; }
+.tfv-photo.fb-layer {
+  inset: auto;
+  left: 4px;
+  right: 4px;
+  top: 3px;
+  height: 30px;
+  z-index: 1;
+  border-radius: 3px;
+  box-shadow: 0 4px 10px -4px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.2s ease, transform 0.28s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+/* The row overlays (dim, selected wash) are for text on a row, not a tile. */
+.tfv-photo.fb-layer::before,
+.tfv-photo.fb-layer::after { display: none; }
+.tfv-photo .fb-img { transform: scale(var(--fb-z, 1)); transition: none; }
+.tfv-flap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 66%;
+  z-index: 2;
+  border-radius: 3px 3px 9px 9px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--tfv-c, #6366f1) 80%, #fff), var(--tfv-c, #6366f1) 55%, color-mix(in srgb, var(--tfv-c, #6366f1) 72%, #000));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transform-origin: bottom center;
+  /* Invisible at rest, so a closed tile is exactly today's tile (no seam);
+     it shows the moment it starts to tip, and hides once it has closed. */
+  opacity: 0;
+  transition: transform 0.28s cubic-bezier(0.3, 1.5, 0.5, 1), opacity 0s linear 0.28s;
+}
+.tfv-tile.has-photo .tfv-glyph > svg { position: relative; z-index: 3; }
+.tfv-tile.has-photo:is(:hover, :focus-visible, .is-open) .tfv-photo.fb-layer {
+  opacity: 1;
+  transform: translateY(-15px);
+  transition: opacity 0.2s ease, transform 0.28s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+.tfv-tile.has-photo:is(:hover, :focus-visible, .is-open) .tfv-flap {
+  opacity: 1;
+  transform: perspective(120px) rotateX(-32deg);
+  transition: transform 0.28s cubic-bezier(0.3, 1.5, 0.5, 1), opacity 0s;
+}
+/* The photo's GIF waits for its still frame, as on a row. */
+.tfv-photo.fb-layer.is-gif:not(.has-frame) { visibility: hidden; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tfv-flap,
+  .tfv-tile.has-photo:is(:hover, :focus-visible, .is-open) .tfv-flap { opacity: 0; transform: none; transition: none; }
+  .tfv-photo.fb-layer,
+  .tfv-tile.has-photo:is(:hover, :focus-visible, .is-open) .tfv-photo.fb-layer {
+    transform: translateY(-15px);
+    transition: opacity 0.12s ease;
+  }
+}

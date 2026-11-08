@@ -219,8 +219,13 @@ function _tfvDraw(c, view) {
       const rec = (state.nodes || []).find(x => x.id === id);
       if (rec) accent = libFolderColor(rec);
     }
+    // The folder's banner, read off its row's layer (folder-banner.js). Only
+    // the reference and position: the img's src changes on hover and must not
+    // enter the signature below.
+    const fbl = folder && row ? row.querySelector(':scope > .fb-layer[data-fb-ref]') : null;
     return {
       id, folder, accent,
+      banner: fbl ? { ref: fbl.getAttribute('data-fb-ref'), style: fbl.getAttribute('style') || '' } : null,
       label: _tfvLabel(n),
       icon: _tfvIconName(n, folder),
       count: folder ? (badge ? badge.textContent.trim() : String(n.querySelectorAll('.tree-node[data-node-id]').length)) : '',
@@ -248,6 +253,7 @@ function _tfvDraw(c, view) {
         + (q ? 'Nothing here matches “' + escapeHTML(q) + '”' : 'This folder is empty') + '</span></div>';
     view.scrollTop = scrolled;
     if (typeof lucide !== 'undefined') lucide.createIcons({ root: view });
+    if (typeof folderBannerHydrate === 'function') folderBannerHydrate(view);
   }
   view.querySelectorAll('.tfv-tile').forEach(t => {
     const id = t.getAttribute('data-tfv-id');
@@ -257,10 +263,13 @@ function _tfvDraw(c, view) {
 }
 
 function _tfvTileHTML(o) {
-  return '<div class="tfv-tile ' + (o.folder ? 'is-folder' : 'is-item') + '"'
+  // A folder with a banner opens on hover: the picture rises from behind a flap.
+  const photo = o.folder && o.banner && typeof folderBannerLayerHTML === 'function';
+  return '<div class="tfv-tile ' + (o.folder ? 'is-folder' : 'is-item') + (photo ? ' has-photo' : '') + '"'
     + ' role="option" tabindex="0" data-tfv-id="' + o.id + '" title="' + escapeHTML(o.label) + (o.folder ? ' (double-click to open)' : '') + '"'
     + (o.accent ? ' style="--tfv-c:' + o.accent + ';"' : '') + '>'
     + '<span class="tfv-glyph" aria-hidden="true">'
+    + (photo ? folderBannerLayerHTML(o.banner.ref, o.banner.style, 'tfv-photo') + '<span class="tfv-flap"></span>' : '')
     + (o.folder ? '<span class="tfv-tab"></span>' : '<span class="tfv-fold"></span>')
     + (o.folder && o.icon === 'folder' ? '' : '<i data-lucide="' + escapeHTML(o.icon) + '"></i>')
     + (o.lock ? '<span class="tfv-mark is-lock"><i data-lucide="lock"></i></span>' : '')
