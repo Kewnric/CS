@@ -73,7 +73,7 @@ const MEDIA_SRC_BLOB_RE = /(\bsrc\s*=\s*)(["'])(blob:[^"']+)\2/gi;
    window.MEDIA_READERS; old saves are moved over only when all of them have. */
 const MEDIA_READER_FILES = ['admin-form', 'admin-snippets', 'admin-notebooks', 'admin-notebook-questions',
   'browse', 'history', 'home', 'notes', 'study', 'notes-practice', 'cheatsheet', 'wings-registry', 'wings-collection',
-  'utils', 'admin-variants', 'practice'];
+  'utils', 'admin-variants', 'practice', 'folder-banner'];
 
 let _mdDbPromise = null;
 const _mdPics = new Map();       // id -> { full, thumb, w, h, bytes }
