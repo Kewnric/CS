@@ -1359,7 +1359,7 @@ function shareSnippet(snippetId) {
     return;
   }
 
-  const url = window.location.origin + window.location.pathname + '?data=' + encoded;
+  const url = shareUrlFor(encoded);
   warnIfShareUrlTooLong(url);
   copyShareLink(url, 'Snippet link copied!');
 }

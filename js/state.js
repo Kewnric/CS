@@ -852,10 +852,45 @@ function setState(updaterFn) {
 /* Plain base64 puts "+" and "/" in a query string, where "+" decodes as a
    space. That was patched on the way back in with a replace(/ /g, '+'), which
    only held while nothing else in the pipeline touched the string. URL-safe
-   base64 has no characters that need escaping, so the round trip is exact. */
+   base64 has no characters that need escaping, so the round trip is exact.
+
+   A share link carries the whole item, and a 500-question notebook would not
+   fit. Two reasons:
+   - the payload was JSON -> encodeURIComponent -> base64. Every quote, colon
+     and comma became %XX before base64 added another third, about 1.7x the
+     JSON, and nothing was compressed;
+   - it rode in ?data=, which the browser sends to the server, and GitHub Pages
+     refuses a request line past about 8 KB, so a big link never opened.
+   Links are now deflated (vendor/fflate, already loaded for saves) and carried
+   in the #fragment, which never leaves the browser. A leading "~" marks the
+   deflated form; anything without it is the old encoding and still decodes. */
+const SHARE_Z_MARK = '~';
+
+function _shareB64url(bytes) {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function _shareB64urlBytes(str) {
+  let b64 = String(str).replace(/-/g, '+').replace(/_/g, '/').replace(/ /g, '+');
+  while (b64.length % 4) b64 += '=';
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
 function encodeShareData(data) {
   try {
-    return btoa(encodeURIComponent(JSON.stringify(data)))
+    const json = JSON.stringify(data);
+    if (typeof fflate !== 'undefined' && typeof TextEncoder !== 'undefined') {
+      const z = fflate.deflateSync(new TextEncoder().encode(json), { level: 9 });
+      return SHARE_Z_MARK + _shareB64url(z);
+    }
+    return btoa(encodeURIComponent(json))
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
       .replace(/=+$/, '');
@@ -867,15 +902,25 @@ function encodeShareData(data) {
 
 function decodeShareData(str) {
   try {
+    const s = String(str).trim();
+    if (s.charAt(0) === SHARE_Z_MARK) {
+      if (typeof fflate === 'undefined') throw new Error('the compressor did not load');
+      return JSON.parse(new TextDecoder().decode(fflate.inflateSync(_shareB64urlBytes(s.slice(1)))));
+    }
     // Accept both: links copied before this change are still plain base64,
     // where a "+" may already have become a space in transit.
-    let b64 = String(str).replace(/-/g, '+').replace(/_/g, '/').replace(/ /g, '+');
+    let b64 = s.replace(/-/g, '+').replace(/_/g, '/').replace(/ /g, '+');
     while (b64.length % 4) b64 += '=';
     return JSON.parse(decodeURIComponent(atob(b64)));
   } catch (e) {
     console.error('[Share] Decode failed:', e);
     return null;
   }
+}
+
+/** The link that opens a shared item. The payload sits after "#", so it is never sent to the server. */
+function shareUrlFor(encoded) {
+  return window.location.origin + window.location.pathname + '#data=' + encoded;
 }
 
 /* ============================================================
@@ -888,6 +933,12 @@ function decodeShareData(str) {
    ============================================================ */
 function copyShareLink(url, okMessage) {
   const done = () => {
+    // A long link opens fine, but some chat apps cap how long a message can be.
+    if (_isLongShareUrl(url) && typeof toast === 'function') {
+      toast((okMessage || 'Link copied!') + ' It is ' + Math.round(url.length / 1024) +
+        ' KB, so if a chat app cuts it short, send it by email or in a doc instead.', { type: 'success', duration: 7000 });
+      return;
+    }
     if (typeof showShareToast === 'function') showShareToast(okMessage || 'Link copied to clipboard!');
     else if (typeof toast === 'function') toast(okMessage || 'Link copied to clipboard!', { type: 'success' });
   };
@@ -953,15 +1004,23 @@ function _showShareLinkDialog(url) {
    ============================================================ */
 const PENDING_SHARE_KEY = 'ssp.pendingShare';
 
-/** Called at boot, before the storage picker. Clears ?data= from the URL. */
+/** Called at boot, before the storage picker, and by the router when a link is
+    opened in a tab that already has the app. Clears #data= / ?data= from the URL. */
 function captureSharePayload() {
   try {
-    const params = new URLSearchParams(window.location.search);
-    const raw = params.get('data');
+    const inHash = /^#data=(.+)$/.exec(window.location.hash || '');
+    let raw;
+    if (inHash) {
+      raw = inHash[1];
+      try { raw = decodeURIComponent(raw); } catch (e) { /* already plain */ }
+    } else {
+      raw = new URLSearchParams(window.location.search).get('data');   // links made before #data=
+    }
     if (!raw) return;
     const decoded = decodeShareData(raw);
-    // Strip the parameter either way: a corrupt link should not survive a reload.
-    window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+    // Strip the payload either way: a corrupt link should not survive a reload.
+    window.history.replaceState({}, document.title,
+      window.location.pathname + (inHash ? '' : window.location.hash));
     if (!decoded || !decoded._type) {
       if (typeof showMessage === 'function') {
         showMessage('Broken share link', 'That link could not be read. It may have been cut short by the app it was sent through.', true);
@@ -987,12 +1046,6 @@ function hasPendingShare() {
   try { return !!sessionStorage.getItem(PENDING_SHARE_KEY); } catch (e) { return false; }
 }
 
-/**
- * Share data is embedded entirely in the URL. Browsers, CDNs and messaging apps
- * truncate very long URLs, producing a link that silently fails to open. Warn the
- * user when that's likely so they can fall back to an exported backup file.
- * @param {string} url @returns {boolean} true if a warning was shown
- */
 /* ============================================================
    DATA INTEGRITY
    ------------------------------------------------------------
@@ -1100,11 +1153,23 @@ function repairDataIntegrity() {
   return report;
 }
 
+/* The old 8 KB ceiling was GitHub Pages refusing a long ?data= request. A
+   #data= link never reaches the server, so the limits left are the browser's
+   own (Firefox stops at 1 MB of URL, Chrome at 2 MB) and chat apps that cap a
+   message's length. Only the first one stops a link from opening. */
+const SHARE_URL_MAX = 1000000;
+const SHARE_URL_LONG = 16000;
+
+function _isLongShareUrl(url) {
+  return typeof url === 'string' && url.indexOf('#data=') !== -1 && url.length > SHARE_URL_LONG;
+}
+
+/** @param {string} url @returns {boolean} true if a warning was shown */
 function warnIfShareUrlTooLong(url) {
-  if (url && url.length > 8000) {
+  if (url && url.length > SHARE_URL_MAX) {
     if (typeof showMessage === 'function') {
       showMessage('Large Share Link',
-        'This link is ' + Math.round(url.length / 1024) + ' KB — large enough that some browsers or apps may cut it off and it won\'t open. If that happens, use “Export Data” to share a backup file instead.',
+        'This link is ' + (url.length / 1048576).toFixed(1) + ' MB, more than some browsers can open. If it will not open, use “Export Data” to share a backup file instead.',
         true);
     }
     return true;

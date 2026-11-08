@@ -2047,7 +2047,7 @@ function shareChallenge(challengeId) {
     return;
   }
 
-  const url = window.location.origin + window.location.pathname + '?data=' + encoded;
+  const url = shareUrlFor(encoded);
   warnIfShareUrlTooLong(url);
   copyShareLink(url, 'Link copied to clipboard!');
 }

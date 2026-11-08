@@ -80,6 +80,15 @@ const SpaRouter = (() => {
 
   // --- Handle hash change ---
   function handleRoute() {
+    // A share link pasted into a tab that already has the app only changes the
+    // hash, so there is no fresh boot to pick it up. Take it here instead.
+    if (/^#data=/.test(window.location.hash) && typeof captureSharePayload === 'function') {
+      captureSharePayload();
+      if (typeof applyPendingShare === 'function') applyPendingShare();
+      window.location.hash = '#/' + (window.cm_currentRawHash || 'home');
+      return;
+    }
+
     let rawHash = window.location.hash.replace(/^#\/?/, '') || 'home';
     let hash = rawHash.split('?')[0]; // Strip query parameters for route lookup
 
