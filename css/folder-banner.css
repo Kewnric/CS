@@ -24,9 +24,24 @@
   z-index: -1;
   pointer-events: none;
   overflow: hidden;
-  border-radius: inherit;
+  /* Square: the row's own rounded clip shapes it. Rounding the layer as well
+     smoothed the same edge twice and let a hairline through. */
   opacity: 0;
   transition: opacity 0.2s ease;
+}
+
+/* While its banner shows, the row paints no background or inset edge of its
+   own: they sat under the picture and showed as a thin light line all round
+   it, where the rounded edge is smoothed. The selected row keeps its drop
+   shadow. */
+.tree-node-row.active:has(> .fb-layer:is(:not(.is-gif), .has-frame)),
+.tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row:has(> .fb-layer:is(:not(.is-gif), .has-frame)) {
+  background: transparent;
+  box-shadow: none;
+}
+.tree-node-row.active:has(> .fb-layer:is(:not(.is-gif), .has-frame)),
+.tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row.active:has(> .fb-layer:is(:not(.is-gif), .has-frame)) {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
 }
 
 .fb-img {
