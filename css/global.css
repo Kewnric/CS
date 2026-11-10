@@ -4,6 +4,26 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
+/* --- No scrollbars, anywhere ---
+   Every pane, dropdown, dialog, editor and the page itself scrolls without
+   drawing a bar: wheel, trackpad, touch, keys and scrollIntoView all still
+   work, only the bar is gone. One rule here rather than 80 per-element ones,
+   and !important because a few dozen elements style their own (thin bars,
+   6px webkit tracks) and every one of those has to lose. scrollbar-width is
+   the standard switch (Firefox, Chrome 121+); the webkit pseudo covers older
+   Chromium and Safari, which ignore it. Native <select> pop-up lists are
+   drawn by the operating system and are out of a page's reach. */
+*,
+*::before,
+*::after {
+  scrollbar-width: none !important;
+}
+::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
 /* --- Design Tokens / CSS Custom Properties --- */
 :root {
   /* Primary palette */
