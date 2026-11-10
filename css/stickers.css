@@ -50,7 +50,23 @@
   overflow: hidden;
   overflow: clip;
   pointer-events: none;
+  /* Its own group in a page transition. The sidebar and the HUD each have one
+     (motion.css), and a View Transition paints every named group above the
+     snapshot of the rest of the page -- this layer included -- so for the
+     length of every transition (the first one comes as the app loads) a
+     spill-over sticker on top sat BEHIND the sidebar, then jumped back over
+     it. Groups are stacked in paint order, so at z 150 this one lands above
+     the sidebar's and the HUD's and under any dialog's, as on the page. */
+  view-transition-name: ssp-stickers;
 }
+/* The stickers of the page you leave fade as the page does and the next
+   page's fade in; one that is on both is the same picture twice, which the
+   default plus-lighter cross-fade keeps steady. */
+::view-transition-old(ssp-stickers),
+::view-transition-new(ssp-stickers) {
+  animation-duration: var(--mx-page, 320ms);
+}
+::view-transition-group(ssp-stickers) { animation: none; }
 
 .stk-sticker {
   position: absolute;
