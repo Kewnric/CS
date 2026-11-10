@@ -1,1 +1,154 @@
-/* MX-NAV.CSS — route transitions, sidebar, tabs, tree. See mx-core.css for how the motion layer is built. */
+/* ============================================================
+   MX-NAV.CSS — route transitions, sidebar, tabs, panes
+   See mx-core.css for how the motion layer is built (levels, nesting,
+   individual transform properties, mxIn / mxOut names).
+
+   The router tags each navigation with a direction on <html data-nav-dir>
+   (js/mx-nav.js) for the length of its View Transition. motion.css keeps the
+   sidebar and the HUD out of the page snapshot; nothing here changes that.
+   ============================================================ */
+
+/* Deeper: you pass through the old page and the new one comes up to meet you. */
+@keyframes mxVtForwardOut { to { opacity: 0; scale: calc(1 + 0.05 * var(--mx-travel)); } }
+@keyframes mxVtForwardIn { from { opacity: 0; scale: calc(1 - 0.05 * var(--mx-travel)); } }
+/* Back: the reverse. */
+@keyframes mxVtBackOut { to { opacity: 0; scale: calc(1 - 0.05 * var(--mx-travel)); } }
+@keyframes mxVtBackIn { from { opacity: 0; scale: calc(1 + 0.05 * var(--mx-travel)); } }
+/* Along the sidebar: the page follows the rail. */
+@keyframes mxVtDownOut { to { opacity: 0; translate: 0 calc(-44px * var(--mx-travel)); } }
+@keyframes mxVtDownIn { from { opacity: 0; translate: 0 calc(44px * var(--mx-travel)); } }
+@keyframes mxVtUpOut { to { opacity: 0; translate: 0 calc(44px * var(--mx-travel)); } }
+@keyframes mxVtUpIn { from { opacity: 0; translate: 0 calc(-44px * var(--mx-travel)); } }
+
+@keyframes mxTabOn { from { opacity: 0.55; translate: 0 calc(3px * var(--mx-travel)); } }
+@keyframes mxPaneIn { from { opacity: 0.35; translate: 0 calc(8px * var(--mx-travel)); } }
+@keyframes mxLandPulse {
+  0% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.55); }
+  100% { box-shadow: 0 0 0 16px rgba(34, 211, 238, 0); }
+}
+
+/* The gliding rail and the collapsed-rail label are built by js/mx-nav.js. */
+.mx-rail {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 3px;
+  height: 34px;
+  border-radius: 0 4px 4px 0;
+  background: linear-gradient(180deg, #67e8f9 0%, #22d3ee 25%, #0891b2 50%, #22d3ee 75%, #67e8f9 100%);
+  background-size: 100% 200%;
+  animation: railFlow 2.4s linear infinite, railBreathe 2.4s ease-in-out infinite;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 2;
+  transition: translate 380ms var(--ease-emphasis), opacity 200ms ease;
+}
+.mx-rail.is-on { opacity: 1; }
+.sidebar-menu.mx-has-rail { position: relative; }
+.sidebar-menu.mx-has-rail .sidebar-link.active::before { display: none; }
+
+.mx-rail-tip {
+  position: fixed;
+  z-index: 960;
+  left: 0;
+  top: 0;
+  padding: 0.35rem 0.7rem;
+  border-radius: var(--radius-md, 10px);
+  background: var(--bg-elevated, #1b2440);
+  color: var(--text-primary, #e8edf7);
+  border: 1px solid rgba(34, 211, 238, 0.25);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.4);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  translate: -6px 0;
+  transition: opacity 140ms ease, translate 200ms var(--ease-expo-out);
+}
+.mx-rail-tip.is-on { opacity: 1; translate: 0 0; }
+
+.mx-top-btn {
+  position: fixed;
+  right: 76px;
+  bottom: 20px;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  z-index: 940;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  translate: 0 14px;
+  pointer-events: none;
+  transition: opacity 200ms ease, translate 260ms var(--ease-expo-out), color 0.2s ease, border-color 0.2s ease;
+}
+.mx-top-btn.is-on { opacity: 1; translate: 0 0; pointer-events: auto; }
+.mx-top-btn:hover { color: var(--color-primary); border-color: var(--color-primary); }
+.mx-top-btn svg { width: 20px; height: 20px; }
+body.route-focused .mx-top-btn { display: none; }
+
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-motion="off"]) {
+
+    /* ── Route transitions by direction ───────────────────────────── */
+    &[data-nav-dir]::view-transition-old(root),
+    &[data-nav-dir]::view-transition-new(root) {
+      animation-duration: var(--mx-page);
+      animation-timing-function: var(--ease-emphasis);
+    }
+    &[data-nav-dir]::view-transition-old(root) { animation-duration: 240ms; animation-timing-function: var(--ease-exit); }
+
+    &[data-nav-dir="forward"]::view-transition-old(root) { animation-name: mxVtForwardOut; }
+    &[data-nav-dir="forward"]::view-transition-new(root) { animation-name: mxVtForwardIn; }
+    &[data-nav-dir="back"]::view-transition-old(root),
+    &[data-nav-dir="land"]::view-transition-old(root) { animation-name: mxVtBackOut; }
+    &[data-nav-dir="back"]::view-transition-new(root),
+    &[data-nav-dir="land"]::view-transition-new(root) { animation-name: mxVtBackIn; }
+    &[data-nav-dir="down"]::view-transition-old(root) { animation-name: mxVtDownOut; }
+    &[data-nav-dir="down"]::view-transition-new(root) { animation-name: mxVtDownIn; }
+    &[data-nav-dir="up"]::view-transition-old(root) { animation-name: mxVtUpOut; }
+    &[data-nav-dir="up"]::view-transition-new(root) { animation-name: mxVtUpIn; }
+    /* A page redrawing itself is not a journey. */
+    &[data-nav-dir="same"]::view-transition-old(root),
+    &[data-nav-dir="same"]::view-transition-new(root) { animation-duration: 160ms; }
+
+    /* ── Morph: the clicked card's icon becomes the next page's ───── */
+    &::view-transition-group(mx-morph) {
+      animation-duration: var(--mx-page);
+      animation-timing-function: var(--ease-emphasis);
+    }
+    &::view-transition-old(mx-morph),
+    &::view-transition-new(mx-morph) { height: 100%; object-fit: contain; }
+
+    /* ── Sidebar ──────────────────────────────────────────────────── */
+    .app-sidebar.expanded .sidebar-label {
+      animation: mxInFromLeft 280ms var(--ease-expo-out) backwards;
+      animation-delay: calc(40ms + var(--mx-i, 0) * 24ms);
+    }
+    .sidebar-menu > :nth-child(2) { --mx-i: 1; }
+    .sidebar-menu > :nth-child(3) { --mx-i: 2; }
+    .sidebar-menu > :nth-child(4) { --mx-i: 3; }
+    .sidebar-menu > :nth-child(5) { --mx-i: 4; }
+    .sidebar-menu > :nth-child(6) { --mx-i: 5; }
+    .sidebar-menu > :nth-child(n + 7) { --mx-i: 6; }
+    .sidebar-backdrop:not(.hidden) { animation: mxInFade var(--mx-base) ease-out backwards; }
+
+    /* ── Tabs and panes ───────────────────────────────────────────── */
+    :is(.quest-tab, .lang-tab, .variant-tab, .bnm-tab, .study-tab, .pp-tab, .file-tab):is(.active, .is-active, .is-on) {
+      animation: mxTabOn 240ms var(--ease-expo-out) backwards;
+    }
+    /* A detail pane redrawn for a new selection. */
+    :is([id$="-detail-container"], #wing-detail, #mtl-detail, #lang-detail, #quest-details-container) > * {
+      animation: mxPaneIn 260ms var(--ease-expo-out) backwards;
+    }
+    /* Back from an attempt: the row you came from says where you are. */
+    .mx-land { animation: mxLandPulse 900ms ease-out 2; }
+  }
+}
