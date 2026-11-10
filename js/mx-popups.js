@@ -137,12 +137,15 @@
     if (cs.position !== 'fixed' || cs.pointerEvents === 'none' || cs.display === 'none') return false;
     const r = el.getBoundingClientRect();
     if (r.width < window.innerWidth * 0.9 || r.height < window.innerHeight * 0.9) return false;
-    el.classList.add('mx-overlay');
-    if (cs.animationName === 'none') el.classList.add('mx-in-fade');
+    // Read first, mark after: the marks themselves start animations.
+    const bare = cs.animationName === 'none';
+    const kids = [];
     for (let i = 0; i < el.children.length; i++) {
-      const kid = el.children[i];
-      if (getComputedStyle(kid).animationName === 'none') kid.classList.add('mx-in-origin');
+      if (getComputedStyle(el.children[i]).animationName === 'none') kids.push(el.children[i]);
     }
+    el.classList.add('mx-overlay');
+    if (bare) el.classList.add('mx-in-fade');
+    kids.forEach(function (kid) { kid.classList.add('mx-in-origin'); });
     return true;
   }
 

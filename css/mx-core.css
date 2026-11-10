@@ -231,8 +231,7 @@ html[data-motion="off"]::view-transition-new(*) {
     .nb-import-overlay,
     .np-sheet-overlay,
     .np-zoom-overlay,
-    .np-wrong-overlay,
-    .mx-overlay {
+    .np-wrong-overlay {
       animation: mxInFade var(--mx-base) ease-out backwards;
     }
     .prereq-picker-overlay > *,
@@ -240,8 +239,7 @@ html[data-motion="off"]::view-transition-new(*) {
     .nb-tags-overlay > *,
     .nb-import-overlay > *,
     .np-sheet-overlay > *,
-    .np-zoom-overlay > *,
-    .mx-overlay > * {
+    .np-zoom-overlay > * {
       animation: mxInOrigin var(--mx-enter) var(--ease-emphasis) backwards;
     }
 
@@ -263,8 +261,7 @@ html[data-motion="off"]::view-transition-new(*) {
     .np-sheet-overlay[data-mx-ghost] > *,
     .np-zoom-overlay[data-mx-ghost] > *,
     .np-wrong-overlay[data-mx-ghost] > *,
-    .mt-overlay[data-mx-ghost] > *,
-    .mx-overlay[data-mx-ghost] > * {
+    .mt-overlay[data-mx-ghost] > * {
       animation: mxOutOrigin var(--mx-exit) var(--ease-exit) forwards !important;
     }
   }
