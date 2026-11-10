@@ -85,9 +85,74 @@
   // but never both.
   const scan = M.scan;
   M.scan = function () {
-    if (root.hasAttribute('data-nav-dir')) root.classList.add('mx-vt-new');
+    // Only inside a transition: <html data-nav-dir> now outlives it a little
+    // (Motion.withViewTransition waits for the page's entrances), and a later
+    // scan must not leave .mx-vt-new behind for the next one.
+    if (root.hasAttribute('data-nav-dir') && (typeof M.inTransition !== 'function' || M.inTransition())) {
+      root.classList.add('mx-vt-new');
+      stage(root.getAttribute('data-nav-dir'));
+    }
     return scan.apply(this, arguments);
   };
+
+  /* ---------- Staged arrivals -------------------------------- */
+  // "The children of X but one", which CSS cannot key on <html data-nav-dir>
+  // cheaply: a selector whose last part names no class or id makes the browser
+  // restyle the whole document whenever that attribute changes (96 ms on Home,
+  // twice per navigation; see mx-pages.css). So they are put on the elements
+  // this navigation drew, here, and taken off when they have played -- the
+  // same span the attribute used to give them, minus being cut off when the
+  // transition ended first. --mx-i still comes from mx-pages.css.
+  const RISE_ROUTES = /^(quests|visualization|drills|wing-recall|cheatsheet|analytics-.*)$/;
+  const STAGED = [
+    // Coding, multi-problem, SQL and notebook attempts share this frame.
+    { launch: true, sel: '.practice-body > :not(.practice-sidebar)',
+      anim: 'mxInFromRight 460ms var(--ease-expo-out) 260ms backwards' },
+    { launch: true, sel: '.practice-layout > :not(.practice-topbar):not(.practice-body):not(.sr-only)',
+      anim: 'mxInFromBottom 460ms var(--ease-expo-out) 240ms backwards' },
+    // Typing: the stage rises under its bar.
+    { launch: true, sel: '.mt-shell > :not(.mt-nav)',
+      anim: 'mxInFromBottom 480ms var(--ease-expo-out) 220ms backwards' },
+    // Language drill and free run: the whole screen rises, piece by piece.
+    { launch: true, route: /^lang-(attempt|quest)$/, sel: '#spa-content > * > *',
+      anim: 'mxInFromBottom 460ms var(--ease-expo-out) backwards', delay: 'calc(160ms + var(--mx-i, 0) * 70ms)' },
+    // Result to Solution: the two sides of the compare.
+    { route: /^solution$/, sel: '.sol-compare > :first-child',
+      anim: 'mxInFromLeft 420ms var(--ease-expo-out) 160ms backwards' },
+    { route: /^solution$/, sel: '.sol-compare > :not(:first-child)',
+      anim: 'mxInFromRight 420ms var(--ease-expo-out) 200ms backwards' },
+    { route: /^notes-solution$/, sel: '#ns-sections-review > *',
+      anim: 'mxInRise 380ms var(--ease-expo-out) backwards', delay: 'calc(120ms + var(--mx-i, 0) * 50ms)' },
+    // Pages without the two-pane frame: their blocks rise in order.
+    { arrive: true, route: RISE_ROUTES, sel: '#spa-content > * > :not(.messenger-pane-1):not(.messenger-pane-2):not(.sr-only)',
+      anim: 'mxInRise 440ms var(--ease-expo-out) backwards', delay: 'calc(50ms + var(--mx-i, 0) * 70ms)' },
+  ];
+
+  function unstage(e) {
+    if (e.target !== this) return;
+    this.style.animation = '';
+    this.style.animationDelay = '';
+    this.removeEventListener('animationend', unstage);
+    this.removeEventListener('animationcancel', unstage);
+  }
+
+  function stage(dir) {
+    if (!dir || !M.isFull() || M.prefersReducedMotion()) return;
+    const route = document.body.dataset.route || '';
+    for (let i = 0; i < STAGED.length; i++) {
+      const s = STAGED[i];
+      if (s.launch && dir !== 'launch') continue;
+      if (s.arrive && dir === 'same') continue;
+      if (s.route && !s.route.test(route)) continue;
+      document.querySelectorAll(s.sel).forEach(function (el) {
+        if (el.style.animation) return;
+        el.style.animation = s.anim;
+        if (s.delay) el.style.animationDelay = s.delay;
+        el.addEventListener('animationend', unstage);
+        el.addEventListener('animationcancel', unstage);
+      });
+    }
+  }
   const afterNav = M.afterNav;
   M.afterNav = function () {
     root.classList.remove('mx-vt-new');

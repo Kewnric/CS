@@ -52,27 +52,21 @@
     &[data-nav-dir="launch"] .practice-body > .practice-sidebar {
       animation: mxInFromLeft 460ms var(--ease-expo-out) 200ms backwards;
     }
-    &[data-nav-dir="launch"] .practice-body > :not(.practice-sidebar) {
-      animation: mxInFromRight 460ms var(--ease-expo-out) 260ms backwards;
-    }
-    &[data-nav-dir="launch"] .practice-layout > :not(.practice-topbar):not(.practice-body):not(.sr-only) {
-      animation: mxInFromBottom 460ms var(--ease-expo-out) 240ms backwards;
-    }
+    /* The rest of the frame, the typing stage, the language screens, the
+       solution compare and the notebook review are staged by js/mx-pages.js
+       (STAGED), not here. Each is "the children of X but one", and keyed on
+       <html data-nav-dir> a selector whose last part names no class made the
+       browser restyle the WHOLE document every time the attribute flipped:
+       measured 96 ms on Home with them, 2 ms without, at the start of every
+       navigation and again as its transition ended, mid-entrance. A rule
+       added here must end in a class or an id. */
     &[data-nav-dir="launch"] .timer-display {
       animation: mxInPop 420ms var(--ease-spring) 420ms backwards;
     }
     /* Notebook: the question card is dealt, the answer bubbles ripple in. */
     &[data-nav-dir="launch"] .np-card { animation: mxInSheet 480ms var(--ease-expo-out) 240ms backwards; }
 
-    /* Typing: the stage rises under its bar. */
-    &[data-nav-dir="launch"] .mt-shell > :not(.mt-nav) {
-      animation: mxInFromBottom 480ms var(--ease-expo-out) 220ms backwards;
-    }
-    /* Language drill and free run: their whole screen rises, piece by piece. */
-    &[data-nav-dir="launch"] body:is([data-route="lang-attempt"], [data-route="lang-quest"]) #spa-content > * > * {
-      animation: mxInFromBottom 460ms var(--ease-expo-out) backwards;
-      animation-delay: calc(160ms + var(--mx-i, 0) * 70ms);
-    }
+    /* Language drill and free run (staged in mx-pages.js): their order. */
     body:is([data-route="lang-attempt"], [data-route="lang-quest"]) #spa-content > * > :nth-child(2) { --mx-i: 1; }
     body:is([data-route="lang-attempt"], [data-route="lang-quest"]) #spa-content > * > :nth-child(3) { --mx-i: 2; }
     body:is([data-route="lang-attempt"], [data-route="lang-quest"]) #spa-content > * > :nth-child(n + 4) { --mx-i: 3; }
@@ -87,16 +81,7 @@
     &[data-nav-dir] body[data-route="solution"] .sol-summary {
       animation: mxInRise 420ms var(--ease-expo-out) 100ms backwards;
     }
-    &[data-nav-dir] body[data-route="solution"] .sol-compare > :first-child {
-      animation: mxInFromLeft 420ms var(--ease-expo-out) 160ms backwards;
-    }
-    &[data-nav-dir] body[data-route="solution"] .sol-compare > :not(:first-child) {
-      animation: mxInFromRight 420ms var(--ease-expo-out) 200ms backwards;
-    }
-    &[data-nav-dir] body[data-route="notes-solution"] #ns-sections-review > * {
-      animation: mxInRise 380ms var(--ease-expo-out) backwards;
-      animation-delay: calc(120ms + var(--mx-i, 0) * 50ms);
-    }
+    /* The compare's two sides and the review's sections: mx-pages.js. */
     #ns-sections-review > :nth-child(2) { --mx-i: 1; }
     #ns-sections-review > :nth-child(3) { --mx-i: 2; }
     #ns-sections-review > :nth-child(4) { --mx-i: 3; }
@@ -192,13 +177,8 @@
     &[data-nav-dir] .lib-hub-search { animation-delay: 170ms; }
 
     /* Everything else with a sidebar: its top-level blocks rise in turn. */
-    &[data-nav-dir]:not([data-nav-dir="same"]) body:is(
-        [data-route="quests"], [data-route="visualization"], [data-route="drills"],
-        [data-route="wing-recall"], [data-route^="analytics-"], [data-route="cheatsheet"]
-      ) #spa-content > * > :not(.messenger-pane-1):not(.messenger-pane-2):not(.sr-only) {
-      animation: mxInRise 440ms var(--ease-expo-out) backwards;
-      animation-delay: calc(50ms + var(--mx-i, 0) * 70ms);
-    }
+    /* Quests, Visualize, drills, recall, analytics, cheat sheets: the page's
+       blocks rise in order (staged in mx-pages.js; this is the order). */
     #spa-content > * > :nth-child(2) { --mx-i: 1; }
     #spa-content > * > :nth-child(3) { --mx-i: 2; }
     #spa-content > * > :nth-child(n + 4) { --mx-i: 3; }

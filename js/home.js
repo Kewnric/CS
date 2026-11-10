@@ -880,9 +880,13 @@ function renderNotebookCarousel() {
   if (notebookCarouselIndex >= items.length) notebookCarouselIndex = 0;
   if (notebookCarouselIndex < 0) notebookCarouselIndex = items.length - 1;
 
-  // Positioning (active/side/depth) is applied by _positionCarouselSlides()
-  // so the slides persist in the DOM and CSS transitions animate the rotation.
-  const slidesHTML = items.map(item => _buildCarouselSlide(item, homeCarouselSource)).join('');
+  // The slides are drawn by _positionCarouselSlides(), and only the few
+  // around the front card (CAROUSEL_WINDOW). Every item used to be drawn:
+  // with the 159-program pack that was 799 icons and 3,514 nodes, half of
+  // Home, each card past the second one parked invisible but still
+  // 3D-transformed, so each was a compositor layer of its own. Every
+  // full restyle of Home (both ends of a page transition) paid for all of
+  // them, and the page juddered as it came in.
 
   const dotsHTML = items.map((_, idx) => `
     <div class="carousel-dot ${idx === notebookCarouselIndex ? 'active' : ''}" onclick="jumpToNotebookCarousel(${idx})"></div>
@@ -900,9 +904,7 @@ function renderNotebookCarousel() {
         <button class="carousel-nav-btn prev-btn" onclick="prevNotebookCarousel(event)" aria-label="Previous notebooks" title="Previous">
           <i data-lucide="chevron-left"></i>
         </button>
-        <div class="carousel-track">
-          ${slidesHTML}
-        </div>
+        <div class="carousel-track"></div>
         <button class="carousel-nav-btn next-btn" onclick="nextNotebookCarousel(event)" aria-label="Next notebooks" title="Next">
           <i data-lucide="chevron-right"></i>
         </button>
@@ -923,14 +925,45 @@ function renderNotebookCarousel() {
  * elements persist between navigations, changing these inline transforms lets the
  * CSS transition animate a smooth left/right rotation instead of a pop.
  */
+// Cards either side of the front one kept in the page. Two are on stage; the
+// third waits parked (transparent) on each side, so the next step still has a
+// card to rotate in from rather than one appearing in place.
+const CAROUSEL_WINDOW = 3;
+
 function _positionCarouselSlides() {
   const track = document.querySelector('#home-notebook-carousel .carousel-track');
   if (!track) return;
-  const slides = track.querySelectorAll('.carousel-slide');
-  const n = slides.length;
+  const items = _carouselItems();
+  const n = items.length;
   if (!n) return;
 
-  slides.forEach((slide, idx) => {
+  // Which items belong on the track now; drop the rest, draw what is missing.
+  // A card leaving the window is already parked at opacity 0, and one entering
+  // it starts parked, so neither shows the swap.
+  const want = new Set();
+  for (let off = -CAROUSEL_WINDOW; off <= CAROUSEL_WINDOW; off++) {
+    want.add(((notebookCarouselIndex + off) % n + n) % n);
+  }
+  const have = new Map();
+  track.querySelectorAll('.carousel-slide').forEach(el => {
+    const idx = Number(el.dataset.idx);
+    if (want.has(idx) && !have.has(idx)) have.set(idx, el); else el.remove();
+  });
+  let drew = false;
+  want.forEach(idx => {
+    if (have.has(idx)) return;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = _buildCarouselSlide(items[idx], homeCarouselSource);
+    const el = tmp.firstElementChild;
+    if (!el) return;
+    el.dataset.idx = String(idx);
+    track.appendChild(el);
+    have.set(idx, el);
+    drew = true;
+  });
+  if (drew && typeof lucide !== 'undefined') lucide.createIcons({ root: track });
+
+  have.forEach((slide, idx) => {
     // Shortest-path offset so wrapping (last↔first) rotates the nearest way.
     let off = idx - notebookCarouselIndex;
     if (off > n / 2) off -= n;

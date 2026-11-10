@@ -318,7 +318,28 @@ const Motion = (() => {
       if (!settled) { settled = true; if (onDone) { try { onDone(); } catch (e) { console.error(e); } } }
       if (classSeq !== vtClassSeq) return;
       vtCurrent = null;
-      if (dir) { rootEl.removeAttribute('data-nav-dir'); vtDirOn = false; }
+      if (dir) {
+        // The page's entrances are keyed on the attribute (mx-pages.css) and
+        // can outlast the transition: Home's quick actions play to ~880 ms
+        // against a ~470 ms transition. Taking it away under them cut them off
+        // mid-flight and they jumped into place. So it waits for whatever
+        // entrance is still playing (at most 1.5 s), unless a newer
+        // transition has taken the attribute over by then.
+        const off = () => {
+          if (classSeq !== vtClassSeq || !vtDirOn) return;
+          rootEl.removeAttribute('data-nav-dir');
+          vtDirOn = false;
+        };
+        const playing = typeof document.getAnimations === 'function'
+          ? document.getAnimations().filter(a => a.playState !== 'finished'
+            && typeof a.animationName === 'string' && a.animationName.indexOf('mxIn') === 0)
+          : [];
+        if (!playing.length) off();
+        else Promise.race([
+          Promise.all(playing.map(a => a.finished.catch(() => {}))),
+          new Promise(r => setTimeout(r, 1500)),
+        ]).then(off);
+      }
       if (!rootClass) return;
       rootEl.classList.remove(rootClass);
       vtClassOn = null;
@@ -423,6 +444,7 @@ const Motion = (() => {
     dismissToast,
     withViewTransition,
     skipTransition,
+    inTransition: function () { return !!vtCurrent; },
     flip,
     init,
   };
