@@ -1,1 +1,124 @@
-/* MX-PAGES.CSS — attempt launch, results, page staging, boot. See mx-core.css for how the motion layer is built. */
+/* ============================================================
+   MX-PAGES.CSS — attempt launch, results, page staging, boot
+   See mx-core.css for how the motion layer is built.
+
+   The sequences here are keyed on <html data-nav-dir>, which exists only for
+   the length of one View Transition. So they cannot replay when a screen
+   redraws part of itself later, and ending the transition (any key, any
+   click: js/mx-pages.js) ends them on the spot.
+   ============================================================ */
+
+@keyframes mxStamp {
+  0% { opacity: 0; scale: calc(1 + 0.7 * var(--mx-travel)); }
+  55% { opacity: 1; scale: calc(1 - 0.06 * var(--mx-travel)); }
+  100% { scale: 1; }
+}
+@keyframes mxFillX { from { scale: 0 1; } }
+@keyframes mxVtHold { from { opacity: 1; } to { opacity: 1; } }
+
+@media (prefers-reduced-motion: no-preference) {
+  html[data-motion="full"] {
+
+    /* ══ Launch: into an attempt ════════════════════════════════════════
+       The Session Setup card and the attempt's top bar share one View
+       Transition name, so the card folds into the bar. Under it the old
+       page falls away fast and the attempt's parts arrive from their own
+       sides. 700 ms at most, and the editor has focus throughout. */
+    &[data-nav-dir="launch"]::view-transition-group(root) { animation-duration: var(--mx-hero); }
+    &[data-nav-dir="launch"]::view-transition-old(root) {
+      animation: mxVtForwardOut 220ms var(--ease-exit) both;
+    }
+    &[data-nav-dir="launch"]::view-transition-new(root) {
+      animation: mxInFade 260ms ease-out 120ms both;
+    }
+    &[data-nav-dir="launch"]::view-transition-group(mx-launch) {
+      animation-duration: 520ms;
+      animation-timing-function: var(--ease-emphasis);
+    }
+    &[data-nav-dir="launch"]::view-transition-old(mx-launch) { animation-duration: 200ms; }
+    &[data-nav-dir="launch"]::view-transition-new(mx-launch) { animation-duration: 320ms; animation-delay: 160ms; }
+    /* The card stretches as it folds; the bar keeps its own proportions. */
+    &[data-nav-dir="launch"]::view-transition-old(mx-launch) { height: 100%; }
+
+    /* One name, two ends, never both at once: .mx-vt-new goes on <html> once
+       the new page is drawn (js/mx-pages.js), and the closing card is still
+       on screen then. Two elements with one name would cancel the transition. */
+    &[data-nav-dir="launch"]:not(.mx-vt-new) #timer-modal > .modal-content,
+    &[data-nav-dir="launch"].mx-vt-new :is(.practice-topbar, .mt-nav) {
+      view-transition-name: mx-launch;
+    }
+
+    /* Coding, multi-problem, SQL and notebook attempts share this frame. */
+    &[data-nav-dir="launch"] .practice-body > .practice-sidebar {
+      animation: mxInFromLeft 460ms var(--ease-expo-out) 200ms backwards;
+    }
+    &[data-nav-dir="launch"] .practice-body > :not(.practice-sidebar) {
+      animation: mxInFromRight 460ms var(--ease-expo-out) 260ms backwards;
+    }
+    &[data-nav-dir="launch"] .practice-layout > :not(.practice-topbar):not(.practice-body):not(.sr-only) {
+      animation: mxInFromBottom 460ms var(--ease-expo-out) 240ms backwards;
+    }
+    &[data-nav-dir="launch"] .timer-display {
+      animation: mxInPop 420ms var(--ease-spring) 420ms backwards;
+    }
+    /* Notebook: the question card is dealt, the answer bubbles ripple in. */
+    &[data-nav-dir="launch"] .np-card { animation: mxInSheet 480ms var(--ease-expo-out) 240ms backwards; }
+
+    /* Typing: the stage rises under its bar. */
+    &[data-nav-dir="launch"] .mt-shell > :not(.mt-nav) {
+      animation: mxInFromBottom 480ms var(--ease-expo-out) 220ms backwards;
+    }
+    /* Language drill and free run: their whole screen rises, piece by piece. */
+    &[data-nav-dir="launch"] body:is([data-route="lang-attempt"], [data-route="lang-quest"]) #spa-content > * > * {
+      animation: mxInFromBottom 460ms var(--ease-expo-out) backwards;
+      animation-delay: calc(160ms + var(--mx-i, 0) * 70ms);
+    }
+    body:is([data-route="lang-attempt"], [data-route="lang-quest"]) #spa-content > * > :nth-child(2) { --mx-i: 1; }
+    body:is([data-route="lang-attempt"], [data-route="lang-quest"]) #spa-content > * > :nth-child(3) { --mx-i: 2; }
+    body:is([data-route="lang-attempt"], [data-route="lang-quest"]) #spa-content > * > :nth-child(n + 4) { --mx-i: 3; }
+
+    /* ══ Land: out of an attempt ════════════════════════════════════════ */
+    &[data-nav-dir="land"]::view-transition-old(root) { animation-duration: 260ms; }
+
+    /* ══ Result to Solution ═════════════════════════════════════════════ */
+    &[data-nav-dir] body[data-route="solution"] .diff-topbar {
+      animation: mxInFromTop 380ms var(--ease-expo-out) backwards;
+    }
+    &[data-nav-dir] body[data-route="solution"] .sol-summary {
+      animation: mxInRise 420ms var(--ease-expo-out) 100ms backwards;
+    }
+    &[data-nav-dir] body[data-route="solution"] .sol-compare > :first-child {
+      animation: mxInFromLeft 420ms var(--ease-expo-out) 160ms backwards;
+    }
+    &[data-nav-dir] body[data-route="solution"] .sol-compare > :not(:first-child) {
+      animation: mxInFromRight 420ms var(--ease-expo-out) 200ms backwards;
+    }
+    &[data-nav-dir] body[data-route="notes-solution"] #ns-sections-review > * {
+      animation: mxInRise 380ms var(--ease-expo-out) backwards;
+      animation-delay: calc(120ms + var(--mx-i, 0) * 50ms);
+    }
+    #ns-sections-review > :nth-child(2) { --mx-i: 1; }
+    #ns-sections-review > :nth-child(3) { --mx-i: 2; }
+    #ns-sections-review > :nth-child(4) { --mx-i: 3; }
+    #ns-sections-review > :nth-child(n + 5) { --mx-i: 4; }
+
+    /* ══ The result window ══════════════════════════════════════════════
+       The verdict stamps in; what is under it cascades. */
+    #result-modal:not(.hidden) #rm-icon {
+      animation: mxStamp 520ms var(--ease-standard) 120ms backwards;
+    }
+    #result-modal:not(.hidden) #rm-desc > * {
+      animation: mxInRise 360ms var(--ease-expo-out) backwards;
+      animation-delay: calc(260ms + var(--mx-i, 0) * 60ms);
+    }
+    #rm-desc > :nth-child(2) { --mx-i: 1; }
+    #rm-desc > :nth-child(3) { --mx-i: 2; }
+    #rm-desc > :nth-child(4) { --mx-i: 3; }
+    #rm-desc > :nth-child(n + 5) { --mx-i: 4; }
+
+    /* ══ Session Setup ══════════════════════════════════════════════════ */
+    .ss-preset { transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, scale 220ms var(--ease-spring); }
+    .ss-preset.is-on { scale: 1.06; }
+    .mx-bump { animation: mxInPop 260ms var(--ease-spring) !important; }
+  }
+}
