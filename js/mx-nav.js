@@ -92,12 +92,12 @@
     if (!on) { if (rail.classList.contains('is-on')) rail.classList.remove('is-on'); return; }
     const h = Math.round(on.offsetHeight * 0.72);
     const to = on.offsetLeft + 'px ' + Math.round(on.offsetTop + (on.offsetHeight - h) / 2) + 'px';
-    // A glide to another link: dim for the trip (mx-nav.css), back up on
-    // arrival. 380ms is the translate transition.
+    // A glide to another link: dip fast, then climb back over the rest of
+    // the 380ms glide so it is full as it lands (timings in mx-nav.css).
     if (rail.classList.contains('is-on') && rail.style.translate && rail.style.translate !== to) {
       clearTimeout(railTravelTimer);
       rail.classList.add('is-travel');
-      railTravelTimer = setTimeout(function () { rail.classList.remove('is-travel'); }, 380);
+      railTravelTimer = setTimeout(function () { rail.classList.remove('is-travel'); }, 70);
     }
     rail.style.height = h + 'px';
     rail.style.translate = to;

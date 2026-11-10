@@ -33,12 +33,32 @@ function initVisualization() {
   // the canvas. None of these operations are user-initiated changes that should
   // bump the dirty flag or trigger a cloud save.
   const _withSuppress = (fn) => (typeof withCloudSaveSuppressed === 'function') ? withCloudSaveSuppressed(fn) : fn();
+
+  // Back to Brain if that is where you were: a refresh used to land on Programs
+  // every time. Brain is the default: with nothing saved, or once for everyone
+  // when it became the default (ssp.vizBrainDefault), Visualize opens on
+  // Brain; after that it opens wherever you last were. Decided up here so a
+  // Brain opening can skip drawing the library map (see below).
+  let surface = 'brain';
+  try {
+    if (!localStorage.getItem('ssp.vizBrainDefault')) localStorage.setItem('ssp.vizBrainDefault', '1');
+    else surface = localStorage.getItem('ssp.vizSurface') || 'brain';
+  } catch (_) { /* private mode */ }
+
   _withSuppress(() => {
     loadData();
     vizLoad();
     vizAutoPopulate();
-    vizRenderContentPane();
-    vizRenderCanvas();
+    // Opening on Brain, the library map was drawn here only to be replaced by
+    // Brain at the end of this function: with the 159-program pack that was
+    // ~160 of the 214 ms the route change sat frozen under its transition
+    // (canvas, content pane, minimap, and the forced style pass in
+    // vizRestoreUiState over all of it). _vizEnterLibrary draws both panes
+    // whenever the library is opened, so nothing is lost by waiting.
+    if (surface !== 'brain') {
+      vizRenderContentPane();
+      vizRenderCanvas();
+    }
   });
 
   // A canvas filled for the first time gets one arrangement pass before you
@@ -264,17 +284,8 @@ function initVisualization() {
   // Restore collapsible/swap UI state
   if (typeof vizRestoreUiState === 'function') vizRestoreUiState();
 
-  // Back to Brain if that is where you were: a refresh used to land on Programs
-  // every time. It starts on the libraries above so the pane, the toolbar label
-  // and the strip are set up together, then switches the ordinary way.
-  // Brain is the default: with nothing saved, or once for everyone when it
-  // became the default (ssp.vizBrainDefault), Visualize opens on Brain; after
-  // that it opens wherever you last were.
-  let surface = 'brain';
-  try {
-    if (!localStorage.getItem('ssp.vizBrainDefault')) localStorage.setItem('ssp.vizBrainDefault', '1');
-    else surface = localStorage.getItem('ssp.vizSurface') || 'brain';
-  } catch (_) { /* private mode */ }
+  // Brain (decided at the top): it starts on the libraries so the toolbar
+  // label and the strip are set up together, then switches the ordinary way.
   if (surface === 'brain' && typeof vizSetSurface === 'function') vizSetSurface('brain');
   // The strip was drawn before the saved libraries were loaded.
   if (typeof _vizPaintStripView === 'function') _vizPaintStripView();

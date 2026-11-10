@@ -42,16 +42,17 @@
   opacity: 0;
   z-index: 2;
   /* opacity belongs to railBreathe, so the travel dim rides on filter, which
-     multiplies with it. Coming back: a short beat after it lands, then quick. */
+     multiplies with it. Coming back runs across the rest of the glide: about
+     half way up by the midpoint, full as it lands. */
   transition: translate 380ms var(--ease-emphasis), opacity 200ms ease,
-              filter 240ms ease-out 70ms;
+              filter 310ms ease-out;
 }
 .mx-rail.is-on { opacity: 1; }
-/* Set by paintRail for the length of a glide between two links. */
+/* Set by paintRail for the first 70ms of a glide between two links. */
 .mx-rail.is-travel {
   filter: opacity(0.28);
   transition: translate 380ms var(--ease-emphasis), opacity 200ms ease,
-              filter 110ms ease-out;
+              filter 70ms ease-out;
 }
 .sidebar-menu.mx-has-rail { position: relative; }
 .sidebar-menu.mx-has-rail .sidebar-link.active::before { display: none; }
