@@ -293,7 +293,11 @@ const Motion = (() => {
   let vtCurrent = null;
   function withViewTransition(updateFn, opts) {
     const onDone = (opts && typeof opts.onDone === 'function') ? opts.onDone : null;
-    if (prefersReducedMotion() || typeof document.startViewTransition !== 'function') {
+    // The first page of a load has no page to travel from, and the document
+    // under a View Transition takes no clicks or drags -- so that one is drawn
+    // directly rather than spend its first moments deaf.
+    const first = !!(opts && opts.dir === 'boot');
+    if (first || prefersReducedMotion() || typeof document.startViewTransition !== 'function') {
       updateFn();
       if (onDone) onDone();
       return null;

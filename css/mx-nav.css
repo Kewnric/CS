@@ -118,6 +118,10 @@ body.route-focused .mx-top-btn { display: none; }
     /* A page redrawing itself is not a journey. */
     &[data-nav-dir="same"]::view-transition-old(root),
     &[data-nav-dir="same"]::view-transition-new(root) { animation-duration: 160ms; }
+    /* The first page of a load has nothing to travel from, and the page under
+       a transition takes no clicks: keep that window short. */
+    &[data-nav-dir="boot"]::view-transition-old(root),
+    &[data-nav-dir="boot"]::view-transition-new(root) { animation-duration: 180ms; }
 
     /* ── Morph: the clicked card's icon becomes the next page's ───── */
     &::view-transition-group(mx-morph) {

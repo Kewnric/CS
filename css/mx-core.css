@@ -27,7 +27,7 @@
   --mx-base: 240ms;
   --mx-enter: 340ms;
   --mx-exit: 190ms;
-  --mx-page: 420ms;
+  --mx-page: 320ms;
   --mx-hero: 700ms;
   /* Two curves beside the three in global.css. Exit accelerates: it leaves
      without lingering. Emphasis is expo-out's heavier sibling, for pages. */

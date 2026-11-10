@@ -24,8 +24,9 @@
   // page under one does not take clicks. Typing already reaches the editor;
   // this makes the first key or click also drop the curtain.
   function skip() {
-    const dir = root.getAttribute('data-nav-dir');
-    if (dir === 'launch' || dir === 'land') M.skipTransition();
+    // Every direction: the page under a transition takes no clicks, so the
+    // first press ends it rather than being swallowed twice.
+    if (root.hasAttribute('data-nav-dir')) M.skipTransition();
   }
   document.addEventListener('keydown', skip, true);
   document.addEventListener('pointerdown', skip, true);
@@ -93,9 +94,74 @@
     if (typeof afterNav === 'function') return afterNav.apply(this, arguments);
   };
 
+  /* ---------- Boot waits for the storage picker ------------ */
+  // The shell assembling is worth seeing, and the picker covers it. When the
+  // picker is up, the boot staging is held back and played as it closes.
+  function watchPicker() {
+    const picker = document.getElementById('storage-mode-popup');
+    if (!picker || picker.classList.contains('hidden')) return;
+    endBoot();
+    const obs = new MutationObserver(function () {
+      if (!picker.classList.contains('hidden')) return;
+      obs.disconnect();
+      if (!M.isFull()) return;
+      root.classList.add('mx-boot');
+      setTimeout(endBoot, 1500);
+    });
+    obs.observe(picker, { attributes: true, attributeFilter: ['class'] });
+  }
+
+  /* ---------- Theme change ---------------------------------- */
+  // The new theme opens as a circle from the row that was pressed, instead of
+  // every element on the page cross-fading its colours for half a second.
+  function wrapTheme() {
+    const flip = window.toggleTheme;
+    if (typeof flip !== 'function' || flip._mx) return;
+    const wrapped = function () {
+      if (M.prefersReducedMotion() || typeof document.startViewTransition !== 'function') {
+        return flip.apply(this, arguments);
+      }
+      const self = this, args = arguments;
+      const o = M.origin || {};
+      const fresh = performance.now() - (o.t || 0) < 1500;
+      root.style.setProperty('--mx-ox', (fresh ? o.x : window.innerWidth / 2) + 'px');
+      root.style.setProperty('--mx-oy', (fresh ? o.y : window.innerHeight / 2) + 'px');
+      root.classList.add('mx-theme-vt');
+      const done = function () {
+        root.classList.remove('mx-theme-vt');
+        root.style.removeProperty('--mx-ox');
+        root.style.removeProperty('--mx-oy');
+      };
+      try {
+        const vt = document.startViewTransition(function () {
+          flip.apply(self, args);
+          // Its own cross-fade would run under the reveal, on every element.
+          root.classList.remove('theme-transitioning');
+        });
+        vt.finished.then(done, done);
+        if (vt.ready && vt.ready.catch) vt.ready.catch(function () {});
+      } catch (e) {
+        done();
+        flip.apply(self, args);
+      }
+    };
+    wrapped._mx = true;
+    window.toggleTheme = wrapped;
+  }
+
+  /* ---------- HUD chrome ------------------------------------ */
+  const afterNavHud = M.afterNav;
+  M.afterNav = function () {
+    const hud = document.querySelector('.hud-layer');
+    if (hud && typeof M.replay === 'function' && M.isFull()) M.replay(hud, 'mx-ping');
+    if (typeof afterNavHud === 'function') return afterNavHud.apply(this, arguments);
+  };
+
   function mount() {
     watchResult();
     watchSteppers();
+    wrapTheme();
+    watchPicker();
   }
 
   if (document.readyState === 'complete') mount();

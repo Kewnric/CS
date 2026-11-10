@@ -122,3 +122,89 @@
     .mx-bump { animation: mxInPop 260ms var(--ease-spring) !important; }
   }
 }
+
+/* ── Theme change: the new theme opens as a circle from the Theme row ── */
+@keyframes mxThemeReveal {
+  from { clip-path: circle(0 at var(--mx-ox, 50vw) var(--mx-oy, 50vh)); }
+  to { clip-path: circle(150vmax at var(--mx-ox, 50vw) var(--mx-oy, 50vh)); }
+}
+@keyframes mxHudPing { 40% { opacity: 1; scale: 1.012; } }
+
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-motion="off"]) {
+    &.mx-theme-vt::view-transition-old(root) { animation: none; }
+    &.mx-theme-vt::view-transition-new(root) {
+      animation: mxThemeReveal 640ms var(--ease-emphasis) both;
+    }
+    /* The whole screen changes theme, chrome included. */
+    &.mx-theme-vt .app-sidebar,
+    &.mx-theme-vt .hud-layer { view-transition-name: none; }
+  }
+
+  html[data-motion="full"] {
+
+    /* ══ Arriving on a page ═════════════════════════════════════════════
+       Each screen lands in order of importance. Keyed on the navigation's
+       direction, so a page that redraws itself later does not replay it. */
+
+    /* Libraries and tools built on the two-pane frame. */
+    &[data-nav-dir]:not([data-nav-dir="same"]) .messenger-layout > .messenger-pane-1 {
+      animation: mxInFromLeft 440ms var(--ease-expo-out) 60ms backwards;
+    }
+    &[data-nav-dir]:not([data-nav-dir="same"]) .messenger-layout > .messenger-pane-2 {
+      animation: mxInFromRight 440ms var(--ease-expo-out) 120ms backwards;
+    }
+
+    /* Home. */
+    &[data-nav-dir]:not([data-nav-dir="same"]) .home-hero {
+      animation: mxInRise 460ms var(--ease-expo-out) backwards;
+    }
+    &[data-nav-dir]:not([data-nav-dir="same"]) .home-stats-grid > * {
+      animation: mxInSheet 460ms var(--ease-expo-out) backwards;
+      animation-delay: calc(90ms + var(--mx-i, 0) * 55ms);
+    }
+    &[data-nav-dir]:not([data-nav-dir="same"]) .home-card {
+      animation: mxInRise 460ms var(--ease-expo-out) 240ms backwards;
+    }
+    &[data-nav-dir]:not([data-nav-dir="same"]) .quick-action-card {
+      animation: mxInFromRight 400ms var(--ease-expo-out) backwards;
+      animation-delay: calc(300ms + var(--mx-i, 0) * 45ms);
+    }
+    :is(.home-stats-grid, .home-quick-actions) > :nth-child(2) { --mx-i: 1; }
+    :is(.home-stats-grid, .home-quick-actions) > :nth-child(3) { --mx-i: 2; }
+    :is(.home-stats-grid, .home-quick-actions) > :nth-child(4) { --mx-i: 3; }
+    :is(.home-stats-grid, .home-quick-actions) > :nth-child(n + 5) { --mx-i: 4; }
+
+    /* The three hubs: mark, title, counts, then the cards (which stagger
+       on their own). */
+    &[data-nav-dir]:not([data-nav-dir="same"]) .lib-hub-hero-icon {
+      animation: mxInPop 480ms var(--ease-spring) backwards;
+    }
+    &[data-nav-dir]:not([data-nav-dir="same"]) :is(.lib-hub-title, .lib-hub-subtitle, .lib-hub-totals, .lib-hub-search) {
+      animation: mxInRise 420ms var(--ease-expo-out) backwards;
+    }
+    &[data-nav-dir] .lib-hub-subtitle { animation-delay: 60ms; }
+    &[data-nav-dir] .lib-hub-totals { animation-delay: 120ms; }
+    &[data-nav-dir] .lib-hub-search { animation-delay: 170ms; }
+
+    /* Everything else with a sidebar: its top-level blocks rise in turn. */
+    &[data-nav-dir]:not([data-nav-dir="same"]) body:is(
+        [data-route="quests"], [data-route="visualization"], [data-route="drills"],
+        [data-route="wing-recall"], [data-route^="analytics-"], [data-route="cheatsheet"]
+      ) #spa-content > * > :not(.messenger-pane-1):not(.messenger-pane-2):not(.sr-only) {
+      animation: mxInRise 440ms var(--ease-expo-out) backwards;
+      animation-delay: calc(50ms + var(--mx-i, 0) * 70ms);
+    }
+    #spa-content > * > :nth-child(2) { --mx-i: 1; }
+    #spa-content > * > :nth-child(3) { --mx-i: 2; }
+    #spa-content > * > :nth-child(n + 4) { --mx-i: 3; }
+
+    /* ══ First load: the shell assembles ════════════════════════════════ */
+    &.mx-boot .app-sidebar { animation: mxInFromLeft 520ms var(--ease-expo-out) 80ms backwards; }
+    &.mx-boot .settings-fab { animation: mxInPop 460ms var(--ease-spring) 420ms backwards; }
+    &.mx-boot .ag-flag { animation: mxInFromTop 480ms var(--ease-expo-out) 340ms backwards; }
+
+    /* ══ HUD chrome answers a navigation ════════════════════════════════ */
+    .hud-layer.mx-ping { animation: mxHudPing 520ms var(--ease-standard); }
+  }
+}
