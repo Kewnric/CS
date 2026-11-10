@@ -2433,10 +2433,23 @@
   box-shadow: 0 2px 6px var(--color-primary-glow);
 }
 
-/* --- Premium Carousel Indicator Glow --- */
-.carousel-dot.active {
-  animation: glowPulse 1.5s ease-in-out infinite;
+/* --- Premium Carousel Indicator Glow ---
+   glowPulse animates box-shadow, which only the main thread can paint, and
+   this one never stops: Home repainted every frame while sitting still. The
+   dot keeps its own small glow; the wide one is fixed on a layer above it
+   and only its opacity pulses, which the compositor runs on its own. */
+.carousel-dot.active { position: relative; }
+.carousel-dot.active::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 18px var(--color-primary-glow), 0 0 30px rgba(99, 102, 241, 0.1);
+  opacity: 0;
+  pointer-events: none;
+  animation: mxDotGlow 1.5s ease-in-out infinite;
 }
+@keyframes mxDotGlow { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
 
 /* ============================================================
    SETTINGS FAB + POPUP (replaces sidebar-bottom section)

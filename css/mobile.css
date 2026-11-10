@@ -143,7 +143,7 @@
      less of that scrolling: 844px down to about 480. The page itself never
      overflows — the box clips it. */
   .home-heatmap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .heatmap-grid { gap: 1px; }
+  .heatmap-grid, .home-heatmap .heatmap-week { gap: 1px; }
   .heatmap-grid .heatmap-cell { width: 8px; height: 8px; }
 
   /* Tables and code blocks scroll inside themselves rather than pushing the

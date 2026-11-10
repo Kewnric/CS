@@ -35,19 +35,54 @@
   width: 3px;
   height: 34px;
   border-radius: 0 4px 4px 0;
-  background: linear-gradient(180deg, #67e8f9 0%, #22d3ee 25%, #0891b2 50%, #22d3ee 75%, #67e8f9 100%);
-  background-size: 100% 200%;
-  animation: railFlow 2.4s linear infinite, railBreathe 2.4s ease-in-out infinite;
   pointer-events: none;
   opacity: 0;
   z-index: 2;
-  /* opacity belongs to railBreathe, so the travel dim rides on filter, which
-     multiplies with it. Coming back runs across the rest of the glide: about
-     half way up by the midpoint, full as it lands. */
+  /* The travel dim rides on filter. Coming back runs across the rest of the
+     glide: about half way up by the midpoint, full as it lands. */
   transition: translate 380ms var(--ease-emphasis), opacity 200ms ease,
               filter 310ms ease-out;
 }
 .mx-rail.is-on { opacity: 1; }
+/* The flow and the breathing, on properties the compositor runs by itself.
+   They were railFlow (background-position) and railBreathe (box-shadow) on
+   the rail itself, and neither can be: the rail is on every screen and never
+   stops, so the page painted on the main thread every frame, forever -- Home
+   rendered all ~120 frames a second while sitting still. Now the glow is a
+   fixed shadow whose opacity breathes, and the gradient is a strip twice the
+   tile long that slides by transform inside a clipped bar. Same 2.4s loop,
+   same colours; the loop closes because the strip moves exactly one tile. */
+.mx-rail::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 3px 0 14px rgba(34, 211, 238, 0.75), 6px 0 26px rgba(34, 211, 238, 0.25);
+  opacity: 0;
+  animation: mxRailGlow 2.4s ease-in-out infinite;
+}
+.mx-rail-bar {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  box-shadow: 2px 0 6px rgba(34, 211, 238, 0.35);
+  animation: mxRailDim 2.4s ease-in-out infinite;
+}
+.mx-rail-bar::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -200%;
+  height: 400%;
+  background: linear-gradient(180deg, #67e8f9 0%, #22d3ee 25%, #0891b2 50%, #22d3ee 75%, #67e8f9 100%);
+  background-size: 100% 50%;
+  animation: mxRailFlow 2.4s linear infinite;
+}
+@keyframes mxRailGlow { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+@keyframes mxRailDim { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
+@keyframes mxRailFlow { from { transform: translateY(0); } to { transform: translateY(50%); } }
 /* Set by paintRail for the first 70ms of a glide between two links. */
 .mx-rail.is-travel {
   filter: opacity(0.28);

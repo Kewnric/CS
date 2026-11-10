@@ -129,6 +129,8 @@
       rail = document.createElement('span');
       rail.className = 'mx-rail';
       rail.setAttribute('aria-hidden', 'true');
+      // The bar clips the flowing gradient; the glow sits outside it (mx-nav.css).
+      rail.innerHTML = '<span class="mx-rail-bar"></span>';
       menu.appendChild(rail);
       menu.classList.add('mx-has-rail');
       new MutationObserver(function (records) {

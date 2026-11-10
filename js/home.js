@@ -27,9 +27,10 @@ async function renderHomeDashboard() {
   const homeRoot = document.getElementById('home-view') || document.getElementById('main-content');
   lucide.createIcons(homeRoot ? { root: homeRoot } : undefined);
 
-  // Stagger cell animations on heatmap
-  document.querySelectorAll('.home-heatmap .heatmap-cell').forEach((cell, i) => {
-    cell.style.animationDelay = `${Math.min(i * 2, 800)}ms`;
+  // Stagger the heatmap's week columns: the same left-to-right sweep the
+  // cells had at 2ms each (seven to a column), capped at 800ms.
+  document.querySelectorAll('.home-heatmap .heatmap-week').forEach((week, i) => {
+    week.style.animationDelay = `${Math.min(i * 14, 800)}ms`;
   });
 }
 
@@ -188,9 +189,12 @@ function renderHomeHeatmap() {
   oneYearAgo.setDate(today.getDate() - 364);
 
   const startDow = oneYearAgo.getDay();
-  let cells = '';
+  // One <div class="heatmap-week"> per column of seven days, so the entrance
+  // animates 53 columns instead of 368 cells: each animated cell was its own
+  // compositor layer while the sweep played (pages.css).
+  const cellList = [];
   for (let p = 0; p < startDow; p++) {
-    cells += `<div class="heatmap-cell" data-level="0" style="opacity:0;"></div>`;
+    cellList.push(`<div class="heatmap-cell" data-level="0" style="opacity:0;"></div>`);
   }
   for (let i = 0; i < 365; i++) {
     const d = new Date(oneYearAgo);
@@ -203,9 +207,13 @@ function renderHomeHeatmap() {
     else if (c >= 3 && c <= 4) lv = 3;
     else if (c > 4) lv = 4;
     // Clickable: the per-day data was already here, it just had nowhere to go.
-    cells += `<div class="heatmap-cell${c ? ' has-work' : ''}" data-level="${lv}"
+    cellList.push(`<div class="heatmap-cell${c ? ' has-work' : ''}" data-level="${lv}"
       title="${ds}: ${c} attempt${c !== 1 ? 's' : ''}${c ? ' — click to see them' : ''}"
-      onclick="homeShowDay('${ds}')"></div>`;
+      onclick="homeShowDay('${ds}')"></div>`);
+  }
+  let cells = '';
+  for (let w = 0; w < cellList.length; w += 7) {
+    cells += `<div class="heatmap-week">${cellList.slice(w, w + 7).join('')}</div>`;
   }
 
   container.innerHTML = `
