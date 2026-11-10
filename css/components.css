@@ -832,8 +832,18 @@
   max-height: calc(100vh - var(--space-lg) * 2);
   max-height: calc(100dvh - var(--space-lg) * 2);
   overflow-y: auto;
+  /* The opening plays things that poke past the card for a moment: the top
+     rail sweep (::after, mx-core.css) slides out past the right edge, the
+     contents rise in from 12px below, the icon springs past its size, a
+     choice row lifts on hover. With overflow-y auto every one of them drew a
+     scrollbar on x and y mid-animation. Nothing in a dialog scrolls sideways,
+     so x is cut; y still scrolls a dialog taller than the screen, without
+     drawing a bar. */
+  overflow-x: hidden;
+  scrollbar-width: none;
   overscroll-behavior: contain;
 }
+.modal-content::-webkit-scrollbar { display: none; }
 
 @keyframes modalRise {
   from { opacity: 0; transform: translateY(12px) scale(0.985); }

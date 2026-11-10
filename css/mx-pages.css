@@ -155,11 +155,15 @@
       animation: mxInFromRight 440ms var(--ease-expo-out) 120ms backwards;
     }
 
-    /* Home. */
-    &[data-nav-dir]:not([data-nav-dir="same"]) .home-hero {
+    /* Home. The hero and the stat tiles also have an entrance of their own
+       in pages.css (adminCardIn). Keyed on data-nav-dir like the rest, the
+       name flipped back to adminCardIn when the attribute came off at the end
+       of the transition, and a changed animation-name starts over: the hero
+       faded in twice. Unkeyed, the name never changes, so it plays once. */
+    .home-hero {
       animation: mxInRise 460ms var(--ease-expo-out) backwards;
     }
-    &[data-nav-dir]:not([data-nav-dir="same"]) .home-stats-grid > * {
+    .home-stats-grid > * {
       animation: mxInSheet 460ms var(--ease-expo-out) backwards;
       animation-delay: calc(90ms + var(--mx-i, 0) * 55ms);
     }

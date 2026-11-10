@@ -41,9 +41,18 @@
   pointer-events: none;
   opacity: 0;
   z-index: 2;
-  transition: translate 380ms var(--ease-emphasis), opacity 200ms ease;
+  /* opacity belongs to railBreathe, so the travel dim rides on filter, which
+     multiplies with it. Coming back: a short beat after it lands, then quick. */
+  transition: translate 380ms var(--ease-emphasis), opacity 200ms ease,
+              filter 240ms ease-out 70ms;
 }
 .mx-rail.is-on { opacity: 1; }
+/* Set by paintRail for the length of a glide between two links. */
+.mx-rail.is-travel {
+  filter: opacity(0.28);
+  transition: translate 380ms var(--ease-emphasis), opacity 200ms ease,
+              filter 110ms ease-out;
+}
 .sidebar-menu.mx-has-rail { position: relative; }
 .sidebar-menu.mx-has-rail .sidebar-link.active::before { display: none; }
 
@@ -122,14 +131,6 @@ body.route-focused .mx-top-btn { display: none; }
        a transition takes no clicks: keep that window short. */
     &[data-nav-dir="boot"]::view-transition-old(root),
     &[data-nav-dir="boot"]::view-transition-new(root) { animation-duration: 180ms; }
-
-    /* ── Morph: the clicked card's icon becomes the next page's ───── */
-    &::view-transition-group(mx-morph) {
-      animation-duration: var(--mx-page);
-      animation-timing-function: var(--ease-emphasis);
-    }
-    &::view-transition-old(mx-morph),
-    &::view-transition-new(mx-morph) { height: 100%; object-fit: contain; }
 
     /* ── Sidebar ──────────────────────────────────────────────────── */
     .app-sidebar.expanded .sidebar-label {

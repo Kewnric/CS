@@ -60,53 +60,14 @@
     return dir;
   };
 
-  /* ---------- Morph ----------------------------------------- */
-  // The icon of the card you click travels and becomes the next page's
-  // header icon. One View Transition name, lent to one element at each end.
-  const MORPH = 'mx-morph';
-  const CARD_SEL = '.card, .quick-action-card, [class*="hub-card"], .lib-card, .wing-row';
-  const HEAD_SEL = '.section-header-icon-wrap, .lib-hub-hero-icon';
-  let morphSrc = null, morphDst = null, morphTimer = 0;
-
-  function clearMorph() {
-    clearTimeout(morphTimer);
-    if (morphSrc) morphSrc.style.viewTransitionName = '';
-    if (morphDst) morphDst.style.viewTransitionName = '';
-    morphSrc = morphDst = null;
-  }
-
-  document.addEventListener('click', function (e) {
-    if (!M.isFull() || !e.target.closest) return;
-    const card = e.target.closest(CARD_SEL);
-    if (!card || !card.closest('#spa-content')) return;
-    const icon = card.querySelector('svg.lucide');
-    if (!icon) return;
-    clearMorph();
-    morphSrc = icon.parentElement && icon.parentElement !== card ? icon.parentElement : icon;
-    morphSrc.style.viewTransitionName = MORPH;
-    // No navigation followed: give the name back.
-    morphTimer = setTimeout(clearMorph, 700);
-  }, true);
-
-  // The router calls Motion.scan once the new page is drawn, still inside the
-  // transition's update -- the moment to name the far end.
-  const scan = M.scan;
-  M.scan = function (root) {
-    if (morphSrc) {
-      clearTimeout(morphTimer);
-      // The old page is gone from the document; its snapshot is already taken.
-      if (!morphSrc.isConnected) {
-        morphDst = (root || document).querySelector(HEAD_SEL);
-        if (morphDst) morphDst.style.viewTransitionName = MORPH;
-        morphSrc = null;
-      }
-    }
-    return scan.apply(this, arguments);
-  };
+  /* ---------- Morph (removed) ---------------------------- */
+  // The clicked card's icon used to travel and become the next page's header
+  // icon through a shared View Transition name. It read as the header icon
+  // sitting in the middle of the page and then sliding home (Library ->
+  // Coding Library), so the header now simply arrives with its page.
 
   /* ---------- After a navigation ---------------------------- */
   M.afterNav = function (route, dir) {
-    clearMorph();
     paintRail();
     hideTop();
     // Out of an attempt: pulse the selected row once so the eye lands on it.
@@ -121,7 +82,7 @@
   };
 
   /* ---------- Sidebar rail ---------------------------------- */
-  let rail = null, menu = null;
+  let rail = null, menu = null, railTravelTimer = 0;
 
   function paintRail() {
     if (!rail || !menu) return;
@@ -130,8 +91,16 @@
     // change, and this runs from an observer of exactly that. Only real changes.
     if (!on) { if (rail.classList.contains('is-on')) rail.classList.remove('is-on'); return; }
     const h = Math.round(on.offsetHeight * 0.72);
+    const to = on.offsetLeft + 'px ' + Math.round(on.offsetTop + (on.offsetHeight - h) / 2) + 'px';
+    // A glide to another link: dim for the trip (mx-nav.css), back up on
+    // arrival. 380ms is the translate transition.
+    if (rail.classList.contains('is-on') && rail.style.translate && rail.style.translate !== to) {
+      clearTimeout(railTravelTimer);
+      rail.classList.add('is-travel');
+      railTravelTimer = setTimeout(function () { rail.classList.remove('is-travel'); }, 380);
+    }
     rail.style.height = h + 'px';
-    rail.style.translate = on.offsetLeft + 'px ' + Math.round(on.offsetTop + (on.offsetHeight - h) / 2) + 'px';
+    rail.style.translate = to;
     if (!rail.classList.contains('is-on')) rail.classList.add('is-on');
   }
 

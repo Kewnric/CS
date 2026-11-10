@@ -118,7 +118,10 @@
 
     document.addEventListener('pointermove', function (e) {
       if (!M.isFull()) { if (card) leave(); return; }
-      const c = e.target.closest ? e.target.closest(GLOW_SEL) : null;
+      let c = e.target.closest ? e.target.closest(GLOW_SEL) : null;
+      // Home's Quick Actions panel is itself a .home-card, so the gaps between
+      // its action cards lit the panel behind them. Only the actions glow.
+      if (c && c.id === 'home-actions') c = null;
       if (!c || !c.closest('#spa-content')) { if (card) leave(); return; }
       card = c;
       px = e.clientX;
