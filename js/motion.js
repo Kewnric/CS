@@ -256,7 +256,7 @@ const Motion = (() => {
       'pointerdown',
       (e) => {
         if (prefersReducedMotion()) return;
-        const host = e.target.closest && e.target.closest('.mx-ripple-host');
+        const host = e.target.closest && e.target.closest('.mx-ripple-host, .btn-primary, .btn-practice, .btn-danger');
         if (!host) return;
         const rect = host.getBoundingClientRect();
         const size = Math.max(rect.width, rect.height);
