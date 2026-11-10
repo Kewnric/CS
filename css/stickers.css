@@ -50,7 +50,25 @@
   overflow: hidden;
   overflow: clip;
   pointer-events: none;
+  /* A group of its own in a page transition, above the sidebar's. The sidebar
+     and the HUD are named groups (motion.css), and a View Transition paints
+     every named group over the snapshot of the rest of the page, so a
+     spill-over sticker hanging over the sidebar sat BEHIND it for the whole
+     transition and only jumped on top when it ended. Groups stack in paint
+     order, so at z 150 this one lands over the sidebar and HUD and under any
+     dialog, as on the page. js/stickers.js places the new page's stickers
+     inside the transition's update, or they would miss the capture. */
+  view-transition-name: ssp-stickers;
 }
+/* Drawn once, like the sidebar: the incoming page's stickers at full
+   strength from the first frame, the outgoing page's gone at once. A
+   cross-fade showed the sidebar through a half-faded sticker (reading as
+   "behind" again), and left the old page's stickers fading in place while
+   their page slid away. */
+::view-transition-group(ssp-stickers) { animation: none; }
+::view-transition-old(ssp-stickers),
+::view-transition-new(ssp-stickers) { animation: none; mix-blend-mode: normal; }
+::view-transition-old(ssp-stickers) { display: none; }
 
 .stk-sticker {
   position: absolute;

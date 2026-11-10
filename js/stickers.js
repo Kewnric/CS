@@ -1613,6 +1613,24 @@ async function stkInit() {
   if (root) mo.observe(root, { childList: true, subtree: true });
   mo.observe(document.body, { attributes: true, attributeFilter: ['data-route'] });
 
+  // Place the new page's stickers in the same step that draws the page. The
+  // router calls Motion.scan inside the View Transition's update, once the new
+  // page is in; the queued (next-frame) sync landed after the browser had
+  // captured the new page, so for the length of the transition the stickers
+  // were drawn under the sidebar (see #stk-float in css/stickers.css).
+  if (window.Motion && typeof Motion.scan === 'function' && !Motion.scan._stk) {
+    const scan = Motion.scan;
+    const wrapped = function () {
+      const r = scan.apply(this, arguments);
+      // Only inside a transition; every other scan is served by the queue.
+      if (typeof Motion.inTransition !== 'function' || Motion.inTransition()) {
+        try { _stkSync(); } catch (e) { console.warn('[Stickers] Could not place stickers:', e); }
+      }
+      return r;
+    };
+    wrapped._stk = true;
+    Motion.scan = wrapped;
+  }
   window.addEventListener('hashchange', _stkQueue);
   window.addEventListener('resize', () => {
     _stkQueue();
