@@ -151,16 +151,76 @@ function vizToggleModuleTabs() {
   vizSave();
 }
 
-/* --- Collapsible Canvas Toolbar --- */
-function vizToggleCanvasToolbar() {
-  viz.toolbarCollapsed = !viz.toolbarCollapsed;
-  const toolbar = document.getElementById('viz-canvas-toolbar');
-  const wrap = document.getElementById('viz-canvas-toolbar-wrap');
-  const btn = document.getElementById('viz-toolbar-collapse-btn');
-  if (toolbar) toolbar.classList.toggle('collapsed', viz.toolbarCollapsed);
-  if (wrap) wrap.classList.toggle('toolbar-collapsed', viz.toolbarCollapsed);
-  if (btn) btn.title = viz.toolbarCollapsed ? 'Show toolbar' : 'Hide toolbar';
+/* --- Collapsible Canvas Toolbar ---
+   Hidden, the toolbar is gone entirely: its row folds to 0 while it slides up
+   out of the pane's top edge (css .vtb-fold). The way back is a separate tab,
+   #viz-toolbar-reveal, that drops in from the top edge while the pointer is in
+   the canvas's top-right corner. It used to be the toolbar's own chevron,
+   which faded out with the toolbar it belonged to, so nothing came back. */
+const VIZ_TB_PEEK_W = 220;  // the corner that calls the tab down, px from the right
+const VIZ_TB_PEEK_H = 96;   // ... and from the top
+let _vizTbResizeTimer = null;
+
+function vizToggleCanvasToolbar(force) {
+  const on = typeof force === 'boolean' ? force : !viz.toolbarCollapsed;
+  if (on === !!viz.toolbarCollapsed) return;
+  // Its menus go with it rather than hanging over the canvas from nothing.
+  if (on && typeof vizClosePopups === 'function') vizClosePopups();
+  viz.toolbarCollapsed = on;
+  _vizApplyCanvasToolbar();
   vizSave();
+  // The canvas grows (or gives back) the toolbar's height over the fold; let
+  // the minimap and anything else measuring it catch up once it lands.
+  clearTimeout(_vizTbResizeTimer);
+  _vizTbResizeTimer = setTimeout(() => window.dispatchEvent(new Event('resize')), 360);
+}
+
+function _vizApplyCanvasToolbar() {
+  const on = !!viz.toolbarCollapsed;
+  const wrap = document.getElementById('viz-canvas-toolbar-wrap');
+  const toolbar = document.getElementById('viz-canvas-toolbar');
+  const hideBtn = document.getElementById('viz-toolbar-collapse-btn');
+  const reveal = document.getElementById('viz-toolbar-reveal');
+  if (wrap) wrap.classList.toggle('toolbar-collapsed', on);
+  // Folded away, nothing in it should take a Tab press or a stray click.
+  if (toolbar) toolbar.inert = on;
+  if (reveal) reveal.tabIndex = on ? 0 : -1;
+  const pane = wrap && wrap.closest('.viz-canvas-pane');
+  if (pane) {
+    pane.classList.remove('tb-peek');
+    _vizBindToolbarPeek(pane);
+  }
+  // The clicked control just vanished; don't leave focus on it.
+  [hideBtn, reveal].forEach(b => { if (b && document.activeElement === b) b.blur(); });
+}
+
+/* The hover corner, measured from the pointer rather than an invisible box
+   laid over the canvas, which would have eaten pans and clicks there. Bound
+   on the pane itself, so it goes when the route unmounts the pane. */
+function _vizBindToolbarPeek(pane) {
+  if (pane._vizTbPeek) return;
+  let rect = null, rectAt = 0, hideTimer = null;
+  const show = () => { clearTimeout(hideTimer); pane.classList.add('tb-peek'); };
+  const hide = (delay) => {
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => pane.classList.remove('tb-peek'), delay);
+  };
+  const onMove = (e) => {
+    if (!viz.toolbarCollapsed || e.pointerType === 'touch') return;
+    // Mid-drag (a pan, a node, a marquee) is not a reach for the toolbar.
+    if (e.buttons) { if (pane.classList.contains('tb-peek')) hide(0); return; }
+    // Re-measured at most twice a second, never on every move: reading the
+    // pane's box after the canvas has redrawn forces a layout per event.
+    const now = performance.now();
+    if (!rect || now - rectAt > 500) { rect = pane.getBoundingClientRect(); rectAt = now; }
+    const inCorner = e.clientX >= rect.right - VIZ_TB_PEEK_W && e.clientY <= rect.top + VIZ_TB_PEEK_H;
+    if (inCorner) show();
+    else if (pane.classList.contains('tb-peek')) hide(420);
+  };
+  pane.addEventListener('pointermove', onMove, { capture: true, passive: true });
+  pane.addEventListener('pointerenter', () => { rect = null; });
+  pane.addEventListener('pointerleave', () => hide(420));
+  pane._vizTbPeek = true;
 }
 
 /* ── The sheet ─────────────────────────────────────────────────
@@ -298,14 +358,7 @@ function _vizRestoreUiState() {
     if (tabs) tabs.classList.add('collapsed');
     if (btn) btn.classList.add('collapsed');
   }
-  if (viz.toolbarCollapsed) {
-    const toolbar = document.getElementById('viz-canvas-toolbar');
-    const wrap = document.getElementById('viz-canvas-toolbar-wrap');
-    const btn = document.getElementById('viz-toolbar-collapse-btn');
-    if (toolbar) toolbar.classList.add('collapsed');
-    if (wrap) wrap.classList.add('toolbar-collapsed');
-    if (btn) btn.title = 'Show toolbar';
-  }
+  _vizApplyCanvasToolbar();
   let zen = false, paneHidden = false, topHidden = false;
   try {
     zen = localStorage.getItem('ssp.vizZen') === '1';

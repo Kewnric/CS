@@ -2649,12 +2649,30 @@
   transform: rotate(180deg);
 }
 
-/* === COLLAPSIBLE VIZ-CANVAS-TOOLBAR === */
+/* === COLLAPSIBLE VIZ-CANVAS-TOOLBAR ===
+   Hidden means gone: no strip, no bar. The wrap is a one-row grid and the row
+   folds 1fr -> 0fr while the toolbar slides up by its own height, both on the
+   same curve, so its bottom edge and the canvas's top move together and it
+   leaves through the pane's top edge (the pane clips). It used to fade to
+   opacity 0 and set max-height 0, but the later min-height: 46px beat the
+   max-height, so a blank 46px band stayed behind -- and the "show" chevron
+   was inside the faded toolbar, so it vanished too. */
 .viz-canvas-toolbar-wrap {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: 1fr;
+  grid-template-columns: minmax(0, 1fr);
   flex-shrink: 0;
   position: relative;
+  transition: grid-template-rows 0.32s var(--ease-standard);
+}
+.viz-canvas-toolbar-wrap.toolbar-collapsed { grid-template-rows: 0fr; }
+
+/* The grid item: min-height 0 is what lets the row reach 0 (the toolbar's own
+   46px minimum lives inside it). Overflow stays visible for the menus. */
+.vtb-fold {
+  min-height: 0;
+  min-width: 0;
+  z-index: 20;
 }
 
 .viz-canvas-toolbar {
@@ -2665,24 +2683,109 @@
   padding: 0.35rem 0.75rem;
   border-bottom: 1px solid var(--border-color);
   background: var(--bg-surface-hover);
-  z-index: 20;
   flex-shrink: 0;
   flex-wrap: wrap;
   overflow: visible;
   /* must not clip dropdown popups */
-  max-height: 60px;
-  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 0.2s ease,
-    padding 0.2s ease;
+  transition: transform 0.32s var(--ease-standard), opacity 0.24s ease, visibility 0s;
 }
 
-.viz-canvas-toolbar.collapsed {
-  max-height: 0;
+/* No transform at rest: a transformed ancestor would capture any fixed-position
+   menu inside the toolbar. */
+.toolbar-collapsed .viz-canvas-toolbar {
+  transform: translateY(-100%);
   opacity: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-  border-bottom: none;
   pointer-events: none;
+  visibility: hidden;
+  transition-delay: 0s, 0.06s, 0.32s;
+}
+
+/* ── The way back: a tab that drops from the canvas's top edge ──
+   Shown only while the toolbar is hidden AND the pointer is in the top-right
+   corner (viz-ui.js _vizBindToolbarPeek sets .tb-peek), or it has keyboard
+   focus. Parked above the edge otherwise -- visible to Tab, so it can still be
+   reached and focused into view. */
+.vtb-reveal {
+  position: absolute;
+  top: 0;
+  right: 0.85rem;
+  z-index: 45; /* over the force panel (40) that shares this corner */
+  width: 46px;
+  height: 30px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid color-mix(in srgb, var(--border-color) 85%, transparent);
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  background: color-mix(in srgb, var(--bg-surface) 86%, var(--bg-body));
+  color: var(--text-secondary);
+  box-shadow: var(--shadow-lg), inset 0 -1px 0 color-mix(in srgb, var(--color-primary) 22%, transparent);
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(calc(-100% - 10px));
+  transition:
+    transform 0.26s var(--ease-standard),
+    opacity 0.18s ease,
+    visibility 0s linear 0.26s,
+    color 0.15s ease, background-color 0.15s ease, height 0.2s var(--ease-spring);
+}
+.vtb-reveal svg {
+  width: 17px;
+  height: 17px;
+  stroke-width: 2.4;
+}
+/* Parked: reachable by Tab while the toolbar is hidden, still out of sight. */
+.toolbar-collapsed ~ .vtb-reveal { visibility: visible; transition-delay: 0s; }
+
+/* Dropped: falls in from above and settles with the brand's spring overshoot. */
+.viz-canvas-pane.tb-peek > .toolbar-collapsed ~ .vtb-reveal,
+.toolbar-collapsed ~ .vtb-reveal:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+  transition:
+    transform 0.42s var(--ease-spring),
+    opacity 0.14s ease,
+    visibility 0s,
+    color 0.15s ease, background-color 0.15s ease, height 0.2s var(--ease-spring);
+}
+.viz-canvas-pane.tb-peek > .toolbar-collapsed ~ .vtb-reveal svg {
+  animation: vtbRevealNudge 1.6s ease-in-out 0.45s infinite;
+}
+.toolbar-collapsed ~ .vtb-reveal:hover,
+.toolbar-collapsed ~ .vtb-reveal:focus-visible {
+  height: 36px; /* hangs a little lower under the pointer: "pull me down" */
+  color: var(--color-primary);
+  background-color: color-mix(in srgb, var(--color-primary) 14%, var(--bg-surface));
+}
+.toolbar-collapsed ~ .vtb-reveal:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -3px;
+}
+/* Ends where it starts, so the loop never jumps. */
+@keyframes vtbRevealNudge {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(3px); }
+}
+
+/* No hover on a touch screen: with the toolbar hidden, the tab just stays out. */
+@media (hover: none) {
+  .toolbar-collapsed ~ .vtb-reveal {
+    opacity: 0.9;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viz-canvas-toolbar-wrap,
+  .viz-canvas-toolbar,
+  .vtb-reveal { transition-duration: 0s !important; }
+  .vtb-reveal svg { animation: none !important; }
 }
 
 /* Separator between button groups */
@@ -2693,50 +2796,14 @@
   flex-shrink: 0;
 }
 
-/* Collapse btn chevron rotates when toolbar is hidden */
+/* The toolbar's own hide chevron. Showing it again is .vtb-reveal's job. */
 #viz-toolbar-collapse-btn i,
 #viz-toolbar-collapse-btn svg {
   width: 12px;
   height: 12px;
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.25s var(--ease-spring);
 }
-
-.viz-canvas-toolbar-wrap.toolbar-collapsed #viz-toolbar-collapse-btn i,
-.viz-canvas-toolbar-wrap.toolbar-collapsed #viz-toolbar-collapse-btn svg {
-  transform: rotate(180deg);
-}
-
-/* When collapsed: give wrap a known height so the floating tab has a positioning context */
-.viz-canvas-toolbar-wrap.toolbar-collapsed {
-  min-height: 24px;
-}
-
-/* Floating reveal tab — droops below the wrap top edge */
-.viz-canvas-toolbar-wrap.toolbar-collapsed #viz-toolbar-collapse-btn {
-  position: absolute;
-  top: 0;
-  right: 0.75rem;
-  z-index: 25;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-color);
-  border-top: none;
-  border-radius: 0 0 var(--radius-md) var(--radius-md);
-  padding: 0.2rem 0.5rem;
-  pointer-events: all;
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-size: 0.6875rem;
-  color: var(--text-secondary);
-  white-space: nowrap;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-  transition: background 0.15s, color 0.15s;
-}
-
-.viz-canvas-toolbar-wrap.toolbar-collapsed #viz-toolbar-collapse-btn:hover {
-  background: var(--bg-surface-hover);
-  color: var(--text-primary);
-}
+#viz-toolbar-collapse-btn:hover svg { transform: translateY(-2px); }
 
 /* === SIDEBAR-BOTTOM COLLAPSIBLE === */
 .sidebar-bottom-toggle {
@@ -4306,6 +4373,11 @@ body:not(.route-focused) .viz-page.hide-top .viz-workspace.panes-swapped.hide-pa
 }
 body:not(.route-focused) .viz-page.hide-top .viz-workspace.panes-swapped:not(.hide-pane) .viz-content-header {
   padding-right: calc(1rem + 72px);
+}
+/* ...and the canvas toolbar's drop-in tab, which would hang under the flag. */
+body:not(.route-focused):not(.viz-zen) .viz-page.hide-top .viz-workspace:not(.panes-swapped) .vtb-reveal,
+body:not(.route-focused):not(.viz-zen) .viz-page.hide-top .viz-workspace.panes-swapped.hide-pane .vtb-reveal {
+  right: calc(0.85rem + 72px);
 }
 
 @media (prefers-reduced-motion: reduce) {

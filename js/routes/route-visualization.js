@@ -126,7 +126,11 @@ function vizTemplate() {
           <button class="rz-collapse" id="rz-viz-pane-btn" type="button" onmousedown="event.stopPropagation()" onclick="vizTogglePane()" tabindex="-1" aria-hidden="true"><i data-lucide="chevron-left"></i></button>
         </div>
         <div class="viz-canvas-pane">
+          <!-- The wrap is a one-row grid whose row folds 1fr -> 0fr while the
+               toolbar slides up out of the pane's top edge, so hiding it leaves
+               no strip behind (vizToggleCanvasToolbar). -->
           <div class="viz-canvas-toolbar-wrap" id="viz-canvas-toolbar-wrap">
+          <div class="vtb-fold">
           <!-- Seventeen unlabelled icons used to sit in one flat row. They are
                sorted into three categories now -- Build, View, Edit -- and only
                the open one's tools are on screen; zoom and More stay put.
@@ -355,12 +359,19 @@ function vizTemplate() {
                   <button type="button" class="viz-link-type-option" role="menuitem" onclick="vizShowShortcuts()"><i data-lucide="keyboard" style="width:14px;height:14px;"></i> Keyboard shortcuts</button>
                 </div>
               </div>
-              <button class="viz-zoom-btn" id="viz-toolbar-collapse-btn" onclick="vizToggleCanvasToolbar()" title="Hide toolbar" aria-label="Hide the toolbar">
+              <button class="viz-zoom-btn" id="viz-toolbar-collapse-btn" onclick="vizToggleCanvasToolbar(true)" title="Hide toolbar" aria-label="Hide the toolbar">
                 <i data-lucide="chevron-up" id="viz-toolbar-chevron"></i>
               </button>
             </div>
           </div>
           </div>
+          </div>
+          <!-- With the toolbar hidden, this tab drops in from the top edge when
+               the pointer reaches the canvas's top-right corner (or on focus),
+               and brings the toolbar back. -->
+          <button type="button" class="vtb-reveal" id="viz-toolbar-reveal" onclick="vizToggleCanvasToolbar(false)" title="Show toolbar" aria-label="Show the toolbar" tabindex="-1">
+            <i data-lucide="chevron-down"></i>
+          </button>
           <div class="viz-canvas-container" id="viz-canvas-container">
             <svg class="viz-canvas-svg" id="viz-canvas-svg" aria-hidden="true"></svg>
             <div class="viz-nodes-layer" id="viz-nodes-layer"></div>
