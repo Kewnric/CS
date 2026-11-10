@@ -159,6 +159,12 @@ const SpaRouter = (() => {
        being entered. Anything that wants to know where the user came from
        wants this. null on the first route of a page load. */
     window.cm_prevRoute = currentRoute;
+    /* Which way this navigation goes -- deeper, back, along the sidebar, into
+       or out of an attempt (js/mx-nav.js). Asked here, while both ends are
+       still known; the View Transition below carries the answer to the CSS. */
+    const navDir = (window.Motion && typeof Motion.navDir === 'function')
+      ? Motion.navDir(currentRoute, hash, routes[currentRoute], routeConfig)
+      : null;
     currentRoute = hash;
 
     // Update document title
@@ -285,7 +291,11 @@ const SpaRouter = (() => {
        after a navigation that stood down before it rendered. */
     const chromeSwap = document.body.classList.contains('route-focused') !== focused;
     if (window.Motion && typeof Motion.withViewTransition === 'function') {
-      Motion.withViewTransition(renderAndInit, chromeSwap ? { rootClass: 'vt-chrome-swap' } : null);
+      Motion.withViewTransition(renderAndInit, {
+        rootClass: chromeSwap ? 'vt-chrome-swap' : null,
+        dir: navDir,
+        onDone: () => { if (typeof Motion.afterNav === 'function') Motion.afterNav(hash, navDir); },
+      });
     } else {
       renderAndInit();
     }

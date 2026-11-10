@@ -77,6 +77,7 @@ function openSettingsModal() {
   if (typeof _syncHudSettingsRow === 'function') _syncHudSettingsRow();
   if (typeof winMemPaintSetting === 'function') winMemPaintSetting();
   if (typeof storageMeterPaint === 'function') storageMeterPaint();
+  if (window.Motion && typeof Motion.paintSetting === 'function') Motion.paintSetting();
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: modal });
 }
 

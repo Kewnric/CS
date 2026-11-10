@@ -43,6 +43,17 @@ function peekUndoLabel() {
 
 function _showUndoToast(label) {
   _hideUndoToast();
+  // One toast for the whole app (js/motion.js): its Undo button, its countdown
+  // bar. The handle rides on this function so nothing new is declared at the
+  // top level. The hand-built pill below is the fallback.
+  if (window.Motion && typeof Motion.toast === 'function') {
+    _showUndoToast.handle = Motion.toast(label, {
+      type: 'info',
+      duration: UNDO_TOAST_MS,
+      action: { label: 'Undo', onClick: popUndo }
+    });
+    return;
+  }
   let toast = document.getElementById('undo-toast');
   if (!toast) {
     toast = document.createElement('div');
@@ -74,6 +85,10 @@ function _showUndoToast(label) {
 function _hideUndoToast() {
   clearTimeout(_undoToastTimer);
   _undoToastTimer = null;
+  if (_showUndoToast.handle) {
+    try { _showUndoToast.handle.dismiss(); } catch (e) { /* already gone */ }
+    _showUndoToast.handle = null;
+  }
   const toast = document.getElementById('undo-toast');
   if (toast) {
     toast.style.transform = 'translateX(-50%) translateY(100px)';

@@ -1410,6 +1410,11 @@ function withCloudSaveSuppressed(fn) {
 /* ---------- Cloud Toast ---------- */
 
 function showCloudToast(message, isError) {
+  // One toast for the whole app (js/motion.js); #cloud-save-toast is the fallback.
+  if (window.Motion && typeof Motion.toast === 'function') {
+    Motion.toast(message, { type: isError ? 'error' : 'success', duration: 2500 });
+    return;
+  }
   let toast = document.getElementById('cloud-save-toast');
   if (!toast) return;
   toast.textContent = (isError ? '✕ ' : '✓ ') + message;

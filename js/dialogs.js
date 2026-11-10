@@ -42,6 +42,17 @@ function _releaseFocusTrap() {
 function closeModalSmooth(modalEl) {
   if (!modalEl) return;
   _releaseFocusTrap();
+  /* The exit belongs to the stylesheet now (css/mx-core.css): .hidden goes on
+     at once and a `display` transition keeps the dialog drawn while it leaves.
+     So a dialog opened from this one's callback is never fighting a timer, and
+     this close looks like every other popup's. The scripted fade below is what
+     is left for a browser without that, and it is skipped when motion is off --
+     it held an invisible dialog over the page for its 200 ms. */
+  if (window.Motion && (Motion.prefersReducedMotion() || Motion.cssExits)) {
+    modalEl._dlgSeq = (modalEl._dlgSeq || 0) + 1;
+    modalEl.classList.add('hidden');
+    return;
+  }
   const content = modalEl.querySelector('.modal-content');
   modalEl.style.transition = 'opacity 0.2s ease';
   modalEl.style.opacity = '0';
@@ -89,6 +100,8 @@ function _dlgOpen(modal, variant) {
     content.style.transform = '';
     content.style.opacity = '';
     content.style.transition = '';
+    content.style.animation = '';
+    content.classList.remove('dlg-error');
   }
   modal.classList.remove('hidden');
 }
@@ -114,9 +127,12 @@ function showMessage(title, message, isError = false) {
   if (isError) {
     const content = modal.querySelector('.modal-content');
     if (content) {
-      content.style.animation = 'none';
+      /* A class, not an inline animation: inline would replace the dialog's
+         entrance outright, and it used to add a bounce the app's dialogs have
+         otherwise given up. The shake follows the entrance (mx-core.css). */
+      content.classList.remove('dlg-error');
       void content.offsetWidth;
-      content.style.animation = 'shake 0.5s ease-in-out, bounceIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)';
+      content.classList.add('dlg-error');
     }
   }
   lucide.createIcons({ root: modal });

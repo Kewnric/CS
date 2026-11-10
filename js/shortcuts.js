@@ -54,6 +54,11 @@ function _armGoSequence() {
 }
 
 function _showGoToast(label) {
+  // One toast for the whole app (js/motion.js); the pill is the fallback.
+  if (window.Motion && typeof Motion.toast === 'function') {
+    Motion.toast('Go to ' + label, { type: 'info', duration: 1100 });
+    return;
+  }
   let toast = document.getElementById('shortcut-go-toast');
   if (!toast) {
     toast = document.createElement('div');

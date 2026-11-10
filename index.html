@@ -9,6 +9,17 @@
       if (localStorage.getItem('sidebarExpanded') === 'true') {
         document.documentElement.setAttribute('data-sidebar', 'expanded');
       }
+      // The motion level, before first paint, so nothing animates and then stops
+      // (js/motion.js owns it). No stored choice: off when the system asks for
+      // less motion, calm on a phone, full otherwise.
+      var motion = null;
+      try { motion = localStorage.getItem('ssp.motion'); } catch (e) {}
+      if (motion !== 'full' && motion !== 'calm' && motion !== 'off') {
+        motion = (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) ? 'off'
+          : (window.innerWidth < 768 ? 'calm' : 'full');
+      }
+      document.documentElement.setAttribute('data-motion', motion);
+      document.documentElement.classList.add('mx-boot');
     })();
   </script>
   <meta charset="UTF-8">
@@ -64,6 +75,12 @@
   <link rel="stylesheet" href="css/motion.css">
   <link rel="stylesheet" href="css/hud.css">
   <link rel="stylesheet" href="css/stickers.css">
+  <!-- The motion layer. Last on purpose: it re-times things the sheets above
+       already style, and wins ties by order rather than by !important. -->
+  <link rel="stylesheet" href="css/mx-core.css">
+  <link rel="stylesheet" href="css/mx-nav.css">
+  <link rel="stylesheet" href="css/mx-controls.css">
+  <link rel="stylesheet" href="css/mx-pages.css">
 
   <!-- Pixel faces, used only by the Language run screen. -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -292,6 +309,18 @@
           <span class="settings-item-info">
             <span class="settings-item-label" id="settings-hud-label">HUD Chrome On</span>
             <span class="settings-item-desc" id="settings-hud-desc">Frame, brackets and scan lines</span>
+          </span>
+          <i data-lucide="chevron-right" class="settings-item-chevron" aria-hidden="true"></i>
+        </button>
+        <!-- How much the interface moves: every transition, fades only, or
+             nothing (js/motion.js). Three states, so it cycles rather than
+             toggles and carries no aria-pressed. -->
+        <button onclick="Motion.cycleLevel()" class="settings-item" type="button" id="settings-motion-item"
+                aria-label="Motion">
+          <span class="settings-item-icon"><i data-lucide="sparkles" id="settings-motion-icon" aria-hidden="true"></i></span>
+          <span class="settings-item-info">
+            <span class="settings-item-label" id="settings-motion-label">Motion: Full</span>
+            <span class="settings-item-desc" id="settings-motion-desc">Every transition and effect</span>
           </span>
           <i data-lucide="chevron-right" class="settings-item-chevron" aria-hidden="true"></i>
         </button>
@@ -601,6 +630,12 @@
   <script defer src="js/window-memory.js"></script>
   <script defer src="js/theme-editor.js"></script>
   <script defer src="js/motion.js"></script>
+  <!-- The motion layer's scripts. Each is one closure that adds to Motion and
+       declares nothing at the top level. mx-nav must precede router.js. -->
+  <script defer src="js/mx-popups.js"></script>
+  <script defer src="js/mx-nav.js"></script>
+  <script defer src="js/mx-controls.js"></script>
+  <script defer src="js/mx-pages.js"></script>
   <script defer src="js/undo.js"></script>
   <script defer src="js/syntax.js"></script>
   <script defer src="js/syntax-sql.js"></script>

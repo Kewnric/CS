@@ -2053,6 +2053,12 @@ function shareChallenge(challengeId) {
 }
 
 function showShareToast(message) {
+  // One toast for the whole app (js/motion.js). The pill below is what is left
+  // for a page where that has not loaded.
+  if (window.Motion && typeof Motion.toast === 'function') {
+    Motion.toast(message, { type: 'success', duration: 2500 });
+    return;
+  }
   let toast = document.getElementById('share-toast');
   if (!toast) {
     toast = document.createElement('div');

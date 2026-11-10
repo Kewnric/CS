@@ -1,0 +1,627 @@
+/* ============================================================
+   MX-CORE.CSS — the motion layer: tokens, levels, popups, toasts
+   ------------------------------------------------------------
+   Loaded after every other sheet. It re-times what the app already draws and
+   adds the half that was missing: things leaving.
+
+   HOW IT IS BUILT
+   - Three levels on <html data-motion>: full, calm, off (js/motion.js).
+     Every rule below sits inside `html:not([data-motion="off"])`, itself
+     inside `prefers-reduced-motion: no-preference`, so Off and the system
+     switch remove this layer whole rather than rule by rule. What only makes
+     sense with travel sits under `html[data-motion="full"]`.
+   - Moves use `translate`, `scale` and `rotate`, never `transform`. Those
+     compose with whatever transform a rule elsewhere already put on the
+     element (a hover lift, a centring translate) instead of replacing it.
+   - Entrances fill `backwards` and name no `to` keyframe: they end on the
+     element's own style and hold nothing afterwards, so no layer outlives
+     its animation.
+   - Entrances are named mxIn*, exits mxOut*. js/mx-popups.js tells the two
+     apart by that prefix.
+   ============================================================ */
+
+:root {
+  /* Durations. Exits run at about two thirds of their entrance. */
+  --mx-press: 90ms;
+  --mx-quick: 160ms;
+  --mx-base: 240ms;
+  --mx-enter: 340ms;
+  --mx-exit: 190ms;
+  --mx-page: 420ms;
+  --mx-hero: 700ms;
+  /* Two curves beside the three in global.css. Exit accelerates: it leaves
+     without lingering. Emphasis is expo-out's heavier sibling, for pages. */
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --ease-emphasis: cubic-bezier(0.2, 0, 0, 1);
+  /* 1 at full, 0 at calm: multiplies every distance and scale change. */
+  --mx-travel: 1;
+  /* Where a popup opens from, in viewport px. js/mx-popups.js writes these on
+     the popup itself; the middle of the screen is the fallback. */
+  --mx-ox: 50vw;
+  --mx-oy: 50vh;
+}
+
+html[data-motion="calm"] {
+  --mx-travel: 0;
+}
+
+/* ── Off ──────────────────────────────────────────────────────
+   The same treatment the app already gives the system "reduce motion"
+   switch (global.css): durations collapse rather than animations being
+   removed, so anything that rests on an animation's last frame still gets
+   there and every animationend / transitionend still fires. */
+html[data-motion="off"] *,
+html[data-motion="off"] *::before,
+html[data-motion="off"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  transition-delay: 0s !important;
+  scroll-behavior: auto !important;
+}
+html[data-motion="off"] [data-reveal] {
+  opacity: 1 !important;
+  transform: none !important;
+}
+html[data-motion="off"]::view-transition-group(*),
+html[data-motion="off"]::view-transition-old(*),
+html[data-motion="off"]::view-transition-new(*) {
+  animation: none !important;
+}
+
+/* ── Keyframes ────────────────────────────────────────────── */
+
+/* Out of the control that opened it: starts part-way toward --mx-ox/--mx-oy,
+   smaller, and settles in the middle. No overshoot -- at this size a bounce
+   reads as clunky, which is why the app took it off its dialogs once already. */
+@keyframes mxInOrigin {
+  from {
+    opacity: 0;
+    scale: calc(1 - 0.32 * var(--mx-travel));
+    translate:
+      calc((var(--mx-ox) - 50vw) * 0.5 * var(--mx-travel))
+      calc((var(--mx-oy) - 50vh) * 0.5 * var(--mx-travel));
+  }
+  55% { opacity: 1; }
+}
+@keyframes mxOutOrigin {
+  40% { opacity: 1; }
+  to {
+    opacity: 0;
+    scale: calc(1 - 0.2 * var(--mx-travel));
+    translate:
+      calc((var(--mx-ox) - 50vw) * 0.28 * var(--mx-travel))
+      calc((var(--mx-oy) - 50vh) * 0.28 * var(--mx-travel));
+  }
+}
+@keyframes mxInFade { from { opacity: 0; } }
+@keyframes mxOutFade { to { opacity: 0; } }
+/* A piece of content arriving after its container. */
+@keyframes mxInRise {
+  from { opacity: 0; translate: 0 calc(12px * var(--mx-travel)); }
+}
+/* Small things only: the spring. */
+@keyframes mxInPop {
+  from { opacity: 0; scale: calc(1 - 0.5 * var(--mx-travel)); }
+  60% { opacity: 1; }
+}
+/* From the top edge (search), and back up. */
+@keyframes mxInDrop {
+  from { opacity: 0; translate: 0 calc(-28px * var(--mx-travel)); scale: calc(1 - 0.04 * var(--mx-travel)); }
+}
+@keyframes mxOutDrop {
+  to { opacity: 0; translate: 0 calc(-18px * var(--mx-travel)); scale: calc(1 - 0.03 * var(--mx-travel)); }
+}
+/* A full-height sheet: the big editors. */
+@keyframes mxInSheet {
+  from { opacity: 0; translate: 0 calc(36px * var(--mx-travel)); scale: calc(1 - 0.03 * var(--mx-travel)); }
+  45% { opacity: 1; }
+}
+@keyframes mxOutSheet {
+  to { opacity: 0; translate: 0 calc(28px * var(--mx-travel)); scale: calc(1 - 0.03 * var(--mx-travel)); }
+}
+/* Menus: out of their own corner (transform-origin set where they are used). */
+@keyframes mxInMenu {
+  from { opacity: 0; scale: calc(1 - 0.14 * var(--mx-travel)); translate: 0 calc(-4px * var(--mx-travel)); }
+}
+@keyframes mxOutMenu {
+  to { opacity: 0; scale: calc(1 - 0.08 * var(--mx-travel)); }
+}
+/* The rail sweep: the app's selection mark, used as an arrival mark. */
+@keyframes mxSweep {
+  from { translate: -100% 0; opacity: 1; }
+  to { translate: 100% 0; opacity: 0; }
+}
+/* Edges. */
+@keyframes mxInFromRight { from { opacity: 0; translate: calc(40px * var(--mx-travel)) 0; } }
+@keyframes mxInFromLeft { from { opacity: 0; translate: calc(-40px * var(--mx-travel)) 0; } }
+@keyframes mxInFromBottom { from { opacity: 0; translate: 0 calc(40px * var(--mx-travel)); } }
+@keyframes mxInFromTop { from { opacity: 0; translate: 0 calc(-40px * var(--mx-travel)); } }
+@keyframes mxOutToRight { to { opacity: 0; translate: calc(32px * var(--mx-travel)) 0; } }
+@keyframes mxOutToLeft { to { opacity: 0; translate: calc(-32px * var(--mx-travel)) 0; } }
+@keyframes mxOutToBottom { to { opacity: 0; translate: 0 calc(32px * var(--mx-travel)); } }
+@keyframes mxOutToTop { to { opacity: 0; translate: 0 calc(-32px * var(--mx-travel)); } }
+
+/* A ghost is a picture of something already gone. */
+[data-mx-ghost] {
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-motion="off"]) {
+
+    /* ══ 1. The shared dialog shell: .modal-overlay > .modal-content ══════
+       Nine shells in index.html and about twenty built in JS use it. */
+
+    .modal-overlay::before,
+    .mindmap-overlay::before {
+      animation: mxInFade var(--mx-base) ease-out backwards;
+    }
+
+    .modal-overlay > .modal-content:not(.no-entry),
+    .mindmap-overlay > .mindmap-panel {
+      animation: mxInOrigin var(--mx-enter) var(--ease-emphasis) backwards;
+    }
+
+    /* Closing a shell that stays in the page. `display` is transitioned as a
+       discrete property, so the element stays drawn for the length of its
+       exit and then goes, with no script holding it open. .hidden is set at
+       once, as always: nothing that reads the class can tell the difference.
+       Where this is not supported the declaration is dropped and the close is
+       instant, exactly as it was. */
+    .modal-overlay.hidden,
+    .mindmap-overlay.hidden {
+      pointer-events: none;
+      /* Two of the shells carry a second scrim inline; take it out with the
+         first so the page does not stay dimmed until the display flips. */
+      background-color: transparent !important;
+      -webkit-backdrop-filter: blur(0) !important;
+      backdrop-filter: blur(0) !important;
+      transition:
+        display var(--mx-exit) allow-discrete,
+        background-color var(--mx-exit) var(--ease-exit),
+        backdrop-filter var(--mx-exit) var(--ease-exit);
+    }
+    .modal-overlay.hidden::before,
+    .mindmap-overlay.hidden::before {
+      animation: none !important;
+      opacity: 0;
+      transition: opacity var(--mx-exit) var(--ease-exit);
+    }
+    .modal-overlay.hidden > .modal-content,
+    .mindmap-overlay.hidden > .mindmap-panel {
+      /* An entrance that fills forwards would hold these values against the
+         transition, so the animation goes as the exit begins. */
+      animation: none !important;
+      opacity: 0;
+      scale: calc(1 - 0.2 * var(--mx-travel));
+      translate:
+        calc((var(--mx-ox) - 50vw) * 0.28 * var(--mx-travel))
+        calc((var(--mx-oy) - 50vh) * 0.28 * var(--mx-travel));
+      transition:
+        opacity var(--mx-exit) var(--ease-exit),
+        scale var(--mx-exit) var(--ease-exit),
+        translate var(--mx-exit) var(--ease-exit);
+    }
+
+    /* The same exit for one that is removed instead: its ghost plays it. */
+    .modal-overlay[data-mx-ghost]::before,
+    .mindmap-overlay[data-mx-ghost]::before {
+      animation: mxOutFade var(--mx-exit) var(--ease-exit) forwards !important;
+    }
+    .modal-overlay[data-mx-ghost] > .modal-content,
+    .mindmap-overlay[data-mx-ghost] > .mindmap-panel {
+      animation: mxOutOrigin var(--mx-exit) var(--ease-exit) forwards !important;
+    }
+    .modal-overlay[data-mx-ghost] {
+      -webkit-backdrop-filter: none !important;
+      backdrop-filter: none !important;
+      background-color: transparent !important;
+    }
+
+    /* ══ 2. Layers whose scrim is the layer itself ═══════════════════════
+       Pickers, the big editors, the attempt's sheets. The layer fades; the
+       card on it grows from the origin. */
+
+    .prereq-picker-overlay,
+    .set-builder-overlay,
+    .nb-tags-overlay,
+    .nb-import-overlay,
+    .np-sheet-overlay,
+    .np-zoom-overlay,
+    .np-wrong-overlay,
+    .mx-overlay {
+      animation: mxInFade var(--mx-base) ease-out backwards;
+    }
+    .prereq-picker-overlay > *,
+    .set-builder-overlay > *,
+    .nb-tags-overlay > *,
+    .nb-import-overlay > *,
+    .np-sheet-overlay > *,
+    .np-zoom-overlay > *,
+    .mx-overlay > * {
+      animation: mxInOrigin var(--mx-enter) var(--ease-emphasis) backwards;
+    }
+
+    .prereq-picker-overlay[data-mx-ghost],
+    .set-builder-overlay[data-mx-ghost],
+    .nb-tags-overlay[data-mx-ghost],
+    .nb-import-overlay[data-mx-ghost],
+    .np-sheet-overlay[data-mx-ghost],
+    .np-zoom-overlay[data-mx-ghost],
+    .np-wrong-overlay[data-mx-ghost],
+    .mt-overlay[data-mx-ghost],
+    .mx-overlay[data-mx-ghost] {
+      animation: mxOutFade var(--mx-exit) var(--ease-exit) forwards !important;
+    }
+    .prereq-picker-overlay[data-mx-ghost] > *,
+    .set-builder-overlay[data-mx-ghost] > *,
+    .nb-tags-overlay[data-mx-ghost] > *,
+    .nb-import-overlay[data-mx-ghost] > *,
+    .np-sheet-overlay[data-mx-ghost] > *,
+    .np-zoom-overlay[data-mx-ghost] > *,
+    .np-wrong-overlay[data-mx-ghost] > *,
+    .mt-overlay[data-mx-ghost] > *,
+    .mx-overlay[data-mx-ghost] > * {
+      animation: mxOutOrigin var(--mx-exit) var(--ease-exit) forwards !important;
+    }
+  }
+
+  /* ══ Full only: staged contents ═══════════════════════════════════════
+     Title, text and buttons land a beat after the card, 34 ms apart. */
+  html[data-motion="full"] {
+    .modal-overlay:not(.hidden):not([data-mx-ghost]) > .modal-content:not(.no-entry) > * {
+      animation: mxInRise var(--mx-enter) var(--ease-expo-out) backwards;
+      animation-delay: calc(40ms + var(--mx-i, 0) * 30ms);
+    }
+    .modal-content > :nth-child(2) { --mx-i: 1; }
+    .modal-content > :nth-child(3) { --mx-i: 2; }
+    .modal-content > :nth-child(4) { --mx-i: 3; }
+    .modal-content > :nth-child(5) { --mx-i: 4; }
+    .modal-content > :nth-child(n + 6) { --mx-i: 5; }
+
+    /* The icon is small enough to spring. */
+    .modal-overlay:not(.hidden):not([data-mx-ghost]) > .modal-content:not(.no-entry) > .modal-icon {
+      animation: mxInPop 420ms var(--ease-spring) backwards;
+      animation-delay: 60ms;
+    }
+  }
+}
+
+/* The error shake, for a browser that drops the nested layer below. */
+.modal-content.dlg-error {
+  animation: modalRise 0.34s cubic-bezier(0.16, 1, 0.3, 1) both, shake 0.5s ease-in-out 0.16s;
+}
+
+@keyframes mxDraw {
+  from { stroke-dasharray: 64; stroke-dashoffset: 64; }
+  to { stroke-dasharray: 64; stroke-dashoffset: 0; }
+}
+@keyframes mxToastIn {
+  from { opacity: 0; translate: calc(48px * var(--mx-travel)) 0; scale: calc(1 - 0.06 * var(--mx-travel)); }
+}
+@keyframes mxGlowOnce {
+  0% { box-shadow: 0 0 0 0 var(--mx-glow, var(--color-primary-glow)); }
+  100% { box-shadow: 0 0 0 14px transparent; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-motion="off"]) {
+
+    /* ══ 3. Layers nobody listed (js/mx-popups.js enlist) ════════════════ */
+    .mx-in-fade { animation: mxInFade var(--mx-base) ease-out backwards; }
+    .mx-in-origin { animation: mxInOrigin var(--mx-enter) var(--ease-emphasis) backwards; }
+    .mx-overlay[data-mx-ghost] {
+      animation: mxOutFade var(--mx-exit) var(--ease-exit) forwards !important;
+    }
+
+    /* ══ 4. Layers with a window of their own ═══════════════════════════ */
+
+    /* Run Code. Floating, the layer is see-through and only the window shows,
+       so the window carries the whole entrance and exit either way. */
+    .run-code-overlay > .run-code-window,
+    .demo-overlay > .demo-window {
+      animation: mxInOrigin var(--mx-enter) var(--ease-emphasis) backwards;
+    }
+    .run-code-overlay[data-mx-ghost],
+    .demo-overlay[data-mx-ghost] {
+      animation: mxOutFade var(--mx-exit) var(--ease-exit) forwards !important;
+    }
+    .run-code-overlay[data-mx-ghost] > .run-code-window,
+    .demo-overlay[data-mx-ghost] > .demo-window {
+      animation: mxOutOrigin var(--mx-exit) var(--ease-exit) forwards !important;
+    }
+
+    /* The storage picker: the first thing on screen. The card used to spring
+       in at 0.4 s, the one dialog still bouncing. */
+    .smp-overlay { animation: mxInFade var(--mx-enter) ease-out backwards; }
+    .smp-overlay > .smp-card { animation: mxInOrigin 460ms var(--ease-expo-out) backwards; }
+    .smp-overlay.hidden {
+      animation: none !important;
+      opacity: 0;
+      pointer-events: none;
+      transition: display 260ms allow-discrete, opacity 260ms var(--ease-exit);
+    }
+    /* Choosing a mode is going INTO the app, so this one leaves by growing
+       toward you rather than shrinking away. */
+    .smp-overlay.hidden > .smp-card {
+      animation: none !important;
+      scale: calc(1 + 0.06 * var(--mx-travel));
+      transition: scale 260ms var(--ease-exit);
+    }
+
+    /* ══ 5. Menus ═══════════════════════════════════════════════════════
+       Out of their own corner (each already sets transform-origin), fast.
+       These replace a 0.2 s spring that overshot on every right-click. */
+    .tree-context-menu,
+    .viz-context-menu,
+    .viz-toolbar-popup,
+    .viz-ctx-submenu,
+    .viz-build-menu,
+    .timer-menu,
+    .file-menu,
+    .cs-table-menu,
+    .mx-menu {
+      animation: mxInMenu 150ms var(--ease-expo-out) backwards;
+    }
+    .timer-menu,
+    .file-menu,
+    .cs-table-menu { transform-origin: top left; }
+
+    /* Closed with .hidden: the same discrete `display` transition as the
+       dialog shells, at menu speed. */
+    .tree-context-menu.hidden,
+    .viz-context-menu.hidden,
+    .viz-toolbar-popup.hidden,
+    .viz-ctx-submenu.hidden,
+    .viz-force-panel.hidden {
+      animation: none !important;
+      opacity: 0;
+      scale: calc(1 - 0.06 * var(--mx-travel));
+      pointer-events: none;
+      transition:
+        display 100ms allow-discrete,
+        opacity 100ms var(--ease-exit),
+        scale 100ms var(--ease-exit);
+    }
+    /* Closed by removal: the ghost. */
+    .timer-menu[data-mx-ghost],
+    .file-menu[data-mx-ghost],
+    .cs-table-menu[data-mx-ghost],
+    .viz-build-menu[data-mx-ghost],
+    .mx-menu[data-mx-ghost] {
+      animation: mxOutMenu 100ms var(--ease-exit) forwards !important;
+    }
+
+    /* ══ 6. Character, by kind of window ════════════════════════════════ */
+
+    /* Search / command palette: drops from the top edge it sits against. */
+    .modal-overlay > .modal-content-search:not(.no-entry) {
+      animation: mxInDrop var(--mx-enter) var(--ease-expo-out) backwards;
+    }
+    .modal-overlay.hidden > .modal-content-search {
+      scale: calc(1 - 0.03 * var(--mx-travel));
+      translate: 0 calc(-18px * var(--mx-travel));
+    }
+    .modal-overlay[data-mx-ghost] > .modal-content-search {
+      animation-name: mxOutDrop !important;
+    }
+
+    /* The big editors: too large to fly out of a button, so they rise as a
+       sheet and go back down. */
+    .modal-overlay > .modal-content-wide:not(.no-entry),
+    .modal-overlay > .nb-modal-full:not(.no-entry),
+    .set-builder-overlay > *,
+    .nb-import-overlay > *,
+    .nb-tags-overlay > * {
+      animation: mxInSheet 380ms var(--ease-expo-out) backwards;
+    }
+    .modal-overlay.hidden > .modal-content-wide,
+    .modal-overlay.hidden > .nb-modal-full {
+      scale: calc(1 - 0.03 * var(--mx-travel));
+      translate: 0 calc(28px * var(--mx-travel));
+    }
+    .modal-overlay[data-mx-ghost] > .modal-content-wide,
+    .modal-overlay[data-mx-ghost] > .nb-modal-full,
+    .set-builder-overlay[data-mx-ghost] > *,
+    .nb-import-overlay[data-mx-ghost] > *,
+    .nb-tags-overlay[data-mx-ghost] > * {
+      animation-name: mxOutSheet !important;
+    }
+
+    /* An error still shakes -- after it has arrived, and without the bounce
+       that used to be stacked on top. */
+    .modal-overlay > .modal-content.dlg-error {
+      animation:
+        mxInOrigin var(--mx-enter) var(--ease-emphasis) backwards,
+        shake 0.5s ease-in-out 0.16s;
+    }
+
+    /* The rail sweep: one line of light across the top edge as a dialog
+       lands. Red when the dialog holds a destructive button. */
+    .modal-overlay > .modal-content { position: relative; }
+    .modal-overlay:not(.hidden):not([data-mx-ghost]) > .modal-content:not(.no-entry)::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      pointer-events: none;
+      background: linear-gradient(90deg, transparent, var(--color-accent-hover, #22d3ee) 45%, var(--color-primary, #6366f1) 70%, transparent);
+      opacity: 0;
+      animation: mxSweep 620ms var(--ease-standard) 120ms backwards;
+    }
+    .modal-overlay > .modal-content:has(.btn-danger)::after {
+      background: linear-gradient(90deg, transparent, var(--color-danger, #ef4444) 50%, transparent);
+    }
+
+    /* ══ 7. Toasts ══════════════════════════════════════════════════════ */
+    .mx-toast { animation: mxToastIn 360ms var(--ease-expo-out) both; }
+    /* The icon draws itself, a beat after the toast lands. */
+    .mx-toast .mx-toast-icon :is(path, circle, line, polyline, rect) {
+      animation: mxDraw 520ms ease-out 140ms backwards;
+    }
+    .mx-toast.success { --mx-glow: rgba(34, 197, 94, 0.35); }
+    .mx-toast.error { --mx-glow: rgba(239, 68, 68, 0.35); }
+    .mx-toast.success,
+    .mx-toast.error {
+      animation: mxToastIn 360ms var(--ease-expo-out) both, mxGlowOnce 700ms ease-out 200ms;
+    }
+    .mx-toast.mx-leaving { animation: mx-toast-out 0.26s var(--ease-exit) forwards; }
+
+    /* ══ 8. Sheets that hide with the [hidden] attribute ════════════════ */
+    .la-sheet[hidden] {
+      display: none;
+      opacity: 0;
+      pointer-events: none;
+      transition: display var(--mx-exit) allow-discrete, opacity var(--mx-exit) var(--ease-exit);
+    }
+    .la-sheet[hidden] > .la-sheet-panel {
+      animation: none !important;
+      translate: 0 calc(24px * var(--mx-travel));
+      transition: translate var(--mx-exit) var(--ease-exit);
+    }
+  }
+
+  html[data-motion="full"] {
+    /* Context menu rows cascade. Only the menus that close on a choice: a
+       toolbar popup redraws itself on every toggle, and would replay this. */
+    .tree-context-menu:not(.hidden) > *,
+    .viz-context-menu:not(.hidden) > *,
+    .file-menu:not([data-mx-ghost]) > *,
+    .cs-table-menu:not([data-mx-ghost]) > * {
+      animation: mxInRise 200ms var(--ease-expo-out) backwards;
+      animation-delay: calc(20ms + var(--mx-i, 0) * 13ms);
+    }
+    :is(.tree-context-menu, .viz-context-menu, .file-menu, .cs-table-menu) > :nth-child(2) { --mx-i: 1; }
+    :is(.tree-context-menu, .viz-context-menu, .file-menu, .cs-table-menu) > :nth-child(3) { --mx-i: 2; }
+    :is(.tree-context-menu, .viz-context-menu, .file-menu, .cs-table-menu) > :nth-child(4) { --mx-i: 3; }
+    :is(.tree-context-menu, .viz-context-menu, .file-menu, .cs-table-menu) > :nth-child(5) { --mx-i: 4; }
+    :is(.tree-context-menu, .viz-context-menu, .file-menu, .cs-table-menu) > :nth-child(6) { --mx-i: 5; }
+    :is(.tree-context-menu, .viz-context-menu, .file-menu, .cs-table-menu) > :nth-child(7) { --mx-i: 6; }
+    :is(.tree-context-menu, .viz-context-menu, .file-menu, .cs-table-menu) > :nth-child(8) { --mx-i: 7; }
+    :is(.tree-context-menu, .viz-context-menu, .file-menu, .cs-table-menu) > :nth-child(9) { --mx-i: 8; }
+    :is(.tree-context-menu, .viz-context-menu, .file-menu, .cs-table-menu) > :nth-child(n + 10) { --mx-i: 9; }
+
+    /* Settings rows cascade in behind the sheet. */
+    #settings-modal:not(.hidden) .settings-items > * {
+      animation: mxInRise 300ms var(--ease-expo-out) backwards;
+      animation-delay: calc(90ms + var(--mx-i, 0) * 22ms);
+    }
+    .settings-items > :nth-child(2) { --mx-i: 1; }
+    .settings-items > :nth-child(3) { --mx-i: 2; }
+    .settings-items > :nth-child(4) { --mx-i: 3; }
+    .settings-items > :nth-child(5) { --mx-i: 4; }
+    .settings-items > :nth-child(6) { --mx-i: 5; }
+    .settings-items > :nth-child(7) { --mx-i: 6; }
+    .settings-items > :nth-child(8) { --mx-i: 7; }
+    .settings-items > :nth-child(9) { --mx-i: 8; }
+    .settings-items > :nth-child(10) { --mx-i: 9; }
+    .settings-items > :nth-child(n + 11) { --mx-i: 10; }
+
+    /* The storage picker's two choices rise after the card. */
+    .smp-overlay:not(.hidden) .smp-body > * {
+      animation: mxInRise 380ms var(--ease-expo-out) backwards;
+      animation-delay: calc(160ms + var(--mx-i, 0) * 70ms);
+    }
+    .smp-body > :nth-child(2) { --mx-i: 1; }
+    .smp-body > :nth-child(3) { --mx-i: 2; }
+
+    /* Picker grids fill as a wave. */
+    .prereq-picker-overlay:not([data-mx-ghost]) .tier-picker-tile {
+      animation: mxInPop 320ms var(--ease-spring) backwards;
+      animation-delay: calc(90ms + var(--mx-i, 0) * 28ms);
+    }
+    .tier-picker-tile:nth-child(2) { --mx-i: 1; }
+    .tier-picker-tile:nth-child(3) { --mx-i: 2; }
+    .tier-picker-tile:nth-child(4) { --mx-i: 3; }
+    .tier-picker-tile:nth-child(5) { --mx-i: 4; }
+    .tier-picker-tile:nth-child(n + 6) { --mx-i: 5; }
+  }
+}
+
+/* A value that just changed: the new text comes up from below (W6). */
+@keyframes mxSwap {
+  from { opacity: 0; translate: 0 calc(7px * var(--mx-travel)); }
+}
+/* "You have unsaved work": the window resists being closed. */
+@keyframes mxResist {
+  0%, 100% { translate: 0 0; }
+  30% { translate: calc(-7px * var(--mx-travel)) 0; }
+  60% { translate: calc(5px * var(--mx-travel)) 0; }
+  82% { translate: calc(-2px * var(--mx-travel)) 0; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-motion="off"]) {
+
+    /* ══ 9. Floating windows and drawers ════════════════════════════════ */
+
+    /* The Brain note editor: a window on a layer, like Run Code. */
+    .viz-comment-editor-overlay > .viz-comment-editor-window {
+      animation: mxInOrigin var(--mx-enter) var(--ease-emphasis) backwards;
+    }
+    .viz-comment-editor-overlay[data-mx-ghost] {
+      animation: mxOutFade var(--mx-exit) var(--ease-exit) forwards !important;
+    }
+    .viz-comment-editor-overlay[data-mx-ghost] > .viz-comment-editor-window {
+      animation: mxOutOrigin var(--mx-exit) var(--ease-exit) forwards !important;
+    }
+
+    /* The execution stack: slides in from the side it docks on, or pops in
+       place when floating. */
+    .sk-win.is-docked { animation: mxInFromRight 300ms var(--ease-expo-out) backwards; }
+    .sk-win.is-floating { animation: mxInMenu 220ms var(--ease-expo-out) backwards; }
+    .sk-win.is-docked[data-mx-ghost] { animation: mxOutToRight var(--mx-exit) var(--ease-exit) forwards !important; }
+    .sk-win.is-floating[data-mx-ghost] { animation: mxOutMenu 140ms var(--ease-exit) forwards !important; }
+
+    /* The notebook's edit drawer leaves the way it came. */
+    .np-edit-overlay[data-mx-ghost] > .np-edit-backdrop {
+      animation: mxOutFade var(--mx-exit) var(--ease-exit) forwards !important;
+    }
+    .np-edit-overlay[data-mx-ghost] > .np-edit-drawer {
+      animation: mxOutToRight 220ms var(--ease-exit) forwards !important;
+    }
+
+    /* The agenda panel hides with the [hidden] attribute. */
+    .ag-panel[hidden] {
+      display: none;
+      animation: none !important;
+      opacity: 0;
+      scale: calc(1 - 0.04 * var(--mx-travel));
+      translate: 0 calc(-10px * var(--mx-travel));
+      pointer-events: none;
+      transition:
+        display 170ms allow-discrete,
+        opacity 170ms var(--ease-exit),
+        scale 170ms var(--ease-exit),
+        translate 170ms var(--ease-exit);
+    }
+
+    /* Picked up, a window lifts: deeper shadow, a hair larger, a slight
+       tilt. Set down, it settles on the spring. */
+    .run-code-window,
+    .sk-win.is-floating,
+    .viz-comment-editor-window {
+      transition:
+        rotate 260ms var(--ease-spring),
+        scale 260ms var(--ease-spring),
+        box-shadow 220ms ease;
+    }
+    .run-code-window:has(.run-code-header.is-dragging),
+    .sk-win.is-floating:has(.sk-head.is-dragging),
+    .viz-comment-editor-window:has(.viz-comment-editor-header.is-dragging) {
+      rotate: calc(0.5deg * var(--mx-travel));
+      scale: calc(1 + 0.012 * var(--mx-travel));
+      box-shadow: 0 34px 80px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(34, 211, 238, 0.28);
+    }
+
+    /* ══ 10. Small confirmations ════════════════════════════════════════ */
+    .mx-swap { animation: mxSwap 240ms var(--ease-expo-out) backwards !important; }
+    .mx-resist { animation: mxResist 380ms var(--ease-standard) !important; }
+    .mx-icon-pop { animation: mxInPop 360ms var(--ease-spring) backwards !important; }
+  }
+}

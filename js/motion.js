@@ -12,8 +12,72 @@ const Motion = (() => {
       ? window.matchMedia('(prefers-reduced-motion: reduce)')
       : { matches: false };
 
+  /* ---------- Motion level --------------------------------- */
+  // 'full' | 'calm' | 'off', kept on <html data-motion> where the stylesheets
+  // read it. index.html sets the attribute before first paint; this is the
+  // same rule, for when the attribute is missing.
+  const LEVEL_KEY = 'ssp.motion';
+  const LEVELS = ['full', 'calm', 'off'];
+  const LEVEL_COPY = {
+    full: { label: 'Motion: Full', desc: 'Every transition and effect', icon: 'sparkles' },
+    calm: { label: 'Motion: Calm', desc: 'Fades only, nothing travels', icon: 'feather' },
+    off: { label: 'Motion: Off', desc: 'No animation', icon: 'ban' },
+  };
+
+  function defaultLevel() {
+    if (reduceQuery.matches) return 'off';
+    return window.innerWidth < 768 ? 'calm' : 'full';
+  }
+
+  function level() {
+    const attr = document.documentElement.getAttribute('data-motion');
+    if (LEVELS.indexOf(attr) !== -1) return attr;
+    let saved = null;
+    try { saved = localStorage.getItem(LEVEL_KEY); } catch (e) { /* private mode */ }
+    return LEVELS.indexOf(saved) !== -1 ? saved : defaultLevel();
+  }
+
+  function setLevel(next) {
+    if (LEVELS.indexOf(next) === -1) return;
+    try { localStorage.setItem(LEVEL_KEY, next); } catch (e) { /* private mode */ }
+    document.documentElement.setAttribute('data-motion', next);
+    paintSetting();
+  }
+
+  function cycleLevel() {
+    const next = LEVELS[(LEVELS.indexOf(level()) + 1) % LEVELS.length];
+    setLevel(next);
+    toast(LEVEL_COPY[next].label, { type: 'info', duration: 1600 });
+  }
+
+  // Keep the Settings row reading what the level actually is. Called on change
+  // and again when Settings opens (another tab may have changed it).
+  function paintSetting() {
+    const row = document.getElementById('settings-motion-item');
+    if (!row) return;
+    const copy = LEVEL_COPY[level()];
+    const label = document.getElementById('settings-motion-label');
+    const desc = document.getElementById('settings-motion-desc');
+    if (label) label.textContent = copy.label;
+    if (desc) {
+      // The system switch is read by the stylesheets directly, so it holds
+      // whatever this row says. Say so rather than look broken.
+      desc.textContent = reduceQuery.matches && level() !== 'off'
+        ? 'Your system is set to reduce motion'
+        : copy.desc;
+    }
+    if (typeof _setLucideIcon === 'function') {
+      _setLucideIcon(document.getElementById('settings-motion-icon'), copy.icon);
+    }
+  }
+
   function prefersReducedMotion() {
-    return !!reduceQuery.matches;
+    return !!reduceQuery.matches || level() === 'off';
+  }
+
+  // Travel, stagger and hero sequences: only at the full level.
+  function isFull() {
+    return !prefersReducedMotion() && level() === 'full';
   }
 
   /* ---------- Scroll reveal ---------------------------------- */
@@ -217,27 +281,47 @@ const Motion = (() => {
   // startViewTransition, so both the old and the new capture see it, and comes
   // off when the transition settles -- unless a newer transition has since
   // taken over the class, in which case that one decides.
+  //
+  // opts.dir: which way this navigation goes ('forward', 'back', 'up', 'down',
+  // 'launch', 'land', ...). Kept on <html data-nav-dir> for the same span, by
+  // the same rule, so mx-nav.css can pick the keyframes for that direction.
+  //
+  // opts.onDone: called once when the transition settles, however it ends.
   let vtClassSeq = 0;
   let vtClassOn = null;
+  let vtDirOn = false;
+  let vtCurrent = null;
   function withViewTransition(updateFn, opts) {
+    const onDone = (opts && typeof opts.onDone === 'function') ? opts.onDone : null;
     if (prefersReducedMotion() || typeof document.startViewTransition !== 'function') {
       updateFn();
+      if (onDone) onDone();
       return null;
     }
     const rootEl = document.documentElement;
     const rootClass = (opts && opts.rootClass) || null;
+    const dir = (opts && opts.dir) || null;
     const classSeq = ++vtClassSeq;
     // Starting a transition skips the one before it, so its class goes now.
     if (vtClassOn) rootEl.classList.remove(vtClassOn);
     vtClassOn = rootClass;
     if (rootClass) rootEl.classList.add(rootClass);
+    if (dir) rootEl.setAttribute('data-nav-dir', dir);
+    else if (vtDirOn) rootEl.removeAttribute('data-nav-dir');
+    vtDirOn = !!dir;
+    let settled = false;
     const dropClass = () => {
-      if (classSeq !== vtClassSeq || !rootClass) return;
+      if (!settled) { settled = true; if (onDone) { try { onDone(); } catch (e) { console.error(e); } } }
+      if (classSeq !== vtClassSeq) return;
+      vtCurrent = null;
+      if (dir) { rootEl.removeAttribute('data-nav-dir'); vtDirOn = false; }
+      if (!rootClass) return;
       rootEl.classList.remove(rootClass);
       vtClassOn = null;
     };
     try {
       const vt = document.startViewTransition(updateFn);
+      vtCurrent = vt;
       // finished settles once the transition is over -- run, skipped or failed.
       if (vt && vt.finished) vt.finished.then(dropClass, dropClass);
       else dropClass();
@@ -259,26 +343,83 @@ const Motion = (() => {
       }
       return vt;
     } catch (e) {
-      dropClass();
       updateFn();
+      dropClass();
       return null;
     }
+  }
+
+  // End the running View Transition now (a key or a click during a long one).
+  function skipTransition() {
+    if (vtCurrent && typeof vtCurrent.skipTransition === 'function') {
+      try { vtCurrent.skipTransition(); } catch (e) { /* already over */ }
+    }
+  }
+
+  /* ---------- FLIP ------------------------------------------ */
+  // Let a list's items glide to their new places. `mutate` changes the DOM
+  // (re-render, sort, filter, add, remove); items are matched before and after
+  // by opts.key(el), or by the element itself when the nodes are kept.
+  //   Motion.flip(grid, () => renderCards(), { key: el => el.dataset.id })
+  function flip(container, mutate, opts) {
+    opts = opts || {};
+    if (!container || !isFull() || typeof container.animate !== 'function') { mutate(); return; }
+    const keyOf = opts.key || ((el) => el);
+    const pick = () => (opts.selector ? container.querySelectorAll(opts.selector) : container.children);
+    const before = new Map();
+    Array.prototype.forEach.call(pick(), (el) => {
+      const k = keyOf(el);
+      if (k != null && k !== '') before.set(k, el.getBoundingClientRect());
+    });
+    mutate();
+    const items = pick();
+    // Past a few hundred items the measuring costs more than the effect is worth.
+    if (items.length > 400) return;
+    const duration = opts.duration || 320;
+    Array.prototype.forEach.call(items, (el, i) => {
+      const k = keyOf(el);
+      const a = (k != null && k !== '') ? before.get(k) : null;
+      const b = el.getBoundingClientRect();
+      if (!b.width && !b.height) return;
+      if (!a) {
+        el.animate(
+          [{ opacity: 0, transform: 'scale(0.94)' }, { opacity: 1, transform: 'none' }],
+          { duration: duration, delay: Math.min(i * 18, 180), easing: 'cubic-bezier(0.16, 1, 0.3, 1)', fill: 'backwards' }
+        );
+        return;
+      }
+      const dx = a.left - b.left;
+      const dy = a.top - b.top;
+      if (Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+      el.animate(
+        [{ transform: 'translate(' + dx + 'px,' + dy + 'px)' }, { transform: 'none' }],
+        { duration: duration, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }
+      );
+    });
   }
 
   /* ---------- Init ----------------------------------------- */
   function init() {
     toastContainer();
     attachRipple();
+    paintSetting();
     scan(document);
   }
 
   return {
     prefersReducedMotion,
+    isFull,
+    level,
+    setLevel,
+    cycleLevel,
+    paintSetting,
     scan,
     countUp,
     toast,
     dismissToast,
     withViewTransition,
+    skipTransition,
+    flip,
     init,
   };
 })();
