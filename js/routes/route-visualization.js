@@ -387,6 +387,8 @@ function vizTemplate() {
                  graph is currently hiding. Both were state you could get into
                  with nothing on screen saying so. -->
             <div class="viz-canvas-chips">
+              <!-- Brain, inside a directory note: the way back (brain-dir.js). -->
+              <nav class="viz-canvas-chip brain-dir-bar hidden" id="brain-dir-bar" aria-label="Directory path"></nav>
               <div class="viz-canvas-chip hidden" id="viz-selection-chip" aria-live="polite"></div>
               <div class="viz-canvas-chip viz-focus-bar hidden" id="viz-focus-bar" aria-live="polite"></div>
             </div>
@@ -588,6 +590,8 @@ function vizTemplate() {
         <button type="button" class="bnm-act" onclick="brainCtxEditComment()" title="Edit Comment"><i data-lucide="edit-2"></i><span>Edit</span></button>
         <button type="button" class="bnm-act" onclick="brainCtxStartLink()" title="Add Link"><i data-lucide="link"></i><span>Link</span></button>
         <button type="button" class="bnm-act" id="brain-ctx-check-btn" aria-pressed="false" onclick="brainCtxToggleCheck()" title="Put a check mark on this note"><i data-lucide="circle-check"></i><span>Check</span></button>
+        <!-- A switch: on, the note has a canvas of its own and a double-click opens it (brain-dir.js). -->
+        <button type="button" class="bnm-act" id="brain-ctx-dir-btn" aria-pressed="false" onclick="brainCtxToggleDir()" title="Directory: give this note a canvas of its own"><i data-lucide="folder-tree"></i><span>Directory</span></button>
         <button type="button" class="bnm-act" id="brain-ctx-collapse-btn" style="display:none;" onclick="brainCtxCollapseChildren()" title="Collapse Children"><i data-lucide="chevrons-up"></i><span>Collapse</span></button>
         <button type="button" class="bnm-act" id="brain-ctx-expand-btn" style="display:none;" onclick="brainCtxExpandChildren()" title="Expand Children"><i data-lucide="chevrons-down"></i><span>Expand</span></button>
         <button type="button" class="bnm-act danger" onclick="brainCtxDeleteNode()" title="Delete"><i data-lucide="trash-2"></i><span>Delete</span></button>

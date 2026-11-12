@@ -446,6 +446,8 @@ function _vizLeaveSurface() {
 
   if (viz.activeModule === 'brain') {
     brainSaveCurrentVersion();
+    // Out of any directory note, and its path bar off the library map.
+    if (typeof brainDirLeave === 'function') brainDirLeave();
     // Fully reset brain link mode: clear state, hint, and container class
     if (brain.linkModeEnabled || brain.linkingFrom) {
       brain.linkingFrom = null;

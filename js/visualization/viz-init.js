@@ -225,6 +225,14 @@ function initVisualization() {
       if (k === 'v') { if (brainPasteNode()) e.preventDefault(); return; }
       if (k === 'd' && brain.selectedNodeId) { e.preventDefault(); brainPasteNode(brain.selectedNodeId); return; }
     }
+    // Brain: Alt+Left goes up out of a directory note (brain-dir.js). Only
+    // inside one; on the top level it stays the browser's Back.
+    if (isBrain && e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.key === 'ArrowLeft'
+      && brain.dirPath && brain.dirPath.length && typeof brainDirUp === 'function') {
+      e.preventDefault();
+      brainDirUp();
+      return;
+    }
     // Ctrl+Z is handled in the capture listener above; everything else with a
     // modifier belongs to the browser or the OS.
     if (e.ctrlKey || e.metaKey || e.altKey) return;

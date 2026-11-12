@@ -28,6 +28,9 @@ const brain = {
   searchQuery: '',
   _highlightedIds: new Set(),
   _focusedParentId: null,
+  // The directory notes opened from the version's own canvas down to the one
+  // on screen (brain-dir.js). Empty: the version's own canvas is on screen.
+  dirPath: [],
 };
 
 // (Removed BRAIN_STORAGE_KEY constant, using getBrainStorageKey() instead)
@@ -89,13 +92,16 @@ function brainSaveCurrentVersion() {
   if (!brain.activeVersionId) return;
   const v = brain.versions.find(v => v.id === brain.activeVersionId);
   if (!v) return;
-  v.nodes = JSON.parse(JSON.stringify(brain.nodes.map(n => {
+  // Inside a directory note the canvas on screen is that note's own (brain-dir.js).
+  const into = brain.dirPath.length && typeof brainDirContainer === 'function' ? brainDirContainer(v) : v;
+  if (!into) return;
+  into.nodes = JSON.parse(JSON.stringify(brain.nodes.map(n => {
     const { _resizeObserver, ...rest } = n;   // strip anything an older build left
     return rest;
   })));
-  v.links = JSON.parse(JSON.stringify(brain.links));
-  v.pan = { ...brain.pan };
-  v.zoom = brain.zoom;
+  into.links = JSON.parse(JSON.stringify(brain.links));
+  into.pan = { ...brain.pan };
+  into.zoom = brain.zoom;
   brainSave();
   brainMarkSaved();
 }
@@ -107,6 +113,11 @@ function brainSwitchVersion(id) {
   if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
   const v = brain.versions.find(v => v.id === id);
   if (!v) return;
+  // A canvas opens at its top level. With the undo history gone, nothing can
+  // bring back a deleted directory note any more, so its canvases go too.
+  const left = brain.versions.find(x => x.id === brain.activeVersionId);
+  brain.dirPath = [];
+  if (typeof brainDirPrune === 'function') { brainDirPrune(left); brainDirPrune(v); }
   brain.activeVersionId = id;
   brain.nodes = JSON.parse(JSON.stringify(v.nodes || []));
   brain.links = JSON.parse(JSON.stringify(v.links || []));
@@ -147,6 +158,7 @@ function brainDeleteVersion(id) {
     brain.versions = brain.versions.filter(x => x.id !== id);
     if (wasActive) {
       brain.activeVersionId = null;
+      brain.dirPath = [];
       brain.nodes = []; brain.links = [];
       brain.pan = { x: 0, y: 0 }; brain.zoom = 1;
     }
@@ -189,6 +201,7 @@ function brainDuplicateVersion(id) {
     nodes: JSON.parse(JSON.stringify(src.nodes || [])),
     links: JSON.parse(JSON.stringify(src.links || [])),
     pan: { ...src.pan }, zoom: src.zoom,
+    ...(src.dirs ? { dirs: JSON.parse(JSON.stringify(src.dirs)) } : {}),   // its directories' canvases
   });
   brainSave(); brainRenderSidebar();
 }
@@ -837,6 +850,7 @@ function brainTreeBatchDelete(ids) {
     brain.versions = brain.versions.filter(v => !vIds.has(v.id));
     if (closesActive) {
       brain.activeVersionId = null;
+      brain.dirPath = [];
       brain.nodes = []; brain.links = [];
       brain.pan = { x: 0, y: 0 }; brain.zoom = 1;
     }
@@ -984,6 +998,7 @@ function brainCtxVersionShare() {
     pan: v.pan || { x: 0, y: 0 },
     zoom: v.zoom || 1
   };
+  if (v.dirs) shareable.dirs = v.dirs;   // its directories' canvases (brain-dir.js)
   const encoded = encodeShareData(shareable);
   if (!encoded) {
     if (typeof showMessage === 'function') showMessage('Error', 'Failed to encode version for sharing.', true);
@@ -1005,7 +1020,7 @@ function brainImportVersion() {
       return;
     }
     const id = 'bv_' + generateId();
-    brain.versions.push({
+    const fresh = {
       id,
       name: '[Shared] ' + (shared.name || 'Version'),
       folderId: null,
@@ -1013,7 +1028,9 @@ function brainImportVersion() {
       links: shared.links || [],
       pan: shared.pan || { x: 0, y: 0 },
       zoom: shared.zoom || 1
-    });
+    };
+    if (shared.dirs && typeof shared.dirs === 'object') fresh.dirs = shared.dirs;
+    brain.versions.push(fresh);
     brainSave();
     brainSwitchVersion(id);
     if (typeof vizSwitchModule === 'function') vizSwitchModule('brain');
@@ -1023,6 +1040,12 @@ function brainImportVersion() {
 
 function brainUpdateCanvasToolbar() {
   const v = brain.versions.find(v => v.id === brain.activeVersionId);
+  // Inside a directory note: the way there above, the directory's name below.
+  if (v && brain.dirPath.length && typeof brainDirTrail === 'function') {
+    const names = brainDirTrail(v);
+    vizSetCanvasTitle(names.slice(0, -1).join(' › '), names[names.length - 1], 'folder-open');
+    return;
+  }
   vizSetCanvasTitle('Brain', v ? v.name : 'No version open', 'brain-circuit');
 }
 
@@ -1037,6 +1060,8 @@ function brainPushUndo() {
 function brainUndo() {
   if (!brain._undoStack.length) return;
   const snap = JSON.parse(brain._undoStack.pop());
+  // Never cut a directory note loose from its canvases (brain-dir.js).
+  if (typeof brainDirKeepIds === 'function') brainDirKeepIds(snap.nodes, brain.nodes);
   brain.nodes = snap.nodes;
   brain.links = snap.links;
   brainRenderCanvas(); brainSaveCurrentVersion();
@@ -1125,6 +1150,7 @@ function brainRenderCanvas() {
   if (!container || !nodesLayer) return;
 
   brainUpdateCanvasToolbar();
+  if (typeof brainDirPaint === 'function') brainDirPaint();   // the directory path, if inside one
 
   if (!brain.activeVersionId) {
     if (emptyState) {
@@ -1269,6 +1295,11 @@ function brainRenderCanvas() {
       if (node.ref && typeof brainRefDecorate === 'function') brainRefDecorate(el, node);
       // The check mark put on it from its menu (brainCtxToggleCheck).
       if (node.checked) el.insertAdjacentHTML('beforeend', node.id === _brainCheckPop ? BRAIN_CHECK_BADGE.replace('brain-check-badge', 'brain-check-badge is-new') : BRAIN_CHECK_BADGE);
+      // A directory: the folder mark on its other corner (brain-dir.js).
+      if (node.dir && typeof brainDirBadgeHTML === 'function') {
+        el.classList.add('is-dir');
+        el.insertAdjacentHTML('beforeend', brainDirBadgeHTML(node));
+      }
       if (objectTop) el.insertAdjacentHTML('beforeend', objectTop);
       if (node.shape) {
         el.insertAdjacentHTML('beforeend', '<button class="shape-rotate" type="button" title="Drag to rotate (Shift: 15° steps)" aria-label="Rotate"><i data-lucide="rotate-cw"></i></button>');
@@ -1329,7 +1360,13 @@ function brainRenderCanvas() {
       el.addEventListener('contextmenu', (e) => brainNodeCtx(e, node.id));
       el.addEventListener('mouseenter', () => { if (typeof vizHoverFocus === 'function') vizHoverFocus(node.id); });
       el.addEventListener('mouseleave', () => { if (typeof vizHoverClear === 'function') vizHoverClear(); });
-      el.addEventListener('dblclick', (e) => { e.stopPropagation(); brainHideAllMenus(); brainOpenEditor(node); });
+      // A directory note opens its own canvas instead; its text is edited
+      // from its menu (Edit).
+      el.addEventListener('dblclick', (e) => {
+        e.stopPropagation(); brainHideAllMenus();
+        if (node.dir && typeof brainDirEnter === 'function') brainDirEnter(node.id);
+        else brainOpenEditor(node);
+      });
       // Arrows, lines and timelines are drawings, not things to connect: no ports.
       if (!BRAIN_PORTLESS.has(node.shape)) ['top','right','bottom','left'].forEach(side => {
         const port = document.createElement('div');
@@ -1534,6 +1571,7 @@ function brainCopyNode(nodeId) {
   const node = brain.nodes.find(n => n.id === nodeId);
   if (!node) return false;
   _brainClip = JSON.parse(JSON.stringify(node));
+  if (typeof brainDirPack === 'function') brainDirPack(_brainClip);   // a directory takes its canvases along
   if (typeof toast === 'function') toast('Note copied. Ctrl+V pastes it.', { type: 'info' });
   return true;
 }
@@ -1546,6 +1584,8 @@ function brainPasteNode(fromId) {
   copy.id = 'bn_' + generateId();
   delete copy.collapsed;
   delete copy._collapsedChildren;
+  // A directory gets its own copies of its canvases (brain-dir.js).
+  if (typeof brainDirUnpack === 'function') brainDirUnpack(copy); else delete copy.dirPack;
   // Under the pointer when it is over the canvas; otherwise just down and to
   // the right of the original, stepping further for each paste in a row.
   const c = document.getElementById('viz-canvas-container');
@@ -1821,6 +1861,7 @@ function _brainEnsureVersion() {
   const id = 'bv_' + generateId();
   brain.versions.push({ id, name: 'Default Version', folderId: null, nodes: [], links: [], pan: { x: 0, y: 0 }, zoom: 1 });
   brain.activeVersionId = id;
+  brain.dirPath = [];
   brainSave();
   brainRenderSidebar();
   brainUpdateCanvasToolbar();
@@ -1845,7 +1886,13 @@ function brainAddCommentNode(x, y) {
   brainOpenEditor(node);
 }
 
-function brainDeleteNode(nodeId) {
+function brainDeleteNode(nodeId, sure) {
+  // A directory note asks twice: a whole canvas, or several, go with it (brain-dir.js).
+  const doomed = brain.nodes.find(n => n.id === nodeId);
+  if (!sure && typeof brainDirGuardsDelete === 'function' && brainDirGuardsDelete(doomed)) {
+    brainDirConfirmDelete(doomed, () => brainDeleteNode(nodeId, true));
+    return;
+  }
   brainPushUndo();
   brain.nodes = brain.nodes.filter(n => n.id !== nodeId);
   brain.links = brain.links.filter(l => l.from !== nodeId && l.to !== nodeId);
@@ -2595,6 +2642,7 @@ function brainNodeCtx(e, nodeId) {
     const label = checkBtn.querySelector('span');
     if (label) label.textContent = on ? 'Uncheck' : 'Check';
   }
+  if (typeof brainDirSyncCtx === 'function') brainDirSyncCtx(node);   // the Directory switch
   if (typeof vizPositionMenu === 'function') vizPositionMenu(menu, e.clientX, e.clientY);
   else { menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px'; menu.classList.remove('hidden'); }
   _brainMarkNodeMenu();
@@ -3577,6 +3625,7 @@ function brainClearSearch() {
 
 function initBrain() {
   brainLoad();
+  brain.dirPath = [];   // Brain opens on the version's own canvas, never inside a directory
   // The pane's search box is shared with the other modules and comes back
   // empty; the version filter did not, so the list stayed filtered by a word
   // that was no longer written anywhere.
