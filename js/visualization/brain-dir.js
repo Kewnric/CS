@@ -230,12 +230,11 @@ function brainDirSyncCtx(node) {
     : 'Directory: give this note a canvas of its own';
 }
 
-/** The folder mark on a directory note's corner, with how many notes it holds. */
+/** The folder mark on a directory note's corner: an icon only, shown on hover (CSS). */
 function brainDirBadgeHTML(node) {
   const n = brainDirCount(node);
   const what = n ? `${n} note${n === 1 ? '' : 's'} inside` : 'empty';
-  return `<span class="brain-dir-badge" title="Directory · ${what} · double-click to open" aria-label="Directory, ${what}">`
-    + `<i data-lucide="folder"></i>${n ? `<b>${n}</b>` : ''}</span>`;
+  return `<span class="brain-dir-badge" role="img" aria-label="Directory, ${what}"><i data-lucide="folder"></i></span>`;
 }
 
 /* ── Deleting one asks twice ────────────────────────────────── */

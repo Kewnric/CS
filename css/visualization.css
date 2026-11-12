@@ -6295,31 +6295,31 @@ body.viz-no-anim .app-sidebar {
 
 /* ── Directory notes (brain-dir.js) ─────────────────────────────
    A note switched to Directory has a canvas of its own, opened by a double
-   click. Its mark is a folder on the top-left corner (the check mark has the
-   top-right), with how many notes are inside. */
+   click. Its mark is a small bare folder icon on the top-left corner (the check
+   mark has the top-right), shown only while the note is hovered -- or, where
+   there is no hover (touch), while it is selected. */
 .viz-node > .brain-dir-badge {
   position: absolute;
-  top: -11px;
-  left: -11px;
+  top: -7px;
+  left: -7px;
   z-index: 8;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  min-width: 24px;
-  height: 22px;
-  padding: 0 7px 0 6px;
-  border-radius: 999px;
-  color: #2a1a02;
-  background: linear-gradient(160deg, #fcd34d, #f59e0b 60%, #d97706);
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55), 0 4px 14px rgba(245, 158, 11, 0.45);
-  font-size: 0.6875rem;
-  font-weight: 800;
-  line-height: 1;
+  display: grid;
+  place-items: center;
+  color: #fbbf24;
+  filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.9));
+  pointer-events: none;
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 0.14s ease, transform 0.14s ease;
 }
-.viz-node > .brain-dir-badge:not(:has(b)) { padding: 0; width: 24px; }
-.viz-node > .brain-dir-badge svg { width: 12px; height: 12px; flex: none; }
-.viz-node > .brain-dir-badge b { font-weight: 800; }
+.viz-node > .brain-dir-badge svg { width: 12px; height: 12px; stroke-width: 2.4; fill: rgba(251, 191, 36, 0.28); }
+.viz-node.is-dir:hover > .brain-dir-badge { opacity: 1; transform: none; }
+@media (hover: none) {
+  .viz-node.is-dir.selected > .brain-dir-badge { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .viz-node > .brain-dir-badge { transition: none; }
+}
 .bnm-act#brain-ctx-dir-btn.is-on { color: #f59e0b; background: rgba(245, 158, 11, 0.12); }
 /* Six actions in one row: equal shares left "Directory" and "Collapse" wider
    than their buttons, running into their neighbours. Sized from their words,
