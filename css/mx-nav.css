@@ -27,7 +27,10 @@
   100% { box-shadow: 0 0 0 16px rgba(34, 211, 238, 0); }
 }
 
-/* The gliding rail and the collapsed-rail label are built by js/mx-nav.js. */
+/* The rail and the collapsed-rail label are built by js/mx-nav.js.
+   The rail does not glide between links. It is put on the new link at once
+   (`translate` is not transitioned) and fades in there, drifting the last few
+   px out of the link to its left edge: .is-enter / mxRailIn below. */
 .mx-rail {
   position: absolute;
   left: 0;
@@ -38,10 +41,13 @@
   pointer-events: none;
   opacity: 0;
   z-index: 2;
-  /* The travel dim rides on filter. Coming back runs across the rest of the
-     glide: about half way up by the midpoint, full as it lands. */
-  transition: translate 380ms var(--ease-emphasis), opacity 200ms ease,
-              filter 310ms ease-out;
+  transition: opacity 200ms ease;
+}
+/* `transform`, not `translate`: the rail's position lives in its inline
+   `translate`, and the two compose. No `to` keyframe, so it ends on the
+   rail's own style and holds nothing. At calm --mx-travel is 0: a fade. */
+@keyframes mxRailIn {
+  from { opacity: 0; transform: translateX(calc(14px * var(--mx-travel))); }
 }
 .mx-rail.is-on { opacity: 1; }
 /* The flow and the breathing, on properties the compositor runs by itself.
@@ -83,12 +89,6 @@
 @keyframes mxRailGlow { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
 @keyframes mxRailDim { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
 @keyframes mxRailFlow { from { transform: translateY(0); } to { transform: translateY(50%); } }
-/* Set by paintRail for the first 70ms of a glide between two links. */
-.mx-rail.is-travel {
-  filter: opacity(0.28);
-  transition: translate 380ms var(--ease-emphasis), opacity 200ms ease,
-              filter 70ms ease-out;
-}
 .sidebar-menu.mx-has-rail { position: relative; }
 .sidebar-menu.mx-has-rail .sidebar-link.active::before { display: none; }
 
@@ -169,6 +169,8 @@ body.route-focused .mx-top-btn { display: none; }
     &[data-nav-dir="boot"]::view-transition-new(root) { animation-duration: 180ms; }
 
     /* ── Sidebar ──────────────────────────────────────────────────── */
+    /* Replayed by paintRail (Motion.replay) each time the selection moves. */
+    .mx-rail.is-enter { animation: mxRailIn 360ms var(--ease-expo-out) backwards; }
     .app-sidebar.expanded .sidebar-label {
       animation: mxInFromLeft 280ms var(--ease-expo-out) backwards;
       animation-delay: calc(40ms + var(--mx-i, 0) * 24ms);

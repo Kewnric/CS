@@ -86,7 +86,9 @@ function openSetTimerModal(set) {
   const n = (set.problems || []).length;
   overlay = document.createElement('div');
   overlay.id = 'set-timer-overlay';
-  overlay.className = 'modal-overlay';
+  // ss-setup-overlay: its closing ghost loses the id but keeps this, so it
+  // still leaves upward like it came in (mx-core.css).
+  overlay.className = 'modal-overlay ss-setup-overlay';
   overlay.style.cssText = 'display:flex;align-items:center;justify-content:center;';
   overlay.innerHTML = `
     <div class="modal-content">

@@ -132,12 +132,13 @@
        Each screen lands in order of importance. Keyed on the navigation's
        direction, so a page that redraws itself later does not replay it. */
 
-    /* Libraries and tools built on the two-pane frame. */
+    /* Libraries and tools built on the two-pane frame: both panes come down
+       from above, the list first and the detail a beat after it. */
     &[data-nav-dir]:not([data-nav-dir="same"]) .messenger-layout > .messenger-pane-1 {
-      animation: mxInFromLeft 440ms var(--ease-expo-out) 60ms backwards;
+      animation: mxInFromTop 440ms var(--ease-expo-out) 60ms backwards;
     }
     &[data-nav-dir]:not([data-nav-dir="same"]) .messenger-layout > .messenger-pane-2 {
-      animation: mxInFromRight 440ms var(--ease-expo-out) 120ms backwards;
+      animation: mxInFromTop 440ms var(--ease-expo-out) 120ms backwards;
     }
 
     /* Home. The hero and the stat tiles also have an entrance of their own

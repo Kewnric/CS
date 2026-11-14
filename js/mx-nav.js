@@ -82,25 +82,29 @@
   };
 
   /* ---------- Sidebar rail ---------------------------------- */
-  let rail = null, menu = null, railTravelTimer = 0;
+  let rail = null, menu = null, railOn = null;
 
   function paintRail() {
     if (!rail || !menu) return;
     const on = menu.querySelector('.sidebar-link.active');
     // Writing a class that is already there still counts as an attribute
     // change, and this runs from an observer of exactly that. Only real changes.
-    if (!on) { if (rail.classList.contains('is-on')) rail.classList.remove('is-on'); return; }
-    const h = Math.round(on.offsetHeight * 0.72);
-    const to = on.offsetLeft + 'px ' + Math.round(on.offsetTop + (on.offsetHeight - h) / 2) + 'px';
-    // A glide to another link: dip fast, then climb back over the rest of
-    // the 380ms glide so it is full as it lands (timings in mx-nav.css).
-    if (rail.classList.contains('is-on') && rail.style.translate && rail.style.translate !== to) {
-      clearTimeout(railTravelTimer);
-      rail.classList.add('is-travel');
-      railTravelTimer = setTimeout(function () { rail.classList.remove('is-travel'); }, 70);
+    if (!on) {
+      railOn = null;
+      if (rail.classList.contains('is-on')) rail.classList.remove('is-on');
+      return;
     }
+    const h = Math.round(on.offsetHeight * 0.72);
     rail.style.height = h + 'px';
-    rail.style.translate = to;
+    // Straight to the new link -- `translate` is not transitioned -- and it
+    // fades in there from inside the link (mxRailIn, mx-nav.css). Only when
+    // the selection itself moves: a resize or a stray class change on the same
+    // link just puts it back in place.
+    rail.style.translate = on.offsetLeft + 'px ' + Math.round(on.offsetTop + (on.offsetHeight - h) / 2) + 'px';
+    if (on !== railOn) {
+      railOn = on;
+      if (typeof M.replay === 'function') M.replay(rail, 'is-enter');
+    }
     if (!rail.classList.contains('is-on')) rail.classList.add('is-on');
   }
 
