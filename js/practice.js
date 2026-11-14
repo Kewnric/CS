@@ -117,11 +117,37 @@ function initPractice() {
     parseInt(autoSavedTab, 10) || 0, state.userFiles.length - 1));
   _submitInProgress = false;
   _practiceSubmitted = false;
-  state.timeLimit = timeLimit;
-  // Resume the timer across accidental reloads of the same attempt; otherwise start fresh.
-  const savedStart = autoSaved
-    ? (parseInt(getSessionParam('practiceStartTime')) || (_restoredFromDisk && _restoredFromDisk.startTime) || null)
-    : null;
+  /* THE CLOCK COMES BACK AS TIME SPENT, NOT AS A START TIME. A draft used to
+     restore its original startTime, so a draft left yesterday came back a day
+     into its attempt -- and with a countdown chosen today, the very first tick
+     was past the limit and the attempt graded itself before it was on screen.
+     Time away is not time spent: the clock is put back at what had been used
+     when the draft was written. Drafts from before elapsedMs fall back to what
+     they did carry. */
+  const savedFrom = _restoredFromDisk || (autoSaved ? autoSavedRaw : null);
+  let restoredElapsed = null;
+  if (savedFrom) {
+    if (typeof savedFrom.elapsedMs === 'number' && savedFrom.elapsedMs >= 0) restoredElapsed = savedFrom.elapsedMs;
+    else if (!_restoredFromDisk && parseInt(getSessionParam('practiceStartTime'), 10)) {
+      restoredElapsed = Math.max(0, Date.now() - parseInt(getSessionParam('practiceStartTime'), 10));
+    } else if (_restoredFromDisk && _restoredFromDisk.startTime) {
+      restoredElapsed = Math.max(0, (_restoredFromDisk.savedAt || Date.now()) - _restoredFromDisk.startTime);
+    }
+  }
+  let effectiveLimit = timeLimit;
+  if (restoredElapsed != null && timeLimit > 0 && restoredElapsed / 1000 >= timeLimit) {
+    // A countdown already over would submit on the first tick. Count up instead.
+    effectiveLimit = 0;
+    setSessionParam('timeLimit', 0);
+    setTimeout(() => {
+      if (typeof toast === 'function') {
+        toast('You have already spent longer than that time limit, so the clock is counting up.',
+          { type: 'info', duration: 7000 });
+      }
+    }, 900);
+  }
+  state.timeLimit = effectiveLimit;
+  const savedStart = restoredElapsed != null ? Date.now() - restoredElapsed : null;
   if (_restoredFromDisk) {
     const mins = Math.max(1, Math.round((Date.now() - (_restoredFromDisk.savedAt || Date.now())) / 60000));
     setTimeout(() => {
@@ -131,7 +157,10 @@ function initPractice() {
       }
     }, 700);
   }
-  state.sessionData = { startTime: savedStart || Date.now(), timeLimit: timeLimit, attemptsThisSession: 1, paused: false, pausedAt: null, hintsUsed: 0 };
+  const restoredPaused = !!(savedFrom && savedFrom.paused);
+  state.sessionData = { startTime: savedStart || Date.now(), timeLimit: effectiveLimit, attemptsThisSession: 1,
+    paused: restoredPaused, pausedAt: restoredPaused ? Date.now() : null,
+    hintsUsed: (savedFrom && parseInt(savedFrom.hintsUsed, 10)) || 0 };
   setSessionParam('practiceStartTime', state.sessionData.startTime);
 
   // Populate sidebar
@@ -148,9 +177,9 @@ function initPractice() {
 
   practiceRenderSamples();
 
-  // Hints
-  state.sessionData.hintsUsed = 0;
-  renderHintsBlock('practice-hints-container', variant.hints || [], 0, 'revealNextHint');
+  // Hints: a resumed attempt keeps the ones it revealed, and their penalty.
+  state.sessionData.hintsUsed = Math.min(state.sessionData.hintsUsed || 0, (variant.hints || []).length);
+  renderHintsBlock('practice-hints-container', variant.hints || [], state.sessionData.hintsUsed, 'revealNextHint');
 
   renderPracticeFileTabs();
   // `restored` tells the first load not to save the (still empty) editor over the
@@ -183,6 +212,7 @@ function initPractice() {
 
   // Timer
   _practiceStartTimerTicker();
+  if (state.sessionData.paused) _practicePaintPaused(true);
 
   // Auto-save: persist user code every 30 s so a tab close doesn't lose work
   if (_autoSaveInterval) clearInterval(_autoSaveInterval);
@@ -359,6 +389,7 @@ function _practiceWriteDraft() {
       title: state.activeChallenge.title || '',
       savedAt: Date.now(),
       startTime: (state.sessionData || {}).startTime || Date.now(),
+      ..._practiceClockFields(),
       // Which tab was open is part of where you were, the same as the text in
       // it: coming back to main.c after a reload means finding your place again
       // every time.
@@ -378,6 +409,17 @@ function _practiceReadDraft(challengeId, variantId) {
   } catch (e) { return null; }
 }
 
+/** What the draft carries about the clock: active time used, hints, pause. */
+function _practiceClockFields() {
+  const sd = state.sessionData || {};
+  const now = sd.paused && sd.pausedAt ? sd.pausedAt : Date.now();
+  return {
+    elapsedMs: sd.startTime ? Math.max(0, now - sd.startTime) : 0,
+    hintsUsed: sd.hintsUsed || 0,
+    paused: !!sd.paused
+  };
+}
+
 function _practiceClearDraft() {
   try { localStorage.removeItem(PRACTICE_DRAFT_KEY); } catch (e) { /* nothing to clear */ }
 }
@@ -391,6 +433,7 @@ function _practiceAutoSave() {
     challengeId: state.activeChallenge.id,
     variantId: state.activeVariant.id,
     activeFileIndex: state.activeFileIndex || 0,
+    ..._practiceClockFields(),
     files: state.userFiles.map(f => ({ id: f.id, name: f.name, ext: f.ext, userCode: f.userCode || '' }))
   });
   _practiceSaveExecs();
@@ -1234,8 +1277,12 @@ function _paintTimer(el, main, ms) {
 function _practiceStartTimerTicker() {
   if (window.activeTimerInterval) clearInterval(window.activeTimerInterval);
   const countingDown = !!(state.sessionData && state.sessionData.timeLimit > 0);
-  updatePracticeTimerDisplay();
+  /* Interval first, paint second. The first paint can find the countdown
+     already over, and the clearInterval it makes then must have this interval
+     to clear -- painted first, it cleared nothing and the new interval went on
+     to grade the attempt again a second later. */
   window.activeTimerInterval = setInterval(updatePracticeTimerDisplay, countingDown ? 1000 : 33);
+  updatePracticeTimerDisplay();
 }
 
 function updatePracticeTimerDisplay() {
@@ -1529,7 +1576,9 @@ function _showTimesUpFlash() {
 
 async function submitCode() {
   if (!state.activeVariant) return;
-  if (_submitInProgress) return;
+  // Graded once. _submitInProgress is over within the call, so on its own it
+  // let a second expiry tick record the same attempt again.
+  if (_submitInProgress || _practiceSubmitted) return;
   _submitInProgress = true;
 
   // Disable submit button visually
@@ -1809,6 +1858,13 @@ function retryPractice() {
   renderPracticeFileTabs();
   state.sessionData.startTime = Date.now();
   state.sessionData.attemptsThisSession++;
+  /* A fresh attempt runs. Left paused, resuming later added the whole pause
+     to a start time that had just been reset, and the clock read negative. */
+  if (state.sessionData.paused) {
+    state.sessionData.paused = false;
+    state.sessionData.pausedAt = null;
+    _practicePaintPaused(false);
+  }
 
   // A retry is a FRESH attempt: clear the hint penalty and re-arm the hint UI.
   // Without this the new attempt was still docked 5% per hint revealed during the
@@ -4657,35 +4713,33 @@ function _setSubmitRunning(running) {
 function togglePauseTimer() {
   if (!state.sessionData) return;
 
-  const icon = document.getElementById('pause-timer-icon');
-  const editorArea = document.querySelector('.practice-editor-area');
-  const timerEl = document.getElementById('practice-timer');
-
   if (state.sessionData.paused) {
     const pauseDuration = Date.now() - state.sessionData.pausedAt;
     state.sessionData.startTime += pauseDuration;
     state.sessionData.paused = false;
     state.sessionData.pausedAt = null;
-
-    if (editorArea) editorArea.classList.remove('editor-paused');
-    if (icon) icon.setAttribute('data-lucide', 'pause');
-    // 'PAUSED' left a bare text node behind; clear it so the ms field rebuilds.
-    if (timerEl) { timerEl.classList.remove('timer-paused'); timerEl.textContent = ''; }
-
+    _practicePaintPaused(false);
     _practiceStartTimerTicker();
   } else {
     state.sessionData.paused = true;
     state.sessionData.pausedAt = Date.now();
-
     if (window.activeTimerInterval) clearInterval(window.activeTimerInterval);
-    if (editorArea) editorArea.classList.add('editor-paused');
-    if (icon) icon.setAttribute('data-lucide', 'play');
-    if (timerEl) {
-      timerEl.classList.add('timer-paused');
-      timerEl.innerText = 'PAUSED';
-    }
+    _practicePaintPaused(true);
   }
+}
 
+/** The paused look: dimmed editor, play icon, PAUSED in the clock. */
+function _practicePaintPaused(on) {
+  const icon = document.getElementById('pause-timer-icon');
+  const editorArea = document.querySelector('.practice-editor-area');
+  const timerEl = document.getElementById('practice-timer');
+  if (editorArea) editorArea.classList.toggle('editor-paused', on);
+  if (icon) icon.setAttribute('data-lucide', on ? 'play' : 'pause');
+  if (timerEl) {
+    timerEl.classList.toggle('timer-paused', on);
+    // 'PAUSED' leaves a bare text node behind; clearing it lets the ms field rebuild.
+    if (on) timerEl.innerText = 'PAUSED'; else timerEl.textContent = '';
+  }
   const pauseBtn = document.getElementById('pause-timer-btn');
   if (typeof lucide !== 'undefined') lucide.createIcons(pauseBtn ? { root: pauseBtn } : undefined);
 }
