@@ -2390,6 +2390,11 @@ function npSubmitAttempt(force = false) {
 }
 
 function processSubmission() {
+  /* Once. A timed submit could land while the Submit sheet was open, and the
+     sheet stayed up under the results with its keys live: its Submit (or
+     Enter) then recorded the same attempt a second time. */
+  if (npSubmitted) return;
+  if (typeof npUiCloseSheet === 'function') npUiCloseSheet();
   if (timerInterval) clearInterval(timerInterval);
   _npQClockStop();
   if (npPaused && typeof npTogglePause === 'function') npTogglePause();
