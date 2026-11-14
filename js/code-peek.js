@@ -279,13 +279,20 @@ function codePeekShow() {
   const ps = getComputedStyle(pre), ts = getComputedStyle(text);
   const cs = { paddingTop: ps.paddingTop, paddingLeft: ps.paddingLeft, fontFamily: ts.fontFamily,
                fontSize: ts.fontSize, lineHeight: ts.lineHeight, tabSize: ts.tabSize };
+  /* Every setting that shapes a glyph, not only the font and its size: a
+     weight, spacing or ligature setting the editor has and this layer did not
+     would redraw the same text in a different shape. */
+  const glyph = ['font-weight', 'font-style', 'font-stretch', 'letter-spacing', 'word-spacing',
+    'font-variant-ligatures', 'font-feature-settings', 'font-kerning', 'text-rendering']
+    .map(p => p + ':' + ts.getPropertyValue(p) + ';').join('');
   const el = document.createElement('div');
   el.id = 'code-peek';
   el.className = 'code-peek' + ((typeof edGetWrap === 'function' && edGetWrap()) ? ' cp-wrap' : '');
   el.setAttribute('aria-hidden', 'true');
   el.style.cssText = `--cp-gutter:${gutter && gutter.offsetWidth ? gutter.offsetWidth : 0}px;`
     + `--cp-pad-top:${cs.paddingTop};--cp-pad-left:${cs.paddingLeft};`
-    + `font-family:${cs.fontFamily};font-size:${cs.fontSize};line-height:${cs.lineHeight};tab-size:${cs.tabSize};`;
+    + `font-family:${cs.fontFamily};font-size:${cs.fontSize};line-height:${cs.lineHeight};tab-size:${cs.tabSize};`
+    + glyph;
   el.innerHTML = `
     <div class="cp-badge${!missing && !differ ? ' cp-badge-ok' : ''}">
       ${!missing && !differ ? '✓ Matches the target'

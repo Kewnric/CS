@@ -445,6 +445,12 @@ function practiceApplyProgram(program) {
     if (typeof renderPracticePanel === 'function') renderPracticePanel();
   });
 
+  // The starter lock follows the version's switch and the open file's starter.
+  const openFile = (state.userFiles || [])[state.activeFileIndex || 0];
+  once('slk', String(!!variant.lockStarter) + '\n' + ((openFile && openFile.starterCode) || ''), () => {
+    if (typeof slkAttach === 'function') slkAttach();
+  });
+
   const ta = document.getElementById('editor-textarea');
   if (ta && typeof updateBossHealthBar === 'function') {
     updateBossHealthBar(typeof edFullSource === 'function' ? edFullSource(ta) : ta.value);

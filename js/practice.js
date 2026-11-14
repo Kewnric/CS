@@ -100,7 +100,8 @@ function initPractice() {
         const v = variantFor(sv);
         return v
           ? { ...v, name: sv.name, ext: sv.ext,
-              userCode: v.locked ? (v.starterCode || '') : (sv.userCode || '') }
+              userCode: v.locked ? (v.starterCode || '') : (sv.userCode || ''),
+              ...(sv.slk ? { slk: sv.slk } : {}) }
           : { id: sv.id || generateId(), name: sv.name, ext: sv.ext,
               starterCode: '', code: '', userCode: sv.userCode || '' };
       })
@@ -470,8 +471,10 @@ function _practiceWriteDraft() {
       // every time.
       activeFileIndex: state.activeFileIndex || 0,
       // id as well as name: it is what lets a renamed file still be matched to
-      // the variant file it came from, and so keep its starter code.
-      files: (state.userFiles || []).map(f => ({ id: f.id, name: f.name, ext: f.ext, userCode: f.userCode || '' }))
+      // the variant file it came from, and so keep its starter code. `slk` is
+      // which characters are the locked starter's (js/starter-lock.js).
+      files: (state.userFiles || []).map(f => ({ id: f.id, name: f.name, ext: f.ext, userCode: f.userCode || '',
+        ...(f.slk ? { slk: f.slk } : {}) }))
     };
     practiceDraftStore(map);
   } catch (e) { /* quota — the session copy still covers a reload */ }
@@ -508,7 +511,8 @@ function _practiceAutoSave() {
     variantId: state.activeVariant.id,
     activeFileIndex: state.activeFileIndex || 0,
     ..._practiceClockFields(),
-    files: state.userFiles.map(f => ({ id: f.id, name: f.name, ext: f.ext, userCode: f.userCode || '' }))
+    files: state.userFiles.map(f => ({ id: f.id, name: f.name, ext: f.ext, userCode: f.userCode || '',
+      ...(f.slk ? { slk: f.slk } : {}) }))
   });
   _practiceSaveExecs();
   _bossMarkSaved();
@@ -957,6 +961,9 @@ function renderPracticeFileTabs() {
 function savePracticeFileCode() {
   // A starter still typing itself in is only part of the file on screen.
   _starterAnimFlush();
+  // The starter lock's record of which characters are yours, while the
+  // editor still holds this file (js/starter-lock.js).
+  if (typeof slkFlush === 'function') slkFlush();
   const textarea = document.getElementById('editor-textarea');
   if (!textarea || !state.userFiles) return;
   /* Belt and braces. The textarea is read-only so it should not have changed,
@@ -1008,6 +1015,9 @@ function loadPracticeFile(fi, opts) {
   }
 
   _practiceSyncLock(file);
+  // A version that locks its starter: this file's starter text can be added
+  // to but not changed (js/starter-lock.js).
+  if (typeof slkAttach === 'function') slkAttach();
 
   // Update boss bar for this file. Both reads go through the reconstructed
   // source: with a block collapsed the textarea is only part of the file, and

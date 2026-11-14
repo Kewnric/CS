@@ -5316,7 +5316,11 @@ body.is-resizing .practice-panel { transition: none; }
 /* ── Peek at the target (js/code-peek.js) ──────────────────────
    Held with Ctrl+Space or the eye in the editor toolbar. Drawn over the
    editor's box in the editor's own metrics, so matching lines land exactly
-   where they already were; only the differences show. */
+   where they already were; only the differences show.
+   Seamless on purpose: no frame round it and no band across a row. A blue
+   inset border used to outline the box and a green tint and edge ran across
+   each missing line, which made the same text look like it had moved onto
+   another layer. A missing line is told apart by its faint text alone. */
 .code-peek {
   position: absolute;
   inset: 0;
@@ -5324,7 +5328,6 @@ body.is-resizing .practice-panel { transition: none; }
   background: #0d1117;
   color: #d4d4d4;
   overflow: hidden;
-  box-shadow: inset 0 0 0 1px rgba(88, 166, 255, 0.35);
   animation: cpIn 0.08s ease-out;
 }
 @keyframes cpIn { from { opacity: 0; } to { opacity: 1; } }
@@ -5353,8 +5356,7 @@ body.is-resizing .practice-panel { transition: none; }
 }
 .code-peek.cp-wrap .cp-code { flex: 1 1 auto; min-width: 0; white-space: pre-wrap; overflow-wrap: break-word; }
 
-/* A line the target has and you do not: faint, with a quiet green edge. */
-.cp-row-ghost { background: rgba(63, 185, 80, 0.06); box-shadow: inset 2px 0 0 rgba(63, 185, 80, 0.45); }
+/* A line the target has and you do not: faint, in place, nothing else. */
 .cp-row-ghost .cp-code { opacity: 0.4; }
 .cp-row-ghost .cp-ln { color: #3fb950; opacity: 0.7; }
 /* Missing pieces inside a line of yours. */
@@ -5390,3 +5392,42 @@ body.is-resizing .practice-panel { transition: none; }
 @media (prefers-reduced-motion: reduce) {
   .code-peek { animation: none; }
 }
+
+/* ── Starter lock (js/starter-lock.js) ─────────────────────────
+   A version can lock its starter code: in the attempt it can be added to
+   but not changed. The chip in the editor's toolbar row says so, and gives
+   a small knock when an edit is refused. */
+.slk-chip {
+  flex-shrink: 0;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin: 0 0.4rem;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(210, 153, 34, 0.4);
+  background: rgba(210, 153, 34, 0.1);
+  color: #e3b341;
+  font-family: var(--font-sans, sans-serif);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  cursor: help;
+  user-select: none;
+}
+.slk-chip[hidden] { display: none; }
+.slk-chip svg { width: 11px; height: 11px; }
+.slk-chip.is-bump { animation: slkBump 0.34s ease-out; }
+@keyframes slkBump {
+  20% { translate: -3px 0; }
+  45% { translate: 3px 0; }
+  70% { translate: -1.5px 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .slk-chip.is-bump { animation: none; }
+}
+
+/* The admin form's switch, under the starter editor. */
+.af-lock-starter { margin-top: 0.5rem; }

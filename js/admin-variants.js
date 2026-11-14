@@ -75,6 +75,16 @@ function renderAdminVariantForm() {
           <pre id="admin-starter-pre" class="editor-pre"><code id="admin-starter-code"></code></pre>
           <textarea id="admin-starter-ta" spellcheck="false" class="editor-textarea" placeholder="// Add starter boilerplate here..."></textarea>
         </div>
+        <!-- js/starter-lock.js: the starter can be added to in the attempt, not changed. -->
+        <label class="af-check af-lock-starter" for="admin-lock-starter">
+          <input type="checkbox" id="admin-lock-starter" ${activeVar.lockStarter ? 'checked' : ''}
+                 onchange="updateActiveVariantField('lockStarter', this.checked)" />
+          <span class="af-check-text">
+            <i data-lucide="lock" class="af-label-icon"></i>Lock starter code
+            <span class="af-label-hint">— in the attempt the starter can't be erased or changed. Code goes in on new
+              lines between its lines, or after the end of one; Ctrl+A selects only what was typed.</span>
+          </span>
+        </label>
       </div>
 
       <div data-step="2" style="display:flex; flex-direction:column; flex:1; min-height:240px;">

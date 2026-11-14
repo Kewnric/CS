@@ -58,6 +58,9 @@ function edReplaceRange(textarea, from, to, text, caret) {
      anyway -- a locked file took brackets, Tab, Enter and Ctrl+/ on screen,
      and Run compiled what it showed. */
   if (textarea.readOnly) return false;
+  // A starter-locked file (js/starter-lock.js) is asked first: an edit that
+  // would erase or change the starter's text does not happen.
+  if (typeof slkAllowReplace === 'function' && !slkAllowReplace(textarea, from, to, text)) return false;
   textarea.focus();
   textarea.setSelectionRange(from, to);
   let ok = false;
@@ -822,8 +825,12 @@ function edTextEntry(textarea, key, shiftKey) {
     if (selectionStart !== selectionEnd || shiftKey) return false;
     /* Between an empty pair the editor put in, take both halves: deleting the
        opener of "()" should not leave the ")" behind to be typed around. */
-    if (selectionStart > 0 && ED_PAIRS[prevCh] === nextCh) {
-      edReplaceRange(textarea, selectionStart - 1, selectionStart + 1, '', selectionStart - 1);
+    /* From here down, a command the starter lock refuses (edReplaceRange
+       returns false) hands the key back to the browser as a plain keystroke,
+       which the lock then judges on its own: Enter refused as "split this
+       line and indent" may still be fine as a newline at the line's end. */
+    if (selectionStart > 0 && ED_PAIRS[prevCh] === nextCh &&
+        edReplaceRange(textarea, selectionStart - 1, selectionStart + 1, '', selectionStart - 1)) {
       return true;
     }
     const lineStart = value.lastIndexOf('\n', selectionStart - 1) + 1;
@@ -831,8 +838,7 @@ function edTextEntry(textarea, key, shiftKey) {
     if (!before || /[^ ]/.test(before)) return false;
     const cut = ((before.length - 1) % edIndentWidth(unit)) + 1;
     if (cut <= 1) return false;
-    edReplaceRange(textarea, selectionStart - cut, selectionStart, '', selectionStart - cut);
-    return true;
+    return edReplaceRange(textarea, selectionStart - cut, selectionStart, '', selectionStart - cut);
   }
 
   /* TYPE OVER, DON'T DOUBLE. The closer of every pair used to be inserted on
@@ -850,8 +856,7 @@ function edTextEntry(textarea, key, shiftKey) {
   if (bracketPairs[key]) {
     // Against a word it is wrapping what follows, not starting something empty.
     if (noSel && wordCh(nextCh)) return false;
-    edReplaceRange(textarea, selectionStart, selectionEnd, key + bracketPairs[key], selectionStart + 1);
-    return true;
+    return edReplaceRange(textarea, selectionStart, selectionEnd, key + bracketPairs[key], selectionStart + 1);
   }
 
   if (quote) {
@@ -860,8 +865,7 @@ function edTextEntry(textarea, key, shiftKey) {
     if (noSel && (wordCh(prevCh) || prevCh === '\\')) return false;
     const selected = value.substring(selectionStart, selectionEnd);
     const caret = selected.length === 0 ? selectionStart + 1 : selectionStart + 1 + selected.length;
-    edReplaceRange(textarea, selectionStart, selectionEnd, key + selected + key, caret);
-    return true;
+    return edReplaceRange(textarea, selectionStart, selectionEnd, key + selected + key, caret);
   }
 
   if (key === 'Enter') {
@@ -877,14 +881,12 @@ function edTextEntry(textarea, key, shiftKey) {
     if ((textBefore.endsWith('{') && textAfter.startsWith('}')) ||
         (textBefore.endsWith('[') && textAfter.startsWith(']'))) {
       const innerIndent = indent + unit;
-      edReplaceRange(textarea, selectionStart, selectionEnd,
-        '\n' + innerIndent + '\n' + indent, selectionStart + 1 + innerIndent.length);
-      return true;
+      if (edReplaceRange(textarea, selectionStart, selectionEnd,
+        '\n' + innerIndent + '\n' + indent, selectionStart + 1 + innerIndent.length)) return true;
     }
 
     if (currentLine.trim().endsWith('{') || currentLine.trim().endsWith('[')) indent += unit;
-    edReplaceRange(textarea, selectionStart, selectionEnd, '\n' + indent, selectionStart + 1 + indent.length);
-    return true;
+    return edReplaceRange(textarea, selectionStart, selectionEnd, '\n' + indent, selectionStart + 1 + indent.length);
   }
 
   if (key === '}' || key === ']') {
@@ -895,8 +897,9 @@ function edTextEntry(textarea, key, shiftKey) {
     if (currentLine.trim() === '' && currentLine.length > 0) {
       const lineStart = selectionStart - currentLine.length;
       const newIndent = edOutdent(currentLine, unit);
-      edReplaceRange(textarea, lineStart, selectionEnd, newIndent + key, lineStart + newIndent.length + 1);
-      return true;
+      // Pulling back an indent the starter lock keeps refuses; the brace then goes in where it is.
+      if (edReplaceRange(textarea, lineStart, selectionEnd, newIndent + key, lineStart + newIndent.length + 1)) return true;
+      return false;
     }
     if (noSel && nextCh === key) {                 // type over, as for ) above
       textarea.setSelectionRange(selectionStart + 1, selectionStart + 1);

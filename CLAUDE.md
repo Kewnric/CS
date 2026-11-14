@@ -183,6 +183,20 @@ closing without saving asks (the form's own question), then re-applies the saved
 it is open `state.activeChallenge` can be a draft copy, so anything else that writes to it then
 is lost unless the program is saved. Single-program attempt only; Esc and Back close it first.
 
+**Starter lock** (`js/starter-lock.js`, `variant.lockStarter`, the admin form's "Lock starter code"
+under the starter editor): the starter's characters cannot be deleted, typed over, cut or moved;
+text goes in only at a line's end, between lines, in a blank line, or (as a whole new line) before
+a starter line. A mask over the editor text marks each character starter (1) or yours (0). Every
+edit is judged before it lands -- the textarea's `beforeinput` (capture, on document) and
+`edReplaceRange`'s `slkAllowReplace` -- and an allowed edit sets the mask it will produce
+(`_slk.pending`); undo/redo get theirs back from a history keyed by text; anything else is diffed. A
+range that reaches into the starter only loses YOUR characters (`_slkTakeMine`). Ctrl+A selects the
+piece of yours at the caret, then all of yours, then the file. The mask rides on the file
+(`state.userFiles[i].slk`, run-length plus a hash of the starter) into drafts and restore points;
+without one, `slkAlign` lines the starter up against the text. Folding is off in a locked file
+(view offsets must equal file offsets). editor.js's Enter / brackets / `}` hand the key back to the
+browser when the lock refuses their fancy version, so a plain keystroke can still go in.
+
 **Editor extras:** `fold.js` (folding — parks text in a module, so it is the only
 thing between the user and lost code), `brackets.js` (pair highlight, matched
 against the *whole* file so a folded partner is not mismatched), `editor-fx.js`
