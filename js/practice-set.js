@@ -32,10 +32,24 @@ function psetInit() {
   state.activeVariant = null;
   state.userFiles = null;
 
-  // Restore an in-progress attempt of this same set (refresh-proof)
+  // Restore an in-progress attempt of this same set: this tab's copy after a
+  // reload, or the one kept on disk after the tab was closed.
   const saved = getSessionParam('psetAutosave');
-  const restore = saved && saved.setId === set.id ? saved : null;
+  let restore = saved && saved.setId === set.id ? saved : null;
   if (saved && !restore) clearSessionParam('psetAutosave');
+  if (!restore) {
+    const disk = _psetDraftMap()[set.id];
+    if (disk) {
+      restore = disk;
+      const mins = Math.max(1, Math.round((Date.now() - (disk.savedAt || Date.now())) / 60000));
+      setTimeout(() => {
+        if (typeof toast === 'function') {
+          toast('Restored the set you had open ' + mins + ' minute' + (mins !== 1 ? 's' : '') + ' ago.',
+            { type: 'info', duration: 6000 });
+        }
+      }, 700);
+    }
+  }
 
   // Fresh attempt, fresh music -- same rule as the single-program screen.
   if (!restore && typeof ostRewind === 'function') ostRewind();
@@ -52,12 +66,31 @@ function psetInit() {
     p.check = null; // last Check Code result
   });
 
+  /* Time spent, not a start time, as on the program screen: a set left
+     yesterday must not come back a day into its attempt, nor submit itself on
+     the first tick when a countdown is set. */
+  let elapsed = null;
+  if (restore) {
+    if (typeof restore.elapsedMs === 'number' && restore.elapsedMs >= 0) elapsed = restore.elapsedMs;
+    else if (restore.startTime) elapsed = Math.max(0, (restore.savedAt || Date.now()) - restore.startTime);
+  }
+  let timeLimit = parseInt(getSessionParam('codingSetTimeLimit')) || 0;
+  if (elapsed != null && timeLimit > 0 && elapsed / 1000 >= timeLimit) {
+    timeLimit = 0;
+    try { setSessionParam('codingSetTimeLimit', '0'); } catch (e) { /* full */ }
+    setTimeout(() => {
+      if (typeof toast === 'function') {
+        toast('You have already spent longer than that time limit, so the clock is counting up.', { type: 'info', duration: 7000 });
+      }
+    }, 900);
+  }
+
   _pset = {
     set,
     problems,
     current: 0,
-    startTime: (restore && restore.startTime) || Date.now(),
-    timeLimit: parseInt(getSessionParam('codingSetTimeLimit')) || 0,
+    startTime: elapsed != null ? Date.now() - elapsed : Date.now(),
+    timeLimit,
     submitted: false
   };
 
@@ -301,6 +334,10 @@ function _psetResolveProblems(set, restore) {
     // position, which is stable for as long as the attempt runs.
     const key = p.id || ('idx_' + pi);
     const restored = restore && restore.codes ? restore.codes[key] : null;
+    // What the draft kept about the problem besides its files (newer drafts only).
+    const kept = (restored && typeof restored === 'object') ? restored : {};
+    const hintsUsed = parseInt(kept.hintsUsed, 10) || 0;
+    const activeMs = Math.max(0, Number(kept.activeMs) || 0);
     if (p.source === 'library') {
       const c = (state.challenges || []).find(ch => ch.id === p.challengeId);
       if (!c) return; // program deleted — skip
@@ -330,7 +367,8 @@ function _psetResolveProblems(set, restore) {
         // Hints used to be dropped here, so a program with hints lost them the
         // moment it was added to a set.
         hints: (v.hints || []).slice(),
-        hintsUsed: 0,
+        hintsUsed: Math.min(hintsUsed, (v.hints || []).length),
+        activeMs,
         files, activeFileIndex, execs: [],
         userCode: files[0].userCode
       });
@@ -350,7 +388,8 @@ function _psetResolveProblems(set, restore) {
         minRequirements: (p.minRequirements || []).slice(),
         samples: [],
         hints: (p.hints || []).slice(),
-        hintsUsed: 0,
+        hintsUsed: Math.min(hintsUsed, (p.hints || []).length),
+        activeMs,
         files, activeFileIndex, execs: [],
         userCode: files[0].userCode
       });
@@ -443,11 +482,14 @@ function psetTogglePause() {
     _pset.startTime += Date.now() - _pset.pausedAt;
     _pset.paused = false;
     _pset.pausedAt = null;
+    const cur = _pset.problems[_pset.current];
+    if (cur) cur._since = Date.now();
     if (icon) icon.setAttribute('data-lucide', 'pause');
     if (timerEl) timerEl.classList.remove('timer-paused');
     if (editorArea) editorArea.classList.remove('editor-paused');
     _psetTick();
   } else {
+    _psetBankTime(true);
     _pset.paused = true;
     _pset.pausedAt = Date.now();
     if (icon) icon.setAttribute('data-lucide', 'play');
@@ -519,17 +561,70 @@ function _psetUpdateBossBar(_ignoredCode, opts) {
   }
 }
 
+/* ── The set's draft on disk ────────────────────────────────────
+   The session copy alone was lost with the tab, which is why the program screen
+   moved its draft to disk; sets now keep one too. A map by set id, the newest
+   PSET_DRAFTS_MAX kept, so opening another set does not overwrite this one. */
+const PSET_DRAFTS_KEY = 'ssp.psetDrafts';
+const PSET_DRAFTS_MAX = 4;
+
+function _psetDraftMap() {
+  try {
+    const m = JSON.parse(localStorage.getItem(PSET_DRAFTS_KEY) || 'null');
+    return (m && typeof m === 'object' && !Array.isArray(m)) ? m : {};
+  } catch (e) { return {}; }
+}
+
+function _psetDraftWrite(draft) {
+  try {
+    const m = _psetDraftMap();
+    m[draft.setId] = draft;
+    Object.keys(m).sort((a, b) => (m[b].savedAt || 0) - (m[a].savedAt || 0))
+      .slice(PSET_DRAFTS_MAX).forEach(k => { delete m[k]; });
+    localStorage.setItem(PSET_DRAFTS_KEY, JSON.stringify(m));
+  } catch (e) { /* quota: the session copy still covers a reload */ }
+}
+
+function _psetDraftRemove(setId) {
+  try {
+    const m = _psetDraftMap();
+    if (!(setId in m)) return;
+    delete m[setId];
+    localStorage.setItem(PSET_DRAFTS_KEY, JSON.stringify(m));
+  } catch (e) { /* nothing to remove */ }
+}
+
+/* ── Time per problem ───────────────────────────────────────────
+   Every problem's history entry used to carry the whole set's duration, so a
+   30-minute set of five recorded 150 minutes of study. Each problem now banks
+   the time it was on screen with the clock running: p._since is when the
+   current stretch began, null while paused or not on screen. */
+function _psetBankTime(stop) {
+  const p = _pset && _pset.problems[_pset.current];
+  if (!p || !p._since) return;
+  const now = Date.now();
+  p.activeMs = (p.activeMs || 0) + Math.max(0, now - p._since);
+  p._since = stop ? null : now;
+}
+
 function _psetAutosave() {
   if (!_pset) return;
   _psetSyncEditor();
+  _psetBankTime(false);
   const codes = {};
   _pset.problems.forEach(p => {
     codes[p.key] = {
       activeFileIndex: p.activeFileIndex || 0,
+      hintsUsed: p.hintsUsed || 0,
+      activeMs: p.activeMs || 0,
       files: (p.files || []).map(f => ({ name: f.name, ext: f.ext, userCode: f.userCode || '' }))
     };
   });
-  setSessionParam('psetAutosave', { setId: _pset.set.id, codes, startTime: _pset.startTime });
+  const now = _pset.paused && _pset.pausedAt ? _pset.pausedAt : Date.now();
+  const draft = { setId: _pset.set.id, title: _pset.set.title || '', codes, startTime: _pset.startTime,
+                  elapsedMs: Math.max(0, now - _pset.startTime), savedAt: Date.now() };
+  setSessionParam('psetAutosave', draft);
+  if (!_pset.submitted) _psetDraftWrite(draft);
   // Drive the same "Saved · Ns ago" chip the single-program page uses — it was
   // rendered here but never fed, so it sat blank for the whole session.
   if (typeof _bossMarkSaved === 'function') _bossMarkSaved();
@@ -539,6 +634,7 @@ function _psetAutosave() {
 function psetSwitch(i) {
   if (!_pset || i === _pset.current || i < 0 || i >= _pset.problems.length) return;
   _psetSyncEditor();
+  _psetBankTime(true);                 // the problem being left stops counting
   // Close the run terminal so problem A's output can't leak into problem B.
   if (typeof _termClose === 'function') _termClose();
   _psetAutosave();
@@ -707,6 +803,8 @@ function _psetLoadProblem(i) {
   if (!_pset) return;
   _pset.current = i;
   const p = _pset.problems[i];
+  // This one counts from now, unless the clock is paused.
+  p._since = _pset.paused ? null : Date.now();
 
   // Full problem name above the Description; the boss plate takes the short alias.
   const titleEl = document.getElementById('pset-problem-title');
@@ -872,6 +970,7 @@ async function _psetDoSubmit() {
     if (typeof lucide !== 'undefined') lucide.createIcons({ root: submitBtn });
   };
 
+  _psetBankTime(true);
   const submitTime = Date.now();
   const durationSeconds = Math.round((submitTime - _pset.startTime) / 1000);
   const summary = [];
@@ -931,10 +1030,14 @@ async function _psetDoSubmit() {
       date: new Date().toLocaleDateString(),
       startTime: _pset.startTime,
       submitTime,
-      duration: durationSeconds,
+      // This problem's own time; the whole sitting is setDuration.
+      duration: Math.round((p.activeMs || 0) / 1000),
+      setDuration: durationSeconds,
       score,
       attemptNumber: attemptCounter,
       userCode: (p.files && p.files[0]) ? (p.files[0].userCode || '') : (p.userCode || ''),
+      // Every file, as the program screen stores it, so a header is not lost.
+      userFiles: p.files ? JSON.parse(JSON.stringify(p.files)) : null,
       expectedCode: p.referenceCode || '',
       scoreBasis: basis,
       testsPassed,
@@ -964,6 +1067,7 @@ async function _psetDoSubmit() {
 
   saveData();
   clearSessionParam('psetAutosave');
+  _psetDraftRemove(_pset.set.id);
   clearSessionParam('codingSetTimeLimit');
 
   if (submitBtn) {
@@ -1133,6 +1237,7 @@ function psetDiscardAttempt() {
   _psetDiscarding = true;
   try {
     clearSessionParam('psetAutosave');
+    if (_pset) _psetDraftRemove(_pset.set.id);
     _psetStopLoops();
     if (_pset) _pset.submitted = true;   // belt and braces against a late flush
   } catch (e) {
