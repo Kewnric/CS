@@ -257,7 +257,24 @@ function _slkDiff(oldText, oldMask, v) {
   while (p < min && oldText[p] === v[p]) p++;
   let s = 0;
   while (s < min - p && oldText[oldText.length - 1 - s] === v[v.length - 1 - s]) s++;
-  return _slkJoin([oldMask.subarray(0, p), _slkZeros(v.length - p - s), oldMask.subarray(oldText.length - s)]);
+  const mid = _slkZeros(v.length - p - s);
+  /* Two changes seen as one (text put in before AND after a starter line in
+     one go) make the middle span the starter between them. Its characters are
+     still there, in the new middle: find them again, from the end, rather
+     than handing them over as yours. */
+  const gone = oldText.slice(p, oldText.length - s), goneMask = oldMask.subarray(p, oldText.length - s);
+  if (goneMask.some(Boolean)) {
+    const fresh = v.slice(p, v.length - s);
+    let j = fresh.length - 1, found = true;
+    const at = new Array(gone.length);
+    for (let i = gone.length - 1; i >= 0; i--) {
+      while (j >= 0 && fresh[j] !== gone[i]) j--;
+      if (j < 0) { found = false; break; }
+      at[i] = j--;
+    }
+    if (found) for (let i = 0; i < gone.length; i++) if (goneMask[i]) mid[at[i]] = 1;
+  }
+  return _slkJoin([oldMask.subarray(0, p), mid, oldMask.subarray(oldText.length - s)]);
 }
 
 /* ── The rules ────────────────────────────────────────────────── */
@@ -556,6 +573,10 @@ function _slkGutter(on) {
 // Capture, so the lock is asked before editor.js's own handlers act.
 document.addEventListener('beforeinput', _slkBeforeInput, true);
 document.addEventListener('keydown', _slkKeydown, true);
+/* At once, not on a microtask: two edits in one task (a script, a paste
+   handler) were otherwise read as one change spanning both, and the starter
+   text between them was handed over as yours. Folding is off in a locked file,
+   so the textarea is the whole file whatever else has run. */
 document.addEventListener('input', (e) => {
-  if (_slk.on && e.target === _slk.ta) queueMicrotask(_slkSync);
+  if (_slk.on && e.target === _slk.ta) _slkSync();
 }, true);

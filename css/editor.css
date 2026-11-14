@@ -5403,7 +5403,8 @@ body.is-resizing .practice-panel { transition: none; }
    the toolbar the whole time.) */
 .slk-hint {
   position: absolute;
-  z-index: 6;
+  /* Over the textarea (10), which lies over the drawn code. */
+  z-index: 12;
   display: inline-flex;
   align-items: center;
   gap: 0.28rem;
