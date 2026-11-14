@@ -291,7 +291,7 @@ function _bcFinish(save) {
   document.removeEventListener('keydown', _bcKey, true);
   document.removeEventListener('paste', _bcPaste);
   st.modal.removeEventListener('click', _bcOverlayClick);
-  st.modal.classList.remove('dialog-icons', 'dialog-banner');
+  // Its layout classes stay through the exit; _dlgOpen clears them on the next open.
   closeModalSmooth(st.modal);
   const b = _bcClampB(st.b);
   if (save) { if (st.opts.onSave) st.opts.onSave(b); }

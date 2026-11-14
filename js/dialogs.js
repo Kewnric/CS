@@ -85,13 +85,17 @@ function closeModalSmooth(modalEl) {
  * that dialog hidden by the timer the first one left behind. Bumping the
  * sequence lets the timer see it has been overtaken.
  *
- * It also clears the layout classes showChoice and the icon picker add. Only
- * their own buttons removed them, so one dismissed with Esc or a backdrop
- * click left every later confirm laid out as a choice list.
+ * It also clears the layout classes showChoice, the icon picker and the banner
+ * cropper add. Only their own buttons removed them, so one dismissed with Esc
+ * or a backdrop click left every later confirm laid out as a choice list.
+ * This is now the ONLY place they come off: a close that took its class off
+ * changed the dialog's layout while its exit was still on screen -- Cancel on
+ * "Leave attempt?" narrowed the box and slid Cancel up beside the choices for
+ * the length of the fade.
  */
 function _dlgOpen(modal, variant) {
   modal._dlgSeq = (modal._dlgSeq || 0) + 1;
-  modal.classList.remove('dialog-choice', 'dialog-icons');
+  modal.classList.remove('dialog-choice', 'dialog-icons', 'dialog-banner');
   if (variant) modal.classList.add(variant);
   modal.style.opacity = '';
   modal.style.transition = '';
@@ -234,7 +238,9 @@ function showChoice(o) {
     + '</div>'
     + '<button id="dlg-cancel" class="dlg-choice-cancel" type="button">Cancel</button>';
 
-  const close = () => { modal.classList.remove('dialog-choice'); closeModalSmooth(modal); };
+  // The layout class stays on through the exit (the dialog is still drawn while
+  // it fades); _dlgOpen takes it off when the next dialog opens.
+  const close = () => closeModalSmooth(modal);
   document.getElementById('dlg-cancel').onclick = close;
   document.getElementById('dlg-second').onclick = () => { close(); if (o.onSecondary) o.onSecondary(); };
   document.getElementById('dlg-primary').onclick = () => { close(); if (o.onPrimary) o.onPrimary(); };
@@ -647,7 +653,8 @@ function showIconPicker(title, message, current, onConfirm) {
   });
   q.addEventListener('input', paint);
 
-  const close = () => { modal.classList.remove('dialog-icons'); closeModalSmooth(modal); };
+  // Laid out as a picker until it has gone; _dlgOpen resets the class.
+  const close = () => closeModalSmooth(modal);
   document.getElementById('dlg-cancel').onclick = close;
   document.getElementById('dlg-clear').onclick = () => { close(); onConfirm(''); };
   document.getElementById('dlg-confirm').onclick = () => { close(); remember(picked); onConfirm(picked); };
