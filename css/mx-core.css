@@ -399,12 +399,19 @@ html[data-motion="off"]::view-transition-new(*) {
        `transform`, which adds to that place instead of sliding in from the
        middle of the screen to it. */
     .run-code-overlay.mx-drop > .run-code-window,
-    .demo-overlay.mx-drop > .demo-window {
+    .demo-overlay.mx-drop > .demo-window,
+    .padm-overlay > .padm-window {
       animation: mxInFromTopT var(--mx-enter) var(--ease-emphasis) backwards;
     }
     .run-code-overlay.mx-drop[data-mx-ghost] > .run-code-window,
-    .demo-overlay.mx-drop[data-mx-ghost] > .demo-window {
+    .demo-overlay.mx-drop[data-mx-ghost] > .demo-window,
+    .padm-overlay[data-mx-ghost] > .padm-window {
       animation: mxOutToTopT var(--mx-exit) var(--ease-exit) forwards !important;
+    }
+    /* The program admin window (js/practice-admin.js) only ever opens on the
+       attempt, so it drops whatever the route; its layer fades as it goes. */
+    .padm-overlay[data-mx-ghost] {
+      animation: mxOutFade var(--mx-exit) var(--ease-exit) forwards !important;
     }
     /* The floating execution stack (placed by left/top, so `translate` is free). */
     .sk-win.is-floating.mx-drop {
@@ -692,6 +699,7 @@ html[data-motion="off"]::view-transition-new(*) {
     /* Picked up, a window lifts: deeper shadow, a hair larger, a slight
        tilt. Set down, it settles on the spring. */
     .run-code-window,
+    .padm-window,
     .sk-win.is-floating,
     .viz-comment-editor-window {
       transition:
@@ -700,6 +708,7 @@ html[data-motion="off"]::view-transition-new(*) {
         box-shadow 220ms ease;
     }
     .run-code-window:has(.run-code-header.is-dragging),
+    .padm-window:has(.padm-head.is-dragging),
     .sk-win.is-floating:has(.sk-head.is-dragging),
     .viz-comment-editor-window:has(.viz-comment-editor-header.is-dragging) {
       rotate: calc(0.5deg * var(--mx-travel));

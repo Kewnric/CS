@@ -1,0 +1,172 @@
+/* ============================================================
+   PRACTICE-ADMIN.CSS — the program admin window over the attempt
+   ------------------------------------------------------------
+   js/practice-admin.js. Built like the Run Code terminal: a layer that blurs
+   the attempt with the window centred on it, or (.is-floating, the dash)
+   no layer at all -- the attempt stays clear and takes clicks, and only the
+   window catches them.
+
+   z-index 950: over the attempt, under the form's own dialogs (.modal-overlay
+   1000, #dialog-modal 1200, the full-screen code editor), the same place as
+   the notebook attempt's editor drawer. The entrance and exit are in
+   mx-core.css with the terminal's.
+   ============================================================ */
+
+.padm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 950;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3vh 2vw;
+  background: rgba(2, 6, 12, 0.55);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: padmFade 0.18s ease-out;
+}
+@keyframes padmFade { from { opacity: 0; } }
+
+.padm-overlay.is-floating {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  pointer-events: none;
+}
+.padm-overlay.is-floating .padm-window { pointer-events: auto; }
+
+.padm-window {
+  position: relative;
+  width: min(940px, 96vw);
+  height: min(88vh, 960px);
+  min-width: min(420px, 96vw);
+  min-height: 320px;
+  max-width: 98vw;
+  max-height: 96vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* Resized from its corner; the size is remembered (window-memory.js). */
+  resize: both;
+  border-radius: 14px;
+  border: 1px solid #30363d;
+  background: var(--bg-surface, #111827);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  outline: none;
+}
+/* With no layer behind it, the window needs its own edge against the attempt. */
+.padm-overlay.is-floating .padm-window {
+  border-color: color-mix(in srgb, var(--color-primary, #6366f1) 45%, #30363d);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(99, 102, 241, 0.18);
+}
+
+/* ── Header: the handle ───────────────────────────────────── */
+.padm-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.55rem 0.45rem 0.9rem;
+  border-bottom: 1px solid #21262d;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-primary, #6366f1) 14%, #161b22), #161b22);
+  color: #c9d1d9;
+  font-size: 0.78rem;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.padm-head.is-dragging { cursor: grabbing; }
+.padm-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.padm-title svg { width: 15px; height: 15px; color: var(--color-primary, #818cf8); }
+
+/* "Live": the attempt is following this form. It blinks each time the
+   attempt takes a change. */
+.padm-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.12rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(52, 211, 153, 0.35);
+  color: #6ee7b7;
+  font-weight: 700;
+  font-size: 0.64rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: help;
+}
+.padm-live i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #34d399;
+  box-shadow: 0 0 8px #34d399;
+}
+.padm-live.is-pulse i { animation: padmLivePulse 0.7s ease-out; }
+@keyframes padmLivePulse { 30% { transform: scale(2.2); box-shadow: 0 0 14px #34d399; } }
+
+.padm-sp { flex: 1; }
+.padm-hbtn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #8b949e;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.padm-hbtn:hover { background: rgba(139, 148, 158, 0.16); color: #e6edf3; }
+.padm-close:hover { background: rgba(248, 81, 73, 0.16); color: #ff7b72; }
+.padm-hbtn svg { width: 15px; height: 15px; }
+
+/* ── The form inside ──────────────────────────────────────── */
+.padm-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* Laid out for the admin page's wide pane; in a window it takes the width it
+   is given and less padding. The sticky header's bleed follows the padding. */
+.padm-body .admin-form-panel {
+  max-width: none;
+  padding: 1rem 1.5rem 0.75rem;
+}
+.padm-body .admin-form-header {
+  margin: 0 -1.5rem 1rem;
+  padding: 0.75rem 1.5rem 1rem;
+}
+/* The window's own X closes it, and Back would leave for the admin list:
+   neither of the form's is wanted here. Discard and Save stay. */
+.padm-body .af-back-btn,
+.padm-body #close-form-btn { display: none !important; }
+
+@media (max-width: 640px) {
+  .padm-overlay { padding: 0; }
+  .padm-window {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+    resize: none;
+    translate: none !important;
+  }
+  .padm-body .admin-form-panel { padding: 0.75rem 1rem 0.5rem; }
+  .padm-body .admin-form-header { margin-inline: -1rem; padding-inline: 1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .padm-overlay, .padm-live.is-pulse i { animation: none; }
+}

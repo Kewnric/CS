@@ -32,6 +32,7 @@
     '.prereq-picker-overlay', '.set-builder-overlay', '.nb-tags-overlay', '.nb-import-overlay',
     '.np-sheet-overlay', '.np-zoom-overlay', '.np-wrong-overlay', '.np-edit-overlay',
     '.mt-overlay', '.run-code-overlay', '.demo-overlay', '.viz-comment-editor-overlay', '.mx-overlay',
+    '.padm-overlay',
   ].join(',');
   // Small anchored things: they keep their own corner as origin, and ghost out.
   const MENU_SEL = [

@@ -77,6 +77,12 @@ function practiceTemplate() {
           ${feelButtonTemplate()}
           ${ostButtonTemplate()}
           <span class="topbar-div" aria-hidden="true"></span>
+          <!-- The program's admin form in a window over the attempt, which
+               follows it live (js/practice-admin.js). -->
+          <button class="btn btn-ghost practice-icon-btn" onclick="practiceAdminOpen()" title="Program admin: edit this program, live"
+                  id="practice-admin-btn" aria-label="Program admin">
+            <i data-lucide="file-cog" style="width:16px;height:16px;" aria-hidden="true"></i>
+          </button>
           <button class="btn btn-ghost practice-icon-btn" onclick="openCheatsheet()" title="Cheat sheet" id="cheatsheet-toggle-btn" aria-label="Cheat sheet" style="display:none;">
             <i data-lucide="book-open" style="width:16px;height:16px;" aria-hidden="true"></i>
           </button>
@@ -179,6 +185,8 @@ function practiceInit() {
 }
 function practiceDestroy() {
   if (typeof GuidedTutorial !== 'undefined' && GuidedTutorial.end) GuidedTutorial.end();
+  // The program admin window lives on <body>; an unsaved draft goes with it.
+  if (typeof practiceAdminDrop === 'function') practiceAdminDrop();
   if (typeof skDestroy === 'function') skDestroy();
   if (typeof _stopSavedTicker === 'function') _stopSavedTicker();
   if (typeof edCloseFind === 'function') edCloseFind();

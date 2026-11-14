@@ -254,6 +254,9 @@ function initPractice() {
     }
     if (document.querySelector('.modal-overlay:not(.hidden)')) return;
     if (document.getElementById('run-code-overlay')) return;
+    // Typing in the program admin window: Ctrl+Enter, Ctrl+B and the rest are
+    // the form's keys there. (Its own handler takes Esc and Ctrl+S.)
+    if (typeof practiceAdminOwnsFocus === 'function' && practiceAdminOwnsFocus()) return;
     const findBar = document.getElementById('ed-find-bar');
     if (findBar && findBar.classList.contains('open') && findBar.contains(document.activeElement)) return;
 
@@ -833,6 +836,9 @@ function practiceDiscardAttempt() {
 }
 
 function practiceConfirmExit() {
+  // The program admin window is the topmost thing: Back closes it first, so an
+  // unsaved edit in it is asked about rather than dropped with the attempt.
+  if (typeof practiceAdminIsOpen === 'function' && practiceAdminIsOpen()) { practiceAdminClose(); return; }
   if (_practiceSubmitted || !state.sessionData) { spaNavigate('browse'); return; }
   if (typeof showChoice !== 'function') {
     if (typeof showConfirm === 'function') {

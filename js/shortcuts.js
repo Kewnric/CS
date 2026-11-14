@@ -41,6 +41,7 @@ function _shortcutModalOpen() {
   if (document.querySelector('.modal-overlay:not(.hidden)')) return true;
   if (document.querySelector('.smp-overlay:not(.hidden)')) return true;
   if (document.getElementById('run-code-overlay')) return true;
+  if (document.getElementById('padm-overlay')) return true;
   if (document.getElementById('bulk-q-import-overlay')) return true;
   const gs = document.getElementById('global-search-modal');
   if (gs && !gs.classList.contains('hidden')) return true;

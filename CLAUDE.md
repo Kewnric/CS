@@ -171,6 +171,18 @@ old JS interpreter (93/158), is gone.
 files *and* which tab was open. The saved list is authoritative for which files
 exist; the challenge definition only supplies each file's starter code.
 
+**Program admin window** (`js/practice-admin.js`, `css/practice-admin.css`): the topbar's
+file-cog button opens the program's own admin form (`getAdminFormHTML` + `openAdminForm`) in a
+window built like the terminal (dragged by its header, resized from its corner, the dash leaves
+the attempt clear and clickable; remembered as `programAdmin` in window-memory.js). The attempt
+follows the draft (`adminState`) live through `practiceApplyProgram`, which re-points
+`state.activeChallenge` / `activeVariant` and repaints only what changed. **`userCode` is never
+touched**: a locked file follows the program's text, a file the program gains becomes a tab, and
+one the window added goes again if dropped before it was written in. Save keeps it and closes;
+closing without saving asks (the form's own question), then re-applies the saved program. While
+it is open `state.activeChallenge` can be a draft copy, so anything else that writes to it then
+is lost unless the program is saved. Single-program attempt only; Esc and Back close it first.
+
 **Editor extras:** `fold.js` (folding — parks text in a module, so it is the only
 thing between the user and lost code), `brackets.js` (pair highlight, matched
 against the *whole* file so a folded partner is not mismatched), `editor-fx.js`
