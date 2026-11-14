@@ -2206,12 +2206,82 @@ function bossBarTemplate() {
     </div>
     <!-- Stands in for the bar when the bar is switched off. Emitted here, not
          in the routes, so all three attempt screens keep the same topbar
-         without three copies of it. -->
+         without three copies of it. Lettered as a title card: the stars and
+         the letters share the outline and drop (#bnk-fx, below); the speed
+         lines sit outside it, plain, as in the design it follows. -->
     <span class="boss-nick" id="boss-nick" hidden>
-      <i data-lucide="file-code-2" class="boss-nick-icon" aria-hidden="true"></i>
-      <span class="boss-nick-text" id="boss-nick-text"></span>
+      ${bnkDash('is-bl')}
+      <span class="boss-nick-art">
+        ${bnkStar('is-tl')}
+        <span class="boss-nick-text" id="boss-nick-text"></span>
+        ${bnkStar('is-br')}
+      </span>
+      ${bnkDash('is-tr')}
       <span class="boss-nick-lv" id="boss-nick-lv" hidden></span>
-    </span>`;
+    </span>
+    <!-- Out of the chip: a gradient or filter inside a display:none subtree
+         is not drawn in Chrome, and the chip is hidden while the bar is on. -->
+    <svg class="boss-nick-defs" width="0" height="0" aria-hidden="true" focusable="false">
+      <defs>
+        <linearGradient id="bnk-star-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#fff27a"/>
+          <stop offset="0.47" stop-color="#ffc928"/>
+          <stop offset="0.53" stop-color="#f2611c"/>
+          <stop offset="0.62" stop-color="#ff7a1a"/>
+          <stop offset="1" stop-color="#f04b17"/>
+        </linearGradient>
+        <pattern id="bnk-dots" width="3" height="3" patternUnits="userSpaceOnUse">
+          <circle cx="1.5" cy="1.5" r="0.7" fill="#ff6a00" fill-opacity="0.5"/>
+        </pattern>
+        <!-- In CSS px of .boss-nick-art, whose padding leaves the room. -->
+        <filter id="bnk-fx" x="-4%" y="-12%" width="110%" height="130%" color-interpolation-filters="sRGB">
+          <!-- A peach rim, a pixel and a half. -->
+          <feMorphology in="SourceAlpha" operator="dilate" radius="1.4" result="rim"/>
+          <!-- The black outline: grown, softened and cut at half, which rounds
+               the square corners a plain dilate leaves. -->
+          <feMorphology in="SourceAlpha" operator="dilate" radius="3.2" result="lineSq"/>
+          <feGaussianBlur in="lineSq" stdDeviation="1.1" result="lineSoft"/>
+          <feComponentTransfer in="lineSoft" result="line">
+            <feFuncA type="linear" slope="6" intercept="-2.5"/>
+          </feComponentTransfer>
+          <!-- The drop, down and to the right: purple near, cyan far, and a
+               black edge round the whole shape. -->
+          <feOffset in="line" dx="1.8" dy="2.2" result="near"/>
+          <feOffset in="line" dx="3.6" dy="4.4" result="far"/>
+          <feMerge result="body"><feMergeNode in="line"/><feMergeNode in="near"/><feMergeNode in="far"/></feMerge>
+          <feMorphology in="body" operator="dilate" radius="1.3" result="edge"/>
+          <feFlood flood-color="#0a0712"/><feComposite in2="edge" operator="in" result="edgeC"/>
+          <feFlood flood-color="#1fe0f5"/><feComposite in2="far" operator="in" result="farC"/>
+          <feFlood flood-color="#9b4dff"/><feComposite in2="near" operator="in" result="nearC"/>
+          <feFlood flood-color="#0a0712"/><feComposite in2="line" operator="in" result="lineC"/>
+          <feFlood flood-color="#ffb877"/><feComposite in2="rim" operator="in" result="rimC"/>
+          <feMerge>
+            <feMergeNode in="edgeC"/><feMergeNode in="farC"/><feMergeNode in="nearC"/>
+            <feMergeNode in="lineC"/><feMergeNode in="rimC"/><feMergeNode in="SourceGraphic"/>
+          </feMerge>
+        </filter>
+      </defs>
+    </svg>`;
+}
+
+/* The title card's two stars: chubby, the tips rounded by a stroke of their
+   own fill, yellow over orange with the halftone and a glint. */
+function bnkStar(where) {
+  const pts = '12,2.5 15.17,7.63 21.04,9.06 17.14,13.67 17.58,19.69 12,17.4 6.42,19.69 6.86,13.67 2.96,9.06 8.83,7.63';
+  return `<svg class="boss-nick-star ${where}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <polygon points="${pts}" fill="url(#bnk-star-fill)" stroke="url(#bnk-star-fill)" stroke-width="3" stroke-linejoin="round"/>
+      <polygon points="${pts}" fill="url(#bnk-dots)"/>
+      <ellipse cx="9.6" cy="8.6" rx="2.6" ry="1.2" fill="#fff" opacity="0.6" transform="rotate(-28 9.6 8.6)"/>
+    </svg>`;
+}
+
+/* Two speed lines, thin at the letters and wide away from them. Drawn for the
+   top-right corner; the bottom-left one is the same turned half round. */
+function bnkDash(where) {
+  return `<svg class="boss-nick-dash ${where}" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+      <polygon points="2.5,12.5 7.2,1.6 9.7,2.8" fill="currentColor"/>
+      <polygon points="4.6,14.6 14,8.4 15.3,10.9" fill="currentColor"/>
+    </svg>`;
 }
 
 /** Show/hide the crystal + nameplate together (they're siblings in the topbar). */

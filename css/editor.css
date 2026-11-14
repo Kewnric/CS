@@ -302,47 +302,91 @@
    the bar 53px off centre. The LV pill inside it already carried this guard;
    the plate needed its own. */
 .boss-nick[hidden] { display: none; }
+
+/* Now lettered like an anime title card rather than set in a glass pill:
+   thick brush letters, yellow over orange split by a seam, a halftone and a
+   glassy top, a peach rim, a black outline and a purple-to-cyan drop -- with
+   a star at two corners and speed lines at the other two. No plate, no
+   border: the lettering is the label.
+   The rim, outline and drop are one SVG filter (#bnk-fx, in bossBarTemplate)
+   over the letters and the stars together, so they follow any name and any
+   truncation. The font is Knewave (Google Fonts, index.html); offline it falls
+   back to the bundled Manga Lettering. */
 .boss-nick {
   flex: 0 1 auto;
   min-width: 0;
-  max-width: min(420px, 100%);
+  max-width: min(540px, 100%);
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.34rem 0.7rem 0.34rem 0.6rem;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.07);
-  backdrop-filter: blur(14px) saturate(150%);
-  -webkit-backdrop-filter: blur(14px) saturate(150%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.24),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.22),
-    0 2px 12px rgba(0, 0, 0, 0.3);
-  color: var(--text-primary, #e6e6ef);
-  font-size: 0.8rem;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  line-height: 1.25;
+  gap: 0.1rem;
 }
-/* The icon carries the accent so the plate has one lit thing on it, the way the
-   timer's clock face does. */
-.boss-nick-icon {
-  flex-shrink: 0;
-  width: 14px;
-  height: 14px;
-  color: var(--color-primary, #818cf8);
-  opacity: 0.9;
+.boss-nick-art {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  /* Room inside the box for what the filter draws past the letters: the
+     outline all round, the drop down and to the right. The negative margins
+     give the height back so the topbar stays one row high. */
+  padding: 6px 11px 11px 6px;
+  margin: -6px 0 -11px;
+  filter: url(#bnk-fx);
 }
-/* The name is the part allowed to run out of room. */
+/* The name is the part allowed to run out of room. Its gradient, dots and
+   gloss are painted through the letters (background-clip: text); the line
+   is tall enough that nothing of a letter falls outside the clip. */
 .boss-nick-text {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* The brush letters lean right past their advance. */
+  padding: 0 0.14em 0 0.04em;
+  font-family: 'Knewave', 'Manga Lettering', 'Comic Sans MS', cursive;
+  font-size: 1.3rem;
+  font-weight: 400;
+  line-height: 1.4;
+  letter-spacing: 0.03em;
+  color: transparent;
+  background:
+    /* the glassy top */
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.14) 30%, transparent 37%),
+    /* the halftone */
+    radial-gradient(circle, rgba(255, 106, 0, 0.5) 0 0.8px, transparent 1.15px) 0 0 / 3.5px 3.5px,
+    /* yellow over orange, split by a darker seam just under the middle */
+    linear-gradient(180deg, #fff27a 0%, #ffc928 45%, #ff9f1c 51%, #f2611c 53%, #ff7a1a 60%, #f04b17 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+.boss-nick-star {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  overflow: visible;
+}
+.boss-nick-star.is-tl { align-self: flex-start; rotate: -14deg; margin-top: -2px; }
+.boss-nick-star.is-br { align-self: flex-end; rotate: 12deg; margin-bottom: -3px; }
+/* Black on the design's white page; on this dark bar they take the colour of
+   the letters' glint instead, or they would not be seen. */
+.boss-nick-dash {
+  flex-shrink: 0;
+  width: 13px;
+  height: 13px;
+  color: #fff1d6;
+  opacity: 0.92;
+}
+.boss-nick-dash.is-tr { align-self: flex-start; margin-top: -8px; }
+.boss-nick-dash.is-bl { align-self: flex-end; margin-bottom: -8px; rotate: 180deg; }
+.boss-nick-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 .boss-nick-lv {
   flex-shrink: 0;
+  margin-left: 0.25rem;
   padding: 0.08rem 0.4rem;
   border-radius: 999px;
   background: color-mix(in srgb, var(--color-primary, #6366f1) 22%, transparent);
