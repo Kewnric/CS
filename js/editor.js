@@ -13,6 +13,8 @@ const editorListeners = new WeakMap();
 let syntaxDebounceTimer;
 
 const ED_INDENT = '  ';
+/** Every pair the editor closes for you: opener → closer. */
+const ED_PAIRS = { '(': ')', '[': ']', '{': '}', '"': '"', "'": "'", '`': '`' };
 
 /* The file's own indentation: a tab when its lines are indented with tabs --
    what most code pasted from elsewhere uses -- or when nothing is indented
@@ -811,8 +813,19 @@ function edTextEntry(textarea, key, shiftKey) {
   /* Backspace in the spaces at the start of a line takes them back one indent
      step at a time, the way a tab would go -- not one space at a time. Mid-line,
      or over a tab, or over a single space, it is an ordinary backspace. */
+  const noSel = selectionStart === selectionEnd;
+  const prevCh = value.charAt(selectionStart - 1);
+  const nextCh = value.charAt(selectionEnd);
+  const wordCh = (c) => /[A-Za-z0-9_]/.test(c);
+
   if (key === 'Backspace') {
     if (selectionStart !== selectionEnd || shiftKey) return false;
+    /* Between an empty pair the editor put in, take both halves: deleting the
+       opener of "()" should not leave the ")" behind to be typed around. */
+    if (selectionStart > 0 && ED_PAIRS[prevCh] === nextCh) {
+      edReplaceRange(textarea, selectionStart - 1, selectionStart + 1, '', selectionStart - 1);
+      return true;
+    }
     const lineStart = value.lastIndexOf('\n', selectionStart - 1) + 1;
     const before = value.slice(lineStart, selectionStart);
     if (!before || /[^ ]/.test(before)) return false;
@@ -822,12 +835,29 @@ function edTextEntry(textarea, key, shiftKey) {
     return true;
   }
 
+  /* TYPE OVER, DON'T DOUBLE. The closer of every pair used to be inserted on
+     the open and inserted again when you typed it, so printf("hi"); typed the
+     ordinary way came out as printf("hi");"") -- the one habit a student
+     cannot help having. A closer typed against the same character steps over
+     it. (A closing brace first on its line is pulled back an indent below,
+     before this would see it.) */
+  const quote = key === '"' || key === "'" || key === '`';
+  if (noSel && (quote || key === ')' || key === ']') && nextCh === key) {
+    textarea.setSelectionRange(selectionStart + 1, selectionStart + 1);
+    return true;
+  }
+
   if (bracketPairs[key]) {
+    // Against a word it is wrapping what follows, not starting something empty.
+    if (noSel && wordCh(nextCh)) return false;
     edReplaceRange(textarea, selectionStart, selectionEnd, key + bracketPairs[key], selectionStart + 1);
     return true;
   }
 
-  if (key === '"' || key === "'" || key === '`') {
+  if (quote) {
+    /* After a letter, a digit or a backslash it is an apostrophe (don't), an
+       escape (\") or the end of a string whose closer was deleted: one char. */
+    if (noSel && (wordCh(prevCh) || prevCh === '\\')) return false;
     const selected = value.substring(selectionStart, selectionEnd);
     const caret = selected.length === 0 ? selectionStart + 1 : selectionStart + 1 + selected.length;
     edReplaceRange(textarea, selectionStart, selectionEnd, key + selected + key, caret);
@@ -866,6 +896,10 @@ function edTextEntry(textarea, key, shiftKey) {
       const lineStart = selectionStart - currentLine.length;
       const newIndent = edOutdent(currentLine, unit);
       edReplaceRange(textarea, lineStart, selectionEnd, newIndent + key, lineStart + newIndent.length + 1);
+      return true;
+    }
+    if (noSel && nextCh === key) {                 // type over, as for ) above
+      textarea.setSelectionRange(selectionStart + 1, selectionStart + 1);
       return true;
     }
   }
