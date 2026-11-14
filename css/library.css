@@ -1455,12 +1455,28 @@ body.tree-dragging .tree-root-drop { display: flex; }
   background: var(--color-primary-subtle);
 }
 
-/* A 24px target without a 24px glyph — the chevron sits inside a row whose
-   click does something else, so it was easy to miss at 18px. */
+/* The chevron's target is the row's whole gutter, not the 18px glyph. The
+   row's own click opens the folder, so every near-miss of the arrow opened
+   it instead of expanding it -- and at 26px (4px of padding) most of the
+   space round the arrow was still a near-miss.
+
+   12px of padding all round, cancelled by the margin so nothing moves, makes
+   a 42px square: from the row's left edge (its padding is 12px) to the
+   folder icon, and top to bottom of the 44px row. Square on purpose: the
+   open chevron is turned 90deg, and an uneven box would turn with it. It
+   cannot reach the rows above and below, because .tree-node-row clips its
+   overflow and hit testing is clipped with it; the folder icon, drawn after
+   it, keeps the 4px they overlap; and an invisible chevron (a folder with
+   nothing in it) takes no clicks at all. */
 .tree-node-chevron {
-  padding: 4px;
-  margin: -4px;
+  padding: 12px;
+  margin: -12px;
   box-sizing: content-box;
+}
+/* A soft disc behind the arrow on hover, so the bigger target reads as its
+   own thing rather than as part of the row. */
+.tree-node-chevron:hover {
+  background: radial-gradient(circle, color-mix(in srgb, var(--text-primary) 13%, transparent) 0 10.5px, transparent 11px);
 }
 
 /* --- Right-click menu ---
