@@ -3219,6 +3219,13 @@ function toggleBossHealthBar() {
   const btn = document.getElementById('boss-bar-toggle-btn');
   if (!wrapper) return;
   const isVisible = bossIsVisible();
+  /* Recall forces the bar off at the start (initPractice), and this is the
+     other way it could come back: it reads how close your text is to the
+     reference, which is the one thing a recall attempt keeps from you. */
+  if (!isVisible && typeof examRecallOn === 'function' && examRecallOn()) {
+    if (typeof toast === 'function') toast('Recall attempt: the boss bar stays off.', { type: 'info' });
+    return;
+  }
   bossSetVisible(!isVisible);
   sessionStorage.setItem('bossBarEnabled', isVisible ? 'false' : 'true');
   if (btn) btn.style.color = isVisible ? 'var(--text-tertiary)' : 'var(--color-warning)';
@@ -3438,8 +3445,11 @@ function runCodeWithPiston(seedStdin) {
     if (!ta) return '';
     return (typeof edFullSource === 'function') ? edFullSource(ta) : ta.value;
   };
-  document.getElementById('run-code-rerun-btn').onclick = () => _termInit(freshSource());
-  document.getElementById('run-code-restart-btn').onclick = () => _termInit(freshSource());
+  /* Each is a run, the same as the panel's Run Code, so each counts against the
+     budget -- only the first run of a terminal used to. */
+  const counted = () => { if (typeof examNoteRun === 'function') examNoteRun(); };
+  document.getElementById('run-code-rerun-btn').onclick = () => { counted(); _termInit(freshSource()); };
+  document.getElementById('run-code-restart-btn').onclick = () => { counted(); _termInit(freshSource()); };
 
   // Typing goes straight into the transcript (see terminal-io.js).
   termBindInput({
@@ -3491,6 +3501,7 @@ function runCodeWithPiston(seedStdin) {
   on('term-seed-run', () => {
     const seed = document.getElementById('term-seed');
     _termTogglePanel('term-stdin-panel', false);
+    counted();
     _termInit(freshSource(), seed ? seed.value : '');
   });
 

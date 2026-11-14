@@ -21,6 +21,9 @@ function psetInit() {
 
   // Nothing carried in from whatever was open before this set.
   if (typeof mistakeResetAttempt === 'function') mistakeResetAttempt();
+  /* A set has no recall or run budget of its own; a recall flag left by the
+     last program attempt would otherwise keep its boss bar locked off. */
+  if (typeof examClear === 'function') examClear();
   if (typeof examResetRuns === 'function') examResetRuns();
 
   // Neutralize single-practice state so shared helpers (run terminal,
