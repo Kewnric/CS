@@ -106,6 +106,32 @@
     if (glow) glow.classList.remove('is-on');
   }
 
+  /* The card is no longer what the pointer is over, and the pointer has not
+     moved to say so: a click opened Session Setup over it, re-drew the pane,
+     or went to another page. The layer is above every popup, so the light
+     stayed on top of the dialog until the mouse moved. Out at once, not by
+     the 260 ms fade, which would play over the popup's entrance. The next
+     pointermove over a card lights it again. */
+  function douse() {
+    if (!glow || !card) return;
+    leave();
+    glow.style.visibility = 'hidden';
+  }
+
+  // After a click, once its handlers have run: is the card still what is
+  // under the pointer? (The fx layer takes no pointer events, so it is not
+  // what elementFromPoint finds.)
+  function recheck() {
+    if (!card) return;
+    if (!card.isConnected) { douse(); return; }
+    const top = document.elementFromPoint(px, py);
+    if (!top || !card.contains(top)) douse();
+  }
+
+  // mx-popups.js calls this as any popup opens, whatever opened it (a click,
+  // a shortcut, something that finished loading).
+  M.glowOff = douse;
+
   function mountGlow() {
     // Hover only exists with a fine pointer; a finger would leave it stranded.
     if (!window.matchMedia || !matchMedia('(hover: hover) and (pointer: fine)').matches) return;
@@ -126,11 +152,14 @@
       card = c;
       px = e.clientX;
       py = e.clientY;
+      if (glow.style.visibility) glow.style.visibility = '';
       glow.classList.add('is-on');
       if (!frame) frame = requestAnimationFrame(place);
     }, { passive: true });
     document.addEventListener('scroll', function () { if (card) leave(); }, { capture: true, passive: true });
     document.addEventListener('pointerleave', leave);
+    document.addEventListener('click', function () { if (card) requestAnimationFrame(recheck); }, true);
+    window.addEventListener('hashchange', douse);
   }
 
   if (document.readyState === 'complete') mountGlow();

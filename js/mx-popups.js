@@ -106,6 +106,9 @@
     el.style.setProperty('--mx-ox', x.toFixed(1) + 'px');
     el.style.setProperty('--mx-oy', y.toFixed(1) + 'px');
     markDrop(el);
+    // The card light (mx-controls.js) sits above every popup; a popup opened
+    // under a pointer that has not moved would otherwise wear it.
+    if (typeof M.glowOff === 'function') M.glowOff();
   }
 
   // A class, not a route rule in the stylesheet: it is set as the popup opens
