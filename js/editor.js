@@ -116,6 +116,11 @@ function setupSpecificEditor(textareaId, preId, codeId, isPracticeMode, stateFie
     scroll: () => {
       preContainer.scrollTop = textarea.scrollTop;
       preContainer.scrollLeft = textarea.scrollLeft;
+      /* The line numbers belong to the attempt's editor only. Every editor
+         used to drive them, so scrolling the starter or target code in the
+         program admin window (open over the attempt) scrolled the attempt's
+         numbers away from its code. */
+      if (!isPracticeMode) return;
       const gutter = document.getElementById('editor-line-numbers');
       if (gutter) gutter.scrollTop = textarea.scrollTop;
     },
@@ -134,6 +139,14 @@ function setupSpecificEditor(textareaId, preId, codeId, isPracticeMode, stateFie
         adminState.variants[adminState.activeVariantIndex][stateField] = newVal;
       }
       preCode.innerHTML = syntaxHighlight(e.target.value) + '<br/>';
+      /* Put the drawn text back level with the real one, now and once the
+         browser has scrolled the caret into view. The drawn layer is a line
+         taller (the <br/> above), so after a large delete the two could each
+         settle at their own limit -- a line apart, with the caret drawn under
+         the text it was actually in -- and only a scroll event re-levelled
+         them, which a shrinking text does not reliably send. */
+      handlers.scroll();
+      requestAnimationFrame(handlers.scroll);
       if (isPracticeMode) updateLineNumbers(e.target);
     },
     keydown: (e) => {
@@ -696,6 +709,13 @@ function updateLineNumbers(textarea) {
   // fold keeps the third partition open after the pointer leaves.
   gutter.classList.toggle('has-folded', Object.keys(foldMap).some(k => foldMap[k] === 'folded'));
   gutter.scrollTop = textarea.scrollTop;
+  // And the drawn text with them: this runs on every caret move (click, keyup,
+  // input), which is every way the editor can scroll without a scroll event.
+  const drawn = document.getElementById('editor-pre');
+  if (drawn && textarea.id === 'editor-textarea') {
+    if (drawn.scrollTop !== textarea.scrollTop) drawn.scrollTop = textarea.scrollTop;
+    if (drawn.scrollLeft !== textarea.scrollLeft) drawn.scrollLeft = textarea.scrollLeft;
+  }
   // Delegated, and attached once — the rows above are rebuilt on every keystroke.
   if (!gutter._markClick) {
     gutter._markClick = (e) => {

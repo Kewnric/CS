@@ -1878,7 +1878,7 @@ mark.diff-hit.current {
    mark. See .has-marks below. */
 .editor-line-numbers {
   width: auto;
-  /* Clears the always-open marker column (16px) plus two digits and padding. */
+  /* Clears the always-open fold column (16px) plus two digits and padding. */
   min-width: 46px;
   /* Nothing on the gutter itself animates any more. It used to ease
      padding-left AND min-width while each ROW eased its own padding-left and
@@ -1938,16 +1938,19 @@ mark.diff-hit.current {
   transition: flex-basis 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* The marker partition is always open. It never moves, so the digits never
-   move either, and the ghost has somewhere to sit the instant you point at a
-   row rather than after the column has finished opening. */
-.editor-line-numbers .ln-mark-col { flex: 0 0 16px; }
+/* The always-open gap is the FOLD partition, on the right beside the code:
+   its chevrons are always there to fold or unfold a block. It never moves, so
+   the digits never move either.
 
-/* The fold partition still opens on hover, and stays open while a block is
-   actually folded - that chevron is the only sign the code is still there. */
-.editor-line-numbers .ln-fold-col { flex: 0 0 0px; width: 0; }
-.editor-line-numbers:not(.gutter-hidden):hover .ln-fold-col { flex-basis: 16px; }
-.editor-line-numbers.has-folded:not(.gutter-hidden) .ln-fold-col { flex-basis: 16px; }
+   The MARKER partition on the left (the pin / highlight triangle) opens only
+   while the pointer is over the gutter -- that is when you place a pin, and
+   its ghost has somewhere to sit. A pinned line still shows with the gutter
+   closed: its number is tinted and its row lit, and the code has its band.
+   This used to be the other way round, with a 16px empty gap held open on
+   the left for pins most files never have. */
+.editor-line-numbers .ln-fold-col { flex: 0 0 16px; }
+.editor-line-numbers .ln-mark-col { flex: 0 0 0px; width: 0; }
+.editor-line-numbers:not(.gutter-hidden):hover .ln-mark-col { flex-basis: 16px; }
 
 .editor-line-numbers .line-num.active {
   color: #e6edf3;
@@ -4351,18 +4354,19 @@ body.is-resizing .practice-panel { transition: none; }
   border: none;
   background: transparent;
   cursor: pointer;
-  opacity: 0;
+  /* Always shown: the fold column is the gutter's open gap now (see
+     .ln-fold-col), and an arrow that appears only on hover had to be hunted
+     for. Quiet until pointed at; a folded block's arrow is lit. */
+  opacity: 1;
   transition: opacity 0.14s ease, color 0.14s ease;
   color: #6e7681;
   display: flex;
   align-items: center;
   justify-content: center;
 }
-/* A collapsed block keeps its chevron visible — it is the only sign the code
-   is still there, and hiding it until hover would make a fold easy to forget. */
-.editor-line-numbers:hover .line-fold,
-.line-fold.closed { opacity: 1; }
 .line-fold:hover { color: #e6edf3; }
+/* A starter-locked file does not fold (js/starter-lock.js), so no arrows. */
+.editor-line-numbers.slk-locked .line-fold { display: none; }
 .line-fold::before {
   content: '';
   width: 7px;
@@ -5394,39 +5398,34 @@ body.is-resizing .practice-panel { transition: none; }
 }
 
 /* ── Starter lock (js/starter-lock.js) ─────────────────────────
-   A version can lock its starter code: in the attempt it can be added to
-   but not changed. The chip in the editor's toolbar row says so, and gives
-   a small knock when an edit is refused. */
-.slk-chip {
-  flex-shrink: 0;
-  align-self: center;
+   Said only when an edit is refused, and only for a moment: a small tag just
+   above the caret's line, inside the editor's box. (It was a chip held open in
+   the toolbar the whole time.) */
+.slk-hint {
+  position: absolute;
+  z-index: 6;
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  margin: 0 0.4rem;
-  padding: 0.12rem 0.5rem;
+  gap: 0.28rem;
+  padding: 0.1rem 0.45rem;
   border-radius: 999px;
-  border: 1px solid rgba(210, 153, 34, 0.4);
-  background: rgba(210, 153, 34, 0.1);
+  border: 1px solid rgba(210, 153, 34, 0.45);
+  background: rgba(22, 27, 34, 0.94);
   color: #e3b341;
   font-family: var(--font-sans, sans-serif);
-  font-size: 0.66rem;
+  font-size: 0.64rem;
   font-weight: 700;
-  letter-spacing: 0.02em;
+  line-height: 1.4;
   white-space: nowrap;
-  cursor: help;
-  user-select: none;
+  pointer-events: none;
+  opacity: 0;
+  translate: 0 3px;
+  transition: opacity 0.18s ease, translate 0.18s ease;
 }
-.slk-chip[hidden] { display: none; }
-.slk-chip svg { width: 11px; height: 11px; }
-.slk-chip.is-bump { animation: slkBump 0.34s ease-out; }
-@keyframes slkBump {
-  20% { translate: -3px 0; }
-  45% { translate: 3px 0; }
-  70% { translate: -1.5px 0; }
-}
+.slk-hint svg { flex-shrink: 0; }
+.slk-hint.is-on { opacity: 1; translate: 0 0; }
 @media (prefers-reduced-motion: reduce) {
-  .slk-chip.is-bump { animation: none; }
+  .slk-hint { transition: none; translate: none; }
 }
 
 /* The admin form's switch, under the starter editor. */

@@ -101,11 +101,15 @@ function slkAlign(S, T) {
   const n = sl.length, m = tl.length;
   const tAt = new Array(m);
   for (let j = 0, o = 0; j < m; j++) { tAt[j] = o; o += tl[j].length + 1; }
+  const sAt = new Array(n).fill(-1);      // the line of T each starter line was found on
+  const tUsed = new Uint8Array(m);
   const put = (i, j, col) => {
     const a = tAt[j] + col;
     mask.fill(1, a, a + sl[i].length);
     // The line's own end goes with it, unless it was the starter's last line.
     if (i < n - 1 && j < m - 1) mask[tAt[j] + tl[j].length] = 1;
+    sAt[i] = j;
+    tUsed[j] = 1;
   };
   const pairs = [];
   if (n * m <= 2500000) {
@@ -139,6 +143,27 @@ function slkAlign(S, T) {
   let pi = 0, pj = 0;
   pairs.forEach(([a, b]) => { gap(pi, a, pj, b); put(a, b, 0); pi = a + 1; pj = b + 1; });
   gap(pi, n, pj, m);
+
+  /* A blank starter line you wrote on has nothing left to find -- but it still
+     ends in its own newline, and that newline comes after whatever was typed
+     on it: the end of the last line before the next starter line that was
+     found. Without this, Ctrl+A then Delete took the blank line with your
+     code and left the braces round it touching. */
+  const lastReal = n - 1 - (sl[n - 1] === '' ? 1 : 0);   // S's final '' is only what follows its last newline
+  for (let i = 0; i <= lastReal;) {
+    if (sAt[i] >= 0 || sl[i].length) { i++; continue; }
+    let k = i;
+    while (k <= lastReal && sAt[k] < 0 && !sl[k].length) k++;
+    const prev = i > 0 ? sAt[i - 1] : -1;
+    const next = k <= lastReal ? sAt[k] : (tl[m - 1] === '' ? m - 1 : m);
+    if ((i === 0 || prev >= 0) && next >= 0) {
+      for (let j = next - 1, c = k - i; c > 0 && j > prev && j < m - 1 && !tUsed[j]; j--, c--) {
+        mask[tAt[j] + tl[j].length] = 1;
+        tUsed[j] = 1;
+      }
+    }
+    i = k;
+  }
   return mask;
 }
 
@@ -177,7 +202,7 @@ function slkFlush() { _slkSync(); }
 function slkAttach() {
   const ta = document.getElementById('editor-textarea');
   _slk = { on: false };
-  _slkChip(false);
+  _slkGutter(false);
   if (!ta || !document.body || document.body.dataset.route !== 'practice') return;
   const variant = state.activeVariant;
   const fi = state.activeFileIndex || 0;
@@ -199,7 +224,7 @@ function slkAttach() {
   _slk = { on: true, ta, fi, hash, text, mask, hist: new Map(), pending: null, bypass: false };
   _slkRemember(text, mask);
   _slkStore();
-  _slkChip(true);
+  _slkGutter(true);
 }
 
 /** Bring the mask up to the text in the editor, after any change. */
@@ -260,16 +285,11 @@ function _slkInsertOk(a, b, ins) {
   return false;
 }
 
+/* Said where it happened, and only then: a small tag over the caret's line for
+   a moment. It was a chip held open in the toolbar the whole time, which read
+   as a big box over the code. */
 function _slkRefuse(msg) {
-  const chip = document.getElementById('slk-chip');
-  if (chip) { chip.classList.remove('is-bump'); void chip.offsetWidth; chip.classList.add('is-bump'); }
-  const now = Date.now();
-  if (now - _slkRefusedAt < 2500) return;
-  _slkRefusedAt = now;
-  if (typeof toast === 'function') {
-    toast(msg || 'The starter code is locked. Add yours on a new line, or after the end of a line.',
-      { type: 'info', duration: 3200 });
-  }
+  _slkHint(msg || 'Starter code is locked');
 }
 
 /** Expected text and mask after [a, b) becomes `ins`, for the sync to take up exactly. */
@@ -333,7 +353,7 @@ function slkAllowReplace(ta, from, to, text) {
 /** Folding is off while the starter is locked (see the top of this file). */
 function slkBlocksFolding() {
   if (!_slk.on) return false;
-  _slkRefuse('Folding is off while the starter code is locked.');
+  _slkRefuse('Folding is off — starter locked');
   return true;
 }
 
@@ -392,7 +412,7 @@ function _slkBeforeInput(e) {
   if (t === 'insertFromDrop' || t === 'deleteByDrag' || t === 'insertTranspose') {
     // Where a drop lands is not something a textarea says; copy and paste does.
     _slkStop(e);
-    _slkRefuse('Dragging text is off while the starter code is locked. Copy and paste instead.');
+    _slkRefuse('Copy and paste instead — starter locked');
     return;
   }
   if (t === 'insertLineBreak' || t === 'insertParagraph') ins = '\n';
@@ -461,7 +481,7 @@ function _slkKeydown(e) {
   const is = r => s === r[0] && en === r[1];
   if (!runs.length) {
     e.preventDefault();
-    if (typeof toast === 'function') toast('Nothing of yours to select yet. The starter code is locked; press Ctrl+A again for all of it.', { type: 'info', duration: 2600 });
+    _slkHint('Nothing of yours yet — Ctrl+A again for all');
     // A second press still selects the whole file, for copying.
     if (_slk.allArmed) { _slk.allArmed = false; ta.setSelectionRange(0, ta.value.length); }
     else _slk.allArmed = true;
@@ -480,25 +500,55 @@ function _slkKeydown(e) {
   else ta.setSelectionRange(here[0], here[1]);
 }
 
-/* ── The sign that it is on ───────────────────────────────────── */
+/* ── Saying so ────────────────────────────────────────────────── */
 
-function _slkChip(on) {
-  let chip = document.getElementById('slk-chip');
-  if (!on) { if (chip) chip.hidden = true; return; }
-  if (!chip) {
-    const row = document.querySelector('.practice-editor-area .editor-toolbar-row');
-    const tabs = document.getElementById('practice-file-tabs');
-    if (!row || !tabs) return;
-    chip = document.createElement('span');
-    chip.id = 'slk-chip';
-    chip.className = 'slk-chip';
-    chip.title = 'The starter code is locked: it cannot be erased or changed. Add your code on a new line, '
-      + 'or after the end of a line. Ctrl+A selects your code (press again for all of it, a third time for the whole file).';
-    chip.innerHTML = '<i data-lucide="lock"></i><span>Starter locked</span>';
-    tabs.after(chip);
-    if (typeof lucide !== 'undefined') lucide.createIcons({ root: chip });
+let _slkHintTimer = 0;
+
+/** A small tag just above the caret's line, gone again in a moment. */
+function _slkHint(text) {
+  const ta = document.getElementById('editor-textarea');
+  const box = ta && ta.parentElement;
+  if (!box) return;
+  let tag = document.getElementById('slk-hint');
+  if (!tag || tag.parentElement !== box) {
+    if (tag) tag.remove();
+    tag = document.createElement('div');
+    tag.id = 'slk-hint';
+    tag.className = 'slk-hint';
+    tag.setAttribute('role', 'status');
+    tag.innerHTML = '<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.6" '
+      + 'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/>'
+      + '<path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><span></span>';
+    box.appendChild(tag);
   }
-  chip.hidden = false;
+  tag.querySelector('span').textContent = text;
+
+  // Over the line the caret is on, at the caret's column where it can be measured.
+  const cs = getComputedStyle(ta);
+  const lh = parseFloat(cs.lineHeight) || 22;
+  const padTop = parseFloat(cs.paddingTop) || 0;
+  const padLeft = parseFloat(cs.paddingLeft) || 0;
+  const caret = ta.selectionStart;
+  const line = ta.value.slice(0, caret).split('\n').length - 1;
+  let x = padLeft;
+  const r = typeof edCharRect === 'function' ? edCharRect(Math.max(0, caret - 1)) : null;
+  if (r && ta.value[caret - 1] !== '\n') x = r.right - ta.scrollLeft;
+  let y = padTop + line * lh - ta.scrollTop - 24;
+  if (y < 4) y = padTop + (line + 1) * lh - ta.scrollTop + 4;     // no room above: below the line
+  tag.style.left = Math.max(4, Math.min(box.clientWidth - 180, x - 10)) + 'px';
+  tag.style.top = Math.max(4, Math.min(box.clientHeight - 26, y)) + 'px';
+
+  tag.classList.remove('is-on');
+  void tag.offsetWidth;
+  tag.classList.add('is-on');
+  clearTimeout(_slkHintTimer);
+  _slkHintTimer = setTimeout(() => tag.classList.remove('is-on'), 1600);
+}
+
+/** Folding's arrows go while a file is locked (the gutter's own class). */
+function _slkGutter(on) {
+  const g = document.getElementById('editor-line-numbers');
+  if (g) g.classList.toggle('slk-locked', !!on);
 }
 
 /* ── Wiring ───────────────────────────────────────────────────── */
