@@ -583,8 +583,19 @@ const CARD_TAGS_SHOWN = 3;
 /** Build HTML for a single challenge card (extracted for progressive rendering). */
 /** Is there an unfinished attempt of this program sitting in the autosave? */
 function browseHasResumable(c) {
+  return !!_browseSavedAttempt(c.id);
+}
+
+/**
+ * The unfinished attempt of this program: this tab's session copy, or else the
+ * draft kept on disk (a closed tab, another day). { variantId, fromDisk } or null.
+ */
+function _browseSavedAttempt(challengeId) {
   const saved = getSessionParam('autoSavedFiles');
-  return !!(saved && saved.challengeId === c.id);
+  if (saved && saved.challengeId === challengeId) return { variantId: saved.variantId, fromDisk: false };
+  const d = typeof practiceDraftForChallenge === 'function' ? practiceDraftForChallenge(challengeId) : null;
+  if (d && (d.files || []).some(f => (f.userCode || '').trim())) return { variantId: d.variantId, fromDisk: true };
+  return null;
 }
 
 /** Compact or detailed? Remembered per library, like the other View settings. */
@@ -737,9 +748,9 @@ registerLibAdapter('browse', {
 
 /** Pick an abandoned attempt back up rather than starting a new one. */
 function browseResume(challengeId) {
-  const saved = getSessionParam('autoSavedFiles');
+  const saved = _browseSavedAttempt(challengeId);
   const c = state.challenges.find(x => x.id === challengeId);
-  if (!c || !saved || saved.challengeId !== challengeId) { browseStartFresh(challengeId); return; }
+  if (!c || !saved) { browseStartFresh(challengeId); return; }
   browseRememberScroll();
   const variant = c.variants.find(v => v.id === saved.variantId) || c.variants[0];
   setSessionParam('practiceChallenge', c.id);
@@ -756,13 +767,18 @@ function browseResume(challengeId) {
  * abandoning the old attempt first. Resume is now its own button.
  */
 function browseStartFresh(challengeId) {
-  const saved = getSessionParam('autoSavedFiles');
-  if (saved && saved.challengeId === challengeId) {
+  /* The disk draft counts too. Asking only about this tab's session copy meant
+     a draft from a closed tab was restored silently by the "fresh" attempt. */
+  if (_browseSavedAttempt(challengeId)) {
     const c = state.challenges.find(x => x.id === challengeId);
     const go = () => {
-      clearSessionParam('autoSavedFiles');
-      clearSessionParam('practiceStartTime');
-      clearSessionParam('practiceExecs');
+      const s = getSessionParam('autoSavedFiles');
+      if (s && s.challengeId === challengeId) {
+        clearSessionParam('autoSavedFiles');
+        clearSessionParam('practiceStartTime');
+        clearSessionParam('practiceExecs');
+      }
+      if (typeof practiceDraftRemove === 'function') practiceDraftRemove(challengeId);
       promptTimer(challengeId);
     };
     if (typeof showConfirm === 'function') {

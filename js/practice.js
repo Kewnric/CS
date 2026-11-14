@@ -377,13 +377,85 @@ function practiceJumpToLine(fileIndex, line) {
    when the tab closes. A refresh kept your work; a closed tab, a crash or a
    reboot did not — on the screen where you type the most. It is mirrored to
    localStorage now, keyed by challenge+variant, and cleared when the attempt is
-   graded. */
-const PRACTICE_DRAFT_KEY = 'ssp.practiceDraft';
+   graded.
+
+   ONE PER PROGRAM. It was a single draft for the whole app, so "Keep and
+   leave" kept your work only until you opened any other program, whose first
+   autosave wrote over it. The newest PRACTICE_DRAFTS_MAX are kept. */
+const PRACTICE_DRAFT_KEY = 'ssp.practiceDraft';     // the old single draft; moved into the map on read
+const PRACTICE_DRAFTS_KEY = 'ssp.practiceDrafts';
+const PRACTICE_DRAFTS_MAX = 8;
+
+function _practiceDraftKey(challengeId, variantId) { return challengeId + '::' + variantId; }
+
+/**
+ * Fold drafts into a map, the newer savedAt winning for each program.
+ * @param {Object} map  { 'challenge::variant': draft }
+ * @param {Object} incoming a single draft (old shape) or a map of them
+ * @returns {Object} map
+ */
+function practiceDraftMerge(map, incoming) {
+  if (!incoming || typeof incoming !== 'object') return map;
+  const list = incoming.challengeId ? [incoming] : Object.values(incoming);
+  list.forEach(d => {
+    if (!d || typeof d !== 'object' || !d.challengeId || !d.variantId) return;
+    const k = _practiceDraftKey(d.challengeId, d.variantId);
+    if (!map[k] || (map[k].savedAt || 0) < (d.savedAt || 0)) map[k] = d;
+  });
+  return map;
+}
+
+/** Write the map back, keeping only the newest PRACTICE_DRAFTS_MAX. Throws on quota. */
+function practiceDraftStore(map) {
+  Object.keys(map)
+    .sort((a, b) => (map[b].savedAt || 0) - (map[a].savedAt || 0))
+    .slice(PRACTICE_DRAFTS_MAX)
+    .forEach(k => { delete map[k]; });
+  localStorage.setItem(PRACTICE_DRAFTS_KEY, JSON.stringify(map));
+}
+
+/** Every kept draft, keyed by challenge::variant. Moves an old single draft in. */
+function practiceDraftMap() {
+  let map = {};
+  try {
+    const m = JSON.parse(localStorage.getItem(PRACTICE_DRAFTS_KEY) || 'null');
+    if (m && typeof m === 'object' && !Array.isArray(m)) map = m;
+  } catch (e) { /* unreadable: start a new map */ }
+  let old = null;
+  try { old = localStorage.getItem(PRACTICE_DRAFT_KEY); } catch (e) { /* no storage */ }
+  if (old) {
+    try { practiceDraftMerge(map, JSON.parse(old)); } catch (e) { /* unreadable old draft */ }
+    try { practiceDraftStore(map); localStorage.removeItem(PRACTICE_DRAFT_KEY); } catch (e) { /* keep the old key */ }
+  }
+  return map;
+}
+
+/** The kept drafts, newest first. */
+function practiceDraftList() {
+  const m = practiceDraftMap();
+  return Object.keys(m).map(k => m[k]).sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+}
+
+/** The newest draft of any version of this program, or null. */
+function practiceDraftForChallenge(challengeId) {
+  return practiceDraftList().find(d => d.challengeId === challengeId) || null;
+}
+
+/** Remove the drafts of a program (one version when variantId is given). */
+function practiceDraftRemove(challengeId, variantId) {
+  const m = practiceDraftMap();
+  Object.keys(m).forEach(k => {
+    const d = m[k];
+    if (d && d.challengeId === challengeId && (variantId == null || d.variantId === variantId)) delete m[k];
+  });
+  try { practiceDraftStore(m); } catch (e) { /* nothing more to do */ }
+}
 
 function _practiceWriteDraft() {
   try {
     if (!state.activeChallenge || !state.activeVariant) return;
-    localStorage.setItem(PRACTICE_DRAFT_KEY, JSON.stringify({
+    const map = practiceDraftMap();
+    map[_practiceDraftKey(state.activeChallenge.id, state.activeVariant.id)] = {
       challengeId: state.activeChallenge.id,
       variantId: state.activeVariant.id,
       title: state.activeChallenge.title || '',
@@ -397,16 +469,13 @@ function _practiceWriteDraft() {
       // id as well as name: it is what lets a renamed file still be matched to
       // the variant file it came from, and so keep its starter code.
       files: (state.userFiles || []).map(f => ({ id: f.id, name: f.name, ext: f.ext, userCode: f.userCode || '' }))
-    }));
+    };
+    practiceDraftStore(map);
   } catch (e) { /* quota — the session copy still covers a reload */ }
 }
 
 function _practiceReadDraft(challengeId, variantId) {
-  try {
-    const d = JSON.parse(localStorage.getItem(PRACTICE_DRAFT_KEY) || 'null');
-    if (!d || d.challengeId !== challengeId || d.variantId !== variantId) return null;
-    return d;
-  } catch (e) { return null; }
+  return practiceDraftMap()[_practiceDraftKey(challengeId, variantId)] || null;
 }
 
 /** What the draft carries about the clock: active time used, hints, pause. */
@@ -420,8 +489,10 @@ function _practiceClockFields() {
   };
 }
 
+/** This attempt's draft only; every other program's stays. */
 function _practiceClearDraft() {
-  try { localStorage.removeItem(PRACTICE_DRAFT_KEY); } catch (e) { /* nothing to clear */ }
+  if (!state.activeChallenge || !state.activeVariant) return;
+  practiceDraftRemove(state.activeChallenge.id, state.activeVariant.id);
 }
 
 function _practiceAutoSave() {

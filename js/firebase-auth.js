@@ -658,7 +658,7 @@ async function _loadV2Domains(uid) {
   if (stashDoc.exists) {
     const st = stashDoc.data();
     state.codingStash = st.codingStash || state.codingStash || null;
-    _restoreDraft('ssp.practiceDraft', st.practiceDraft);
+    _restorePracticeDrafts(st.practiceDraft);
     _restoreDraft('ssp.sqlAttemptDraft', st.sqlDraft);
     _restoreDraft('npAttemptInProgress', st.npDraft);
   }
@@ -790,7 +790,7 @@ function _restoreV1Data(data) {
   state.langRun = parsed.langRun || state.langRun || null;
   state.codingStash = parsed.codingStash || state.codingStash || null;
   state.mistakes = Array.isArray(parsed.mistakes) ? parsed.mistakes : (state.mistakes || []);
-  _restoreDraft('ssp.practiceDraft', parsed.practiceDraft);
+  _restorePracticeDrafts(parsed.practiceDraft);
   _restoreDraft('ssp.sqlAttemptDraft', parsed.sqlDraft);
   _restoreDraft('npAttemptInProgress', parsed.npDraft);
 
@@ -1157,7 +1157,8 @@ async function saveToFirestore(uid) {
        reason. */
     const stashPayload = _sanitizeForFirestore({
       codingStash: state.codingStash || null,
-      practiceDraft: _draftForCloud('ssp.practiceDraft'),
+      // The map of program drafts (practice.js); one per program now.
+      practiceDraft: (typeof practiceDraftMap === 'function') ? practiceDraftMap() : _draftForCloud('ssp.practiceDraft'),
       sqlDraft: _draftForCloud('ssp.sqlAttemptDraft'),
       /* The notebook attempt too. Home lists all three under Resume, from
          the same keys that resume them, but only two of them travelled --
@@ -1384,6 +1385,18 @@ function _restoreDraft(key, incoming) {
     }
     localStorage.setItem(key, JSON.stringify(incoming));
   } catch (e) { /* private mode, or a draft too big to store */ }
+}
+
+/**
+ * Program drafts from the cloud, merged per program: the newer savedAt wins for
+ * each one, so a draft that only this device has is never dropped. Takes the
+ * map, or the single draft older releases sent.
+ */
+function _restorePracticeDrafts(incoming) {
+  if (!incoming || typeof incoming !== 'object') return;
+  if (typeof practiceDraftMap !== 'function') { _restoreDraft('ssp.practiceDraft', incoming); return; }
+  try { practiceDraftStore(practiceDraftMerge(practiceDraftMap(), incoming)); }
+  catch (e) { /* private mode, or too big to store */ }
 }
 
 function scheduleCloudSave() {

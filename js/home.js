@@ -424,8 +424,10 @@ function _homeRecentEntries() {
 function _homeUnfinished() {
   const out = [];
   try {
-    const d = JSON.parse(localStorage.getItem('ssp.practiceDraft') || 'null');
-    if (d && d.challengeId && (d.files || []).some(f => (f.userCode || '').trim())) {
+    // The newest kept program draft; one card, so one program (practice.js).
+    const d = (typeof practiceDraftList === 'function' ? practiceDraftList() : [])
+      .find(x => x && x.challengeId && (x.files || []).some(f => (f.userCode || '').trim()));
+    if (d) {
       out.push({ kind: 'coding', label: 'Coding', icon: 'code-2',
         title: d.title || 'Untitled program', ts: d.savedAt || 0, itemId: d.challengeId });
     }
@@ -517,7 +519,7 @@ function renderHomeContinue() {
         <i data-lucide="play"></i><span>Continue</span>
       </button>
       <button class="hc-dismiss" title="Discard this draft" aria-label="Discard this draft"
-              onclick="event.stopPropagation(); homeDiscardDraft('${u.kind}')"><i data-lucide="x"></i></button>
+              onclick="event.stopPropagation(); homeDiscardDraft('${u.kind}','${u.itemId}')"><i data-lucide="x"></i></button>
     </div>`;
 
   host.innerHTML = `
@@ -551,10 +553,17 @@ function renderHomeContinue() {
 }
 
 /** Throw away a saved draft, with a confirm — it is unrecoverable. */
-window.homeDiscardDraft = function (kind) {
+window.homeDiscardDraft = function (kind, itemId) {
   showConfirm('Discard this draft?', 'The unfinished work in it cannot be recovered.', () => {
     try {
-      localStorage.removeItem(kind === 'coding' ? 'ssp.practiceDraft' : 'npAttemptInProgress');
+      if (kind === 'coding') {
+        // That program's draft only -- the others are kept attempts too.
+        if (typeof practiceDraftRemove === 'function') practiceDraftRemove(itemId);
+        const s = getSessionParam('autoSavedFiles');
+        if (s && s.challengeId === itemId) clearSessionParam('autoSavedFiles');
+      } else {
+        localStorage.removeItem('npAttemptInProgress');
+      }
     } catch (e) { /* nothing to remove */ }
     renderHomeContinue();
     renderRecentActivity();
