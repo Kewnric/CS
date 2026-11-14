@@ -51,6 +51,11 @@ function edOutdent(ws, unit) {
  * @param {number|[number,number]} [caret] final caret, or [start,end] selection
  */
 function edReplaceRange(textarea, from, to, text, caret) {
+  /* The one write path, so this guard covers every command. On a read-only
+     file execCommand fails, and the fallback below used to assign the value
+     anyway -- a locked file took brackets, Tab, Enter and Ctrl+/ on screen,
+     and Run compiled what it showed. */
+  if (textarea.readOnly) return false;
   textarea.focus();
   textarea.setSelectionRange(from, to);
   let ok = false;
@@ -70,6 +75,7 @@ function edReplaceRange(textarea, from, to, text, caret) {
   }
   if (Array.isArray(caret)) textarea.setSelectionRange(caret[0], caret[1]);
   else if (caret != null) textarea.setSelectionRange(caret, caret);
+  return true;
 }
 
 /** Expand a selection to whole lines. @returns {{start,end,text,lines}} */
@@ -478,11 +484,16 @@ function edFindStep(dir) {
   edFocusMatch();
 }
 
+function _edReadOnlyToast() {
+  if (typeof toast === 'function') toast('This file is read only.', { type: 'info' });
+}
+
 function edReplaceOne() {
   const ta = document.getElementById('editor-textarea');
   const find = document.getElementById('ed-find-input');
   const rep = document.getElementById('ed-replace-input');
   if (!ta || !find || _edFindIndex < 0) return;
+  if (ta.readOnly) { _edReadOnlyToast(); return; }
   const start = _edFindMatches[_edFindIndex];
   edReplaceRange(ta, start, start + find.value.length, rep.value, start + rep.value.length);
   edRunFind(true);
@@ -493,6 +504,7 @@ function edReplaceAll() {
   const find = document.getElementById('ed-find-input');
   const rep = document.getElementById('ed-replace-input');
   if (!ta || !find || !find.value || !_edFindMatches.length) return;
+  if (ta.readOnly) { _edReadOnlyToast(); return; }
   const n = _edFindMatches.length;
   const next = ta.value.split(find.value).join(rep.value);
   edReplaceRange(ta, 0, ta.value.length, next, 0);
@@ -772,6 +784,11 @@ function updateVal(newVal, cursorOffset, textarea, preCode, isPracticeMode, stat
    ============================================================ */
 function edTextEntry(textarea, key, shiftKey) {
   if (!textarea || !key) return false;
+  /* Read-only: hand the key back, and the browser's own default does nothing.
+     Except Tab, which is swallowed exactly as it is in an editable file --
+     handed back, it would move focus off the editor and the next Enter would
+     press whatever button it landed on. */
+  if (textarea.readOnly) return key === 'Tab';
   const value = textarea.value;
   const selectionStart = textarea.selectionStart;
   const selectionEnd = textarea.selectionEnd;
