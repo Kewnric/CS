@@ -878,6 +878,8 @@ function renderPracticeFileTabs() {
 }
 
 function savePracticeFileCode() {
+  // A starter still typing itself in is only part of the file on screen.
+  _starterAnimFlush();
   const textarea = document.getElementById('editor-textarea');
   if (!textarea || !state.userFiles) return;
   /* Belt and braces. The textarea is read-only so it should not have changed,
@@ -928,12 +930,7 @@ function loadPracticeFile(fi, opts) {
     setupSpecificEditor('editor-textarea', 'editor-pre', 'editor-code', true);
   }
 
-  /* readOnly rather than disabled: the text stays selectable and copyable,
-     which is the point of a file you were given to read. */
-  textarea.readOnly = !!file.locked;
-  textarea.classList.toggle('is-locked', !!file.locked);
-  const area = document.querySelector('.editor-container');
-  if (area) area.classList.toggle('has-locked-file', !!file.locked);
+  _practiceSyncLock(file);
 
   // Update boss bar for this file. Both reads go through the reconstructed
   // source: with a block collapsed the textarea is only part of the file, and
@@ -963,6 +960,20 @@ function loadPracticeFile(fi, opts) {
 }
 
 
+
+/** Read-only, and visibly so, exactly when the file on screen is locked.
+    readOnly rather than disabled: the text stays selectable and copyable,
+    which is the point of a file you were given to read. */
+function _practiceSyncLock(file) {
+  const textarea = document.getElementById('editor-textarea');
+  const locked = !!(file && file.locked);
+  if (textarea) {
+    textarea.readOnly = locked;
+    textarea.classList.toggle('is-locked', locked);
+  }
+  const area = document.querySelector('.editor-container');
+  if (area) area.classList.toggle('has-locked-file', locked);
+}
 
 /* Add / Rename / Delete a companion file. The dialog itself lives in
    file-dialog.js — this is only the practice page's half of the contract. */
@@ -1101,6 +1112,10 @@ function practiceRestoreFile(fi) {
   const f = state.userFiles[fi];
   const name = f.name + f.ext;
   const go = () => {
+    // Keep what is on screen if it is another file; this one is replaced.
+    if (fi !== state.activeFileIndex) savePracticeFileCode();
+    // The text is being replaced, so its folds no longer describe it.
+    else if (typeof edFoldReset === 'function') edFoldReset();
     f.userCode = f.starterCode || '';
     loadPracticeFile(state.activeFileIndex, { restored: true });
     renderPracticeFileTabs();
@@ -1177,6 +1192,31 @@ function _starterAnimRunning() {
  * The guard on createdAt is against the very click that opened the attempt
  * also finishing the animation before it has drawn a character.
  */
+/**
+ * Finish a running starter fill NOW, synchronously: the whole starter goes into
+ * the editor and the animator is dropped.
+ *
+ * Skip (complete()) is not enough for anything that reads the editor next: it
+ * lets the loop finish on its next frame, so a tab switch or a Run in the same
+ * call still read the part typed so far -- and saved it, cutting the file down
+ * to its first line or two.
+ */
+function _starterAnimFlush() {
+  const anim = _starterAnimator;
+  if (!anim || anim._aborted || typeof anim.targetCode !== 'string') return;
+  const textarea = document.getElementById('editor-textarea');
+  const preCode = document.getElementById('editor-code');
+  anim.abort();
+  _starterAnimator = null;
+  if (!textarea) return;
+  textarea.value = anim.targetCode;
+  if (preCode) preCode.innerHTML = syntaxHighlight(anim.targetCode) + '<br/>';
+  state.userCode = anim.targetCode;
+  // Supersedes the fill's last debounced boss update, which carries the partial text.
+  updateBossHealthBar(anim.targetCode);
+  if (typeof updateLineNumbers === 'function') updateLineNumbers(textarea);
+}
+
 function _starterAnimSkip() {
   if (!_starterAnimRunning()) return;
   if (_starterAnimator.createdAt && (Date.now() - _starterAnimator.createdAt < 50)) return;
@@ -1232,11 +1272,13 @@ async function animateStarterCode(code, textarea, preCode) {
     _starterAnimator.createdAt = Date.now();
 
     // Sync state as animation progresses
-    await _starterAnimator.animate(code, preCode, textarea, syntaxHighlight);
+    const anim = _starterAnimator;
+    await anim.animate(code, preCode, textarea, syntaxHighlight);
     /* Released once it is over. Neither _aborted nor _forceComplete is set by
        a natural finish, so without this the animator sat there looking like a
-       live one and every later click called complete() on a corpse. */
-    _starterAnimator = null;
+       live one and every later click called complete() on a corpse. Only if it
+       is still this one: a newer fill may have started while this one ran. */
+    if (_starterAnimator === anim) _starterAnimator = null;
   } else {
     // Fallback if animation class is missing
     textarea.value = code;
@@ -1840,20 +1882,20 @@ function retryPractice() {
     : (variant.files ? (variant.files[0]?.starterCode || '') : (variant.starterCode || ''));
 
   const textarea = document.getElementById('editor-textarea');
-  const preCode = document.getElementById('editor-code');
-  const starterCode = state.userCode;
 
   // A fresh attempt: the old folds describe code that no longer exists.
   if (typeof edFoldReset === 'function') edFoldReset();
 
-  if (starterCode && typeof SyntaxTextAnimator !== 'undefined') {
-    textarea.value = '';
-    preCode.innerHTML = '<br/>';
-    animateStarterCode(starterCode, textarea, preCode);
-  } else {
-    textarea.value = starterCode;
-    preCode.innerHTML = typeof syntaxHighlight === 'function' ? syntaxHighlight(starterCode) + '<br/>' : starterCode + '<br/>';
-  }
+  /* Opened the way the attempt opens a file, through loadPracticeFile, rather
+     than by writing the textarea here. Writing it directly skipped the lock and
+     the per-file input handler, so a retry from a locked tab left file 1 on
+     screen in an editor that was still read-only. An empty file with a starter
+     is what loadPracticeFile fills in with the animation. */
+  const first = state.userFiles && state.userFiles[0];
+  if (first && !first.locked && !recall) first.userCode = '';
+  if (first) loadPracticeFile(0, { restored: true });
+  // A tab closed before the next autosave must not bring the old attempt back.
+  _practiceClearDraft();
 
   renderPracticeFileTabs();
   state.sessionData.startTime = Date.now();
@@ -3289,6 +3331,8 @@ function _termSetFloating(overlay, on, auto) {
 }
 
 function runCodeWithPiston(seedStdin) {
+  // Run what the file IS, not the part of the starter typed in so far.
+  _starterAnimFlush();
   const textarea = document.getElementById('editor-textarea');
   if (!textarea) return;
   /* Counted, never gated -- the budget is there to be noticed, not obeyed.
@@ -4747,25 +4791,11 @@ function _practicePaintPaused(on) {
 // ── Per-File Reset ──
 function resetSingleFile(fi) {
   if (!state.userFiles || fi >= state.userFiles.length) return;
-  const file = state.userFiles[fi];
-  const fileName = file.name + file.ext;
-
-  showConfirm('Reset File', `Reset "${fileName}" to its starter code? This won't affect other files or the timer.`, () => {
-    // This file's text is being replaced, so its folds no longer describe it.
-    if (typeof edFoldReset === 'function') edFoldReset();
-    const variant = state.activeVariant;
-    const originalFile = variant.files ? variant.files[fi] : null;
-    state.userFiles[fi].userCode = originalFile ? (originalFile.starterCode || '') : '';
-
-    if (fi === state.activeFileIndex) {
-      loadPracticeFile(fi);
-    } else {
-      renderPracticeFileTabs();
-    }
-
-    const textarea = document.getElementById('editor-textarea');
-    if (textarea) updateBossHealthBar(textarea.value);
-  });
+  /* The same path as the right-click "Reset to starter code". This one used to
+     reset the file and then reload it through loadPracticeFile's own save,
+     which wrote the editor's text straight back over the reset -- so the tab's
+     reset button did nothing at all on the file you had open. */
+  practiceRestoreFile(fi);
 }
 
 // ── Hint System ──

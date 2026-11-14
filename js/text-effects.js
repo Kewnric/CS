@@ -180,6 +180,8 @@ class SyntaxTextAnimator {
   async animate(code, preCode, textarea, highlighter) {
     this._aborted = false;
     this._forceComplete = false;
+    // What the fill is heading for, so a caller can finish it at once.
+    this.targetCode = code;
 
     // 1. Pre-render the full syntax-highlighted HTML
     const fullHTML = highlighter(code);
