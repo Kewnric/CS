@@ -329,8 +329,22 @@ function _ppExecHtml() {
 // ── Actions ──
 
 /** Top-bar "Check Code" → run all minimum requirements + test cases for the current problem. */
+/* Set while a Check Code is in flight. A second press used to start a second
+   run, which saved the spinner as the button's label -- so the button read
+   "Checking…" for good -- and stored two restore points for one check. */
+let _ppChecking = false;
+
 async function ppRunAllChecks() {
-  if (!_ppCtx) return;
+  if (!_ppCtx || _ppChecking) return;
+  _ppChecking = true;
+  try { await _ppRunAllChecksNow(); }
+  finally { _ppChecking = false; }
+}
+
+async function _ppRunAllChecksNow() {
+  // The problem this check is for. A set can switch problems while it runs.
+  const ctx = _ppCtx;
+  const at = ctx.current ? ctx.current() : 0;
   if (typeof psfxWorkStart === 'function') psfxWorkStart();
   // A mode whose answers are not compiled brings its own checker. SQL practice
   // compares text against a reference answer; there is nothing to build and
@@ -349,50 +363,67 @@ async function ppRunAllChecks() {
   const checkBtn = document.getElementById('pp-check-btn')
     || document.getElementById(_ppCtx.mode === 'set' ? 'pset-check-btn' : 'practice-check-btn');
   if (checkBtn) { checkBtn.disabled = true; checkBtn._orig = checkBtn.innerHTML; checkBtn.innerHTML = '<i data-lucide="loader" class="run-code-spinner" style="width:16px;height:16px;"></i> Checking…'; if (typeof lucide !== 'undefined') lucide.createIcons({ root: checkBtn }); }
+  // Put back however this ends, so a thrown error cannot leave it spinning.
+  const restoreBtn = () => {
+    if (checkBtn && checkBtn._orig != null) {
+      checkBtn.disabled = false;
+      checkBtn.innerHTML = checkBtn._orig;
+      checkBtn._orig = null;
+      if (typeof lucide !== 'undefined') lucide.createIcons({ root: checkBtn });
+    }
+  };
+  let check, reqs, tests, testResults, testsPassed;
+  try {
+    reqs = (_ppCtx.minReqs() || []).map(r => ({ type: r.type, ok: evalMinRequirement(r.type, codeNow) }));
+    tests = _ppCtx.tests() || [];
+    testResults = [];
+    testsPassed = 0;
+    let compileOk;
+    if (tests.length) {
+      try { testResults = await runTestCases(tests, codeNow); }
+      catch (e) { testResults = tests.map(t => ({ name: t.name, hidden: t.hidden, passed: false, expected: t.expected, actual: '', error: 'Could not run' })); }
+      testsPassed = testResults.filter(r => r.passed).length;
+    } else {
+      // No tests → compile-check so the score still means something.
+      let ok = false;
+      // Through runTestCases' cache, and through its Godbolt-to-xcc fallback,
+      // rather than a second copy of both here.
+      try { const probe = await runCompileProbe(codeNow); ok = !!(probe && probe.didExecute); }
+      catch (e) { ok = false; }
+      testResults = [{ name: 'Compiles & runs', hidden: false, passed: ok, expected: '', actual: '', error: ok ? '' : 'Does not compile' }];
+      testsPassed = ok ? 1 : 0;
+      compileOk = ok;   // remembered so a later per-row ▶ can't zero this half (_ppRecount)
+    }
 
-  const reqs = (_ppCtx.minReqs() || []).map(r => ({ type: r.type, ok: evalMinRequirement(r.type, codeNow) }));
-  const tests = _ppCtx.tests() || [];
-  let testResults = [];
-  let testsPassed = 0;
-  let compileOk;
-  if (tests.length) {
-    try { testResults = await runTestCases(tests, codeNow); }
-    catch (e) { testResults = tests.map(t => ({ name: t.name, hidden: t.hidden, passed: false, expected: t.expected, actual: '', error: 'Could not run' })); }
-    testsPassed = testResults.filter(r => r.passed).length;
-  } else {
-    // No tests → compile-check so the score still means something.
-    let ok = false;
-    // Through runTestCases' cache, and through its Godbolt-to-xcc fallback,
-    // rather than a second copy of both here.
-    try { const probe = await runCompileProbe(codeNow); ok = !!(probe && probe.didExecute); }
-    catch (e) { ok = false; }
-    testResults = [{ name: 'Compiles & runs', hidden: false, passed: ok, expected: '', actual: '', error: ok ? '' : 'Does not compile' }];
-    testsPassed = ok ? 1 : 0;
-    compileOk = ok;   // remembered so a later per-row ▶ can't zero this half (_ppRecount)
-  }
+    const reqsOk = reqs.filter(r => r.ok).length;
+    const total = (tests.length || 1) + reqs.length;
+    const passed = testsPassed + reqsOk;
+    const allPass = passed === total;
 
-  const reqsOk = reqs.filter(r => r.ok).length;
-  const total = (tests.length || 1) + reqs.length;
-  const passed = testsPassed + reqsOk;
-  const allPass = passed === total;
+    check = { ts: Date.now(), codeKey: codeNow, reqs, tests: tests.length ? testResults : [], passed, total, allPass, compileOk,
+                    testScore: tests.length ? Math.round((testsPassed / tests.length) * 100) : (testsPassed ? 100 : 0) };
 
-  const check = { ts: Date.now(), codeKey: codeNow, reqs, tests: tests.length ? testResults : [], passed, total, allPass, compileOk,
-                  testScore: tests.length ? Math.round((testsPassed / tests.length) * 100) : (testsPassed ? 100 : 0) };
-  if (_ppCtx.setCheck) _ppCtx.setCheck(check);
-  // Fresh results — let the new failures open themselves again.
-  _ppRowChoice = {};
+    /* The screen moved on while this ran -- another problem, or another page.
+       setCheck writes to whatever is current NOW, so storing this would put
+       problem A's verdict on problem B. */
+    if (_ppCtx !== ctx || (ctx.current ? ctx.current() : 0) !== at) {
+      if (typeof psfxWorkStop === 'function') psfxWorkStop();
+      if (_ppCtx === ctx && typeof toast === 'function') {
+        toast('That check finished after you moved to another problem. Check again to see its result.', { type: 'info' });
+      }
+      return;
+    }
+    if (_ppCtx.setCheck) _ppCtx.setCheck(check);
+    // Fresh results — let the new failures open themselves again.
+    _ppRowChoice = {};
 
-  // Save a restore point keyed to this check's overall score (reqs + tests).
-  if (_ppCtx.pushExec && _ppCtx.snapshot) {
-    const overall = total > 0 ? Math.round((passed / total) * 100) : 0;
-    _ppCtx.pushExec({ score: overall, ts: check.ts, snapshot: _ppCtx.snapshot(), label: `Check · ${passed}/${total} passed` });
-  }
-
-  if (checkBtn && checkBtn._orig != null) {
-    checkBtn.disabled = false;
-    checkBtn.innerHTML = checkBtn._orig;
-    checkBtn._orig = null;
-    if (typeof lucide !== 'undefined') lucide.createIcons({ root: checkBtn });
+    // Save a restore point keyed to this check's overall score (reqs + tests).
+    if (_ppCtx.pushExec && _ppCtx.snapshot) {
+      const overall = total > 0 ? Math.round((passed / total) * 100) : 0;
+      _ppCtx.pushExec({ score: overall, ts: check.ts, snapshot: _ppCtx.snapshot(), label: `Check · ${passed}/${total} passed` });
+    }
+  } finally {
+    restoreBtn();
   }
   renderPracticePanel();
 
@@ -412,7 +443,7 @@ async function ppRunAllChecks() {
   /* Everything passed: the answer is right, whatever the similarity bar makes
      of it. Fired after the per-row reactions have run down the list, so the
      crit lands on the end of them rather than over the top. */
-  if (allPass && typeof bossCorrectnessWin === 'function') {
+  if (check.allPass && typeof bossCorrectnessWin === 'function') {
     const lead = reqLead + (tests.length ? tests.length * 90 : 0) + 220;
     setTimeout(() => bossCorrectnessWin(), lead);
   }
