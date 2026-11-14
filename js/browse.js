@@ -2047,6 +2047,7 @@ function shareChallenge(challengeId) {
         hidden: !!t.hidden
       })),
       minRequirements: (v.minRequirements || []).map(r => ({ type: r.type })),
+      hints: (v.hints || []).slice(),
       files: (v.files || []).map(f => ({
         name: f.name,
         ext: f.ext,
@@ -2126,6 +2127,7 @@ function importSharedChallenge(shared) {
       samples: v.samples || [],
       tests: v.tests || [],
       minRequirements: v.minRequirements || [],
+      hints: Array.isArray(v.hints) ? v.hints.slice() : [],
       activeFileIndex: 0,
       // Older links carry no files array; rebuild one from the flat code so the
       // editor always has something to open.
