@@ -146,6 +146,9 @@ html[data-motion="off"]::view-transition-new(*) {
 @keyframes mxOutToLeft { to { opacity: 0; translate: calc(-32px * var(--mx-travel)) 0; } }
 @keyframes mxOutToBottom { to { opacity: 0; translate: 0 calc(32px * var(--mx-travel)); } }
 @keyframes mxOutToTop { to { opacity: 0; translate: 0 calc(-32px * var(--mx-travel)); } }
+/* The same two by `transform`, for a window whose `translate` is its place. */
+@keyframes mxInFromTopT { from { opacity: 0; transform: translateY(calc(-40px * var(--mx-travel))); } }
+@keyframes mxOutToTopT { to { opacity: 0; transform: translateY(calc(-32px * var(--mx-travel))); } }
 
 /* A ghost is a picture of something already gone. */
 [data-mx-ghost] {
@@ -246,6 +249,25 @@ html[data-motion="off"]::view-transition-new(*) {
       animation: mxOutToTop var(--mx-exit) var(--ease-exit) forwards !important;
     }
 
+    /* The coding attempt's dialogs (Leave, Finish, Retry, the result...) come
+       down the same way, so the screen has one way in and out from its Session
+       Setup on. js/mx-popups.js sets .mx-drop on a popup that opens there. */
+    .modal-overlay.mx-drop > .modal-content:not(.no-entry) {
+      animation: mxInFromTop var(--mx-enter) var(--ease-emphasis) backwards;
+    }
+    .modal-overlay.mx-drop > .modal-content.dlg-error {
+      animation:
+        mxInFromTop var(--mx-enter) var(--ease-emphasis) backwards,
+        shake 0.5s ease-in-out 0.16s;
+    }
+    .modal-overlay.mx-drop.hidden > .modal-content {
+      scale: none;
+      translate: 0 calc(-32px * var(--mx-travel));
+    }
+    .modal-overlay.mx-drop[data-mx-ghost] > .modal-content {
+      animation: mxOutToTop var(--mx-exit) var(--ease-exit) forwards !important;
+    }
+
     /* ══ 2. Layers whose scrim is the layer itself ═══════════════════════
        Pickers, the big editors, the attempt's sheets. The layer fades; the
        card on it grows from the origin. */
@@ -316,6 +338,14 @@ html[data-motion="off"]::view-transition-new(*) {
       animation: mxInFall var(--mx-enter) var(--ease-expo-out) backwards;
       animation-delay: calc(40ms + var(--mx-i, 0) * 30ms);
     }
+    /* And so do the coding attempt's (.mx-drop). The second selector is the
+       icon's, which outranks the first; the result window's stamp outranks
+       both by id and keeps its own. */
+    .modal-overlay.mx-drop:not(.hidden):not([data-mx-ghost]) > .modal-content:not(.no-entry) > *,
+    .modal-overlay.mx-drop:not(.hidden):not([data-mx-ghost]) > .modal-content:not(.no-entry) > .modal-icon {
+      animation: mxInFall var(--mx-enter) var(--ease-expo-out) backwards;
+      animation-delay: calc(40ms + var(--mx-i, 0) * 30ms);
+    }
   }
 }
 
@@ -361,6 +391,35 @@ html[data-motion="off"]::view-transition-new(*) {
     .run-code-overlay[data-mx-ghost] > .run-code-window,
     .demo-overlay[data-mx-ghost] > .demo-window {
       animation: mxOutOrigin var(--mx-exit) var(--ease-exit) forwards !important;
+    }
+
+    /* On the coding attempt (.mx-drop, js/mx-popups.js) its windows come down
+       from above like its Session Setup, and go back up. The terminal keeps
+       the place it was dragged to in its own `translate`, so these move by
+       `transform`, which adds to that place instead of sliding in from the
+       middle of the screen to it. */
+    .run-code-overlay.mx-drop > .run-code-window,
+    .demo-overlay.mx-drop > .demo-window {
+      animation: mxInFromTopT var(--mx-enter) var(--ease-emphasis) backwards;
+    }
+    .run-code-overlay.mx-drop[data-mx-ghost] > .run-code-window,
+    .demo-overlay.mx-drop[data-mx-ghost] > .demo-window {
+      animation: mxOutToTopT var(--mx-exit) var(--ease-exit) forwards !important;
+    }
+    /* The floating execution stack (placed by left/top, so `translate` is free). */
+    .sk-win.is-floating.mx-drop {
+      animation: mxInFromTop var(--mx-enter) var(--ease-emphasis) backwards;
+    }
+    .sk-win.is-floating.mx-drop[data-mx-ghost] {
+      animation: mxOutToTop var(--mx-exit) var(--ease-exit) forwards !important;
+    }
+    /* The cheat sheet, which otherwise grows out of the middle (editor.css).
+       Its close is a class and a 170 ms timer, not a ghost. */
+    .cheat-overlay.mx-drop > .cheat-page {
+      animation: mxInFromTop var(--mx-enter) var(--ease-emphasis) backwards;
+    }
+    .cheat-overlay.mx-drop.closing > .cheat-page {
+      animation: mxOutToTop 160ms var(--ease-exit) forwards;
     }
 
     /* The storage picker: the first thing on screen. The card used to spring

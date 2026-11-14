@@ -328,6 +328,11 @@ multi-problem, SQL, notebook), or Alt+Shift+S anywhere.
   A MutationObserver on `#spa-content` puts layers back after a pane re-renders (`ambSetContent`
   keeps them). Drags do their work once per frame, move by transform, and look up the pane under
   the pointer at most every 90 ms -- that lookup was 91% of a drag's cost.
+- **A sticker keeps to the nearer edge of its pane** (left/right, top/bottom), so fullscreen or a
+  resized pane does not leave one placed along the bottom floating mid-pane. `bw`/`bh` are the
+  pane's size when it was put down (`bh` 0 when the content scrolled: it rides with the content);
+  `x`/`y` are measured in that pane. Read the place through `_stkPos(it, host)`, never raw `it.x`.
+  A gesture first `_stkPin`s the sticker to the pane as it is, so x/y are exact while it runs.
 - Placements: localStorage `ssp.stickers` (other tabs follow via the `storage` event). Pictures:
   IndexedDB `ssp-stickers` (device only, not in the data export; Reset Data clears both). Huge
   pictures are scaled to 2000px once, as WebP.

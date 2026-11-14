@@ -234,9 +234,13 @@
 /* Dialogs and menus opened from inside the sheet.
    .cheat-overlay sits at z-index 10000; .modal-overlay is 1000 and .fd-overlay
    1200, so "Topics..." opened behind the sheet and looked like nothing had
-   happened. */
+   happened. The shared prompt is lifted by its id: `#dialog-modal { z-index:
+   1200 }` (components.css) outranks a class rule, so "New sheet" asked for its
+   name behind the library. It stays above the sheet's other dialogs too, as it
+   does everywhere else. */
 body.cheat-open .modal-overlay,
 body.cheat-open .fd-overlay { z-index: 10100; }
+body.cheat-open #dialog-modal { z-index: 10120; }
 body.cheat-open .tree-ctx { z-index: 10150; }
 
 /* ── Card covers and badges ───────────────────────────────── */

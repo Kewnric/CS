@@ -46,6 +46,14 @@
   ].join(',');
   const GHOST_SEL = OVERLAY_SEL + ',' + MENU_SEL;
   const MAX_GHOST_NODES = 2500;
+  // On these routes (the coding attempt) every popup comes down from above,
+  // the way the attempt's own Session Setup did on the way in, instead of
+  // growing out of the button pressed. Marked with .mx-drop (mx-core.css).
+  const DROP_ROUTES = ['practice', 'practice-set'];
+  // Windows this file otherwise leaves alone that drop all the same: the
+  // cheat sheet, and the execution stack when it floats (docked, it is put in
+  // the page, not the body, and keeps its slide in from the side).
+  const DROP_SEL = '.cheat-overlay, .sk-win';
 
   // The exits for .hidden shells are a `display` transition (mx-core.css).
   // dialogs.js asks, so it can drop its own scripted fade where this works.
@@ -97,6 +105,16 @@
     const y = fresh ? origin.y : window.innerHeight / 2;
     el.style.setProperty('--mx-ox', x.toFixed(1) + 'px');
     el.style.setProperty('--mx-oy', y.toFixed(1) + 'px');
+    markDrop(el);
+  }
+
+  // A class, not a route rule in the stylesheet: it is set as the popup opens
+  // and stays with it through its exit, and onto its ghost, so a dialog that
+  // closes by leaving the attempt ("Keep and leave") still goes back up
+  // rather than switching to the other exit halfway out.
+  function markDrop(el) {
+    const on = DROP_ROUTES.indexOf((document.body && document.body.dataset.route) || '') !== -1;
+    if (el.classList.contains('mx-drop') !== on) el.classList.toggle('mx-drop', on);
   }
 
   function isGhost(el) {
@@ -150,7 +168,9 @@
   }
 
   function adopt(el) {
-    if (el.nodeType !== 1 || isGhost(el) || el.matches(EXCLUDE_SEL)) return;
+    if (el.nodeType !== 1 || isGhost(el)) return;
+    if (el.matches(DROP_SEL)) { markDrop(el); return; }
+    if (el.matches(EXCLUDE_SEL)) return;
     if (!el.matches(OVERLAY_SEL) && !enlist(el)) return;
     watch(el);
     if (!el.classList.contains('hidden')) {

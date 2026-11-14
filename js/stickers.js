@@ -355,6 +355,58 @@ function _stkOrigin(host) {
   return { x: r.left + host.clientLeft - host.scrollLeft, y: r.top + host.clientTop - host.scrollTop };
 }
 
+/* ── Which edges a sticker keeps to ──────────────────────────
+   Panes change size under their stickers: fullscreen, a resized window, a
+   dragged seam. Measured from the top-left corner alone, a sticker set along
+   the bottom of the attempt's Tests pane was left floating mid-pane once
+   fullscreen made the pane taller. So each sticker keeps its distance to the
+   NEARER edge of its pane, left or right and top or bottom, as it was placed.
+
+   `bw` / `bh` are the pane's width and height when the sticker was last put
+   down; x / y are measured in that pane. `bh` is 0 when the pane's content
+   was taller than the pane: the sticker then rides with the content, which
+   stays where it is when the pane grows, so it keeps to the top. A sticker
+   from before this (no `bw`) takes the pane as it is the first time it shows. */
+
+/** Whether a pane's content fits in it without scrolling. Its own scrollHeight,
+ *  not _stkContentHeight: that reads its children's offsetTop, which is only
+ *  measured from the pane once _stkAttach has made it a positioned box, and a
+ *  pane seen for the first time or just dropped into has not been yet. The
+ *  sticker layers cannot inflate this: they are sized to the content and clip. */
+function _stkFits(host) {
+  if (!/(auto|scroll)/.test(getComputedStyle(host).overflowY)) return true;
+  return host.scrollHeight <= host.clientHeight + 1;
+}
+
+/** Where a sticker sits in its pane's content right now. `host` is the pane,
+ *  or anything with its clientWidth / clientHeight. */
+function _stkPos(it, host) {
+  let x = it.x, y = it.y;
+  if (host) {
+    const W = host.clientWidth, H = host.clientHeight;
+    if (it.bw > 0 && W > 0 && it.x + it.w / 2 > it.bw / 2) x += W - it.bw;
+    if (it.bh > 0 && H > 0 && it.y + it.h / 2 > it.bh / 2) y += H - it.bh;
+  }
+  return { x, y };
+}
+
+/** Note the pane's size as the one a sticker's x / y are measured in. */
+function _stkMeasure(it, host) {
+  if (!host || !host.clientWidth || !host.clientHeight) return false;
+  it.bw = host.clientWidth;
+  it.bh = _stkFits(host) ? host.clientHeight : 0;
+  return true;
+}
+
+/** Re-measure a sticker against its pane as it is now, without moving it. */
+function _stkPin(it, host) {
+  if (!host || !host.clientWidth || !host.clientHeight) return false;
+  const p = _stkPos(it, host);
+  it.x = Math.round(p.x);
+  it.y = Math.round(p.y);
+  return _stkMeasure(it, host);
+}
+
 /* ── Which stickers are on screen ────────────────────────── */
 
 function _stkVisible() {
@@ -489,12 +541,15 @@ function _stkEl(it) {
   return el;
 }
 
-function _stkSpillTf(it, o) {
-  return 'translate(' + (o.x + it.x) + 'px,' + (o.y + it.y) + 'px)' + (it.rot ? ' rotate(' + it.rot + 'deg)' : '');
+/** `o` is the pane's origin on screen, `p` the sticker's place in it (_stkPos). */
+function _stkSpillTf(it, o, p) {
+  return 'translate(' + (o.x + p.x) + 'px,' + (o.y + p.y) + 'px)' + (it.rot ? ' rotate(' + it.rot + 'deg)' : '');
 }
 
-/** Bring an element in line with its record, writing only what changed. */
-function _stkApply(it, el) {
+/** Bring an element in line with its record, writing only what changed.
+ *  `host` is the sticker's pane or its size as read ({ clientWidth,
+ *  clientHeight }); the pane is looked up when it is not given. */
+function _stkApply(it, el, host) {
   const c = el._stk || (el._stk = {});
   const set = (k, v, write) => { if (c[k] !== v) { c[k] = v; write(v); } };
   const img = _stkImgs.get(it.img);
@@ -524,8 +579,9 @@ function _stkApply(it, el) {
     }
   });
   if (!spill) {
-    set('x', it.x, v => { el.style.left = v + 'px'; });
-    set('y', it.y, v => { el.style.top = v + 'px'; });
+    const p = _stkPos(it, host || _stkFindHost(it.host));
+    set('x', p.x, v => { el.style.left = v + 'px'; });
+    set('y', p.y, v => { el.style.top = v + 'px'; });
     set('tf', it.rot ? 'rotate(' + it.rot + 'deg)' : '', v => { el.style.transform = v; });
   }
 }
@@ -543,13 +599,14 @@ function _stkPlaceSpill() {
     let o = origins.get(it.host);
     if (o === undefined) {
       const h = _stkFindHost(it.host);
-      o = h ? _stkOrigin(h) : null;
+      o = h ? { at: _stkOrigin(h), host: h } : null;
       origins.set(it.host, o);
     }
-    if (o) todo.push([el, it, o]);
+    // The place is read here too, with the other reads, not between writes.
+    if (o) todo.push([el, it, o.at, _stkPos(it, o.host)]);
   }
-  todo.forEach(([el, it, o]) => {
-    const v = _stkSpillTf(it, o);
+  todo.forEach(([el, it, o, p]) => {
+    const v = _stkSpillTf(it, o, p);
     const c = el._stk || (el._stk = {});
     if (c.stf !== v) { c.stf = v; el.style.transform = v; }
   });
@@ -574,9 +631,16 @@ function _stkSync() {
   const shown = new Set();
   const used = new Map();       // host -> { back: [], front: [] }
   const spill = [];
+  // Each pane's size, read here before anything below writes, so placing the
+  // stickers by their edges does not lay the page out once per sticker.
+  const boxes = new Map();
+  let pinned = false;
   for (const v of vis) {
     shown.add(v.it.id);
     if (_stkDrag && _stkDrag.id === v.it.id && _stkDrag.lifted) continue;   // being carried
+    if (!boxes.has(v.host)) boxes.set(v.host, { clientWidth: v.host.clientWidth, clientHeight: v.host.clientHeight });
+    // Placed before stickers kept to an edge: the pane as it is now is the one it was put on.
+    if (v.it.bw == null && _stkPin(v.it, v.host)) pinned = true;
     if (v.it.edge === 'spill') { spill.push(v.it); continue; }
     let u = used.get(v.host);
     if (!u) used.set(v.host, u = { back: [], front: [] });
@@ -595,7 +659,7 @@ function _stkSync() {
       list.forEach((it, i) => {
         const el = _stkEl(it);
         if (L.children[i] !== el) L.insertBefore(el, L.children[i] || null);
-        _stkApply(it, el);
+        _stkApply(it, el, boxes.get(host));
       });
       while (L.children.length > list.length) L.lastElementChild.remove();
     });
@@ -616,6 +680,7 @@ function _stkSync() {
   const f = document.getElementById('stk-float');
   if (f && !f.firstChild && !_stkDrag) f.remove();
   _stkPlaceSpill();
+  if (pinned) _stkSave();
 
   if (_stkSel && !shown.has(_stkSel)) _stkSel = null;
   if (_stkSel || document.querySelector('#stk-ui .stk-frame:not([hidden])')) _stkUiUpdate();
@@ -716,7 +781,8 @@ function _stkScreenBox(it) {
   const host = _stkFindHost(it.host);
   if (!host) return null;
   const o = _stkOrigin(host);
-  return { x: o.x + it.x, y: o.y + it.y, w: it.w, h: it.h, rot: it.rot || 0, host };
+  const p = _stkPos(it, host);
+  return { x: o.x + p.x, y: o.y + p.y, w: it.w, h: it.h, rot: it.rot || 0, host };
 }
 
 function _stkUiUpdate() {
@@ -923,6 +989,9 @@ function _stkOnFrameDown(e) {
 function _stkBegin(e, it, kind, handle) {
   const host = _stkFindHost(it.host);
   if (!host) return;
+  // Measured against the pane as it is now, so for the length of the gesture
+  // x / y are exactly where it is drawn (_stkPos adds nothing).
+  _stkPin(it, host);
   const o = _stkOrigin(host);
   const d = {
     id: it.id, kind, pid: e.pointerId, sx: e.clientX, sy: e.clientY, host, ox: o.x, oy: o.y,
@@ -1019,9 +1088,13 @@ function _stkDragFrame() {
 
 /** During a resize or turn: the record's new size and angle, placed from the origin read when the gesture began. */
 function _stkApplyLive(it, el, d) {
-  _stkApply(it, el);
+  // Pinned when the gesture began, so x / y are its place as they stand. The
+  // pane's size is passed as the one it was pinned in, not read again once
+  // _stkApply has written the new size, which would lay out every frame.
+  const at = { x: it.x, y: it.y };
+  _stkApply(it, el, { clientWidth: it.bw, clientHeight: it.bh });
   if (it.edge === 'spill') {
-    const v = _stkSpillTf(it, { x: d.ox, y: d.oy });
+    const v = _stkSpillTf(it, { x: d.ox, y: d.oy }, at);
     el._stk.stf = v;
     el.style.transform = v;
   }
@@ -1041,9 +1114,10 @@ function _stkOnUp(e) {
   const it = _stkById(d.id);
   const el = _stkEls.get(d.id);
   if (it && d.moved) {
+    let host = d.host;
     if (d.kind === 'move' && !cancel) {
       const at = d.ev || { x: d.sx, y: d.sy };
-      let host = _stkHostAt(at.x, at.y) || d.host;
+      host = _stkHostAt(at.x, at.y) || d.host;
       if (!host.isConnected) host = d.host;
       const o = _stkOrigin(host);
       it.x = d.left - o.x;
@@ -1059,6 +1133,8 @@ function _stkOnUp(e) {
     }
     it.x = Math.round(it.x); it.y = Math.round(it.y);
     it.w = Math.round(it.w); it.h = Math.round(it.h);
+    // Put down: its nearer edges are now the ones it lies nearest in this pane.
+    _stkMeasure(it, host);
     _stkSave();
   }
   if (el && d.lifted) {
@@ -1105,6 +1181,7 @@ function _stkPlace(imgId, x, y) {
     x: Math.round(x - o.x - w / 2), y: Math.round(y - o.y - h / 2), w, h,
     rot: 0, op: 1, lock: false, edge: 'clip', layer: 'front', z: 1,
   };
+  _stkMeasure(it, host);
   it.z = _stkTopZ(it) + 1;
   _stkItems.push(it);
   _stkSave();
@@ -1268,7 +1345,7 @@ function _stkTrayPageRender(vis) {
 function _stkReveal(it) {
   const host = _stkFindHost(it.host);
   if (!host || !/(auto|scroll)/.test(getComputedStyle(host).overflowY)) return;
-  const top = it.y, bottom = it.y + it.h;
+  const top = _stkPos(it, host).y, bottom = top + it.h;
   if (top < host.scrollTop || bottom > host.scrollTop + host.clientHeight) {
     host.scrollTo({ top: Math.max(0, top - Math.max(16, (host.clientHeight - it.h) / 2)), behavior: 'smooth' });
   }
@@ -1591,8 +1668,18 @@ async function stkInit() {
         if (_stkHosts.has(t)) hosts.add(t);
         else if (t.parentElement && _stkHosts.has(t.parentElement)) hosts.add(t.parentElement);
       });
-      hosts.forEach(h => { if (h.isConnected) _stkSizeLayers(h); });
-      _stkOnScroll();
+      // A pane that changed size moves the stickers kept to its right or
+      // bottom edge (fullscreen, a dragged seam, a folded panel).
+      let resized = false;
+      hosts.forEach(h => {
+        if (!h.isConnected) return;
+        // Read before _stkSizeLayers writes, while this layout is still good.
+        const sz = h.clientWidth + 'x' + h.clientHeight;
+        if (h._stkSz !== sz) { if (h._stkSz) resized = true; h._stkSz = sz; }
+        _stkSizeLayers(h);
+      });
+      if (resized) _stkSync();
+      else _stkOnScroll();
     });
   }
   // A page or pane rebuilt by its own code takes the layers with it; put them back.
