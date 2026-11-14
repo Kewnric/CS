@@ -130,11 +130,15 @@ are different things — setting both to the same value makes the boss bar read
 reference `code`, per file. Max HP is the reference's significant-character
 count. No reference means no bar.
 
-**Run Code** (`preprocessMultiFile`) builds one translation unit: it inlines
-`#include "local.h"` from the file you are on, then links a companion `.c`
-**only if its matching header is in the unit** (`utils.c` ↔ `utils.h`). If
-nothing defines `main`, the file that does is pulled in. It deliberately does
-*not* compile every file present — that used to drag unrelated programs in.
+**Run Code** (`preprocessMultiFile` → `mergeTranslationUnit`) builds one
+translation unit: it inlines `#include "local.h"` from the file you are on,
+links a companion `.c` whose header is in the unit (`utils.c` ↔ `utils.h`),
+pulls in the file that defines `main` if nothing does yet, and then links every
+other source file **that has no `main` of its own** (a workshop's `cancel.c` has
+no header). A second file with its own `main` is another program and stays out.
+**Check Code and Finish** build the same unit from `entryFileIndex` (the file
+that defines `main`) rather than the open tab, so a check means the same code
+from every tab. Practice sets use the same function (`_psetMerge`).
 
 **Compilers:** two, and Run Code picks by `termEnginePref()` (the engine badge
 in the terminal's status bar toggles it; default `xcc`):

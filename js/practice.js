@@ -4304,14 +4304,52 @@ function preprocessMultiFile(code) {
   // Persist current editor content so we get the latest for every file
   savePracticeFileCode();
 
+  const files = state.userFiles.map((f, i) => (i === state.activeFileIndex ? { ...f, userCode: code } : f));
+  return mergeTranslationUnit(files, state.activeFileIndex);
+}
+
+/** A definition of main, not a mention of one: anchored to a line start, which
+    keeps printf("main") and a commented-out one out of it. */
+function _definesMain(src) {
+  return /^[\t ]*(?:int|void)\s+main\s*\(/m.test(src || '');
+}
+
+/**
+ * The file a program starts from: the first source file that defines main.
+ * Grading builds from here, so a check means the same code from every tab.
+ * @param {Array<{name:string, ext:string, userCode?:string}>} files
+ * @returns {number}
+ */
+function entryFileIndex(files) {
+  const i = (files || []).findIndex(f => (f.ext === '.c' || f.ext === '.cpp') && _definesMain(f.userCode));
+  return i < 0 ? 0 : i;
+}
+
+/**
+ * One translation unit out of an attempt's files. Pure: reads only `files`.
+ *   1. inline every #include "local" reachable from the base file, once each
+ *   2. link a companion .c to the header that declares it
+ *   3. if nothing defines main yet, bring in the file that does
+ *   4. then link every remaining source file that has no main of its own
+ * @param {Array<{name:string, ext:string, userCode?:string}>} files
+ * @param {number} baseIndex the file the unit is built from
+ * @returns {string}
+ */
+function mergeTranslationUnit(files, baseIndex) {
+  files = files || [];
+  const base = files[baseIndex] || files[0];
+  if (!base) return '';
+  const code = base.userCode || '';
+  if (files.length <= 1) return code;
+
   const included = new Set(); // track filenames already inlined
 
-  /** Recursively resolve #include "file" directives against userFiles */
+  /** Recursively resolve #include "file" directives against the files */
   function inlineIncludes(src) {
     return src.replace(/#include\s*"([^"]+)"/g, (match, filename) => {
       // Skip if already inlined (include-guard)
       if (included.has(filename)) return '/* already included ' + filename + ' */';
-      const file = state.userFiles.find(f => (f.name + f.ext) === filename);
+      const file = files.find(f => (f.name + f.ext) === filename);
       if (file && file.userCode != null) {
         included.add(filename);
         // Recursively resolve nested local includes inside this file
@@ -4325,16 +4363,11 @@ function preprocessMultiFile(code) {
   // Inline includes in the main file
   let result = inlineIncludes(code);
 
-  // The file you pressed Run on is already here; don't append it again.
-  const activeFile = state.userFiles[state.activeFileIndex];
-  if (activeFile) included.add(activeFile.name + activeFile.ext);
+  // The base file is already here; don't append it again.
+  included.add(base.name + base.ext);
 
   const isSource = (f) => f.ext === '.c' || f.ext === '.cpp';
   const hasBody = (f) => f.userCode != null && f.userCode.trim() !== '';
-  /* A DEFINITION of main, not a mention of one. Anchored to the start of a
-     line because that is where a definition is written, which keeps
-     printf("main") and a commented-out one out of it. */
-  const DEFINES_MAIN = /^[\t ]*(?:int|void)\s+main\s*\(/m;
 
   const append = (f, why) => {
     included.add(f.name + f.ext);
@@ -4352,13 +4385,13 @@ function preprocessMultiFile(code) {
 
      The pairing used here is the one C itself uses -- utils.c is the
      implementation of utils.h, so it belongs in the unit exactly when utils.h
-     is in the unit. A file that nothing includes is not part of this program.
+     is in the unit. (Step 4 below then adds the files no header names.)
 
      Repeated until nothing new arrives, since a file linked this way can
      include a header whose own .c then belongs here too. */
   const linkPass = () => {
     let added = false;
-    for (const f of state.userFiles) {
+    for (const f of files) {
       if (included.has(f.name + f.ext) || !isSource(f) || !hasBody(f)) continue;
       if (!included.has(f.name + '.h') && !included.has(f.name + '.hpp')) continue;
       append(f, 'linked: implements ' + f.name + '.h');
@@ -4375,12 +4408,27 @@ function preprocessMultiFile(code) {
 
      A file that DOES define its own main never reaches this, which is what
      lets a self-contained header run on its own. */
-  if (!DEFINES_MAIN.test(result)) {
-    const starter = state.userFiles.find(f =>
-      !included.has(f.name + f.ext) && isSource(f) && hasBody(f) && DEFINES_MAIN.test(f.userCode));
+  if (!_definesMain(result)) {
+    const starter = files.find(f =>
+      !included.has(f.name + f.ext) && isSource(f) && hasBody(f) && _definesMain(f.userCode));
     if (starter) {
       append(starter, 'linked: defines main');
       while (linkPass()) { /* headers the starter pulled in */ }
+    }
+  }
+
+  /* THE REST OF THE PROGRAM. A file with no header of its own was only ever in
+     the unit when it was the base, so a workshop's cancel.c -- declared in
+     listUtils.h, implemented in a file nothing includes -- was missing from
+     every unit built from another tab: Run on the driver failed to link, and
+     Check Code from a header tab failed every test. Once the unit has its
+     main, every other source file without a main is part of it, the way
+     `gcc *.c` builds it. A file that defines its own main is another program
+     and stays out. */
+  if (_definesMain(result)) {
+    for (const f of files) {
+      if (included.has(f.name + f.ext) || !isSource(f) || !hasBody(f) || _definesMain(f.userCode)) continue;
+      append(f, 'linked: rest of the program');
     }
   }
 
@@ -4539,10 +4587,18 @@ function _normalizeOutput(s) {
 }
 
 /** Merge the user's files into one translation unit for grading (savePracticeFileCode already ran). */
+/* Built from the file that defines main, not from whichever tab is open: it is
+   also the key a check is remembered under, and building it from the open tab
+   made a check on one file read as "not checked" from the next. */
 function _buildSubmissionSource() {
-  const entry = (state.userFiles && state.userFiles[state.activeFileIndex]) || null;
-  const base = entry ? (entry.userCode || '') : (state.userCode || '');
-  return preprocessMultiFile(base);
+  if (!state.userFiles || !state.userFiles.length) return state.userCode || '';
+  if (state.userFiles.length === 1) {
+    // One file: what is on screen, as Run Code has always used it.
+    const only = state.userFiles[0];
+    return only.userCode != null ? only.userCode : (state.userCode || '');
+  }
+  savePracticeFileCode();
+  return mergeTranslationUnit(state.userFiles, entryFileIndex(state.userFiles));
 }
 
 

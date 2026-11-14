@@ -384,28 +384,11 @@ function _psetSyncEditor() {
     append companion .c) — pure, never touches the editor (safe for grading any problem). */
 function _psetMerge(p) {
   const files = p.files || [];
-  const main = files[0] || { userCode: p.userCode || '' };
-  if (files.length <= 1) return main.userCode || '';
-  const included = new Set();
-  function inline(src) {
-    return (src || '').replace(/#include\s*"([^"]+)"/g, (m, fn) => {
-      if (included.has(fn)) return '/* already included ' + fn + ' */';
-      const f = files.find(x => (x.name + x.ext) === fn);
-      if (f && f.userCode != null) { included.add(fn); return inline(f.userCode); }
-      return m;
-    });
-  }
-  let result = inline(main.userCode || '');
-  included.add(main.name + main.ext);
-  for (const f of files) {
-    const full = f.name + f.ext;
-    if (included.has(full)) continue;
-    if (f.ext !== '.c' && f.ext !== '.cpp') continue;
-    if (!f.userCode || !f.userCode.trim()) continue;
-    included.add(full);
-    result += '\n\n/* ── ' + full + ' (auto-linked) ── */\n' + inline(f.userCode);
-  }
-  return result;
+  if (files.length <= 1) return (files[0] || { userCode: p.userCode || '' }).userCode || '';
+  /* The same unit the program screen grades and runs (practice.js). This used
+     to be a copy of its own that appended every .c file, a second main
+     included, so Check and Run could compile two different programs. */
+  return mergeTranslationUnit(files, entryFileIndex(files));
 }
 
 function _psetFmt(secs) {

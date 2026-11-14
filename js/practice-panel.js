@@ -445,6 +445,18 @@ function _ppRecount(check) {
   return check;
 }
 
+/**
+ * A row run on code the check was not made on: the other rows describe that
+ * older code, so they go. Keeping them and stamping the new key on the check
+ * is how one passing row on an empty program recorded the whole old 100%.
+ */
+function _ppDropStaleRows(check, codeNow, testCount) {
+  if (!check || check.codeKey == null || check.codeKey === codeNow) return;
+  check.tests = Array.from({ length: testCount }, () => null);
+  check.reqs = [];
+  check.compileOk = undefined;
+}
+
 /** Run a single test case (▶ on the row). */
 async function ppRunTest(ti) {
   if (!_ppCtx) return;
@@ -457,6 +469,7 @@ async function ppRunTest(ti) {
   catch (e) { res = { name: t.name, hidden: t.hidden, passed: false, expected: t.expected, actual: '', error: 'Could not run' }; }
 
   const check = (_ppCtx.getCheck && _ppCtx.getCheck()) || { ts: Date.now(), codeKey: codeNow, reqs: [], tests: tests.map(() => null), passed: 0, total: 0 };
+  _ppDropStaleRows(check, codeNow, tests.length);
   if (!Array.isArray(check.tests) || check.tests.length !== tests.length) check.tests = tests.map(() => null);
   check.tests[ti] = res;
   check.codeKey = codeNow;
@@ -476,6 +489,7 @@ function ppRunMinReq(ri) {
   const codeNow = _ppCtx.code();
   const ok = evalMinRequirement(r.type, codeNow);
   const check = (_ppCtx.getCheck && _ppCtx.getCheck()) || { ts: Date.now(), codeKey: codeNow, reqs: [], tests: [], passed: 0, total: 0 };
+  _ppDropStaleRows(check, codeNow, ((_ppCtx.tests && _ppCtx.tests()) || []).length);
   if (!Array.isArray(check.reqs)) check.reqs = [];
   const existing = check.reqs.find(x => x.type === r.type);
   if (existing) existing.ok = ok; else check.reqs.push({ type: r.type, ok });
