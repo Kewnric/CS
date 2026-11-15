@@ -493,6 +493,39 @@ function countNoun(n, noun) {
   return n + ' ' + noun + (n === 1 ? '' : 's');
 }
 
+/**
+ * How long ago `then` was, in every unit that is not zero:
+ * "5 minutes", "3 days, 2 hours", "1 year, 2 months, 4 minutes".
+ * Years and months are calendar ones (15 Oct -> 15 Nov is 1 month), the rest
+ * is counted from there. Rounded to the nearest minute, and never under one.
+ * @param {number} then ms timestamp @param {number} [now] ms timestamp
+ */
+function elapsedSinceText(then, now) {
+  now = now == null ? Date.now() : now;
+  const mins = Math.max(1, Math.round((now - (then || now)) / 60000));
+  const from = new Date(now - mins * 60000);
+  const to = new Date(now);
+  // Same day of the month n months later, clamped (31 Jan + 1 month = 28/29 Feb).
+  const plusMonths = (d, n) => {
+    const r = new Date(d.getFullYear(), d.getMonth() + n, 1,
+      d.getHours(), d.getMinutes(), d.getSeconds(), d.getMilliseconds());
+    const last = new Date(r.getFullYear(), r.getMonth() + 1, 0).getDate();
+    r.setDate(Math.min(d.getDate(), last));
+    return r;
+  };
+  let months = (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth());
+  if (months > 0 && plusMonths(from, months) > to) months--;
+  const rest = Math.round((to - plusMonths(from, months)) / 60000);
+  const parts = [
+    ['year', Math.floor(months / 12)],
+    ['month', months % 12],
+    ['day', Math.floor(rest / 1440)],
+    ['hour', Math.floor((rest % 1440) / 60)],
+    ['minute', rest % 60]
+  ];
+  return parts.filter(([, n]) => n > 0).map(([u, n]) => countNoun(n, u)).join(', ');
+}
+
 /** @param {Function} fn @param {number} wait ms @returns {Function} debounced wrapper */
 function debounce(fn, wait) {
   let timer;

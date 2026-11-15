@@ -150,10 +150,10 @@ function initPractice() {
   state.timeLimit = effectiveLimit;
   const savedStart = restoredElapsed != null ? Date.now() - restoredElapsed : null;
   if (_restoredFromDisk) {
-    const mins = Math.max(1, Math.round((Date.now() - (_restoredFromDisk.savedAt || Date.now())) / 60000));
+    const savedAt = _restoredFromDisk.savedAt;
     setTimeout(() => {
       if (typeof toast === 'function') {
-        toast('Restored the code you had open ' + mins + ' minute' + (mins !== 1 ? 's' : '') + ' ago. Retry starts fresh.',
+        toast('Restored the code you had open ' + elapsedSinceText(savedAt) + ' ago. Retry starts fresh.',
           { type: 'info', duration: 7000 });
       }
     }, 700);

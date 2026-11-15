@@ -41,10 +41,10 @@ function psetInit() {
     const disk = _psetDraftMap()[set.id];
     if (disk) {
       restore = disk;
-      const mins = Math.max(1, Math.round((Date.now() - (disk.savedAt || Date.now())) / 60000));
+      const savedAt = disk.savedAt;
       setTimeout(() => {
         if (typeof toast === 'function') {
-          toast('Restored the set you had open ' + mins + ' minute' + (mins !== 1 ? 's' : '') + ' ago.',
+          toast('Restored the set you had open ' + elapsedSinceText(savedAt) + ' ago.',
             { type: 'info', duration: 6000 });
         }
       }, 700);
