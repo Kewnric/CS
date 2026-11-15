@@ -1160,6 +1160,9 @@ function practiceFileMenu(fi, anchor, e) {
     if (fi === 0) items.push(['reset', 'rotate-ccw', 'Reset to starter code', '']);
     else items.push(['delete', 'trash-2', 'Delete this file', '']);
   }
+  if (typeof fgOpen === 'function') {
+    items.push(['freeground', 'terminal', 'Open a copy in Freeground', 'Your code as it is now, to experiment on. The attempt is kept.']);
+  }
 
   const el = document.createElement('div');
   el.id = 'file-menu';
@@ -1187,11 +1190,21 @@ function practiceFileMenu(fi, anchor, e) {
     else if (act === 'delete') practiceDeleteFile(fi);
     else if (act === 'reset') practiceRestoreFile(fi);
     else if (act === 'lock' || act === 'unlock') practiceToggleFileLock(fi);
+    else if (act === 'freeground') practiceOpenInFreeground();
   });
 
   document.addEventListener('mousedown', _pfmOutside, true);
   document.addEventListener('keydown', _pfmEsc, true);
   if (typeof lucide !== 'undefined') lucide.createIcons({ el: el });
+}
+
+/** Every file of the attempt, as typed so far, into a new Freeground tab.
+    Leaving saves the attempt's draft, and Back returns to it. */
+function practiceOpenInFreeground() {
+  if (!state.userFiles || !state.activeChallenge || typeof fgOpen !== 'function') return;
+  savePracticeFileCode();
+  const files = state.userFiles.map(f => ({ name: f.name, ext: f.ext, code: f.userCode || '' }));
+  fgOpen({ newTab: { name: (state.activeChallenge.title || 'Program') + ' (mine)', files, from: 'attempt:' + state.activeChallenge.id }, back: 'practice' });
 }
 
 /** Turn the lock on or off for one file, from the attempt. */

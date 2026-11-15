@@ -138,7 +138,13 @@ function renderStudyAdmin() {
   lucide.createIcons();
 }
 
-function openStudyForm(id) {
+/**
+ * @param {string} id      a snippet id, or 'new'
+ * @param {{title?: string, code?: string}} [prefill]
+ *   for 'new' only: a title and the first example's code (Freeground's Save
+ *   as snippet).
+ */
+function openStudyForm(id, prefill) {
   // Hide Empty State, Show Study Form
   const emptyState = document.getElementById('admin-empty-state');
   if (emptyState) emptyState.classList.add('hidden');
@@ -177,6 +183,10 @@ function openStudyForm(id) {
       examples: [{ id: generateId(), name: 'Example 1', code: '', highlightLines: '' }],
       activeExampleIndex: 0, tryCodingTargetIndices: [0]
     };
+    if (prefill) {
+      studyModeState.title = String(prefill.title || '');
+      studyModeState.examples[0].code = String(prefill.code || '');
+    }
   } else {
     const s = state.snippets.find(x => x.id === id);
     studyModeState = JSON.parse(JSON.stringify(s));

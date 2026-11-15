@@ -90,6 +90,7 @@ function snippetsTemplate() {
         <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
           <button onclick="resetTryCoding()" class="btn btn-secondary" style="flex: 1;"><i data-lucide="rotate-ccw" style="width:16px;height:16px;"></i> Reset</button>
           <button onclick="runSnippetCodeWithPiston()" class="btn btn-secondary" style="flex: 1;"><i data-lucide="play" style="width:16px;height:16px;"></i> Run Code</button>
+          <button onclick="fgOpenTryCoding()" class="btn btn-secondary" title="Open this code in Freeground, to keep experimenting with it" aria-label="Open in Freeground"><i data-lucide="terminal" style="width:16px;height:16px;"></i></button>
           <button onclick="checkTryCoding()" class="btn btn-primary" style="flex: 2;"><i data-lucide="check-circle" style="width:16px;height:16px;"></i> Check Code</button>
         </div>
       </div>

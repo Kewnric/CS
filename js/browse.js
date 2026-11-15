@@ -234,6 +234,13 @@ function renderBrowse() {
  * for deleted programs sticks around — both used to be counted as "completed
  * programs" and pushed the Coding Library's Done/% stats above the real value.
  */
+/** Has this program been passed (a 100% graded attempt that is not archived)?
+    The one meaning of "passed": what may be shown of its answer elsewhere
+    (Freeground's copies, later the drills) is decided here. */
+function programPassed(challengeId) {
+  return (state.history || []).some(h => h && h.challengeId === challengeId && h.score === 100 && !h.isArchived);
+}
+
 function countCompletedPrograms() {
   const perfect = new Set(
     state.history.filter(h => h.challengeId && h.score === 100 && !h.isArchived).map(h => h.challengeId)
@@ -1456,6 +1463,11 @@ function _renderProgramDetail(container, c) {
         <button class="btn btn-practice btn-lg" onclick="browseStartFresh('${c.id}')" style="flex:1; max-width:280px;">
           <i data-lucide="play" style="width:18px;height:18px;fill:currentColor;"></i> ${isPerfect ? 'Practice Again' : 'Start Practice'}
         </button>`}
+        <button class="btn btn-secondary" onclick="fgOpenProgramCopy('${c.id}')"
+                aria-label="Open in Freeground"
+                title="Open in Freeground: ${isPerfect ? 'a copy of your passed answer' : 'a copy of the starter code'}, to experiment on">
+          <i data-lucide="terminal" style="width:16px;height:16px;"></i>
+        </button>
         <button class="btn btn-secondary" onclick="agOpenDeadlineModal('challenge', '${c.id}')"
                 title="${hasDeadline ? 'Change or clear the deadline on this program' : 'Put a due date on this program'}">
           <i data-lucide="flag" style="width:16px;height:16px;"></i> ${hasDeadline ? 'Deadline' : 'Set Deadline'}

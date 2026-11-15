@@ -766,6 +766,20 @@ function adminCodingInit() {
   if (typeof bindAdminFormListeners === 'function') bindAdminFormListeners();
   if (typeof bindAdminKeyboardShortcuts === 'function') bindAdminKeyboardShortcuts();
   GuidedTutorial.init('admin-coding');
+  adminOpenPrefill('program');
+}
+
+/* A form to open pre-filled, handed over from another screen (Freeground's
+   Save as program / snippet). Taken once; unsaved, so leaving asks. */
+function adminOpenPrefill(kind) {
+  const pre = getSessionParam('adminPrefill');
+  if (!pre || pre.kind !== kind) return;
+  clearSessionParam('adminPrefill');
+  if (kind === 'program' && typeof openAdminForm === 'function') openAdminForm('new', pre);
+  else if (kind === 'snippet' && typeof openStudyForm === 'function') openStudyForm('new', pre);
+  else return;
+  window.adminIsDirty = true;
+  if (typeof setSaveStatus === 'function') setSaveStatus(kind === 'program' ? 'admin-save-status' : 'study-save-status', 'unsaved');
 }
 
 function adminCodingDestroy() {
@@ -1043,6 +1057,7 @@ function adminSnippetsInit() {
   if (typeof bindAdminFormListeners === 'function') bindAdminFormListeners();
   if (typeof bindAdminKeyboardShortcuts === 'function') bindAdminKeyboardShortcuts();
   GuidedTutorial.init('admin-snippets');
+  adminOpenPrefill('snippet');
 }
 
 function adminSnippetsDestroy() {

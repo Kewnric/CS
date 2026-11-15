@@ -53,6 +53,59 @@ function fgOpen(opts) {
   return true;
 }
 
+/**
+ * A program as a new Freeground tab: its starter code, or its answer once you
+ * have passed it (programPassed). An unsolved program's answer is never shown.
+ */
+function fgOpenProgramCopy(challengeId) {
+  const c = (state.challenges || []).find(x => x.id === challengeId);
+  const v = c && (c.variants || [])[0];
+  if (!c || !v) return;
+  const passed = typeof programPassed === 'function' && programPassed(c.id);
+  const src = (v.files && v.files.length) ? v.files : [{ name: 'main', ext: '.c', starterCode: v.starterCode, code: v.code }];
+  const files = src.map(f => ({ name: f.name || 'main', ext: f.ext || '.c', code: String((passed ? (f.code || f.starterCode) : f.starterCode) || '') }));
+  if (!files.some(f => f.code.trim())) files[0].code = fgDefaultStarter();
+  if (!fgOpen({ newTab: { name: c.title, files, from: 'program:' + c.id }, back: 'browse' })) return;
+  if (typeof toast === 'function') {
+    toast(passed ? 'A copy of your answer, to experiment on.' : 'A copy of the starter code. The answer stays hidden until you pass the program.',
+      { type: 'info', duration: 3000 });
+  }
+}
+
+/** The snippet Try Coding box's code as a new Freeground tab. */
+function fgOpenTryCoding() {
+  const ta = document.getElementById('try-coding-textarea');
+  if (!ta) return;
+  const title = ((document.getElementById('try-coding-title') || {}).textContent || '').trim();
+  fgOpen({ newTab: { name: title || 'Snippet', files: [{ name: 'main', ext: '.c', code: ta.value }], from: 'snippet' } });
+}
+
+/** Freeground's code in a new program's form, as its answer. */
+function fgSaveAsProgram(id) {
+  const t = fgFindTab(id);
+  if (!t) return;
+  fgCommit();
+  setSessionParam('adminPrefill', { kind: 'program', title: t.name, files: t.files.map(f => ({ name: f.name, ext: f.ext, code: f.code })) });
+  spaNavigate('admin-coding');
+}
+
+/** The selection (or the open file) in a new snippet's form. */
+function fgSaveAsSnippet(id) {
+  const t = fgFindTab(id);
+  if (!t) return;
+  const ta = document.getElementById('editor-textarea');
+  let code = '';
+  if (_fg && id === fgStore().activeId && ta && ta.selectionEnd > ta.selectionStart) {
+    code = ta.value.slice(ta.selectionStart, ta.selectionEnd);
+  } else {
+    fgCommit();
+    const f = t.files[t.activeFile || 0] || t.files[0];
+    code = f ? f.code : '';
+  }
+  setSessionParam('adminPrefill', { kind: 'snippet', title: t.name, code });
+  spaNavigate('admin-snippets');
+}
+
 /* ── The screen ────────────────────────────────────────────── */
 
 function freegroundTemplate() {

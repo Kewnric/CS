@@ -2,7 +2,13 @@
    ADMIN-FORM.JS — Challenge Form Open/Close/Save/Tags
    ============================================================ */
 
-function openAdminForm(id) {
+/**
+ * @param {string} id      a program id, or 'new'
+ * @param {{title?: string, files?: Array<{name, ext, code}>}} [prefill]
+ *   for 'new' only: a title and files to start from (Freeground's Save as
+ *   program). The code becomes the answer; the starter is left empty.
+ */
+function openAdminForm(id, prefill) {
   if (window.currentAdminMode === 'study') return openStudyForm(id);
 
   // Hide Empty State, Show Form
@@ -50,6 +56,16 @@ function openAdminForm(id) {
       variants: [{ id: generateId(), name: 'Version 1', description: '', starterCode: '', code: '', samples: [], tests: [] }],
       activeVariantIndex: 0
     };
+    if (prefill && id === 'new') {
+      adminState.title = String(prefill.title || '');
+      const v = adminState.variants[0];
+      const files = (prefill.files || []).filter(f => f && typeof f.code === 'string');
+      if (files.length) {
+        // The reference only: a starter equal to it would read as solved on load.
+        v.files = files.map(f => ({ id: generateId(), name: f.name || 'main', ext: f.ext || '.c', starterCode: '', code: f.code }));
+        v.code = v.files[0].code;
+      }
+    }
   } else {
     adminState = JSON.parse(JSON.stringify(c));
     if (!adminState.tags) adminState.tags = [];
