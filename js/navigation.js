@@ -234,6 +234,7 @@ function getGlobalCommands() {
     { id: 'go-home', icon: 'home', label: 'Go to Home', sub: 'Dashboard', keywords: 'dashboard home', run: () => spaNavigate('home') },
     { id: 'go-library', icon: 'library', label: 'Go to Library', sub: 'All collections', keywords: 'library hub collections wings', run: () => spaNavigate('library') },
     { id: 'go-browse', icon: 'layout-template', label: 'Go to Coding Library', sub: 'Programs', keywords: 'browse programs challenges code', run: () => spaNavigate('browse') },
+    { id: 'go-freeground', icon: 'terminal', label: 'Open Freeground', sub: 'Write and run anything', keywords: 'freeground scratch playground editor terminal run', run: () => fgOpen() },
     { id: 'go-study', icon: 'book-open', label: 'Go to Notes Library', sub: 'Notebooks & quizzes', keywords: 'study notes notebooks quizzes', run: () => spaNavigate('study') },
     { id: 'go-snippets', icon: 'code', label: 'Go to Snippet Library', sub: 'Code snippets', keywords: 'snippets code reference examples', run: () => spaNavigate('snippets') },
     { id: 'go-analytics', icon: 'bar-chart-3', label: 'Go to Analytics', sub: 'Progress & history', keywords: 'analytics stats history progress charts', run: () => spaNavigate('analytics') },

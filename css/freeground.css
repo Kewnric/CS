@@ -1,0 +1,226 @@
+/* ============================================================
+   FREEGROUND.CSS — js/routes/route-freeground.js
+   The editor, its toolbar, file tabs, the "Last run" strip and the
+   terminal are the attempt's own and keep their own styles. This is
+   the strip of freegrounds, the switcher and the two notices.
+   ============================================================ */
+
+.fg-layout .practice-topbar { gap: 0.5rem; }
+.fg-layout .practice-topbar-left { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+
+.fg-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+.fg-title svg { width: 15px; height: 15px; color: var(--color-primary); }
+
+/* ── The strip of freegrounds ── */
+.fg-strip {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding: 2px;
+}
+.fg-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  max-width: 200px;
+  height: 30px;
+  padding: 0 6px 0 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  user-select: none;
+}
+.fg-tab:hover { background: rgba(255, 255, 255, 0.05); color: var(--text-primary); }
+.fg-tab.is-active {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border-color);
+  color: var(--text-primary);
+}
+.fg-tab:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+.fg-tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fg-tab-pin { width: 12px; height: 12px; color: var(--color-warning); flex-shrink: 0; }
+.fg-tab-dot {
+  display: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-warning);
+  flex-shrink: 0;
+}
+.fg-tab.is-dirty .fg-tab-dot { display: inline-block; }
+.fg-tab-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  opacity: 0;
+}
+.fg-tab-x svg { width: 12px; height: 12px; }
+.fg-tab:hover .fg-tab-x, .fg-tab.is-active .fg-tab-x { opacity: 1; }
+.fg-tab-x:hover { background: rgba(255, 255, 255, 0.1); color: var(--text-primary); }
+.fg-rename-input {
+  width: 130px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 4px;
+  border: 1px solid var(--color-primary);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font: inherit;
+}
+
+/* The last run, as saved with the tab: plain text, not the live transcript. */
+.editor-output-body.fg-plain {
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+}
+
+/* ── Changed in another browser tab ── */
+.fg-conflict {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.9rem;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--text-primary);
+  font-size: 0.82rem;
+}
+.fg-conflict[hidden] { display: none; }
+.fg-conflict svg { width: 15px; height: 15px; color: var(--color-warning); }
+.fg-conflict span { flex: 1; }
+
+/* ── An older file is still being served ── */
+.fg-stale {
+  max-width: 460px;
+  margin: 12vh auto 0;
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-secondary);
+}
+.fg-stale svg { width: 40px; height: 40px; color: var(--color-warning); }
+.fg-stale h1 { font-size: 1.2rem; color: var(--text-primary); margin: 0.75rem 0 0.5rem; }
+.fg-stale p { line-height: 1.6; }
+.fg-stale-actions { display: flex; justify-content: center; gap: 0.5rem; margin-top: 1.25rem; }
+
+/* ── All freegrounds and the shelf ── */
+.fg-switcher { align-items: flex-start; padding-top: 12vh; }
+.fg-sw-box {
+  width: 560px;
+  max-width: calc(100vw - 32px);
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+}
+.fg-sw-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+.fg-sw-head svg { width: 16px; height: 16px; color: var(--text-tertiary); }
+.fg-sw-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.95rem;
+}
+.fg-sw-list { max-height: 50vh; overflow-y: auto; padding: 0.35rem; }
+.fg-sw-section {
+  padding: 0.5rem 0.6rem 0.25rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.fg-sw-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.fg-sw-row > svg { width: 15px; height: 15px; color: var(--text-tertiary); flex-shrink: 0; }
+.fg-sw-row.is-sel, .fg-sw-row:hover { background: rgba(255, 255, 255, 0.06); }
+.fg-sw-row.is-active strong { color: var(--color-primary); }
+.fg-sw-text { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; }
+.fg-sw-text strong { color: var(--text-primary); font-size: 0.88rem; }
+.fg-sw-text em {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fg-sw-when { font-size: 0.72rem; color: var(--text-tertiary); white-space: nowrap; }
+.fg-sw-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-tertiary);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+.fg-sw-del svg { width: 14px; height: 14px; }
+.fg-sw-del:hover { color: var(--color-danger); border-color: var(--border-color); }
+.fg-sw-del.is-confirm { background: var(--color-danger); color: #fff; font-weight: 700; }
+.fg-sw-empty { padding: 1.5rem; text-align: center; color: var(--text-tertiary); font-size: 0.85rem; }
+.fg-sw-foot {
+  padding: 0.55rem 1rem;
+  border-top: 1px solid var(--border-color);
+  font-size: 0.72rem;
+  color: var(--text-tertiary);
+}
+.fg-sw-foot kbd {
+  display: inline-block;
+  padding: 0 5px;
+  margin: 0 1px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+}
+
+@media (max-width: 640px) {
+  .fg-title { display: none; }
+  .fg-tab { max-width: 140px; }
+  .fg-switcher { padding-top: 4vh; }
+}

@@ -1629,6 +1629,7 @@ async function _doSignOut() {
     localStorage.removeItem('brainCanvasData_online');
     localStorage.removeItem('questBoardData_online');
     localStorage.removeItem('cheatsheetLibrary_online');
+    localStorage.removeItem('ssp.fg.buffer_online');   // Freeground's unsaved typing
 
     // Also wipe sessionStorage so nothing carries over to the next account
     try { sessionStorage.clear(); } catch (e) {}

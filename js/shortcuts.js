@@ -11,6 +11,7 @@ const SHORTCUT_GO_MAP = {
   h: { route: 'home',          label: 'Home' },
   l: { route: 'library',       label: 'Library' },
   c: { route: 'browse',        label: 'Coding Library' },
+  f: { route: 'freeground',    label: 'Freeground' },
   n: { route: 'study',         label: 'Notes Library' },
   p: { route: 'snippets',      label: 'Snippet Library' },
   a: { route: 'analytics',     label: 'Analytics' },
@@ -130,6 +131,7 @@ function toggleShortcutsCheatSheet() {
       ['Home', seq('G', 'H')],
       ['Library hub', seq('G', 'L')],
       ['Coding Library', seq('G', 'C')],
+      ['Freeground', seq('G', 'F')],
       ['Notes Library', seq('G', 'N')],
       ['Snippet Library', seq('G', 'P')],
       ['Analytics', seq('G', 'A')],
@@ -142,7 +144,9 @@ function toggleShortcutsCheatSheet() {
       ['Search (g-jump)', seq('G', 'S')]
     ]},
     { title: 'Practice', rows: [
-      ['Submit code', `${kbd(mod)} ${kbd('Enter')}`],
+      ['Check code', `${kbd(mod)} ${kbd('Enter')}`],
+      ['Finish attempt', `${kbd(mod)} ${kbd('Shift')} ${kbd('Enter')}`],
+      ['Zen mode', `${kbd(mod)} ${kbd(String.fromCharCode(92))}`],
       ['Retry', `${kbd(mod)} ${kbd('Shift')} ${kbd('R')}`],
       ['Back to library', kbd('Esc')]
     ]},

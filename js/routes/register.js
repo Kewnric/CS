@@ -64,6 +64,9 @@ function registerAllRoutes() {
   });
   SpaRouter.register('visualization', { title: 'StudySession Pro — Visualization', templateFn: vizTemplate, initFn: vizInit, destroyFn: vizDestroy, sidebarVisible: true, navId: 'nav-mindmap' });
   SpaRouter.register('quests', { title: 'StudySession Pro — Quest Board', templateFn: questTemplate, initFn: questInit, destroyFn: questDestroy, sidebarVisible: true, navId: 'nav-quests' });
+  /* Freeground: a blank editor and a terminal, saved in tabs. Focused like an
+     attempt, because it is a place to write, but it is not one. */
+  SpaRouter.register('freeground', { title: 'StudySession Pro — Freeground', templateFn: freegroundTemplate, initFn: freegroundInit, destroyFn: freegroundDestroy, sidebarVisible: false, navId: null });
   SpaRouter.register('practice', { title: 'StudySession Pro — Practice', templateFn: practiceTemplate, initFn: practiceInit, destroyFn: practiceDestroy, sidebarVisible: false, navId: null });
   SpaRouter.register('drills', { title: 'StudySession Pro — Drills', templateFn: drillsTemplate, initFn: drillsInit, destroyFn: drillsDestroy, sidebarVisible: true, navId: null });
   SpaRouter.register('practice-set', { title: 'StudySession Pro — Multi-Problem Session', templateFn: practiceSetTemplate, initFn: practiceSetInit, destroyFn: practiceSetDestroy, sidebarVisible: false, navId: null });

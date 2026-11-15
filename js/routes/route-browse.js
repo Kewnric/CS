@@ -71,6 +71,11 @@ function browseTemplate() {
                             title="Drills — predict the output, or find the bug" aria-label="Drills">
                       <i data-lucide="brain-circuit"></i>
                     </button>
+                    <!-- A blank editor and a terminal, saved in tabs. -->
+                    <button class="tutorial-trigger-btn" onclick="fgOpen()" data-label="Freeground"
+                            title="Freeground — write and run anything, saved in tabs" aria-label="Freeground">
+                      <i data-lucide="terminal"></i>
+                    </button>
                     <button class="tutorial-trigger-btn" onclick="GuidedTutorial.start()" data-label="Page tour"
                             title="Show Page Tour" aria-label="Show Page Tour">
                       <i data-lucide="graduation-cap"></i>
@@ -149,7 +154,7 @@ function browseInit() {
      it means "open this now" rather than "this is where I was". */
   const focusOnce = getSessionParam('browseFocusOnce') === true;
   clearSessionParam('browseFocusOnce');
-  if (['practice', 'practice-set', 'solution', 'browse'].indexOf(cameFrom) === -1) {
+  if (['practice', 'practice-set', 'solution', 'browse', 'freeground'].indexOf(cameFrom) === -1) {
     if (typeof collapseAllFolders === 'function') collapseAllFolders('challenge');
     if (!focusOnce) {
       // Arrived with nothing asked for: open at the folder view, closed.
