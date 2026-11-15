@@ -305,6 +305,11 @@ marks correct work wrong, silently.
 
 - **SFX** (typing, success, failure) are base64 in `js/audio-data.js`. Embedded
   because `fetch` failed silently for the user; they are only ~42 KB.
+- **Typing voices**: Mita, Keys and Recorded live in `js/typing-sfx.js`; the ten
+  synthesised ones (Typewriter … Drums) are engines in `js/typing-voices.js`, which
+  register into `SFX_VOICES` at load and receive the key itself, not numbers.
+  `SFX_SYNTH_LEVEL` levels them against Keys/Mita — re-measure (offline render,
+  K-weighted 50 ms loudness) rather than retune by guess after changing an engine.
 - **OST music** (`js/ost.js`) are real files in `audio/ost/`. Not base64: 13.4 MB
   would become ~19 MB of JS parsed on every load, and `<audio src>` streams and
   seeks by byte range, which a `data:` URI cannot.

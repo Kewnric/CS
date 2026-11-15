@@ -212,10 +212,17 @@ function _sfxApplyVoice(next) {
   // Switching voices while muted would be silent and look broken, so it
   // demonstrates the choice either way.
   if (!sfxEnabled()) { try { localStorage.setItem(SFX_KEY, '1'); } catch (e) {} _syncTypingSfxBtn(); }
-  const a = sfxKeyVoice('a'), b = sfxKeyVoice('e'), sp = sfxKeyVoice(' ');
-  sfxBlip(a[0], a[1], a[2], a[3]);
-  setTimeout(() => sfxBlip(b[0], b[1], b[2], b[3]), 85);
-  setTimeout(() => sfxBlip(sp[0], sp[1], sp[2], sp[3]), 170);
+  // A voice may name the keys that show it off — the typewriter's bell is on
+  // return, the drums' kick on the space bar. The rest play two letters and a
+  // space, as all of them always did.
+  const def = SFX_VOICES[next];
+  const demo = def.demo || ['a', 'e', ' '];
+  const gap = def.demoGap || 85;
+  demo.forEach((k, i) => {
+    const v = sfxKeyVoice(k);
+    if (i === 0) sfxBlip(v[0], v[1], v[2], v[3]);
+    else setTimeout(() => sfxBlip(v[0], v[1], v[2], v[3]), i * gap);
+  });
   if (typeof toast === 'function') {
     toast(SFX_VOICES[next].label + ' — ' + SFX_VOICES[next].hint, { type: 'info', duration: 1800 });
   }
@@ -282,6 +289,9 @@ function sfxBlip(pitch, length, colour, extra) {
   // handler, the volume preview, the toggle's proof-of-life — gets whichever
   // voice is selected without knowing there is a choice.
   const engine = sfxVoiceDef().engine;
+  // The ten in typing-voices.js take the key itself, which sfxKeyVoice put in
+  // `extra` for them.
+  if (typeof sfxIsSynth === 'function' && sfxIsSynth(engine)) { sfxSynthPlay(engine, ctx, _sfxBus, extra); return; }
   if (engine === 'keys') { _sfxKeyPress(ctx, pitch, length, colour, extra); return; }
   if (engine === 'sample') {
     // audio/voice.MP3, and only that. It does not fall through to the Mita
@@ -369,6 +379,11 @@ const SFX_SAMPLE_RATES = {
 };
 
 function sfxKeyVoice(key) {
+  // The synthesised voices shape each key themselves, so they are handed the
+  // key rather than numbers decided for them here.
+  if (typeof sfxIsSynth === 'function' && sfxIsSynth(sfxVoiceDef().engine)) {
+    return [SFX_VOICE.pitch, SFX_VOICE.length, SFX_VOICE.formant, key];
+  }
   if (sfxVoiceDef().engine === 'sample') {
     // pitch/length/colour are unused by the sample engine; the fourth value is
     // the playback rate, which is the only knob a recording has.
@@ -511,7 +526,12 @@ document.addEventListener('input', function (e) {
      so it gets the ordinary character's voice. A deletion is the one case
      that can be told apart, and it already came through keydown. */
   const isDelete = e.inputType && e.inputType.indexOf('delete') === 0;
-  const voice = sfxKeyVoice(isDelete ? 'Backspace' : 'a');
+  /* The key is unknown, but what it wrote usually is: the last character
+     inserted. Enough for the space bar to sound like one and for the
+     kalimba's letters to keep their notes on a phone. */
+  const isBreak = e.inputType === 'insertLineBreak' || e.inputType === 'insertParagraph';
+  const wrote = (typeof e.data === 'string' && e.data) ? e.data.slice(-1) : 'a';
+  const voice = sfxKeyVoice(isDelete ? 'Backspace' : isBreak ? 'Enter' : wrote);
   sfxBlip(voice[0], voice[1], voice[2], voice[3]);
 }, true);
 

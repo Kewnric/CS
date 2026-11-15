@@ -4634,6 +4634,7 @@ body.is-resizing .practice-panel { transition: none; }
 
 .sfx-voice-row {
   display: flex;
+  flex-wrap: wrap;               /* thirteen voices now, not three */
   gap: 0.25rem;
   margin-top: 0.45rem;
   padding-top: 0.45rem;
@@ -4832,6 +4833,16 @@ body.is-resizing .practice-panel { transition: none; }
   gap: 0.5rem;
   padding: 0.2rem 0.5rem 0.45rem;
 }
+
+/* The typing voices, two to a row — see _feelSfxRows. */
+.feel-voice-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.15rem;
+}
+.feel-voice-grid .feel-opt { min-width: 0; }
+.feel-voice-grid .feel-opt-name,
+.feel-voice-grid .feel-opt-hint { overflow-wrap: anywhere; }
 .feel-vol-row .sfx-vol-range { flex: 1; min-width: 0; }
 
 /* A hairline between kinds of control, so ten dots read as four groups. */

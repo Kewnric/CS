@@ -68,11 +68,14 @@ function _feelSfxRows() {
     + ' value="' + vol + '" aria-label="Typing sound volume"'
     + ' oninput="sfxSetVolume(this.value / 100)">'
     + '<span class="sfx-vol-label" id="sfx-vol-label">' + vol + '%</span></div>';
-  return slider + voices + _feelOpt({
+  /* Two columns: thirteen voices and Off as one list ran past the bottom of
+     the panel, and they are short names that sit side by side easily. Off is
+     the last cell, which also keeps the grid even. */
+  return slider + '<div class="feel-voice-grid">' + voices + _feelOpt({
     name: 'Off', hint: 'no sound as you type', on: !on,
     title: 'Silence the typing sound',
     onclick: 'if (sfxEnabled()) toggleTypingSfx();'
-  });
+  }) + '</div>';
 }
 
 /** Letter animation: the style switches, and Off. */
