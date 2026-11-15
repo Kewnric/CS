@@ -527,6 +527,13 @@ function codingStarterPack() {
     allCh = allCh.concat(adv.challenges);
     allNodes = allNodes.concat(adv.nodes);
   }
+  /* The Pre-Final exam's own problems, with the starter code they come with
+     -- see coding-starter-prefinal.js. */
+  if (typeof codingStarterPreFinal === 'function') {
+    const pf = codingStarterPreFinal();
+    allCh = allCh.concat(pf.challenges);
+    allNodes = allNodes.concat(pf.nodes);
+  }
 
   return _csStamp({ challenges: allCh, nodes: allNodes, sets: _csExamSets(allCh) });
 }

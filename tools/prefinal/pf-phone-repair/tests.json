@@ -1,0 +1,10 @@
+[
+  { "name": "received to repairing", "stdin": "1\nJB-1001 1\n" },
+  { "name": "ready to claimed, then past claimed", "stdin": "2\nJB-1003 3\nJB-1003 4\n" },
+  { "name": "the last job in the list", "stdin": "1\nJB-1008 1\n" },
+  { "name": "skipping, going back, staying put", "stdin": "3\nJB-1005 2\nJB-1007 1\nJB-1006 1\n" },
+  { "name": "statuses out of range", "stdin": "3\nJB-1004 4\nJB-1004 0\nJB-1001 -1\n" },
+  { "name": "IDs that do not match exactly", "stdin": "3\nJB-9999 1\njb-1001 1\nJB-100 1\n" },
+  { "name": "one job all the way through", "stdin": "4\nJB-1005 1\nJB-1005 2\nJB-1005 3\nJB-1005 3\n" },
+  { "name": "a mix of valid and invalid", "stdin": "5\nJB-1002 3\nJB-1002 2\nJB-1007 3\nJB-1003 2\nJB-1008 1\n" }
+]

@@ -40,7 +40,9 @@ const files = [
   'js/coding-starter-advanced-solutions.js',
   'js/coding-starter-advanced.js',
   'js/coding-starter-lists-expected.js',
-  'js/coding-starter-lists.js'
+  'js/coding-starter-lists.js',
+  'js/coding-starter-prefinal-files.js',
+  'js/coding-starter-prefinal.js'
 ];
 
 const sandbox = {

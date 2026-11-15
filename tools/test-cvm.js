@@ -28,7 +28,7 @@ const files = [
   'js/coding-starter-workshop-files.js', 'js/coding-starter.js', 'js/coding-starter-core.js', 'js/coding-starter-ptr.js',
   'js/coding-starter-arr.js', 'js/coding-starter-loop.js', 'js/coding-starter-workshop.js', 'js/coding-starter-c.js',
   'js/coding-starter-advanced-solutions.js', 'js/coding-starter-advanced.js', 'js/coding-starter-lists-expected.js',
-  'js/coding-starter-lists.js'
+  'js/coding-starter-lists.js', 'js/coding-starter-prefinal-files.js', 'js/coding-starter-prefinal.js'
 ];
 const sandbox = {
   console, state: { challenges: [], nodes: [], codingSets: [] },

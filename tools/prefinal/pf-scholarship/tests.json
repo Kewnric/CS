@@ -1,0 +1,11 @@
+[
+  { "name": "three applicants, best last", "stdin": "5\n3\n22100001 Andrea 80 80 80\n22100002 Benjie 85 85 85\n22100003 Carla 90 90 90\n" },
+  { "name": "already in order", "stdin": "5\n4\n22100004 Dodong 90 90 90\n22100005 Ella 85 90 85\n22100006 Franco 80 85 85\n22100007 Gwen 80 80 80\n" },
+  { "name": "applied in mixed order", "stdin": "6\n5\n22100008 Hector 85 80 85\n22100009 Isa 90 90 90\n22100010 Jun 80 70 80\n22100011 Kim 85 85 90\n22100012 Lea 80 80 80\n" },
+  { "name": "ties keep the order they applied", "stdin": "6\n4\n22100013 Migs 90 80 85\n22100014 Nina 85 85 85\n22100015 Oscar 95 90 85\n22100016 Paolo 80 90 85\n" },
+  { "name": "repeats and a full shortlist", "stdin": "4\n7\n22100017 Queenie 85 85 85\n22100018 Rico 90 85 85\n22100017 Queenie 99 99 99\n22100019 Sam 85 80 85\n22100020 Tess 80 80 85\n22100018 Rico 90 85 85\n22100021 Ugo 100 100 100\n" },
+  { "name": "full, then a repeat", "stdin": "3\n5\n22100022 Vina 80 80 80\n22100023 Wally 85 80 85\n22100024 Xyza 80 85 80\n22100025 Yael 99 100 100\n22100022 Vina 80 80 80\n" },
+  { "name": "one slot", "stdin": "1\n2\n22100026 Zoe 75 80 85\n22100027 Aldo 95 95 95\n" },
+  { "name": "totals, not single scores", "stdin": "5\n4\n22100028 Bea 99 70 70\n22100029 Cris 80 80 81\n22100030 Dina 70 99 72\n22100031 Edu 100 60 60\n" },
+  { "name": "same name, different ID", "stdin": "5\n3\n22100032 Ana 80 80 80\n22100033 Ana 75 75 95\n22100032 Anna 90 90 90\n" }
+]

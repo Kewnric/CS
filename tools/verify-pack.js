@@ -44,6 +44,8 @@ const files = [
   'js/coding-starter-advanced.js',
   'js/coding-starter-lists-expected.js',
   'js/coding-starter-lists.js',
+  'js/coding-starter-prefinal-files.js',
+  'js/coding-starter-prefinal.js',
   // Walkthrough coverage is part of what "the pack is finished" now means.
   'js/demo-lessons.js'
 ];

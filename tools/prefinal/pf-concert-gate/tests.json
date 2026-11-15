@@ -1,0 +1,11 @@
+[
+  { "name": "a regular fan, empty line", "stdin": "0\n1\nT-3001 Gio Ramos 0\n" },
+  { "name": "a VIP ahead of regulars", "stdin": "2\n1\nT-3002 Hana Cruz 1\n" },
+  { "name": "a VIP behind the last VIP", "stdin": "6\n1\nT-3003 Ivan Sy 1\n" },
+  { "name": "a regular fan at the end", "stdin": "6\n1\nT-3004 Jade Ong 0\n" },
+  { "name": "VIPs keep their arrival order", "stdin": "0\n5\nT-3005 Kai Dy 1\nT-3006 Lia Yu 1\nT-3007 Mo Chan 1\nT-3008 Nico Ang 0\nT-3009 Olga Co 1\n" },
+  { "name": "tickets scanned twice", "stdin": "6\n4\nT-2003 Paul Lee 1\nT-2006 Quin Ty 0\nT-3010 Rae Lao 0\nT-3010 Sol Bao 1\n" },
+  { "name": "the line fills up", "stdin": "6\n6\nT-3011 Tom Kho 0\nT-3012 Uma Pe 1\nT-3013 Vic Yap 0\nT-3014 Wen Ko 1\nT-3015 Xia Lu 1\nT-2004 Yna Ho 0\n" },
+  { "name": "VIPs between VIPs and regulars", "stdin": "3\n3\nT-3016 Zed Ga 1\nT-3017 Al Bo 0\nT-3018 Bea Di 1\n" },
+  { "name": "full, then a repeat, then full", "stdin": "6\n7\nT-3019 Cy Ma 0\nT-3020 Di Na 0\nT-3021 Ed Pa 0\nT-3022 Fe Ra 0\nT-3023 Gi Sa 0\nT-3020 Ha Ta 1\nT-3024 Io Va 1\n" }
+]

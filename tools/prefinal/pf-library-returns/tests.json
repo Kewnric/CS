@@ -1,0 +1,10 @@
+[
+  { "name": "one book returned", "stdin": "1\n22101102\n" },
+  { "name": "two books, side by side", "stdin": "1\n22100451\n" },
+  { "name": "three books, two in a row", "stdin": "1\n22100873\n" },
+  { "name": "two books, including the last", "stdin": "1\n22100618\n" },
+  { "name": "IDs that are not on loan", "stdin": "3\n22109999\n2210045\nAndrea\n" },
+  { "name": "the same borrower twice", "stdin": "2\n22101539\n22101539\n" },
+  { "name": "every loan returned", "stdin": "5\n22100451\n22100873\n22101102\n22101539\n22100618\n" },
+  { "name": "three borrowers in turn", "stdin": "3\n22101539\n22100873\n22100451\n" }
+]
