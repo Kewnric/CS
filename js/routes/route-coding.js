@@ -7,16 +7,14 @@
      Hackathon     the programs and practice sets (route `browse`, unchanged)
      Training hub  templates to learn by heart, and what is due for review
      Freeground    a blank editor and a terminal, saved in tabs
+     C Codex       every piece of C the course uses, and F1 lookup
 
    Each tile carries live numbers read from the data on every visit (nothing
    is stored for it, so it can never disagree with the library) and a button
    for its most common action, so the extra page costs a click only when you
    wanted the tree: Continue goes straight back into the program you left.
 
-   The Codex gets its tile when it exists. A tile for a section that is not
-   built yet would be a promise, not a door.
-
-   Keys: 1, 2 and 3 open the tiles.
+   Keys: 1 to 4 open the tiles.
    ============================================================ */
 
 let _chubKey = null;
@@ -118,17 +116,30 @@ function _chubFreegroundTile() {
   });
 }
 
+function _chubCodexTile() {
+  const all = typeof codexAll === 'function' ? codexAll() : [];
+  const usage = typeof codexUsage === 'function' ? codexUsage() : {};
+  const used = all.filter(e => (usage[e.id] || []).length).length;
+  return libSpatialCardHTML({
+    route: 'codex', cls: 'lib-card-codex', icon: 'book-open-text', name: 'C Codex', key: '4',
+    desc: 'Every operator, keyword, type, format code and library function, with examples that run. F1 in any editor opens one.',
+    chips: _libStatChip('book-open-text', countNoun(all.length, 'entry').replace('entrys', 'entries')) + _libStatChip('star', `${used} used in your code`),
+    pct: all.length ? Math.round((used / all.length) * 100) : null, pctLabel: `${used}/${all.length} used in your code`, accent: '#f59e0b'
+  });
+}
+
 const CHUB_TILES = [
   { key: '1', open: () => spaNavigate('browse') },
   { key: '2', open: () => spaNavigate('training') },
-  { key: '3', open: () => fgOpen({ back: 'coding' }) }
+  { key: '3', open: () => fgOpen({ back: 'coding' }) },
+  { key: '4', open: () => spaNavigate('codex') }
 ];
 
 function codingHubInit() {
   const grid = document.getElementById('chub-grid');
   if (typeof tplEnsureStarters === 'function') tplEnsureStarters();
   if (grid) {
-    grid.innerHTML = _chubHackathonTile() + _chubTrainingTile() + _chubFreegroundTile();
+    grid.innerHTML = _chubHackathonTile() + _chubTrainingTile() + _chubFreegroundTile() + _chubCodexTile();
     if (typeof libSpatialBind === 'function') libSpatialBind(grid);
   }
   _chubKey = (e) => {

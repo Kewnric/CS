@@ -24,7 +24,7 @@
    Navigations stay network-first, so a new index.html — and with it a new
    worker — is noticed as soon as the network allows, with the cached shell as
    the offline fallback. */
-const CACHE = 'ssp-v556';
+const CACHE = 'ssp-v557';
 // The bundled comic font too, so comic notes letter correctly offline even
 // before one has been shown online.
 // The in-browser C compiler too (js/xcc-runner.js): it is only ever fetched
@@ -34,7 +34,9 @@ const CACHE = 'ssp-v556';
 // so reading it back offline needs these two before anything else does.
 const SHELL = ['./index.html', './manifest.json', './fonts/comic-neue-bold.woff2',
   './vendor/xcc/wccfiles.js', './js/xcc-core.js', './js/xcc-stdio.js',
-  './vendor/fflate/fflate.min.js', './js/store-codec.js'];
+  './vendor/fflate/fflate.min.js', './js/store-codec.js',
+  // The Codex reference, so it answers offline before it has ever been opened.
+  './js/codex-data.js'];
 
 /* Third-party libraries the page loads. Every URL in index.html pins an exact
    version, so a cached copy never goes stale and cache-first is safe. Without

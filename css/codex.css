@@ -1,0 +1,137 @@
+/* ============================================================
+   CODEX.CSS — the C Codex (route-codex.js) and its lookup cards in the
+   editors (codex-lookup.js).
+   ============================================================ */
+
+.lib-card-codex .lib-card-icon { color: #f59e0b; }
+
+.cdx-top { align-items: center; }
+.cdx-h1 { display: inline-flex; align-items: center; gap: 8px; margin: 0; font-size: 1.25rem; color: var(--text-primary); }
+.cdx-h1 svg { color: #f59e0b; }
+.cdx-progress { min-width: 80px; text-align: right; }
+.cdx-search { width: 100%; max-width: 640px; margin: 0.75rem auto; }
+.cdx-layout { display: grid; grid-template-columns: 270px 1fr; gap: 1rem; max-width: 1200px; margin: 0 auto; align-items: start; }
+.cdx-nav {
+  position: sticky; top: 0; max-height: calc(100vh - 170px); overflow-y: auto;
+  padding: 0.5rem; border-radius: var(--radius-lg); border: 1px solid var(--border-color); background: var(--bg-surface);
+}
+.cdx-cat { margin-bottom: 2px; }
+.cdx-cat-head { display: flex; align-items: center; border-radius: var(--radius-md); }
+.cdx-cat-head.is-on { background: rgba(245, 158, 11, 0.12); }
+.cdx-cat-fold, .cdx-cat-name {
+  display: inline-flex; align-items: center; gap: 6px; border: none; background: transparent;
+  color: var(--text-secondary); font: inherit; cursor: pointer; padding: 0.35rem 0.3rem;
+}
+.cdx-cat-fold svg { width: 14px; height: 14px; }
+.cdx-cat-name { flex: 1; font-weight: 700; font-size: 0.82rem; color: var(--text-primary); text-align: left; }
+.cdx-cat-name svg { width: 14px; height: 14px; color: #f59e0b; }
+.cdx-cat-name em { margin-left: auto; font-style: normal; font-weight: 400; font-size: 0.72rem; color: var(--text-tertiary); }
+.cdx-cat-items { display: flex; flex-direction: column; padding-left: 1.4rem; }
+.cdx-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.4rem;
+  padding: 0.22rem 0.5rem; border: none; border-radius: 6px; background: transparent;
+  color: var(--text-secondary); font: inherit; font-size: 0.8rem; cursor: pointer; text-align: left;
+}
+.cdx-item code { font-family: var(--font-mono); }
+.cdx-item:hover { background: rgba(255, 255, 255, 0.05); color: var(--text-primary); }
+.cdx-item.is-on { background: rgba(245, 158, 11, 0.15); color: var(--text-primary); }
+.cdx-results { display: flex; flex-direction: column; }
+.cdx-stars { display: inline-flex; gap: 1px; font-size: 0.7rem; letter-spacing: 0; color: var(--border-color); }
+.cdx-stars .is-on { color: #f59e0b; }
+
+.cdx-main {
+  min-width: 0; padding: 1.25rem 1.4rem; border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color); background: var(--bg-surface); min-height: 420px;
+}
+.cdx-welcome { text-align: center; padding: 2rem 1rem; color: var(--text-secondary); max-width: 560px; margin: 0 auto; }
+.cdx-welcome svg { width: 40px; height: 40px; color: #f59e0b; }
+.cdx-welcome h2 { color: var(--text-primary); font-size: 1.1rem; }
+.cdx-welcome kbd, .cdx-pop kbd {
+  padding: 0 6px; border: 1px solid var(--border-color); border-bottom-width: 2px; border-radius: 5px;
+  font-family: var(--font-mono); font-size: 0.75rem;
+}
+.cdx-kicker { font-size: 0.75rem; color: var(--text-tertiary); }
+.cdx-kicker code { font-family: var(--font-mono); }
+.cdx-link { border: none; background: transparent; padding: 0; color: #f59e0b; font: inherit; cursor: pointer; }
+.cdx-link:hover { text-decoration: underline; }
+.cdx-link code { font-family: var(--font-mono); }
+.cdx-name { display: flex; align-items: center; gap: 0.6rem; margin: 0.3rem 0 0.6rem; font-size: 1.5rem; color: var(--text-primary); }
+.cdx-name code { font-family: var(--font-mono); }
+.cdx-name svg { color: #f59e0b; }
+.cdx-name .cdx-stars { font-size: 0.95rem; }
+.cdx-sig, .cdx-code, .cdx-pop-sig, .cdx-pop-ex {
+  margin: 0; padding: 0.6rem 0.8rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);
+  background: rgba(0, 0, 0, 0.3); font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.55;
+  overflow-x: auto; white-space: pre;
+}
+.cdx-lead { margin: 0.75rem 0 0.4rem; font-size: 1rem; line-height: 1.55; color: var(--text-primary); }
+.cdx-more { margin: 0 0 0.75rem; line-height: 1.55; color: var(--text-secondary); font-size: 0.9rem; }
+.cdx-ex { margin: 0.75rem 0; }
+.cdx-ex-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-size: 0.75rem; font-weight: 700; color: var(--text-tertiary); }
+.cdx-ex-actions { display: inline-flex; gap: 4px; }
+.cdx-out { display: flex; gap: 0.6rem; align-items: flex-start; margin-top: 0.4rem; font-size: 0.75rem; color: var(--text-tertiary); }
+.cdx-out pre { margin: 0; padding: 0.35rem 0.6rem; border-radius: 6px; background: rgba(0, 0, 0, 0.3); font-family: var(--font-mono); font-size: 0.8rem; color: var(--color-success); white-space: pre-wrap; }
+.cdx-h3 { display: flex; align-items: center; gap: 6px; margin: 1.1rem 0 0.4rem; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-tertiary); }
+.cdx-h3 svg { width: 14px; height: 14px; }
+.cdx-mistakes { margin: 0; padding-left: 1.2rem; color: var(--text-secondary); line-height: 1.6; font-size: 0.88rem; }
+.cdx-rel { display: flex; flex-wrap: wrap; gap: 6px; }
+.cdx-chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: var(--radius-full);
+  border: 1px solid var(--border-color); background: transparent; color: var(--text-secondary); font: inherit; font-size: 0.8rem; cursor: pointer;
+}
+.cdx-chip code { font-family: var(--font-mono); }
+.cdx-chip svg { width: 13px; height: 13px; }
+.cdx-chip:hover { border-color: #f59e0b; color: var(--text-primary); }
+.cdx-used { margin: 0; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.5; }
+.cdx-note { font-size: 0.85rem; }
+.cdx-actions { display: flex; gap: 0.4rem; margin-top: 0.6rem; }
+
+.cdx-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.cdx-table th { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--border-color); color: var(--text-tertiary); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; }
+.cdx-table td { padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--border-color); color: var(--text-secondary); vertical-align: top; }
+.cdx-table td code { font-family: var(--font-mono); }
+.cdx-table td pre { margin: 0; font-family: var(--font-mono); font-size: 0.78rem; white-space: pre-wrap; }
+.cdx-table td .cdx-link { margin-right: 6px; }
+.cdx-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 0.6rem; }
+.cdx-card {
+  display: flex; flex-direction: column; gap: 4px; padding: 0.7rem 0.8rem; border-radius: var(--radius-md);
+  border: 1px solid var(--border-color); background: rgba(0, 0, 0, 0.15); color: var(--text-secondary);
+  font: inherit; text-align: left; cursor: pointer;
+}
+.cdx-card:hover { border-color: #f59e0b; }
+.cdx-card-top { display: flex; justify-content: space-between; align-items: center; }
+.cdx-card-top code { font-family: var(--font-mono); font-weight: 700; color: var(--text-primary); }
+.cdx-card-d { font-size: 0.78rem; line-height: 1.4; }
+
+/* ── The lookup card in an editor ── */
+.cdx-pop {
+  position: fixed; z-index: 9000; width: min(420px, calc(100vw - 16px)); max-height: 60vh; overflow-y: auto;
+  padding: 0.8rem 0.9rem; border-radius: var(--radius-lg); border: 1px solid rgba(245, 158, 11, 0.5);
+  background: rgba(13, 17, 23, 0.98); box-shadow: var(--shadow-lg); color: var(--text-secondary); font-size: 0.85rem;
+  animation: cdx-pop-in 0.14s ease-out backwards;
+}
+@keyframes cdx-pop-in { from { opacity: 0; transform: translateY(-4px); } }
+.cdx-pop.is-pinned { border-color: #f59e0b; }
+.cdx-pop hr { border: none; border-top: 1px solid var(--border-color); margin: 0.7rem 0; }
+.cdx-pop-head { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.4rem; }
+.cdx-pop-head code { font-family: var(--font-mono); font-weight: 700; font-size: 1rem; color: var(--text-primary); }
+.cdx-pop-head span { font-size: 0.72rem; color: var(--text-tertiary); font-family: var(--font-mono); }
+.cdx-pop-head .cdx-stars { margin-left: auto; }
+.cdx-pop-sig, .cdx-pop-ex { font-size: 0.76rem; padding: 0.4rem 0.6rem; }
+.cdx-pop-d { margin: 0.5rem 0; line-height: 1.5; color: var(--text-primary); }
+.cdx-pop-ex { margin-top: 0.4rem; }
+.cdx-pop-m { display: flex; gap: 6px; margin: 0.5rem 0 0; font-size: 0.78rem; color: var(--color-warning); line-height: 1.45; }
+.cdx-pop-m svg { width: 13px; height: 13px; flex-shrink: 0; margin-top: 2px; }
+.cdx-pop-rel { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 0.5rem; }
+.cdx-pop-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 0.6rem; }
+.cdx-pin { border: none; background: transparent; color: var(--text-tertiary); cursor: pointer; padding: 2px; }
+.cdx-pin svg { width: 14px; height: 14px; }
+.cdx-pop.is-pinned .cdx-pin { color: #f59e0b; }
+
+@media (max-width: 900px) {
+  .cdx-layout { grid-template-columns: 1fr; }
+  .cdx-nav { position: static; max-height: 280px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cdx-pop { animation: none; }
+}

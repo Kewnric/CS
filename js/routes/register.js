@@ -74,6 +74,8 @@ function registerAllRoutes() {
      writes them (js/templates.js and friends). */
   SpaRouter.register('training', { title: 'StudySession Pro — Training hub', templateFn: trainingTemplate, initFn: trainingInit, destroyFn: trainingDestroy, sidebarVisible: true, navId: 'nav-library', depth: 2 });
   SpaRouter.register('template-attempt', { title: 'Template drill — StudySession Pro', templateFn: templateAttemptTemplate, initFn: templateAttemptInit, destroyFn: templateAttemptDestroy, sidebarVisible: false, navId: null });
+  // The C Codex: every operator, keyword, type and library function, and F1 lookup.
+  SpaRouter.register('codex', { title: 'StudySession Pro — C Codex', templateFn: codexTemplate, initFn: codexInit, destroyFn: codexDestroy, sidebarVisible: true, navId: 'nav-library', depth: 2 });
   SpaRouter.register('admin-templates', { title: 'StudySession Pro — Templates Admin', templateFn: adminTemplatesTemplate, initFn: adminTemplatesInit, destroyFn: adminTemplatesDestroy, sidebarVisible: true, navId: 'nav-admin', depth: 2 });
   SpaRouter.register('freeground', { title: 'StudySession Pro — Freeground', templateFn: freegroundTemplate, initFn: freegroundInit, destroyFn: freegroundDestroy, sidebarVisible: false, navId: null });
   SpaRouter.register('practice', { title: 'StudySession Pro — Practice', templateFn: practiceTemplate, initFn: practiceInit, destroyFn: practiceDestroy, sidebarVisible: false, navId: null });

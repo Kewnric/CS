@@ -44,6 +44,16 @@ const _dgPick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 function drillCorpus(source) {
   const [src, concept] = String(source || 'mine').split(':');
   const out = [];
+  // One Codex entry's example (the entry's Quiz me).
+  if (src === 'codex') {
+    const e = typeof codexFind === 'function' ? codexFind(concept) : null;
+    if (e && e.ex) {
+      const full = codexWrap(e.ex);
+      out.push({ key: 'C:' + e.id, title: e.n, file: 'codex.c', code: e.ex, full,
+        stdin: '', expected: typeof e.out === 'string' ? e.out : null, concepts: e.k || [] });
+    }
+    return out;
+  }
   const want = (s) => src === 'mine' || src === s;
   if (want('lessons') && !concept) {
     (typeof DEMO_LESSONS !== 'undefined' ? DEMO_LESSONS : []).forEach(l => {

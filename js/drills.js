@@ -298,8 +298,10 @@ function drillsTemplate() {
 
 function drillsInit() {
   const concept = getSessionParam('drillConcept');
+  const once = getSessionParam('drillSourceOnce');
   clearSessionParam('drillConcept');
-  drillState.source = concept ? 'mine:' + concept : drillSourcePref();
+  clearSessionParam('drillSourceOnce');
+  drillState.source = once || (concept ? 'mine:' + concept : drillSourcePref());
   const askedMode = getSessionParam('drillModeOnce');
   clearSessionParam('drillModeOnce');
   drillStart(_drillInMix() ? 'mix' : (askedMode || drillModePref()));
@@ -468,9 +470,13 @@ function drillRender() {
   }
   const sel = document.getElementById('drill-source');
   if (sel) {
-    const concept = drillState.source.indexOf(':') !== -1 ? drillState.source.split(':')[1] : '';
+    const parts = drillState.source.split(':');
+    const concept = parts.length > 1 ? parts[1] : '';
+    const narrowed = !concept ? '' : parts[0] === 'codex'
+      ? 'Codex: ' + ((typeof codexFind === 'function' && codexFind(concept)) || { n: concept }).n
+      : 'Only: ' + (typeof minReqLabel === 'function' ? minReqLabel(concept) : concept);
     sel.innerHTML = DRILL_SOURCES.map(s => `<option value="${s.id}" ${drillState.source === s.id ? 'selected' : ''} title="${escapeHTML(s.hint)}">${escapeHTML(s.label)}</option>`).join('')
-      + (concept ? `<option value="${escapeHTML(drillState.source)}" selected>Only: ${escapeHTML(typeof minReqLabel === 'function' ? minReqLabel(concept) : concept)}</option>` : '');
+      + (concept ? `<option value="${escapeHTML(drillState.source)}" selected>${escapeHTML(narrowed)}</option>` : '');
   }
   const score = document.getElementById('drill-score');
   if (score) score.textContent = drillState.done ? drillState.right + ' / ' + drillState.done : '';

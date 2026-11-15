@@ -235,6 +235,7 @@ function getGlobalCommands() {
     { id: 'go-library', icon: 'library', label: 'Go to Library', sub: 'All collections', keywords: 'library hub collections wings', run: () => spaNavigate('library') },
     { id: 'go-coding', icon: 'code-2', label: 'Go to Coding Library', sub: 'Hackathon and Freeground', keywords: 'coding library code', run: () => spaNavigate('coding') },
     { id: 'go-browse', icon: 'swords', label: 'Go to Hackathon', sub: 'Programs and practice sets', keywords: 'hackathon browse programs challenges code', run: () => spaNavigate('browse') },
+    { id: 'go-codex', icon: 'book-open-text', label: 'Go to the C Codex', sub: 'Operators, keywords, functions', keywords: 'codex reference operators keywords functions printf format lookup', run: () => spaNavigate('codex') },
     { id: 'go-training', icon: 'target', label: 'Go to Training hub', sub: 'Templates to learn by heart', keywords: 'training templates drill memorise review', run: () => spaNavigate('training') },
     { id: 'go-freeground', icon: 'terminal', label: 'Open Freeground', sub: 'Write and run anything', keywords: 'freeground scratch playground editor terminal run', run: () => fgOpen() },
     { id: 'go-study', icon: 'book-open', label: 'Go to Notes Library', sub: 'Notebooks & quizzes', keywords: 'study notes notebooks quizzes', run: () => spaNavigate('study') },
