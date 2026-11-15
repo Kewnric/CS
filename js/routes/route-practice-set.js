@@ -101,6 +101,7 @@ function practiceSetInit() {
 
 function practiceSetDestroy() {
   psetDestroy();
+  if (typeof zdockUnmount === 'function') zdockUnmount();
   if (typeof skDestroy === 'function') skDestroy();
   // All of these live on <body> or on a timer, not inside the route, so the
   // route being replaced does not take them with it. The program screen has

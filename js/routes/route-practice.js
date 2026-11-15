@@ -185,6 +185,7 @@ function practiceInit() {
 }
 function practiceDestroy() {
   if (typeof GuidedTutorial !== 'undefined' && GuidedTutorial.end) GuidedTutorial.end();
+  if (typeof zdockUnmount === 'function') zdockUnmount();
   // The program admin window lives on <body>; an unsaved draft goes with it.
   if (typeof practiceAdminDrop === 'function') practiceAdminDrop();
   if (typeof skDestroy === 'function') skDestroy();

@@ -764,6 +764,12 @@ function _syncTopbarButton() {
 }
 
 /* ── Zen mode: collapse the description and results panels ── */
+/* Where zen is remembered. The attempt screens share 'practiceZen'; a screen
+   that wants its own (Freeground's bare mode) names it in data-zen-key. */
+function _zenKey(layout) {
+  return (layout && layout.dataset && layout.dataset.zenKey) || 'practiceZen';
+}
+
 function isZenMode() {
   const layout = document.querySelector('.practice-layout');
   return !!layout && layout.classList.contains('zen');
@@ -775,7 +781,7 @@ function toggleZenMode() {
   // Zen folds the topbar too; pin its height so that fold animates.
   _tbPrepareFold(layout);
   const on = layout.classList.toggle('zen');
-  localStorage.setItem('practiceZen', on ? '1' : '0');
+  localStorage.setItem(_zenKey(layout), on ? '1' : '0');
   const btn = document.getElementById('ed-zen-btn');
   if (btn) {
     btn.classList.toggle('active', on);
@@ -783,10 +789,13 @@ function toggleZenMode() {
     if (ic) { ic.setAttribute('data-lucide', on ? 'minimize-2' : 'maximize-2'); if (typeof lucide !== 'undefined') lucide.createIcons({ root: btn }); }
   }
   window.dispatchEvent(new Event('resize'));
+  // Run, Check and Finish, which zen just folded away (js/zen-dock.js).
+  if (typeof zdockSync === 'function') zdockSync();
 }
 
 function initZenState() {
-  if (localStorage.getItem('practiceZen') === '1' && !isZenMode()) toggleZenMode();
+  const layout = document.querySelector('.practice-layout');
+  if (localStorage.getItem(_zenKey(layout)) === '1' && !isZenMode()) toggleZenMode();
 }
 
 /** Leaving mid-attempt — the code is autosaved, but say so rather than just vanishing. */

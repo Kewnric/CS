@@ -1,0 +1,93 @@
+/* ============================================================
+   ZEN-DOCK.CSS — the pill that carries Run, Check and Finish in zen
+   (js/zen-dock.js). Inside .practice-layout, above the editor and its
+   ambient layers, below the terminal window, dialogs and sticker tools.
+   ============================================================ */
+
+.practice-layout { position: relative; }
+
+.zdock {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 6px 4px 2px;
+  border-radius: var(--radius-full);
+  background: rgba(13, 17, 23, 0.88);
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  animation: zdock-in 0.26s ease-out backwards;
+  transition: opacity 0.25s ease, transform 0.2s ease;
+  user-select: none;
+}
+@keyframes zdock-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+}
+
+/* Typing: out of the way, and back on focus or a pointer nearby. */
+.zdock.is-faded { opacity: 0.35; }
+.zdock:focus-within, .zdock.is-dragging { opacity: 1; }
+
+/* The caret's line runs underneath: sit at the top instead. */
+.zdock.is-raised { bottom: auto !important; top: 16px; }
+
+.zdock-grip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 2px;
+  cursor: grab;
+  color: var(--text-tertiary);
+  touch-action: none;
+}
+.zdock.is-dragging .zdock-grip { cursor: grabbing; }
+.zdock-grip svg { width: 14px; height: 14px; }
+
+.zdock-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+.zdock-seg[hidden] { display: none; }
+.zdock-seg svg { width: 13px; height: 13px; color: var(--text-tertiary); }
+.zdock-hp svg { color: var(--color-warning); }
+
+.zdock-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.zdock-btn svg { width: 14px; height: 14px; }
+.zdock-btn:hover { background: rgba(255, 255, 255, 0.08); }
+.zdock-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+.zdock-btn.is-primary { background: var(--color-primary); color: #fff; }
+.zdock-btn.is-primary:hover { filter: brightness(1.1); }
+.zdock-btn.is-unavailable { opacity: 0.45; cursor: not-allowed; }
+
+@media (max-width: 640px) {
+  .zdock-label { display: none; }
+  .zdock-btn { min-width: 44px; min-height: 44px; justify-content: center; padding: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zdock { animation: none; transition: none; }
+}
