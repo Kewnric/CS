@@ -233,7 +233,8 @@ function getGlobalCommands() {
   const cmds = [
     { id: 'go-home', icon: 'home', label: 'Go to Home', sub: 'Dashboard', keywords: 'dashboard home', run: () => spaNavigate('home') },
     { id: 'go-library', icon: 'library', label: 'Go to Library', sub: 'All collections', keywords: 'library hub collections wings', run: () => spaNavigate('library') },
-    { id: 'go-browse', icon: 'layout-template', label: 'Go to Coding Library', sub: 'Programs', keywords: 'browse programs challenges code', run: () => spaNavigate('browse') },
+    { id: 'go-coding', icon: 'code-2', label: 'Go to Coding Library', sub: 'Hackathon and Freeground', keywords: 'coding library code', run: () => spaNavigate('coding') },
+    { id: 'go-browse', icon: 'swords', label: 'Go to Hackathon', sub: 'Programs and practice sets', keywords: 'hackathon browse programs challenges code', run: () => spaNavigate('browse') },
     { id: 'go-freeground', icon: 'terminal', label: 'Open Freeground', sub: 'Write and run anything', keywords: 'freeground scratch playground editor terminal run', run: () => fgOpen() },
     { id: 'go-study', icon: 'book-open', label: 'Go to Notes Library', sub: 'Notebooks & quizzes', keywords: 'study notes notebooks quizzes', run: () => spaNavigate('study') },
     { id: 'go-snippets', icon: 'code', label: 'Go to Snippet Library', sub: 'Code snippets', keywords: 'snippets code reference examples', run: () => spaNavigate('snippets') },

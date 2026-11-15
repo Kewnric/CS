@@ -6,16 +6,16 @@ function browseTemplate() {
         <div class="pane-1-header">
           <div style="display: flex; align-items: center; gap: 0.5rem; width: 100%; justify-content: space-between;">
             <div style="display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0;">
-              <button onclick="spaNavigate('library')" class="btn-back-dark" style="margin-right: 0.5rem; padding: 0.25rem 0.5rem; font-size: 0.75rem; flex-shrink: 0;">
+              <button onclick="spaNavigate('coding')" class="btn-back-dark" title="Back to the Coding Library" style="margin-right: 0.5rem; padding: 0.25rem 0.5rem; font-size: 0.75rem; flex-shrink: 0;">
                 <i data-lucide="chevron-left" style="width:14px;height:14px;"></i> Back
               </button>
               <h2 class="section-header-animated" style="margin: 0; display: flex; align-items: center;">
                 <span class="section-header-icon-wrap browse-icon-wrap">
-                  <i data-lucide="layout-template"></i>
+                  <i data-lucide="swords"></i>
                   <span class="section-header-icon-ring"></span>
                 </span>
                 <span class="section-header-text">
-                  <span class="section-header-title">Coding Library</span>
+                  <span class="section-header-title">Hackathon</span>
                   <span class="section-header-subtitle" id="browse-header-stats">0 programs</span>
                 </span>
               </h2>

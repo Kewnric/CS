@@ -271,7 +271,7 @@ window.homeHideVerse = function () {
 
 const HOME_ACTIONS = [
   { key: 'library',   route: 'library',    href: '#/library',   icon: 'library',      label: 'Library',         desc: 'All collections in one place' },
-  { key: 'browse',    route: 'browse',     href: '#/browse',    icon: 'layout-grid',  label: 'Coding Library',  desc: 'Explore challenge programs' },
+  { key: 'browse',    route: 'coding',     href: '#/coding',    icon: 'layout-grid',  label: 'Coding Library',  desc: 'Hackathon and Freeground' },
   { key: 'notes',     route: 'study',      href: '#/study',     icon: 'book-open',    label: 'Notes Library',   desc: 'Notebooks & quizzes' },
   { key: 'snippets',  route: 'snippets',   href: '#/snippets',  icon: 'code-2',       label: 'Snippet Library', desc: 'Reference & try-coding' },
   { key: 'analytics', route: 'analytics',  href: '#/analytics', icon: 'bar-chart-2',  label: 'Analytics',       desc: 'View your history' },

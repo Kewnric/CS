@@ -48,7 +48,7 @@ function fgOpen(opts) {
   }
   if (_fg) return true;
   const here = (document.body && document.body.dataset.route) || '';
-  setSessionParam('fgBack', o.back || here || 'browse');
+  setSessionParam('fgBack', o.back || here || 'coding');
   spaNavigate('freeground');
   return true;
 }
@@ -64,7 +64,7 @@ function freegroundTemplate() {
         <p>The app was just updated and part of it is still the old version, which cannot save freegrounds. Reload the page to finish updating.</p>
         <div class="fg-stale-actions">
           <button class="btn btn-primary" onclick="location.reload()">Reload</button>
-          <button class="btn btn-ghost" onclick="spaNavigate('browse')">Back</button>
+          <button class="btn btn-ghost" onclick="spaNavigate('coding')">Back</button>
         </div>
       </div>`;
   }
@@ -133,7 +133,7 @@ function freegroundInit() {
   clearSessionParam('fgBack');
   const prevRoute = String(window.cm_prevRoute || '').split('?')[0];
   _fg = {
-    back: back || (prevRoute && prevRoute !== 'freeground' ? prevRoute : 'browse'),
+    back: back || (prevRoute && prevRoute !== 'freeground' ? prevRoute : 'coding'),
     prev: { challenge: state.activeChallenge, variant: state.activeVariant, files: state.userFiles, idx: state.activeFileIndex },
     page: generateId(),
     dirty: new Set(),
@@ -211,9 +211,9 @@ function freegroundDestroy() {
 }
 
 function fgBack() {
-  const back = _fg ? _fg.back : 'browse';
+  const back = _fg ? _fg.back : 'coding';
   fgCommit();
-  spaNavigate(back && back !== 'freeground' ? back : 'browse');
+  spaNavigate(back && back !== 'freeground' ? back : 'coding');
 }
 
 /* ── One tab in the editor ─────────────────────────────────── */

@@ -1,0 +1,56 @@
+/* ============================================================
+   CODING-HUB.CSS — the Coding Library's landing page
+   (js/routes/route-coding.js). The tiles are the Library page's own
+   cards (libSpatialCardHTML); this adds the number key and the action
+   button they can carry, and sizes the page for two to four tiles.
+   ============================================================ */
+
+.chub-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+.chub-back { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
+
+.chub-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  max-width: 900px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* The number that opens a tile from the keyboard. */
+.lib-card-key {
+  margin-left: auto;
+  margin-right: 8px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  border-bottom-width: 2px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--text-tertiary);
+  background: transparent;
+}
+
+/* A tile's shortcut: Continue, New tab. Above the card's own hover layers. */
+.lib-card-action {
+  position: relative;
+  z-index: 2;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 0.85rem;
+}
+.lib-card-action svg { width: 14px; height: 14px; }
+
+.lib-card-freeground .lib-card-icon { color: #22c55e; }
+
+@media (max-width: 640px) {
+  .chub-grid { grid-template-columns: 1fr; }
+  .lib-card-key { display: none; }
+}

@@ -26,6 +26,10 @@ const GuidedTutorial = (function () {
       { selector: '#home-heatmap', message: "This tracks your daily consistency. Darker squares mean you were extra productive those days.", title: 'Heatmap' },
       { selector: '#home-notebook-carousel', message: "Your recently accessed notebooks live here for quick jumping back into study sessions.", title: 'Carousel' },
     ],
+    coding: [
+      { selector: '#chub-grid .lib-card:nth-child(1)', message: "Hackathon is where your programs live: the folder tree, attempts, tests and the boss bar. Continue drops you straight back into the program you left.", title: 'Hackathon' },
+      { selector: '#chub-grid .lib-card:nth-child(2)', message: "Freeground is a blank editor and a terminal with nothing else on screen. Write and run anything; every tab is saved, and Ctrl+P lists them all.", title: 'Freeground' },
+    ],
     browse: [
       { selector: '#browse-search', message: "Looking for something specific? Start typing keywords or tags to filter challenges in real-time.", title: 'Search Bar' },
       { selector: '#browse-category-list', message: "Navigate your folders here. Folders can be nested; click the chevron to expand or collapse subcategories.", title: 'Folder Tree' },
@@ -78,7 +82,7 @@ const GuidedTutorial = (function () {
   };
 
   // Pages that have the sidebar
-  const SIDEBAR_PAGES = ['dashboard', 'browse', 'study', 'snippets', 'admin', 'analytics'];
+  const SIDEBAR_PAGES = ['dashboard', 'coding', 'browse', 'study', 'snippets', 'admin', 'analytics'];
 
   function getStepsForPage(pageId) {
     const pageSteps = (PAGE_STEPS[pageId] || []).slice();

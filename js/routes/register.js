@@ -32,7 +32,11 @@ function registerAllRoutes() {
   });
 
   SpaRouter.register('wing', { title: 'StudySession Pro — Library', templateFn: wingTemplate, initFn: wingInitLegacy, destroyFn: wingDestroy, sidebarVisible: true, navId: 'nav-library' });
-  SpaRouter.register('browse', { title: 'StudySession Pro — Coding Library', templateFn: browseTemplate, initFn: browseInit, destroyFn: browseDestroy, sidebarVisible: true, navId: 'nav-library' });
+  /* The Coding Library opens on its sections (route-coding.js); the programs
+     are Hackathon, one level down, at the address they always had. Depths
+     tell the page transition which way each move goes (mx-nav.js). */
+  SpaRouter.register('coding', { title: 'StudySession Pro — Coding Library', templateFn: codingHubTemplate, initFn: codingHubInit, destroyFn: codingHubDestroy, sidebarVisible: true, navId: 'nav-library', depth: 1 });
+  SpaRouter.register('browse', { title: 'StudySession Pro — Hackathon', templateFn: browseTemplate, initFn: browseInit, destroyFn: browseDestroy, sidebarVisible: true, navId: 'nav-library', depth: 2 });
   SpaRouter.register('study', { title: 'StudySession Pro — Notes Library', templateFn: studyTemplate, initFn: studyInit, destroyFn: studyDestroy, sidebarVisible: true, navId: 'nav-library' });
   SpaRouter.register('snippets', { title: 'StudySession Pro — Snippet Library', templateFn: snippetsTemplate, initFn: snippetsInit, destroyFn: snippetsDestroy, sidebarVisible: true, navId: 'nav-library' });
   SpaRouter.register('typing', { title: 'StudySession Pro — Memorization Typing Library', templateFn: typingTemplate, initFn: typingInit, destroyFn: typingDestroy, sidebarVisible: true, navId: 'nav-library' });
@@ -68,7 +72,7 @@ function registerAllRoutes() {
      attempt, because it is a place to write, but it is not one. */
   SpaRouter.register('freeground', { title: 'StudySession Pro — Freeground', templateFn: freegroundTemplate, initFn: freegroundInit, destroyFn: freegroundDestroy, sidebarVisible: false, navId: null });
   SpaRouter.register('practice', { title: 'StudySession Pro — Practice', templateFn: practiceTemplate, initFn: practiceInit, destroyFn: practiceDestroy, sidebarVisible: false, navId: null });
-  SpaRouter.register('drills', { title: 'StudySession Pro — Drills', templateFn: drillsTemplate, initFn: drillsInit, destroyFn: drillsDestroy, sidebarVisible: true, navId: null });
+  SpaRouter.register('drills', { title: 'StudySession Pro — Drills', templateFn: drillsTemplate, initFn: drillsInit, destroyFn: drillsDestroy, sidebarVisible: true, navId: null, depth: 3 });
   SpaRouter.register('practice-set', { title: 'StudySession Pro — Multi-Problem Session', templateFn: practiceSetTemplate, initFn: practiceSetInit, destroyFn: practiceSetDestroy, sidebarVisible: false, navId: null });
   SpaRouter.register('snippet-attempt', { title: 'SQL Practice — StudySession Pro', templateFn: snippetAttemptTemplate, initFn: snippetAttemptInit, destroyFn: snippetAttemptDestroy, sidebarVisible: false, navId: null });
   /* Focused like the other attempts: the test is the whole screen, with its

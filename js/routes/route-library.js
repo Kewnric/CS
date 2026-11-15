@@ -132,8 +132,8 @@ function libraryInit() {
     };
 
     active.innerHTML =
-      card('browse', 'lib-card-coding', 'code-2', 'Coding Library',
-        'Challenge programs — rebuild them from memory, run real tests, defeat the boss bar.',
+      card('coding', 'lib-card-coding', 'code-2', 'Coding Library',
+        'Hackathon, your programs to rebuild from memory and test, and Freeground, to write and run anything.',
         _libStatChip('file-code', countNoun(challenges.length, 'program')) + _libStatChip('check-circle', `${completedPrograms} completed`) + dueChip('challenge', challenges),
         codingPct, `${completedPrograms}/${challenges.length} completed`) +
       card('study', 'lib-card-notes', 'book-open', 'Notes Library',
@@ -231,11 +231,19 @@ function libSpatialCardHTML(o) {
         <div class="lib-card-bg"><div class="lib-card-glow"></div><div class="lib-card-light"></div></div>
         <div class="lib-card-head">
           <div class="lib-card-icon"><i data-lucide="${o.icon}"></i></div>
+          ${o.key ? `<kbd class="lib-card-key" title="Press ${o.key}">${o.key}</kbd>` : ''}
           <i data-lucide="${o.arrow || 'arrow-up-right'}" class="lib-card-arrow"></i>
         </div>
         <h3 class="lib-card-name">${o.name}</h3>
         <p class="lib-card-desc">${o.desc}</p>
         <div class="lib-card-chips">${o.chips || ''}</div>
+        ${o.action ? `
+        <!-- Its own click and keys only: the card around it opens on both. -->
+        <button type="button" class="btn btn-secondary btn-sm lib-card-action"
+                onclick="event.stopPropagation(); ${o.action.onclick}" onkeydown="event.stopPropagation()"
+                title="${escapeHTML(o.action.title || o.action.label)}">
+          <i data-lucide="${o.action.icon || 'play'}"></i> ${escapeHTML(o.action.label)}
+        </button>` : ''}
         ${o.pct === null || o.pct === undefined ? '' : `
         <div class="lib-card-progress" title="${o.pctLabel || ''}">
           <div class="folder-progress-bar"><div class="folder-progress-fill" style="width:${o.pct}%;"></div></div>

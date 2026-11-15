@@ -10,7 +10,8 @@
 const SHORTCUT_GO_MAP = {
   h: { route: 'home',          label: 'Home' },
   l: { route: 'library',       label: 'Library' },
-  c: { route: 'browse',        label: 'Coding Library' },
+  c: { route: 'coding',        label: 'Coding Library' },
+  k: { route: 'browse',        label: 'Hackathon' },
   f: { route: 'freeground',    label: 'Freeground' },
   n: { route: 'study',         label: 'Notes Library' },
   p: { route: 'snippets',      label: 'Snippet Library' },
@@ -131,6 +132,7 @@ function toggleShortcutsCheatSheet() {
       ['Home', seq('G', 'H')],
       ['Library hub', seq('G', 'L')],
       ['Coding Library', seq('G', 'C')],
+      ['Hackathon (programs)', seq('G', 'K')],
       ['Freeground', seq('G', 'F')],
       ['Notes Library', seq('G', 'N')],
       ['Snippet Library', seq('G', 'P')],
