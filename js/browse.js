@@ -2250,6 +2250,8 @@ function treeAccentAttrs(rec) {
 
 /** Write one colour to one part of a record. An empty id clears that part and leaves the other alone. */
 function _treeWriteColor(rec, target, colorId) {
+  // A bullet's colour belongs to its level, not a row (treeSetLevelBulletColor).
+  if (target === 'bullet') return;
   const key = target === 'rail' ? 'railColor' : target === 'icon' ? 'iconColor' : 'color';
   if (colorId) rec[key] = colorId; else delete rec[key];
 }
@@ -2414,7 +2416,7 @@ const TREE_COLOR_TARGET_KEY = 'ssp.treeColorTarget';
 
 /** Which part the dialog paints, remembered so it opens where you left it. */
 function _treeColorTarget() {
-  try { const t = localStorage.getItem(TREE_COLOR_TARGET_KEY); return t === 'rail' || t === 'icon' ? t : 'text'; }
+  try { const t = localStorage.getItem(TREE_COLOR_TARGET_KEY); return t === 'rail' || t === 'icon' || t === 'bullet' ? t : 'text'; }
   catch (e) { return 'text'; }
 }
 
@@ -2443,8 +2445,8 @@ function treeColorDialog(o) {
   const stale = document.getElementById('tree-color-dlg');
   if (stale) stale.remove();
   let target = _treeColorTarget();
-  const cur = Object.assign({ text: '', rail: '', icon: '' }, o.current || {});
-  const known = { text: !!o.current, rail: !!o.current, icon: !!o.current };
+  const cur = Object.assign({ text: '', rail: '', icon: '', bullet: '' }, o.current || {});
+  const known = { text: !!o.current, rail: !!o.current, icon: !!o.current, bullet: !!o.current };
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay fd-overlay';
@@ -2462,11 +2464,17 @@ function treeColorDialog(o) {
         '<button type="button" class="tree-color-seg-btn" role="radio" data-target="icon">' +
           '<span class="tree-color-seg-glyph is-icon" aria-hidden="true"><i data-lucide="folder"></i></span>Icon' +
           '<span class="tree-color-seg-dot" aria-hidden="true"></span></button>' +
+        // The bullets or numbers of this row's whole level (right-click >
+        // Bullets for this level): one colour for every row beside it.
+        '<button type="button" class="tree-color-seg-btn" role="radio" data-target="bullet"' +
+          ' title="Colours the bullet or number of every row in this level">' +
+          '<span class="tree-color-seg-glyph is-bullet" aria-hidden="true">1.</span>Bullet' +
+          '<span class="tree-color-seg-dot" aria-hidden="true"></span></button>' +
       '</div>' +
       '<div class="tree-color-preview" aria-hidden="true">' +
         '<span class="tree-color-preview-bar"></span>' +
         '<span class="tree-color-preview-icon"><i data-lucide="folder"></i></span>' +
-        '<span class="tree-color-preview-label">Preview</span>' +
+        '<span class="tree-color-preview-label"><span class="tree-color-preview-bullet">1.</span>Preview</span>' +
         '<span class="tree-color-preview-rail"></span>' +
       '</div>' +
       '<div class="tree-color-grid">' +
@@ -2501,6 +2509,9 @@ function treeColorDialog(o) {
     if (cur.rail) pv.style.setProperty('--pv-rail', treeRgbOf(cur.rail));
     pv.classList.toggle('has-rail', !!cur.rail);
     pv.style.setProperty('--pv-icon', cur.icon ? treeColorOf(cur.icon) : 'var(--text-tertiary)');
+    // No colour of its own: the bullet is the title's (it sits inside the title).
+    if (cur.bullet) pv.style.setProperty('--pv-bullet', treeColorOf(cur.bullet));
+    else pv.style.removeProperty('--pv-bullet');
   };
 
   overlay.querySelectorAll('.tree-color-seg-btn').forEach(b => {
@@ -2535,8 +2546,11 @@ function browseSetColor(id) {
   if (!it) return;
   treeColorDialog({
     title: 'Highlight colour',
-    current: { text: it.color || '', rail: it.railColor || '', icon: it.iconColor || '' },
+    current: { text: it.color || '', rail: it.railColor || '', icon: it.iconColor || '',
+               bullet: typeof treeLevelBulletColor === 'function' ? treeLevelBulletColor(id) : '' },
     apply: (target, colorId) => {
+      // The bullet colour is the whole level's, the rest are this row's.
+      if (target === 'bullet') { if (typeof treeSetLevelBulletColor === 'function') treeSetLevelBulletColor([id], colorId); return; }
       _treeWriteColor(it, target, colorId);
       saveData(); invalidateBrowseCache(); treeRefreshHosts();
     }
@@ -2545,6 +2559,7 @@ function browseSetColor(id) {
 window.browseApplyColor = function (id, color, target) {
   const it = browseFindItem(id);
   if (!it) return;
+  if (target === 'bullet') { if (typeof treeSetLevelBulletColor === 'function') treeSetLevelBulletColor([id], color); return; }
   _treeWriteColor(it, target === 'rail' || target === 'icon' ? target : 'text', color);
   saveData();
   invalidateBrowseCache(); treeRefreshHosts();
@@ -2632,6 +2647,8 @@ function browseBatchColor(ids) {
     title: 'Highlight colour for ' + targets.length,
     current: null,
     apply: (part, colorId) => {
+      // Every level the ticked rows are in.
+      if (part === 'bullet') { if (typeof treeSetLevelBulletColor === 'function') treeSetLevelBulletColor(ids, colorId); return; }
       targets.forEach(t => _treeWriteColor(t.rec, part, colorId));
       saveData(); invalidateBrowseCache(); treeRefreshHosts();
     }

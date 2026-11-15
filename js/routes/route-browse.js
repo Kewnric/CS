@@ -50,6 +50,16 @@ function browseTemplate() {
                             aria-pressed="false" title="Show hidden programs" aria-label="Show hidden programs">
                       <i data-lucide="archive"></i>
                     </button>
+                    <!-- Lock the tree's order: no row can be dragged to a new
+                         place, in this tree or any other (tree-dnd.js). -->
+                    ${(() => {
+                      const locked = typeof treeOrderLocked === 'function' && treeOrderLocked();
+                      const label = locked ? 'Unlock tree order' : 'Lock tree order';
+                      return `<button class="tutorial-trigger-btn${locked ? ' is-on' : ''}" data-tree-lock-btn onclick="treeToggleOrderLock()"
+                            data-label="${label}" aria-pressed="${locked}" title="${label}" aria-label="${label}">
+                      <i data-lucide="${locked ? 'lock' : 'lock-open'}"></i>
+                    </button>`;
+                    })()}
                     ${typeof codingStarterButtonTemplate === 'function' ? codingStarterButtonTemplate() : ''}
                     <!-- Every walkthrough, browsable outside an attempt. -->
                     <button class="tutorial-trigger-btn" onclick="demoOpenLibrary()" data-label="Walkthroughs"

@@ -221,6 +221,18 @@ tokens so spacing and comments never count; off in Recall mode).
   device in `ssp.typeConfig`.
 - **Wings** (`js/wings/`) — newer libraries sharing a schema-driven core.
 
+**Tree bullets and the order lock** (`js/tree-dnd.js`, every tree that commits through
+`treeCommit`: Coding, Notebooks, Snippets, Visualize, Brain). Right-click a row → "Bullets for
+this level…" lists that row's level (its siblings) with a bullet or a number style;
+`treeApplyBullets` marks the level's box `data-bullets` and puts an empty `.tree-bullet` slot first
+inside each row's `.tree-node-label`, and a CSS counter fills it (`css/library.css`). Numbers come
+from the rows' order on screen, so they stay with the SLOT through a reorder. Keys: a real folder's
+id (shared by every tree that shows it), else `<scope>:top` / `<scope>:<pseudo id>`. Styles live in
+libPrefs `treeBullets`, a level's colour in `treeBulletColors` (Highlight colour → Bullet, the whole
+level). "Lock tree order" (`treeOrderLocked`, libPrefs, in the Coding Library's header menu and every
+row's right-click) stops drags in every tree; a Visualize row can still be dragged onto the canvas.
+A drop between two top-level rows reorders the top level (`treeMoveAllowed(…, reorder)`).
+
 **Notebook editor** (route `admin-notes`), three files:
 - `admin-notebooks.js` — the list, the form, tags window, sections, Import window.
 - `admin-notebook-questions.js` — the question model (`nbApplyTypeDefaults`,

@@ -192,12 +192,12 @@ let _treeMoveConfirmed = false;   // set while re-entering after the user says y
  * @param {string|null} beforeId  insert ahead of this sibling, or append
  * @returns {number} how many actually moved
  */
-function treeApplyMove(ids, ns, newParentId, beforeId) {
+function treeApplyMove(ids, ns, newParentId, beforeId, reorder) {
   _treeNs = ns;
   if (newParentId === TREE_ROOT_ID) newParentId = null;
   const scope = treeScope(ns);
   const host = TREE_HOSTS[ns] || {};
-  const moving = ids.filter(id => treeMoveAllowed(id, ns, newParentId));
+  const moving = ids.filter(id => treeMoveAllowed(id, ns, newParentId, reorder));
   if (!moving.length) return 0;
 
   /* Changing which folder something lives in is asked about first; reordering
@@ -211,7 +211,7 @@ function treeApplyMove(ids, ns, newParentId, beforeId) {
       const where = newParentId ? `“${treeLabelOf(newParentId, scope)}”` : 'the top level';
       showConfirm('Move?', `Move ${what} to ${where}?`, () => {
         _treeMoveConfirmed = true;
-        try { treeApplyMove(ids, ns, newParentId, beforeId); } finally { _treeMoveConfirmed = false; }
+        try { treeApplyMove(ids, ns, newParentId, beforeId, reorder); } finally { _treeMoveConfirmed = false; }
       });
       return 0;
     }
@@ -275,15 +275,18 @@ function _treeSetOrder(ns, parentId, scope, ids) {
   updateTreeOrder(parentId, scope, ids);
 }
 
-/** Nothing may enter itself, its own descendants, or a non-folder. */
-function treeMoveAllowed(id, ns, newParentId) {
+/** Nothing may enter itself, its own descendants, or a non-folder.
+ *  `reorder`: a drop between two rows, which may stay in the level it is in --
+ *  "already at the top level" refused that too, so the top level could never
+ *  be put in a different order at all. */
+function treeMoveAllowed(id, ns, newParentId, reorder) {
   const host = TREE_HOSTS[ns] || {};
   // A host that consumes drops on this target decides for itself.
   if (newParentId && host.acceptsDrop && host.acceptsDrop(newParentId, id)) return true;
   if (newParentId === TREE_ROOT_ID) newParentId = null;
   const scope = treeScope(ns);
   if (!id || id === TREE_ROOT_ID) return false;     // the pseudo-folder never moves
-  if (!newParentId && !treeParentOf(id, scope)) return false;   // already there
+  if (!newParentId && !treeParentOf(id, scope) && !reorder) return false;   // already there
   if (host.canMove && !host.canMove(id, treeKindOf(id, scope))) return false;
   // Target-aware veto. The General tree stacks three libraries in one pane, and
   // nothing may cross between them — a snippet cannot become a program.
@@ -356,6 +359,14 @@ function treeToastUndo(msg) {
 /* ── Drag lifecycle ────────────────────────────────────────── */
 
 function treeDragStart(e, id, ns) {
+  /* Order locked: the tree takes no part in this drag. A Visualize row is
+     also being dragged toward the canvas (vizTreeDragStart), so that drag
+     goes on; anywhere else there is nothing else it could be for. */
+  if (treeOrderLocked()) {
+    if (ns !== 'viz' && e && typeof e.preventDefault === 'function') e.preventDefault();
+    if (ns !== 'viz') _treeLockTell();
+    return;
+  }
   _treeNs = ns;
   const scope = treeScope(ns);
   const host = TREE_HOSTS[ns] || {};
@@ -441,7 +452,7 @@ function treeDragOver(e, id, ns) {
     return;
   }
 
-  const legal = TDND.ids.some(d => treeMoveAllowed(d, ns, parentId));
+  const legal = TDND.ids.some(d => treeMoveAllowed(d, ns, parentId, zone !== 'into'));
   _treeClearHover();
   TDND.row = row; TDND.zone = zone;
 
@@ -492,7 +503,7 @@ function treeDrop(e, id, ns) {
   const sibs = treeChildren(parentId, scope).map(x => x.node.id).filter(x => ids.indexOf(x) === -1);
   const at = sibs.indexOf(id);
   const beforeId = zone === 'before' ? id : (at === -1 ? null : sibs[at + 1] || null);
-  treeApplyMove(ids, ns, parentId, beforeId);
+  treeApplyMove(ids, ns, parentId, beforeId, true);
 }
 
 /* ── Spring-loaded folders ─────────────────────────────────── */
@@ -554,6 +565,7 @@ document.addEventListener('pointerdown', (e) => {
   if (!holder) return;
   const ns = holder.dataset.treeNs;
   const id = row.dataset.nodeId;
+  if (treeOrderLocked()) return;            // a long press is only ever a drag here
   TDND.touch = { id, ns, row, x: e.clientX, y: e.clientY, active: false, timer: setTimeout(() => {
     TDND.touch.active = true;
     treeDragStart({ currentTarget: row, dataTransfer: null }, id, ns);
@@ -678,7 +690,247 @@ function treeCommit(container, html, selectedId) {
     if (typeof folderBannerHydrate === 'function') folderBannerHydrate(container);
   }
   treeApplySelection(container, selectedId);
+  // Every commit, not only a rebuild: a changed bullet style changes no markup.
+  treeApplyBullets(container);
   return rebuilt;
+}
+
+/* ── Bullets and numbers ───────────────────────────────────────
+   Any level of any tree can be listed: right-click a row, "Bullets for this
+   level", and every row beside it -- the children of the same folder, or the
+   tree's top level -- gets a mark between its icon and its title. One level
+   at a time: setting the top level does nothing to what is inside a folder,
+   and two folders side by side keep their own.
+
+   THE NUMBER BELONGS TO THE SLOT, NOT THE ROW. It is a CSS counter over the
+   rows as they stand on screen, so drag program 2 above program 1 and the
+   top row still reads "1.". Rows that are hidden (a search, "hide programs")
+   are not counted. Nothing here touches the rows' own markup: the renderer
+   draws its rows, and this adds an empty slot to each one after the fact,
+   so it works the same for every tree the engine serves.
+
+   Kept with the other library view settings (library-common.js libPrefs, on
+   this device). A folder's level is keyed by the folder's id, so two trees
+   showing the same folders (the Coding Library and Visualize) show the same
+   bullets; a tree's top level, and pseudo rows like Uncategorized, by the
+   tree's scope. */
+const TREE_BULLETS = [
+  { id: 'disc', sample: '•', label: 'Bullet' },
+  { id: 'circle', sample: '◦', label: 'Circle' },
+  { id: 'square', sample: '▪', label: 'Square' },
+  { id: 'dash', sample: '–', label: 'Dash' },
+  { id: 'arrow', sample: '›', label: 'Arrow' },
+  { id: 'star', sample: '★', label: 'Star' },
+  { sep: true },
+  { id: 'decimal', sample: '1.', label: 'Numbers' },
+  { id: 'paren', sample: '1)', label: 'Numbers, bracket' },
+  { id: 'zero', sample: '01.', label: 'Two-digit numbers' },
+  { id: 'upper-roman', sample: 'I.', label: 'Roman numerals' },
+  { id: 'lower-roman', sample: 'i.', label: 'Small roman numerals' },
+  { id: 'upper-alpha', sample: 'A.', label: 'Letters' },
+  { id: 'lower-alpha', sample: 'a.', label: 'Small letters' },
+];
+
+function _treeBulletMap() {
+  const m = typeof getLibPref === 'function' ? getLibPref('treeBullets', null) : null;
+  return m && typeof m === 'object' ? m : {};
+}
+
+/* A level's bullet COLOUR, by the same keys: one colour for every row of the
+   level, as the style is (Highlight colour > Bullet). With none, each mark is
+   its own title's colour. */
+function _treeBulletColorMap() {
+  const m = typeof getLibPref === 'function' ? getLibPref('treeBulletColors', null) : null;
+  return m && typeof m === 'object' ? m : {};
+}
+
+/** The level a row for `id` is in, in whichever tree on screen shows it. */
+function treeLevelOfId(id) {
+  const rows = document.querySelectorAll('[data-tree-ns] .tree-node-row[data-node-id]');
+  for (const row of rows) {
+    if (row.dataset.nodeId !== String(id)) continue;
+    const holder = row.closest('[data-tree-ns]');
+    const lv = holder ? _treeLevelOf(row, holder.dataset.treeNs) : null;
+    if (lv) return lv;
+  }
+  return null;
+}
+
+/** The bullet colour of the level `id` is in, or ''. */
+function treeLevelBulletColor(id) {
+  const lv = treeLevelOfId(id);
+  return lv ? (_treeBulletColorMap()[lv.key] || '') : '';
+}
+
+/** Colour the bullets of every level these rows are in (or with '' clear it). */
+function treeSetLevelBulletColor(ids, colorId) {
+  if (typeof setLibPref !== 'function') return 0;
+  const map = _treeBulletColorMap();
+  const keys = new Set();
+  (ids || []).forEach(id => { const lv = treeLevelOfId(id); if (lv) keys.add(lv.key); });
+  keys.forEach(k => { if (colorId) map[k] = colorId; else delete map[k]; });
+  setLibPref('treeBulletColors', Object.keys(map).length ? map : null);
+  document.querySelectorAll('[data-tree-ns]').forEach(c => treeApplyBullets(c));
+  return keys.size;
+}
+
+/**
+ * The key a level is stored under. `group` is the element that holds the
+ * level's rows: a folder's children box, or the tree itself (or a section of
+ * it) for the top level.
+ */
+function _treeLevelKey(group, container, ns) {
+  const scope = treeScope(ns) || ns || '';
+  const owner = group !== container && group.closest ? group.closest('.tree-node[data-node-id]') : null;
+  if (owner && container.contains(owner)) {
+    const id = owner.dataset.nodeId;
+    // A real folder is keyed by its id, which is the same in every tree.
+    const real = id !== TREE_ROOT_ID && ((state.nodes || []).some(n => n.id === id) ||
+      (_treeData(ns, scope) && treeFind(id, scope, ns)));
+    return real ? id : scope + ':' + id;
+  }
+  // Top level: the tree itself, or one of several sections laid out in it.
+  const tops = [];
+  container.querySelectorAll('.tree-node').forEach(n => {
+    const p = n.parentElement;
+    if (p && tops.indexOf(p) === -1 && !(p !== container && p.closest('.tree-node') && container.contains(p.closest('.tree-node')))) tops.push(p);
+  });
+  const k = Math.max(0, tops.indexOf(group));
+  return scope + ':top' + (k ? ':' + k : '');
+}
+
+/** The level a row is in, as { group, key }, or null. */
+function _treeLevelOf(row, ns) {
+  const node = row && row.closest ? row.closest('.tree-node') : null;
+  const group = node && node.parentElement;
+  const container = row && row.closest ? row.closest('[data-tree-ns]') : null;
+  if (!group || !container) return null;
+  return { group, key: _treeLevelKey(group, container, ns) };
+}
+
+/** Mark each level of a drawn tree with its style, and give its rows a slot for the mark. */
+function treeApplyBullets(container) {
+  if (!container || !container.querySelectorAll) return;
+  const ns = _treeNsOf(container);
+  if (!ns) return;
+  const map = _treeBulletMap();
+  // The usual case: nothing listed anywhere, nothing marked. This runs on every commit.
+  if (!Object.keys(map).length && !container.querySelector('[data-bullets]') && !container.dataset.bullets) return;
+  const groups = [];
+  container.querySelectorAll('.tree-node').forEach(n => {
+    const p = n.parentElement;
+    if (p && groups.indexOf(p) === -1) groups.push(p);
+  });
+  const colors = _treeBulletColorMap();
+  groups.forEach(g => {
+    const key = _treeLevelKey(g, container, ns);
+    const style = map[key] || '';
+    if ((g.dataset.bullets || '') !== style) {
+      if (style) g.dataset.bullets = style; else delete g.dataset.bullets;
+    }
+    // The level's colour, if it has one: every mark in it, not one row's.
+    const color = style && colors[key] && typeof treeColorOf === 'function' ? colors[key] : '';
+    if ((g.dataset.bulletColor || '') !== color) {
+      if (color) {
+        g.dataset.bulletColor = color;
+        g.style.setProperty('--tb-color', treeColorOf(color));
+      } else {
+        delete g.dataset.bulletColor;
+        g.style.removeProperty('--tb-color');
+      }
+    }
+    if (!style) return;
+    for (const node of g.children) {
+      if (!node.classList.contains('tree-node')) continue;
+      /* Inside the title, as its first thing -- so it is after the icon and
+         before the words, wears the title's own colour and type in every
+         state (selected, a highlight colour, a banner), and slides with the
+         title when a long one is walked along on hover. The slot is empty
+         markup; the mark itself is CSS, so the title's text is unchanged. */
+      const label = node.querySelector(':scope > .tree-node-row > .tree-node-label');
+      if (!label || label.querySelector('.tree-bullet')) continue;
+      const span = document.createElement('span');
+      span.className = 'tree-bullet';
+      span.setAttribute('aria-hidden', 'true');
+      label.prepend(span);
+    }
+  });
+}
+
+/** Set (or with '' clear) the style of the level stored under `key`. */
+function treeSetBullets(key, style) {
+  if (typeof setLibPref !== 'function') return;
+  const map = _treeBulletMap();
+  if (style) map[key] = style; else delete map[key];
+  setLibPref('treeBullets', Object.keys(map).length ? map : null);
+  // Every tree on screen, including any other one showing the same folders.
+  document.querySelectorAll('[data-tree-ns]').forEach(c => treeApplyBullets(c));
+}
+
+/** The choice of styles, opened in place of the right-click menu it came from. */
+function treeBulletMenu(e, key) {
+  const now = _treeBulletMap()[key] || '';
+  const tick = (id) => (id === now ? 'check' : 'minus');
+  const actions = [{ icon: tick(''), label: 'None', fn: () => treeSetBullets(key, '') }, { sep: true }];
+  TREE_BULLETS.forEach(b => {
+    if (b.sep) { actions.push({ sep: true }); return; }
+    actions.push({
+      icon: tick(b.id),
+      label: '<span class="tree-bullet-sample">' + b.sample + '</span>' + b.label,
+      fn: () => treeSetBullets(key, b.id)
+    });
+  });
+  _treeShowMenu(e, actions);
+}
+
+/* ── Locking the order ────────────────────────────────────────
+   One switch for every tree (library header menu, or any row's right-click):
+   while it is on, nothing in a tree can be dragged to a new place. Moving
+   with "Move to…" still works -- that is asked for, not slipped into by a
+   drag that started a little too far. A Visualize row can still be dragged
+   onto the canvas; only the tree refuses the drop. */
+function treeOrderLocked() {
+  return typeof getLibPref === 'function' && !!getLibPref('treeOrderLocked', false);
+}
+
+function treeToggleOrderLock() {
+  const on = !treeOrderLocked();
+  if (typeof setLibPref === 'function') setLibPref('treeOrderLocked', on || null);
+  treeSyncLockButtons();
+  if (typeof toast === 'function') {
+    toast(on ? 'Tree order locked: rows can no longer be dragged.' : 'Tree order unlocked: drag rows to reorder them.',
+      { type: 'info', duration: 2400 });
+  }
+}
+
+/** Every lock switch on screen shows the state, and the page knows it for the cursor. */
+function treeSyncLockButtons() {
+  const on = treeOrderLocked();
+  document.body.classList.toggle('tree-order-locked', on);
+  document.querySelectorAll('[data-tree-lock-btn]').forEach(btn => {
+    btn.classList.toggle('is-on', on);
+    btn.setAttribute('aria-pressed', String(on));
+    const label = on ? 'Unlock tree order' : 'Lock tree order';
+    btn.title = label;
+    btn.setAttribute('aria-label', label);
+    btn.dataset.label = label;
+    const icon = btn.querySelector('svg, i');
+    if (icon && typeof _setLucideIcon === 'function') _setLucideIcon(icon, on ? 'lock' : 'lock-open');
+    else if (icon) {
+      const i = document.createElement('i');
+      i.setAttribute('data-lucide', on ? 'lock' : 'lock-open');
+      icon.replaceWith(i);
+      if (typeof lucide !== 'undefined') lucide.createIcons({ root: btn });
+    }
+  });
+}
+
+let _treeLockToldAt = 0;
+function _treeLockTell() {
+  const now = Date.now();
+  if (now - _treeLockToldAt < 2500) return;
+  _treeLockToldAt = now;
+  if (typeof toast === 'function') toast('Tree order is locked. Unlock it from the library menu or a row\'s right-click.', { type: 'info', duration: 2600 });
 }
 
 /**
@@ -857,7 +1109,12 @@ function treeSyncExpansion(container) {
   });
   // A hovered folder that just opened (or closed) starts (or stops) its GIF banner.
   if (typeof folderBannerSyncPlay === 'function') folderBannerSyncPlay(container);
+  // A folder that draws its rows only when opened gets their bullet slots now.
+  treeApplyBullets(container);
 }
+
+// The lock is a page-wide state (the cursor, every switch); put it up on load.
+document.addEventListener('DOMContentLoaded', () => { if (typeof treeSyncLockButtons === 'function') treeSyncLockButtons(); });
 
 /** The always-present drop target under a tree that means "top level". */
 function treeRootDropHTML(ns) {
@@ -897,6 +1154,14 @@ function treeContextMenu(e, id, ns) {
   const found = treeFind(id, scope);
   if (!found) return;
   const isFolder = found.kind === 'folder';
+  // The row the menu was opened on: its level is what "Bullets for this level" sets.
+  const menuRow = (e.currentTarget && e.currentTarget.closest && e.currentTarget.closest('.tree-node-row')) || _treeRowEl(id, ns);
+  const level = menuRow ? _treeLevelOf(menuRow, ns) : null;
+  const lockItem = () => ({
+    icon: treeOrderLocked() ? 'lock-open' : 'lock',
+    label: treeOrderLocked() ? 'Unlock tree order' : 'Lock tree order',
+    fn: treeToggleOrderLock
+  });
 
   const actions = [];
   if (found.pseudo) {
@@ -921,6 +1186,15 @@ function treeContextMenu(e, id, ns) {
         fn: () => libCycleRootMode(host.selectNs)
       });
     }
+    /* A pseudo row is not a slot of its level (it is not numbered), so what
+       it offers is a style for the rows inside it. */
+    const inner = menuRow && menuRow.closest('.tree-node')
+      ? menuRow.closest('.tree-node').querySelector(':scope > .tree-children > .tree-children-inner') : null;
+    const holder = menuRow && menuRow.closest('[data-tree-ns]');
+    const innerKey = inner && holder ? _treeLevelKey(inner, holder, ns) : (treeScope(ns) || ns) + ':' + id;
+    actions.push({ sep: true });
+    actions.push({ icon: 'list-ordered', label: 'Bullets for what\'s inside…', fn: () => treeBulletMenu(e, innerKey) });
+    actions.push(lockItem());
     _treeShowMenu(e, actions);
     return;
   }
@@ -960,6 +1234,10 @@ function treeContextMenu(e, id, ns) {
   if (treeParentOf(id, scope)) {
     actions.push({ icon: 'corner-left-up', label: 'Move to top level', fn: () => treeApplyMove([id], ns, null, null) });
   }
+  // This row and every row beside it: the same choice from any of them.
+  actions.push({ sep: true });
+  if (level) actions.push({ icon: 'list-ordered', label: 'Bullets for this level…', fn: () => treeBulletMenu(e, level.key) });
+  actions.push(lockItem());
   if (host.selectNs && typeof libToggleSelectMode === 'function') {
     actions.push({ sep: true });
     const on = typeof libSelectMode === 'function' && libSelectMode(host.selectNs);

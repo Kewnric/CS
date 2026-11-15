@@ -804,8 +804,11 @@ function brainTreeSetColor(ids) {
   if (!recs.length || typeof treeColorDialog !== 'function') return;
   treeColorDialog({
     title: recs.length > 1 ? 'Highlight colour for ' + recs.length : 'Highlight colour',
-    current: recs.length === 1 ? { text: recs[0].color || '', rail: recs[0].railColor || '', icon: recs[0].iconColor || '' } : null,
+    current: recs.length === 1 ? { text: recs[0].color || '', rail: recs[0].railColor || '', icon: recs[0].iconColor || '',
+      bullet: typeof treeLevelBulletColor === 'function' ? treeLevelBulletColor(ids[0]) : '' } : null,
     apply: (target, colorId) => {
+      // The bullet colour is the whole level's (tree-dnd.js), the rest are each canvas's.
+      if (target === 'bullet') { if (typeof treeSetLevelBulletColor === 'function') treeSetLevelBulletColor(ids, colorId); return; }
       recs.forEach(r => _treeWriteColor(r, target, colorId));
       brainSave(); brainRenderSidebar();
     }

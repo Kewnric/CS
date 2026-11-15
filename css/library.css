@@ -3257,3 +3257,75 @@ body.tree-dragging [data-tree-ns]::-webkit-scrollbar { width: 0; height: 0; }
 .tree-color-seg:has(> [data-target="icon"]) { grid-template-columns: repeat(3, 1fr); }
 .tree-color-seg-glyph.is-icon { background: none; }
 .tree-color-preview-icon { margin-right: 0.45rem; }
+
+/* ── Bullets and numbers on a tree level (tree-dnd.js treeApplyBullets) ──
+   The level's box carries data-bullets; each row's title starts with an empty
+   slot, and a CSS counter over the rows as they stand fills it. That is what
+   keeps a number with its slot: drag the second row to the top and the top
+   row still reads "1.". Hidden rows (display: none) are not counted.
+   Uncategorized is a view, not a slot, and is skipped.
+   The slot is INSIDE the title, so the mark is the title's colour, weight and
+   size whatever state the row is in. */
+[data-bullets] { counter-reset: tree-bullet; }
+[data-bullets] > .tree-node:not([data-node-id="__root__"]) { counter-increment: tree-bullet; }
+.tree-bullet { display: none; }
+[data-bullets] > .tree-node:not([data-node-id="__root__"]) > .tree-node-row > .tree-node-label .tree-bullet {
+  display: inline-block;
+  min-width: var(--tb-min, 0.75em);
+  margin-right: 0.4em;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+/* Numbers line their dots up, however many digits. */
+[data-bullets="decimal"], [data-bullets="paren"], [data-bullets="zero"],
+[data-bullets="upper-roman"], [data-bullets="lower-roman"],
+[data-bullets="upper-alpha"], [data-bullets="lower-alpha"] { --tb-min: 1.2em; --tb-align: right; }
+[data-bullets] > .tree-node > .tree-node-row > .tree-node-label .tree-bullet { text-align: var(--tb-align, center); }
+
+[data-bullets="disc"] > .tree-node > .tree-node-row > .tree-node-label .tree-bullet::before { content: "\2022"; }
+[data-bullets="circle"] > .tree-node > .tree-node-row > .tree-node-label .tree-bullet::before { content: "\25E6"; }
+[data-bullets="square"] > .tree-node > .tree-node-row > .tree-node-label .tree-bullet::before { content: "\25AA"; }
+[data-bullets="dash"] > .tree-node > .tree-node-row > .tree-node-label .tree-bullet::before { content: "\2013"; }
+[data-bullets="arrow"] > .tree-node > .tree-node-row > .tree-node-label .tree-bullet::before { content: "\203A"; }
+[data-bullets="star"] > .tree-node > .tree-node-row > .tree-node-label .tree-bullet::before { content: "\2605"; }
+[data-bullets="decimal"] > .tree-node > .tree-node-row > .tree-node-label .tree-bullet::before { content: counter(tree-bullet) "."; }
+[data-bullets="paren"] > .tree-node > .tree-node-row > .tree-node-label .tree-bullet::before { content: counter(tree-bullet) ")"; }
+[data-bullets="zero"] > .tree-node > .tree-node-row > .tree-node-label .tree-bullet::before { content: counter(tree-bullet, decimal-leading-zero) "."; }
+[data-bullets="upper-roman"] > .tree-node > .tree-node-row > .tree-node-label .tree-bullet::before { content: counter(tree-bullet, upper-roman) "."; }
+[data-bullets="lower-roman"] > .tree-node > .tree-node-row > .tree-node-label .tree-bullet::before { content: counter(tree-bullet, lower-roman) "."; }
+[data-bullets="upper-alpha"] > .tree-node > .tree-node-row > .tree-node-label .tree-bullet::before { content: counter(tree-bullet, upper-alpha) "."; }
+[data-bullets="lower-alpha"] > .tree-node > .tree-node-row > .tree-node-label .tree-bullet::before { content: counter(tree-bullet, lower-alpha) "."; }
+
+/* The style list in the right-click menu shows each mark before its name. */
+.tree-bullet-sample {
+  display: inline-block;
+  min-width: 1.9em;
+  margin-right: 0.35rem;
+  color: var(--text-secondary);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The Highlight colour dialog's fourth part: the row's bullet or number.
+   Four parts sit two by two; four in a row squeezed every label onto two lines. */
+.tree-color-seg:has(> [data-target="bullet"]) { grid-template-columns: repeat(2, 1fr); }
+.tree-color-seg-glyph.is-bullet {
+  width: auto;
+  height: auto;
+  background: none;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.tree-color-preview-bullet {
+  margin-right: 0.4em;
+  color: var(--pv-bullet, var(--pv-text, var(--text-primary)));
+  font-variant-numeric: tabular-nums;
+}
+/* A level with a bullet colour (Highlight colour > Bullet, tree-dnd.js
+   treeSetLevelBulletColor): every mark in it. Without one, each is its title's. */
+[data-bullet-color] > .tree-node:not([data-node-id="__root__"]) > .tree-node-row > .tree-node-label .tree-bullet {
+  color: var(--tb-color);
+}
