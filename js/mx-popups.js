@@ -117,7 +117,9 @@
   // closes by leaving the attempt ("Keep and leave") still goes back up
   // rather than switching to the other exit halfway out.
   function markDrop(el) {
-    const on = DROP_ROUTES.indexOf((document.body && document.body.dataset.route) || '') !== -1;
+    const on = (typeof editorRouteHas === 'function')
+      ? editorRouteHas('dropPopups')
+      : DROP_ROUTES.indexOf((document.body && document.body.dataset.route) || '') !== -1;
     if (el.classList.contains('mx-drop') !== on) el.classList.toggle('mx-drop', on);
   }
 

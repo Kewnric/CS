@@ -31,6 +31,8 @@ firebase.initializeApp(firebaseConfig);
 const fbAuth = firebase.auth();
 const fbDb = firebase.firestore();
 const FIRESTORE_SCHEMA_VERSION = 2;
+// Loads and saves the `training` and `freeground` documents (js/train-store.js).
+const FB_HAS_TRAINING = true;
 
 // SESSION persistence: the auth session only lives until the browser tab/window
 // is closed. The next browser launch is a clean slate and the user has to sign
@@ -644,15 +646,25 @@ async function _loadV2Domains(uid) {
   const userRef = fbDb.collection('users').doc(uid);
   const domRef = (name) => userRef.collection('domains').doc(name);
 
-  const [appDoc, histDoc, vizDoc, brainDoc, questsDoc, settingsDoc, stashDoc] = await Promise.all([
+  const [appDoc, histDoc, vizDoc, brainDoc, questsDoc, settingsDoc, stashDoc, trainingDoc, fgDoc] = await Promise.all([
     domRef('app').get(),
     domRef('history').get(),
     domRef('viz').get(),
     domRef('brain').get(),
     domRef('quests').get(),
     domRef('settings').get(),
-    domRef('stash').get()
+    domRef('stash').get(),
+    domRef('training').get(),
+    domRef('freeground').get()
   ]);
+
+  /* Freeground, templates, training and Codex (js/train-store.js). A missing
+     document reads as empty, like every field above: keeping what was in
+     memory would carry one account's data into the next one signed in. */
+  if (typeof trainFieldsRead === 'function') {
+    trainFieldsRead(trainingDoc.exists ? trainingDoc.data() : {}, { domain: 'training' });
+    trainFieldsRead(fgDoc.exists ? fgDoc.data() : {}, { domain: 'freeground' });
+  }
 
   // The parked library and the unfinished attempts; see the write side.
   if (stashDoc.exists) {
@@ -790,6 +802,7 @@ function _restoreV1Data(data) {
   state.langRun = parsed.langRun || state.langRun || null;
   state.codingStash = parsed.codingStash || state.codingStash || null;
   state.mistakes = Array.isArray(parsed.mistakes) ? parsed.mistakes : (state.mistakes || []);
+  if (typeof trainFieldsRead === 'function') trainFieldsRead(parsed);
   _restorePracticeDrafts(parsed.practiceDraft);
   _restoreDraft('ssp.sqlAttemptDraft', parsed.sqlDraft);
   _restoreDraft('npAttemptInProgress', parsed.npDraft);
@@ -1178,6 +1191,11 @@ async function saveToFirestore(uid) {
       typeHistory: state.typeHistory || []
     }) || {};
 
+    /* Freeground and the training sections: a document each, so neither can
+       push the app or history document over its cap (js/train-store.js). */
+    const trainingPayload = _sanitizeForFirestore(typeof trainFieldsWrite === 'function' ? trainFieldsWrite('training') : {}) || {};
+    const fgPayload = _sanitizeForFirestore(typeof trainFieldsWrite === 'function' ? trainFieldsWrite('freeground') : {}) || {};
+
     // Viz domain
     let vizPayload = {};
     if (typeof viz !== 'undefined') {
@@ -1239,7 +1257,7 @@ async function saveToFirestore(uid) {
        so an oversized stash does not fail by itself, it fails EVERY domain with
        it -- app, history, settings, all of it -- and reports a raw Firestore
        error instead of the sentence that says what to do about it. */
-    const domains = { app: appPayload, history: historyPayload, stash: stashPayload, viz: vizPayload, brain: brainPayload, quests: questsPayload, settings: settingsPayload };
+    const domains = { app: appPayload, history: historyPayload, stash: stashPayload, viz: vizPayload, brain: brainPayload, quests: questsPayload, settings: settingsPayload, training: trainingPayload, freeground: fgPayload };
     for (const [name, payload] of Object.entries(domains)) {
       /* UTF-8 BYTES, which is what Firestore counts. String length counts
          UTF-16 units, and every em dash and arrow in this app's own copy is
@@ -1260,7 +1278,7 @@ async function saveToFirestore(uid) {
         const hint = name === 'history' ? 'Trim practice history (Analytics → delete old attempts).'
           : name === 'app' ? 'Reduce challenges/snippets/notebooks.'
           : name === 'stash' ? 'The parked library is too big. Switch the coding library over to it so it is not being carried as a spare, or clear it.'
-          : 'Reduce ' + name + ' data.';
+          : (typeof trainDomainHint === 'function' && trainDomainHint(name)) || ('Reduce ' + name + ' data.');
         const err = new Error('Domain "' + name + '" too large (' + Math.round(size / 1024) + ' KB). ' + hint);
         err.code = 'doc-too-large';
         throw err;
@@ -1275,6 +1293,8 @@ async function saveToFirestore(uid) {
     batch.set(domRef('brain'), brainPayload);
     batch.set(domRef('quests'), questsPayload);
     batch.set(domRef('settings'), settingsPayload);
+    batch.set(domRef('training'), trainingPayload);
+    batch.set(domRef('freeground'), fgPayload);
 
     // Commit with timeout
     const writePromise = batch.commit();

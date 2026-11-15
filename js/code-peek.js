@@ -239,7 +239,9 @@ function peekRowsHTML(rows) {
 /** On an attempt screen with an editor? */
 function codePeekAvailable() {
   const route = document.body.dataset.route;
-  return (route === 'practice' || route === 'practice-set') && !!document.getElementById('editor-textarea');
+  const wants = typeof editorRouteHas === 'function' ? editorRouteHas('peek', route)
+    : (route === 'practice' || route === 'practice-set');
+  return wants && !!document.getElementById('editor-textarea');
 }
 
 /** Why it cannot be shown now, or '' when it can. */

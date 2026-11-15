@@ -250,6 +250,7 @@ function sfxEnabled() {
 
 /** The routes that talk. Typing in the library or the admin stays silent. */
 function sfxRouteWantsSound() {
+  if (typeof editorRouteHas === 'function') return editorRouteHas('typingSound');
   const r = document.body.dataset.route;
   return r === 'practice' || r === 'practice-set';
 }

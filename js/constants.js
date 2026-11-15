@@ -47,3 +47,33 @@ const AUTOSAVE_INTERVAL_MS = 30000;
 
 /** Admin search debounce — keeps UI snappy while typing */
 const ADMIN_SEARCH_DEBOUNCE_MS = 220;
+
+/* ── Screens built on the code editor ─────────────────────────
+   Several shared features used to decide "is this the attempt screen" by
+   comparing the route to 'practice' and 'practice-set', so a new screen with
+   the same editor silently lost its typing sound and letter animation. They
+   ask here instead, by what they need:
+
+     typingSound  the typing voice           letterFx    per-letter animation
+     dropPopups   pop-ups drop from above    peek        Ctrl+Space target peek
+     countsRuns   Run Code counts against an exam run budget
+
+   Freeground has no target (no peek) and is not an attempt (no run budget). */
+const EDITOR_ROUTES = {
+  'practice':     { typingSound: true, letterFx: true, dropPopups: true, peek: true,  countsRuns: true },
+  'practice-set': { typingSound: true, letterFx: true, dropPopups: true, peek: true,  countsRuns: true },
+  'freeground':   { typingSound: true, letterFx: true, dropPopups: true, peek: false, countsRuns: false }
+};
+
+/** Is this route (default: the one on screen) one of the editor screens? */
+function isEditorRoute(route) {
+  const r = route || (document.body && document.body.dataset.route) || '';
+  return Object.prototype.hasOwnProperty.call(EDITOR_ROUTES, r);
+}
+
+/** Does this editor route (default: the one on screen) want `cap`? */
+function editorRouteHas(cap, route) {
+  const r = route || (document.body && document.body.dataset.route) || '';
+  const caps = Object.prototype.hasOwnProperty.call(EDITOR_ROUTES, r) ? EDITOR_ROUTES[r] : null;
+  return !!(caps && caps[cap]);
+}

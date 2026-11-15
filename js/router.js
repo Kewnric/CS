@@ -188,6 +188,8 @@ const SpaRouter = (() => {
       // belongs to the app shell — the settings FAB — stay out of an attempt.
       document.body.classList.toggle('route-focused', focused);
       document.body.dataset.route = hash;
+      // Screens built on the code editor (constants.js EDITOR_ROUTES).
+      document.body.classList.toggle('route-editor', typeof isEditorRoute === 'function' && isEditorRoute(hash));
     };
 
     // Close mobile sidebar overlay on every navigation (before the transition

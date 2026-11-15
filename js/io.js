@@ -3,6 +3,7 @@
    ============================================================ */
 
 const IO_READS_PACKED_CS = true;   // the cheat sheets may be stored compressed (store-codec.js)
+const IO_HAS_TRAINING = true;      // exports, imports and resets the fields in train-store.js
 
 function handleDataExport() {
   const data = {
@@ -43,7 +44,9 @@ function handleDataExport() {
     codingPackLayout: state.codingPackLayout || 0,
     langRun: state.langRun || null,
     codingStash: state.codingStash || null,
-    mistakes: Array.isArray(state.mistakes) ? state.mistakes : []
+    mistakes: Array.isArray(state.mistakes) ? state.mistakes : [],
+    // Freeground, templates, training, Codex (js/train-store.js).
+    ...(typeof trainFieldsWrite === 'function' ? trainFieldsWrite() : {})
   };
   // The cheat sheets live in their own localStorage key rather than in
   // `state`, which is exactly why they were missing from every backup taken
@@ -189,6 +192,8 @@ function handleDataImport(e) {
         state.codingStash = parsed.codingStash || state.codingStash || null;
         state.mistakes = Array.isArray(parsed.mistakes) ? parsed.mistakes
           : (Array.isArray(state.mistakes) ? state.mistakes : []);
+        // Same rule: a backup from before these sections keeps what you have.
+        if (typeof trainFieldsRead === 'function') trainFieldsRead(parsed, { keepMissing: true });
 
         if (parsed.nodes && parsed.nodes.length > 0) {
           state.nodes = parsed.nodes;
@@ -295,6 +300,7 @@ function handleDataReset() {
         timeLimit: 0,
         lastDiffs: []
       };
+      if (typeof trainFieldsReset === 'function') trainFieldsReset();
 
       saveData();
 

@@ -49,6 +49,8 @@ let state = {
   timeLimit: 0,
   lastDiffs: []
 };
+// The new Coding Library sections' fields (js/train-store.js), empty to start.
+if (typeof trainFieldsReset === 'function') trainFieldsReset();
 
 // Admin Flow State
 let adminState = null;
@@ -164,6 +166,9 @@ function migrateCategoriesToNodes(parsed) {
 /* This file reads compressed saves (store-codec.js). The codec packs an old
    plain save only once every reader of it says so -- see storeCompactExisting. */
 const STATE_READS_PACKED = true;
+/* This file saves the fields in js/train-store.js. Their screens check for this
+   before writing; see trainStoreWritable. */
+const STATE_HAS_TRAINING = true;
 
 function loadData() {
   const saved = localStorage.getItem(getAppStorageKey());
@@ -199,6 +204,7 @@ function loadData() {
       state.langRun = parsed.langRun || null;
       state.codingStash = parsed.codingStash || null;
       state.mistakes = Array.isArray(parsed.mistakes) ? parsed.mistakes : [];
+      if (typeof trainFieldsRead === 'function') trainFieldsRead(parsed);
       state.expandedNodes = parsed.expandedNodes || [];
 
       // Tree migration: if nodes don't exist yet, migrate from flat categories
@@ -312,6 +318,7 @@ function seedDefaultData() {
   state.langRun = null;
   state.codingStash = null;
   state.mistakes = [];
+  if (typeof trainFieldsReset === 'function') trainFieldsReset();
   saveData();
 }
 
@@ -421,7 +428,9 @@ function _flushSaveData(opts) {
     langRun: state.langRun || null,
     codingStash: state.codingStash || null,
     // The classified error log; see mistakes.js. Also never persisted.
-    mistakes: state.mistakes || []
+    mistakes: state.mistakes || [],
+    // Freeground, templates, training, Codex (js/train-store.js).
+    ...(typeof trainFieldsWrite === 'function' ? trainFieldsWrite() : {})
   };
   /* Never write over data we could not read. Everything above is default state
      when the load failed, so this would be the write that turns a recoverable

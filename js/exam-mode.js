@@ -52,6 +52,9 @@ function examResetRuns() {
  * @returns {boolean} always true; kept as a return so callers read as a gate
  */
 function examNoteRun() {
+  /* A run on a screen that is not an attempt (Freeground) is nobody's budget:
+     counting it would charge an attempt left open in this tab for it. */
+  if (typeof isEditorRoute === 'function' && isEditorRoute() && !editorRouteHas('countsRuns')) return true;
   setSessionParam(EXAM_RUNS_KEY, examRunsUsed() + 1);
   examSyncRuns();
   return true;

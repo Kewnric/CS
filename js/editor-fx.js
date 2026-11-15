@@ -197,6 +197,7 @@ function edfxEnabled() {
 }
 
 function edfxRouteWants() {
+  if (typeof editorRouteHas === 'function') return editorRouteHas('letterFx');
   const r = document.body.dataset.route;
   return r === 'practice' || r === 'practice-set';
 }
