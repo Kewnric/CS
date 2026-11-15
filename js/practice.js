@@ -3416,6 +3416,35 @@ function _termClose(byUser) {
   const toast = document.getElementById('run-code-toast');
   if (toast) toast.remove();
   if (byUser && overlay) bossLockOn();
+  /* Back to typing where you were. The terminal took the keyboard for the
+     program's input, and closing it left nothing focused: the caret was gone
+     and the next key went nowhere. */
+  if (byUser && overlay) _termReturnToEditor();
+}
+
+/* Where the caret was when Run was pressed, to put it back on close. */
+let _termCaret = null;
+
+function _termRememberCaret() {
+  const ta = document.getElementById('editor-textarea');
+  _termCaret = ta ? { s: ta.selectionStart, e: ta.selectionEnd, top: ta.scrollTop, left: ta.scrollLeft,
+    file: state.activeFileIndex || 0, len: ta.value.length } : null;
+}
+
+function _termReturnToEditor() {
+  const ta = document.getElementById('editor-textarea');
+  if (!ta || !ta.isConnected || ta.disabled) return;
+  const at = _termCaret;
+  _termCaret = null;
+  ta.focus({ preventScroll: true });
+  // Only the same file, as it was: a tab switched or the text changed since
+  // makes the old offsets point somewhere else.
+  if (at && at.file === (state.activeFileIndex || 0) && at.len === ta.value.length) {
+    ta.setSelectionRange(at.s, at.e);
+    ta.scrollTop = at.top;
+    ta.scrollLeft = at.left;
+  }
+  if (typeof updateLineNumbers === 'function') updateLineNumbers(ta);
 }
 
 /* On a phone the on-screen keyboard covers the bottom of the page, and the
@@ -3499,6 +3528,8 @@ function runCodeWithPiston(seedStdin) {
   _starterAnimFlush();
   const textarea = document.getElementById('editor-textarea');
   if (!textarea) return;
+  // Closing the terminal puts the caret back here.
+  _termRememberCaret();
   /* Counted, never gated -- the budget is there to be noticed, not obeyed.
      See exam-mode.js for why this does not stop you. */
   if (typeof examNoteRun === 'function') examNoteRun();

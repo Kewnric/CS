@@ -1942,15 +1942,18 @@ mark.diff-hit.current {
    its chevrons are always there to fold or unfold a block. It never moves, so
    the digits never move either.
 
-   The MARKER partition on the left (the pin / highlight triangle) opens only
+   The MARKER partition on the left (the pin / highlight triangle) opens
    while the pointer is over the gutter -- that is when you place a pin, and
-   its ghost has somewhere to sit. A pinned line still shows with the gutter
-   closed: its number is tinted and its row lit, and the code has its band.
+   its ghost has somewhere to sit -- and stays open while the file has a pin.
    This used to be the other way round, with a 16px empty gap held open on
    the left for pins most files never have. */
 .editor-line-numbers .ln-fold-col { flex: 0 0 16px; }
 .editor-line-numbers .ln-mark-col { flex: 0 0 0px; width: 0; }
 .editor-line-numbers:not(.gutter-hidden):hover .ln-mark-col { flex-basis: 16px; }
+/* Once a line is pinned the column stays open, so its marker stays on show
+   after the pointer leaves -- the column is closed only while there is
+   nothing in it to see. */
+.editor-line-numbers.has-marks:not(.gutter-hidden) .ln-mark-col { flex-basis: 16px; }
 
 .editor-line-numbers .line-num.active {
   color: #e6edf3;
@@ -4365,8 +4368,6 @@ body.is-resizing .practice-panel { transition: none; }
   justify-content: center;
 }
 .line-fold:hover { color: #e6edf3; }
-/* A starter-locked file does not fold (js/starter-lock.js), so no arrows. */
-.editor-line-numbers.slk-locked .line-fold { display: none; }
 .line-fold::before {
   content: '';
   width: 7px;

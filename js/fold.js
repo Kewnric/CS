@@ -288,8 +288,6 @@ function edToggleFold(view) {
   const ta = document.getElementById('editor-textarea');
   const v = parseInt(view, 10);
   if (!ta || !(v > 0)) return;
-  // A starter-locked file keeps its whole text on screen (js/starter-lock.js).
-  if (typeof slkBlocksFolding === 'function' && slkBlocksFolding()) return;
   const full = edFullSource(ta);
   const real = edViewToReal(v);
   const open = _edFoldRows().find(r => r.view === v);

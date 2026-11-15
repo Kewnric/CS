@@ -30,9 +30,11 @@
    Ctrl+A selects your code, not the file: the piece the caret is in, then all
    of your code, then (a third time) everything, for copying.
 
-   Folding is off in a locked file. A fold takes text out of the textarea,
-   and keeping the mask to the screen through that is not worth the risk to
-   a guarantee whose whole point is that it holds.
+   Folding works in a locked file. A fold takes its block out of the textarea,
+   so the mask is over the WHOLE file (edFullSource), which folding never
+   changes, and positions on screen are carried to it and back with fold.js's
+   own mapping. An edit that would reach into a folded block is refused with
+   "Unfold it first".
 
    Single-program attempt (route practice) only.
    ============================================================ */
@@ -202,7 +204,6 @@ function slkFlush() { _slkSync(); }
 function slkAttach() {
   const ta = document.getElementById('editor-textarea');
   _slk = { on: false };
-  _slkGutter(false);
   if (!ta || !document.body || document.body.dataset.route !== 'practice') return;
   const variant = state.activeVariant;
   const fi = state.activeFileIndex || 0;
@@ -213,10 +214,11 @@ function slkAttach() {
   // Recall starts from an empty file: there is no starter on screen to keep.
   if (typeof examRecallOn === 'function' && examRecallOn()) return;
 
-  if (typeof edFoldsFor === 'function' && edFoldsFor().length && typeof edUnfoldAll === 'function') edUnfoldAll();
-  // While the starter is still typing itself in, the file holds all of it.
-  const running = typeof _starterAnimRunning === 'function' && _starterAnimRunning();
-  const text = running ? String(file.userCode || '') : ta.value;
+  /* The file's own copy, not the textarea: it is always the whole file. The
+     editor may be mid-way through a fill (the starter typing itself in), or
+     loadPracticeFile may not have put this file's folds back on screen yet,
+     when this runs. */
+  const text = String(file.userCode || '');
   const hash = _slkHash(S);
   let mask = (file.slk && file.slk.s === hash) ? _slkDecode(file.slk.r, text.length) : null;
   if (!mask) mask = slkAlign(S, text);
@@ -224,8 +226,47 @@ function slkAttach() {
   _slk = { on: true, ta, fi, hash, text, mask, hist: new Map(), pending: null, bypass: false };
   _slkRemember(text, mask);
   _slkStore();
-  _slkGutter(true);
 }
+
+/* ── The screen and the file ──────────────────────────────────────
+   A fold takes its block out of the textarea and parks it (fold.js), so what
+   is on screen is not the whole file. The mask is kept over the WHOLE file,
+   which folding never changes, and positions on screen are carried across with
+   fold.js's own mapping. With nothing folded the two are the same. */
+
+function _slkFolded() {
+  return typeof edFoldsFor === 'function' && edFoldsFor().length > 0;
+}
+
+/** The whole file, folded parts included. */
+function _slkFull() {
+  return _slkFolded() && typeof edFullSource === 'function' ? edFullSource(_slk.ta) : _slk.ta.value;
+}
+
+function _slkToFull(off) {
+  return _slkFolded() && typeof edViewOffsetToFull === 'function' ? edViewOffsetToFull(_slk.ta, off) : off;
+}
+
+function _slkToView(off) {
+  return _slkFolded() && typeof edFullOffsetToView === 'function' ? edFullOffsetToView(_slk.ta, off) : off;
+}
+
+/** A range on screen as a range of the file, or null when a folded block
+ *  lies inside it (the edit would reach text that is not on screen). */
+function _slkRange(a, b) {
+  const fa = _slkToFull(a);
+  const fb = a === b ? fa : _slkToFull(b);
+  return fb - fa === b - a ? [fa, fb] : null;
+}
+
+/** A range of the file as a range on screen, or null when part of it is folded away. */
+function _slkViewRange(a, b) {
+  const va = _slkToView(a);
+  const vb = a === b ? va : _slkToView(b);
+  return va >= 0 && vb >= 0 && vb - va === b - a ? [va, vb] : null;
+}
+
+const SLK_UNFOLD = 'Unfold it first — starter locked';
 
 /** Bring the mask up to the text in the editor, after any change. */
 function _slkSync() {
@@ -236,7 +277,7 @@ function _slkSync() {
   // reading it as an edit of this one would wreck this one's mask.
   if ((state.activeFileIndex || 0) !== _slk.fi) return;
   if (typeof _starterAnimRunning === 'function' && _starterAnimRunning()) return;
-  const v = ta.value;
+  const v = _slkFull();
   if (v === _slk.text) return;
   let mask;
   if (_slk.pending && _slk.pending.text === v) mask = _slk.pending.mask;
@@ -329,6 +370,9 @@ function _slkTakeMine(s, e, ins) {
   let a = -1, b = -1;
   for (let i = s; i < e; i++) if (!m[i]) { if (a < 0) a = i; b = i + 1; }
   if (a < 0) return false;
+  // The edit is made on screen; a fold inside the stretch would hide part of it.
+  const view = _slkViewRange(a, b);
+  if (!view) { _slkRefuse(SLK_UNFOLD); return true; }
   let keep = '';
   for (let i = a; i < b; i++) if (m[i]) keep += v[i];
   const text = ins + keep;
@@ -338,7 +382,7 @@ function _slkTakeMine(s, e, ins) {
     mask: _slkJoin([m.subarray(0, a), _slkZeros(ins.length), kept, m.subarray(b)]),
   };
   _slk.bypass = true;
-  try { edReplaceRange(ta, a, b, text, a + ins.length); }
+  try { edReplaceRange(ta, view[0], view[1], text, view[0] + ins.length); }
   finally { _slk.bypass = false; }
   _slkSync();
   return true;
@@ -352,25 +396,20 @@ function _slkTakeMine(s, e, ins) {
 function slkAllowReplace(ta, from, to, text) {
   if (!_slk.on || ta !== _slk.ta || _slk.bypass) return true;
   _slkSync();
-  const v = _slk.text;
-  if (v !== ta.value) return true;      // not a state this file knows; let the sync work it out
-  const seg = v.slice(from, to);
+  if (_slk.text !== _slkFull()) return true;   // not a state this file knows; let the sync work it out
+  const seg = ta.value.slice(from, to);
   text = String(text);
   const max = Math.min(seg.length, text.length);
   let p = 0;
   while (p < max && seg[p] === text[p]) p++;
   let s = 0;
   while (s < max - p && seg[seg.length - 1 - s] === text[text.length - 1 - s]) s++;
-  const ra = from + p, rb = to - s, ins = text.slice(p, text.length - s);
+  const ins = text.slice(p, text.length - s);
+  const r = _slkRange(from + p, to - s);
+  if (!r) { _slkRefuse(SLK_UNFOLD); return false; }
+  const [ra, rb] = r;
   if (_slkHasStarter(ra, rb) || (ins && !_slkInsertOk(ra, rb, ins))) { _slkRefuse(); return false; }
   _slkExpect(ra, rb, ins);
-  return true;
-}
-
-/** Folding is off while the starter is locked (see the top of this file). */
-function slkBlocksFolding() {
-  if (!_slk.on) return false;
-  _slkRefuse('Folding is off — starter locked');
   return true;
 }
 
@@ -378,9 +417,8 @@ function slkBlocksFolding() {
 
 const _SLK_WORD = /[A-Za-z0-9_]/;
 
-/** What a collapsed word/line delete would take, in the file's terms. */
-function _slkDeleteSpan(type, at) {
-  const v = _slk.text;
+/** What a collapsed word/line delete would take, in `v` (the text on screen). */
+function _slkDeleteSpan(type, at, v) {
   let a = at, b = at;
   if (type === 'deleteWordBackward') {
     while (a > 0 && (v[a - 1] === ' ' || v[a - 1] === '\t')) a--;
@@ -419,8 +457,8 @@ function _slkBeforeInput(e) {
     _starterAnimFlush();
   }
   _slkSync();
-  const ta = _slk.ta, v = _slk.text;
-  if (ta.value !== v) return;
+  const ta = _slk.ta, v = ta.value;         // what is on screen; the mask is over the whole file
+  if (_slk.text !== _slkFull()) return;
   const t = e.inputType || '';
   if (t === 'historyUndo' || t === 'historyRedo' || t === 'insertCompositionText') return;
   let s = ta.selectionStart, en = ta.selectionEnd;
@@ -445,13 +483,15 @@ function _slkBeforeInput(e) {
        idea of a word is not one this file can see in advance, and guessing
        it short would let the rest of it through. */
     _slkStop(e);
-    if (s === en) [s, en] = _slkDeleteSpan(t, s);
-    if (!_slkHasStarter(s, en)) {
-      _slkExpect(s, en, '');
+    if (s === en) [s, en] = _slkDeleteSpan(t, s, v);
+    const span = _slkRange(s, en);
+    if (!span) { _slkRefuse(SLK_UNFOLD); return; }
+    if (!_slkHasStarter(span[0], span[1])) {
+      _slkExpect(span[0], span[1], '');
       _slk.bypass = true;
       try { edReplaceRange(ta, s, en, '', s); } finally { _slk.bypass = false; }
       _slkSync();
-    } else if (!_slkTakeMine(s, en, '')) _slkRefuse();
+    } else if (!_slkTakeMine(span[0], span[1], '')) _slkRefuse();
     return;
   } else if (t !== 'deleteByCut' && t !== 'deleteContent') {
     return;                                   // nothing that edits text
@@ -461,16 +501,19 @@ function _slkBeforeInput(e) {
   // Judged by where it goes, not by what the browser says it is: a paste can
   // arrive without its text, and it must not slip into a line for that.
   const inserting = t.indexOf('insert') === 0;
-  if (!_slkHasStarter(s, en)) {
-    if (inserting && !_slkInsertOk(s, en, text)) { _slkStop(e); _slkRefuse(); return; }
+  const span = _slkRange(s, en);
+  if (!span) { _slkStop(e); _slkRefuse(SLK_UNFOLD); return; }
+  const [fs, fe] = span;
+  if (!_slkHasStarter(fs, fe)) {
+    if (inserting && !_slkInsertOk(fs, fe, text)) { _slkStop(e); _slkRefuse(); return; }
     // When the text is known the sync takes the result up exactly; when it is
     // not, the change is a plain insertion, which the sync's diff gets right.
-    if (!inserting || text) _slkExpect(s, en, text);
+    if (!inserting || text) _slkExpect(fs, fe, text);
     return;                                   // the browser does it
   }
   // It reaches into the starter: only your part of the range goes.
   _slkStop(e);
-  if (!_slkTakeMine(s, en, text)) _slkRefuse();
+  if (!_slkTakeMine(fs, fe, text)) _slkRefuse();
 }
 
 /** Cancel an edit and keep editor.js's own handler from trying it again. */
@@ -494,8 +537,16 @@ function _slkKeydown(e) {
     runs.push([i, j]);
     i = j;
   }
-  const s = ta.selectionStart, en = ta.selectionEnd;
+  // The selection in the file's terms (it is made and read on screen).
+  const sel = _slkRange(ta.selectionStart, ta.selectionEnd) || [-1, -1];
+  const s = sel[0], en = sel[1];
   const is = r => s === r[0] && en === r[1];
+  const pick = r => {
+    const view = _slkViewRange(r[0], r[1]);
+    if (!view) return false;                  // part of it is folded away: leave it to the browser
+    ta.setSelectionRange(view[0], view[1]);
+    return true;
+  };
   if (!runs.length) {
     e.preventDefault();
     _slkHint('Nothing of yours yet — Ctrl+A again for all');
@@ -512,9 +563,7 @@ function _slkKeydown(e) {
   }
   const all = [runs[0][0], runs[runs.length - 1][1]];
   if (is(all) || (runs.length === 1 && is(here))) return;   // third press: the browser selects everything
-  e.preventDefault();
-  if (is(here)) ta.setSelectionRange(all[0], all[1]);
-  else ta.setSelectionRange(here[0], here[1]);
+  if (pick(is(here) ? all : here)) e.preventDefault();
 }
 
 /* ── Saying so ────────────────────────────────────────────────── */
@@ -562,11 +611,6 @@ function _slkHint(text) {
   _slkHintTimer = setTimeout(() => tag.classList.remove('is-on'), 1600);
 }
 
-/** Folding's arrows go while a file is locked (the gutter's own class). */
-function _slkGutter(on) {
-  const g = document.getElementById('editor-line-numbers');
-  if (g) g.classList.toggle('slk-locked', !!on);
-}
 
 /* ── Wiring ───────────────────────────────────────────────────── */
 
@@ -575,8 +619,9 @@ document.addEventListener('beforeinput', _slkBeforeInput, true);
 document.addEventListener('keydown', _slkKeydown, true);
 /* At once, not on a microtask: two edits in one task (a script, a paste
    handler) were otherwise read as one change spanning both, and the starter
-   text between them was handed over as yours. Folding is off in a locked file,
-   so the textarea is the whole file whatever else has run. */
+   text between them was handed over as yours. On the way back up (not
+   capture), so editor.js's own input handler has already slid the fold
+   anchors past the edit and the whole file reads true. */
 document.addEventListener('input', (e) => {
   if (_slk.on && e.target === _slk.ta) _slkSync();
-}, true);
+});

@@ -730,6 +730,30 @@ function updateLineNumbers(textarea) {
     };
     gutter.addEventListener('click', gutter._markClick);
   }
+  /* The gutter cannot scroll by itself (it follows the editor), so a wheel
+     turned over the line numbers did nothing at all. It scrolls the editor,
+     and the gutter and the drawn code follow it as they do any scroll.
+     Ctrl+wheel is the browser's zoom and is left alone. */
+  if (!gutter._wheel) {
+    gutter._wheel = (e) => {
+      if (e.ctrlKey) return;
+      const ta = document.getElementById('editor-textarea');
+      if (!ta) return;
+      const lh = parseFloat(getComputedStyle(ta).lineHeight) || 20;
+      const k = e.deltaMode === 1 ? lh : e.deltaMode === 2 ? ta.clientHeight : 1;
+      const top = ta.scrollTop, left = ta.scrollLeft;
+      ta.scrollTop += e.deltaY * k;
+      ta.scrollLeft += e.deltaX * k;
+      // Only take the wheel when the editor moved; at either end it scrolls the page as before.
+      if (ta.scrollTop === top && ta.scrollLeft === left) return;
+      e.preventDefault();
+      // The numbers and the drawn code follow at once, not a frame later.
+      gutter.scrollTop = ta.scrollTop;
+      const pre = document.getElementById('editor-pre');
+      if (pre) { pre.scrollTop = ta.scrollTop; pre.scrollLeft = ta.scrollLeft; }
+    };
+    gutter.addEventListener('wheel', gutter._wheel, { passive: false });
+  }
   _edPaintMarkBands(marks, lineCount);
   if (typeof edFoldPaintBadges === 'function') edFoldPaintBadges(textarea);
   // Repainted from here rather than from a listener of its own: this already

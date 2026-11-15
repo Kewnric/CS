@@ -193,8 +193,10 @@ edit is judged before it lands -- the textarea's `beforeinput` (capture, on docu
 range that reaches into the starter only loses YOUR characters (`_slkTakeMine`). Ctrl+A selects the
 piece of yours at the caret, then all of yours, then the file. The mask rides on the file
 (`state.userFiles[i].slk`, run-length plus a hash of the starter) into drafts and restore points;
-without one, `slkAlign` lines the starter up against the text. Folding is off in a locked file
-(view offsets must equal file offsets). editor.js's Enter / brackets / `}` hand the key back to the
+without one, `slkAlign` lines the starter up against the text. The mask is over the WHOLE file
+(`edFullSource`), so folding works: positions on screen go through `edViewOffsetToFull` /
+`edFullOffsetToView`, and an edit whose range would reach into a folded block is refused.
+`slkAttach` reads the file from `userCode`, never the textarea (folds may not be back on screen yet). editor.js's Enter / brackets / `}` hand the key back to the
 browser when the lock refuses their fancy version, so a plain keystroke can still go in.
 
 **Editor extras:** `fold.js` (folding — parks text in a module, so it is the only
