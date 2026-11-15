@@ -168,7 +168,11 @@ function initNotesPracticeSession() {
   } else if (_npResume && _npResume.notebookId === activeNotebook.id && !reviewRecord && _npDraftEmpty) {
     npClearProgress();
   } else if (_npResume && _npResume.notebookId === activeNotebook.id && !reviewRecord) {
-    const mins = Math.max(1, Math.round((Date.now() - (_npResume.savedAt || Date.now())) / 60000));
+    // Guarded: this runs on the way into the attempt, and a cached older utils.js
+    // beside this file would otherwise stop the attempt from opening at all.
+    const ago = typeof elapsedSinceText === 'function'
+      ? elapsedSinceText(_npResume.savedAt)
+      : 'about ' + countNoun(Math.max(1, Math.round((Date.now() - (_npResume.savedAt || Date.now())) / 60000)), 'minute');
     const answered = (_npResume.answers || []).reduce(
       (n, sec) => n + Object.values(sec || {}).filter(v => v != null && v !== '').length, 0);
     const ask = typeof npUiSheet === 'function' ? npUiSheet : null;
@@ -183,7 +187,7 @@ function initNotesPracticeSession() {
           npClearProgress();
         }
       };
-    const said = `You left "${_npResume.title || activeNotebook.title}" about ${mins} minute${mins !== 1 ? 's' : ''} ago with ${answered} question${answered !== 1 ? 's' : ''} answered.`;
+    const said = `You left "${_npResume.title || activeNotebook.title}" ${ago} ago with ${answered} question${answered !== 1 ? 's' : ''} answered.`;
     if (ask) {
       ask({
         icon: 'history', tone: 'info', title: 'Unfinished attempt', body: escapeHTML(said), dismissable: false,
