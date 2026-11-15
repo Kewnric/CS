@@ -70,6 +70,11 @@ function registerAllRoutes() {
   SpaRouter.register('quests', { title: 'StudySession Pro — Quest Board', templateFn: questTemplate, initFn: questInit, destroyFn: questDestroy, sidebarVisible: true, navId: 'nav-quests' });
   /* Freeground: a blank editor and a terminal, saved in tabs. Focused like an
      attempt, because it is a place to write, but it is not one. */
+  /* Templates: the Training hub lists them, the drill teaches one, the admin
+     writes them (js/templates.js and friends). */
+  SpaRouter.register('training', { title: 'StudySession Pro — Training hub', templateFn: trainingTemplate, initFn: trainingInit, destroyFn: trainingDestroy, sidebarVisible: true, navId: 'nav-library', depth: 2 });
+  SpaRouter.register('template-attempt', { title: 'Template drill — StudySession Pro', templateFn: templateAttemptTemplate, initFn: templateAttemptInit, destroyFn: templateAttemptDestroy, sidebarVisible: false, navId: null });
+  SpaRouter.register('admin-templates', { title: 'StudySession Pro — Templates Admin', templateFn: adminTemplatesTemplate, initFn: adminTemplatesInit, destroyFn: adminTemplatesDestroy, sidebarVisible: true, navId: 'nav-admin', depth: 2 });
   SpaRouter.register('freeground', { title: 'StudySession Pro — Freeground', templateFn: freegroundTemplate, initFn: freegroundInit, destroyFn: freegroundDestroy, sidebarVisible: false, navId: null });
   SpaRouter.register('practice', { title: 'StudySession Pro — Practice', templateFn: practiceTemplate, initFn: practiceInit, destroyFn: practiceDestroy, sidebarVisible: false, navId: null });
   SpaRouter.register('drills', { title: 'StudySession Pro — Drills', templateFn: drillsTemplate, initFn: drillsInit, destroyFn: drillsDestroy, sidebarVisible: true, navId: null, depth: 3 });

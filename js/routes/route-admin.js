@@ -508,6 +508,9 @@ function adminInit() {
       card('admin-coding', 'lib-card-coding', 'code-2', 'Coding Library Admin',
         'Configure challenge programs, add variants/test cases, organize categories, and define prerequisite lock rules.',
         _libStatChip('file-code', countNoun(challenges.length, 'program')) + _libStatChip('folder', countNoun(codingFolders, 'folder'))) +
+      card('admin-templates', 'lib-card-templates', 'puzzle', 'Templates Admin',
+        'Write the code shapes you drill in the Training hub: mark the names that change, give it a test, import a set from an AI.',
+        _libStatChip('puzzle', countNoun((state.templates || []).length, 'template')), '#a855f7') +
       card('admin-notes', 'lib-card-notes', 'book-open', 'Notes Library Admin',
         'Configure MCQ notebooks, set up questions/answers, and categorize quiz sets.',
         _libStatChip('book-open', countNoun(notebooks.length, 'notebook')) + _libStatChip('folder', countNoun(notebookFolders, 'folder'))) +

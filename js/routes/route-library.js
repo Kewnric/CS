@@ -364,6 +364,7 @@ function _libDueKind(type) {
   if (type === 'challenge') return { icon: 'file-code', color: 'var(--color-primary)', one: 'program', many: 'programs', rank: 0 };
   if (type === 'notebook') return { icon: 'book-open', color: 'var(--color-warning)', one: 'notebook', many: 'notebooks', rank: 1 };
   if (type === 'snippet') return { icon: 'code', color: 'var(--color-accent)', one: 'snippet', many: 'snippets', rank: 2 };
+  if (type === 'template') return { icon: 'puzzle', color: '#a855f7', one: 'template', many: 'templates', rank: 2.5 };
   const key = String(type || '').startsWith('wing:') ? String(type).slice(5) : '';
   const i = key ? LIBRARY_WINGS.findIndex(x => x.key === key) : -1;
   if (i >= 0) {

@@ -56,13 +56,16 @@ const ADMIN_SEARCH_DEBOUNCE_MS = 220;
 
      typingSound  the typing voice           letterFx    per-letter animation
      dropPopups   pop-ups drop from above    peek        Ctrl+Space target peek
-     countsRuns   Run Code counts against an exam run budget
+     exam         Recall and the run budget (exam-mode.js) apply
+     starterLock  a version's locked starter is enforced (starter-lock.js)
 
-   Freeground has no target (no peek) and is not an attempt (no run budget). */
+   Freeground has no target (no peek) and is not an attempt (no exam). The
+   template drill has a target and locks the lines it gives you. */
 const EDITOR_ROUTES = {
-  'practice':     { typingSound: true, letterFx: true, dropPopups: true, peek: true,  countsRuns: true },
-  'practice-set': { typingSound: true, letterFx: true, dropPopups: true, peek: true,  countsRuns: true },
-  'freeground':   { typingSound: true, letterFx: true, dropPopups: true, peek: false, countsRuns: false }
+  'practice':         { typingSound: true, letterFx: true, dropPopups: true, peek: true,  exam: true,  starterLock: true },
+  'practice-set':     { typingSound: true, letterFx: true, dropPopups: true, peek: true,  exam: true,  starterLock: false },
+  'freeground':       { typingSound: true, letterFx: true, dropPopups: true, peek: false, exam: false, starterLock: false },
+  'template-attempt': { typingSound: true, letterFx: true, dropPopups: true, peek: true,  exam: false, starterLock: true }
 };
 
 /** Is this route (default: the one on screen) one of the editor screens? */

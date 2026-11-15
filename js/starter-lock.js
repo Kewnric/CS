@@ -204,7 +204,9 @@ function slkFlush() { _slkSync(); }
 function slkAttach() {
   const ta = document.getElementById('editor-textarea');
   _slk = { on: false };
-  if (!ta || !document.body || document.body.dataset.route !== 'practice') return;
+  const lockHere = typeof editorRouteHas === 'function' ? editorRouteHas('starterLock')
+    : (!!document.body && document.body.dataset.route === 'practice');
+  if (!ta || !document.body || !lockHere) return;
   const variant = state.activeVariant;
   const fi = state.activeFileIndex || 0;
   const file = state.userFiles && state.userFiles[fi];

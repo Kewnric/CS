@@ -458,7 +458,7 @@ function practiceDraftRemove(challengeId, variantId) {
 function _practiceWriteDraft() {
   try {
     if (!state.activeChallenge || !state.activeVariant) return;
-    if (state.activeChallenge.isFreeground) return;   // see _practiceAutoSave
+    if (state.activeChallenge.isFreeground || state.activeChallenge.notAttempt) return;   // see _practiceAutoSave
     const map = practiceDraftMap();
     map[_practiceDraftKey(state.activeChallenge.id, state.activeVariant.id)] = {
       challengeId: state.activeChallenge.id,
@@ -504,8 +504,8 @@ function _practiceClearDraft() {
 
 function _practiceAutoSave() {
   if (_practiceDiscarding) return;      // this attempt is being thrown away
-  // Freeground borrows this editor; its code is never an attempt's draft.
-  if (state.activeChallenge && state.activeChallenge.isFreeground) return;
+  // Freeground and the template drill borrow this editor; neither is an attempt.
+  if (state.activeChallenge && (state.activeChallenge.isFreeground || state.activeChallenge.notAttempt)) return;
   if (!state.userFiles || !state.activeChallenge || !state.activeVariant) return;
   savePracticeFileCode();
   _practiceWriteDraft();
@@ -947,6 +947,8 @@ function renderPracticeFileTabs() {
     fgRenderFileTabs();
     return;
   }
+  // The template drill is one file with no tabs to show.
+  if (state.activeChallenge && state.activeChallenge.notAttempt) return;
   const tabBar = document.getElementById('practice-file-tabs');
   if (!tabBar || !state.userFiles) return;
   // The main file (index 0) can be reset but never deleted — everything else is

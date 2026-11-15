@@ -4,18 +4,19 @@
    The Coding Library is more than the programs now, so it opens on its
    sections, one tile each, the way the Library page opens on its libraries:
 
-     Hackathon   the programs and practice sets (route `browse`, unchanged)
-     Freeground  a blank editor and a terminal, saved in tabs
+     Hackathon     the programs and practice sets (route `browse`, unchanged)
+     Training hub  templates to learn by heart, and what is due for review
+     Freeground    a blank editor and a terminal, saved in tabs
 
    Each tile carries live numbers read from the data on every visit (nothing
    is stored for it, so it can never disagree with the library) and a button
    for its most common action, so the extra page costs a click only when you
    wanted the tree: Continue goes straight back into the program you left.
 
-   Training hub and the Codex get their tiles when they exist. A tile for a
-   section that is not built yet would be a promise, not a door.
+   The Codex gets its tile when it exists. A tile for a section that is not
+   built yet would be a promise, not a door.
 
-   Keys: 1 and 2 open the tiles.
+   Keys: 1, 2 and 3 open the tiles.
    ============================================================ */
 
 let _chubKey = null;
@@ -83,6 +84,24 @@ function _chubHackathonTile() {
   });
 }
 
+function _chubTrainingTile() {
+  const list = typeof tplStore === 'function' ? tplStore() : [];
+  const due = typeof tplDueList === 'function' ? tplDueList() : [];
+  const learned = list.filter(t => tplStatus(t.id).stage >= 4).length;
+  const fresh = list.find(t => !tplStatus(t.id).stage);
+  const action = due.length
+    ? { icon: 'brain', label: `Review ${due.length} due`, onclick: `tplStartDrill('${String(due[0].id).replace(/[^\w-]/g, '')}', { review: true, back: 'coding' })`, title: 'Start with ' + due[0].title }
+    : fresh ? { icon: 'play', label: 'Learn one', onclick: `tplStartDrill('${String(fresh.id).replace(/[^\w-]/g, '')}', { back: 'coding' })`, title: 'Start ' + fresh.title } : null;
+  return libSpatialCardHTML({
+    route: 'training', cls: 'lib-card-training', icon: 'target', name: 'Training hub', key: '2',
+    desc: 'Templates: the code shapes you write again and again, learned in five stages until they come out on their own.',
+    chips: (list.length ? _libStatChip('puzzle', countNoun(list.length, 'template')) : _libStatChip('puzzle', '32 built-in templates'))
+      + (due.length ? `<span class="lib-stat-chip due"><i data-lucide="brain"></i> ${due.length} due</span>` : '')
+      + (learned ? _libStatChip('trophy', `${learned} learned`) : ''),
+    pct: list.length ? Math.round((learned / list.length) * 100) : null, pctLabel: `${learned}/${list.length} learned`, accent: '#a855f7', action
+  });
+}
+
 function _chubFreegroundTile() {
   const open = typeof fgOpenTabs === 'function' ? fgOpenTabs() : [];
   const shelf = typeof fgShelfTabs === 'function' ? fgShelfTabs() : [];
@@ -92,7 +111,7 @@ function _chubFreegroundTile() {
       + (active ? _libStatChip('history', 'last: ' + escapeHTML(active.name)) : '')
     : _libStatChip('sparkles', 'Nothing yet: your first one is a click away');
   return libSpatialCardHTML({
-    route: 'freeground', onclick: `fgOpen({ back: 'coding' })`, cls: 'lib-card-freeground', icon: 'terminal', name: 'Freeground', key: '2',
+    route: 'freeground', onclick: `fgOpen({ back: 'coding' })`, cls: 'lib-card-freeground', icon: 'terminal', name: 'Freeground', key: '3',
     desc: 'A blank editor and a terminal. Write and run anything, saved in tabs you can switch between.',
     chips, pct: null, accent: '#22c55e',
     action: { icon: 'plus', label: 'New tab', onclick: `fgOpen({ newTab: {}, back: 'coding' })`, title: 'Open Freeground on a new tab' }
@@ -101,13 +120,15 @@ function _chubFreegroundTile() {
 
 const CHUB_TILES = [
   { key: '1', open: () => spaNavigate('browse') },
-  { key: '2', open: () => fgOpen({ back: 'coding' }) }
+  { key: '2', open: () => spaNavigate('training') },
+  { key: '3', open: () => fgOpen({ back: 'coding' }) }
 ];
 
 function codingHubInit() {
   const grid = document.getElementById('chub-grid');
+  if (typeof tplEnsureStarters === 'function') tplEnsureStarters();
   if (grid) {
-    grid.innerHTML = _chubHackathonTile() + _chubFreegroundTile();
+    grid.innerHTML = _chubHackathonTile() + _chubTrainingTile() + _chubFreegroundTile();
     if (typeof libSpatialBind === 'function') libSpatialBind(grid);
   }
   _chubKey = (e) => {

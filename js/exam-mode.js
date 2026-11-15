@@ -26,6 +26,8 @@ const EXAM_RUNS_KEY = 'practiceRunsUsed';
 
 /** Is this attempt a recall attempt? @returns {boolean} */
 function examRecallOn() {
+  // Only an attempt is an exam: Freeground and the template drill are not.
+  if (typeof isEditorRoute === 'function' && isEditorRoute() && !editorRouteHas('exam')) return false;
   return getSessionParam(EXAM_RECALL_KEY) === true || getSessionParam(EXAM_RECALL_KEY) === 'true';
 }
 
@@ -54,7 +56,7 @@ function examResetRuns() {
 function examNoteRun() {
   /* A run on a screen that is not an attempt (Freeground) is nobody's budget:
      counting it would charge an attempt left open in this tab for it. */
-  if (typeof isEditorRoute === 'function' && isEditorRoute() && !editorRouteHas('countsRuns')) return true;
+  if (typeof isEditorRoute === 'function' && isEditorRoute() && !editorRouteHas('exam')) return true;
   setSessionParam(EXAM_RUNS_KEY, examRunsUsed() + 1);
   examSyncRuns();
   return true;

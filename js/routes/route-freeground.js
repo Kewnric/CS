@@ -11,7 +11,7 @@
      - the attempt's draft writer refuses it (practice.js _practiceAutoSave),
        so nothing lands in the per-program drafts that sync to the cloud;
      - nothing here calls history, review, mistakes, quests or Finish;
-     - the run budget does not count it (EDITOR_ROUTES.freeground.countsRuns);
+     - the run budget does not count it (EDITOR_ROUTES.freeground.exam);
      - the attempt's state is put back on the way out.
    The file tabs, add/rename/delete and the menus are this screen's own,
    because the attempt's versions autosave a draft.
@@ -104,6 +104,17 @@ function fgSaveAsSnippet(id) {
   }
   setSessionParam('adminPrefill', { kind: 'snippet', title: t.name, code });
   spaNavigate('admin-snippets');
+}
+
+/** The selection (or the open file) as a new template, to mark its slots. */
+function fgSaveAsTemplate(id) {
+  const t = fgFindTab(id);
+  if (!t) return;
+  const ta = document.getElementById('editor-textarea');
+  let code = '';
+  if (_fg && id === fgStore().activeId && ta && ta.selectionEnd > ta.selectionStart) code = ta.value.slice(ta.selectionStart, ta.selectionEnd);
+  else { fgCommit(); const f = t.files[t.activeFile || 0] || t.files[0]; code = f ? f.code : ''; }
+  tplMakeFrom({ title: t.name, body: code, sourceType: 'freeground', sourceId: t.id });
 }
 
 /* ── The screen ────────────────────────────────────────────── */
@@ -608,6 +619,7 @@ function fgTabMenu(id, anchor) {
   ];
   if (typeof fgSaveAsSnippet === 'function') items.push(['snippet', 'code', 'Save as snippet…', 'The selection, or the whole file.']);
   if (typeof fgSaveAsProgram === 'function') items.push(['program', 'file-code', 'Save as program…', 'Opens the program form with this code as the answer.']);
+  if (typeof tplMakeFrom === 'function') items.push(['template', 'puzzle', 'Save as template…', 'The selection, or the whole file; mark the names that change.']);
 
   const el = document.createElement('div');
   el.id = 'fg-tab-menu';
@@ -660,6 +672,7 @@ function _fgMenuAct(act, id) {
     }
   } else if (act === 'snippet' && typeof fgSaveAsSnippet === 'function') fgSaveAsSnippet(id);
   else if (act === 'program' && typeof fgSaveAsProgram === 'function') fgSaveAsProgram(id);
+  else if (act === 'template' && typeof tplMakeFrom === 'function') fgSaveAsTemplate(id);
 }
 
 /* ── Every freeground and the shelf (Ctrl+P) ───────────────── */

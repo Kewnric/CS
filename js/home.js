@@ -329,7 +329,8 @@ function renderHomeSRS() {
   const typeMeta = {
     challenge: { icon: 'code' },
     snippet:   { icon: 'file-code' },
-    notebook:  { icon: 'book-open' }
+    notebook:  { icon: 'book-open' },
+    template:  { icon: 'puzzle' }
   };
 
   let itemsHtml;

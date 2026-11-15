@@ -16,7 +16,7 @@ function isAdminFormOpen() {
   // handles. Without them here the browser's Back button discarded unsaved
   // wing edits in silence.
   const forms = ['admin-form-container', 'study-form-container', 'notebook-form-container',
-                 'wing-form', 'awx-form'];
+                 'wing-form', 'awx-form', 'atpl-form'];
   return forms.some(id => {
     const el = document.getElementById(id);
     return el && !el.classList.contains('hidden');

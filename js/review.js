@@ -44,7 +44,7 @@ function _revScoreToQuality(pct) {
   return 0;
 }
 
-const _REV_TYPES = ['challenge', 'snippet', 'notebook'];
+const _REV_TYPES = ['challenge', 'snippet', 'notebook', 'template'];
 
 /**
  * The seven wings schedule too, as 'wing:<key>'.
@@ -126,6 +126,9 @@ function _revResolveItem(rec) {
   } else if (rec.type === 'notebook') {
     item = (state.notebooks || []).find(n => n.id === rec.id);
     title = item ? item.title : '';
+  } else if (rec.type === 'template') {
+    item = (state.templates || []).find(t => t.id === rec.id);
+    title = item ? item.title : '';
   } else if (_revIsWingType(rec.type) && typeof wingItems === 'function') {
     item = wingItems(rec.type.slice(5)).find(w => w.id === rec.id);
     title = item ? (item.title || 'Untitled') : '';
@@ -185,6 +188,10 @@ function reviewNavigateTo(type, id) {
   } else if (type === 'notebook') {
     setSessionParam('activeNotebook', id);
     spaNavigate('study');
+  } else if (type === 'template') {
+    // Straight into the drill at Recall, the way a due wing opens its recall.
+    if (typeof tplStartDrill === 'function') tplStartDrill(id, { review: true });
+    else spaNavigate('training');
   } else if (_revIsWingType(type)) {
     // Straight into a recall session for that one entry, rather than the
     // library with the entry merely open. "Due" means there is something to

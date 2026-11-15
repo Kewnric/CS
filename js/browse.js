@@ -241,6 +241,15 @@ function programPassed(challengeId) {
   return (state.history || []).some(h => h && h.challengeId === challengeId && h.score === 100 && !h.isArchived);
 }
 
+/** A passed program's main file as a new template (Training hub). */
+function browseMakeTemplate(challengeId) {
+  const c = (state.challenges || []).find(x => x.id === challengeId);
+  const v = c && (c.variants || [])[0];
+  if (!c || !v || !programPassed(c.id)) return;
+  const f = (v.files && v.files.length) ? (v.files.find(x => x.ext === '.c') || v.files[0]) : { code: v.code };
+  tplMakeFrom({ title: c.title, body: String(f.code || ''), sourceType: 'program', sourceId: c.id });
+}
+
 function countCompletedPrograms() {
   const perfect = new Set(
     state.history.filter(h => h.challengeId && h.score === 100 && !h.isArchived).map(h => h.challengeId)
@@ -1463,6 +1472,10 @@ function _renderProgramDetail(container, c) {
         <button class="btn btn-practice btn-lg" onclick="browseStartFresh('${c.id}')" style="flex:1; max-width:280px;">
           <i data-lucide="play" style="width:18px;height:18px;fill:currentColor;"></i> ${isPerfect ? 'Practice Again' : 'Start Practice'}
         </button>`}
+        ${isPerfect && typeof tplMakeFrom === 'function' ? `<button class="btn btn-secondary" onclick="browseMakeTemplate('${c.id}')"
+                aria-label="Make a template" title="Make a template from your passed answer, to learn its shape by heart">
+          <i data-lucide="puzzle" style="width:16px;height:16px;"></i>
+        </button>` : ''}
         <button class="btn btn-secondary" onclick="fgOpenProgramCopy('${c.id}')"
                 aria-label="Open in Freeground"
                 title="Open in Freeground: ${isPerfect ? 'a copy of your passed answer' : 'a copy of the starter code'}, to experiment on">

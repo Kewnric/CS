@@ -361,6 +361,10 @@ function agItemTitle(type, id) {
     const t = (state.typeItems || []).find(x => x.id === id);
     return t ? (t.title || 'Untitled') : null;
   }
+  if (type === 'template') {
+    const t = (state.templates || []).find(x => x.id === id);
+    return t ? (t.title || 'Untitled template') : null;
+  }
   const list = type === 'challenge' ? state.challenges
     : type === 'snippet' ? state.snippets
     : type === 'notebook' ? state.notebooks : null;
@@ -850,6 +854,8 @@ function agGoToEntry(key) {
   } else if (e.sourceType === 'langword' || e.sourceType === 'langset') {
     setSessionParam('langView', e.sourceType === 'langset' ? 'sets' : 'dictionary');
     agNavigateEvenIfHere('language', () => spaNavigate('language'));
+  } else if (e.sourceType === 'template') {
+    if (typeof tplStartDrill === 'function') tplStartDrill(e.sourceId, { review: true });
   } else if (e.sourceType === 'typing') {
     const t = (state.typeItems || []).find(x => x.id === e.sourceId);
     setSessionParam('mtlView', t ? (t.kind === 'code' ? t.lang : 'text') : 'all');
