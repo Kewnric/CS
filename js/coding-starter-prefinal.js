@@ -14,6 +14,11 @@
    test and writes coding-starter-prefinal-files.js (CSPF_FILES, CSPF_TESTS).
    Every expected output is what the reference printed, never typed out.
 
+   THE REFERENCES ARE WRITTEN THE WAY THE TEACHER WRITES THEM -- memmove for
+   every shift, an empty-body for loop to search, one return at the end --
+   following tools/prefinal/teacher-style.c. The reference is the boss bar's
+   target, so it should be the answer the course actually teaches.
+
    ADDING ONE: a folder in tools/prefinal/ (starter.c, answer.c, tests.json),
    `node tools/build-prefinal.js`, then an entry in CSP_PROGRAMS below, in
    the order the exam numbers them. Then `node tools/verify-pack.js .`.

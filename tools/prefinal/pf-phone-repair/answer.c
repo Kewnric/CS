@@ -2,19 +2,18 @@ int updateJobStatus(ListV2 L, char* jobID, int newStatus)
 {
     int i, result = -1;
 
-    for(i = 0; i < L->count && result == -1; i++){
-        if(strcmp(L->elems[i].jobID, jobID) == 0){
-            result = i;
-        }
-    }
+    /* stops at the index holding jobID, or at the end of the list */
+    for(i = 0; i < L->count && strcmp(L->elems[i].jobID, jobID) != 0; i++){}
 
-    if(result != -1){
-        if(newStatus == L->elems[result].status + 1 && newStatus <= CLAIMED){
-            L->elems[result].status = newStatus;
+    if(i < L->count){                       /* found */
+        //Only one step forward, and never past CLAIMED.
+        if(newStatus == L->elems[i].status + 1 && newStatus <= CLAIMED){
+            L->elems[i].status = newStatus;
+            result = i;
         } else {
             result = -2;
         }
     }
 
-    return result;
+    return result;                          /* -1 means not found */
 }

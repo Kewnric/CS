@@ -1,31 +1,28 @@
 int addApplicant(ListV3* L, Applicant a)
 {
-    int i, pos, total, result = 1;
+    int i, total, result = -1;
 
-    for(i = 0; i < L->count && result == 1; i++){
-        if(strcmp(L->elemPtr[i].info.idNo, a.info.idNo) == 0){
-            result = -1;
-        }
-    }
+    /* stops at the applicant with the same ID number, or at the end of the list */
+    for(i = 0; i < L->count && strcmp(L->elemPtr[i].info.idNo, a.info.idNo) != 0; i++){}
 
-    if(result == 1 && L->count >= L->arrSize){
+    if(i == L->count){                      /* not on the shortlist yet */
         result = 0;
-    }
+        //Check if there is enough space to insert.
+        if(L->count < L->arrSize){
+            total = a.scores.math + a.scores.science + a.scores.english;
+            //Find the correct index for insertion: after every total at least as high.
+            for(i = 0; i < L->count && L->elemPtr[i].scores.math + L->elemPtr[i].scores.science
+                                       + L->elemPtr[i].scores.english >= total; i++){}
 
-    if(result == 1){
-        total = a.scores.math + a.scores.science + a.scores.english;
-        pos = 0;
-        while(pos < L->count &&
-              L->elemPtr[pos].scores.math + L->elemPtr[pos].scores.science
-              + L->elemPtr[pos].scores.english >= total){
-            pos++;
+            //Shift elements down.
+            if(i < L->count){
+                memmove(L->elemPtr+i+1, L->elemPtr+i, sizeof(Applicant) * (L->count-i));
+            }
+            //Insert.
+            L->elemPtr[i] = a;
+            L->count++;
+            result = 1;
         }
-
-        for(i = L->count; i > pos; i--){
-            L->elemPtr[i] = L->elemPtr[i - 1];
-        }
-        L->elemPtr[pos] = a;
-        L->count++;
     }
 
     return result;
