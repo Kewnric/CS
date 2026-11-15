@@ -365,7 +365,7 @@ async function atplRunHarness() {
     const printed = String(r.stdout || '').replace(/\r\n/g, '\n');
     const ok = tplSameOutput(printed, d.harness.expect);
     out.innerHTML = `<div class="${ok ? 'atpl-ok' : 'atpl-err'}">${ok ? 'Prints exactly the expected output.' : 'Does not match the expected output.'}</div>
-      ${r.buildStderr ? `<pre class="atpl-pv">${escapeHTML(String(r.buildStderr).slice(0, 800))}</pre>` : ''}
+      ${r.buildStderr ? `<pre class="atpl-pv">${escapeHTML((typeof termStripAnsi === 'function' ? termStripAnsi(String(r.buildStderr)) : String(r.buildStderr)).slice(0, 800))}</pre>` : ''}
       <pre class="atpl-pv">${escapeHTML(printed) || '(printed nothing)'}</pre>`;
   } catch (e) {
     out.innerHTML = `<div class="atpl-err">${escapeHTML((e && e.message) || String(e))}</div>`;

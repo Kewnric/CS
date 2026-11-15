@@ -25,6 +25,10 @@ function homeActivityByDay() {
     if (h.isArchived) return;
     add(h.submitTime || Date.parse((h.date || '') + ' ' + (h.time || '')) || 0);
   });
+  // Training counts too (Training hub): drill rounds, the daily mix, template
+  // checks. One streak for everything, not a second one that disagrees.
+  (state.trainLog || []).forEach(e => { if (e && (e.kind !== 'mix' || e.done >= 1)) add(e.at); });
+  (state.templateHistory || []).forEach(e => { if (e) add(e.at); });
   return counts;
 }
 

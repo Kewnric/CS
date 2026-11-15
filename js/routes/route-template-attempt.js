@@ -147,6 +147,8 @@ function templateAttemptDestroy() {
 
 function tdBack() {
   const back = _td ? _td.back : 'training';
+  // Part of the daily mix: on to its next step.
+  if (back === 'mix' && typeof thubMixNext === 'function') { thubMixNext(); return; }
   spaNavigate(back && back !== 'template-attempt' ? back : 'training');
 }
 
@@ -300,7 +302,12 @@ async function _tdRunHarness(answer) {
     const r = got && got.res;
     if (!r) return { verdict: 'error', note: (got && got.error) || 'No compiler could be reached.' };
     if (r.didExecute === false || (r.buildStderr && !r.stdout && r.exitCode !== 0)) {
-      return { verdict: 'build', note: String(r.buildStderr || r.stderr || 'It did not compile.').split('\n').slice(0, 4).join('\n') };
+      // The online compiler colours its messages; show the words, and the error lines first.
+      const raw = String(r.buildStderr || r.stderr || 'It did not compile.');
+      const clean = typeof termStripAnsi === 'function' ? termStripAnsi(raw) : raw;
+      const lines = clean.split('\n');
+      const errs = lines.filter(l => /\b(error|warning)\b/i.test(l));
+      return { verdict: 'build', note: (errs.length ? errs : lines).slice(0, 3).join('\n') };
     }
     const out = String(r.stdout || '').replace(/\r\n/g, '\n');
     return { verdict: tplSameOutput(out, t.harness.expect) ? 'pass' : 'fail', out };
