@@ -43,16 +43,16 @@ function peekTokenize(src) {
       if (inBlock) {
         const end = line.indexOf('*/', i);
         const stop = end < 0 ? line.length : end + 2;
-        toks.push({ t: line.slice(i, stop), k: 'c' });
+        toks.push({ t: line.slice(i, stop), k: 'c', c: i });
         if (end >= 0) inBlock = false;
         i = stop;
         continue;
       }
-      if (line.startsWith('//', i)) { toks.push({ t: line.slice(i), k: 'c' }); break; }
+      if (line.startsWith('//', i)) { toks.push({ t: line.slice(i), k: 'c', c: i }); break; }
       if (line.startsWith('/*', i)) {
         const end = line.indexOf('*/', i + 2);
         const stop = end < 0 ? line.length : end + 2;
-        toks.push({ t: line.slice(i, stop), k: 'c' });
+        toks.push({ t: line.slice(i, stop), k: 'c', c: i });
         if (end < 0) inBlock = true;
         i = stop;
         continue;
@@ -60,7 +60,7 @@ function peekTokenize(src) {
       PEEK_TOKEN.lastIndex = i;
       const m = PEEK_TOKEN.exec(line);
       const t = m ? m[0] : line[i];
-      toks.push({ t, k: /^\s+$/.test(t) ? 'w' : 'x' });
+      toks.push({ t, k: /^\s+$/.test(t) ? 'w' : 'x', c: i });
       i += t.length;
     }
     return toks;
@@ -129,7 +129,7 @@ function peekPairScore(u, r) {
 /**
  * The rows to draw, in order. Each is
  *   { kind: 'same' | 'ghost' | 'extra' | 'pair', u: your line index or -1,
- *     uToks, rToks }
+ *     r: the target's line index or -1, uToks, rToks }
  */
 function peekMerge(userSrc, refSrc) {
   const U = peekTokenize(userSrc), R = peekTokenize(refSrc);
@@ -160,7 +160,7 @@ function peekMerge(userSrc, refSrc) {
       if (i < n && j < m) {
         const s = sim(i, j);
         if (s > 0 && best[i * w + j] === best[(i + 1) * w + j + 1] + s) {
-          rows.push({ kind: 'pair', u: us[i], uToks: U[us[i]], rToks: R[rs[j]] });
+          rows.push({ kind: 'pair', u: us[i], r: rs[j], uToks: U[us[i]], rToks: R[rs[j]] });
           i++; j++;
           continue;
         }
@@ -171,15 +171,15 @@ function peekMerge(userSrc, refSrc) {
       else { rows.push(extraRow(us[i])); i++; }
     }
   };
-  const ghostRow = (j) => ({ kind: 'ghost', u: -1, rToks: R[j] });
+  const ghostRow = (j) => ({ kind: 'ghost', u: -1, r: j, rToks: R[j] });
   /* A line of yours with no counterpart. Blank and comment-only lines are not
      mistakes -- a starter's "// TODO" is meant to be there -- so they are
      drawn as written. */
-  const extraRow = (i) => ({ kind: uk[i] ? 'extra' : 'same', u: i, uToks: U[i] });
+  const extraRow = (i) => ({ kind: uk[i] ? 'extra' : 'same', u: i, r: -1, uToks: U[i] });
 
   for (const [a, b] of matched) {
     hunk(ui, a, ri, b);
-    rows.push({ kind: 'same', u: a, uToks: U[a] });
+    rows.push({ kind: 'same', u: a, r: b, uToks: U[a] });
     ui = a + 1; ri = b + 1;
   }
   hunk(ui, U.length, ri, R.length);
@@ -188,12 +188,66 @@ function peekMerge(userSrc, refSrc) {
 
 /* ── Drawing ───────────────────────────────────────────────── */
 
-function peekHL(text) {
-  if (!text) return '';
-  return typeof syntaxHighlight === 'function' ? syntaxHighlight(text) : escapeHTML(text);
+const peekJoin = toks => toks.map(t => t.t).join('');
+
+function peekEsc(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-const peekJoin = toks => toks.map(t => t.t).join('');
+/**
+ * Colours for any stretch of a source, taken from highlighting the WHOLE
+ * source once. Highlighting a line, or a token, on its own got colours wrong
+ * that the editor gets right: a variable is only coloured once its declaration
+ * is in sight, `memmove` is a call only with its `(` after it, and the middle
+ * of a block comment does not look like a comment at all.
+ *
+ * Returns paint(line, from, to): the HTML for columns [from, to) of a line.
+ */
+function peekPaint(src) {
+  const text = String(src);
+  const lines = text.split('\n');
+  const plain = (line, from, to) => peekEsc((lines[line] || '').slice(from, to));
+  if (typeof syntaxHighlight !== 'function') return plain;
+
+  // One class list per character, line by line.
+  const html = syntaxHighlight(text);
+  const per = [[]];
+  const stack = [];
+  const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" };
+  const re = /<span class="([^"]*)">|<\/span>|<[^>]+>|&(amp|lt|gt|quot|#39);|[\s\S]/g;
+  let m, chars = '';
+  while ((m = re.exec(html))) {
+    if (m[1] !== undefined) { stack.push(m[1]); continue; }
+    if (m[0] === '</span>') { stack.pop(); continue; }
+    if (m[0].length > 1 && m[0][0] === '<') continue;
+    const ch = m[2] ? ENT[m[2]] : m[0];
+    chars += ch;
+    if (ch === '\n') { per.push([]); continue; }
+    per[per.length - 1].push(stack.slice());
+  }
+  // Something the highlighter changed: no colour beats colour in the wrong place.
+  if (chars !== text) return plain;
+
+  return (line, from, to) => {
+    const src = lines[line] || '', cls = per[line] || [];
+    let out = '', open = [];
+    for (let i = from; i < to && i < src.length; i++) {
+      const want = cls[i] || [];
+      let same = 0;
+      while (same < open.length && same < want.length && open[same] === want[same]) same++;
+      for (let k = open.length; k > same; k--) out += '</span>';
+      for (let k = same; k < want.length; k++) out += '<span class="' + want[k] + '">';
+      open = want;
+      out += peekEsc(src[i]);
+    }
+    for (let k = 0; k < open.length; k++) out += '</span>';
+    return out;
+  };
+}
+
+/** A whole token, or a run of tokens, painted where it sits in its line. */
+const peekPaintToks = (paint, line, toks) =>
+  toks.map(t => paint(line, t.c, t.c + t.t.length)).join('');
 
 /**
  * The code tokens of a line as compared: a bracket carries how deep it sits,
@@ -231,36 +285,39 @@ function peekPairAlign(uToks, rToks) {
 }
 
 /** A paired line: yours, with the target's missing pieces faint in place and
-    your different pieces underlined. */
-function peekPairParts(uToks, rToks) {
+    your different pieces underlined. Your tokens are painted from your file,
+    the missing ones from the target's; the spaces put between missing tokens
+    are plain. */
+function peekPairParts(uToks, rToks, u, r, paintU, paintR) {
   const al = peekPairAlign(uToks, rToks);
   const uToR = al.uToR, rMatched = al.rMatched;
 
   let html = '', rPos = 0, lastChar = '';
   const ghosts = (upTo) => {
-    let text = '';
+    let piece = '', text = '';
     for (; rPos < upTo; rPos++) {
       const t = rToks[rPos];
       if (t.k !== 'x' || rMatched.has(rPos)) continue;
       const spaced = rPos > 0 && rToks[rPos - 1].k === 'w';
-      if (spaced && (text || (lastChar && !/\s/.test(lastChar)))) text += ' ';
+      if (spaced && (text || (lastChar && !/\s/.test(lastChar)))) { piece += ' '; text += ' '; }
+      piece += peekPaintToks(paintR, r, [t]);
       text += t.t;
     }
     if (!text) return;
     // Spaced after, too, where the target is: "i <= n", not "i <=n".
-    if (upTo < rToks.length && upTo > 0 && rToks[upTo - 1].k === 'w') text += ' ';
-    html += '<span class="cp-ghost">' + peekHL(text) + '</span>';
+    if (upTo < rToks.length && upTo > 0 && rToks[upTo - 1].k === 'w') { piece += ' '; text += ' '; }
+    html += '<span class="cp-ghost">' + piece + '</span>';
     lastChar = text.slice(-1);
   };
   uToks.forEach((t, i) => {
     if (uToR.has(i)) {
       ghosts(uToR.get(i));
       rPos = uToR.get(i) + 1;
-      html += peekHL(t.t);
+      html += peekPaintToks(paintU, u, [t]);
     } else if (t.k === 'x') {
-      html += '<span class="cp-wrong">' + peekHL(t.t) + '</span>';
+      html += '<span class="cp-wrong">' + peekPaintToks(paintU, u, [t]) + '</span>';
     } else {
-      html += peekHL(t.t);
+      html += peekPaintToks(paintU, u, [t]);
     }
     lastChar = t.t.slice(-1);
   });
@@ -270,22 +327,22 @@ function peekPairParts(uToks, rToks) {
 
 /** A line of yours the target has no counterpart for: its code underlined,
     not the indentation in front of it or a comment after it. */
-function peekExtraHTML(uToks) {
+function peekExtraHTML(uToks, u, paintU) {
   const first = uToks.findIndex(t => t.k === 'x');
   let last = -1;
   uToks.forEach((t, i) => { if (t.k === 'x') last = i; });
-  if (first < 0) return peekHL(peekJoin(uToks));
-  return peekHL(peekJoin(uToks.slice(0, first)))
-    + '<span class="cp-wrong">' + peekHL(peekJoin(uToks.slice(first, last + 1))) + '</span>'
-    + peekHL(peekJoin(uToks.slice(last + 1)));
+  if (first < 0) return peekPaintToks(paintU, u, uToks);
+  return peekPaintToks(paintU, u, uToks.slice(0, first))
+    + '<span class="cp-wrong">' + peekPaintToks(paintU, u, uToks.slice(first, last + 1)) + '</span>'
+    + peekPaintToks(paintU, u, uToks.slice(last + 1));
 }
 
 /** One row's code, as HTML. */
-function peekRowCode(r) {
-  if (r.kind === 'ghost') return peekHL(peekJoin(r.rToks));
-  if (r.kind === 'pair') return peekPairParts(r.uToks, r.rToks).html;
-  if (r.kind === 'extra') return peekExtraHTML(r.uToks);
-  return peekHL(peekJoin(r.uToks));
+function peekRowCode(row, paintU, paintR) {
+  if (row.kind === 'ghost') return peekPaintToks(paintR, row.r, row.rToks);
+  if (row.kind === 'pair') return peekPairParts(row.uToks, row.rToks, row.u, row.r, paintU, paintR).html;
+  if (row.kind === 'extra') return peekExtraHTML(row.uToks, row.u, paintU);
+  return peekPaintToks(paintU, row.u, row.uToks);
 }
 
 /**
@@ -320,7 +377,8 @@ function peekBadgeText(c) {
     as HTML, and the counts. */
 function peekRender(userSrc, refSrc) {
   const rows = peekMerge(userSrc, refSrc);
-  return { rows, codeHTML: rows.map(peekRowCode), counts: peekCounts(rows) };
+  const paintU = peekPaint(userSrc), paintR = peekPaint(refSrc);
+  return { rows, codeHTML: rows.map(r => peekRowCode(r, paintU, paintR)), counts: peekCounts(rows) };
 }
 
 function peekRowsHTML(rows, codeHTML) {

@@ -140,5 +140,26 @@ run('brackets, underline, badge', () => {
   eq('counts: identical is all zero', countsOf(answer, answer), { missing: 0, incomplete: 0, different: 0 });
 });
 
+/* Task 3: colours come from the whole file, as in the editor. */
+run('colours', () => {
+  const src = 'int f(List* L)\n{\n  int i, result = -1;\n  /* one\n     two */\n  result = 0;\n  memmove(L->elems)\n}\n';
+  const ref = src.replace('memmove(L->elems)', 'memmove(L->elems+i, x);');
+  const html = rowsHTMLOf(src, ref);
+  check('variable keeps its colour on another line', html[5].includes('<span class="syntax-var">result</span>'), html[5]);
+  check('block comment middle line is a comment', /syntax-comment[^<]*>\s*two \*\//.test(html[4]), html[4]);
+  check('function keeps its colour in a merged line', html[6].includes('<span class="syntax-stdlib">memmove</span>'), html[6]);
+  // A matching file is drawn exactly as the editor colours it, character by character.
+  const lines = classesPerChar(G('syntaxHighlight')(answer)).split('|');
+  const byLine = [];
+  let cur = [], k = 0;
+  for (const ch of answer) { if (ch === '\n') { byLine.push(cur.join('|')); cur = []; k++; continue; } cur.push(lines[k++]); }
+  byLine.push(cur.join('|'));
+  const drawn = rowsHTMLOf(answer, answer);
+  let bad = -1;
+  drawn.forEach((h, i) => { if (bad < 0 && byLine[i] && classesPerChar(h) !== byLine[i]) bad = i; });
+  check('identical source is coloured as the editor colours it', bad < 0,
+        bad < 0 ? '' : 'line ' + (bad + 1) + ': ' + classesPerChar(drawn[bad]) + '\n      want ' + byLine[bad]);
+});
+
 console.log(`${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);
