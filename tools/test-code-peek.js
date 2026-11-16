@@ -182,5 +182,22 @@ run('comments, blanks, indentation', () => {
      countsOf('x = 1;\n', '// note\nx = 1;\n'), { missing: 0, incomplete: 0, different: 0 });
 });
 
+/* Task 5: exponent literals; a brace on its own line is not a mistake. */
+run('tokens and braces', () => {
+  eq('exponent is one token', tokensOf('x = 1.5e-3;'), ['x', '=', '1.5e-3', ';']);
+  eq('hex minus is three tokens', tokensOf('0x1e-3'), ['0x1e', '-', '3']);
+  check('your brace on its own line is not wrong',
+     rowsOf('if(x)\n{\n  y = 1;\n}\n', 'if(x){\n  y = 1;\n}\n').every(r => r.startsWith('same|')),
+     rowsOf('if(x)\n{\n  y = 1;\n}\n', 'if(x){\n  y = 1;\n}\n').join('  /  '));
+  check('their brace on its own line is not missing',
+     rowsOf('if(x){\n  y = 1;\n}\n', 'if(x)\n{\n  y = 1;\n}\n').every(r => r.startsWith('same|')),
+     rowsOf('if(x){\n  y = 1;\n}\n', 'if(x)\n{\n  y = 1;\n}\n').join('  /  '));
+  eq('a block brace after a statement is still compared',
+     rowsOf('x = 1;\n{\n', 'x = 1;\n')[1].split('|')[0], 'extra');
+  eq('the brace you wrote on its own line is drawn, the moved one is not',
+     rowsOf('if(x)\n{\n', 'if(x){\n').slice(0, 2), ['same|if(x)', 'same|{']);
+  eq('function body brace on its own line', rowsOf(answer.replace(/\)\n\{/, ') {'), answer).every(r => r.startsWith('same|')), true);
+});
+
 console.log(`${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);

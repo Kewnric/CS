@@ -27,7 +27,9 @@ let _peekEl = null;
 
 /* ── Tokens ────────────────────────────────────────────────── */
 
-const PEEK_TOKEN = /\s+|"(?:[^"\\]|\\.)*"?|'(?:[^'\\]|\\.)*'?|[A-Za-z_]\w*|\.?\d[\w.]*|->|\+\+|--|<<=|>>=|<<|>>|&&|\|\||[-+*\/%&|^!=<>]=|./y;
+/* A number keeps the sign of its exponent (`1.5e-3` is one token); a hex
+   literal has no exponent, so `0x1e-3` stays `0x1e`, `-`, `3`. */
+const PEEK_TOKEN = /\s+|"(?:[^"\\]|\\.)*"?|'(?:[^'\\]|\\.)*'?|[A-Za-z_]\w*|0[xX][\da-fA-F]+\w*|\.?\d(?:[eE][+-]|[\w.])*|->|\+\+|--|<<=|>>=|<<|>>|&&|\|\||[-+*\/%&|^!=<>]=|./y;
 
 /**
  * Every line as tokens: k is 'w' (white space), 'c' (comment) or 'x' (code).
@@ -80,6 +82,34 @@ function peekKey(toks) {
 }
 
 const peekHasCode = toks => toks.some(t => t.k === 'x');
+
+/**
+ * A `{` on a line of its own belongs to the line above it, when that line is
+ * waiting for one (`if (x)`, `else`, a function's head). Both styles are the
+ * same program, so for comparing the brace is moved up: the line above gets
+ * a virtual `{` (v: true -- compared, never drawn) and the brace itself
+ * becomes k 'b' (drawn as written, never compared). Without this, `if(x)` /
+ * `{` against `if(x){` showed a faint `{` on one line and underlined the
+ * other.
+ */
+function peekFoldBraces(lines) {
+  let prev = -1;   // the last line with code
+  lines.forEach((toks, i) => {
+    const code = toks.filter(t => t.k === 'x');
+    if (!code.length) return;
+    if (code.length === 1 && code[0].t === '{' && prev >= 0) {
+      const above = lines[prev].filter(t => t.k === 'x');
+      const last = above[above.length - 1].t;
+      if (last !== '{' && last !== '}' && last !== ';') {
+        lines[prev].push({ t: '{', k: 'x', v: true, c: -1 });
+        code[0].k = 'b';
+        return;   // a brace line is not waiting for anything
+      }
+    }
+    prev = i;
+  });
+  return lines;
+}
 
 /**
  * Missing lines drawn at YOUR indentation. The target may indent by 4 or by
@@ -171,7 +201,7 @@ function peekPairScore(u, r) {
  *     r: the target's line index or -1, uToks, rToks }
  */
 function peekMerge(userSrc, refSrc) {
-  const U = peekTokenize(userSrc), R = peekTokenize(refSrc);
+  const U = peekFoldBraces(peekTokenize(userSrc)), R = peekFoldBraces(peekTokenize(refSrc));
   const uk = U.map(peekKey), rk = R.map(peekKey);
   const matched = peekLCS(uk, rk, (a, b) => a === b);
   const rows = [];
@@ -287,9 +317,10 @@ function peekPaint(src) {
   };
 }
 
-/** A whole token, or a run of tokens, painted where it sits in its line. */
+/** A whole token, or a run of tokens, painted where it sits in its line.
+    A virtual token (a brace moved up for comparing) is never drawn. */
 const peekPaintToks = (paint, line, toks) =>
-  toks.map(t => paint(line, t.c, t.c + t.t.length)).join('');
+  toks.map(t => t.v ? '' : paint(line, t.c, t.c + t.t.length)).join('');
 
 /**
  * The code tokens of a line as compared: a bracket carries how deep it sits,
@@ -339,7 +370,7 @@ function peekPairParts(uToks, rToks, u, r, paintU, paintR) {
     let piece = '', text = '';
     for (; rPos < upTo; rPos++) {
       const t = rToks[rPos];
-      if (t.k !== 'x' || rMatched.has(rPos)) continue;
+      if (t.k !== 'x' || t.v || rMatched.has(rPos)) continue;
       const spaced = rPos > 0 && rToks[rPos - 1].k === 'w';
       if (spaced && (text || (lastChar && !/\s/.test(lastChar)))) { piece += ' '; text += ' '; }
       piece += peekPaintToks(paintR, r, [t]);
@@ -356,6 +387,8 @@ function peekPairParts(uToks, rToks, u, r, paintU, paintR) {
       ghosts(uToR.get(i));
       rPos = uToR.get(i) + 1;
       html += peekPaintToks(paintU, u, [t]);
+    } else if (t.v) {
+      return;                                  // a moved brace: compared, not drawn
     } else if (t.k === 'x') {
       html += '<span class="cp-wrong">' + peekPaintToks(paintU, u, [t]) + '</span>';
     } else {
