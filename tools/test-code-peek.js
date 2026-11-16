@@ -158,8 +158,9 @@ run('comments, blanks, indentation', () => {
   const kinds = rows => rows.map(r => r.split('|')[0]);
   eq('your comment takes the target comment, text ignored',
      kinds(rowsOf('// mine\nx = 1;\n', '// theirs\nx = 1;\n')), ['same', 'same', 'same']);
-  eq('a blank line does not absorb a target comment',
-     kinds(rowsOf('\nx = 1;\n', '// theirs\nx = 1;\n')), ['ghost', 'same', 'same', 'same']);
+  // (Since the empty-line rule below, the comment is drawn ON your empty line.)
+  eq('a blank line does not stand for a target comment',
+     kinds(rowsOf('\nx = 1;\n', '// theirs\nx = 1;\n')), ['ghost', 'same', 'same']);
   eq('blank target lines open no row', rowsOf('a = 1;\nb = 2;\n', 'a = 1;\n\n\nb = 2;\n').length, 3);
   eq('trailing newline adds no row', rowsOf('int a;', 'int a;\n').length, 1);
   eq('ghost row uses your indentation (2 spaces vs 4)',
@@ -229,6 +230,41 @@ run('hide target-only comments', () => {
   eq('hidden comments change no count', countsOf(mine, target, hide), countsOf(mine, target));
   eq('your own comments are always drawn',
      rowsOf('int f(void)\n{\n  // my note\n}\n', target, hide).filter(r => /my note/.test(r)).length, 1);
+});
+
+/* Reported: the missing line showed one line below the empty line you were on. */
+run('missing lines fill your empty lines', () => {
+  const uOf = (user, target, i) => render(user, target).rows[i].u;
+  eq('a missing line is drawn on your empty line, not below it',
+     rowsOf('if(x){\n\n}\n', 'if(x){\n  y = 1;\n}\n'), ['same|if(x){', 'ghost|  y = 1;', 'same|}', 'same|']);
+  eq('it carries your line number', uOf('if(x){\n\n}\n', 'if(x){\n  y = 1;\n}\n', 1), 1);
+  eq('also where the target has an empty line there too',
+     rowsOf('  i = 1;\n\n}\n', '  i = 1;\n\n  if(c){\n    m();\n  }\n}\n'),
+     ['same|  i = 1;', 'ghost|  if(c){', 'ghost|    m();', 'ghost|  }', 'same|}', 'same|']);
+  eq('more empty lines than missing ones: the rest stay',
+     rowsOf('a;\n\n\n\nb;\n', 'a;\nc;\nb;\n'), ['same|a;', 'ghost|c;', 'same|', 'same|', 'same|b;', 'same|']);
+
+  // The reported screen: caret on the empty line 71, a `}` on 72 closing `if(L->count < MAX)`.
+  const user = [
+    'int queueFan(List* L, Fan f)', '{', '  int i, result = -1;',
+    '  for(i = 0; i < L->count && strcmp(L->elems[i].ticket.code, f.ticket.code) != 0; i++){}',
+    '  if(i == L->count){', '    result = 0;', '    if(L->count < MAX){', '      if(f.ticket.type == VIP){',
+    '        for(i = 0; i < L->count && L->elems[i].ticket.type == VIP; i++){}', '      } else {',
+    '        i = L ->count;', '      }', '', '    }', '', '  }', '', '  return result;', '}', ''].join('\n');
+  const starter = fs.readFileSync(path.join(root, 'tools/prefinal/pf-concert-gate/starter.c'), 'utf8').replace(/\r\n/g, '\n');
+  for (const opts of [undefined, { hideComments: true, starter }]) {
+    const tag = opts ? ' (comments hidden)' : '';
+    const v = render(user, answer, opts);
+    const text = i => marks(v.codeHTML[i]).trim();
+    const onEmpty = v.rows.findIndex(r => r.u === 12);
+    check('the empty line you are on shows the next missing line' + tag,
+          v.rows[onEmpty].kind === 'ghost' && /^(if\(i < L->count\)\{|\/\/Shift elements down\.)$/.test(text(onEmpty)),
+          v.rows.map((r, i) => (r.u >= 0 ? r.u + 1 : '+') + ' ' + r.kind + ' ' + text(i)).join('  /  '));
+    const brace = v.rows.findIndex(r => r.u === 13);
+    const last = v.rows.findIndex((r, i) => r.kind === 'ghost' && text(i) === 'result = 1;');
+    check('your } closing if(L->count < MAX) comes after result = 1;' + tag, brace > last && last > 0,
+          v.rows.map((r, i) => (r.u >= 0 ? r.u + 1 : '+') + ' ' + r.kind + ' ' + text(i)).join('  /  '));
+  }
 });
 
 console.log(`${pass}/${pass + fail} passed`);

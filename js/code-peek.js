@@ -274,15 +274,23 @@ function peekMerge(userSrc, refSrc, opts) {
   const U = peekFoldBraces(peekTokenize(userSrc)), R = peekFoldBraces(peekTokenize(refSrc));
   if (opts && opts.hideComments) peekHideComments(R, opts.starter);
   const uk = U.map(peekKey), rk = R.map(peekKey);
-  /* Whole lines first: as many as possible matched. Between matchings that
-     match as many, the one whose lines sit at the same brace depth wins --
-     every `}` line looks alike, and the first one along used to take your
-     function's closing brace and draw it inside the body. Depth only breaks
-     ties, so one brace you have not written yet does not unmatch every line
-     after it. */
+  /* A line of the target's that holds only hidden comments is not there at
+     all: it matches nothing and opens no row. As a blank line it matched your
+     empty lines, and those pulled your braces out of place. */
+  const hiddenOnly = R.map(toks => toks.some(t => t.k === 'h') && toks.every(t => t.k === 'h' || t.k === 'w'));
+  hiddenOnly.forEach((h, j) => { if (h) rk[j] = '\u0004' + j; });
+  /* Whole lines first. Code lines count most, comment lines less, empty lines
+     least, so an empty line of yours can never trade away a line of code (an
+     empty line matched up the target's pulled your `}` to the wrong block).
+     Between matchings as good, the one whose lines sit at the same brace depth
+     wins -- every `}` line looks alike, and the first one along used to take
+     your function's closing brace and draw it inside the body. Depth only
+     breaks ties, so one brace you have not written yet does not unmatch every
+     line after it. */
   const ud = peekDepths(U), rd = peekDepths(R);
+  const worth = k => k === '' ? 10 : k === '\u0002' ? 100 : 1000;
   const matched = peekMatchWeighted(uk.length, rk.length,
-    (i, j) => uk[i] !== rk[j] ? 0 : (ud[i] === rd[j] ? 1001 : 1000));
+    (i, j) => uk[i] !== rk[j] ? 0 : worth(uk[i]) + (ud[i] === rd[j] ? 1 : 0));
   const rows = [];
   let ui = 0, ri = 0;
 
@@ -327,7 +335,7 @@ function peekMerge(userSrc, refSrc, opts) {
      its brace at the end, say), it is not missing at all. */
   const rGhost = new Set();
   const ghostRow = (j) => {
-    if (rk[j] === '') return null;
+    if (rk[j] === '' || hiddenOnly[j]) return null;
     if (rk[j] === '\u0003' && !rGhost.has(R[j].braceOf)) return null;
     rGhost.add(j);
     return { kind: 'ghost', u: -1, r: j, rToks: R[j] };
@@ -343,7 +351,38 @@ function peekMerge(userSrc, refSrc, opts) {
     ui = a + 1; ri = b + 1;
   }
   hunk(ui, U.length, ri, R.length);
-  return rows.filter(Boolean);
+  return peekFillBlanks(rows.filter(Boolean));
+}
+
+/**
+ * Missing lines go ON your empty lines. You leave an empty line where the
+ * next thing goes and peek from it; the missing line used to be drawn under
+ * it, one line below where you were about to type.
+ *
+ * Wherever missing lines and empty lines of yours sit together with nothing
+ * else between them, the missing lines take the empty lines in order (with
+ * your line numbers). Extra missing lines follow; extra empty lines stay after.
+ */
+function peekFillBlanks(rows) {
+  const blank = r => r.kind === 'same' && r.u >= 0 && r.uToks.every(t => t.k === 'w');
+  const out = [];
+  let i = 0;
+  while (i < rows.length) {
+    if (rows[i].kind !== 'ghost' && !blank(rows[i])) { out.push(rows[i++]); continue; }
+    const blanks = [], ghosts = [];
+    let j = i;
+    for (; j < rows.length && (rows[j].kind === 'ghost' || blank(rows[j])); j++) {
+      (rows[j].kind === 'ghost' ? ghosts : blanks).push(rows[j]);
+    }
+    if (!ghosts.length || !blanks.length) out.push(...rows.slice(i, j));
+    else {
+      const k = Math.min(blanks.length, ghosts.length);
+      for (let n = 0; n < k; n++) out.push(Object.assign({}, ghosts[n], { u: blanks[n].u }));
+      out.push(...ghosts.slice(k), ...blanks.slice(k));
+    }
+    i = j;
+  }
+  return out;
 }
 
 /* ── Drawing ───────────────────────────────────────────────── */
