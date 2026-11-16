@@ -199,5 +199,27 @@ run('tokens and braces', () => {
   eq('function body brace on its own line', rowsOf(answer.replace(/\)\n\{/, ') {'), answer).every(r => r.startsWith('same|')), true);
 });
 
+/* Final review: a missing head keeps its own-line brace. */
+run('final review', () => {
+  eq('a missing Allman head is drawn with its brace',
+     rowsOf('', 'if(x)\n{\n  y = 1;\n}\n').slice(0, 4),
+     ['ghost|if(x)', 'ghost|{', 'ghost|  y = 1;', 'ghost|}']);
+  eq('the brace is not counted on its own',
+     countsOf('', 'if(x)\n{\n  y = 1;\n}\n'), { missing: 3, incomplete: 0, different: 0 });
+  // Reported: an empty function body against returnAllBooks. Your `}` closes the
+  // function, so it is the target's LAST `}`, not the one closing the else.
+  const lib = fs.readFileSync(path.join(root, 'tools/prefinal/pf-library-returns/answer.c'), 'utf8').replace(/\r\n/g, '\n');
+  const head = lib.split('\n')[0];
+  const rows = rowsOf(head + '\n{\n\n}\n', lib);
+  const mine = rows.findIndex(r => r === 'same|}');
+  eq('a brace not written yet: the lines after it still match',
+     rowsOf('void f(){\n  if(x){\n    a = 1;\n  b = 2;\n}\n', 'void f(){\n  if(x){\n    a = 1;\n  }\n  b = 2;\n}\n')
+       .map(r => r.split('|')[0]),
+     ['same', 'same', 'same', 'ghost', 'same', 'same', 'same']);
+  check('your closing brace is the function\'s closing brace',
+        mine === rows.length - 2 && rows.slice(mine + 1).every(r => r.startsWith('same|')),
+        rows.join('  /  '));
+});
+
 console.log(`${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);

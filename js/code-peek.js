@@ -78,6 +78,9 @@ function peekTokenize(src) {
 function peekKey(toks) {
   const code = toks.filter(t => t.k === 'x');
   if (code.length) return code.map(t => t.t).join('\u0001');
+  // A brace moved up to the line above (peekFoldBraces): only ever the same
+  // as another such brace, never a blank line.
+  if (toks.some(t => t.k === 'b')) return '\u0003';
   return toks.some(t => t.k === 'c') ? '\u0002' : '';
 }
 
@@ -103,6 +106,7 @@ function peekFoldBraces(lines) {
       if (last !== '{' && last !== '}' && last !== ';') {
         lines[prev].push({ t: '{', k: 'x', v: true, c: -1 });
         code[0].k = 'b';
+        toks.braceOf = prev;   // which line it went to
         return;   // a brace line is not waiting for anything
       }
     }
@@ -165,6 +169,49 @@ function peekLCS(a, b, same) {
 }
 
 /**
+ * The best matching of a's n items with b's m items in order, where
+ * weight(i, j) is 0 for "not the same" and otherwise how good a match it is.
+ * Returns the matched index pairs.
+ */
+function peekMatchWeighted(n, m, weight) {
+  if (!n || !m) return [];
+  if (n * m > 4000000) return [];
+  const w = m + 1;
+  const dp = new Float64Array((n + 1) * w);
+  const wt = new Float64Array(n * m);
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      const s = weight(i, j);
+      wt[i * m + j] = s;
+      dp[i * w + j] = Math.max(dp[(i + 1) * w + j], dp[i * w + j + 1], s > 0 ? dp[(i + 1) * w + j + 1] + s : 0);
+    }
+  }
+  const out = [];
+  let i = 0, j = 0;
+  while (i < n && j < m) {
+    const s = wt[i * m + j];
+    if (s > 0 && dp[i * w + j] === dp[(i + 1) * w + j + 1] + s) { out.push([i, j]); i++; j++; }
+    else if (dp[(i + 1) * w + j] >= dp[i * w + j + 1]) i++;
+    else j++;
+  }
+  return out;
+}
+
+/** How deep in braces each line starts (code braces only, moved ones too). */
+function peekDepths(lines) {
+  let d = 0;
+  return lines.map(toks => {
+    const at = d;
+    toks.forEach(t => {
+      if (t.k !== 'x') return;
+      if (t.t === '{') d++;
+      else if (t.t === '}') d = Math.max(0, d - 1);
+    });
+    return at;
+  });
+}
+
+/**
  * How well a line of yours stands for a line of the target, by their code
  * tokens: a score in (0, 1], or -1 for "these are not the same line".
  *
@@ -203,7 +250,15 @@ function peekPairScore(u, r) {
 function peekMerge(userSrc, refSrc) {
   const U = peekFoldBraces(peekTokenize(userSrc)), R = peekFoldBraces(peekTokenize(refSrc));
   const uk = U.map(peekKey), rk = R.map(peekKey);
-  const matched = peekLCS(uk, rk, (a, b) => a === b);
+  /* Whole lines first: as many as possible matched. Between matchings that
+     match as many, the one whose lines sit at the same brace depth wins --
+     every `}` line looks alike, and the first one along used to take your
+     function's closing brace and draw it inside the body. Depth only breaks
+     ties, so one brace you have not written yet does not unmatch every line
+     after it. */
+  const ud = peekDepths(U), rd = peekDepths(R);
+  const matched = peekMatchWeighted(uk.length, rk.length,
+    (i, j) => uk[i] !== rk[j] ? 0 : (ud[i] === rd[j] ? 1001 : 1000));
   const rows = [];
   let ui = 0, ri = 0;
 
@@ -243,7 +298,16 @@ function peekMerge(userSrc, refSrc) {
   /* A target line you do not have. One with nothing on it opens no row: a
      blank line the target has would only push your lines down with nothing
      to show. (rows.push(null) is dropped below.) */
-  const ghostRow = (j) => rk[j] === '' ? null : { kind: 'ghost', u: -1, r: j, rToks: R[j] };
+  /* A brace of the target's on its own line goes with its head: when the head
+     is missing, so is the brace and it is drawn; when you have the head (with
+     its brace at the end, say), it is not missing at all. */
+  const rGhost = new Set();
+  const ghostRow = (j) => {
+    if (rk[j] === '') return null;
+    if (rk[j] === '\u0003' && !rGhost.has(R[j].braceOf)) return null;
+    rGhost.add(j);
+    return { kind: 'ghost', u: -1, r: j, rToks: R[j] };
+  };
   /* A line of yours with no counterpart. Blank and comment-only lines are not
      mistakes -- a starter's "// TODO" is meant to be there -- so they are
      drawn as written. */
@@ -606,7 +670,9 @@ function _peekThemeVars(pre, text, gutter) {
     if (c && c !== 'transparent' && !/rgba\([^)]*,\s*0\)$/.test(c)) { bg = c; break; }
   }
   let out = (bg ? `--cp-bg:${bg};` : '') + `--cp-fg:${getComputedStyle(text).color};`;
-  const no = gutter && gutter.querySelector('.line-num:not(.active) .ln-no, .line-num .ln-no');
+  // Not the caret's line, which the gutter brightens (a selector list would
+  // take whichever comes first, and the caret starts on line 1).
+  const no = gutter && (gutter.querySelector('.line-num:not(.active) .ln-no') || gutter.querySelector('.line-num .ln-no'));
   if (no && gutter.offsetWidth) {
     const g = gutter.getBoundingClientRect(), r = no.getBoundingClientRect();
     const ns = getComputedStyle(no), gs = getComputedStyle(gutter);
