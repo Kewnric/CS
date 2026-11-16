@@ -95,12 +95,33 @@ function peekLCS(a, b, same) {
   return out;
 }
 
-/** How alike two lines are, 0..1, by their code tokens. */
-function peekSimilar(u, r) {
+/**
+ * How well a line of yours stands for a line of the target, by their code
+ * tokens: a score in (0, 1], or -1 for "these are not the same line".
+ *
+ * Similarity alone was not enough. Against the 30 tokens of
+ * `memmove(L->elems+i+1, L->elems+i, sizeof(Fan) * (L->count-i));` the six
+ * correct ones of `memmove(L->elems)` score 0.33 and were drawn as a line of
+ * their own, while one more character crossed the line and merged them. A
+ * line that is the start of the target line, or shares its start and most of
+ * its tokens with it, is that line being written.
+ *
+ * Every pure start scores the same, so between two target lines that both
+ * begin like yours the earlier one wins (the merge takes a pair as soon as it
+ * is on a best path).
+ */
+function peekPairScore(u, r) {
   const a = u.filter(t => t.k === 'x').map(t => t.t);
   const b = r.filter(t => t.k === 'x').map(t => t.t);
-  if (!a.length && !b.length) return 1;
-  return (2 * peekLCS(a, b, (x, y) => x === y).length) / (a.length + b.length);
+  if (!a.length || !b.length) return -1;          // blank or comment-only: matched whole, never merged
+  let lead = 0;
+  while (lead < a.length && lead < b.length && a[lead] === b[lead]) lead++;
+  if (lead === a.length && b.length > a.length) return 0.9;
+  const c = peekLCS(a, b, (x, y) => x === y).length;
+  const dice = (2 * c) / (a.length + b.length);
+  if (dice >= 0.34) return dice;
+  if (lead >= 2 && c / a.length >= 0.6) return 0.34;
+  return -1;
 }
 
 /* ── Merging your code with the target ─────────────────────── */
@@ -126,10 +147,7 @@ function peekMerge(userSrc, refSrc) {
     for (let i = u0; i < u1; i++) us.push(i);
     for (let j = r0; j < r1; j++) rs.push(j);
     const n = us.length, m = rs.length, w = m + 1;
-    const sim = (i, j) => {
-      const s = peekSimilar(U[us[i]], R[rs[j]]);
-      return s >= 0.34 ? s : -1;
-    };
+    const sim = (i, j) => peekPairScore(U[us[i]], R[rs[j]]);
     const best = new Float64Array((n + 1) * w);
     for (let i = n - 1; i >= 0; i--) {
       for (let j = m - 1; j >= 0; j--) {

@@ -1,0 +1,128 @@
+#!/usr/bin/env node
+/* ============================================================
+   TEST-CODE-PEEK.JS — the target peek's merge, run under Node
+   ------------------------------------------------------------
+   js/code-peek.js decides, line by line and token by token, how your code
+   and the target are drawn together. That half has no DOM, so it is loaded
+   here with js/syntax.js into one context and checked against cases that
+   were wrong once.
+
+     node tools/test-code-peek.js .
+
+   A row is written `kind|text`: in a merged line the target's missing pieces
+   are ⟦faint⟧ and your different pieces are ⟪underlined⟫.
+   ============================================================ */
+'use strict';
+const fs = require('fs'), path = require('path'), vm = require('vm');
+
+const root = path.resolve(process.argv[2] || '.');
+const ctx = {
+  console,
+  document: { addEventListener() {}, body: { dataset: {} } },
+  window: { addEventListener() {} }
+};
+vm.createContext(ctx);
+for (const f of ['js/syntax.js', 'js/code-peek.js']) {
+  vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
+}
+const G = name => vm.runInContext(`typeof ${name} === 'undefined' ? undefined : ${name}`, ctx);
+
+/* ── Reading what is drawn ─────────────────────────────────── */
+
+const ENT = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" };
+
+/** Drawn HTML to text, with the faint and underlined pieces bracketed. */
+function marks(html) {
+  let out = '';
+  const stack = [];
+  const re = /<span class="([^"]*)">|<\/span>|<[^>]+>|&(amp|lt|gt|quot|#39);|[^<&]+|[\s\S]/g;
+  let m;
+  while ((m = re.exec(html))) {
+    if (m[1] !== undefined) {
+      const close = /\bcp-ghost\b/.test(m[1]) ? '⟧' : /\bcp-wrong\b/.test(m[1]) ? '⟫' : '';
+      out += close === '⟧' ? '⟦' : close === '⟫' ? '⟪' : '';
+      stack.push(close);
+    } else if (m[0] === '</span>') out += stack.pop() || '';
+    else if (m[0][0] === '<') continue;
+    else if (m[2]) out += ENT[m[2]];
+    else out += m[0];
+  }
+  return out;
+}
+
+/** Each character's classes, outermost first: 'a.b|a.b|c|…' (a test's own reading of the HTML). */
+function classesPerChar(html) {
+  const out = [];
+  const stack = [];
+  const re = /<span class="([^"]*)">|<\/span>|<[^>]+>|&(amp|lt|gt|quot|#39);|[^<&]|[\s\S]/g;
+  let m;
+  while ((m = re.exec(html))) {
+    if (m[1] !== undefined) stack.push(m[1]);
+    else if (m[0] === '</span>') stack.pop();
+    else if (m[0][0] === '<') continue;
+    else out.push(stack.filter(c => !/^cp-/.test(c)).join('.'));
+  }
+  return out.join('|');
+}
+
+/** The rows and each row's drawn code, the way the overlay draws them. */
+function render(user, target) {
+  const peekRender = G('peekRender');
+  if (peekRender) return peekRender(user, target);
+  const rows = G('peekMerge')(user, target);
+  const rowsHTML = G('peekRowsHTML');
+  const codeHTML = rows.map(r => {
+    const m = rowsHTML([r]).match(/<span class="cp-code">([\s\S]*)<\/span><\/div>$/);
+    return m ? m[1] : '';
+  });
+  return { rows, codeHTML };
+}
+
+const rowsOf = (user, target) => {
+  const r = render(user, target);
+  return r.rows.map((row, i) => row.kind + '|' + marks(r.codeHTML[i]));
+};
+const countsOf = (user, target) => {
+  const c = render(user, target).counts || {};
+  return { missing: c.missing, incomplete: c.incomplete, different: c.different };
+};
+const rowsHTMLOf = (user, target) => render(user, target).codeHTML;
+const tokensOf = line => G('peekTokenize')(line)[0].filter(t => t.k === 'x').map(t => t.t);
+
+/* ── Checks ────────────────────────────────────────────────── */
+
+let pass = 0, fail = 0;
+function check(name, ok, detail) {
+  if (ok) { pass++; return; }
+  fail++;
+  console.log('FAIL  ' + name + (detail ? '\n      ' + detail : ''));
+}
+function eq(name, got, want) {
+  const g = JSON.stringify(got), w = JSON.stringify(want);
+  check(name, g === w, 'got  ' + g + '\n      want ' + w);
+}
+function run(name, fn) {
+  try { fn(); } catch (e) { fail++; console.log('FAIL  ' + name + ' threw\n      ' + (e && e.stack || e)); }
+}
+
+const answer = fs.readFileSync(path.join(root, 'tools/prefinal/pf-concert-gate/answer.c'), 'utf8').replace(/\r\n/g, '\n');
+const T = 'memmove(L->elems+i+1, L->elems+i, sizeof(Fan) * (L->count-i));';
+
+/* Task 1: a half-typed line merges into its target line. */
+run('pairing', () => {
+  const pairs = l => rowsOf(l + '\n', T + '\n')[0].startsWith('pair|');
+  for (const l of ['memmove', 'memmove(', 'memmove(L', 'memmove(L->elems', 'memmove(L->elems)',
+                   'memmove(L->elems);', 'memmove(L->elems+', 'memmove(L->elems+i)'])
+    check('pairs: ' + l, pairs(l), rowsOf(l + '\n', T + '\n').join('  /  '));
+  check('gibberish does not pair', !pairs('mem'));
+  check('lone brace does not pair', !pairs('}'));
+  check('lone semicolon does not pair', !pairs(';'));
+  eq('prefix takes the next missing line',
+     rowsOf('L->\n', 'L->elems[i] = f;\nL->count++;\n').slice(0, 2).map(r => r.split('|')[0]),
+     ['pair', 'ghost']);
+  check('identical source is all same', rowsOf(answer, answer).every(r => r.startsWith('same|')));
+  check('empty editor: no pair, no extra', rowsOf('', answer).every(r => /^(ghost|same)\|/.test(r)));
+});
+
+console.log(`${pass}/${pass + fail} passed`);
+process.exit(fail ? 1 : 0);
