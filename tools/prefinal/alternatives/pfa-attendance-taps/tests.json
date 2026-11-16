@@ -1,0 +1,8 @@
+[
+  { "name": "one student tapped twice", "stdin": "4\n2201 Ana 7 30\n2202 Ben 7 31\n2201 Ana 7 35\n2203 Cy 7 40\n" },
+  { "name": "repeats side by side", "stdin": "5\n2201 Ana 7 30\n2201 Ana 7 31\n2201 Ana 7 32\n2202 Ben 7 33\n2202 Ben 7 34\n" },
+  { "name": "no repeats", "stdin": "3\n2201 Ana 7 30\n2202 Ben 7 31\n2203 Cy 7 32\n" },
+  { "name": "no taps at all", "stdin": "0\n" },
+  { "name": "repeats spread out", "stdin": "6\n2204 Di 8 0\n2205 Ed 8 1\n2204 Di 8 2\n2205 Ed 8 3\n2206 Fe 8 4\n2204 Di 8 5\n" },
+  { "name": "one student, four taps", "stdin": "4\n2207 Gi 9 0\n2207 Gi 9 1\n2207 Gi 9 2\n2207 Gi 9 3\n" }
+]

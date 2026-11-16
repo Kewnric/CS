@@ -1,0 +1,7 @@
+[
+  { "name": "one course", "stdin": "1\nBSCS\n" },
+  { "name": "two courses", "stdin": "2\nBSIT\nBSIS\n" },
+  { "name": "a course with nobody", "stdin": "1\nBSN\n" },
+  { "name": "a course in lowercase", "stdin": "1\nbscs\n" },
+  { "name": "the same course twice", "stdin": "2\nBSIS\nBSIS\n" }
+]

@@ -1,0 +1,7 @@
+[
+  { "name": "the first member", "stdin": "0\n1\n22101005 Ella BSIT\n" },
+  { "name": "already a member", "stdin": "4\n1\n22101002 Bryan BSIT\n" },
+  { "name": "two new members", "stdin": "4\n2\n22101005 Ella BSIT\n22101006 Fred BSCS\n" },
+  { "name": "a repeat, then full", "stdin": "4\n4\n22101005 Ella BSIT\n22101005 Ella BSIT\n22101006 Fred BSCS\n22101007 Gina BSIS\n" },
+  { "name": "full, then a repeat", "stdin": "4\n3\n22101005 Ella BSIT\n22101006 Fred BSCS\n22101001 Aiza BSCS\n" }
+]

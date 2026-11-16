@@ -1,0 +1,8 @@
+[
+  { "name": "four runners, mixed up", "stdin": "4\n101 Ana 1 5 30\n102 Ben 0 58 10\n103 Cy 1 2 0\n104 Di 0 59 59\n" },
+  { "name": "already in order", "stdin": "3\n201 Eva 0 45 0\n202 Fil 0 50 0\n203 Gia 0 55 0\n" },
+  { "name": "exactly backwards", "stdin": "5\n301 Hal 1 30 0\n302 Ivy 1 20 0\n303 Jay 1 10 0\n304 Kim 1 0 0\n305 Lou 0 50 0\n" },
+  { "name": "equal times keep their order", "stdin": "5\n401 Al 1 0 0\n402 Bo 0 50 0\n403 Cy 1 0 0\n404 Di 0 50 0\n405 Ed 1 0 0\n" },
+  { "name": "one runner", "stdin": "1\n501 Solo 2 0 5\n" },
+  { "name": "no runners", "stdin": "0\n" }
+]

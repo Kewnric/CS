@@ -1,0 +1,8 @@
+[
+  { "name": "after a middle stop", "stdin": "5\n1\nS10 Mabolo S02\n" },
+  { "name": "after the last stop", "stdin": "5\n1\nS11 Pier S05\n" },
+  { "name": "after a stop that is not there", "stdin": "5\n1\nS12 Ayala S99\n" },
+  { "name": "after a stop just added", "stdin": "5\n2\nS13 IT_Park S03\nS14 Capitol S13\n" },
+  { "name": "twice after the first, then full", "stdin": "5\n3\nS15 Gorordo S01\nS16 Escario S01\nS17 Jones S01\n" },
+  { "name": "an empty route", "stdin": "0\n1\nS18 Mandaue S01\n" }
+]

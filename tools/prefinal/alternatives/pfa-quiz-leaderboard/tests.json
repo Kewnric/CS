@@ -1,0 +1,8 @@
+[
+  { "name": "catching up with the leader", "stdin": "1\nDelta 20\n" },
+  { "name": "a deduction drops a rank", "stdin": "1\nAlpha -10\n" },
+  { "name": "zero points, last place stays", "stdin": "1\nFoxtrot 0\n" },
+  { "name": "two climbs", "stdin": "2\nEcho 30\nCharlie 6\n" },
+  { "name": "teams that are not there", "stdin": "2\nGolf 10\nalpha 5\n" },
+  { "name": "a three-way tie", "stdin": "3\nBravo 5\nCharlie 5\nAlpha 1\n" }
+]

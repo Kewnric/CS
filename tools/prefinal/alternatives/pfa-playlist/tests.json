@@ -1,0 +1,8 @@
+[
+  { "name": "at the very front", "stdin": "3\n1\nSampaguita Lira 3 50 1\n" },
+  { "name": "in the middle", "stdin": "4\n1\nAlon Dagat 4 5 3\n" },
+  { "name": "one past the end", "stdin": "2\n1\nBituin Tala 3 15 3\n" },
+  { "name": "positions that do not exist", "stdin": "6\n3\nAraw Lira 3 0 0\nBuwan Lira 3 0 8\nUlap Lira 3 0 7\n" },
+  { "name": "full, and invalid when full", "stdin": "6\n4\nIsa Lira 3 0 2\nDalawa Lira 3 0 2\nTatlo Lira 3 0 9\nApat Lira 3 0 20\n" },
+  { "name": "an empty playlist", "stdin": "0\n2\nFirst Solo 2 30 1\nSecond Solo 2 45 1\n" }
+]

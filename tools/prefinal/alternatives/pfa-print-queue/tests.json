@@ -1,0 +1,7 @@
+[
+  { "name": "print the first job", "stdin": "3\n1\n" },
+  { "name": "print two in turn", "stdin": "6\n2\n" },
+  { "name": "more prints than jobs", "stdin": "2\n3\n" },
+  { "name": "an empty queue", "stdin": "0\n1\n" },
+  { "name": "print every job", "stdin": "6\n6\n" }
+]

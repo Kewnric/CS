@@ -1,0 +1,8 @@
+[
+  { "name": "a restock", "stdin": "1\nP-104 20\n" },
+  { "name": "a sale", "stdin": "1\nP-101 -15\n" },
+  { "name": "selling the last one", "stdin": "2\nP-106 -5\nP-106 -1\n" },
+  { "name": "selling more than there is", "stdin": "1\nP-105 -9\n" },
+  { "name": "a product that is not there", "stdin": "2\nP-999 5\np-101 -1\n" },
+  { "name": "a busy day", "stdin": "4\nP-103 -30\nP-103 -30\nP-103 -1\nP-103 50\n" }
+]

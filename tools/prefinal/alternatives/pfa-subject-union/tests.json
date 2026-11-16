@@ -1,0 +1,8 @@
+[
+  { "name": "some subjects shared", "stdin": "3\nCS101 3\nMATH1 3\nPE1 2\n3\nMATH1 3\nCS102 3\nNSTP1 3\n" },
+  { "name": "nothing shared", "stdin": "2\nCS101 3\nPE1 2\n2\nENG1 3\nFIL1 3\n" },
+  { "name": "exactly the same subjects", "stdin": "2\nCS101 3\nMATH1 3\n2\nMATH1 3\nCS101 3\n" },
+  { "name": "the first student has none", "stdin": "0\n2\nENG1 3\nFIL1 3\n" },
+  { "name": "a subject listed twice", "stdin": "3\nCS101 3\nCS101 3\nPE1 2\n1\nPE1 2\n" },
+  { "name": "neither has any", "stdin": "0\n0\n" }
+]

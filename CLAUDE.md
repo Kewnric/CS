@@ -284,7 +284,7 @@ the program quietly in the page, because only an interpreter knows which bytes a
 - `stack-window.js` — the window: docked beside the code or floating, `ssp.stackWindow`.
 All three `cvm-*` files attach to one global `CVM` and run under Node. After any change
 run `node tools/test-cvm.js`: every starter-pack reference must print exactly its
-tests' expected output (400/400), plus snapshot checks.
+tests' expected output (563/563), plus snapshot checks.
 
 **Starter-pack switch** (`js/coding-starter*.js`): the package button in the
 Coding Library header swaps the whole library. Whatever is live is parked in
@@ -298,12 +298,14 @@ starter code and one empty function, starter locked. Sources are real C in
 `answer.c` = that one function, `tests.json` = names + stdin). `node tools/build-prefinal.js`
 splices the answer over the stub, compiles with gcc, runs every test and writes
 `coding-starter-prefinal-files.js` — expected outputs are never typed by hand. Then add the
-program to `CSP_PROGRAMS` (exam item order). The first three tests are the exam's samples.
+program to `CSP_PROGRAMS` (exam item order), or to `CSP_ALTERNATIVES` for the Alternatives
+subfolder (`tools/prefinal/alternatives/`: 29 V1/V2 variants by operation). The first three
+tests are the samples.
 Every `answer.c` is written in the teacher's style, kept in `tools/prefinal/teacher-style.c`:
 `memmove` for every shift, an empty-body `for` to search, the space check wrapping the
 insert, one `return` at the end. It is the boss bar's target, so match it.
 
-The pack is 34 folders / 163 programs plus 12 practice sets. Every program has a reference solution in
+The pack is 35 folders / 192 programs plus 12 practice sets. Every program has a reference solution in
 `coding-starter-solutions.js` (or `-advanced-solutions.js`) that has been
 **compiled and run against its own tests** by `tools/verify-pack.js`, which also
 checks every minimum requirement against that same reference. Run it after any

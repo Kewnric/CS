@@ -1,0 +1,7 @@
+[
+  { "name": "one item taken out", "stdin": "1\nG-03\n" },
+  { "name": "nothing taken out", "stdin": "0\n" },
+  { "name": "two items taken out", "stdin": "2\nG-01\nG-06\n" },
+  { "name": "a code not in the cart", "stdin": "1\nG-99\n" },
+  { "name": "the whole cart emptied", "stdin": "6\nG-01\nG-02\nG-03\nG-04\nG-05\nG-06\n" }
+]

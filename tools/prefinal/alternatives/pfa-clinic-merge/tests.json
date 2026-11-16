@@ -1,0 +1,8 @@
+[
+  { "name": "two branches, interleaved", "stdin": "3\nAna 8 0\nBen 9 30\nCy 11 0\n2\nDi 8 30\nEd 10 0\n" },
+  { "name": "one branch empty", "stdin": "2\nFe 9 0\nGi 13 15\n0\n" },
+  { "name": "no appointments", "stdin": "0\n0\n" },
+  { "name": "equal times, Lahug first", "stdin": "2\nHo 9 0\nIo 10 0\n2\nJo 9 0\nKo 10 0\n" },
+  { "name": "one branch entirely first", "stdin": "2\nLu 13 0\nMo 14 0\n3\nNa 8 0\nOw 9 0\nPi 10 0\n" },
+  { "name": "two full branches", "stdin": "5\nA1 8 0\nA2 9 0\nA3 10 0\nA4 11 0\nA5 15 0\n5\nB1 8 15\nB2 8 45\nB3 12 0\nB4 13 30\nB5 16 0\n" }
+]

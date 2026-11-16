@@ -1,0 +1,8 @@
+[
+  { "name": "the first call of the day", "stdin": "0\n1\nAirah 09221110006 4\n" },
+  { "name": "newest call goes on top", "stdin": "3\n1\nAirah 09221110006 4\n" },
+  { "name": "a full log drops the oldest", "stdin": "5\n1\nAirah 09221110006 4\n" },
+  { "name": "three drops in a row", "stdin": "5\n3\nAirah 09221110006 4\nBong 09231110007 9\nCes 09241110008 1\n" },
+  { "name": "fills up, then drops", "stdin": "2\n4\nAirah 09221110006 4\nBong 09231110007 9\nCes 09241110008 1\nDave 09251110009 15\n" },
+  { "name": "no calls at all", "stdin": "0\n0\n" }
+]

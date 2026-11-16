@@ -1,0 +1,8 @@
+[
+  { "name": "one agent", "stdin": "1\n" },
+  { "name": "the first one is ahead", "stdin": "2\n" },
+  { "name": "a tie goes to the earlier agent", "stdin": "4\n" },
+  { "name": "no agents", "stdin": "0\n" },
+  { "name": "the whole team, a tie at the top", "stdin": "7\n" },
+  { "name": "five agents", "stdin": "5\n" }
+]

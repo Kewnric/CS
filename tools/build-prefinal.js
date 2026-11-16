@@ -48,13 +48,25 @@ function splice(id, starter, answer) {
   return lines.slice(0, at).concat(ans, lines.slice(close + 1)).join('\n');
 }
 
+/* A folder with a starter.c is a program; one without is a group of them
+   (tools/prefinal/alternatives/) and is read one level down. */
+function programDirs(root) {
+  const out = [];
+  for (const name of fs.readdirSync(root).sort()) {
+    const dir = path.join(root, name);
+    if (!fs.statSync(dir).isDirectory()) continue;
+    if (fs.existsSync(path.join(dir, 'starter.c'))) out.push({ id: name, dir: dir });
+    else out.push(...programDirs(dir));
+  }
+  return out;
+}
+
 const files = {};
 const tests = {};
 let failed = false;
 
-for (const id of fs.readdirSync(SRC).sort()) {
-  const dir = path.join(SRC, id);
-  if (!fs.statSync(dir).isDirectory()) continue;
+for (const { id, dir } of programDirs(SRC)) {
+  if (files[id]) { console.error(id + ': two folders with this name'); failed = true; continue; }
   const starter = read(path.join(dir, 'starter.c'));
   const code = splice(id, starter, read(path.join(dir, 'answer.c')));
   const cases = JSON.parse(read(path.join(dir, 'tests.json')));

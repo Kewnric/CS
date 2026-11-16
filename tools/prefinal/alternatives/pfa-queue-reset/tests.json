@@ -1,0 +1,6 @@
+[
+  { "name": "a full queue at closing", "stdin": "6\n0\n" },
+  { "name": "a fresh queue the next day", "stdin": "3\n2\nGlo Deposit\nHerm Inquiry\n" },
+  { "name": "nobody waiting at closing", "stdin": "0\n1\nIsko Loan\n" },
+  { "name": "more customers than slots", "stdin": "6\n9\nA1 Deposit\nA2 Deposit\nA3 Deposit\nA4 Deposit\nA5 Deposit\nA6 Deposit\nA7 Deposit\nA8 Deposit\nA9 Deposit\n" }
+]

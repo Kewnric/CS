@@ -1,0 +1,8 @@
+[
+  { "name": "five passengers, two side by side", "stdin": "10\n1\n5J560\n" },
+  { "name": "two passengers", "stdin": "10\n1\nZ2771\n" },
+  { "name": "the same flight twice", "stdin": "10\n2\nPR1845\nPR1845\n" },
+  { "name": "a flight code in lowercase", "stdin": "10\n1\n5j560\n" },
+  { "name": "every flight cancelled", "stdin": "10\n3\n5J560\nPR1845\nZ2771\n" },
+  { "name": "the first and the last", "stdin": "4\n1\n5J560\n" }
+]

@@ -1,0 +1,8 @@
+[
+  { "name": "four cut", "stdin": "230\n" },
+  { "name": "a total equal to the cutoff stays", "stdin": "195\n" },
+  { "name": "nobody cut", "stdin": "0\n" },
+  { "name": "everybody cut", "stdin": "300\n" },
+  { "name": "only the best stays", "stdin": "264\n" },
+  { "name": "five cut, one on the line", "stdin": "245\n" }
+]

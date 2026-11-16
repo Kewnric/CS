@@ -1,0 +1,7 @@
+[
+  { "name": "a full bus", "stdin": "8\n" },
+  { "name": "an odd number of passengers", "stdin": "5\n" },
+  { "name": "two passengers", "stdin": "2\n" },
+  { "name": "one passenger", "stdin": "1\n" },
+  { "name": "an empty bus", "stdin": "0\n" }
+]

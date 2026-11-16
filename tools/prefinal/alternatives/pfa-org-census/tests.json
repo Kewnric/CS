@@ -1,0 +1,8 @@
+[
+  { "name": "a course, all years", "stdin": "1\nBSCS 0\n" },
+  { "name": "a course and a year", "stdin": "1\nBSIT 2\n" },
+  { "name": "a year with nobody", "stdin": "1\nBSIS 4\n" },
+  { "name": "a course in lowercase", "stdin": "1\nbscs 0\n" },
+  { "name": "every course", "stdin": "3\nBSCS 0\nBSIT 0\nBSIS 0\n" },
+  { "name": "first years in each course", "stdin": "3\nBSCS 1\nBSIT 1\nBSIS 1\n" }
+]

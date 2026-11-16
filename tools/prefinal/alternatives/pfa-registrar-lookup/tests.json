@@ -1,0 +1,7 @@
+[
+  { "name": "the first record", "stdin": "1\n22100451\n" },
+  { "name": "a record that is not there", "stdin": "1\n22109999\n" },
+  { "name": "the last record, then a middle one", "stdin": "2\n21100777\n21100618\n" },
+  { "name": "an ID one digit short", "stdin": "1\n2210045\n" },
+  { "name": "a mix of requests", "stdin": "4\n24101539\n00000000\n23100345\n22100873\n" }
+]

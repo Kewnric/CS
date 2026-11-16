@@ -1,0 +1,8 @@
+[
+  { "name": "the first patient", "stdin": "0\n1\nER-201 Mila 30 2\n" },
+  { "name": "critical, behind the critical", "stdin": "6\n1\nER-202 Rey 50 1\n" },
+  { "name": "urgent, behind the urgent", "stdin": "6\n1\nER-203 Gia 19 2\n" },
+  { "name": "standard goes last", "stdin": "6\n2\nER-204 Ko 40 3\nER-205 Su 80 1\n" },
+  { "name": "levels that do not exist", "stdin": "6\n4\nER-206 Al 1 0\nER-207 Bo 2 4\nER-208 Cy 3 2\nER-209 Di 4 3\n" },
+  { "name": "the ER fills up", "stdin": "6\n3\nER-210 Ed 5 3\nER-211 Fe 6 1\nER-212 Gi 7 2\n" }
+]

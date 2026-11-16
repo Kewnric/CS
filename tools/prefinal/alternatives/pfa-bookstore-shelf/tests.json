@@ -1,0 +1,8 @@
+[
+  { "name": "the first slot", "stdin": "8\n1\n9780000000011\n" },
+  { "name": "a middle slot and the last", "stdin": "8\n2\n9780000000042\n9780000000080\n" },
+  { "name": "a book that is not there", "stdin": "8\n1\n9789999999999\n" },
+  { "name": "an ISBN one digit short", "stdin": "8\n1\n978000000001\n" },
+  { "name": "on the list, not on this shelf", "stdin": "3\n2\n9780000000035\n9780000000042\n" },
+  { "name": "an empty shelf", "stdin": "0\n1\n9780000000011\n" }
+]

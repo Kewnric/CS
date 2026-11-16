@@ -1,0 +1,8 @@
+[
+  { "name": "the last app to the front", "stdin": "6\n1\nShopLa\n" },
+  { "name": "the first app stays first", "stdin": "6\n1\nChatNow\n" },
+  { "name": "a middle app", "stdin": "6\n1\nClassHub\n" },
+  { "name": "an app that is not there", "stdin": "6\n2\nGameZone\nchatnow\n" },
+  { "name": "switching back and forth", "stdin": "6\n3\nRideX\nPayGo\nRideX\n" },
+  { "name": "an empty switcher", "stdin": "0\n1\nChatNow\n" }
+]

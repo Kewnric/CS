@@ -1,0 +1,7 @@
+[
+  { "name": "two in common", "stdin": "4\ncebu_eats 1200\nsugbo_news 5400\nlakwatsa 800\ncode_ph 3100\n3\ncode_ph 3100\nmemes_ph 9000\ncebu_eats 1200\n" },
+  { "name": "nothing in common", "stdin": "2\ncebu_eats 1200\nlakwatsa 800\n2\nmemes_ph 9000\ngym_rat 450\n" },
+  { "name": "exactly the same", "stdin": "2\ncebu_eats 1200\ncode_ph 3100\n2\ncode_ph 3100\ncebu_eats 1200\n" },
+  { "name": "the first follows nobody", "stdin": "0\n2\nmemes_ph 9000\ngym_rat 450\n" },
+  { "name": "an account listed twice", "stdin": "3\ncode_ph 3100\ncode_ph 3100\nlakwatsa 800\n1\ncode_ph 3100\n" }
+]

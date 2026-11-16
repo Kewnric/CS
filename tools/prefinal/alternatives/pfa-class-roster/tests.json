@@ -1,0 +1,8 @@
+[
+  { "name": "the first enrollee", "stdin": "0\n1\n23100201 Ana Reyes BSCS\n" },
+  { "name": "into the middle", "stdin": "3\n1\n23100202 Ben Garcia BSIT\n" },
+  { "name": "a last name already there", "stdin": "5\n1\n23100203 Joy Santos BSIS\n" },
+  { "name": "first and last place", "stdin": "5\n2\n23100204 Zed Abad BSCS\n23100205 Yna Zamora BSIT\n" },
+  { "name": "the roster fills up", "stdin": "5\n4\n23100206 Al Cruz BSCS\n23100207 Bo Diaz BSIT\n23100208 Cy Lim BSIS\n23100209 Di Tan BSCS\n" },
+  { "name": "early registration only", "stdin": "5\n0\n" }
+]

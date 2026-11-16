@@ -1,0 +1,8 @@
+[
+  { "name": "the oldest of a dish", "stdin": "8\n1\nAdobo\n" },
+  { "name": "three of the same dish", "stdin": "8\n3\nAdobo\nAdobo\nAdobo\n" },
+  { "name": "dishes nobody ordered", "stdin": "8\n2\nKare-Kare\nadobo\n" },
+  { "name": "the last order, then a middle one", "stdin": "8\n2\nLumpia\nSinigang\n" },
+  { "name": "nothing pending", "stdin": "0\n1\nAdobo\n" },
+  { "name": "one more than was ordered", "stdin": "8\n4\nAdobo\nAdobo\nAdobo\nAdobo\n" }
+]
