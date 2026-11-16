@@ -267,5 +267,44 @@ run('missing lines fill your empty lines', () => {
   }
 });
 
+/* Reported: missing lines were indented by the answer's depth, not by the code
+   around them, so under an `if` of yours indented a level deeper than the
+   answer's they came out level with it instead of inside it. */
+run('missing lines indent from your code around them', () => {
+  const user = [
+    'int queueFan(List* L, Fan f)', '{', '  int i, result = -1;',
+    '  for(i = 0; i < L->count && strcmp(L->elems[i].ticket.code, f.ticket.code) != 0; i++){}',
+    '  if(i == L->count){', '    result = 0;', '      if(L->count < MAX){', '', '      }', '    }', '  }', '}', ''].join('\n');
+  const rows = rowsOf(user, answer);
+  const ghost = re => rows.find(r => r.startsWith('ghost|') && re.test(r));
+  eq('inside your if: one level in', ghost(/if\(f\.ticket\.type == VIP\)/), 'ghost|        if(f.ticket.type == VIP){');
+  eq('two levels in', ghost(/for\(i = 0; i < L->count && L->elems/), 'ghost|          for(i = 0; i < L->count && L->elems[i].ticket.type == VIP; i++){}');
+  eq('back out to the if', ghost(/\} else \{/), 'ghost|        } else {');
+  eq('return at the function\'s first level', ghost(/return result;/), 'ghost|  return result;');
+  eq('lines inside your if stay inside it', ghost(/L->elems\[i\] = f;/), 'ghost|        L->elems[i] = f;');
+  const v = render(user, answer);
+  const at = u => v.rows.findIndex(r => r.u === u);
+  const res = rows.findIndex(r => r.startsWith('ghost|') && /result = 1;/.test(r));
+  check('your } after if(L->count < MAX) comes after the lines that go inside it', at(8) > res && res > 0, rows.join('  /  '));
+  eq('a } that closes nothing is marked', v.rows[at(11)].kind, 'extra');
+
+  // Reported: your } closing the VIP if is where the answer has `} else {`.
+  const user2 = [
+    'int queueFan(List* L, Fan f)', '{', '  int i, result = -1;',
+    '  for(i = 0; i < L->count && strcmp(L->elems[i].ticket.code, f.ticket.code) != 0; i++){}',
+    '  if(i == L->count){', '    result = 0;', '      if(L->count < MAX){', '        if(f.ticket.type == VIP){',
+    '          for(i = 0; i < L->count && L->elems[i].ticket.type == VIP; i++){}', '        }', '      }', '    }', '}', ''].join('\n');
+  const rows2 = rowsOf(user2, answer);
+  const v2 = render(user2, answer);
+  const at2 = u => v2.rows.findIndex(r => r.u === u);
+  eq('your } carries on into the answer\'s else', rows2[at2(9)], 'pair|        }⟦ else {⟧');
+  eq('no separate } else { line', rows2.filter(r => /else/.test(r)).length, 1);
+  eq('the else body is inside it', rows2[at2(9) + 1].replace(/\s+\/\*.*$/, ''), 'ghost|          i = L->count;');
+  eq('and its } closes it', rows2[at2(9) + 2], 'ghost|        }');
+  eq('a do-while: your } carries on into } while', rowsOf('do{\n  x++;\n}\n', 'do{\n  x++;\n} while(x < 3);\n')[2], 'pair|}⟦ while(x < 3);⟧');
+  eq('a line with no line of yours above it keeps the answer\'s depth in your unit',
+     rowsOf('x;\n  int a;\n', 'int f(void)\n{\n    int a;\n}\n')[0], 'ghost|int f(void)');
+});
+
 console.log(`${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);

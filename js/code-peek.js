@@ -139,14 +139,23 @@ function peekFoldBraces(lines) {
 }
 
 /**
- * Missing lines drawn at YOUR indentation. The target may indent by 4 or by
- * tabs while you indent by 2; a missing line keeping the target's depth sat
- * far to the right of the lines around it.
+ * Missing lines drawn at YOUR indentation, as the code around them has it.
  *
- * Returns map(ws): the leading white space of a target line, as you would
- * have written it. With nothing of yours indented yet it is left as it is.
+ * A missing line is placed from a line above it that you and the target both
+ * have, found the way indentation nests: the nearest one at the same depth in
+ * the target (drawn at your indentation of it), or failing that the block it
+ * sits in (your indentation of that, one step in per level). Taking the
+ * target's depth alone was wrong whenever your code sat a level deeper or
+ * shallower than the target's -- under an `if` of yours one level in, the
+ * missing lines inside it came out level with the `if`. Lines of yours that
+ * are only braces are not used: a `}` is often a level off. With nothing to go
+ * by, the target's depth is used, in your step (or left as it is while
+ * nothing of yours is indented).
+ *
+ * Returns, per row, the leading white space for a missing line, or null for a
+ * row that is not one (or is the inside of a block comment, drawn as it is).
  */
-function peekIndentMap(userSrc, refSrc) {
+function peekGhostIndents(rows, userSrc, refSrc) {
   const unitOf = (src) => {
     let tabs = false, spaces = 0;
     peekTokenize(src).forEach(toks => {
@@ -160,12 +169,34 @@ function peekIndentMap(userSrc, refSrc) {
     return null;
   };
   const mine = unitOf(userSrc), theirs = unitOf(refSrc) || { str: '    ', spaces: 4 };
-  if (!mine) return ws => ws;
-  return (ws) => {
+  const step = (mine || theirs).str;
+  const level = (ws, unit) => {
     const tabs = (ws.match(/\t/g) || []).length;
-    const level = tabs + Math.round((ws.length - tabs) / theirs.spaces);
-    return mine.str.repeat(level);
+    return tabs + Math.round((ws.length - tabs) / unit.spaces);
   };
+  const lead = toks => (toks && toks[0] && toks[0].k === 'w') ? toks[0].t : '';
+  const solid = toks => !!toks && toks.some(t => t.k !== 'w' && !t.v);
+  const bracesOnly = toks => toks.every(t => t.k === 'w' || t.k === 'c' || t.v
+    || ((t.k === 'x' || t.k === 'b') && (t.t === '{' || t.t === '}' || t.t === ';')));
+  const anchors = [];   // { lvl: the target's depth, ws: your indentation }
+  return rows.map(row => {
+    if (row.kind === 'same' || row.kind === 'pair') {
+      if (solid(row.uToks) && solid(row.rToks) && !bracesOnly(row.uToks)) {
+        anchors.push({ lvl: level(lead(row.rToks), theirs), ws: lead(row.uToks) });
+      }
+      return null;
+    }
+    if (row.kind !== 'ghost') return null;
+    const t0 = row.rToks[0];
+    if (t0 && t0.k === 'c' && /^\s/.test(t0.t)) return null;   // inside a block comment
+    const ws = lead(row.rToks), lvl = level(ws, theirs);
+    for (let k = anchors.length - 1; k >= 0; k--) {
+      const a = anchors[k];
+      if (a.lvl === lvl) return a.ws;
+      if (a.lvl < lvl) return a.ws + step.repeat(lvl - a.lvl);
+    }
+    return mine ? mine.str.repeat(lvl) : ws;
+  });
 }
 
 /** Longest common subsequence of two arrays, as matched index pairs. */
@@ -289,8 +320,19 @@ function peekMerge(userSrc, refSrc, opts) {
      line after it. */
   const ud = peekDepths(U), rd = peekDepths(R);
   const worth = k => k === '' ? 10 : k === '\u0002' ? 100 : 1000;
-  const matched = peekMatchWeighted(uk.length, rk.length,
-    (i, j) => uk[i] !== rk[j] ? 0 : worth(uk[i]) + (ud[i] === rd[j] ? 1 : 0));
+  /* A line of nothing but closing braces says which block it ends only by
+     its depth: at the wrong depth it is worth little, so one `}` too many in
+     your code (easy mid-edit) no longer shifts every `}` after it a block
+     early -- the spare one is marked instead. And your `}` may be the start
+     of the target's `} else {` / `} while (...);`: that is the same brace,
+     the rest of the line not written yet, so it pairs with it. */
+  const closer = k => /^\}(\u0001[};])*$/.test(k);
+  const matched = peekMatchWeighted(uk.length, rk.length, (i, j) => {
+    const a = uk[i], b = rk[j], level = ud[i] === rd[j];
+    if (closer(a) && (a === b || b.startsWith(a + '\u0001'))) return level ? 1001 : 300;
+    if (a !== b) return 0;
+    return worth(a) + (level ? 1 : 0);
+  });
   const rows = [];
   let ui = 0, ri = 0;
 
@@ -347,7 +389,7 @@ function peekMerge(userSrc, refSrc, opts) {
 
   for (const [a, b] of matched) {
     hunk(ui, a, ri, b);
-    rows.push({ kind: 'same', u: a, r: b, uToks: U[a] });
+    rows.push({ kind: uk[a] === rk[b] ? 'same' : 'pair', u: a, r: b, uToks: U[a], rToks: R[b] });
     ui = a + 1; ri = b + 1;
   }
   hunk(ui, U.length, ri, R.length);
@@ -539,15 +581,16 @@ function peekExtraHTML(uToks, u, paintU) {
     + peekPaintToks(paintU, u, uToks.slice(last + 1));
 }
 
-/** One row's code, as HTML. A missing line is moved to your indentation. */
+/** One row's code, as HTML. A missing line is drawn at `indent` (see
+    peekGhostIndents), or as the target has it when that is null. */
 function peekRowCode(row, paintU, paintR, indent) {
   if (row.kind === 'ghost') {
     // A hidden comment is not drawn, nor the space that led up to it.
     let toks = row.rToks.filter(t => t.k !== 'h');
     if (toks.length < row.rToks.length) while (toks.length && toks[toks.length - 1].k === 'w') toks = toks.slice(0, -1);
-    const t0 = toks[0];
-    if (indent && t0 && t0.k === 'w') return peekEsc(indent(t0.t)) + peekPaintToks(paintR, row.r, toks.slice(1));
-    return peekPaintToks(paintR, row.r, toks);
+    if (indent == null) return peekPaintToks(paintR, row.r, toks);
+    const rest = toks[0] && toks[0].k === 'w' ? toks.slice(1) : toks;
+    return peekEsc(indent) + peekPaintToks(paintR, row.r, rest);
   }
   if (row.kind === 'pair') return peekPairParts(row.uToks, row.rToks, row.u, row.r, paintU, paintR).html;
   if (row.kind === 'extra') return peekExtraHTML(row.uToks, row.u, paintU);
@@ -588,8 +631,8 @@ function peekBadgeText(c) {
 function peekRender(userSrc, refSrc, opts) {
   const rows = peekMerge(userSrc, refSrc, opts);
   const paintU = peekPaint(userSrc), paintR = peekPaint(refSrc);
-  const indent = peekIndentMap(userSrc, refSrc);
-  return { rows, codeHTML: rows.map(r => peekRowCode(r, paintU, paintR, indent)), counts: peekCounts(rows) };
+  const indents = peekGhostIndents(rows, userSrc, refSrc);
+  return { rows, codeHTML: rows.map((r, i) => peekRowCode(r, paintU, paintR, indents[i])), counts: peekCounts(rows) };
 }
 
 /** The rows as HTML. The gutter shows your line number on your lines (the
