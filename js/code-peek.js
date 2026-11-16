@@ -461,12 +461,16 @@ function peekRender(userSrc, refSrc) {
   return { rows, codeHTML: rows.map(r => peekRowCode(r, paintU, paintR, indent)), counts: peekCounts(rows) };
 }
 
+/** The rows as HTML. The gutter shows your line number on your lines (the
+    real one, as the editor's gutter does under a fold) and + on a line the
+    target adds. */
 function peekRowsHTML(rows, codeHTML) {
   return rows.map((r, i) => {
     let cls = 'cp-row';
     if (r.kind === 'ghost') cls += ' cp-row-ghost';
     else if (r.kind === 'pair' || r.kind === 'extra') cls += ' cp-row-diff';
-    return `<div class="${cls}"${r.u >= 0 ? ` data-u="${r.u}"` : ''}><span class="cp-ln"></span><span class="cp-code">${codeHTML[i] || ' '}</span></div>`;
+    const ln = r.u >= 0 ? String(r.u + 1) : '+';
+    return `<div class="${cls}"${r.u >= 0 ? ` data-u="${r.u}"` : ''}><span class="cp-ln"><span class="cp-ln-no">${ln}</span></span><span class="cp-code">${codeHTML[i] || ' '}</span></div>`;
   }).join('');
 }
 
@@ -524,12 +528,16 @@ function codePeekShow() {
   const glyph = ['font-weight', 'font-style', 'font-stretch', 'letter-spacing', 'word-spacing',
     'font-variant-ligatures', 'font-feature-settings', 'font-kerning', 'text-rendering']
     .map(p => p + ':' + ts.getPropertyValue(p) + ';').join('');
+  const wrap = typeof edGetWrap === 'function' && edGetWrap();
+  const gutterW = gutter && gutter.offsetWidth ? gutter.offsetWidth : 0;
   const el = document.createElement('div');
   el.id = 'code-peek';
-  el.className = 'code-peek' + ((typeof edGetWrap === 'function' && edGetWrap()) ? ' cp-wrap' : '');
+  el.className = 'code-peek' + (wrap ? ' cp-wrap' : '') + (gutterW ? '' : ' cp-nogutter')
+    + (gutter && gutter.classList.contains('gutter-hidden') ? ' cp-ln-off' : '');
   el.setAttribute('aria-hidden', 'true');
-  el.style.cssText = `--cp-gutter:${gutter && gutter.offsetWidth ? gutter.offsetWidth : 0}px;`
+  el.style.cssText = `--cp-gutter:${gutterW}px;`
     + `--cp-pad-top:${cs.paddingTop};--cp-pad-left:${cs.paddingLeft};`
+    + _peekThemeVars(pre, text, gutter)
     + `font-family:${cs.fontFamily};font-size:${cs.fontSize};line-height:${cs.lineHeight};tab-size:${cs.tabSize};`
     + glyph;
   el.innerHTML = `
@@ -547,11 +555,21 @@ function codePeekShow() {
   const scroller = el.querySelector('.cp-scroll');
   const lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.5 || 21;
   const pad = parseFloat(cs.paddingTop) || 0;
-  const firstLine = Math.max(0, Math.floor((ta.scrollTop - pad) / lh));
+  /* Where each line on screen starts. Without word wrap it is one row per
+     line; with it a long line takes several, so the tops are measured. */
+  const tops = wrap ? _peekWrappedTops(ta, pre, text) : null;
+  const topOf = v => tops ? tops[v] : pad + v * lh;
+  let atTop = 0;   // the view line at the top of the editor
+  if (tops) { while (atTop + 1 < tops.length && tops[atTop + 1] <= ta.scrollTop + 0.5) atTop++; }
+  else atTop = Math.max(0, Math.floor((ta.scrollTop - pad) / lh));
+  /* The screen shows the file with folds closed; the rows are the whole file.
+     A view line is found by its real number, as the gutter prints it. */
+  const realOf = v => (typeof edViewToReal === 'function' ? edViewToReal(v + 1) : v + 1) - 1;
+  const firstLine = realOf(atTop);
   const row = el.querySelector(`.cp-row[data-u="${firstLine}"]`)
     || [...el.querySelectorAll('.cp-row[data-u]')].find(r => Number(r.dataset.u) >= firstLine);
   if (row) {
-    const atInEditor = pad + Number(row.dataset.u) * lh - ta.scrollTop;   // that line's top in the editor
+    const atInEditor = topOf(atTop) - ta.scrollTop;   // that line's top in the editor
     scroller.scrollTop = row.offsetTop - atInEditor;
   } else {
     scroller.scrollTop = ta.scrollTop;
@@ -571,6 +589,51 @@ function codePeekShow() {
 }
 
 let _peekWheel = null;
+
+/**
+ * The editor's own colours and gutter metrics, as custom properties for the
+ * overlay: its background and text (it was a fixed dark grey whatever the
+ * theme), and where the gutter's digits sit, so the overlay's line numbers
+ * land on them.
+ */
+function _peekThemeVars(pre, text, gutter) {
+  let bg = '';
+  for (let n = pre; n && n !== document.documentElement; n = n.parentElement) {
+    const c = getComputedStyle(n).backgroundColor;
+    if (c && c !== 'transparent' && !/rgba\([^)]*,\s*0\)$/.test(c)) { bg = c; break; }
+  }
+  let out = (bg ? `--cp-bg:${bg};` : '') + `--cp-fg:${getComputedStyle(text).color};`;
+  const no = gutter && gutter.querySelector('.line-num:not(.active) .ln-no, .line-num .ln-no');
+  if (no && gutter.offsetWidth) {
+    const g = gutter.getBoundingClientRect(), r = no.getBoundingClientRect();
+    const ns = getComputedStyle(no), gs = getComputedStyle(gutter);
+    out += `--cp-ln-left:${(r.left - g.left).toFixed(2)}px;--cp-ln-w:${r.width.toFixed(2)}px;`
+      + `--cp-ln-color:${ns.color};--cp-ln-size:${ns.fontSize};--cp-ln-font:${gs.fontFamily};`
+      + `--cp-ln-bg:${gs.backgroundColor && !/rgba\([^)]*,\s*0\)$/.test(gs.backgroundColor) ? gs.backgroundColor : (bg || 'transparent')};`;
+  }
+  return out;
+}
+
+/** With word wrap on: the top of every line on screen, measured by laying the
+    editor's text out again in a hidden copy of the highlight layer. */
+function _peekWrappedTops(ta, pre, text) {
+  const ps = getComputedStyle(pre), ts = getComputedStyle(text);
+  const probe = document.createElement('div');
+  probe.setAttribute('aria-hidden', 'true');
+  probe.style.cssText = 'position:absolute;left:0;top:0;visibility:hidden;pointer-events:none;'
+    + `width:${pre.clientWidth}px;box-sizing:border-box;padding:${ps.padding};`
+    + `font:${ts.font};letter-spacing:${ts.letterSpacing};tab-size:${ts.tabSize};line-height:${ts.lineHeight};`
+    + 'white-space:pre-wrap;overflow-wrap:break-word;';
+  ta.value.split('\n').forEach(line => {
+    const d = document.createElement('div');
+    d.textContent = line || '​';
+    probe.appendChild(d);
+  });
+  (pre.parentElement || document.body).appendChild(probe);
+  const tops = [...probe.children].map(d => d.offsetTop);
+  probe.remove();
+  return tops;
+}
 
 function codePeekHide() {
   if (_peekWheel) { window.removeEventListener('wheel', _peekWheel, { capture: true }); _peekWheel = null; }

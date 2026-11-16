@@ -5341,8 +5341,9 @@ body.is-resizing .practice-panel { transition: none; }
   position: absolute;
   inset: 0;
   z-index: 50;
-  background: #0d1117;
-  color: #d4d4d4;
+  /* The editor's own colours, read when the peek opens (_peekThemeVars). */
+  background: var(--cp-bg, #0d1117);
+  color: var(--cp-fg, #d4d4d4);
   overflow: hidden;
   animation: cpIn 0.08s ease-out;
 }
@@ -5357,14 +5358,30 @@ body.is-resizing .practice-panel { transition: none; }
 .code-peek .cp-scroll::-webkit-scrollbar { display: none; }
 .code-peek .cp-rows { display: inline-block; min-width: 100%; }
 .cp-row { display: flex; }
+/* The gutter: digits measured onto the editor's own (left and width of its
+   .ln-no), and held at the left edge when the code scrolls sideways, as the
+   real gutter is. */
 .cp-ln {
-  flex: 0 0 var(--cp-gutter);
+  flex: 0 0 var(--cp-gutter, 0px);
+  /* Never wider than the gutter it stands for: a digit wider than a hidden
+     gutter's 10px strip would push the code right. */
+  min-width: 0;
+  overflow: hidden;
   box-sizing: border-box;
-  padding-right: 12px;
-  text-align: right;
-  color: #484f58;
+  padding-left: var(--cp-ln-left, 0px);
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--cp-ln-bg, transparent);
+  color: var(--cp-ln-color, #484f58);
+  font-family: var(--cp-ln-font, inherit);
+  font-size: var(--cp-ln-size, inherit);
   user-select: none;
 }
+.cp-ln-no { display: inline-block; width: var(--cp-ln-w, auto); text-align: center; }
+.code-peek.cp-nogutter .cp-ln { display: none; }
+/* Line numbers switched off: the gutter keeps a thin strip and no digits. */
+.code-peek.cp-ln-off .cp-ln-no { visibility: hidden; }
 .cp-code {
   flex: 1 0 auto;
   padding: 0 var(--cp-pad-left);
