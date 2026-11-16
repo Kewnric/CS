@@ -207,6 +207,8 @@ against the *whole* file so a folded partner is not mismatched), `editor-fx.js`
 reference `code` -- missing lines faint, wrong tokens wavy-red, compared as C
 tokens so spacing and comments never count; off in Recall mode). Its merge is
 pure (`peekRender`); after any change to it run `node tools/test-code-peek.js .`.
+Right-click either eye for its settings (`ssp.peek`: hide the target's comments
+that the starter does not have).
 
 ---
 

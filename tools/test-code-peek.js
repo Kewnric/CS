@@ -66,24 +66,16 @@ function classesPerChar(html) {
 }
 
 /** The rows and each row's drawn code, the way the overlay draws them. */
-function render(user, target) {
-  const peekRender = G('peekRender');
-  if (peekRender) return peekRender(user, target);
-  const rows = G('peekMerge')(user, target);
-  const rowsHTML = G('peekRowsHTML');
-  const codeHTML = rows.map(r => {
-    const m = rowsHTML([r]).match(/<span class="cp-code">([\s\S]*)<\/span><\/div>$/);
-    return m ? m[1] : '';
-  });
-  return { rows, codeHTML };
+function render(user, target, opts) {
+  return G('peekRender')(user, target, opts);
 }
 
-const rowsOf = (user, target) => {
-  const r = render(user, target);
+const rowsOf = (user, target, opts) => {
+  const r = render(user, target, opts);
   return r.rows.map((row, i) => row.kind + '|' + marks(r.codeHTML[i]));
 };
-const countsOf = (user, target) => {
-  const c = render(user, target).counts || {};
+const countsOf = (user, target, opts) => {
+  const c = render(user, target, opts).counts || {};
   return { missing: c.missing, incomplete: c.incomplete, different: c.different };
 };
 const rowsHTMLOf = (user, target) => render(user, target).codeHTML;
@@ -219,6 +211,24 @@ run('final review', () => {
   check('your closing brace is the function\'s closing brace',
         mine === rows.length - 2 && rows.slice(mine + 1).every(r => r.startsWith('same|')),
         rows.join('  /  '));
+});
+
+/* Setting: hide the target's comments that the starter code does not have. */
+run('hide target-only comments', () => {
+  const starter = 'int f(void)\n{\n  // --- Your Implementation ---\n}\n';
+  const target = 'int f(void)\n{\n  // --- Your Implementation ---\n  //Shift elements down.\n  x = 1;   /* why x is 1 */\n  /* a block\n     over two lines */\n  return x;\n}\n';
+  const mine = 'int f(void)\n{\n}\n';
+  const hide = { hideComments: true, starter };
+  eq('comments on by default', rowsOf(mine, target).filter(r => /Shift|why x|a block|two lines/.test(r)).length, 4);
+  eq('hidden: only the starter\'s comment and the code are left',
+     rowsOf(mine, target, hide),
+     ['same|int f(void)', 'same|{', 'ghost|  // --- Your Implementation ---', 'ghost|  x = 1;', 'ghost|  return x;', 'same|}', 'same|']);
+  eq('the starter\'s comment matches however it is spaced',
+     rowsOf(mine, target, { hideComments: true, starter: '//   --- Your   Implementation ---' }).filter(r => /Implementation|Shift/.test(r)),
+     ['ghost|  // --- Your Implementation ---']);
+  eq('hidden comments change no count', countsOf(mine, target, hide), countsOf(mine, target));
+  eq('your own comments are always drawn',
+     rowsOf('int f(void)\n{\n  // my note\n}\n', target, hide).filter(r => /my note/.test(r)).length, 1);
 });
 
 console.log(`${pass}/${pass + fail} passed`);

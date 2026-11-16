@@ -408,8 +408,8 @@ function editorToolbarTemplate() {
       </span>
       <!-- Hold to see your code against the target: js/code-peek.js -->
       <button class="ed-tool" id="ed-peek-btn" onpointerdown="codePeekHold(event)"
-              onkeydown="codePeekKey(event)" onkeyup="codePeekKey(event)"
-              title="Peek at the target code: hold this, or hold Ctrl+Space" aria-label="Peek at the target code">
+              onkeydown="codePeekKey(event)" onkeyup="codePeekKey(event)" oncontextmenu="codePeekMenu(event)"
+              title="Peek at the target code: hold this, or hold Ctrl+Space. Right-click for settings" aria-label="Peek at the target code">
         <i data-lucide="eye"></i>
       </button>
       <button class="ed-tool" id="ed-zen-btn" onclick="toggleZenMode()" title="Zen mode — editor only (Ctrl+\\)" aria-label="Zen mode">

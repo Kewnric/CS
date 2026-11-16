@@ -50,7 +50,7 @@ function templateAttemptTemplate() {
           <div class="timer-display" title="Time on this stage">
             <i data-lucide="clock"></i><span id="td-timer">00:00</span>
           </div>
-          <button class="btn btn-ghost practice-icon-btn" id="td-peek-btn" title="Hold to peek at the target (or hold Ctrl+Space). Each peek costs 10 points from stage 2 on." aria-label="Peek at the target">
+          <button class="btn btn-ghost practice-icon-btn" id="td-peek-btn" title="Hold to peek at the target (or hold Ctrl+Space). Each peek costs 10 points from stage 2 on. Right-click for settings" aria-label="Peek at the target">
             <i data-lucide="eye" style="width:16px;height:16px;" aria-hidden="true"></i>
           </button>
           <button class="btn btn-primary practice-action-btn" id="td-check-btn" onclick="tdCheck()" title="Check (Ctrl+Enter)">
@@ -94,9 +94,15 @@ function templateAttemptInit() {
   if (ta) ta.addEventListener('input', _tdOnInput);
   const peek = document.getElementById('td-peek-btn');
   if (peek) {
-    const show = (e) => { e.preventDefault(); if (typeof codePeekShow === 'function') codePeekShow(); };
+    const show = (e) => {
+      // A right-click opens the settings (code-peek.js) and is not a peek: it would cost one.
+      if (e.type === 'pointerdown' && e.button !== 0) return;
+      e.preventDefault();
+      if (typeof codePeekShow === 'function') codePeekShow();
+    };
     const hide = () => { if (typeof codePeekHide === 'function') codePeekHide(); };
     peek.addEventListener('pointerdown', show);
+    if (typeof codePeekMenu === 'function') peek.addEventListener('contextmenu', codePeekMenu);
     peek.addEventListener('pointerup', hide);
     peek.addEventListener('pointerleave', hide);
     peek.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') show(e); });

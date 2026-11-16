@@ -86,6 +86,29 @@ function peekKey(toks) {
 
 const peekHasCode = toks => toks.some(t => t.k === 'x');
 
+/** A comment as compared with the starter's: no markers, no spacing, any case. */
+const peekCommentText = s => String(s).trim()
+  .replace(/^\/\/+|^\/\*+|\*+\/$/g, '').replace(/^\s*\*+(?!\/)/, '')
+  .replace(/\s+/g, ' ').trim().toLowerCase();
+
+/**
+ * Setting "Target's own comments" off: every comment of the target's that the
+ * starter code does not have becomes k 'h' (hidden). A line left with only
+ * hidden comments is blank to the merge, so it opens no row; a hidden comment
+ * after code is not drawn. The starter's own comments -- `// --- Your
+ * Implementation ---`, the hints it leaves -- are kept.
+ */
+function peekHideComments(lines, starter) {
+  const keep = new Set();
+  peekTokenize(starter || '').forEach(toks => toks.forEach(t => {
+    if (t.k === 'c') keep.add(peekCommentText(t.t));
+  }));
+  lines.forEach(toks => toks.forEach(t => {
+    if (t.k === 'c' && !keep.has(peekCommentText(t.t))) t.k = 'h';
+  }));
+  return lines;
+}
+
 /**
  * A `{` on a line of its own belongs to the line above it, when that line is
  * waiting for one (`if (x)`, `else`, a function's head). Both styles are the
@@ -247,8 +270,9 @@ function peekPairScore(u, r) {
  *   { kind: 'same' | 'ghost' | 'extra' | 'pair', u: your line index or -1,
  *     r: the target's line index or -1, uToks, rToks }
  */
-function peekMerge(userSrc, refSrc) {
+function peekMerge(userSrc, refSrc, opts) {
   const U = peekFoldBraces(peekTokenize(userSrc)), R = peekFoldBraces(peekTokenize(refSrc));
+  if (opts && opts.hideComments) peekHideComments(R, opts.starter);
   const uk = U.map(peekKey), rk = R.map(peekKey);
   /* Whole lines first: as many as possible matched. Between matchings that
      match as many, the one whose lines sit at the same brace depth wins --
@@ -479,9 +503,12 @@ function peekExtraHTML(uToks, u, paintU) {
 /** One row's code, as HTML. A missing line is moved to your indentation. */
 function peekRowCode(row, paintU, paintR, indent) {
   if (row.kind === 'ghost') {
-    const t0 = row.rToks[0];
-    if (indent && t0 && t0.k === 'w') return peekEsc(indent(t0.t)) + peekPaintToks(paintR, row.r, row.rToks.slice(1));
-    return peekPaintToks(paintR, row.r, row.rToks);
+    // A hidden comment is not drawn, nor the space that led up to it.
+    let toks = row.rToks.filter(t => t.k !== 'h');
+    if (toks.length < row.rToks.length) while (toks.length && toks[toks.length - 1].k === 'w') toks = toks.slice(0, -1);
+    const t0 = toks[0];
+    if (indent && t0 && t0.k === 'w') return peekEsc(indent(t0.t)) + peekPaintToks(paintR, row.r, toks.slice(1));
+    return peekPaintToks(paintR, row.r, toks);
   }
   if (row.kind === 'pair') return peekPairParts(row.uToks, row.rToks, row.u, row.r, paintU, paintR).html;
   if (row.kind === 'extra') return peekExtraHTML(row.uToks, row.u, paintU);
@@ -517,9 +544,10 @@ function peekBadgeText(c) {
 }
 
 /** Everything the overlay draws, without the page: the rows, each row's code
-    as HTML, and the counts. */
-function peekRender(userSrc, refSrc) {
-  const rows = peekMerge(userSrc, refSrc);
+    as HTML, and the counts. opts: { hideComments, starter } (see
+    peekHideComments). */
+function peekRender(userSrc, refSrc, opts) {
+  const rows = peekMerge(userSrc, refSrc, opts);
   const paintU = peekPaint(userSrc), paintR = peekPaint(refSrc);
   const indent = peekIndentMap(userSrc, refSrc);
   return { rows, codeHTML: rows.map(r => peekRowCode(r, paintU, paintR, indent)), counts: peekCounts(rows) };
@@ -569,7 +597,8 @@ function codePeekShow() {
   const file = state.userFiles[state.activeFileIndex];
   const mine = ((typeof edFullSource === 'function') ? edFullSource(ta) : ta.value).replace(/\r\n/g, '\n');
   const target = String(file.code).replace(/\r\n/g, '\n');
-  const view = peekRender(mine, target);
+  const view = peekRender(mine, target,
+    { hideComments: !peekPrefs().targetComments, starter: String(file.starterCode || '').replace(/\r\n/g, '\n') });
   const rows = view.rows;
   const c = view.counts;
   const ok = !c.missing && !c.incomplete && !c.different;
@@ -713,6 +742,7 @@ function codePeekHide() {
 
 /** The eye in the editor toolbar: shows while held, for mouse and touch. */
 function codePeekHold(e) {
+  if (e && e.button !== 0) return;   // a right-click opens the settings instead
   if (e) e.preventDefault();
   codePeekShow();
   const end = () => {
@@ -722,6 +752,83 @@ function codePeekHold(e) {
   };
   window.addEventListener('pointerup', end);
   window.addEventListener('pointercancel', end);
+}
+
+/* ── Settings: right-click the eye ─────────────────────────────
+   Per device, in localStorage `ssp.peek`:
+     targetComments  show the target's comments the starter does not have */
+
+const PEEK_PREF_DEFAULTS = { targetComments: true };
+
+function peekPrefs() {
+  try { return Object.assign({}, PEEK_PREF_DEFAULTS, JSON.parse(localStorage.getItem('ssp.peek') || '{}')); }
+  catch (e) { return Object.assign({}, PEEK_PREF_DEFAULTS); }
+}
+
+function peekPrefSet(key, value) {
+  const p = peekPrefs();
+  p[key] = value;
+  try { localStorage.setItem('ssp.peek', JSON.stringify(p)); } catch (e) { /* kept for this page only */ }
+}
+
+function _peekMenuClose() {
+  const m = document.getElementById('cp-menu');
+  if (m) m.remove();
+  document.removeEventListener('mousedown', _peekMenuOutside, true);
+  document.removeEventListener('keydown', _peekMenuKey, true);
+  window.removeEventListener('hashchange', _peekMenuClose);
+  window.removeEventListener('resize', _peekMenuClose);
+}
+
+function _peekMenuOutside(e) {
+  const m = document.getElementById('cp-menu');
+  if (!m || m.contains(e.target)) return;
+  // A press on an eye is the toggle (see the timer menu for why).
+  if (e.target.closest && e.target.closest('#ed-peek-btn, #td-peek-btn')) return;
+  _peekMenuClose();
+}
+
+function _peekMenuKey(e) {
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); _peekMenuClose(); }
+}
+
+/** Right-click on a peek eye: its settings, beside it. */
+function codePeekMenu(e) {
+  e.preventDefault();
+  if (document.getElementById('cp-menu')) { _peekMenuClose(); return; }
+  const btn = (e.currentTarget && e.currentTarget.getBoundingClientRect) ? e.currentTarget
+    : (e.target.closest && e.target.closest('button')) || e.target;
+  const p = peekPrefs();
+  const m = document.createElement('div');
+  m.id = 'cp-menu';
+  m.className = 'cp-menu';
+  m.setAttribute('role', 'dialog');
+  m.setAttribute('aria-label', 'Peek settings');
+  m.innerHTML = `
+    <div class="cp-menu-title"><i data-lucide="eye"></i>Peek settings</div>
+    <label class="cp-menu-row">
+      <input type="checkbox" id="cp-opt-comments"${p.targetComments ? ' checked' : ''}>
+      <span class="cp-menu-text">
+        <strong>Target's own comments</strong>
+        <em>Comments the starter code doesn't have. The starter's comments always show.</em>
+      </span>
+    </label>`;
+  document.body.appendChild(m);
+  if (typeof lucide !== 'undefined' && lucide.createIcons) lucide.createIcons();
+  m.querySelector('#cp-opt-comments').addEventListener('change', (ev) => peekPrefSet('targetComments', ev.target.checked));
+
+  // Under the eye, its right edges lined up, kept inside the window.
+  const r = btn.getBoundingClientRect();
+  const w = m.offsetWidth, h = m.offsetHeight;
+  const left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8));
+  const top = r.bottom + 6 + h > window.innerHeight - 8 ? Math.max(8, r.top - h - 6) : r.bottom + 6;
+  m.style.left = left + 'px';
+  m.style.top = top + 'px';
+
+  document.addEventListener('mousedown', _peekMenuOutside, true);
+  document.addEventListener('keydown', _peekMenuKey, true);
+  window.addEventListener('hashchange', _peekMenuClose);
+  window.addEventListener('resize', _peekMenuClose);
 }
 
 /** The eye in the editor toolbar, from the keyboard: Space or Enter held. */
