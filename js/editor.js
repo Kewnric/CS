@@ -175,6 +175,14 @@ function setupSpecificEditor(textareaId, preId, codeId, isPracticeMode, stateFie
         edOpenFind(textarea);
         return;
       }
+      /* Page Up / Page Down do what End does. A page jump threw the caret
+         dozens of lines away from where you were typing. With Ctrl they are
+         left alone (the browser's switch-tab keys). */
+      if ((e.key === 'PageUp' || e.key === 'PageDown') && !mod && !e.altKey) {
+        e.preventDefault();
+        edCaretToLineEnd(textarea, e.shiftKey);
+        return;
+      }
 
       // Everything below is text entry. With Ctrl/Cmd held these are app
       // shortcuts (Ctrl+Enter = check, etc.) and must not also type a newline
@@ -225,6 +233,20 @@ function setupSpecificEditor(textareaId, preId, codeId, isPracticeMode, stateFie
 /* ============================================================
    LINE COMMANDS
    ============================================================ */
+
+/** End, for keys that stand in for it: the caret to the end of its line, or
+    with `extend` the selection stretched there from where it was anchored. */
+function edCaretToLineEnd(textarea, extend) {
+  const v = textarea.value;
+  const back = textarea.selectionDirection === 'backward';
+  const focus = back ? textarea.selectionStart : textarea.selectionEnd;
+  const anchor = back ? textarea.selectionEnd : textarea.selectionStart;
+  let end = v.indexOf('\n', focus);
+  if (end === -1) end = v.length;
+  if (!extend) textarea.setSelectionRange(end, end);
+  else if (end >= anchor) textarea.setSelectionRange(anchor, end, 'forward');
+  else textarea.setSelectionRange(end, anchor, 'backward');
+}
 
 /** Ctrl+/ — comment or uncomment every line the selection touches. */
 function edToggleComment(textarea) {
