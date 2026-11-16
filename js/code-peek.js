@@ -195,15 +195,46 @@ function peekHL(text) {
 
 const peekJoin = toks => toks.map(t => t.t).join('');
 
-/** A paired line: yours, with the target's missing pieces faint in place and
-    your different pieces underlined. */
-function peekPairHTML(uToks, rToks) {
+/**
+ * The code tokens of a line as compared: a bracket carries how deep it sits,
+ * so your `)` closing `memmove(` meets the target's `)` closing `memmove(`,
+ * not the first `)` along the line (the one after `sizeof(Fan`).
+ */
+function peekDepthKeys(toks, idx) {
+  let depth = 0;
+  return idx.map(i => {
+    const t = toks[i].t;
+    if (t === '(' || t === '[' || t === '{') return t + (++depth);
+    if (t === ')' || t === ']' || t === '}') { const k = t + depth; depth = Math.max(0, depth - 1); return k; }
+    return t;
+  });
+}
+
+/**
+ * How a line of yours lines up with its target line, token by token.
+ *   uToR      your token index -> the target token it is
+ *   rMatched  target token indexes you have
+ *   wrong     your code tokens the target does not have there
+ *   ghost     target code tokens you do not have yet
+ */
+function peekPairAlign(uToks, rToks) {
   const uc = [], rc = [];
   uToks.forEach((t, i) => { if (t.k === 'x') uc.push(i); });
   rToks.forEach((t, j) => { if (t.k === 'x') rc.push(j); });
-  const pairs = peekLCS(uc.map(i => uToks[i].t), rc.map(j => rToks[j].t), (a, b) => a === b);
-  const uToR = new Map(pairs.map(([a, b]) => [uc[a], rc[b]]));
-  const rMatched = new Set(pairs.map(([, b]) => rc[b]));
+  const pairs = peekLCS(peekDepthKeys(uToks, uc), peekDepthKeys(rToks, rc), (a, b) => a === b);
+  return {
+    uToR: new Map(pairs.map(([a, b]) => [uc[a], rc[b]])),
+    rMatched: new Set(pairs.map(([, b]) => rc[b])),
+    wrong: uc.length - pairs.length,
+    ghost: rc.length - pairs.length
+  };
+}
+
+/** A paired line: yours, with the target's missing pieces faint in place and
+    your different pieces underlined. */
+function peekPairParts(uToks, rToks) {
+  const al = peekPairAlign(uToks, rToks);
+  const uToR = al.uToR, rMatched = al.rMatched;
 
   let html = '', rPos = 0, lastChar = '';
   const ghosts = (upTo) => {
@@ -234,21 +265,70 @@ function peekPairHTML(uToks, rToks) {
     lastChar = t.t.slice(-1);
   });
   ghosts(rToks.length);
-  return html;
+  return { html, wrong: al.wrong, ghost: al.ghost };
 }
 
-function peekRowsHTML(rows) {
-  return rows.map(r => {
-    let code, cls = 'cp-row';
-    if (r.kind === 'ghost') {
-      cls += ' cp-row-ghost';
-      code = peekHL(peekJoin(r.rToks)) || ' ';
-    } else {
-      if (r.kind === 'pair') { cls += ' cp-row-diff'; code = peekPairHTML(r.uToks, r.rToks); }
-      else if (r.kind === 'extra') { cls += ' cp-row-diff'; code = '<span class="cp-wrong">' + peekHL(peekJoin(r.uToks)) + '</span>'; }
-      else code = peekHL(peekJoin(r.uToks));
+/** A line of yours the target has no counterpart for: its code underlined,
+    not the indentation in front of it or a comment after it. */
+function peekExtraHTML(uToks) {
+  const first = uToks.findIndex(t => t.k === 'x');
+  let last = -1;
+  uToks.forEach((t, i) => { if (t.k === 'x') last = i; });
+  if (first < 0) return peekHL(peekJoin(uToks));
+  return peekHL(peekJoin(uToks.slice(0, first)))
+    + '<span class="cp-wrong">' + peekHL(peekJoin(uToks.slice(first, last + 1))) + '</span>'
+    + peekHL(peekJoin(uToks.slice(last + 1)));
+}
+
+/** One row's code, as HTML. */
+function peekRowCode(r) {
+  if (r.kind === 'ghost') return peekHL(peekJoin(r.rToks));
+  if (r.kind === 'pair') return peekPairParts(r.uToks, r.rToks).html;
+  if (r.kind === 'extra') return peekExtraHTML(r.uToks);
+  return peekHL(peekJoin(r.uToks));
+}
+
+/**
+ * What the badge says, counted by line:
+ *   missing     target lines with code you have not started
+ *   incomplete  lines of yours that are right so far but not finished
+ *   different   lines of yours with something the target does not have
+ */
+function peekCounts(rows) {
+  const c = { missing: 0, incomplete: 0, different: 0 };
+  rows.forEach(r => {
+    if (r.kind === 'ghost') { if (r.rToks.some(t => t.k === 'x')) c.missing++; }
+    else if (r.kind === 'extra') c.different++;
+    else if (r.kind === 'pair') {
+      if (peekPairAlign(r.uToks, r.rToks).wrong) c.different++;
+      else c.incomplete++;
     }
-    return `<div class="${cls}"${r.u >= 0 ? ` data-u="${r.u}"` : ''}><span class="cp-ln"></span><span class="cp-code">${code || ' '}</span></div>`;
+  });
+  return c;
+}
+
+/** The badge's words for those counts. */
+function peekBadgeText(c) {
+  const parts = [];
+  if (c.missing) parts.push(c.missing + ' missing');
+  if (c.incomplete) parts.push(c.incomplete + ' incomplete');
+  if (c.different) parts.push(c.different + ' different');
+  return parts.length ? parts.join(' · ') : '✓ Matches the target';
+}
+
+/** Everything the overlay draws, without the page: the rows, each row's code
+    as HTML, and the counts. */
+function peekRender(userSrc, refSrc) {
+  const rows = peekMerge(userSrc, refSrc);
+  return { rows, codeHTML: rows.map(peekRowCode), counts: peekCounts(rows) };
+}
+
+function peekRowsHTML(rows, codeHTML) {
+  return rows.map((r, i) => {
+    let cls = 'cp-row';
+    if (r.kind === 'ghost') cls += ' cp-row-ghost';
+    else if (r.kind === 'pair' || r.kind === 'extra') cls += ' cp-row-diff';
+    return `<div class="${cls}"${r.u >= 0 ? ` data-u="${r.u}"` : ''}><span class="cp-ln"></span><span class="cp-code">${codeHTML[i] || ' '}</span></div>`;
   }).join('');
 }
 
@@ -281,9 +361,10 @@ function codePeekShow() {
   const file = state.userFiles[state.activeFileIndex];
   const mine = ((typeof edFullSource === 'function') ? edFullSource(ta) : ta.value).replace(/\r\n/g, '\n');
   const target = String(file.code).replace(/\r\n/g, '\n');
-  const rows = peekMerge(mine, target);
-  const missing = rows.filter(r => r.kind === 'ghost' && peekKey(r.rToks)).length;
-  const differ = rows.filter(r => r.kind === 'pair' || r.kind === 'extra').length;
+  const view = peekRender(mine, target);
+  const rows = view.rows;
+  const c = view.counts;
+  const ok = !c.missing && !c.incomplete && !c.different;
 
   /* Drawn INSIDE the editor's own box and in the metrics of the text you
      actually see (the highlight layer), so a line that matches lands exactly
@@ -314,12 +395,11 @@ function codePeekShow() {
     + `font-family:${cs.fontFamily};font-size:${cs.fontSize};line-height:${cs.lineHeight};tab-size:${cs.tabSize};`
     + glyph;
   el.innerHTML = `
-    <div class="cp-badge${!missing && !differ ? ' cp-badge-ok' : ''}">
-      ${!missing && !differ ? '✓ Matches the target'
-        : (missing ? missing + ' missing' : '') + (missing && differ ? ' · ' : '') + (differ ? differ + ' different' : '')}
+    <div class="cp-badge${ok ? ' cp-badge-ok' : ''}">
+      ${peekBadgeText(c)}
       <span class="cp-badge-hint">release to go back</span>
     </div>
-    <div class="cp-scroll"><div class="cp-rows">${peekRowsHTML(rows)}</div></div>`;
+    <div class="cp-scroll"><div class="cp-rows">${peekRowsHTML(rows, view.codeHTML)}</div></div>`;
   box.appendChild(el);
   _peekEl = el;
 

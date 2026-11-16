@@ -124,5 +124,21 @@ run('pairing', () => {
   check('empty editor: no pair, no extra', rowsOf('', answer).every(r => /^(ghost|same)\|/.test(r)));
 });
 
+/* Task 2: brackets by depth, only code underlined, an honest badge. */
+run('brackets, underline, badge', () => {
+  eq('closing bracket lands at its own depth',
+     rowsOf('memmove(L->elems)\n', T + '\n')[0],
+     'pair|memmove(L->elems⟦+i+1, L->elems+i, sizeof(Fan) * (L->count-i)⟧)⟦;⟧');
+  eq('extra row: indentation is not underlined',
+     rowsOf('    foo();\n', 'bar = 1;\n').find(r => r.startsWith('extra|')), 'extra|    ⟪foo();⟫');
+  eq('counts: half-typed line is incomplete, not different',
+     countsOf('memmove(L->elems)\n', T + '\n'), { missing: 0, incomplete: 1, different: 0 });
+  eq('counts: a wrong token makes it different',
+     countsOf('x = a - b;\n', 'x = a + b;\n'), { missing: 0, incomplete: 0, different: 1 });
+  eq('counts: a line not written yet is missing',
+     countsOf('a = 1;\n', 'a = 1;\nb = 2;\n'), { missing: 1, incomplete: 0, different: 0 });
+  eq('counts: identical is all zero', countsOf(answer, answer), { missing: 0, incomplete: 0, different: 0 });
+});
+
 console.log(`${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);
