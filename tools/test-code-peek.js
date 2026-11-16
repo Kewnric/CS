@@ -161,5 +161,26 @@ run('colours', () => {
         bad < 0 ? '' : 'line ' + (bad + 1) + ': ' + classesPerChar(drawn[bad]) + '\n      want ' + byLine[bad]);
 });
 
+/* Task 4: one rule for comments and blank lines; missing lines at your indentation. */
+run('comments, blanks, indentation', () => {
+  const kinds = rows => rows.map(r => r.split('|')[0]);
+  eq('your comment takes the target comment, text ignored',
+     kinds(rowsOf('// mine\nx = 1;\n', '// theirs\nx = 1;\n')), ['same', 'same', 'same']);
+  eq('a blank line does not absorb a target comment',
+     kinds(rowsOf('\nx = 1;\n', '// theirs\nx = 1;\n')), ['ghost', 'same', 'same', 'same']);
+  eq('blank target lines open no row', rowsOf('a = 1;\nb = 2;\n', 'a = 1;\n\n\nb = 2;\n').length, 3);
+  eq('trailing newline adds no row', rowsOf('int a;', 'int a;\n').length, 1);
+  eq('ghost row uses your indentation (2 spaces vs 4)',
+     rowsOf('if(x){\n  a = 1;\n}\n', 'if(x){\n    a = 1;\n    b = 2;\n}\n')[2], 'ghost|  b = 2;');
+  eq('ghost row: target tabs, your spaces',
+     rowsOf('if(x){\n  a = 1;\n}\n', 'if(x){\n\ta = 1;\n\tb = 2;\n}\n')[2], 'ghost|  b = 2;');
+  eq('ghost row: target spaces, your tabs',
+     rowsOf('if(x){\n\ta = 1;\n}\n', 'if(x){\n    a = 1;\n    b = 2;\n}\n')[2], 'ghost|\tb = 2;');
+  eq('ghost row: nothing indented yet keeps the target\'s',
+     rowsOf('', 'if(x){\n    b = 2;\n}\n')[1], 'ghost|    b = 2;');
+  eq('comment-only ghost rows are not counted',
+     countsOf('x = 1;\n', '// note\nx = 1;\n'), { missing: 0, incomplete: 0, different: 0 });
+});
+
 console.log(`${pass}/${pass + fail} passed`);
 process.exit(fail ? 1 : 0);

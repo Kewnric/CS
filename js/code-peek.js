@@ -67,9 +67,48 @@ function peekTokenize(src) {
   });
 }
 
-/** What a line means, for comparing: its code tokens, nothing else. */
+/**
+ * What a line means, for comparing: its code tokens, nothing else. A line
+ * with no code is '' when it is blank and '\u0002' when it holds a comment,
+ * so any comment line stands for any other (their words never count) but a
+ * blank line of yours never stands in for a comment of the target's.
+ */
 function peekKey(toks) {
-  return toks.filter(t => t.k === 'x').map(t => t.t).join('\u0001');
+  const code = toks.filter(t => t.k === 'x');
+  if (code.length) return code.map(t => t.t).join('\u0001');
+  return toks.some(t => t.k === 'c') ? '\u0002' : '';
+}
+
+const peekHasCode = toks => toks.some(t => t.k === 'x');
+
+/**
+ * Missing lines drawn at YOUR indentation. The target may indent by 4 or by
+ * tabs while you indent by 2; a missing line keeping the target's depth sat
+ * far to the right of the lines around it.
+ *
+ * Returns map(ws): the leading white space of a target line, as you would
+ * have written it. With nothing of yours indented yet it is left as it is.
+ */
+function peekIndentMap(userSrc, refSrc) {
+  const unitOf = (src) => {
+    let tabs = false, spaces = 0;
+    peekTokenize(src).forEach(toks => {
+      if (!peekHasCode(toks) || !toks.length || toks[0].k !== 'w') return;
+      const ws = toks[0].t;
+      if (ws.includes('\t')) { tabs = true; return; }
+      if (!spaces || ws.length < spaces) spaces = ws.length;
+    });
+    if (tabs) return { str: '\t', spaces: spaces || 4 };
+    if (spaces) return { str: ' '.repeat(spaces), spaces };
+    return null;
+  };
+  const mine = unitOf(userSrc), theirs = unitOf(refSrc) || { str: '    ', spaces: 4 };
+  if (!mine) return ws => ws;
+  return (ws) => {
+    const tabs = (ws.match(/\t/g) || []).length;
+    const level = tabs + Math.round((ws.length - tabs) / theirs.spaces);
+    return mine.str.repeat(level);
+  };
 }
 
 /** Longest common subsequence of two arrays, as matched index pairs. */
@@ -171,11 +210,14 @@ function peekMerge(userSrc, refSrc) {
       else { rows.push(extraRow(us[i])); i++; }
     }
   };
-  const ghostRow = (j) => ({ kind: 'ghost', u: -1, r: j, rToks: R[j] });
+  /* A target line you do not have. One with nothing on it opens no row: a
+     blank line the target has would only push your lines down with nothing
+     to show. (rows.push(null) is dropped below.) */
+  const ghostRow = (j) => rk[j] === '' ? null : { kind: 'ghost', u: -1, r: j, rToks: R[j] };
   /* A line of yours with no counterpart. Blank and comment-only lines are not
      mistakes -- a starter's "// TODO" is meant to be there -- so they are
      drawn as written. */
-  const extraRow = (i) => ({ kind: uk[i] ? 'extra' : 'same', u: i, r: -1, uToks: U[i] });
+  const extraRow = (i) => ({ kind: peekHasCode(U[i]) ? 'extra' : 'same', u: i, r: -1, uToks: U[i] });
 
   for (const [a, b] of matched) {
     hunk(ui, a, ri, b);
@@ -183,7 +225,7 @@ function peekMerge(userSrc, refSrc) {
     ui = a + 1; ri = b + 1;
   }
   hunk(ui, U.length, ri, R.length);
-  return rows;
+  return rows.filter(Boolean);
 }
 
 /* ── Drawing ───────────────────────────────────────────────── */
@@ -337,9 +379,13 @@ function peekExtraHTML(uToks, u, paintU) {
     + peekPaintToks(paintU, u, uToks.slice(last + 1));
 }
 
-/** One row's code, as HTML. */
-function peekRowCode(row, paintU, paintR) {
-  if (row.kind === 'ghost') return peekPaintToks(paintR, row.r, row.rToks);
+/** One row's code, as HTML. A missing line is moved to your indentation. */
+function peekRowCode(row, paintU, paintR, indent) {
+  if (row.kind === 'ghost') {
+    const t0 = row.rToks[0];
+    if (indent && t0 && t0.k === 'w') return peekEsc(indent(t0.t)) + peekPaintToks(paintR, row.r, row.rToks.slice(1));
+    return peekPaintToks(paintR, row.r, row.rToks);
+  }
   if (row.kind === 'pair') return peekPairParts(row.uToks, row.rToks, row.u, row.r, paintU, paintR).html;
   if (row.kind === 'extra') return peekExtraHTML(row.uToks, row.u, paintU);
   return peekPaintToks(paintU, row.u, row.uToks);
@@ -378,7 +424,8 @@ function peekBadgeText(c) {
 function peekRender(userSrc, refSrc) {
   const rows = peekMerge(userSrc, refSrc);
   const paintU = peekPaint(userSrc), paintR = peekPaint(refSrc);
-  return { rows, codeHTML: rows.map(r => peekRowCode(r, paintU, paintR)), counts: peekCounts(rows) };
+  const indent = peekIndentMap(userSrc, refSrc);
+  return { rows, codeHTML: rows.map(r => peekRowCode(r, paintU, paintR, indent)), counts: peekCounts(rows) };
 }
 
 function peekRowsHTML(rows, codeHTML) {
