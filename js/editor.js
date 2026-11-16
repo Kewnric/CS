@@ -386,6 +386,7 @@ function editorToolbarTemplate() {
       </span>
       <!-- Hold to see your code against the target: js/code-peek.js -->
       <button class="ed-tool" id="ed-peek-btn" onpointerdown="codePeekHold(event)"
+              onkeydown="codePeekKey(event)" onkeyup="codePeekKey(event)"
               title="Peek at the target code: hold this, or hold Ctrl+Space" aria-label="Peek at the target code">
         <i data-lucide="eye"></i>
       </button>

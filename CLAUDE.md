@@ -205,7 +205,8 @@ against the *whole* file so a folded partner is not mismatched), `editor-fx.js`
 (per-character animation; hides the real glyph while its ghost flies), and
 `code-peek.js` (hold Ctrl+Space or the toolbar eye: your code merged with the
 reference `code` -- missing lines faint, wrong tokens wavy-red, compared as C
-tokens so spacing and comments never count; off in Recall mode).
+tokens so spacing and comments never count; off in Recall mode). Its merge is
+pure (`peekRender`); after any change to it run `node tools/test-code-peek.js .`.
 
 ---
 

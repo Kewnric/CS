@@ -434,9 +434,16 @@ function tdCompare() {
   const el = document.getElementById('td-result');
   if (el) el.hidden = true;
   if (typeof codePeekShow !== 'function') return;
-  // Comparing after a check is not a peek: undo the count it is about to add.
-  if (_td) _td.peeks = Math.max(0, _td.peeks - 1);
-  codePeekShow();
+  /* Comparing after a check is not a peek: undo the count the layer appearing
+     adds. Only when it did appear, and after the observer has counted it (its
+     callback was queued by the append, so it runs before this one). */
+  if (codePeekShow() && _td) {
+    Promise.resolve().then(() => {
+      if (!_td) return;
+      _td.peeks = Math.max(0, _td.peeks - 1);
+      _tdPaintSide();
+    });
+  }
   const off = () => {
     if (typeof codePeekHide === 'function') codePeekHide();
     document.removeEventListener('keydown', off, true);

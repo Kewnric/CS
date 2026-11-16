@@ -492,10 +492,12 @@ function _peekBlocked() {
   return '';
 }
 
+/** Puts the overlay up. True when it did; false when it was already up, this
+    screen has no peek, or the peek is off here (the toast says why). */
 function codePeekShow() {
-  if (_peekEl || !codePeekAvailable()) return;
+  if (_peekEl || !codePeekAvailable()) return false;
   const why = _peekBlocked();
-  if (why) { if (typeof toast === 'function') toast(why, { type: 'info', duration: 2000 }); return; }
+  if (why) { if (typeof toast === 'function') toast(why, { type: 'info', duration: 2000 }); return false; }
 
   const ta = document.getElementById('editor-textarea');
   const gutter = document.getElementById('editor-line-numbers');
@@ -586,6 +588,7 @@ function codePeekShow() {
     scroller.scrollLeft += e.deltaX * k;
   };
   window.addEventListener('wheel', _peekWheel, { passive: false, capture: true });
+  return true;
 }
 
 let _peekWheel = null;
@@ -655,18 +658,36 @@ function codePeekHold(e) {
   window.addEventListener('pointercancel', end);
 }
 
+/** The eye in the editor toolbar, from the keyboard: Space or Enter held. */
+function codePeekKey(e) {
+  if (e.key !== ' ' && e.key !== 'Enter') return;
+  e.preventDefault();
+  if (e.type === 'keydown') { if (!e.repeat) codePeekShow(); }
+  else codePeekHide();
+}
+
+/* Once the chord is taken, Space belongs to it until Space itself is let go.
+   Letting go of Ctrl first hides the peek while Space is still down, and its
+   auto-repeat used to type spaces into your code. */
+let _peekEatSpace = false;
+const _peekStopEating = () => { _peekEatSpace = false; };
+
 /* Ctrl+Space down shows it, letting go of either key hides it. Capture phase,
    so the editor never sees the chord and types a space. */
 document.addEventListener('keydown', (e) => {
-  if (e.code !== 'Space' || !e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+  if (e.code !== 'Space') return;
+  if (_peekEatSpace) { e.preventDefault(); e.stopPropagation(); return; }
+  if (!e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
   if (!codePeekAvailable()) return;
   e.preventDefault();
   e.stopPropagation();
+  _peekEatSpace = true;
   if (!e.repeat) codePeekShow();
 }, true);
 document.addEventListener('keyup', (e) => {
+  if (e.code === 'Space') _peekStopEating();
   if (_peekEl && (e.code === 'Space' || e.key === 'Control')) codePeekHide();
 }, true);
 // A key let go in another window would never reach us.
-window.addEventListener('blur', codePeekHide);
-document.addEventListener('visibilitychange', () => { if (document.hidden) codePeekHide(); });
+window.addEventListener('blur', () => { _peekStopEating(); codePeekHide(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { _peekStopEating(); codePeekHide(); } });
