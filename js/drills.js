@@ -304,6 +304,10 @@ function drillsInit() {
   drillState.source = once || (concept ? 'mine:' + concept : drillSourcePref());
   const askedMode = getSessionParam('drillModeOnce');
   clearSessionParam('drillModeOnce');
+  // In the daily mix only when the mix itself sent us here.
+  const fromMix = getSessionParam('thubMixEnter');
+  clearSessionParam('thubMixEnter');
+  if (!fromMix && _drillInMix()) clearSessionParam('thubMix');
   drillStart(_drillInMix() ? 'mix' : (askedMode || drillModePref()));
 }
 
@@ -350,7 +354,7 @@ function drillNext() {
 
 /* A finished round goes in the training log (Home's activity and streak read it). */
 function _drillRoundDone() {
-  if (!drillState.done) return;
+  if (!drillState.done || _drillInMix()) return;   // the daily mix logs its own round
   if (!Array.isArray(state.trainLog)) state.trainLog = [];
   state.trainLog.push({ id: generateId(), kind: 'drills', mode: drillState.mode, source: drillState.source,
     right: drillState.right, done: drillState.done, seconds: Math.round((Date.now() - drillState.startedAt) / 1000), at: Date.now() });
@@ -377,7 +381,8 @@ function drillSubmit() {
   const answer = _drillCollect(q);
   const res = (['predict', 'fix'].indexOf(q.mode) !== -1 ? drillCheck(q, answer) : drillCheckMore(q, answer)) || { ok: false, why: '', want: '' };
   const sure = !!(document.getElementById('drill-sure') || {}).checked;
-  if (sure || !res.ok) drillNoteSure(q, res.ok || !sure);
+  if (res.ok) drillNoteSure(q, true);              // right: off the come-back-first list
+  else if (sure) drillNoteSure(q, false);         // sure and wrong: on it
   res.sure = sure;
   drillState.answered = res;
   drillState.done++;
@@ -591,6 +596,16 @@ function _drillWirePuzzle() {
   const list = document.getElementById('drill-puzzle');
   if (!list) return;
   let dragId = null;
+  // Space below the last line: the end of the list.
+  list.addEventListener('dragover', (e) => e.preventDefault());
+  list.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const st = drillState.puzzle;
+    if (!st || !dragId) return;
+    st.order = st.order.filter(x => x !== dragId).concat([dragId]);
+    dragId = null;
+    drillRender();
+  });
   list.querySelectorAll('.dz-line').forEach(li => {
     li.addEventListener('dragstart', (e) => { dragId = li.dataset.id; li.classList.add('is-drag'); e.dataTransfer.effectAllowed = 'move'; });
     li.addEventListener('dragend', () => li.classList.remove('is-drag'));
@@ -598,10 +613,14 @@ function _drillWirePuzzle() {
     li.addEventListener('dragleave', () => li.classList.remove('is-over'));
     li.addEventListener('drop', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       const st = drillState.puzzle;
       if (!st || !dragId || dragId === li.dataset.id) return;
+      // The lower half of a line drops after it, so the last place is reachable.
+      const r = li.getBoundingClientRect();
+      const after = e.clientY > r.top + r.height / 2;
       st.order = st.order.filter(x => x !== dragId);
-      st.order.splice(st.order.indexOf(li.dataset.id), 0, dragId);
+      st.order.splice(st.order.indexOf(li.dataset.id) + (after ? 1 : 0), 0, dragId);
       dragId = null;
       drillRender();
     });

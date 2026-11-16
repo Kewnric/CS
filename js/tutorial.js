@@ -30,6 +30,7 @@ const GuidedTutorial = (function () {
       { selector: '#chub-grid .lib-card:nth-child(1)', message: "Hackathon is where your programs live: the folder tree, attempts, tests and the boss bar. Continue drops you straight back into the program you left.", title: 'Hackathon' },
       { selector: '#chub-grid .lib-card:nth-child(2)', message: "The Training hub teaches templates, the code shapes you write again and again, in five stages from copying to writing them from memory with new names.", title: 'Training hub' },
       { selector: '#chub-grid .lib-card:nth-child(3)', message: "Freeground is a blank editor and a terminal with nothing else on screen. Write and run anything; every tab is saved, and Ctrl+P lists them all.", title: 'Freeground' },
+      { selector: '#chub-grid .lib-card:nth-child(4)', message: "The C Codex: every operator, keyword, format code and function the course uses. F1 on a word in any editor opens its entry without leaving your code.", title: 'C Codex', optional: true },
     ],
     codex: [
       { selector: '#cdx-q', message: "Search every operator, keyword, type, format code and function by name or by what it does.", title: 'Search' },
@@ -37,7 +38,7 @@ const GuidedTutorial = (function () {
     ],
     training: [
       { selector: '#thub-due', message: "Templates due for review come first. A review starts at Recall: you get only the label and write the whole thing.", title: 'Due today', optional: true },
-      { selector: '#thub-grid', message: "Every template, with five dots for the stages you have passed. Click one to practise it.", title: 'Templates' },
+      { selector: '#thub-grid', message: "Every template, with five dots for the stages you have passed. Click one to practise it.", title: 'Templates', optional: true },
     ],
     browse: [
       { selector: '#browse-search', message: "Looking for something specific? Start typing keywords or tags to filter challenges in real-time.", title: 'Search Bar' },

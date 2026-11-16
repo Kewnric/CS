@@ -45,7 +45,10 @@ function codexInit() {
   const want = getSessionParam('codexOpen');
   clearSessionParam('codexOpen');
   if (want && codexFind(want)) { _cdx.open = want; _cdx.cat = null; }
-  _cdx.q = '';
+  _cdx.q = String(getSessionParam('codexQuery') || '');
+  clearSessionParam('codexQuery');
+  const box = document.getElementById('cdx-q');
+  if (box) box.value = _cdx.q;
   codexRenderNav();
   codexRenderMain();
   _cdx.onKey = (e) => {
@@ -61,7 +64,24 @@ function codexInit() {
 
 function codexDestroy() {
   if (_cdx.onKey) document.removeEventListener('keydown', _cdx.onKey);
+  _cdxNoteFlush();
+}
+
+/* 2. A note being typed is saved under the entry it was typed on, now, before
+   another entry (or another screen) takes its place. */
+function _cdxNoteFlush() {
   clearTimeout(_cdx.noteTimer);
+  const p = _cdx.notePending;
+  _cdx.notePending = null;
+  if (p) codexSetNote(p.id, p.text);
+}
+
+/** Put a word in the search box (Search the Codex from a card, already here). */
+function codexSearchFor(q) {
+  const box = document.getElementById('cdx-q');
+  if (box) { box.value = q; box.focus(); }
+  _cdx.q = q;
+  codexRenderNav();
 }
 
 /** Open an entry from anywhere in the app. */
@@ -129,6 +149,7 @@ function codexRenderNav() {
 function codexRenderMain() {
   const main = document.getElementById('cdx-main');
   if (!main) return;
+  _cdxNoteFlush();
   if (_cdx.open) main.innerHTML = _cdxEntryHTML(codexFind(_cdx.open));
   else if (_cdx.cat) main.innerHTML = _cdxCatHTML(_cdx.cat);
   else main.innerHTML = `
@@ -142,9 +163,11 @@ function codexRenderMain() {
   if (_cdx.open) {
     codexMarkSeen(_cdx.open);
     const note = document.getElementById('cdx-note');
+    const id = _cdx.open;
     if (note) note.addEventListener('input', () => {
       clearTimeout(_cdx.noteTimer);
-      _cdx.noteTimer = setTimeout(() => codexSetNote(_cdx.open, note.value), 400);
+      _cdx.notePending = { id, text: note.value };
+      _cdx.noteTimer = setTimeout(_cdxNoteFlush, 400);
     });
   }
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: main });
@@ -160,7 +183,10 @@ function _cdxEntryHTML(e) {
   const used = codexUsage()[e.id] || [];
   const note = codexStore().notes[e.id] || '';
   const rel = (e.r || []).map(codexFind).filter(Boolean);
-  const tpls = (state.templates || []).filter(t => tplTokens(tplCanonical(t)).indexOf(e.n) !== -1).slice(0, 6);
+  const tpls = (state.templates || []).filter(t => {
+    const code = tplCanonical(t);
+    return tplTokens(_cdxWantsDirectives(e) ? code : _cdxNoDirectives(code)).indexOf(e.n) !== -1;
+  }).slice(0, 6);
   return `
     <article class="cdx-entry">
       <div class="cdx-kicker"><button class="cdx-link" onclick="codexShowCat('${e.c}')">${escapeHTML(cat.name)}</button>${e.h && e.h !== cat.name ? ' · <code>#include &lt;' + escapeHTML(e.h) + '&gt;</code>' : ''}${e.size ? ' · ' + escapeHTML(e.size) + ' byte' + (e.size === '1' ? '' : 's') : ''}</div>

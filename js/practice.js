@@ -492,8 +492,19 @@ function _practiceClockFields() {
   return {
     elapsedMs: sd.startTime ? Math.max(0, now - sd.startTime) : 0,
     hintsUsed: sd.hintsUsed || 0,
-    paused: !!sd.paused
+    paused: !!sd.paused,
+    exam: _practiceExamFields()
   };
+}
+
+/* How the attempt is being taken (exam-mode.js), so Resume brings it back the
+   same. Read from the session params themselves, not examRecallOn(): the save
+   on leaving runs once the next screen's route is already set. */
+function _practiceExamFields() {
+  if (typeof EXAM_RECALL_KEY === 'undefined') return null;
+  const on = (k) => getSessionParam(k) === true || getSessionParam(k) === 'true';
+  return { recall: on(EXAM_RECALL_KEY), closedBook: on(EXAM_CLOSED_KEY),
+    budget: parseInt(getSessionParam(EXAM_BUDGET_KEY), 10) || 0, runs: parseInt(getSessionParam(EXAM_RUNS_KEY), 10) || 0 };
 }
 
 /** This attempt's draft only; every other program's stays. */

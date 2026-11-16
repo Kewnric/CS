@@ -219,7 +219,7 @@ const BADGE_CATALOG = [
   { id: 't_mix', icon: 'calendar-check', name: 'Daily Habit', hint: 'Finish the daily mix five times', goal: 5,
     get: () => (state.trainLog || []).filter(e => e.kind === 'mix' && e.done >= e.steps).length },
   { id: 't_drills', icon: 'brain-circuit', name: 'Drill Sergeant', hint: 'Answer 100 drill questions right', goal: 100,
-    get: () => (state.trainLog || []).filter(e => e.kind === 'drills').reduce((t, e) => t + (e.right || 0), 0) },
+    get: () => (state.trainLog || []).filter(e => e.kind === 'drills' || e.kind === 'mix').reduce((t, e) => t + (e.right || 0), 0) },
   { id: 't_free', icon: 'terminal', name: 'Free Spirit', hint: 'Keep ten freegrounds', goal: 10,
     get: () => ((state.freeground && state.freeground.tabs) || []).length },
   { id: 't_codex', icon: 'book-open-text', name: 'Well Read', hint: 'Open fifty Codex entries', goal: 50,

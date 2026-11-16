@@ -663,7 +663,10 @@ async function _loadV2Domains(uid) {
      memory would carry one account's data into the next one signed in. */
   if (typeof trainFieldsRead === 'function') {
     trainFieldsRead(trainingDoc.exists ? trainingDoc.data() : {}, { domain: 'training' });
+    const runs = {};
+    ((state.freeground || {}).tabs || []).forEach(t => { if (t && t.id && t.lastRun) runs[t.id] = t.lastRun; });
     trainFieldsRead(fgDoc.exists ? fgDoc.data() : {}, { domain: 'freeground' });
+    ((state.freeground || {}).tabs || []).forEach(t => { if (t && !t.lastRun && runs[t.id]) t.lastRun = runs[t.id]; });
   }
 
   // The parked library and the unfinished attempts; see the write side.
@@ -1194,7 +1197,12 @@ async function saveToFirestore(uid) {
     /* Freeground and the training sections: a document each, so neither can
        push the app or history document over its cap (js/train-store.js). */
     const trainingPayload = _sanitizeForFirestore(typeof trainFieldsWrite === 'function' ? trainFieldsWrite('training') : {}) || {};
-    const fgPayload = _sanitizeForFirestore(typeof trainFieldsWrite === 'function' ? trainFieldsWrite('freeground') : {}) || {};
+    const fgRaw = typeof trainFieldsWrite === 'function' ? trainFieldsWrite('freeground') : {};
+    if (fgRaw.freeground && Array.isArray(fgRaw.freeground.tabs)) {
+      // The last run's output stays on this device (a copy: state keeps it).
+      fgRaw.freeground = Object.assign({}, fgRaw.freeground, { tabs: fgRaw.freeground.tabs.map(t => Object.assign({}, t, { lastRun: '' })) });
+    }
+    const fgPayload = _sanitizeForFirestore(fgRaw) || {};
 
     // Viz domain
     let vizPayload = {};

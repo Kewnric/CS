@@ -771,8 +771,17 @@ function browseResume(challengeId) {
   const variant = c.variants.find(v => v.id === saved.variantId) || c.variants[0];
   setSessionParam('practiceChallenge', c.id);
   setSessionParam('practiceVariant', variant.id);
-  // Straight in, with no Session Setup: no recall, no run budget.
+  /* Straight in, with no Session Setup -- and taken the way it was started:
+     a closed-book or recall attempt, its run budget and the runs already spent
+     come back with the draft. A draft from before they were saved has none. */
+  const draft = saved.fromDisk ? (typeof practiceDraftForChallenge === 'function' ? practiceDraftForChallenge(challengeId) : null)
+    : getSessionParam('autoSavedFiles');
+  const ex = draft && draft.exam;
   if (typeof examClear === 'function') examClear();
+  if (ex && typeof examSetup === 'function') {
+    examSetup(ex.recall, ex.budget, ex.closedBook);
+    if (ex.runs > 0) setSessionParam(EXAM_RUNS_KEY, ex.runs);
+  }
   spaNavigate('practice');
 }
 
@@ -1473,12 +1482,12 @@ function _renderProgramDetail(container, c) {
           <i data-lucide="play" style="width:18px;height:18px;fill:currentColor;"></i> ${isPerfect ? 'Practice Again' : 'Start Practice'}
         </button>`}
         ${isPerfect && typeof tplMakeFrom === 'function' ? `<button class="btn btn-secondary" onclick="browseMakeTemplate('${c.id}')"
-                aria-label="Make a template" title="Make a template from your passed answer, to learn its shape by heart">
+                aria-label="Make a template" title="Make a template from this program's reference answer (you have passed it), to learn its shape by heart">
           <i data-lucide="puzzle" style="width:16px;height:16px;"></i>
         </button>` : ''}
         <button class="btn btn-secondary" onclick="fgOpenProgramCopy('${c.id}')"
                 aria-label="Open in Freeground"
-                title="Open in Freeground: ${isPerfect ? 'a copy of your passed answer' : 'a copy of the starter code'}, to experiment on">
+                title="Open in Freeground: ${isPerfect ? 'a copy of the reference answer (you have passed it)' : 'a copy of the starter code'}, to experiment on">
           <i data-lucide="terminal" style="width:16px;height:16px;"></i>
         </button>
         <button class="btn btn-secondary" onclick="agOpenDeadlineModal('challenge', '${c.id}')"

@@ -23,11 +23,16 @@ const _cdxPops = [];
 function codexWordAt(text, pos) {
   const t = String(text || '');
   // A format code in a string: %d, %.2f, %-5s, %lf ...
-  const fmt = /%[-+ 0#]*\d*(?:\.\d+)?(?:hh|h|ll|l|z)?[diouxXfeEgGcsp%]/g;
-  let m;
-  while ((m = fmt.exec(t))) {
-    if (m.index <= pos && pos <= m.index + m[0].length) return { word: m[0], kind: 'format' };
-    if (m.index > pos) break;
+  const str = _cdxStringAt(t, pos);
+  if (str) {
+    const fmt = /%[-+ 0#]*\d*(?:\.\d+)?(?:hh|h|ll|l|z)?[diouxXfeEgGcsp%]/g;
+    const body = t.slice(str.from, str.to);
+    let m;
+    while ((m = fmt.exec(body))) {
+      const at = str.from + m.index;
+      if (at <= pos && pos <= at + m[0].length) return { word: m[0], kind: 'format' };
+      if (at > pos) break;
+    }
   }
   let a = pos, b = pos;
   while (a > 0 && /\w/.test(t[a - 1])) a--;
@@ -44,6 +49,29 @@ function codexWordAt(text, pos) {
     }
   }
   return null;
+}
+
+/* The inside of the "..." string literal on pos's line that pos is in, or null. */
+function _cdxStringAt(t, pos) {
+  const from = t.lastIndexOf('\n', pos - 1) + 1;
+  let to = t.indexOf('\n', pos);
+  if (to === -1) to = t.length;
+  let open = -1, quote = '';
+  for (let i = from; i < to; i++) {
+    const c = t[i];
+    if (quote) {
+      if (c === '\\') { i++; continue; }
+      if (c === quote) {
+        if (quote === '"' && open < pos && pos <= i) return { from: open + 1, to: i };
+        quote = '';
+      }
+    } else if (c === '/' && t[i + 1] === '/') {
+      break;
+    } else if (c === '"' || c === "'") {
+      quote = c; open = i;
+    }
+  }
+  return quote === '"' && open < pos ? { from: open + 1, to } : null;   // still being typed
 }
 
 /** The entries a looked-up word stands for. */
@@ -82,13 +110,14 @@ function _cdxCaretRect(ta) {
 }
 
 function codexPopsClose(all) {
-  while (_cdxPops.length) {
-    const p = _cdxPops[_cdxPops.length - 1];
-    if (!all && _cdxPops.length === 0) break;
-    if (all && p.pinned) break;
-    _cdxPops.pop();
-    p.el.remove();
-    if (!all) break;
+  if (all) {
+    for (let i = _cdxPops.length - 1; i >= 0; i--) {
+      if (_cdxPops[i].pinned) continue;
+      _cdxPops[i].el.remove();
+      _cdxPops.splice(i, 1);
+    }
+  } else if (_cdxPops.length) {
+    _cdxPops.pop().el.remove();
   }
   if (!_cdxPops.length) {
     document.removeEventListener('mousedown', _cdxOutside, true);
@@ -174,8 +203,9 @@ function codexPopShow(entries, at, word) {
       el.classList.toggle('is-pinned', pop.pinned);
     } else if (search) {
       codexPopsClose(true);
-      setSessionParam('codexOpen', '');
-      spaNavigate('codex');
+      const q = search.getAttribute('data-cdx-search') || '';
+      if (document.body.dataset.route === 'codex' && typeof codexSearchFor === 'function') codexSearchFor(q);
+      else { setSessionParam('codexQuery', q); spaNavigate('codex'); }
     }
   });
   if (_cdxPops.length === 1) {

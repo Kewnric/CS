@@ -262,17 +262,20 @@ function thubMixGo() {
   const s = m.steps[m.at];
   if (typeof toast === 'function') toast('Daily mix: step ' + (m.at + 1) + ' of ' + m.steps.length, { type: 'info', duration: 1600 });
   if (s.kind === 'template') tplStartDrill(s.id, { review: s.review, back: 'mix' });
-  else spaNavigate('drills');
+  else { setSessionParam('thubMixEnter', true); spaNavigate('drills'); }
 }
 
 /** The current step is finished: on to the next, or done. */
 function thubMixNext() {
   const m = getSessionParam('thubMix');
   if (!m) { spaNavigate('training'); return; }
+  const step = m.steps[m.at];
+  if (step && step.kind === 'drills' && typeof drillState !== 'undefined') { m.right = drillState.right; m.answered = drillState.done; }
   m.at++;
   if (m.at >= m.steps.length) {
     if (!Array.isArray(state.trainLog)) state.trainLog = [];
     state.trainLog.push({ id: generateId(), kind: 'mix', steps: m.steps.length, done: m.steps.length,
+      right: m.right || 0, answered: m.answered || 0,
       seconds: Math.round((Date.now() - (m.started || Date.now())) / 1000), at: Date.now() });
     if (typeof saveData === 'function') saveData();
     clearSessionParam('thubMix');
@@ -463,7 +466,7 @@ function _thubHistoryHTML() {
         <h2 class="lib-hub-section-title"><i data-lucide="history"></i> Sessions</h2>
         ${log.length ? `<div class="thub-hist-list">${log.slice(0, 60).map(e => `
           <div class="thub-hist-row"><strong>${escapeHTML(kindLabel(e))}</strong>
-            <span>${e.kind === 'mix' ? e.done + ' of ' + e.steps + ' steps' : e.right + ' of ' + e.done + ' right'}</span>
+            <span>${e.kind === 'mix' ? e.done + ' of ' + e.steps + ' steps' + (e.answered ? ' · ' + e.right + ' of ' + e.answered + ' right' : '') : e.right + ' of ' + e.done + ' right'}</span>
             <em>${escapeHTML(when(e.at))}</em></div>`).join('')}</div>` : '<p class="atpl-hint">No sessions yet. The daily mix and every drill round land here.</p>'}
       </section>
       <section>

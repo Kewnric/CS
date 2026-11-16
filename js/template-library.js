@@ -152,6 +152,7 @@ function tplStartStage(id, opts) {
   if (opts && opts.stage) return Math.min(5, Math.max(1, opts.stage | 0));
   if (t && t.relearn && s.stage >= 3) return 3;
   if (opts && opts.review) return 4;
+  if (s.stage === 4 && t && tplVariation(t, 1)) return 5;   // Recall passed: on to new names
   if (s.stage >= 4) return 4;
   return Math.min(4, s.stage + 1);
 }
@@ -176,7 +177,8 @@ function tplStartDrill(id, opts) {
     id, stage: tplStartStage(id, o), review: !!o.review,
     seed: o.seed || ((Date.now() % 1000000) + 1), back: o.back || (here && here !== 'template-attempt' ? here : 'training')
   });
-  spaNavigate('template-attempt');
+  if (here === 'template-attempt' && typeof SpaRouter !== 'undefined' && SpaRouter.refresh) SpaRouter.refresh();
+  else spaNavigate('template-attempt');
 }
 
 /**

@@ -35,8 +35,9 @@
 .zdock.is-faded { opacity: 0.35; }
 .zdock:focus-within, .zdock.is-dragging { opacity: 1; }
 
-/* The caret's line runs underneath: sit at the top instead. */
-.zdock.is-raised { bottom: auto !important; top: 16px; }
+/* The caret's line runs underneath: sit at the top of the code instead,
+   below the editor's toolbar (--zdock-raised-top is set from the editor). */
+.zdock.is-raised { bottom: auto !important; top: var(--zdock-raised-top, 16px); }
 
 .zdock-grip {
   display: inline-flex;

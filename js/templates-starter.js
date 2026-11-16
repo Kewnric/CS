@@ -227,7 +227,9 @@ const TPL_STARTER = [
     return len;
 }`,
     harness: { prelude: TPL_IO, code: String.raw`int main(void) {
-    printf("%d %d\n", ⟦fn⟧("hello"), ⟦fn⟧(""));
+    int a = ⟦fn⟧("hello");
+    int b = ⟦fn⟧("");
+    printf("%d %d\n", a, b);
     return 0;
 }`, expect: '5 0\n' }
   },
@@ -298,7 +300,9 @@ const TPL_STARTER = [
     return 1;
 }`,
     harness: { prelude: TPL_IO_STR, code: String.raw`int main(void) {
-    printf("%d %d\n", ⟦fn⟧("level"), ⟦fn⟧("lever"));
+    int a = ⟦fn⟧("level");
+    int b = ⟦fn⟧("lever");
+    printf("%d %d\n", a, b);
     return 0;
 }`, expect: '1 0\n' }
   },
@@ -545,7 +549,9 @@ struct ⟦Type⟧ { int ⟦field⟧; struct ⟦Type⟧ *next; };
         n->next = list;
         list = n;
     }
-    int a = ⟦fn⟧(&list, 2), b = ⟦fn⟧(&list, 9), c = ⟦fn⟧(&list, 1);
+    int a = ⟦fn⟧(&list, 2);
+    int b = ⟦fn⟧(&list, 9);
+    int c = ⟦fn⟧(&list, 1);
     printf("%d %d %d:", a, b, c);
     for (struct ⟦Type⟧ *p = list; p != NULL; p = p->next) printf(" %d", p->⟦field⟧);
     printf("\n");
@@ -611,7 +617,9 @@ struct ⟦Type⟧ { int ⟦field⟧; struct ⟦Type⟧ *next; };
     return a;
 }`,
     harness: { prelude: TPL_IO, code: String.raw`int main(void) {
-    printf("%d %d\n", ⟦fn⟧(10), ⟦fn⟧(1));
+    int a = ⟦fn⟧(10);
+    int b = ⟦fn⟧(1);
+    printf("%d %d\n", a, b);
     return 0;
 }`, expect: '55 1\n' }
   },
@@ -646,7 +654,11 @@ struct ⟦Type⟧ { int ⟦field⟧; struct ⟦Type⟧ *next; };
     return 1;
 }`,
     harness: { prelude: TPL_IO, code: String.raw`int main(void) {
-    printf("%d%d%d%d\n", ⟦fn⟧(1), ⟦fn⟧(2), ⟦fn⟧(9), ⟦fn⟧(13));
+    int a = ⟦fn⟧(1);
+    int b = ⟦fn⟧(2);
+    int c = ⟦fn⟧(9);
+    int d = ⟦fn⟧(13);
+    printf("%d%d%d%d\n", a, b, c, d);
     return 0;
 }`, expect: '0101\n' }
   },

@@ -67,7 +67,7 @@ function fgOpenProgramCopy(challengeId) {
   if (!files.some(f => f.code.trim())) files[0].code = fgDefaultStarter();
   if (!fgOpen({ newTab: { name: c.title, files, from: 'program:' + c.id }, back: 'browse' })) return;
   if (typeof toast === 'function') {
-    toast(passed ? 'A copy of your answer, to experiment on.' : 'A copy of the starter code. The answer stays hidden until you pass the program.',
+    toast(passed ? 'A copy of the reference answer (you have passed this one), to experiment on.' : 'A copy of the starter code. The answer stays hidden until you pass the program.',
       { type: 'info', duration: 3000 });
   }
 }
@@ -225,6 +225,8 @@ function freegroundInit() {
   }
 
   fgActivate(id, { noCommit: true });
+  const peek = document.getElementById('ed-peek-btn');
+  if (peek) peek.style.display = 'none';
 
   if (typeof applyEditorViewSettings === 'function') applyEditorViewSettings();
   const layout = document.getElementById('fg-layout');
@@ -347,6 +349,8 @@ function fgRun() {
   const t = fgActiveTab();
   if (t) { _fg.dirty.delete(t.id); fgRenderStrip(); }
   fgCommit();
+  const out = document.getElementById('editor-output-body');
+  if (out) out.classList.remove('fg-plain');
   if (typeof runCodeWithPiston === 'function') runCodeWithPiston();
 }
 

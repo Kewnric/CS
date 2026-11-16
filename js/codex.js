@@ -50,6 +50,12 @@ function codexMarkSeen(id) {
   if (typeof saveData === 'function') saveData();
 }
 
+/* Code without its preprocessor lines: only the directive entries look at those. */
+function _cdxNoDirectives(code) { return String(code || '').replace(/^[ \t]*#.*$/gm, ''); }
+
+/* Does an entry's matcher need the directive lines? */
+function _cdxWantsDirectives(e) { return /^#/.test(e.n); }
+
 /* What counts as using an entry, as a test over a source's tokens. */
 function _cdxMatcher(e) {
   if (e.c === 'formats') {
@@ -90,11 +96,12 @@ function codexUsage() {
   const key = (state.history || []).length + ':' + (state.templateHistory || []).length + ':' + (state.challenges || []).length + ':' + (state.templates || []).length;
   if (_cdxUsage && _cdxUsage.key === key) return _cdxUsage.counts;
   const counts = {};
-  const sources = _cdxSources().map(s => ({ title: s.title, toks: tplTokens(s.code) }));
+  const sources = _cdxSources().map(s => ({ title: s.title, toks: tplTokens(s.code), plain: tplTokens(_cdxNoDirectives(s.code)) }));
   codexAll().forEach(e => {
     const m = _cdxMatcher(e);
     if (!m) return;
-    const hits = sources.filter(s => m(s.toks)).map(s => s.title);
+    const pp = _cdxWantsDirectives(e);
+    const hits = sources.filter(s => m(pp ? s.toks : s.plain)).map(s => s.title);
     if (hits.length) counts[e.id] = hits;
   });
   _cdxUsage = { key, counts };

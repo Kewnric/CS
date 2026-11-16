@@ -293,9 +293,11 @@ function _zdockWireFade() {
   });
 }
 
-/* If the caret's line runs under the dock, lift the dock to the top of the
-   layout until it no longer does. The line is found from the text before the
-   caret, so with word wrap on it is an estimate; it errs toward lifting. */
+/* If the caret's line runs under the dock -- its row AND its text reaching
+   across to the dock -- lift the dock to the top of the code, just below the
+   editor's toolbar, until it no longer does. The row is found from the text
+   before the caret, so with word wrap on it is an estimate; it errs toward
+   lifting. */
 function _zdockAvoidCaret(ta) {
   const z = _zdock;
   if (!z || !ta) return;
@@ -303,11 +305,38 @@ function _zdockAvoidCaret(ta) {
     if (z !== _zdock) return;
     const cs = getComputedStyle(ta);
     const lh = parseFloat(cs.lineHeight) || 21;
-    const line = ta.value.slice(0, ta.selectionStart || 0).split('\n').length;
-    const top = ta.getBoundingClientRect().top + (parseFloat(cs.paddingTop) || 0) + (line - 1) * lh - ta.scrollTop;
+    const caret = ta.selectionStart || 0;
+    const before = ta.value.slice(0, caret);
+    const line = before.split('\n').length;
+    const T = ta.getBoundingClientRect();
+    const top = T.top + (parseFloat(cs.paddingTop) || 0) + (line - 1) * lh - ta.scrollTop;
+    const start = before.lastIndexOf('\n') + 1;
+    let end = ta.value.indexOf('\n', caret);
+    if (end === -1) end = ta.value.length;
+    const left = T.left + (parseFloat(cs.paddingLeft) || 0) - ta.scrollLeft;
+    const room = _zdockTextWidth('  ', cs);   // the next keystrokes
+    const right = Math.min(T.right, left + _zdockTextWidth(ta.value.slice(start, end), cs) + room);
     z.el.classList.remove('is-raised');
     const r = z.el.getBoundingClientRect();
-    const under = top + lh > r.top - 4 && top < r.bottom + 4;
+    const under = top + lh > r.top - 4 && top < r.bottom + 4 && right > r.left - 4;
+    if (under) {
+      const L = z.layout.getBoundingClientRect();
+      z.el.style.setProperty('--zdock-raised-top', Math.max(8, Math.round(T.top - L.top + 8)) + 'px');
+    }
     z.el.classList.toggle('is-raised', under);
   }, 0);
+}
+
+/* How wide a line of code is in the editor's font, tabs at its tab size. */
+function _zdockTextWidth(text, cs) {
+  const cv = _zdockTextWidth.cv || (_zdockTextWidth.cv = document.createElement('canvas'));
+  const ctx = cv.getContext('2d');
+  ctx.font = cs.font || (cs.fontSize + ' ' + cs.fontFamily);
+  const tab = parseInt(cs.tabSize, 10) || 4;
+  let col = 0, out = '';
+  for (const ch of String(text)) {
+    if (ch === '\t') { const n = tab - (col % tab); out += ' '.repeat(n); col += n; }
+    else { out += ch; col++; }
+  }
+  return ctx.measureText(out).width;
 }

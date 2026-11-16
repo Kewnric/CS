@@ -252,7 +252,7 @@ function _tdPaintStages() {
     return `
       <button type="button" class="td-stage${on ? ' is-on' : ''}${done ? ' is-done' : ''}" role="tab" aria-selected="${on}"
               ${off ? 'disabled title="This template has nothing to vary"' : `title="${escapeHTML(s.hint)}"`}
-              onclick="tdSetStage(${s.n})">
+              onclick="tdGoStage(${s.n})">
         <span class="td-stage-n">${done && !on ? '<i data-lucide="check"></i>' : s.n}</span>
         <span class="td-stage-name">${s.name}</span>
       </button>`;
@@ -289,6 +289,16 @@ function _tdPaintSide() {
     </div>
     ${t.harness ? '<div class="td-harness-note"><i data-lucide="flask-conical"></i> Check also compiles and runs it: the right output passes even if you wrote it differently.</div>' : ''}`;
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: host });
+}
+
+/** A stage chosen from the bar: ask first when it would throw away unchecked typing. */
+function tdGoStage(n) {
+  if (!_td) return;
+  const typed = _tdAnswer();
+  const unchecked = typed.trim() && typed !== _td.starter && (!_td.lastCheck || _td.lastCheck.answer !== typed);
+  if (!unchecked || typeof showConfirm !== 'function') { tdSetStage(n); return; }
+  showConfirm('Leave this stage?', 'What you have typed here has not been checked, and it is not kept.',
+    () => tdSetStage(n), { confirmLabel: 'Leave it', tone: 'primary' });
 }
 
 function tdNewNames() {

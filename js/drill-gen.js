@@ -101,11 +101,47 @@ function drillMakePredict(e) {
     ask: e.stdin ? 'Given the input below, what does this print?' : 'What does this print?' };
 }
 
+/* The whole program a source's code runs in: a template inside its harness,
+   a Codex example inside main, a program as it is. null when there is none. */
+function _dgFullWith(e, code) {
+  if (e.key.startsWith('T:')) {
+    const t = typeof tplFind === 'function' ? tplFind(e.key.slice(2)) : null;
+    return t && t.harness ? tplHarnessSource(t, code, {}) : null;
+  }
+  if (e.key.startsWith('C:')) return typeof codexWrap === 'function' ? codexWrap(code) : null;
+  return code;
+}
+
+/* Run a program in the page's interpreter: what it printed, or why it stopped. */
+function _dgRun(src, stdin) {
+  if (typeof CVM === 'undefined' || !CVM.parseProgram) return null;
+  try {
+    const r = CVM.runProgram(CVM.parseProgram([{ name: 'main.c', code: src }]), { stdin: stdin || '', maxSteps: 300000, timeMs: 150 });
+    return { out: r.stdout || '', err: r.error ? String(r.error.message || r.error) : '' };
+  } catch (err) {
+    return { out: '', err: 'does not parse' };
+  }
+}
+
+/* Faults that still compile cleanly: they are only a question when running
+   the program shows them (wrong output, or an index past the end). */
+const DG_SILENT_FAULTS = ['array-bounds', 'off-by-direction'];
+
 function drillMakeFixFrom(e) {
   if (typeof _drillMakeFix !== 'function') return null;
-  const q = _drillMakeFix({ id: e.key, title: e.title, file: e.file, code: e.code });
-  if (q) { q.key = e.key; q.fgCode = e.code; }
-  return q;
+  for (let tries = 0; tries < 6; tries++) {
+    const q = _drillMakeFix({ id: e.key, title: e.title, file: e.file, code: e.code });
+    if (!q) return null;
+    q.key = e.key;
+    q.fgCode = e.code;
+    if (DG_SILENT_FAULTS.indexOf(q.mistakeCode) === -1) return q;
+    const good = _dgFullWith(e, e.code), bad = _dgFullWith(e, q.code);
+    if (!good || !bad) continue;
+    const a = _dgRun(good, e.stdin), b = _dgRun(bad, e.stdin);
+    if (!a || !b || a.err) continue;               // cannot tell: do not ask
+    if (b.err || b.out !== a.out) return q;
+  }
+  return null;
 }
 
 /* ── Trace ─────────────────────────────────────────────────── */
@@ -144,7 +180,10 @@ function drillMakeTrace(e) {
   let off = 0;
   lines.forEach((l, i) => {
     const t = l.trim();
-    if (/;\s*$/.test(t) && !/^(#|\/\/|return\b|printf|puts|putchar|scanf|fprintf|free)/.test(t) && /=|\+\+|--/.test(t)) cand.push({ line: i + 1, at: off + l.length });
+    // Plain statements only: on `if (c) n++;` "the first time the line has run"
+    // could mean the test or the body, which are different moments.
+    if (/;\s*$/.test(t) && !/^(#|\/\/|return\b|printf|puts|putchar|scanf|fprintf|free|if\b|else\b|while\b|for\b|do\b|switch\b|case\b|default\b|\})/.test(t)
+      && /=|\+\+|--/.test(t)) cand.push({ line: i + 1, at: off + l.length });
     off += l.length + 1;
   });
   for (let tries = 0; tries < 6 && cand.length; tries++) {
@@ -156,6 +195,8 @@ function drillMakeTrace(e) {
       r = CVM.runProgram(prog, { stdin: e.stdin || '', target: tgt.target, maxSteps: 200000, timeMs: 150 });
     } catch (err) { continue; }
     if (!r || r.error || !r.snaps || !r.snaps.length) continue;
+    if (r.inputShort) continue;                                    // it needed input the question cannot give
+    if (r.snaps[0].pass && r.snaps[0].pass !== 1) continue;        // the first pass is no longer kept
     let view;
     try { view = CVM.describe(r.snaps[0], prog, {}); } catch (err) { continue; }
     const frame = (view.frames || []).find(f => f && tgt.fn && (f.fn === tgt.fn.name || f.name === tgt.fn.name)) || (view.frames || [])[0];
@@ -259,23 +300,194 @@ function drillMakeFlash(e) {
 
 /* ── Errors ────────────────────────────────────────────────── */
 
-/* A fault, how to put it into a line, and the message the compiler gives. */
+/* A fault, how to put it into a line, and exactly what gcc -Wall says about
+   it. Each `make` returns null when it cannot be sure of the message -- a
+   question whose message gcc would not print teaches the wrong thing -- so
+   the cases are narrow on purpose. Checked against gcc 14. */
+
+const DG_TYPE_WORDS = /^(int|char|short|long|float|double|unsigned|signed|const|static|struct|enum|union|void|size_t|FILE|bool|_Bool|typedef)\b/;
+const DG_C_WORDS = new Set(('auto break case char const continue default do double else enum extern float for goto if int long '
+  + 'register return short signed sizeof static struct switch typedef union unsigned void volatile while bool true false').split(' '));
+/* Names the headers already declare: a typo that lands on one is not "undeclared". */
+const DG_LIB_NAMES = new Set(('printf scanf puts gets putchar getchar fgets fputs fprintf fscanf sprintf sscanf snprintf fopen fclose fread '
+  + 'fwrite feof ferror fflush remove rename rewind fseek ftell perror malloc calloc realloc free exit abort atoi atof atol strtol '
+  + 'strtod rand srand abs labs qsort bsearch system getenv strlen strcpy strncpy strcat strncat strcmp strncmp strchr strrchr '
+  + 'strstr strtok memcpy memmove memset memcmp sqrt pow fabs floor ceil round trunc sin cos tan log exp fmod isalpha isdigit '
+  + 'isalnum isspace isupper islower toupper tolower ispunct time clock difftime main stdin stdout stderr errno').split(' '));
+
+/* gcc names the token it stopped at: "before 'x'" for a name, "before 'x' token" for punctuation. */
+function _dgBefore(next) {
+  const t = String(next || '').trim();
+  const m = /^[A-Za-z_]\w*/.exec(t);
+  if (m) return "'" + m[0] + "'";
+  if (/^\d/.test(t)) return 'numeric constant';
+  if (t[0] === '"') return 'string constant';
+  if (t[0] === "'") return 'character constant';
+  const p = /^(->|\+\+|--|&&|\|\||<<|>>|[<>=!]=|[^\s])/.exec(t);
+  return "'" + (p ? p[0] : '}') + "' token";
+}
+
+/* The code gcc meets after line i: the next line with something in it once
+   comments are taken out (a comment is not a token). */
+function _dgNextCode(lines, i) {
+  let inBlock = false;
+  for (let k = i + 1; k < lines.length; k++) {
+    let s = lines[k];
+    if (inBlock) {
+      const end = s.indexOf('*/');
+      if (end === -1) continue;
+      s = s.slice(end + 2);
+      inBlock = false;
+    }
+    s = s.replace(/\/\*.*?\*\//g, ' ');
+    const open = s.indexOf('/*');
+    if (open !== -1) { s = s.slice(0, open); inBlock = true; }
+    s = s.replace(/\/\/.*$/, '');
+    if (s.trim()) return s;
+  }
+  return undefined;
+}
+
+/* A line with its string and character literals blanked out (same length). */
+function _dgNoStrings(line) {
+  return String(line).replace(/"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g, (m) => ' '.repeat(m.length));
+}
+
+/* The arguments of the call starting at `open` (the index of its "("), split
+   at the commas that are not inside brackets or quotes. */
+function _dgArgs(line, open) {
+  const out = [];
+  let depth = 0, cur = '', q = '';
+  for (let i = open + 1; i < line.length; i++) {
+    const ch = line[i];
+    if (q) { cur += ch; if (ch === '\\') { cur += line[++i] || ''; } else if (ch === q) q = ''; continue; }
+    if (ch === '"' || ch === "'") { q = ch; cur += ch; continue; }
+    if (ch === '(' || ch === '[' || ch === '{') depth++;
+    if (ch === ')' || ch === ']' || ch === '}') {
+      if (depth === 0) { out.push(cur.trim()); return out; }
+      depth--;
+    }
+    if (ch === ',' && depth === 0) { out.push(cur.trim()); cur = ''; continue; }
+    cur += ch;
+  }
+  return null;   // the call does not close on this line
+}
+
+/* The conversions of a format string, in order: [{ len, conv, at }] (not %%). */
+function _dgConversions(fmt) {
+  const out = [];
+  const re = /%([-+ 0#*]*\d*(?:\.\d+)?)(hh|h|ll|l|L|z)?([diouxXfeEgGcsp%])/g;
+  let m;
+  while ((m = re.exec(fmt))) { if (m[3] !== '%') out.push({ len: m[2] || '', conv: m[3], at: m.index, text: m[0] }); }
+  return out;
+}
+
+/* Is `name` declared in this code as a plain int (or short or char, which reach printf as int)? */
+function _dgDeclaredInt(code, name) {
+  const re = new RegExp('(^|[;{(,]\\s*|\\n\\s*)(?:const\\s+)?(int|short|char)\\s+[^;=(){}]*?\\b' + name + '\\b\\s*(?:=|;|,|\\[)', 'm');
+  const m = re.exec(code);
+  return !!m && !/\b(long|unsigned)\b/.test(m[0]);
+}
+
+/* The type a variable is declared with, as gcc spells it, or null. */
+function _dgDeclType(code, name) {
+  const re = new RegExp('\\b(unsigned\\s+int|unsigned|long\\s+long|long|int|short|char|double|float)\\s+(?:[A-Za-z_]\\w*\\s*(?:=[^,;]*)?,\\s*)*\\**' + name + '\\b\\s*(?:=|;|,)');
+  const m = re.exec(code);
+  if (!m) return null;
+  return { 'unsigned': 'unsigned int', 'unsigned int': 'unsigned int', 'long long': 'long long int', 'long': 'long int' }[m[1].replace(/\s+/g, ' ')] || m[1];
+}
+
 const DG_ERROR_CASES = [
-  { code: 'missing-semicolon', hit: (l, next) => /;\s*$/.test(l) && !/^\s*(#|\/\/|for\b)/.test(l) && !!next,
-    breakIt: (l) => l.replace(/;(\s*)$/, '$1'),
-    msg: (file, n, l, next) => `${file}:${n + 1}: error: expected ';' before '${(next.trim().match(/^[\w}]+|^./) || ['}'])[0]}'` },
-  { code: 'scanf-no-ampersand', hit: (l) => /scanf\s*\([^)]*,\s*&\s*\w/.test(l),
-    breakIt: (l) => l.replace(/,(\s*)&(\s*)(\w)/, ',$1$3'),
-    msg: (file, n) => `${file}:${n}: warning: format '%d' expects argument of type 'int *', but argument 2 has type 'int'` },
-  { code: 'assign-in-condition', hit: (l) => /\b(if|while)\s*\([^)]*==/.test(l),
-    breakIt: (l) => l.replace('==', '='),
-    msg: (file, n) => `${file}:${n}: warning: suggest parentheses around assignment used as truth value` },
-  { code: 'format-mismatch', hit: (l) => /printf\s*\("[^"]*%d[^"]*"\s*,/.test(l),
-    breakIt: (l) => l.replace('%d', '%s'),
-    msg: (file, n) => `${file}:${n}: warning: format '%s' expects argument of type 'char *', but argument 2 has type 'int'` },
-  { code: 'undeclared', hit: (l) => /^\s*\w[\w\s]*=\s*[^;]*\b[a-z_]{4,}\w*\b/.test(l) && !/^\s*(int|char|long|double|float|struct|const|unsigned)\b/.test(l),
-    breakIt: (l) => { const m = /=\s*[^;]*?\b([a-z_]{4,}\w*)\b/.exec(l); return m && !/^(sizeof|malloc|NULL|strlen|printf)$/.test(m[1]) ? l.replace(new RegExp('\\b' + m[1] + '\\b'), m[1].slice(0, -1)) : l; },
-    msg: (file, n, l, next, broken) => { const m = /=\s*[^;]*?\b([a-z_]{3,}\w*)\b/.exec(broken); return `${file}:${n}: error: '${m ? m[1] : 'x'}' undeclared (first use in this function)`; } }
+  {
+    code: 'missing-semicolon',
+    make: (line, next) => {
+      const t = line.trim();
+      if (!next || !/;\s*$/.test(t) || /^(#|\/\/|for\b|\}|case\b|default\b)/.test(t) || DG_TYPE_WORDS.test(t)) return null;
+      // A statement: a call, an assignment, ++/--, or return.
+      if (!/^(return\b|[A-Za-z_][\w.\[\]>-]*\s*(\(|=|\+\+|--|[-+*/%]=|->|\[|\.))/.test(t)) return null;
+      if (/^return\s*;$/.test(t)) return null;
+      // Ends in a macro (NULL, EOF, MAX(a, b)): gcc then points at the next token's line.
+      if (/\b[A-Z_][A-Z0-9_]+\s*(\([^;]*\))?\s*;\s*$/.test(t)) return null;
+      if (!/^\s*([A-Za-z_}{"']|\d)/.test(next)) return null;   // *p = ..., (x) ...: one expression with this line
+      const broken = line.replace(/;(\s*)$/, '$1');
+      return { broken, msg: (file, n) => `${file}:${n}: error: expected ';' before ${_dgBefore(next)}` };
+    }
+  },
+  {
+    code: 'scanf-no-ampersand',
+    make: (line) => {
+      const m = /\b(scanf|fscanf|sscanf)\s*\(/.exec(line);
+      if (!m) return null;
+      const args = _dgArgs(line, m.index + m[0].length - 1);
+      if (!args) return null;
+      const fmtAt = m[1] === 'scanf' ? 0 : 1;
+      const fmt = /^"((?:[^"\\]|\\.)*)"$/.exec(args[fmtAt] || '');
+      if (!fmt) return null;
+      const convs = _dgConversions(fmt[1]);
+      const k = args.slice(fmtAt + 1).findIndex(a => /^&\s*[A-Za-z_]\w*$/.test(a));
+      if (k === -1 || !convs[k]) return null;
+      const want = { d: ['int *', 'int'], i: ['int *', 'int'], u: ['unsigned int *', 'unsigned int'], c: ['char *', 'int'],
+        f: ['float *', 'double'], lf: ['double *', 'double'], ld: ['long int *', 'long int'] }[convs[k].len + convs[k].conv];
+      if (!want) return null;
+      const arg = args[fmtAt + 1 + k];
+      const name = arg.replace(/^&\s*/, '');
+      const at = line.indexOf(arg, m.index);
+      const broken = line.slice(0, at) + name + line.slice(at + arg.length);
+      const argNo = fmtAt + 2 + k;
+      return { broken, msg: (file, n) => `${file}:${n}: warning: format '%${convs[k].len}${convs[k].conv}' expects argument of type '${want[0]}', but argument ${argNo} has type '${want[1]}'` };
+    }
+  },
+  {
+    code: 'assign-in-condition',
+    make: (line) => {
+      const m = /\b(if|while)\s*\(\s*([a-z_]\w*)\s*==\s*([^()&|=]+?)\s*\)\s*\{?\s*$/.exec(line);
+      if (!m || DG_C_WORDS.has(m[2])) return null;
+      const broken = line.replace(/==/, '=');
+      return { broken, msg: (file, n) => `${file}:${n}: warning: suggest parentheses around assignment used as truth value` };
+    }
+  },
+  {
+    code: 'format-mismatch',
+    make: (line, next, code) => {
+      const m = /\b(printf|fprintf)\s*\(/.exec(line);
+      if (!m) return null;
+      const args = _dgArgs(line, m.index + m[0].length - 1);
+      if (!args) return null;
+      const fmtAt = m[1] === 'printf' ? 0 : 1;
+      const fmt = /^"((?:[^"\\]|\\.)*)"$/.exec(args[fmtAt] || '');
+      if (!fmt) return null;
+      const convs = _dgConversions(fmt[1]);
+      const k = convs.findIndex(c => c.conv === 'd' && !c.len && /^%d$/.test(c.text));
+      const arg = k === -1 ? null : args[fmtAt + 1 + k];
+      // Only a value that is certainly an int: a number, or a variable declared int.
+      if (!arg || !(/^-?\d+$/.test(arg) || (/^[A-Za-z_]\w*$/.test(arg) && _dgDeclaredInt(code, arg)))) return null;
+      const fmtStart = line.indexOf(args[fmtAt], m.index) + 1;
+      const pos = fmtStart + convs[k].at;
+      const broken = line.slice(0, pos) + '%s' + line.slice(pos + 2);
+      const argNo = fmtAt + 2 + k;
+      return { broken, msg: (file, n) => `${file}:${n}: warning: format '%s' expects argument of type 'char *', but argument ${argNo} has type 'int'` };
+    }
+  },
+  {
+    code: 'undeclared',
+    make: (line, next, code) => {
+      const t = line.trim();
+      if (DG_TYPE_WORDS.test(t) || /^(#|\/\/|for\b)/.test(t)) return null;
+      const bare = _dgNoStrings(line).replace(/\/\/.*$|\/\*.*?\*\//g, (m) => ' '.repeat(m.length));   // nor in a comment
+      const from = bare.indexOf('=') + 1;
+      const re = /(?<![.\w>])[a-z_]\w{3,}\b(?!\s*\()/g;
+      re.lastIndex = from;
+      let w, name = null, at = -1;
+      while ((w = re.exec(bare))) {
+        if (!DG_C_WORDS.has(w[0]) && _dgDeclType(code, w[0])) { name = w[0]; at = w.index; break; }
+      }
+      if (!name) return null;
+      const typo = name.slice(0, -1);
+      if (DG_LIB_NAMES.has(typo) || new RegExp('\\b' + typo + '\\b').test(code)) return null;
+      const broken = line.slice(0, at) + typo + line.slice(at + name.length);
+      return { broken, msg: (file, n) => `${file}:${n}: error: '${typo}' undeclared (first use in this function); did you mean '${name}'?` };
+    }
+  }
 ];
 
 function drillMakeErrors(e) {
@@ -284,24 +496,22 @@ function drillMakeErrors(e) {
   for (const c of cases) {
     const spots = [];
     lines.forEach((l, i) => {
-      const next = lines.slice(i + 1).find(s => s.trim());
-      if (!c.hit(l, next)) return;
-      const broken = c.breakIt(l);
-      if (broken === l) return;
+      const next = _dgNextCode(lines, i);
       if (lines.filter(x => x.trim() === l.trim()).length > 1) return;
-      spots.push({ i, l, broken, next });
+      const made = c.make(l, next, e.code);
+      if (made && made.broken !== l) spots.push({ i, l, made });
     });
     if (!spots.length) continue;
     const s = _dgPick(spots);
     const shown = lines.slice();
-    shown[s.i] = s.broken;
+    shown[s.i] = s.made.broken;
     const meta = (typeof MISTAKE_BY_CODE !== 'undefined' && MISTAKE_BY_CODE[c.code]) || { label: c.code };
     const others = (typeof MISTAKE_RULES !== 'undefined' ? MISTAKE_RULES : [])
       .filter(r => r.code !== c.code && !/^(wrong-output|timeout|segfault)$/.test(r.code))
       .sort(() => Math.random() - 0.5).slice(0, 3).map(r => ({ code: r.code, label: r.label }));
     const choices = others.concat([{ code: c.code, label: meta.label }]).sort(() => Math.random() - 0.5);
     return { mode: 'errors', key: e.key, title: e.title, file: e.file, code: shown.join('\n'), line: s.i + 1,
-      message: c.msg(e.file || 'main.c', s.i + 1, s.l, s.next || '', s.broken), choices, wantCode: c.code,
+      message: s.made.msg(e.file || 'main.c', s.i + 1), choices, wantCode: c.code,
       want: s.l, fgCode: e.code, why: meta.why || '', fix: meta.fix || '',
       ask: 'What is wrong, and what should line ' + (s.i + 1) + ' say?' };
   }
@@ -357,9 +567,27 @@ function drillDeckFrom(mode, source, n) {
 
 /* ── Marking the new kinds ─────────────────────────────────── */
 
+/* A trace answer: what the interpreter showed, or the same value written
+   another way -- 3 for 3.0, 1 for true, 97 or a for 'a'. */
+function _dgSameValue(given, v) {
+  if (!given) return false;
+  if (v.want.indexOf(given) !== -1) return true;
+  const asNum = (s) => {
+    const t = String(s).trim().toLowerCase();
+    if (t === 'true') return 1;
+    if (t === 'false') return 0;
+    return /^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?f?$/.test(t) ? parseFloat(t) : NaN;
+  };
+  const a = asNum(given);
+  return Number.isFinite(a) && v.want.some(w => {
+    const b = asNum(w);
+    return Number.isFinite(b) && Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(b));
+  });
+}
+
 function drillCheckMore(q, answer) {
   if (q.mode === 'trace') {
-    const wrong = q.vars.filter((v, i) => v.want.indexOf(String((answer || [])[i] || '').trim().replace(/^'(.)'$/, "'$1'")) === -1);
+    const wrong = q.vars.filter((v, i) => !_dgSameValue(String((answer || [])[i] || '').trim(), v));
     return wrong.length
       ? { ok: false, why: wrong.length === q.vars.length ? 'None of them. Walk it from the top, a line at a time.' : 'Close: ' + wrong.map(v => v.name).join(', ') + ' ' + (wrong.length === 1 ? 'is' : 'are') + ' not right.', want: q.vars.map(v => v.name + ' = ' + v.show).join('\n') }
       : { ok: true, why: 'Every value right.', want: '' };
