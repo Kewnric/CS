@@ -177,9 +177,13 @@ function _tokenizeBulkInput(text) {
     }
 
     // 5. MATCHING PAIR: "term -> definition"
-    const pairM = t.match(/^(?:[A-Za-z][.)]\s+)?(.+?)\s*(?:->|→|=>)\s*(.+)$/);
-    if (pairM && pairM[1].trim().length > 0 && pairM[2].trim().length > 0) {
-      tokens.push({ type: 'pair', left: pairM[1].trim(), right: pairM[2].trim() });
+    const pairM = t.match(/^(?:([A-Ha-h])[.)]\s+)?(.+?)\s*(?:->|→|=>)\s*(.+)$/);
+    if (pairM && pairM[2].trim().length > 0 && pairM[3].trim().length > 0) {
+      // The letter and the whole text ride along: under an [MCQ] question,
+      // "B. L->count" is a choice with C in it, not a pair (the assembler decides).
+      const lettered = pairM[1] ? t.replace(/^[A-Ha-h][.)]\s+/, '') : '';
+      tokens.push({ type: 'pair', left: pairM[2].trim(), right: pairM[3].trim(),
+        letter: pairM[1] ? pairM[1].toUpperCase() : '', whole: lettered });
       hasActiveQ = true; choicesStarted = true; continue;
     }
 
@@ -448,6 +452,10 @@ function _assembleBulkQuestions(tokens, skipped) {
         cur.choices[String.fromCharCode(65 + Object.keys(cur.choices).length)] = tok.text;
         break;
       case 'pair':
+        if (cur && tok.letter && cur.forcedType && cur.forcedType !== 'matching') {
+          cur.choices[tok.letter] = tok.whole;
+          break;
+        }
         if (!cur) startQ(autoQ++, 'Match the following:', null, false);
         cur.pairs.push({ left: tok.left, right: tok.right });
         break;
