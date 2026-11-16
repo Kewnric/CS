@@ -132,6 +132,7 @@ function demoMatchFor(challenge, variant, opts) {
 
 /** Called from initPractice: show the idea before the attempt, once. */
 function demoMaybeAutoOpen(challenge, variant) {
+  if (typeof examClosedBookOn === 'function' && examClosedBookOn()) return;
   if (!demoAutoEnabled()) return;
   const lesson = demoMatchFor(challenge, variant, { unseenOnly: true });
   if (!lesson) return;
@@ -690,6 +691,7 @@ function demoClose(silent) {
    ============================================================ */
 
 function demoOpenLibrary() {
+  if (document.body.dataset.route === 'practice' && typeof examClosedBookBlocks === 'function' && examClosedBookBlocks('Walkthroughs')) return;
   let ov = document.getElementById('demo-library');
   if (!ov) {
     ov = document.createElement('div');
@@ -793,6 +795,7 @@ function demoResetSeen() {
    otherwise, so the same control is never a dead end. */
 
 function demoShowForCurrent() {
+  if (typeof examClosedBookBlocks === 'function' && examClosedBookBlocks('Walkthroughs')) return;
   const ch = state.activeChallenge, v = state.activeVariant;
   const lesson = ch ? demoMatchFor(ch, v) : null;
   if (lesson) demoOpen(lesson.id);

@@ -661,6 +661,7 @@ function codePeekAvailable() {
 /** Why it cannot be shown now, or '' when it can. */
 function _peekBlocked() {
   if (typeof examRecallOn === 'function' && examRecallOn()) return 'Peeking at the target is off in Recall mode.';
+  if (typeof examClosedBookOn === 'function' && examClosedBookOn()) return 'Peeking at the target is off: this is a closed-book attempt.';
   const f = state.userFiles && state.userFiles[state.activeFileIndex];
   if (!f || !String(f.code || '').trim()) return 'This file has no target code to compare with.';
   return '';

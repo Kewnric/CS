@@ -23,12 +23,29 @@
 const EXAM_RECALL_KEY = 'practiceRecall';
 const EXAM_BUDGET_KEY = 'practiceRunBudget';
 const EXAM_RUNS_KEY = 'practiceRunsUsed';
+/* CLOSED BOOK. Everything that helps from outside your head is off for the
+   attempt: the cheat sheet, peeking at the target, Codex lookup, the
+   walkthroughs and the hints. Each says why when you reach for it. */
+const EXAM_CLOSED_KEY = 'practiceClosedBook';
 
 /** Is this attempt a recall attempt? @returns {boolean} */
 function examRecallOn() {
   // Only an attempt is an exam: Freeground and the template drill are not.
   if (typeof isEditorRoute === 'function' && isEditorRoute() && !editorRouteHas('exam')) return false;
   return getSessionParam(EXAM_RECALL_KEY) === true || getSessionParam(EXAM_RECALL_KEY) === 'true';
+}
+
+/** Is this attempt closed book? @returns {boolean} */
+function examClosedBookOn() {
+  if (typeof isEditorRoute === 'function' && isEditorRoute() && !editorRouteHas('exam')) return false;
+  return getSessionParam(EXAM_CLOSED_KEY) === true || getSessionParam(EXAM_CLOSED_KEY) === 'true';
+}
+
+/** Say why a help is off, and return true, when the attempt is closed book. */
+function examClosedBookBlocks(what) {
+  if (!examClosedBookOn()) return false;
+  if (typeof toast === 'function') toast((what || 'That') + ' is off: this is a closed-book attempt.', { type: 'info', duration: 2200 });
+  return true;
 }
 
 /** Runs this attempt is meant to take. 0 means "not counting". @returns {number} */
@@ -63,8 +80,9 @@ function examNoteRun() {
 }
 
 /** Sets the recall/budget choices for the attempt about to start. */
-function examSetup(recall, budget) {
+function examSetup(recall, budget, closedBook) {
   setSessionParam(EXAM_RECALL_KEY, !!recall);
+  setSessionParam(EXAM_CLOSED_KEY, !!closedBook);
   setSessionParam(EXAM_BUDGET_KEY, parseInt(budget, 10) > 0 ? parseInt(budget, 10) : 0);
   setSessionParam(EXAM_RUNS_KEY, 0);
 }
@@ -72,6 +90,7 @@ function examSetup(recall, budget) {
 /** Nothing carried into an attempt that did not ask for it. */
 function examClear() {
   clearSessionParam(EXAM_RECALL_KEY);
+  clearSessionParam(EXAM_CLOSED_KEY);
   clearSessionParam(EXAM_BUDGET_KEY);
   clearSessionParam(EXAM_RUNS_KEY);
 }
@@ -83,6 +102,7 @@ function examRecord() {
   const out = { runs: used };
   if (budget) { out.runBudget = budget; out.overBudget = used > budget; }
   if (examRecallOn()) out.recall = true;
+  if (examClosedBookOn()) out.closedBook = true;
   return out;
 }
 
@@ -116,6 +136,7 @@ function examSyncRuns() {
 function examBadgeHTML() {
   const bits = [];
   if (examRecallOn()) bits.push('<span class="exam-chip" title="Started from an empty file, with the boss bar off"><i data-lucide="brain"></i>Recall</span>');
+  if (examClosedBookOn()) bits.push('<span class="exam-chip" title="No cheat sheet, peek, Codex lookup, walkthroughs or hints"><i data-lucide="book-x"></i>Closed book</span>');
   const b = examRunBudget();
   if (b) bits.push('<span class="exam-chip" title="A run budget of ' + b + '. It counts; it does not block."><i data-lucide="play"></i>' + b + ' runs</span>');
   return bits.join('');

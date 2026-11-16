@@ -370,6 +370,7 @@ function mtlResultsHTML() {
           </div>
         </div>
       </div>
+      ${typeof twkPanelHTML === 'function' ? twkPanelHTML() : ''}
       ${total ? `
       <div class="mtl-toolbar">
         <div class="lang-tabs" style="padding:0;">

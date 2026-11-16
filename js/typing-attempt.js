@@ -1294,6 +1294,8 @@ function mtFinish(failed) {
     save.consistency = Math.round(save.consistency * 100) / 100;
     save.afk = Math.round(save.afk * 10) / 10;
     mtRecordResult(save);
+    // Which keys and key runs were slow (typing-weak.js).
+    if (!_mt.zen && typeof twkRecord === 'function') twkRecord(_mt.eng);
   }
   result.samples = _mt.samples.slice();
   _mt.lastResult = result;

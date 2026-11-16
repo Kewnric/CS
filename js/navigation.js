@@ -369,6 +369,19 @@ function renderGlobalSearchResults() {
     }
   });
 
+  // Templates (Training hub), Freeground tabs, Codex entries.
+  (state.templates || []).forEach(t => {
+    if (fuzzyMatch(t.title, q) || fuzzyMatch(t.label || '', q) || (t.tags || []).some(x => fuzzyMatch(x, q))) {
+      results.push({ type: 'template', icon: 'puzzle', label: t.title, sub: t.label || 'Template', id: t.id });
+    }
+  });
+  ((state.freeground && state.freeground.tabs) || []).forEach(t => {
+    if (fuzzyMatch(t.name, q)) results.push({ type: 'freeground', icon: 'terminal', label: t.name, sub: t.shelved ? 'Freeground · on the shelf' : 'Freeground', id: t.id });
+  });
+  if (typeof codexSearch === 'function' && q.length >= 2) {
+    codexSearch(q).slice(0, 8).forEach(e => results.push({ type: 'codex', icon: 'book-open-text', label: e.n, sub: e.d, id: e.id }));
+  }
+
   if (results.length === 0 && matchedCommands.length === 0) {
     container.innerHTML = `<div style="padding:1.5rem;text-align:center;color:var(--text-tertiary);font-size:0.875rem;">
       No results for "<strong>${escapeHTML(q)}</strong>"
@@ -376,8 +389,9 @@ function renderGlobalSearchResults() {
     return;
   }
 
-  const typeLabels = { challenge: 'Program', snippet: 'Snippet', notebook: 'Notebook' };
-  const typeColors = { challenge: 'var(--color-primary)', snippet: 'var(--color-accent)', notebook: 'var(--color-warning)' };
+  const typeLabels = { challenge: 'Program', snippet: 'Snippet', notebook: 'Notebook', template: 'Template', freeground: 'Freeground', codex: 'Codex' };
+  const typeColors = { challenge: 'var(--color-primary)', snippet: 'var(--color-accent)', notebook: 'var(--color-warning)',
+    template: '#a855f7', freeground: '#22c55e', codex: '#f59e0b' };
 
   const contentHtml = results.slice(0, 40).map(r => `
     <div class="global-search-result-item" role="option"
@@ -403,6 +417,16 @@ function renderGlobalSearchResults() {
 
 function handleGlobalSearchSelect(type, id, parentId) {
   closeGlobalSearch();
+  if (type === 'template' && typeof tplStartDrill === 'function') { tplStartDrill(id, { back: 'training' }); return; }
+  if (type === 'freeground' && typeof fgOpen === 'function') {
+    const here = typeof _fg !== 'undefined' && _fg && typeof fgActivate === 'function';
+    if (here) fgCommit();                       // save the tab on screen before it changes
+    if (typeof fgReopenTab === 'function') fgReopenTab(id);
+    if (here) fgActivate(id, { noCommit: true });
+    else fgOpen();
+    return;
+  }
+  if (type === 'codex' && typeof codexOpen === 'function') { codexOpen(id); return; }
   if (type === 'challenge') {
     browseOpenProgram(id);
     spaNavigate('browse');

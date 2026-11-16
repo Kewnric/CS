@@ -40,6 +40,7 @@
   <link rel="stylesheet" href="css/training.css">
   <link rel="stylesheet" href="css/drills-more.css">
   <link rel="stylesheet" href="css/codex.css">
+  <link rel="stylesheet" href="css/typing-weak.css">
   <link rel="stylesheet" href="css/pages.css">
   <link rel="stylesheet" href="css/analytics-pro.css">
   <link rel="stylesheet" href="css/drills.css">
@@ -321,6 +322,17 @@
           </span>
           <i data-lucide="chevron-right" class="settings-item-chevron" aria-hidden="true"></i>
         </button>
+        <!-- The Coding Library's Training hub, templates, drills, Freeground,
+             zen dock and Codex lookup (js/training-settings.js). -->
+        <button onclick="trainSettingsOpen()" class="settings-item" type="button" id="settings-training-item"
+                aria-label="Training settings">
+          <span class="settings-item-icon"><i data-lucide="target" aria-hidden="true"></i></span>
+          <span class="settings-item-info">
+            <span class="settings-item-label">Training</span>
+            <span class="settings-item-desc">Templates, drills, Freeground, zen dock, Codex lookup</span>
+          </span>
+          <i data-lucide="chevron-right" class="settings-item-chevron" aria-hidden="true"></i>
+        </button>
         <!-- How much the interface moves: every transition, fades only, or
              nothing (js/motion.js). Three states, so it cycles rather than
              toggles and carries no aria-pressed. -->
@@ -478,6 +490,12 @@
           <span class="setup-row-main"><strong>Recall</strong><em>Start from an empty file with the boss bar off. The
             spec and the tests stay &mdash; only what leaks the answer goes.</em></span>
           <input type="checkbox" id="setup-recall" class="setup-check" role="switch" />
+        </label>
+        <label class="setup-row" for="setup-closed">
+          <span class="setup-row-icon"><i data-lucide="book-x"></i></span>
+          <span class="setup-row-main"><strong>Closed book</strong><em>No cheat sheet, no peeking at the target, no Codex
+            lookup, no walkthroughs or hints. Just you and the spec.</em></span>
+          <input type="checkbox" id="setup-closed" class="setup-check" role="switch" />
         </label>
         <label class="setup-row" for="setup-runs">
           <span class="setup-row-icon"><i data-lucide="gauge"></i></span>
@@ -747,6 +765,8 @@
   <script defer src="js/codex-data.js"></script>
   <script defer src="js/codex.js"></script>
   <script defer src="js/codex-lookup.js"></script>
+  <script defer src="js/typing-weak.js"></script>
+  <script defer src="js/training-settings.js"></script>
   <script defer src="js/practice-set.js"></script>
   <!-- The execution stack: a C interpreter (parse, run, view) and its window. -->
   <script defer src="js/cvm-parse.js"></script>

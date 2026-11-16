@@ -207,7 +207,23 @@ const BADGE_CATALOG = [
   { id: 'm_hours', icon: 'hourglass', name: 'Time Served', hint: 'Ten hours of recorded practice', goal: 36000, get: () => badgeStats().totalSeconds,
     fmt: (v) => Math.round(v / 3600) + 'h' },
   { id: 'm_deep', icon: 'timer', name: 'Deep Work', hint: 'A single session over thirty minutes', goal: 1800, get: () => badgeStats().longestAttempt,
-    fmt: (v) => Math.round(v / 60) + 'm' }
+    fmt: (v) => Math.round(v / 60) + 'm' },
+
+  /* ── Training hub, Freeground, Codex ──────────────────── */
+  { id: 't_template', icon: 'puzzle', name: 'By Heart', hint: 'Learn a template (pass Recall)', goal: 1,
+    get: () => (state.templates || []).filter(t => typeof tplStatus === 'function' && tplStatus(t.id).stage >= 4).length },
+  { id: 't_template10', icon: 'library', name: 'Pattern Library', hint: 'Learn ten templates', goal: 10,
+    get: () => (state.templates || []).filter(t => typeof tplStatus === 'function' && tplStatus(t.id).stage >= 4).length },
+  { id: 't_vary', icon: 'shuffle', name: 'Same Shape, New Names', hint: 'Pass the Vary stage of five templates', goal: 5,
+    get: () => new Set((state.templateHistory || []).filter(h => h.stage === 5 && h.passed && !h.self).map(h => h.templateId)).size },
+  { id: 't_mix', icon: 'calendar-check', name: 'Daily Habit', hint: 'Finish the daily mix five times', goal: 5,
+    get: () => (state.trainLog || []).filter(e => e.kind === 'mix' && e.done >= e.steps).length },
+  { id: 't_drills', icon: 'brain-circuit', name: 'Drill Sergeant', hint: 'Answer 100 drill questions right', goal: 100,
+    get: () => (state.trainLog || []).filter(e => e.kind === 'drills').reduce((t, e) => t + (e.right || 0), 0) },
+  { id: 't_free', icon: 'terminal', name: 'Free Spirit', hint: 'Keep ten freegrounds', goal: 10,
+    get: () => ((state.freeground && state.freeground.tabs) || []).length },
+  { id: 't_codex', icon: 'book-open-text', name: 'Well Read', hint: 'Open fifty Codex entries', goal: 50,
+    get: () => Object.keys((state.codex && state.codex.seen) || {}).length }
 ];
 
 /** Every badge with its progress. Sorted by the caller, not here. */

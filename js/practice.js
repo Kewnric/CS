@@ -3350,6 +3350,7 @@ function syncCheatsheetBtn(challenge) {
  *   (and testable) outside an attempt.
  */
 function openCheatsheet(programId) {
+  if (typeof examClosedBookBlocks === 'function' && examClosedBookBlocks('The cheat sheet')) return;
   if (document.getElementById('cheat-overlay')) return;
   const ov = document.createElement('div');
   ov.id = 'cheat-overlay';
@@ -5129,6 +5130,7 @@ function _resetHintsForNewAttempt() {
 }
 
 function revealNextHint() {
+  if (typeof examClosedBookBlocks === 'function' && examClosedBookBlocks('Hints')) return;
   if (!state.activeVariant || !state.activeVariant.hints) return;
   const hints = state.activeVariant.hints;
   const used = state.sessionData.hintsUsed || 0;

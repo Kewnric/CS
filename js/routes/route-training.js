@@ -154,6 +154,14 @@ function _thubOverviewHTML(due) {
         <i data-lucide="brain-circuit"></i>
         <span><strong>Drills</strong><em>Predict, trace, find the bug, blanks, line puzzles, chunk flash, compiler errors</em></span>
       </button>
+      <button class="thub-tile" onclick="thubExamRun()">
+        <i data-lucide="book-x"></i>
+        <span><strong>Exam run</strong><em>A program you have solved before, from an empty file, closed book</em></span>
+      </button>
+      <button class="thub-tile" onclick="setSessionParam('mtlView', 'results'); spaNavigate('typing')">
+        <i data-lucide="keyboard"></i>
+        <span><strong>Typing weak spots</strong><em>The keys and C symbols that slow you down, and a drill made of them</em></span>
+      </button>
       <button class="thub-tile" onclick="spaNavigate('admin-templates')">
         <i data-lucide="pencil"></i>
         <span><strong>Write templates</strong><em>Mark the names that change, import a set from an AI</em></span>
@@ -288,6 +296,36 @@ function thubMixStop() {
     if (typeof saveData === 'function') saveData();
   }
   spaNavigate('training');
+}
+
+/* ── Exam run ──────────────────────────────────────────────── */
+
+/**
+ * A program you have passed, written again from an empty file with nothing
+ * to look at: Recall and Closed book on. One that is due for review first.
+ * A program with an unfinished attempt is skipped, so nothing of yours is
+ * overwritten by the exam.
+ */
+function thubExamRun() {
+  const free = (id) => !(typeof _browseSavedAttempt === 'function' && _browseSavedAttempt(id));
+  const due = (typeof getDueReviewItems === 'function' ? getDueReviewItems() : []).filter(d => d.type === 'challenge' && free(d.id));
+  let id = due.length ? due[0].id : null;
+  if (!id) {
+    const passed = (state.challenges || []).filter(c => typeof programPassed === 'function' && programPassed(c.id) && free(c.id));
+    if (passed.length) id = passed[Math.floor(Math.random() * passed.length)].id;
+  }
+  const c = id && (state.challenges || []).find(x => x.id === id);
+  const v = c && (c.variants || [])[0];
+  if (!c || !v) {
+    if (typeof toast === 'function') toast('An exam run is a program you have passed, written again from memory. Pass one first.', { type: 'info', duration: 3200 });
+    return;
+  }
+  if (typeof examClear === 'function') examClear();
+  if (typeof examSetup === 'function') examSetup(true, 0, true);
+  setSessionParam('practiceChallenge', c.id);
+  setSessionParam('practiceVariant', v.id);
+  setSessionParam('timeLimit', 0);
+  spaNavigate('practice');
 }
 
 /* ── Skill tree ────────────────────────────────────────────── */

@@ -352,6 +352,7 @@
 }
 @media (max-width: 640px) {
   .td-stage-name { display: none; }
+  .td-layout .td-stages { order: 2; flex: 1 1 0; justify-content: flex-start; }
   .td-meter-bar { width: 50px; }
   .thub-due-card { flex-direction: column; align-items: stretch; }
 }

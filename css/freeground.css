@@ -222,5 +222,8 @@
 @media (max-width: 640px) {
   .fg-title { display: none; }
   .fg-tab { max-width: 140px; }
+  /* The phone top bar is ordered (mobile.css): Back, then this, on row one
+     clear of the menu button; the controls get row two. */
+  .fg-layout .fg-strip { order: 2; flex: 1 1 0; }
   .fg-switcher { padding-top: 4vh; }
 }

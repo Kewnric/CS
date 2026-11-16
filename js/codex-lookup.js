@@ -189,6 +189,7 @@ function codexPopShow(entries, at, word) {
 /** Look up whatever is at the caret in the editor. */
 function codexLookupAtCaret(ta) {
   if (!ta) return;
+  if (typeof trainLookupOn === 'function' && !trainLookupOn()) return;   // Settings > Training
   if (typeof examClosedBookOn === 'function' && examClosedBookOn()) {
     if (typeof toast === 'function') toast('Lookup is off: this is a closed-book attempt.', { type: 'info', duration: 2000 });
     return;
