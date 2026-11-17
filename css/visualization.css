@@ -2738,6 +2738,17 @@
   height: 17px;
   stroke-width: 2.4;
 }
+/* Its hit area is bigger than its face: the tab is small, and with its
+   rounded bottom corners a click a few pixels off it used to land on the
+   canvas. Square, and 10px wider each side and below. */
+.vtb-reveal::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -10px;
+  right: -10px;
+  bottom: -10px;
+}
 /* Parked: reachable by Tab while the toolbar is hidden, still out of sight. */
 .toolbar-collapsed ~ .vtb-reveal { visibility: visible; transition-delay: 0s; }
 
@@ -4264,14 +4275,14 @@ body.viz-zen .viz-workspace > .resizer-divider:not(.viz-side-seam) {
    it row-wise is what holds the sidebar rail on the left. */
 body.viz-zen .viz-workspace.panes-swapped { flex-direction: row; }
 
-/* The sidebar's rail: the attempt's divider arrow, folding the app sidebar.
-   It takes the workspace's left padding, and is as wide as the 18px arrow
-   itself — at 8px the arrow spilled over the sidebar's edge and the canvas's. */
+/* The sidebar's rail: an 8px line in the workspace's left padding. Click it
+   to fold the app sidebar (vizToggleZenSidebar); there is no arrow button. */
 .viz-side-seam { display: none; }
 body.viz-zen .viz-side-seam {
   display: flex;
-  width: 18px;
-  cursor: default;
+  width: 8px;
+  margin-right: -0.25rem;   /* the rail IS the gap: 8px from sidebar to canvas */
+  cursor: pointer;
 }
 body.viz-zen .viz-workspace { padding-left: 0; }
 .viz-side-seam::after { display: none; }
@@ -4309,17 +4320,62 @@ body.viz-zen.viz-zen-nosidebar .app-sidebar {
   visibility: hidden;
   transition: width 0.3s ease, margin 0.3s ease, border-width 0.3s ease, opacity 0.2s ease, visibility 0s linear 0.3s;
 }
-/* Nothing left to drag: the seam is a narrow rail holding the arrow back. */
-.viz-workspace > .resizer-divider.collapsed {
-  width: 18px;
-  cursor: default;
+/* ── The seams (no arrow buttons on this screen) ────────────────
+   Between the panes the divider takes no width: the workspace's two 4px gaps
+   are the 8px seam, the same as from the app sidebar to the first pane. A
+   12px band you cannot see straddles it for the grab; the grip pill shows on
+   hover. A press that does not move is a click: it folds the pane
+   (initResizerDrag's onClick). Folded, the seam is an 8px rail with a line
+   on it; click it to bring the pane back. */
+.viz-workspace > .viz-pane-seam {
+  width: 0;
+  flex: 0 0 0;
+  overflow: visible;
+}
+.viz-workspace > .viz-pane-seam::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -6px;
+  right: -6px;
+  cursor: col-resize;
+}
+.viz-workspace > .viz-pane-seam.collapsed,
+.viz-side-seam {
+  width: 8px;
+  flex: 0 0 8px;
+  cursor: pointer;
+}
+.viz-workspace:not(.panes-swapped) > .viz-pane-seam.collapsed { margin-right: -0.25rem; }
+.viz-workspace.panes-swapped > .viz-pane-seam.collapsed { margin-left: -0.25rem; }
+.viz-workspace > .viz-pane-seam.collapsed::before,
+.viz-side-seam::before {
+  content: '';
+  position: absolute;
+  top: 18%;
+  bottom: 18%;
+  left: 3px;
+  width: 2px;
+  right: auto;
+  border-radius: 2px;
+  background: var(--color-primary);
+  opacity: 0.28;
+  cursor: pointer;
+  transition: opacity 0.18s ease, transform 0.24s var(--ease-spring, ease);
+}
+.viz-side-seam:not(.collapsed)::before { opacity: 0; }
+.viz-workspace > .viz-pane-seam.collapsed:hover::before,
+.viz-side-seam:hover::before {
+  opacity: 1;
+  transform: scaleX(1.5);
 }
 /* Everything that changes when the pane folds moves on the same 0.3s, rather
    than the rail and the gap snapping at the start while the width glides. */
 .viz-content-pane {
   transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s ease, margin 0.3s ease, border-width 0.3s ease, opacity 0.25s ease;
 }
-.viz-workspace > .resizer-divider { transition: width 0.3s ease; }
+.viz-workspace > .resizer-divider { transition: width 0.3s ease, flex-basis 0.3s ease, margin 0.3s ease; }
 /* ...flush with the page edge. Left of it were the workspace's 8px padding and
    two 4px flex gaps around the zero-width pane, 16px of nothing before the
    rail. The pane's negative margin cancels its gap; the padding goes on the
@@ -4349,19 +4405,33 @@ body.viz-zen.viz-zen-nosidebar .app-sidebar {
   visibility: hidden;
   transition-delay: 0s, 0s, 0s, 0s, 0.26s;
 }
-/* Folded, the seam's arrow stays out: a tab hanging from the top edge, pulled
-   down from where the bar went (the attempt's .tb-dock). */
-.viz-page.hide-top > .viz-tb-seam .tb-collapse {
-  opacity: 0.6;
-  pointer-events: auto;
-  transform: translate(-50%, 0);
-  border-top: none;
-  border-radius: 0 0 6px 6px;
-}
-.viz-page.hide-top > .viz-tb-seam .tb-collapse:hover { opacity: 1; }
-/* Above the topbar (z-index 50), which otherwise covered the top half of the
-   arrow sitting on its bottom edge. */
+/* The topbar's seam is a click target of its own now: an 8px band on the
+   bar's bottom edge (a line lights on hover). Folded, the band sits along
+   the page's top edge with the line faintly showing, and a click brings the
+   bar back. */
 .viz-tb-seam { z-index: 60; }
+.viz-tb-seam::before {
+  top: -4px;
+  height: 8px;
+  cursor: pointer;
+}
+.viz-tb-seam::after {
+  content: '';
+  position: absolute;
+  left: 30%;
+  right: 30%;
+  top: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--color-primary);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.24s var(--ease-spring, ease);
+}
+.viz-tb-seam:hover::after { opacity: 1; transform: scaleY(1.5); }
+.viz-page.hide-top > .viz-tb-seam::before { top: 0; }
+.viz-page.hide-top > .viz-tb-seam::after { top: 2px; opacity: 0.28; }
+.viz-page.hide-top > .viz-tb-seam:hover::after { opacity: 1; }
 body.viz-zen .viz-tb-seam { display: none; }
 
 /* With the topbar folded, the agenda flag (fixed, top-right) hangs over the

@@ -929,10 +929,22 @@ function html(strings, ...vals) {
 }
 
 // ======================== RESIZER LOGIC ========================
-function initResizerDrag(e, resizer) {
+/* `onClick` (optional, Visualize only): a press that lets go without moving
+   is a click on the line, not a drag -- it folds or unfolds the pane. The
+   width is only written once the pointer has really moved, so a click does
+   not nudge the pane first. Other screens pass nothing and resize as before. */
+const RESIZER_CLICK_SLOP = 4;
+function initResizerDrag(e, resizer, onClick) {
   e.preventDefault();
-  // Its pane is folded away — the seam is only the expand arrow now.
-  if (resizer.classList.contains('collapsed')) return;
+  const clicks = typeof onClick === 'function';
+  // Its pane is folded away — the seam only brings it back now.
+  if (resizer.classList.contains('collapsed')) {
+    if (clicks) {
+      const up = () => { document.removeEventListener('mouseup', up); onClick(); };
+      document.addEventListener('mouseup', up);
+    }
+    return;
+  }
   const parent = resizer.parentElement;
   if (!parent) return;
 
@@ -957,7 +969,7 @@ function initResizerDrag(e, resizer) {
 
   // One write per frame. Mousemove can fire several times between paints, and
   // each extra write forced another layout of the whole editor for nothing.
-  let pending = null, raf = 0;
+  let pending = null, raf = 0, moved = false;
   const paint = () => {
     raf = 0;
     if (pending == null) return;
@@ -974,19 +986,24 @@ function initResizerDrag(e, resizer) {
     // page unclickable. The next move with no button held ends the drag.
     if (ev.buttons === 0) { mouseUpHandler(); return; }
     const delta = ev.clientX - startX;
+    if (!moved) {
+      if (clicks && Math.abs(delta) < RESIZER_CLICK_SLOP) return;
+      moved = true;
+    }
     const newWidth = Math.max(200, startWidth + (isReversed ? -delta : delta));
     const parentWidth = parent.getBoundingClientRect().width;
     pending = Math.min(newWidth, parentWidth - 200);
     if (!raf) raf = requestAnimationFrame(paint);
   };
 
-  const mouseUpHandler = () => {
+  const mouseUpHandler = (ev) => {
     if (raf) { cancelAnimationFrame(raf); paint(); }
     document.body.classList.remove('is-resizing');
     if (overlay.parentNode) document.body.removeChild(overlay);
     document.removeEventListener('mousemove', mouseMoveHandler);
     document.removeEventListener('mouseup', mouseUpHandler);
     window.removeEventListener('blur', mouseUpHandler);
+    if (!moved && clicks && ev && ev.type === 'mouseup') { onClick(); return; }
     window.dispatchEvent(new Event('resize'));
   };
 

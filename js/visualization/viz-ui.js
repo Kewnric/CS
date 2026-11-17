@@ -88,57 +88,25 @@ function vizToggleTopbar() {
   window.dispatchEvent(new Event('resize'));
 }
 
-/** Point each arrow at what it will do next, and label it to match. */
+/** Each seam says what a click on it will do next (they are the fold
+ *  controls now: there are no arrow buttons on this screen). */
 function _vizSyncFoldButtons() {
   const ws = document.querySelector('.viz-workspace');
-  const paneBtn = document.getElementById('rz-viz-pane-btn');
-  if (ws && paneBtn) {
+  const pane = document.getElementById('viz-pane-seam');
+  if (ws && pane) {
     const hidden = ws.classList.contains('hide-pane');
-    // The pane sits on the left unless the panes are swapped. Expanded, the
-    // arrow points toward it (fold it away); folded, back into the canvas.
-    const paneSide = ws.classList.contains('panes-swapped') ? 'right' : 'left';
-    const dir = hidden ? (paneSide === 'left' ? 'right' : 'left') : paneSide;
-    const divider = paneBtn.closest('.resizer-divider');
-    if (divider) divider.classList.toggle('collapsed', hidden);
-    paneBtn.title = hidden ? 'Show the side pane' : 'Collapse the side pane';
-    paneBtn.setAttribute('aria-label', paneBtn.title);
-    // Rebuilt rather than re-pointed: lucide keeps the old svg's classes, so
-    // flipping in place stacks both chevrons on one element.
-    if (paneBtn.dataset.dir !== dir) {
-      paneBtn.dataset.dir = dir;
-      paneBtn.innerHTML = '<i data-lucide="chevron-' + dir + '"></i>';
-      if (typeof lucide !== 'undefined') lucide.createIcons({ root: paneBtn });
-    }
+    pane.classList.toggle('collapsed', hidden);
+    pane.title = hidden ? 'Click to show the side pane' : 'Drag to resize · click to fold';
   }
   const page = document.querySelector('.viz-page');
-  const topBtn = document.getElementById('rz-viz-top-btn');
-  if (page && topBtn) {
-    const hidden = page.classList.contains('hide-top');
-    const dir = hidden ? 'down' : 'up';
-    topBtn.title = hidden ? 'Show the top bar' : 'Collapse the top bar';
-    topBtn.setAttribute('aria-label', topBtn.title);
-    if (topBtn.dataset.dir !== dir) {
-      topBtn.dataset.dir = dir;
-      topBtn.innerHTML = '<i data-lucide="chevron-' + dir + '"></i>';
-      if (typeof lucide !== 'undefined') lucide.createIcons({ root: topBtn });
-    }
-  }
-  const sideBtn = document.getElementById('rz-viz-side-btn');
-  if (sideBtn) {
+  const top = document.getElementById('viz-top-seam');
+  if (page && top) top.title = page.classList.contains('hide-top') ? 'Click to show the top bar' : 'Click to fold the top bar';
+  const side = document.getElementById('viz-side-seam');
+  if (side) {
     const hidden = document.body.classList.contains('viz-zen-nosidebar');
-    const dir = hidden ? 'right' : 'left';
-    const seam = sideBtn.closest('.resizer-divider');
-    if (seam) seam.classList.toggle('collapsed', hidden);
-    sideBtn.title = hidden ? 'Show the sidebar' : 'Collapse the sidebar';
-    sideBtn.setAttribute('aria-label', sideBtn.title);
-    if (sideBtn.dataset.dir !== dir) {
-      sideBtn.dataset.dir = dir;
-      sideBtn.innerHTML = '<i data-lucide="chevron-' + dir + '"></i>';
-      if (typeof lucide !== 'undefined') lucide.createIcons({ root: sideBtn });
-    }
+    side.classList.toggle('collapsed', hidden);
+    side.title = hidden ? 'Click to show the sidebar' : 'Click to fold the sidebar';
   }
-  // The clicked arrow is moving or vanishing; drop its focus so it isn't left lit.
-  [paneBtn, topBtn, sideBtn].forEach(b => { if (b && document.activeElement === b) b.blur(); });
 }
 
 /* --- Collapsible Module Tabs --- */

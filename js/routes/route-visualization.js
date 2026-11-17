@@ -72,16 +72,13 @@ function vizTemplate() {
           <button class="viz-swap-btn viz-tip" onclick="vizSwapPanes()" data-tip="Swap panes" title="Swap panes" aria-label="Swap the two panes"><i data-lucide="arrow-left-right"></i></button>
         </div>
       </div>
-      <!-- The coding attempt's fold arrows (layout.css .tb-seam / .rz-collapse):
-           this one folds the topbar away, the divider's folds the first pane. -->
-      <div class="tb-seam viz-tb-seam">
-        <button class="rz-collapse tb-collapse" id="rz-viz-top-btn" type="button" onclick="vizToggleTopbar()" tabindex="-1" aria-hidden="true"><i data-lucide="chevron-up"></i></button>
-      </div>
+      <!-- The seams are the controls: click the line under the topbar to fold it,
+           the line between the panes to fold the first pane (drag it to resize).
+           No arrow buttons on this screen (vizSyncFoldButtons keeps their titles). -->
+      <div class="tb-seam viz-tb-seam" id="viz-top-seam" onclick="vizToggleTopbar()" title="Click to fold the top bar"></div>
       <div class="viz-workspace">
         <!-- Canvas only: folds the app sidebar (vizToggleZenSidebar). -->
-        <div class="resizer-divider viz-side-seam" id="viz-side-seam">
-          <button class="rz-collapse" id="rz-viz-side-btn" type="button" onclick="vizToggleZenSidebar()" tabindex="-1" aria-hidden="true"><i data-lucide="chevron-left"></i></button>
-        </div>
+        <div class="resizer-divider viz-side-seam" id="viz-side-seam" onclick="vizToggleZenSidebar()" title="Click to fold the sidebar"></div>
         <div class="viz-content-pane">
           <!-- Same header as every library pane (pane-1-header): identity tile,
                subtitle stats, the eye/tour actions, search, and the stat chips.
@@ -122,9 +119,7 @@ function vizTemplate() {
           </div>
           <div class="viz-content-body" id="viz-content-body"></div>
         </div>
-        <div class="resizer-divider" onmousedown="initResizerDrag(event, this)">
-          <button class="rz-collapse" id="rz-viz-pane-btn" type="button" onmousedown="event.stopPropagation()" onclick="vizTogglePane()" tabindex="-1" aria-hidden="true"><i data-lucide="chevron-left"></i></button>
-        </div>
+        <div class="resizer-divider viz-pane-seam" id="viz-pane-seam" onmousedown="initResizerDrag(event, this, vizTogglePane)" title="Drag to resize · click to fold"></div>
         <div class="viz-canvas-pane">
           <!-- The wrap is a one-row grid whose row folds 1fr -> 0fr while the
                toolbar slides up out of the pane's top edge, so hiding it leaves
