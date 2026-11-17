@@ -1,0 +1,559 @@
+/* ============================================================
+   BRAIN BORDERS — the nine animated borders (brain-borders.js)
+   ------------------------------------------------------------
+   Each is the note's card restyled (keyed on .bfx-card + data-border, loaded
+   after visualization.css so these win over the slab's hover/selected/drag
+   rules at equal weight) plus its own layer, .bfx-<id>. Layer parts with
+   z-index -1 sit behind the card: the note is the stacking context.
+
+   Every loop animates transform or opacity only and closes on its first frame
+   (or runs out invisible); none fills forwards. Animated parts are .bfx-a:
+   paused when the canvas is zoomed far out, off under reduced motion.
+   --bfx-c is the border's colour: a picked Border Edge colour, else its own.
+   ============================================================ */
+
+/* ── Shared ─────────────────────────────────────────────────── */
+.viz-node.bfx-card[data-type="comment"] .viz-node-inner,
+.viz-node.bfx-card[data-type="comment"]:hover .viz-node-inner,
+.viz-node.bfx-card[data-type="comment"].selected .viz-node-inner,
+.viz-node.bfx-card[data-type="comment"].dragging .viz-node-inner,
+.viz-node.bfx-card[data-type="comment"] .viz-node-inner:active {
+  transform: none !important;
+}
+.viz-node.bfx-card.selected:not(.in-group) .viz-node-inner {
+  outline: 1px dashed rgba(255, 255, 255, 0.45);
+  outline-offset: 6px;
+}
+.bfx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+/* A ring the width of the padding: the content box is cut out of it. */
+.bfx-ring {
+  position: absolute;
+  inset: -2px;
+  padding: 2px;
+  overflow: hidden;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+.bfx-stars { position: absolute; inset: 0; }
+.bfx-star {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  color: #fff;
+  opacity: 0;
+  filter: drop-shadow(0 0 3px var(--bfx-c));
+  animation: bfxTwinkle 2.8s ease-in-out infinite;
+  animation-delay: calc(var(--i) * -0.7s);
+}
+.bfx-star svg { display: block; width: 100%; height: 100%; }
+@keyframes bfxTwinkle {
+  0%, 100% { opacity: 0; transform: scale(0.3) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1) rotate(45deg); }
+}
+@keyframes bfxSpin { to { transform: rotate(1turn); } }
+@keyframes bfxSpinBack { to { transform: rotate(-1turn); } }
+@keyframes bfxBreathe { 0%, 100% { opacity: 0.55; } 50% { opacity: 1; } }
+
+/* ── Neon: a glowing tube that buzzes now and then ─────────── */
+.viz-node.bfx-card[data-border="neon"] { --bfx-c: var(--viz-node-accent, #ff2bd6); }
+.viz-node.bfx-card[data-type="comment"][data-border="neon"] .viz-node-inner {
+  border-radius: 12px !important;
+  border: 2px solid color-mix(in srgb, var(--bfx-c) 75%, #fff) !important;
+  background: radial-gradient(120% 140% at 50% 115%, color-mix(in srgb, var(--bfx-c) 16%, transparent), transparent 60%), #08060d !important;
+  box-shadow: inset 0 0 12px color-mix(in srgb, var(--bfx-c) 40%, transparent), 0 0 0 1px rgba(0, 0, 0, 0.55) !important;
+}
+.viz-node.bfx-card[data-border="neon"] .viz-comment-content {
+  color: var(--note-text, #fff4fd);
+  text-shadow: 0 0 4px color-mix(in srgb, var(--bfx-c) 80%, transparent), 0 0 12px color-mix(in srgb, var(--bfx-c) 45%, transparent);
+}
+.bfx-neon-tube {
+  position: absolute;
+  inset: -2px;
+  border-radius: 13px;
+  border: 2px solid var(--bfx-c);
+  box-shadow: 0 0 8px var(--bfx-c), 0 0 22px color-mix(in srgb, var(--bfx-c) 70%, transparent),
+    0 0 46px color-mix(in srgb, var(--bfx-c) 35%, transparent), inset 0 0 10px color-mix(in srgb, var(--bfx-c) 60%, transparent);
+  animation: bfxNeon 7s linear infinite;
+}
+.bfx-neon-floor {
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: calc(100% + 6px);
+  z-index: -1;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--bfx-c) 40%, transparent), transparent);
+  animation: bfxNeon 7s linear infinite;
+}
+.bfx-neon-cap {
+  position: absolute;
+  top: -6px;
+  width: 10px;
+  height: 6px;
+  border-radius: 2px 2px 0 0;
+  background: #2b2b33;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+.bfx-neon-cap.is-l { left: 18px; }
+.bfx-neon-cap.is-r { right: 18px; }
+/* Steady, then a stutter: two quick drops, and a softer one later. */
+@keyframes bfxNeon {
+  0%, 9%, 11.5%, 14%, 63%, 65.5%, 100% { opacity: 1; }
+  10% { opacity: 0.25; }
+  12.5% { opacity: 0.6; }
+  13% { opacity: 0.18; }
+  64.5% { opacity: 0.7; }
+}
+
+/* ── Aurora: northern lights flowing round the edge ────────── */
+.viz-node.bfx-card[data-border="aurora"] { --bfx-c: var(--viz-node-accent, #22d3ee); }
+.viz-node.bfx-card[data-type="comment"][data-border="aurora"] .viz-node-inner {
+  border-radius: 16px !important;
+  border: 1px solid rgba(255, 255, 255, 0.06) !important;
+  background: linear-gradient(180deg, rgba(52, 211, 153, 0.12), transparent 50%), #050b16 !important;
+  box-shadow: 0 12px 30px -14px rgba(0, 0, 0, 0.85) !important;
+}
+.viz-node.bfx-card[data-border="aurora"] .viz-comment-content { color: var(--note-text, #e7fff8); }
+.bfx-aurora .bfx-ring { border-radius: 18px; }
+.bfx-aurora .bfx-ring > i,
+.bfx-aurora-halo > i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--bfx-d, 420px);
+  height: var(--bfx-d, 420px);
+  margin: calc(var(--bfx-d, 420px) / -2) 0 0 calc(var(--bfx-d, 420px) / -2);
+  background: conic-gradient(from 0deg, var(--bfx-c), #34d399, #a78bfa, #f472b6, #22d3ee, var(--bfx-c));
+  animation: bfxSpin 6s linear infinite;
+}
+.bfx-aurora-halo {
+  position: absolute;
+  inset: -12px;
+  z-index: -1;
+  border-radius: 26px;
+  overflow: hidden;
+  opacity: 0.45;
+}
+.bfx-aurora-halo > i { filter: blur(12px); }
+/* Curtains of light drifting across the top of the card; the drift is
+   exactly four bands, so the loop does not jump. */
+.bfx-veil {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  overflow: hidden;
+  -webkit-mask: linear-gradient(#000, transparent 70%);
+  mask: linear-gradient(#000, transparent 70%);
+}
+.bfx-veil > i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: calc(100% + 160px);
+  background: repeating-linear-gradient(90deg, transparent 0 14px, rgba(52, 211, 153, 0.16) 22px, transparent 30px, rgba(34, 211, 238, 0.1) 34px, transparent 40px);
+  animation: bfxVeil 9s linear infinite;
+}
+@keyframes bfxVeil { to { transform: translateX(-160px); } }
+
+/* ── Holo: rainbow foil, like a rare card ──────────────────── */
+.viz-node.bfx-card[data-border="holo"] { --bfx-c: var(--viz-node-accent, #c7d2fe); }
+.viz-node.bfx-card[data-type="comment"][data-border="holo"] .viz-node-inner {
+  border-radius: 12px !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  background: linear-gradient(135deg, #1a1d2e, #0d0f1a 60%, #1b1530) !important;
+  box-shadow: 0 10px 26px -12px rgba(0, 0, 0, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.08) !important;
+}
+.viz-node.bfx-card[data-border="holo"] .viz-comment-content { color: var(--note-text, #f1f4ff); }
+.bfx-holo-rim {
+  border-radius: 14px;
+  background: conic-gradient(from 210deg, #ff7eb3, #ffd36e, #7afcff, var(--bfx-c), #a78bfa, #ff7eb3);
+  opacity: 0.85;
+}
+.bfx-holo-foil {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.bfx-holo-foil::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(115deg, rgba(255, 126, 179, 0.06) 0 10px, rgba(122, 252, 255, 0.06) 10px 20px, rgba(255, 211, 110, 0.05) 20px 30px);
+}
+.bfx-holo-foil > i {
+  position: absolute;
+  top: -50%;
+  bottom: -50%;
+  left: -60%;
+  width: 60%;
+  background: linear-gradient(100deg, transparent 15%, rgba(255, 126, 179, 0.22) 35%, rgba(255, 255, 255, 0.42) 50%, rgba(122, 252, 255, 0.25) 62%, transparent 85%);
+  mix-blend-mode: screen;
+  animation: bfxSheen 4.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+/* Across and out, then a rest off the card before the next pass. */
+@keyframes bfxSheen { 0% { transform: translateX(0); } 55%, 100% { transform: translateX(280%); } }
+.bfx-holo .bfx-star:nth-child(1) { left: 8%; top: -5px; }
+.bfx-holo .bfx-star:nth-child(2) { left: calc(100% - 5px); top: 28%; }
+.bfx-holo .bfx-star:nth-child(3) { left: 70%; top: calc(100% - 5px); }
+.bfx-holo .bfx-star:nth-child(4) { left: -5px; top: 64%; }
+
+/* ── Ember: a hot rim with sparks rising off it ────────────── */
+.viz-node.bfx-card[data-border="ember"] { --bfx-c: var(--viz-node-accent, #ff7a18); }
+.viz-node.bfx-card[data-type="comment"][data-border="ember"] .viz-node-inner {
+  border-radius: 10px !important;
+  border: 1px solid color-mix(in srgb, var(--bfx-c) 65%, #000) !important;
+  background: radial-gradient(140% 90% at 50% 125%, color-mix(in srgb, var(--bfx-c) 34%, transparent), transparent 62%), linear-gradient(#19110b, #0d0806) !important;
+  box-shadow: inset 0 -8px 18px -10px var(--bfx-c), 0 0 0 1px rgba(0, 0, 0, 0.6) !important;
+}
+.viz-node.bfx-card[data-border="ember"] .viz-comment-content { color: var(--note-text, #ffeedd); }
+.bfx-ember-rim {
+  position: absolute;
+  inset: -1px;
+  border-radius: 11px;
+  border: 1.5px solid color-mix(in srgb, var(--bfx-c) 85%, #ffd27a);
+  box-shadow: 0 0 10px var(--bfx-c), 0 0 24px color-mix(in srgb, var(--bfx-c) 50%, transparent), inset 0 0 8px color-mix(in srgb, var(--bfx-c) 50%, transparent);
+  animation: bfxBreathe 2.8s ease-in-out infinite;
+}
+.bfx-ember-heat {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  bottom: -10px;
+  z-index: -1;
+  height: 26px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--bfx-c) 55%, transparent), transparent);
+  animation: bfxBreathe 2.8s ease-in-out infinite;
+  animation-delay: -1.4s;
+}
+.bfx-ember-sparks { position: absolute; left: 0; right: 0; top: 0; height: 0; }
+.bfx-ember-sparks > i {
+  position: absolute;
+  top: -2px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff3c4, #ffb347 45%, var(--bfx-c));
+  box-shadow: 0 0 6px var(--bfx-c);
+  opacity: 0;
+  animation: bfxRise 2.6s linear infinite;
+}
+.bfx-ember-sparks > i:nth-child(1) { left: 8%; --dx: -8px; animation-delay: 0s; }
+.bfx-ember-sparks > i:nth-child(2) { left: 21%; --dx: 6px; animation-delay: -0.9s; animation-duration: 3.1s; width: 3px; height: 3px; }
+.bfx-ember-sparks > i:nth-child(3) { left: 33%; --dx: -4px; animation-delay: -1.7s; }
+.bfx-ember-sparks > i:nth-child(4) { left: 47%; --dx: 10px; animation-delay: -0.4s; animation-duration: 2.3s; width: 3px; height: 3px; }
+.bfx-ember-sparks > i:nth-child(5) { left: 58%; --dx: -6px; animation-delay: -2.1s; animation-duration: 3s; }
+.bfx-ember-sparks > i:nth-child(6) { left: 69%; --dx: 4px; animation-delay: -1.2s; width: 3px; height: 3px; }
+.bfx-ember-sparks > i:nth-child(7) { left: 81%; --dx: -10px; animation-delay: -0.6s; animation-duration: 2.8s; }
+.bfx-ember-sparks > i:nth-child(8) { left: 92%; --dx: 7px; animation-delay: -1.9s; animation-duration: 3.2s; width: 3px; height: 3px; }
+@keyframes bfxRise {
+  0% { opacity: 0; transform: translate(0, 0) scale(1); }
+  12% { opacity: 1; }
+  70% { opacity: 0.9; }
+  100% { opacity: 0; transform: translate(var(--dx, 0px), -44px) scale(0.35); }
+}
+
+/* ── Circuit: a board's traces, with light running the edges ─ */
+.viz-node.bfx-card[data-border="circuit"] { --bfx-c: var(--viz-node-accent, #22c55e); }
+.viz-node.bfx-card[data-type="comment"][data-border="circuit"] .viz-node-inner {
+  border-radius: 4px !important;
+  border: 1px solid color-mix(in srgb, var(--bfx-c) 50%, transparent) !important;
+  background:
+    linear-gradient(color-mix(in srgb, var(--bfx-c) 7%, transparent) 1px, transparent 1px) 0 0 / 14px 14px,
+    linear-gradient(90deg, color-mix(in srgb, var(--bfx-c) 7%, transparent) 1px, transparent 1px) 0 0 / 14px 14px,
+    #03100a !important;
+  box-shadow: 0 0 16px -8px var(--bfx-c), 0 0 0 1px rgba(0, 0, 0, 0.55) !important;
+}
+.viz-node.bfx-card[data-border="circuit"] .viz-comment-content { color: var(--note-text, #dcfce7); }
+.bfx-circ-trace {
+  position: absolute;
+  width: 26px;
+  height: 18px;
+  border: 0 solid color-mix(in srgb, var(--bfx-c) 80%, transparent);
+}
+.bfx-circ-trace.is-tl { left: -9px; top: -9px; border-left-width: 1.5px; border-top-width: 1.5px; }
+.bfx-circ-trace.is-tr { right: -9px; top: -9px; border-right-width: 1.5px; border-top-width: 1.5px; }
+.bfx-circ-trace.is-bl { left: -9px; bottom: -9px; border-left-width: 1.5px; border-bottom-width: 1.5px; }
+.bfx-circ-trace.is-br { right: -9px; bottom: -9px; border-right-width: 1.5px; border-bottom-width: 1.5px; }
+.bfx-circ-trace > b {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--bfx-c);
+  box-shadow: 0 0 6px var(--bfx-c);
+  animation: bfxBreathe 1.8s ease-in-out infinite;
+}
+.bfx-circ-trace.is-tl > b { right: -3px; top: -3.25px; }
+.bfx-circ-trace.is-tr > b { left: -3px; top: -3.25px; animation-delay: -0.45s; }
+.bfx-circ-trace.is-bl > b { right: -3px; bottom: -3.25px; animation-delay: -0.9s; }
+.bfx-circ-trace.is-br > b { left: -3px; bottom: -3.25px; animation-delay: -1.35s; }
+/* A comet of light runs each edge in turn, clockwise. */
+.bfx-circ-pulse {
+  position: absolute;
+  opacity: 0;
+  animation: 3.2s linear infinite;
+}
+.bfx-circ-pulse.is-top { left: -22px; top: -1px; width: 22px; height: 2px; background: linear-gradient(90deg, transparent, var(--bfx-c), #fff); animation-name: bfxRunX; }
+.bfx-circ-pulse.is-right { right: -1px; top: -22px; width: 2px; height: 22px; background: linear-gradient(180deg, transparent, var(--bfx-c), #fff); animation-name: bfxRunY; animation-delay: -2.4s; }
+.bfx-circ-pulse.is-bottom { right: -22px; bottom: -1px; width: 22px; height: 2px; background: linear-gradient(270deg, transparent, var(--bfx-c), #fff); animation-name: bfxRunXBack; animation-delay: -1.6s; }
+.bfx-circ-pulse.is-left { left: -1px; bottom: -22px; width: 2px; height: 22px; background: linear-gradient(0deg, transparent, var(--bfx-c), #fff); animation-name: bfxRunYBack; animation-delay: -0.8s; }
+@keyframes bfxRunX { 0% { opacity: 0; transform: translateX(0); } 10%, 85% { opacity: 1; } 100% { opacity: 0; transform: translateX(calc(var(--bfx-w, 250px) + 22px)); } }
+@keyframes bfxRunY { 0% { opacity: 0; transform: translateY(0); } 10%, 85% { opacity: 1; } 100% { opacity: 0; transform: translateY(calc(var(--bfx-h, 80px) + 22px)); } }
+@keyframes bfxRunXBack { 0% { opacity: 0; transform: translateX(0); } 10%, 85% { opacity: 1; } 100% { opacity: 0; transform: translateX(calc((var(--bfx-w, 250px) + 22px) * -1)); } }
+@keyframes bfxRunYBack { 0% { opacity: 0; transform: translateY(0); } 10%, 85% { opacity: 1; } 100% { opacity: 0; transform: translateY(calc((var(--bfx-h, 80px) + 22px) * -1)); } }
+
+/* ── Frost: ice at the corners, light skating the rim ──────── */
+.viz-node.bfx-card[data-border="frost"] { --bfx-c: var(--viz-node-accent, #9be7ff); }
+.viz-node.bfx-card[data-type="comment"][data-border="frost"] .viz-node-inner {
+  border-radius: 14px !important;
+  border: 1px solid color-mix(in srgb, var(--bfx-c) 60%, #fff) !important;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--bfx-c) 18%, transparent), transparent 45%), linear-gradient(#0c1d2f, #081422) !important;
+  box-shadow: inset 0 0 16px color-mix(in srgb, var(--bfx-c) 30%, transparent), 0 0 18px -8px var(--bfx-c), 0 0 0 1px rgba(0, 0, 0, 0.45) !important;
+}
+.viz-node.bfx-card[data-border="frost"] .viz-comment-content { color: var(--note-text, #e8f8ff); }
+.bfx-frost-ring { border-radius: 16px; background: color-mix(in srgb, var(--bfx-c) 30%, transparent); }
+.bfx-frost-ring > i {
+  position: absolute;
+  top: -50%;
+  bottom: -50%;
+  left: -40%;
+  width: 40%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.95), transparent);
+  animation: bfxSkate 5.5s ease-in-out infinite;
+}
+@keyframes bfxSkate { 0% { transform: translateX(0); } 60%, 100% { transform: translateX(360%); } }
+.bfx-flake {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  color: color-mix(in srgb, var(--bfx-c) 80%, #fff);
+  filter: drop-shadow(0 0 4px var(--bfx-c));
+}
+.bfx-flake svg { display: block; width: 100%; height: 100%; }
+.bfx-flake.is-tl { left: -8px; top: -8px; transform: rotate(10deg); }
+.bfx-flake.is-tr { right: -7px; top: -7px; transform: rotate(-12deg) scale(0.8); }
+.bfx-flake.is-bl { left: -7px; bottom: -7px; transform: rotate(24deg) scale(0.75); }
+.bfx-flake.is-br { right: -8px; bottom: -8px; transform: rotate(-4deg); }
+.bfx-frost .bfx-star { width: 8px; height: 8px; }
+.bfx-frost .bfx-star:nth-child(1) { left: 22%; top: -4px; }
+.bfx-frost .bfx-star:nth-child(2) { left: 64%; top: -4px; }
+.bfx-frost .bfx-star:nth-child(3) { left: calc(100% - 4px); top: 52%; }
+.bfx-frost .bfx-star:nth-child(4) { left: 40%; top: calc(100% - 4px); }
+.bfx-frost .bfx-star:nth-child(5) { left: -4px; top: 38%; }
+
+/* ── Arcane: magic seals turning behind both ends ──────────── */
+.viz-node.bfx-card[data-border="arcane"] { --bfx-c: var(--viz-node-accent, #a855f7); }
+.viz-node.bfx-card[data-type="comment"][data-border="arcane"] .viz-node-inner {
+  border-radius: 8px !important;
+  border: 1px solid color-mix(in srgb, var(--bfx-c) 70%, transparent) !important;
+  background: radial-gradient(100% 120% at 50% 0%, color-mix(in srgb, var(--bfx-c) 20%, transparent), transparent 60%), #0d0718 !important;
+  box-shadow: 0 0 22px -8px var(--bfx-c), inset 0 0 0 1px rgba(255, 255, 255, 0.03) !important;
+}
+.viz-node.bfx-card[data-border="arcane"] .viz-comment-content { color: var(--note-text, #f5ecff); }
+.bfx-seal {
+  position: absolute;
+  top: 50%;
+  z-index: -1;
+  height: min(calc(100% + 34px), 150px);
+  aspect-ratio: 1;
+  color: var(--bfx-c);
+  opacity: 0.8;
+  transform: translate(-50%, -50%);
+}
+.bfx-seal.is-l { left: 0; }
+.bfx-seal.is-r { left: 100%; }
+.bfx-seal > svg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 4px var(--bfx-c));
+  animation: bfxSpin 26s linear infinite;
+}
+.bfx-seal > svg + svg {
+  left: 22%;
+  top: 22%;
+  width: 56%;
+  height: 56%;
+  animation: bfxSpinBack 16s linear infinite;
+}
+.bfx-seal.is-r > svg { animation-direction: reverse; }
+.bfx-rune {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--bfx-c);
+  box-shadow: 0 0 6px var(--bfx-c), inset 0 0 3px var(--bfx-c);
+  animation: bfxRune 3s ease-in-out infinite;
+  animation-delay: calc(var(--i) * -0.75s);
+}
+.bfx-rune.is-tl { left: -4px; top: -4px; }
+.bfx-rune.is-tr { right: -4px; top: -4px; }
+.bfx-rune.is-bl { left: -4px; bottom: -4px; }
+.bfx-rune.is-br { right: -4px; bottom: -4px; }
+@keyframes bfxRune {
+  0%, 100% { opacity: 0.3; transform: rotate(45deg) scale(0.8); }
+  50% { opacity: 1; transform: rotate(45deg) scale(1.15); }
+}
+
+/* ── Pixel: an 8-bit frame whose edges march round ────────── */
+.viz-node.bfx-card[data-border="pixel"] { --bfx-c: var(--viz-node-accent, #facc15); }
+.viz-node.bfx-card[data-type="comment"][data-border="pixel"] .viz-node-inner {
+  border-radius: 0 !important;
+  border: 0 !important;
+  background: #10131c !important;
+  box-shadow: none !important;
+}
+.viz-node.bfx-card[data-border="pixel"] .viz-comment-content {
+  color: var(--note-text, #f8fafc);
+  font-family: var(--note-font, 'Consolas', 'Courier New', monospace);
+  letter-spacing: 0.02em;
+}
+.bfx-pixel-shadow { position: absolute; inset: 6px -6px -6px 6px; z-index: -1; background: rgba(0, 0, 0, 0.55); }
+.bfx-pixel-edge { position: absolute; overflow: hidden; }
+.bfx-pixel-edge.is-top { left: 4px; right: 4px; top: -4px; height: 4px; }
+.bfx-pixel-edge.is-bottom { left: 4px; right: 4px; bottom: -4px; height: 4px; }
+.bfx-pixel-edge.is-left { top: 4px; bottom: 4px; left: -4px; width: 4px; }
+.bfx-pixel-edge.is-right { top: 4px; bottom: 4px; right: -4px; width: 4px; }
+.bfx-pixel-edge > i { position: absolute; inset: 0; }
+/* One dash period (12px) per loop, in 4px steps: it marches, seamlessly. */
+.bfx-pixel-edge.is-top > i,
+.bfx-pixel-edge.is-bottom > i {
+  right: -12px;
+  background: repeating-linear-gradient(90deg, var(--bfx-c) 0 8px, color-mix(in srgb, var(--bfx-c) 30%, #10131c) 8px 12px);
+  animation: bfxMarchX 0.6s steps(3) infinite;
+}
+.bfx-pixel-edge.is-left > i,
+.bfx-pixel-edge.is-right > i {
+  bottom: -12px;
+  background: repeating-linear-gradient(180deg, var(--bfx-c) 0 8px, color-mix(in srgb, var(--bfx-c) 30%, #10131c) 8px 12px);
+  animation: bfxMarchY 0.6s steps(3) infinite;
+}
+.bfx-pixel-edge.is-top > i, .bfx-pixel-edge.is-left > i { animation-direction: reverse; }
+@keyframes bfxMarchX { to { transform: translateX(-12px); } }
+@keyframes bfxMarchY { to { transform: translateY(-12px); } }
+.bfx-pixel-corner { position: absolute; width: 4px; height: 4px; background: var(--bfx-c); }
+.bfx-pixel-corner.is-tl { left: 0; top: 0; }
+.bfx-pixel-corner.is-tr { right: 0; top: 0; }
+.bfx-pixel-corner.is-bl { left: 0; bottom: 0; }
+.bfx-pixel-corner.is-br { right: 0; bottom: 0; }
+.bfx-pixel-cursor {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  width: 8px;
+  height: 3px;
+  background: var(--bfx-c);
+  animation: bfxBlinkStep 1s steps(1) infinite;
+}
+@keyframes bfxBlinkStep { 50% { opacity: 0; } }
+
+/* ── Galaxy: stars drifting through a nebula ───────────────── */
+.viz-node.bfx-card[data-border="galaxy"] { --bfx-c: var(--viz-node-accent, #a78bfa); }
+.viz-node.bfx-card[data-type="comment"][data-border="galaxy"] .viz-node-inner {
+  border-radius: 14px !important;
+  border: 1px solid color-mix(in srgb, var(--bfx-c) 50%, transparent) !important;
+  background:
+    radial-gradient(80% 90% at 12% 18%, rgba(124, 58, 237, 0.42), transparent 60%),
+    radial-gradient(70% 80% at 88% 85%, rgba(219, 39, 119, 0.32), transparent 60%),
+    radial-gradient(60% 60% at 60% 35%, rgba(37, 99, 235, 0.3), transparent 60%),
+    #05040f !important;
+  box-shadow: 0 0 26px -10px var(--bfx-c), inset 0 0 0 1px rgba(255, 255, 255, 0.04) !important;
+}
+.viz-node.bfx-card[data-border="galaxy"] .viz-comment-content { color: var(--note-text, #f0ecff); }
+.bfx-galaxy-sky { position: absolute; inset: 0; border-radius: 14px; overflow: hidden; }
+.bfx-galaxy-far,
+.bfx-galaxy-near { position: absolute; left: 0; top: 0; }
+/* Each layer drifts exactly one tile per loop, so the field never jumps. */
+.bfx-galaxy-far {
+  width: calc(100% + 120px);
+  height: calc(100% + 120px);
+  background-image:
+    radial-gradient(1px 1px at 12px 18px, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(1px 1px at 64px 42px, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 98px 90px, rgba(196, 181, 253, 0.9), transparent),
+    radial-gradient(1px 1px at 36px 100px, rgba(255, 255, 255, 0.6), transparent),
+    radial-gradient(1.5px 1.5px at 90px 14px, #fff, transparent);
+  background-size: 120px 120px;
+  opacity: 0.8;
+  animation: bfxDrift 40s linear infinite;
+}
+.bfx-galaxy-near {
+  width: calc(100% + 90px);
+  height: 100%;
+  background-image:
+    radial-gradient(1.5px 1.5px at 20px 30px, #fff, transparent),
+    radial-gradient(1px 1px at 70px 60px, rgba(147, 197, 253, 0.95), transparent),
+    radial-gradient(2px 2px at 45px 80px, rgba(255, 255, 255, 0.85), transparent);
+  background-size: 90px 90px;
+  animation: bfxDriftNear 22s linear infinite;
+}
+@keyframes bfxDrift { to { transform: translate(-120px, -120px); } }
+@keyframes bfxDriftNear { to { transform: translateX(-90px); } }
+.bfx-galaxy-shoot {
+  position: absolute;
+  left: 8%;
+  top: 14%;
+  width: 70px;
+  height: 1.5px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, #fff);
+  opacity: 0;
+  animation: bfxShoot 9s ease-out infinite;
+  animation-delay: -3s;
+}
+@keyframes bfxShoot {
+  0% { opacity: 0; transform: translate(0, 0) rotate(20deg); }
+  2% { opacity: 1; }
+  9% { opacity: 0; transform: translate(160px, 58px) rotate(20deg); }
+  100% { opacity: 0; transform: translate(160px, 58px) rotate(20deg); }
+}
+.bfx-galaxy .bfx-star { width: 7px; height: 7px; }
+.bfx-galaxy .bfx-star:nth-child(1) { left: 18%; top: 62%; }
+.bfx-galaxy .bfx-star:nth-child(2) { left: 74%; top: 22%; }
+.bfx-galaxy .bfx-star:nth-child(3) { left: 52%; top: 78%; }
+
+/* ── A picked background takes the card's place ───────────── */
+.viz-node.bfx-card[data-type="comment"][data-bg][data-border] .viz-node-inner {
+  background: var(--viz-node-bg) !important;
+}
+
+/* ── Quiet when far out, still under reduced motion ────────── */
+.viz-canvas-container.viz-far .bfx-a { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .bfx-a { animation: none !important; }
+}
+
+/* ── The Border menu's Animated tiles ──────────────────────── */
+.bfx-menu-title { margin-top: 0.3rem; }
+.bfx-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 2px 4px 4px; }
+.viz-link-type-option.bfx-tile {
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 0.66rem;
+  text-align: center;
+}
+.bfx-tile svg {
+  width: 16px;
+  height: 16px;
+  color: var(--tc);
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--tc) 60%, transparent));
+  transition: transform var(--transition-spring, 0.3s ease);
+}
+.viz-link-type-option.bfx-tile:hover svg { transform: translateY(-1px) scale(1.12); }
+.viz-link-type-option.bfx-tile.active { border-color: var(--tc); background: color-mix(in srgb, var(--tc) 14%, transparent); }

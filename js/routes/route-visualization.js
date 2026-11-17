@@ -571,6 +571,8 @@ function vizTemplate() {
                 `<div class="viz-link-type-option" role="menuitem" data-bubble="${id}" onclick="brainCtxSetBubble('${id}')">${label}</div>`).join('')}
             </div>
           </div>
+          <!-- The nine animated borders (brain-borders.js), as tiles. -->
+          ${typeof brainBorderTilesHTML === 'function' ? brainBorderTilesHTML() : ''}
         </div>
         <div class="viz-ctx-submenu hidden" id="brain-node-align-menu" role="menu">
           <div class="viz-link-type-option" role="menuitem" data-value="left" onclick="brainCtxSetNote('textAlign', 'left')"><i data-lucide="align-left"></i> Left</div>

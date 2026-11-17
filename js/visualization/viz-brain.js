@@ -1256,6 +1256,9 @@ function brainRenderCanvas() {
     if (node.paraSpacing) el.style.setProperty('--note-para', BRAIN_PARA_SPACING[node.paraSpacing] || '0');
     brainNoteVars(el, node);   // alignment, font, sizes, spacing, code settings
     if (node.border && !isGlobe) el.dataset.border = node.border;
+    // One of the nine animated borders (brain-borders.js): its card style, and its layer below.
+    const bfx = !isGlobe && !node.shape && typeof brainBorderFx === 'function' ? brainBorderFx(node.border) : null;
+    if (bfx) el.classList.add('bfx-card');
     const codeLang = isGlobe ? null : brainShownLang(node);
     if (codeLang) el.dataset.code = codeLang;   // a code note: brainNoteBodyHTML
     if (node.shape && !isGlobe) {
@@ -1315,7 +1318,7 @@ function brainRenderCanvas() {
         <div class="viz-comment-body">
           <div class="viz-comment-content">${brainNoteBodyHTML(node, brainShownText(node))}</div>
         </div>
-      </div>${isElectric ? BRAIN_ELECTRIC_FRONT : ''}${isMedieval ? BRAIN_MEDIEVAL_FRONT : ''}${node.border === 'manhua' ? '<div class="bb-resize" title="Resize" aria-hidden="true"></div>' : ''}${brainCollapseBadge}`;
+      </div>${isElectric ? BRAIN_ELECTRIC_FRONT : ''}${isMedieval ? BRAIN_MEDIEVAL_FRONT : ''}${bfx ? BRAIN_BORDER_FX[bfx] : ''}${node.border === 'manhua' ? '<div class="bb-resize" title="Resize" aria-hidden="true"></div>' : ''}${brainCollapseBadge}`;
       const grip = el.querySelector('.bb-resize');
       if (grip) grip.addEventListener('pointerdown', e => brainBubbleResizeStart(e, node.id, el));
       // A note that links to a library item: its tag and its button (brain-libref.js).
@@ -1356,7 +1359,7 @@ function brainRenderCanvas() {
       const grew = vizFitNoteHeight(inner);
       if (brainFitBubble(el, inner) || grew) brainUpdateSVGLinks();
       else if (node.border === 'manhua') brainPaintBubbles();
-      brainSizeElectric(el, inner);
+      brainSizeElectric(el, inner); if (typeof brainSizeBorderFx === 'function') brainSizeBorderFx(el, inner);
       if (node.shape) brainPaintShape(el, node);
       if (node.task && typeof brainTaskLayout === 'function') brainTaskLayout(el);   // the timer's leader line
       // ResizeObserver always fires once for the current size the moment it
@@ -1372,7 +1375,7 @@ function brainRenderCanvas() {
         // release of the drag is also a click on the note) rebuilt the note
         // from its old size: it sprang back to where it started.
         vizFitNoteHeight(inner);
-        brainSizeElectric(el, inner);
+        brainSizeElectric(el, inner); if (typeof brainSizeBorderFx === 'function') brainSizeBorderFx(el, inner);
         if (node.shape) brainPaintShape(el, node);
         if (node.task && typeof brainTaskLayout === 'function') brainTaskLayout(el);
         if (brainFitBubble(el, inner)) brainUpdateSVGLinks();
@@ -2177,7 +2180,7 @@ function brainOpenEditor(node) {
     if (inner && live && !live.userSized && !el.dataset.shape) inner.style.width = (codeLang ? 360 : 250) + 'px';
     content.innerHTML = live ? brainNoteBodyHTML(live, textarea.value)
       : brainNoteParagraphs(textarea.value || (el.dataset.shape ? '' : 'Double-click or right-click to edit...'));
-    if (inner) { vizFitNoteHeight(inner); brainSizeElectric(el, inner); brainFitBubble(el, inner); }
+    if (inner) { vizFitNoteHeight(inner); brainSizeElectric(el, inner); if (typeof brainSizeBorderFx === 'function') brainSizeBorderFx(el, inner); brainFitBubble(el, inner); }
     if (el.dataset.shape) { const n = brain.nodes.find(x => x.id === nodeId); if (n) brainPaintShape(el, n); }
     brainUpdateSVGLinks();
   };
