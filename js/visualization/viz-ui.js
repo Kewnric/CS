@@ -2800,6 +2800,8 @@ function vizSyncModuleTools() {
   show('brain-only-tools', isBrain);
   show('brain-saved-chip', isBrain);
   show('brain-new-btn', isBrain);
+  show('brain-activity-btn', isBrain);
+  if (!isBrain && typeof brainActivityToggle === 'function') brainActivityToggle(false);   // its list is Brain's
   // The library canvases own these four; Brain has its own arrangement menu
   // and no library scope to filter by.
   showWrap('viz-depth-btn', !isBrain);

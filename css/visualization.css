@@ -6891,3 +6891,96 @@ button.brain-dir-crumb:hover { color: var(--text-primary); background: color-mix
 .bnm-task-custom button { padding: 0.3rem 0.7rem; }
 .bnm-act#brain-ctx-task-btn.is-on { color: #22d3ee; }
 .bnm-act.hidden { display: none; }
+
+/* ── Dates (brain-dates.js) ─────────────────────────────────────
+   The card that rests beside a canvas or folder row, the freshness dot on
+   canvas rows, the dates at the foot of a note's menu, and the Activity
+   panel in place of the tree. Theme tokens throughout, so light themes work. */
+.brain-date-card {
+  position: fixed;
+  z-index: 10050;
+  width: 248px;
+  padding: 10px 12px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md, 10px);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-lg), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-4px) scale(0.98);
+  transform-origin: left top;
+  transition: opacity 0.14s ease, transform 0.22s var(--ease-expo-out, ease);
+}
+.brain-date-card.is-on { opacity: 1; transform: none; }
+.bdc-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; min-width: 0; }
+.bdc-head b { font-size: 0.82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bdc-kind { display: grid; place-items: center; width: 22px; height: 22px; flex: none; border-radius: 6px; color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 12%, transparent); }
+.bdc-kind svg, .bdc-ic svg { width: 13px; height: 13px; }
+.bdc-row { display: grid; grid-template-columns: 16px 1fr auto; align-items: start; gap: 6px; padding: 4px 0; border-top: 1px solid color-mix(in srgb, var(--border-color) 60%, transparent); }
+.bdc-ic { color: var(--text-tertiary); padding-top: 1px; }
+.bdc-k { font-size: 0.72rem; color: var(--text-secondary); font-weight: 600; }
+.bdc-v { display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
+.bdc-v b { font-size: 0.74rem; font-weight: 700; }
+.bdc-v small { font-size: 0.64rem; color: var(--text-tertiary); }
+.bdc-v.is-none { font-size: 0.68rem; color: var(--text-tertiary); font-style: italic; }
+.bdc-stats { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.bdc-stats span { padding: 2px 7px; border-radius: 999px; font-size: 0.64rem; font-weight: 700; color: var(--text-secondary); background: color-mix(in srgb, var(--text-primary) 6%, transparent); }
+.bdc-stats .is-task { color: #10b981; background: color-mix(in srgb, #10b981 12%, transparent); }
+
+/* Edited today: a lit dot; this week: a quiet one. */
+.brain-fresh { width: 6px; height: 6px; flex: none; margin-left: auto; border-radius: 50%; }
+.brain-fresh + .brain-version-size { margin-left: 6px; }
+.brain-fresh.is-today { background: #22d3ee; box-shadow: 0 0 6px rgba(34, 211, 238, 0.7); }
+.brain-fresh.is-week { background: color-mix(in srgb, #22d3ee 35%, var(--text-tertiary)); opacity: 0.7; }
+
+/* The note menu's foot: made / edited / done, one quiet line. */
+.bnm-dates { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 0.35rem; padding: 0.4rem 0.3rem 0.1rem; border-top: 1px solid var(--border-color); font-size: 0.62rem; color: var(--text-tertiary); }
+.bnm-dates:empty { display: none; }
+.bnm-dates span { display: inline-flex; align-items: center; gap: 4px; }
+.bnm-dates svg { width: 11px; height: 11px; }
+.bnm-dates b { color: var(--text-secondary); font-weight: 700; }
+.bnm-dates .is-done, .bnm-dates .is-done b { color: #10b981; }
+#brain-activity-btn.is-active { color: var(--color-primary); background: var(--color-primary-subtle); }
+
+/* The Activity panel: in the tree's place, as long as it is open. */
+.brain-activity { flex: 1; min-height: 0; overflow-y: auto; padding: 0.75rem 0.85rem 1rem; display: flex; flex-direction: column; gap: 0.6rem; }
+.ba-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.ba-head b { display: block; font-size: 0.95rem; }
+.ba-head span { font-size: 0.7rem; color: var(--text-tertiary); }
+.ba-close { display: grid; place-items: center; width: 28px; height: 28px; flex: none; border: 0; border-radius: 8px; background: transparent; color: var(--text-secondary); cursor: pointer; transition: background-color var(--transition-fast), color var(--transition-fast); }
+.ba-close:hover { color: var(--text-primary); background: color-mix(in srgb, var(--text-primary) 8%, transparent); }
+.ba-close svg { width: 15px; height: 15px; }
+.ba-bars { display: grid; grid-template-columns: repeat(28, 1fr); align-items: end; gap: 3px; height: 54px; padding: 6px 6px 4px; border-radius: var(--radius-md, 10px); background: color-mix(in srgb, var(--text-primary) 4%, transparent); }
+.ba-bar { display: block; height: 100%; border-radius: 3px; background: linear-gradient(to top, color-mix(in srgb, var(--color-primary) 55%, transparent), var(--color-primary)); transform: scaleY(var(--h)); transform-origin: bottom; }
+.ba-bar.is-zero { background: color-mix(in srgb, var(--text-primary) 14%, transparent); }
+.ba-bar.is-today { background: linear-gradient(to top, #0891b2, #22d3ee); box-shadow: 0 0 8px rgba(34, 211, 238, 0.45); }
+.ba-bars.is-new .ba-bar { animation: baGrow 0.5s var(--ease-expo-out, ease) backwards; animation-delay: calc(var(--i) * 14ms); }
+@keyframes baGrow { from { transform: scaleY(0); } }
+.ba-chips { display: flex; gap: 4px; flex-wrap: wrap; }
+.ba-chip { padding: 4px 10px; border: 1px solid var(--border-color); border-radius: 999px; background: transparent; color: var(--text-secondary); font: inherit; font-size: 0.7rem; font-weight: 700; cursor: pointer; transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast); }
+.ba-chip:hover { color: var(--text-primary); border-color: var(--color-primary); }
+.ba-chip.is-on { color: #fff; background: var(--color-primary); border-color: var(--color-primary); }
+.ba-list { display: flex; flex-direction: column; gap: 2px; }
+.ba-day { position: sticky; top: -0.75rem; z-index: 1; padding: 8px 2px 4px; font-size: 0.66rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-tertiary); background: var(--bg-surface); }
+.ba-item { display: grid; grid-template-columns: 26px 1fr auto auto; align-items: center; gap: 8px; width: 100%; padding: 6px 8px; border: 0; border-radius: 8px; background: transparent; color: var(--text-primary); font: inherit; text-align: left; cursor: pointer; transition: background-color var(--transition-fast); }
+.ba-item:hover { background: color-mix(in srgb, var(--text-primary) 6%, transparent); }
+.ba-item.is-on { background: color-mix(in srgb, var(--color-primary) 14%, transparent); }
+.ba-ic { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 10%, transparent); }
+.ba-item[data-kind="folder"] .ba-ic { color: #f59e0b; background: color-mix(in srgb, #f59e0b 12%, transparent); }
+.ba-item[data-kind="note"] .ba-ic { color: #22d3ee; background: color-mix(in srgb, #22d3ee 12%, transparent); }
+.ba-ic svg { width: 13px; height: 13px; }
+.ba-main { display: flex; flex-direction: column; min-width: 0; }
+.ba-name { font-size: 0.78rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ba-where { font-size: 0.64rem; color: var(--text-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ba-verb { padding: 2px 7px; border-radius: 999px; font-size: 0.6rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-secondary); background: color-mix(in srgb, var(--text-primary) 7%, transparent); }
+.ba-item[data-verb="created"] .ba-verb { color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 12%, transparent); }
+.ba-item[data-verb="done"] .ba-verb,
+.ba-item[data-verb="checked"] .ba-verb { color: #10b981; background: color-mix(in srgb, #10b981 12%, transparent); }
+.ba-time { font-size: 0.64rem; color: var(--text-tertiary); font-variant-numeric: tabular-nums; }
+.ba-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 2rem 1rem; text-align: center; color: var(--text-tertiary); font-size: 0.75rem; }
+.ba-empty svg { width: 22px; height: 22px; }
+@media (prefers-reduced-motion: reduce) {
+  .ba-bars.is-new .ba-bar { animation: none; }
+  .brain-date-card { transition: opacity 0.14s ease; transform: none; }
+}

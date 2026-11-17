@@ -102,6 +102,8 @@ function brainSaveCurrentVersion() {
   // Inside a directory note the canvas on screen is that note's own (brain-dir.js).
   const into = brain.dirPath.length && typeof brainDirContainer === 'function' ? brainDirContainer(v) : v;
   if (!into) return;
+  // Made and last-edited dates, by comparing with the copy about to be replaced (brain-dates.js).
+  if (typeof brainDatesStamp === 'function') brainDatesStamp(into, v, brain.nodes, brain.links);
   into.nodes = JSON.parse(JSON.stringify(brain.nodes.map(n => {
     const { _resizeObserver, ...rest } = n;   // strip anything an older build left
     return rest;
@@ -146,7 +148,8 @@ function brainCreateVersion(folderId) {
   showInputDialog('New Canvas', null, 'Canvas name', 'New Canvas', (name) => {
     const clean = (name || '').trim() || 'Untitled canvas';   // never a blank row
     const id = 'bv_' + generateId();
-    brain.versions.push({ id, name: clean, folderId: folderId || null, nodes: [], links: [], pan: { x: 0, y: 0 }, zoom: 1 });
+    brain.versions.push({ id, name: clean, folderId: folderId || null, nodes: [], links: [], pan: { x: 0, y: 0 }, zoom: 1,
+      createdAt: Date.now(), updatedAt: Date.now() });
     brainSave();
     brainRenderSidebar();
     if (!brain.activeVersionId) brainSwitchVersion(id);
@@ -190,7 +193,10 @@ function brainRenameVersion(id) {
   const v = brain.versions.find(v => v.id === id);
   if (!v) return;
   showInputDialog('Rename Version', null, 'Version name', v.name, (name) => {
-    v.name = (name || '').trim() || v.name; brainSave(); brainRenderSidebar(); brainUpdateCanvasToolbar();
+    const was = v.name;
+    v.name = (name || '').trim() || v.name;
+    if (v.name !== was) v.updatedAt = Date.now();
+    brainSave(); brainRenderSidebar(); brainUpdateCanvasToolbar();
   });
 }
 
@@ -209,6 +215,7 @@ function brainDuplicateVersion(id) {
     links: JSON.parse(JSON.stringify(src.links || [])),
     pan: { ...src.pan }, zoom: src.zoom,
     ...(src.dirs ? { dirs: JSON.parse(JSON.stringify(src.dirs)) } : {}),   // its directories' canvases
+    createdAt: Date.now(), updatedAt: Date.now(),   // a new canvas; its notes keep their own dates
   });
   brainSave(); brainRenderSidebar();
 }
@@ -216,7 +223,8 @@ function brainDuplicateVersion(id) {
 function brainCreateFolder(parentId) {
   showInputDialog('New Folder', null, 'Folder name', 'New Folder', (name) => {
     const id = 'bf_' + generateId();
-    brain.folders.push({ id, name: (name || '').trim() || 'Untitled folder', parentId: parentId || null, collapsed: false });
+    brain.folders.push({ id, name: (name || '').trim() || 'Untitled folder', parentId: parentId || null, collapsed: false,
+      createdAt: Date.now(), updatedAt: Date.now() });
     brainSave(); brainRenderSidebar();
   });
 }
@@ -271,7 +279,10 @@ function brainRenameFolder(id) {
   const f = brain.folders.find(f => f.id === id);
   if (!f) return;
   showInputDialog('Rename Folder', null, 'Folder name', f.name, (name) => {
-    f.name = (name || '').trim() || f.name; brainSave(); brainRenderSidebar();
+    const was = f.name;
+    f.name = (name || '').trim() || f.name;
+    if (f.name !== was) f.updatedAt = Date.now();
+    brainSave(); brainRenderSidebar();
   });
 }
 
@@ -422,12 +433,13 @@ function brainRenderSidebar(opts) {
              ${treeRowAttrs({ ns: 'brain', id: v.id, kind: 'item', level: depth })}
              style="padding-left: calc(0.75rem + ${TREE_ITEM_INSET}rem)"
              oncontextmenu="treeContextMenu(event, '${v.id}', 'brain')"
-             onmouseenter="brainVersionTip(this, '${v.id}')"
+             onmouseenter="brainDatesHover(this, 'canvas', '${v.id}')" onmouseleave="brainDatesHoverEnd()"
              onclick="brainSwitchVersion('${v.id}')">
           <i class="tree-node-chevron invisible"></i>
           <i data-lucide="${escapeHTML(icon)}" class="tree-node-icon item-icon-color" style="width:14px;height:14px;"></i>
           <span class="tree-node-label" style="font-weight:400; font-size:0.875rem;">${escapeHTML(v.name)}</span>
           ${marks}
+          ${typeof brainFreshDotHTML === 'function' ? brainFreshDotHTML(v) : ''}
           <span class="brain-version-size" data-size-of="${v.id}"></span>
           <span class="brain-active-dot" aria-hidden="true"></span>
         </div>
@@ -453,6 +465,7 @@ function brainRenderSidebar(opts) {
                  ${treeRowAttrs({ ns: 'brain', id: n.id, kind: 'folder', level: depth, expanded: open })}
                  style="padding-left: calc(0.75rem + 0rem)"
                  oncontextmenu="treeContextMenu(event, '${n.id}', 'brain')"
+                 onmouseenter="brainDatesHover(this, 'folder', '${n.id}')" onmouseleave="brainDatesHoverEnd()"
                  onclick="brainToggleFolder('${n.id}')">${typeof folderBannerHTML === 'function' ? folderBannerHTML(n) : ''}
               <i data-lucide="chevron-right" class="tree-node-chevron ${hasKids ? (open ? 'expanded' : '') : 'invisible'}"
                  onclick="brainToggleFolder('${n.id}', event)"></i>
@@ -1037,7 +1050,8 @@ function brainImportVersion() {
       nodes: shared.nodes || [],
       links: shared.links || [],
       pan: shared.pan || { x: 0, y: 0 },
-      zoom: shared.zoom || 1
+      zoom: shared.zoom || 1,
+      createdAt: Date.now(), updatedAt: Date.now()
     };
     if (shared.dirs && typeof shared.dirs === 'object') fresh.dirs = shared.dirs;
     brain.versions.push(fresh);
@@ -1608,6 +1622,8 @@ function brainPasteNode(fromId) {
   brainPushUndo();
   const copy = JSON.parse(JSON.stringify(src));
   copy.id = 'bn_' + generateId();
+  copy.createdAt = copy.updatedAt = Date.now();   // made now, whatever the original's dates
+  delete copy.checkedAt;
   delete copy.collapsed;
   delete copy._collapsedChildren;
   // A directory gets its own copies of its canvases (brain-dir.js).
@@ -1914,7 +1930,8 @@ function brainCanvasCtx(e) {
 function _brainEnsureVersion() {
   if (brain.activeVersionId) return;
   const id = 'bv_' + generateId();
-  brain.versions.push({ id, name: 'Default Version', folderId: null, nodes: [], links: [], pan: { x: 0, y: 0 }, zoom: 1 });
+  brain.versions.push({ id, name: 'Default Version', folderId: null, nodes: [], links: [], pan: { x: 0, y: 0 }, zoom: 1,
+    createdAt: Date.now(), updatedAt: Date.now() });
   brain.activeVersionId = id;
   brain.dirPath = [];
   brainSave();
@@ -2870,6 +2887,7 @@ function brainNodeCtx(e, nodeId) {
   }
   if (typeof brainDirSyncCtx === 'function') brainDirSyncCtx(node);   // the Directory switch
   if (typeof brainTaskSyncCtx === 'function') brainTaskSyncCtx(node);  // the Task switch and its timer
+  if (typeof brainDatesSyncCtx === 'function') brainDatesSyncCtx(node); // made, edited, done (brain-dates.js)
   if (typeof vizPositionMenu === 'function') vizPositionMenu(menu, e.clientX, e.clientY);
   else { menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px'; menu.classList.remove('hidden'); }
   _brainMarkNodeMenu();

@@ -101,6 +101,10 @@ function vizTemplate() {
                 <button class="tutorial-trigger-btn hidden" id="brain-new-btn" onclick="brainCreateVersion(null)" title="New Canvas" aria-label="New Canvas">
                   <i data-lucide="plus"></i>
                 </button>
+                <!-- Activity: what you made and changed, by day (brain-dates.js). -->
+                <button class="tutorial-trigger-btn hidden" id="brain-activity-btn" onclick="brainActivityToggle()" title="Activity: what you made and changed" aria-label="Activity" aria-pressed="false">
+                  <i data-lucide="history"></i>
+                </button>
                 <button class="tutorial-trigger-btn" id="viz-toggle-items-btn" onclick="vizToggleTreeItems()" title="Toggle item visibility" aria-label="Toggle item visibility">
                   <i data-lucide="${localStorage.getItem('vizHideItems') === 'true' ? 'eye-off' : 'eye'}" id="viz-toggle-items-icon"></i>
                 </button>
@@ -604,6 +608,8 @@ function vizTemplate() {
         <button type="button" class="bnm-act" id="brain-ctx-expand-btn" style="display:none;" onclick="brainCtxExpandChildren()" title="Expand Children"><i data-lucide="chevrons-down"></i><span>Expand</span></button>
         <button type="button" class="bnm-act danger" onclick="brainCtxDeleteNode()" title="Delete"><i data-lucide="trash-2"></i><span>Delete</span></button>
       </div>
+      <!-- When it was made, last edited, finished (brain-dates.js). -->
+      <div class="bnm-dates ctx-single" id="brain-ctx-dates"></div>
     </div>
 
     <!-- Brain Link Context Menu -->
