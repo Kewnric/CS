@@ -325,6 +325,17 @@ marks correct work wrong, silently.
   checks the note and starts every task an arrow leads to (`from → to`), timed from the real end, with a
   WAAPI pulse along the arrow. Off-screen canvases are edited in the stored version (`v.nodes` /
   `v.dirs[id]`), the on-screen one in `brain.nodes`. Ticks never push undo. Tests stub `brainTaskChime`.
+  The timer floats above its note (`.brain-task` + `.bt-lead` leader line, `brainTaskLayout`), draggable
+  (`task.pos`, not an edit), right-click for `#brain-task-ctx`. Every state change goes through `_btTask`,
+  which keeps `dur`, `pos` and `startedAt`. It bobs, so tests click it with `force`.
+- **Dates** (`js/visualization/brain-dates.js`): `createdAt` / `updatedAt` on notes, canvases and folders,
+  `checkedAt`, `task.startedAt` / `doneAt`. Notes are stamped only in `brainSaveCurrentVersion`
+  (`brainDatesStamp` compares `brainNoteSig` with the saved copy; position, size and the task's run are
+  not edits). Old records have none ("Before dates were kept"). UI: row card (`brainDatesHover`), the
+  `.brain-fresh` dot, `#brain-ctx-dates`, and the Activity panel (`brainActivityToggle`).
+- **Animated borders** (`js/visualization/brain-borders.js`, `css/brain-borders.css`): nine, keyed on
+  `.bfx-card` + `data-border`, each with a `.bfx-<id>` layer; animated parts are `.bfx-a` (transform /
+  opacity only). `brainSizeBorderFx` sets `--bfx-w/h/d` for Circuit and Aurora.
 - **Select tool** (`js/visualization/viz-select.js`, `viz.selectMode`, V): a box on empty canvas, a click
   adds/removes, no dragging; Space / middle button pan. Brain's group is `brain.selectedNodeIds`. Menu
   actions on a group go through `brainForEachTarget` (one undo, one render, one save via `brain._batch`)
