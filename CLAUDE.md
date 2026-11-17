@@ -317,6 +317,27 @@ marks correct work wrong, silently.
 
 ---
 
+## Visualize: tasks, the select tool, the seams
+
+- **Task notes** (`js/visualization/brain-tasks.js`): a Brain note's `task = { dur, state, endsAt?, left? }`
+  (`idle|running|paused|done`). One app-wide `setTimeout` to the next `endsAt`; it runs off the
+  canvas and across reloads (started by `brainTasksBoot`, again after every `brainLoad`). Finishing
+  checks the note and starts every task an arrow leads to (`from → to`), timed from the real end, with a
+  WAAPI pulse along the arrow. Off-screen canvases are edited in the stored version (`v.nodes` /
+  `v.dirs[id]`), the on-screen one in `brain.nodes`. Ticks never push undo. Tests stub `brainTaskChime`.
+- **Select tool** (`js/visualization/viz-select.js`, `viz.selectMode`, V): a box on empty canvas, a click
+  adds/removes, no dragging; Space / middle button pan. Brain's group is `brain.selectedNodeIds`. Menu
+  actions on a group go through `brainForEachTarget` (one undo, one render, one save via `brain._batch`)
+  or `vizCtxTargets()`; one-note-only items carry `.ctx-single`.
+- **Seams**: Visualize has no `.rz-collapse` buttons. The pane divider is zero-width (the 8px is the two
+  flex gaps); `initResizerDrag(e, el, onClick)` treats a press that moves < 4px as a click (fold).
+- **Note editor**: Text | Code switch (`#viz-ce-mode`) with per-mode settings saved on the note
+  (`BRAIN_OPT_DEFAULTS`); they reach the canvas as `--note-*` / `--code-*` vars (`brainNoteVars`).
+- Run the full Playwright suite with `--workers=2`: at higher parallelism the single http-server makes
+  random `page.goto` calls time out.
+
+---
+
 ## Audio
 
 - **SFX** (typing, success, failure) are base64 in `js/audio-data.js`. Embedded
