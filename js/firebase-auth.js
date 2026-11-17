@@ -244,7 +244,7 @@ function _paintPicker() {
   if (localDesc) {
     localDesc.textContent = summary
       ? 'On this device: ' + summary + '. Works offline.'
-      : 'Data saved in your browser. Fast and offline-ready.';
+      : 'Stays on this device. Works offline.';
   }
 
   // Cloud: offline is a fact we already know, so don't make them find out.
@@ -258,7 +258,7 @@ function _paintPicker() {
   if (onlineDesc) {
     onlineDesc.textContent = offline
       ? "You're offline — Local Storage still works."
-      : 'Sign in with Google to sync across devices.';
+      : 'Use your Google account. Syncs across devices.';
   }
 }
 
@@ -309,6 +309,7 @@ function showStorageModePicker() {
   if (typeof _stkQueue === 'function') _stkQueue();   // the picker's own stickers (js/stickers.js)
   _showSigninChooseView();
   _paintPicker();
+  if (typeof lpOnShow === 'function') lpOnShow();   // the login page's tabs, picture and notes (auth-accounts.js)
 
   document.addEventListener('keydown', _pickerKeydown, true);
   if (!_pickerOnlineHandler) {
@@ -319,7 +320,7 @@ function showStorageModePicker() {
   }
 
   // Focus started on <body>, so a screen reader announced nothing at all.
-  const firstBtn = document.getElementById('smp-local-btn');
+  const firstBtn = document.getElementById('lp-user') || document.getElementById('smp-local-btn');
   if (firstBtn) setTimeout(() => { try { firstBtn.focus(); } catch (e) {} }, 60);
 }
 
@@ -371,6 +372,8 @@ function finishBoot() {
   _attachUnloadGuard();
   _updateCloudStatusUI();
   applyPendingShare();
+  // The game-style greeting: in full the first time, briefly once a day (status-window.js).
+  if (typeof statusWindowMaybeShow === 'function') setTimeout(statusWindowMaybeShow, 700);
 }
 
 /**
@@ -1489,6 +1492,10 @@ function updateCloudUserBadge() {
           <i data-lucide="save" style="width:14px;height:14px;"></i>
           <span>Save now</span>
         </button>
+        ${typeof acctCanAttachEmail === 'function' && acctCanAttachEmail(currentFirebaseUser) ? `<button onclick="acctOpenRecovery()" class="cu-action-btn" title="Attach a recovery email (optional)" aria-label="Recovery email">
+          <i data-lucide="mail-plus" style="width:14px;height:14px;"></i>
+          <span>Recovery email</span>
+        </button>` : ''}
         <button onclick="firebaseSignOut()" class="cu-action-btn cu-signout-btn" title="Sign out" aria-label="Sign out">
           <i data-lucide="log-out" style="width:14px;height:14px;"></i>
           <span>Sign out</span>

@@ -1963,3 +1963,13 @@ details[open]>.snippet-folder-summary>.folder-icon {
   border-top: none !important;
   padding-top: 0 !important;
 }
+
+/* ── Sidebar wheel (js/sidebar-wheel.js) ─────────────────────────
+   The page a wheel notch has moved to, before it opens: a ring and a wash
+   in the brand colour, the icon lifted. */
+.sidebar-link.is-wheel-target {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--color-primary) 16%, transparent);
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--color-primary) 70%, transparent), 0 0 16px -6px var(--color-primary);
+}
+.sidebar-link.is-wheel-target svg { transform: scale(1.14); transition: transform var(--transition-spring); }

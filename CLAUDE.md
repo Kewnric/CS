@@ -317,6 +317,28 @@ marks correct work wrong, silently.
 
 ---
 
+## The front door: login page, accounts, Status Window, sidebar wheel
+
+- **Login page** (`index.html` `#storage-mode-popup.lp-page`, `css/login.css`, `js/auth-accounts.js`): still the
+  storage picker `firebase-auth.js` drives (`showStorageModePicker` → `lpOnShow`), with every `smp-*` id kept —
+  `#smp-local-btn` is **Play as Guest** (Local), `#smp-online-btn` is Google. Your own picture: `ssp.loginArt`
+  holds a `media:` reference (the media clean-up sees it as used).
+- **Username accounts**: Firebase email/password under `<name>@users.studysession.app` (never mailed; Auth's
+  unique emails make names unique), display name = the username; the same `_afterSignedIn` as Google, so the
+  cloud library is `users/<uid>` either way. Needs **Email/Password enabled** in the Firebase console. Optional
+  recovery email (sidebar account card → `acctOpenRecovery`): the account moves to it, and `usernames/<name>`
+  keeps it AES-GCM-encrypted with a PBKDF2 key from the password (needs the Firestore rule in the file's header).
+  Tests stub `fbAuth.*`, `loadFromFirestore` and `_acctLookup`; never create real accounts.
+- **Status Window** (`js/status-window.js`, `css/status-window.css`): from `finishBoot`; full the first time per
+  account (`ssp.welcome.seen.<key>`), brief once a day (`ssp.welcome.day.<key>`). Skipped under
+  `navigator.webdriver` unless `ssp.welcome.test` is set, so it never covers what other tests click.
+- **Sidebar wheel** (`js/sidebar-wheel.js`): notches move `.is-wheel-target`; the page opens after 320 ms still.
+- **Parallel sessions**: give each Playwright run its own port (a config importing `playwright.config.js` with
+  another `baseURL`/`webServer` port, `reuseExistingServer: false`): a shared 8754 server is shut down by
+  whichever run ends first.
+
+---
+
 ## Visualize: tasks, the select tool, the seams
 
 - **Task notes** (`js/visualization/brain-tasks.js`): a Brain note's `task = { dur, state, endsAt?, left? }`

@@ -1,0 +1,487 @@
+/* ============================================================
+   LOGIN.CSS — the front door (js/auth-accounts.js)
+   ------------------------------------------------------------
+   The storage picker grown into a full page with an online-RPG feel: on the
+   left a night sky (an aurora, a moon, a slow magic circle, twinkling stars
+   and drifting crystal shards) or your own picture; on the right a glassy
+   panel in a double frame with gilded corners. Every loop here animates
+   only transform or opacity, and all of it stops the moment the page is
+   hidden (display: none).
+   ============================================================ */
+
+.smp-overlay.lp-page {
+  padding: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(380px, 480px);
+  align-items: stretch;
+  justify-content: stretch;
+  overflow-y: auto;
+  background: #05060f;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* ── The art side ──────────────────────────────────────────── */
+.lp-art {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(120% 80% at 25% 115%, #3b1d6e 0%, transparent 55%),
+    radial-gradient(90% 70% at 85% -5%, #0e3a63 0%, transparent 60%),
+    linear-gradient(180deg, #070a1c 0%, #0b0f2a 60%, #160b31 100%);
+}
+.lp-art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(0deg, rgba(5, 6, 15, 0.9) 0%, transparent 42%),
+    linear-gradient(90deg, transparent 72%, rgba(5, 6, 15, 0.55) 100%);
+}
+.lp-sky { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.lp-art.has-img .lp-sky { display: none; }
+.lp-art-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lp-aurora {
+  position: absolute;
+  left: -20%;
+  right: -20%;
+  top: 6%;
+  height: 48%;
+  background:
+    radial-gradient(55% 50% at 28% 50%, rgba(34, 211, 238, 0.3), transparent 70%),
+    radial-gradient(50% 45% at 68% 42%, rgba(167, 139, 250, 0.34), transparent 70%),
+    radial-gradient(40% 40% at 50% 70%, rgba(52, 211, 153, 0.16), transparent 70%);
+  filter: blur(28px);
+  animation: lpAurora 22s ease-in-out infinite alternate;
+}
+@keyframes lpAurora {
+  from { transform: translateX(-6%) scaleY(0.9); opacity: 0.75; }
+  to { transform: translateX(6%) scaleY(1.12); opacity: 1; }
+}
+.lp-moon {
+  position: absolute;
+  right: 13%;
+  top: 11%;
+  width: 118px;
+  height: 118px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 36% 34%, #fdf4ff 0%, #e9d5ff 28%, #a78bfa 62%, #6d28d9 100%);
+  box-shadow: 0 0 60px 12px rgba(196, 181, 253, 0.35), 0 0 140px 40px rgba(124, 58, 237, 0.18);
+  opacity: 0.92;
+}
+/* A magic circle turning slowly behind everything: a ring of runes cut from
+   one conic gradient by a radial mask. */
+.lp-sigil {
+  position: absolute;
+  left: 50%;
+  top: 62%;
+  width: min(78vh, 620px);
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background:
+    repeating-conic-gradient(from 0deg, rgba(165, 180, 252, 0.5) 0deg 1.2deg, transparent 1.2deg 10deg),
+    radial-gradient(circle, transparent 64%, rgba(165, 180, 252, 0.35) 64.5% 65.2%, transparent 65.7%);
+  -webkit-mask: radial-gradient(circle, transparent 58%, #000 58.5% 61%, transparent 61.5% 68%, #000 68.5% 69.5%, transparent 70%);
+  mask: radial-gradient(circle, transparent 58%, #000 58.5% 61%, transparent 61.5% 68%, #000 68.5% 69.5%, transparent 70%);
+  opacity: 0.55;
+  animation: lpSpin 90s linear infinite;
+}
+@keyframes lpSpin { to { transform: rotate(360deg); } }
+.lp-star {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 6px 1px rgba(255, 255, 255, 0.8);
+  animation: lpTwinkle 4.2s ease-in-out infinite;
+  animation-delay: var(--d);
+}
+@keyframes lpTwinkle { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+/* Crystal shards drifting where they hang. */
+.lp-shard {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: calc(26px * var(--s));
+  height: calc(58px * var(--s));
+  background: linear-gradient(160deg, rgba(224, 242, 254, 0.95), rgba(129, 140, 248, 0.6) 52%, rgba(34, 211, 238, 0.22));
+  clip-path: polygon(50% 0, 100% 42%, 50% 100%, 0 42%);
+  opacity: 0.8;
+  animation: lpFloat var(--t) ease-in-out infinite;
+  animation-delay: var(--d);
+}
+@keyframes lpFloat {
+  0%, 100% { transform: translateY(0) rotate(-7deg); }
+  50% { transform: translateY(-24px) rotate(7deg); }
+}
+
+.lp-art-tools {
+  position: absolute;
+  left: 18px;
+  top: 18px;
+  z-index: 2;
+  display: flex;
+  gap: 8px;
+}
+.lp-art-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid rgba(165, 180, 252, 0.28);
+  border-radius: 999px;
+  background: rgba(10, 12, 30, 0.55);
+  color: #c7d2fe;
+  font: 600 0.75rem/1 var(--font-sans);
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: border-color var(--transition-fast), color var(--transition-fast), background-color var(--transition-fast);
+}
+.lp-art-btn svg { width: 14px; height: 14px; }
+.lp-art-btn:hover, .lp-art-btn:focus-within { color: #fff; border-color: #818cf8; background: rgba(49, 46, 129, 0.55); }
+.lp-art-file { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.lp-tagline {
+  position: absolute;
+  left: clamp(20px, 5vw, 56px);
+  bottom: clamp(24px, 7vh, 64px);
+  right: 24px;
+  z-index: 2;
+}
+.lp-eyebrow {
+  display: inline-block;
+  margin-bottom: 10px;
+  font: 800 0.7rem/1 var(--font-mono);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #67e8f9;
+  text-shadow: 0 0 10px rgba(34, 211, 238, 0.7);
+}
+.lp-tagline h2 {
+  margin: 0;
+  max-width: 14ch;
+  font-size: clamp(1.6rem, 3.4vw, 2.9rem);
+  font-weight: 900;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  color: #f8fafc;
+  text-shadow: 0 2px 30px rgba(99, 102, 241, 0.65);
+}
+
+/* ── The panel ─────────────────────────────────────────────── */
+.lp-page .smp-card.lp-panel {
+  position: relative;
+  max-width: none;
+  width: auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 2.4rem 2.4rem 2rem;
+  overflow: visible;
+  border: 0;
+  border-left: 1px solid rgba(165, 180, 252, 0.18);
+  border-radius: 0;
+  background:
+    radial-gradient(90% 40% at 50% 0%, rgba(99, 102, 241, 0.16), transparent 70%),
+    linear-gradient(180deg, rgba(14, 16, 38, 0.97), rgba(8, 9, 24, 0.99));
+  box-shadow: -30px 0 80px rgba(0, 0, 0, 0.5);
+  animation: lpPanelIn 0.7s var(--ease-expo-out) backwards;
+}
+@keyframes lpPanelIn { from { opacity: 0; transform: translateX(24px); } }
+/* The inner frame, and a gilded ornament at each of its corners. */
+.lp-panel::before {
+  content: '';
+  position: absolute;
+  inset: 14px;
+  border: 1px solid rgba(165, 180, 252, 0.16);
+  border-radius: 14px;
+  pointer-events: none;
+}
+.lp-corner {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border: 2px solid #e5c07b;
+  filter: drop-shadow(0 0 6px rgba(229, 192, 123, 0.6));
+  pointer-events: none;
+}
+.lp-corner.is-tl { top: 10px; left: 10px; border-right: 0; border-bottom: 0; border-top-left-radius: 8px; }
+.lp-corner.is-tr { top: 10px; right: 10px; border-left: 0; border-bottom: 0; border-top-right-radius: 8px; }
+.lp-corner.is-bl { bottom: 10px; left: 10px; border-right: 0; border-top: 0; border-bottom-left-radius: 8px; }
+.lp-corner.is-br { bottom: 10px; right: 10px; border-left: 0; border-top: 0; border-bottom-right-radius: 8px; }
+
+.lp-page .smp-header.lp-header {
+  padding: 0 0 1.3rem;
+  background: none;
+  border: 0;
+  text-align: left;
+}
+.lp-page .smp-logo { justify-content: flex-start; margin-bottom: 0.4rem; }
+.lp-page .smp-logo span { font-size: 1.6rem; }
+.lp-page .smp-subtitle { margin: 0; color: #a5b4fc; font-size: 0.86rem; }
+.lp-page .smp-body { padding: 0; }
+
+/* Sign in | Create account, with a highlight that slides. */
+.lp-tabs {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 1.15rem;
+  padding: 4px;
+  border: 1px solid rgba(165, 180, 252, 0.15);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+}
+.lp-tab-ink {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  border-radius: 9px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.42), rgba(34, 211, 238, 0.24));
+  box-shadow: inset 0 0 0 1px rgba(165, 180, 252, 0.4), 0 6px 18px -8px rgba(99, 102, 241, 0.9);
+  transition: transform 0.38s var(--ease-spring);
+}
+.lp-tabs[data-tab="create"] .lp-tab-ink { transform: translateX(100%); }
+.lp-tab {
+  position: relative;
+  padding: 0.6rem 0.4rem;
+  border: 0;
+  background: none;
+  color: var(--text-secondary);
+  font: 700 0.86rem/1 var(--font-sans);
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+.lp-tab[aria-selected="true"] { color: #fff; }
+.lp-tab:focus-visible { outline: 2px solid #818cf8; outline-offset: -2px; border-radius: 9px; }
+
+.lp-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 0.85rem; }
+.lp-field > span:first-child {
+  font: 800 0.68rem/1 var(--font-sans);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #a5b4fc;
+}
+.lp-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 46px;
+  padding: 0 12px;
+  border: 1px solid rgba(165, 180, 252, 0.2);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.04);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast);
+}
+.lp-input:focus-within {
+  border-color: #818cf8;
+  background: rgba(99, 102, 241, 0.08);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.22), 0 0 22px rgba(99, 102, 241, 0.22);
+}
+.lp-input > svg { width: 17px; height: 17px; flex: none; color: #818cf8; }
+.lp-input input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: none;
+  color: var(--text-primary);
+  font: 500 0.94rem/1 var(--font-sans);
+}
+.lp-input input::placeholder { color: var(--text-tertiary); }
+.lp-eye {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+.lp-eye svg { width: 16px; height: 16px; }
+.lp-eye:hover, .lp-eye[aria-pressed="true"] { color: #c7d2fe; background: rgba(165, 180, 252, 0.1); }
+
+.lp-form[data-tab="signin"] .lp-only-create,
+.lp-form[data-tab="create"] .lp-only-signin { display: none; }
+.lp-row { display: flex; justify-content: flex-end; margin: -0.3rem 0 0.75rem; }
+.lp-hint { margin: -0.25rem 0 0.85rem; color: var(--text-tertiary); font-size: 0.74rem; line-height: 1.45; }
+.lp-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #a5b4fc;
+  font: 600 0.8rem/1.3 var(--font-sans);
+  cursor: pointer;
+}
+.lp-link:hover, .lp-link:focus-visible { color: #fff; text-decoration: underline; outline: none; }
+.lp-err { display: none; font-size: 0.8rem; line-height: 1.45; }
+.lp-err.is-on {
+  display: block;
+  margin: 0.1rem 0 0.8rem;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid rgba(239, 68, 68, 0.32);
+  border-radius: 9px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #fca5a5;
+}
+.lp-err.is-on.is-ok { border-color: rgba(16, 185, 129, 0.32); background: rgba(16, 185, 129, 0.1); color: #6ee7b7; }
+
+.lp-primary {
+  position: relative;
+  width: 100%;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 55%, #06b6d4 100%);
+  color: #fff;
+  font: 800 0.92rem/1 var(--font-sans);
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  box-shadow: 0 12px 30px -12px rgba(99, 102, 241, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  transition: transform var(--transition-spring), box-shadow var(--transition-fast);
+}
+.lp-primary svg { width: 18px; height: 18px; transition: transform var(--transition-spring); }
+/* A shine runs across it under the pointer. */
+.lp-primary::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.35) 50%, transparent 65%);
+  transform: translateX(-110%);
+  transition: transform 0.7s var(--ease-standard);
+}
+.lp-primary:hover { transform: translateY(-1px); box-shadow: 0 16px 34px -12px rgba(99, 102, 241, 1), inset 0 1px 0 rgba(255, 255, 255, 0.3); }
+.lp-primary:hover::after { transform: translateX(110%); }
+.lp-primary:hover svg { transform: translateX(3px); }
+.lp-primary:active { transform: translateY(0) scale(0.99); }
+.lp-primary:focus-visible { outline: 2px solid #c7d2fe; outline-offset: 2px; }
+
+/* Forgot password: replaces the tabs and the form. */
+.lp-forgot { display: none; }
+.lp-page.lp-forgot-on .lp-forgot { display: block; }
+.lp-page.lp-forgot-on .lp-form,
+.lp-page.lp-forgot-on .lp-tabs { display: none; }
+.lp-forgot h3 { margin: 0 0 0.4rem; font-size: 1.05rem; color: #fff; }
+.lp-forgot p { margin: 0 0 0.9rem; color: var(--text-secondary); font-size: 0.82rem; line-height: 1.5; }
+.lp-forgot .lp-input { margin-bottom: 0.8rem; }
+.lp-forgot-acts { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.lp-forgot-acts .lp-primary { width: auto; padding: 0 1.2rem; }
+
+.lp-or {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 1.15rem 0 0.9rem;
+  color: var(--text-tertiary);
+  font: 700 0.68rem/1 var(--font-sans);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.lp-or::before,
+.lp-or::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(165, 180, 252, 0.32), transparent);
+}
+.lp-alts { display: grid; gap: 8px; }
+.lp-page .smp-option.lp-alt {
+  gap: 0.8rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid rgba(165, 180, 252, 0.16);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.lp-page .smp-option.lp-alt:hover {
+  border-color: rgba(129, 140, 248, 0.6);
+  background: rgba(99, 102, 241, 0.09);
+  box-shadow: 0 0 18px -6px rgba(99, 102, 241, 0.8);
+  transform: none;
+}
+.lp-page .smp-option.lp-alt .smp-option-icon { width: 38px; height: 38px; flex: none; }
+.lp-page .smp-option.lp-alt h3 { margin: 0; font-size: 0.88rem; }
+.lp-page .smp-option.lp-alt p { margin: 2px 0 0; font-size: 0.74rem; }
+.lp-private {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0.6rem 0 0;
+  color: #fcd34d;
+  font-size: 0.74rem;
+}
+.lp-private svg { width: 14px; height: 14px; flex: none; }
+.lp-page .smp-remember { margin-top: 0.9rem; }
+
+@media (max-width: 900px) {
+  .smp-overlay.lp-page { grid-template-columns: 1fr; grid-template-rows: auto auto; }
+  .lp-art { min-height: 230px; }
+  .lp-moon { width: 70px; height: 70px; right: 10%; }
+  .lp-tagline h2 { font-size: 1.35rem; max-width: none; }
+  .lp-page .smp-card.lp-panel {
+    min-height: 0;
+    padding: 1.6rem 1.25rem 1.5rem;
+    border-left: 0;
+    border-top: 1px solid rgba(165, 180, 252, 0.18);
+    animation-name: lpPanelUp;
+  }
+  @keyframes lpPanelUp { from { opacity: 0; transform: translateY(18px); } }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp-aurora, .lp-sigil, .lp-star, .lp-shard, .lp-page .smp-card.lp-panel { animation: none; }
+  .lp-primary::after { transition: none; }
+}
+
+/* ── Recovery email (from the sidebar's account card) ──────── */
+.acct-recovery {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(5, 6, 15, 0.66);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.acct-rec-card {
+  width: min(420px, 100%);
+  padding: 1.5rem;
+  border: 1px solid rgba(165, 180, 252, 0.26);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #0f1230, #0a0b1f);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+  animation: lpPanelIn 0.4s var(--ease-expo-out) backwards;
+}
+.acct-rec-card h3 { margin: 0 0 0.4rem; color: #fff; font-size: 1.05rem; }
+.acct-rec-card p { margin: 0 0 1rem; color: var(--text-secondary); font-size: 0.82rem; line-height: 1.5; }
+.acct-rec-acts { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 0.4rem; }
+.acct-rec-acts .lp-primary { width: auto; padding: 0 1.2rem; }
