@@ -1223,14 +1223,8 @@ function brainRenderCanvas() {
     vizApplyNodeBg(el, node.bg);
     // Text settings ride on custom properties the note's text reads.
     if (node.textColor) el.style.setProperty('--note-text', vizColorMap(node.textColor));
-    if (node.textAlign) el.style.setProperty('--note-align', node.textAlign);
-    if (node.lineSpacing) el.style.setProperty('--note-line', node.lineSpacing);
     if (node.paraSpacing) el.style.setProperty('--note-para', BRAIN_PARA_SPACING[node.paraSpacing] || '0');
-    if (BRAIN_FONTS[node.fontFamily]) {
-      el.style.setProperty('--note-font', BRAIN_FONTS[node.fontFamily]);
-      // Manga lettering is set in capitals; the other faces are not.
-      el.style.setProperty('--note-case', node.fontFamily === 'comic' ? 'uppercase' : 'none');
-    }
+    brainNoteVars(el, node);   // alignment, font, sizes, spacing, code settings
     if (node.border && !isGlobe) el.dataset.border = node.border;
     const codeLang = isGlobe ? null : brainShownLang(node);
     if (codeLang) el.dataset.code = codeLang;   // a code note: brainNoteBodyHTML
@@ -1907,6 +1901,55 @@ function brainDeleteNode(nodeId, sure) {
   brainRenderCanvas(); brainSaveCurrentVersion();
 }
 
+/* The note window's header tools, left to right: the open mode's settings,
+   then the Text | Code switch. Narrow, the settings fold behind one button
+   (a container query on the header). */
+function _brainCeStepHTML(opt, label, min, max) {
+  return `<div class="viz-ce-step" data-opt="${opt}" data-min="${min}" data-max="${max}" role="group" aria-label="${label}" title="${label}">`
+    + `<button type="button" data-d="-1" aria-label="Smaller">&minus;</button><span class="v"></span><button type="button" data-d="1" aria-label="Larger">+</button></div>`;
+}
+function _brainCeDdHTML(opt, label, icon, items) {
+  return `<div class="viz-ce-dd" data-opt="${opt}"><button type="button" class="viz-ce-dd-btn" aria-haspopup="listbox" aria-expanded="false" title="${label}" aria-label="${label}">`
+    + `<i data-lucide="${icon}"></i><span class="v"></span><i data-lucide="chevron-down" class="viz-ce-chev"></i></button>`
+    + `<div class="viz-ce-dd-menu hidden" role="listbox" aria-label="${label}"><div class="viz-ce-dd-title">${label}</div>`
+    + items.map(([v, t]) => `<button type="button" role="option" data-value="${v}">${t}</button>`).join('') + '</div></div>';
+}
+function _brainEditorToolsHTML() {
+  return `<div class="viz-ce-tools">
+    <button class="viz-ce-opts-btn" id="viz-ce-opts-btn" type="button" aria-expanded="false" aria-controls="viz-ce-opts" title="Settings" aria-label="Settings"><i data-lucide="sliders-horizontal"></i></button>
+    <div class="viz-ce-opts" id="viz-ce-opts" data-mode="text" role="toolbar" aria-label="Note settings">
+      <div class="viz-ce-optgroup" data-for="code">
+        <div class="viz-ce-lang">
+          <button class="viz-ce-lang-btn" id="viz-ce-lang" type="button" aria-haspopup="listbox" aria-expanded="false" title="Language"><span id="viz-ce-lang-name">C</span><i data-lucide="chevron-down"></i></button>
+          <div class="viz-ce-lang-menu hidden" id="viz-ce-lang-menu" role="listbox" aria-label="Language">
+            ${BRAIN_CODE_LANGS.map(([k, n]) => `<button type="button" role="option" data-lang="${k}">${n}</button>`).join('')}
+          </div>
+        </div>
+        ${_brainCeStepHTML('codeSize', 'Code size', 10, 24)}
+        ${_brainCeDdHTML('codeLine', 'Line height', 'unfold-vertical', [[1.2, '1.2 Tight'], [1.5, '1.5 Normal'], [1.8, '1.8 Loose']])}
+        ${_brainCeDdHTML('codeTab', 'Tab width', 'indent-increase', [[2, '2 spaces'], [4, '4 spaces'], [8, '8 spaces']])}
+        <button type="button" class="viz-ce-tg" data-opt="codeWrap" aria-pressed="true" title="Wrap long lines" aria-label="Wrap long lines"><i data-lucide="wrap-text"></i></button>
+      </div>
+      <div class="viz-ce-optgroup" data-for="text">
+        ${_brainCeStepHTML('fontSize', 'Text size', 10, 28)}
+        ${_brainCeDdHTML('lineSpacing', 'Line spacing', 'unfold-vertical', [[1, '1.0'], [1.15, '1.15'], [1.5, '1.5'], [2, '2.0']])}
+        ${_brainCeDdHTML('fontFamily', 'Font', 'type', [['', 'Default'], ['arial', 'Arial'], ['sans', 'Sans-serif'], ['comic', 'Comic (Manga)']])}
+        <div class="viz-ce-seg" data-opt="textAlign" role="group" aria-label="Alignment">
+          <button type="button" data-value="left" title="Align left" aria-label="Align left"><i data-lucide="align-left"></i></button>
+          <button type="button" data-value="center" title="Centre" aria-label="Centre"><i data-lucide="align-center"></i></button>
+          <button type="button" data-value="right" title="Align right" aria-label="Align right"><i data-lucide="align-right"></i></button>
+        </div>
+      </div>
+    </div>
+    <div class="viz-ce-mode" id="viz-ce-mode" data-active="text" role="group" aria-label="Note type">
+      <span class="viz-ce-mode-ink" aria-hidden="true"></span>
+      <button type="button" data-mode="text" aria-pressed="true" title="Text: plain prose"><i data-lucide="type"></i><span>Text</span></button>
+      <button type="button" data-mode="code" aria-pressed="false" title="Code: highlighted, auto-indented, brackets closed for you"><i data-lucide="code-xml"></i><span>Code</span></button>
+    </div>
+  </div>`;
+}
+const BRAIN_FONT_NAMES = { '': 'Default', arial: 'Arial', sans: 'Sans', comic: 'Comic' };
+
 function brainOpenEditor(node) {
   if (typeof vizHoverClear === 'function') vizHoverClear();
   let overlay = document.getElementById('viz-comment-editor-overlay');
@@ -1933,15 +1976,7 @@ function brainOpenEditor(node) {
     <div class="viz-comment-editor-header">
       <i data-lucide="brain-circuit"></i>
       <span>Brain Note</span>
-      ${node.shape ? '' : `<div class="viz-ce-tools">
-        <button class="viz-ce-code-btn" id="viz-ce-code" type="button" aria-pressed="false" title="Write code: highlighted, auto-indented, brackets closed for you"><i data-lucide="code-xml"></i><span>Code</span></button>
-        <div class="viz-ce-lang">
-          <button class="viz-ce-lang-btn" id="viz-ce-lang" type="button" aria-haspopup="listbox" aria-expanded="false" title="Language"><span id="viz-ce-lang-name">C</span><i data-lucide="chevron-down"></i></button>
-          <div class="viz-ce-lang-menu hidden" id="viz-ce-lang-menu" role="listbox" aria-label="Language">
-            ${BRAIN_CODE_LANGS.map(([k, n]) => `<button type="button" role="option" data-lang="${k}">${n}</button>`).join('')}
-          </div>
-        </div>
-      </div>`}
+      ${node.shape ? '' : _brainEditorToolsHTML()}
       <button class="viz-comment-editor-close viz-comment-editor-min" id="viz-comment-editor-min" title="Unblur the canvas behind the note" aria-label="Unblur the canvas behind the note"><i data-lucide="minus"></i></button>
       <button class="viz-comment-editor-close" id="viz-comment-editor-x" title="Close" aria-label="Close"><i data-lucide="x"></i></button>
     </div>
@@ -1975,8 +2010,14 @@ function brainOpenEditor(node) {
   let pickLang = savedLang || _brainLastCodeLang();
   const hl = document.getElementById('viz-ce-hl');
   const hlCode = document.getElementById('viz-ce-hl-code');
-  const codeBtn = document.getElementById('viz-ce-code');
+  const modeBox = document.getElementById('viz-ce-mode');
+  const optsBox = document.getElementById('viz-ce-opts');
+  const optsBtn = document.getElementById('viz-ce-opts-btn');
   const langBtn = document.getElementById('viz-ce-lang');
+  // The note's Text and Code settings, as saved (null = default); a preview
+  // like the text until Save & Close, and Reset puts them back.
+  const savedOpts = brainNoteOpts(node);
+  let opts = { ...savedOpts };
   const langMenu = document.getElementById('viz-ce-lang-menu');
   const syncHl = () => { hl.scrollTop = textarea.scrollTop; hl.scrollLeft = textarea.scrollLeft; };
   const paintHl = () => {
@@ -1985,11 +2026,52 @@ function brainOpenEditor(node) {
     hlCode.innerHTML = brainCodeHTML(textarea.value, codeLang) + '<br/>';
     syncHl();
   };
+  /* The window follows the settings too: code at its size, height and tab
+     width (scaled up from the note's, which is drawn small on the canvas),
+     prose in the note's font, size, spacing and alignment. */
+  const paintOpts = () => {
+    const d = BRAIN_OPT_DEFAULTS;
+    const val = k => (opts[k] != null ? opts[k] : d[k]);
+    const set = (k, v) => { if (v == null) overlay.style.removeProperty(k); else overlay.style.setProperty(k, v); };
+    const wrap = !!codeLang && val('codeWrap') !== false;
+    overlay.classList.toggle('ce-wrap', wrap);
+    if (codeLang) {
+      set('--ce-size', (15 * val('codeSize') / d.codeSize).toFixed(2) + 'px');
+      set('--ce-line', val('codeLine'));
+      set('--ce-tab', val('codeTab'));
+      set('--ce-font', null); set('--ce-align', null); set('--ce-case', null);
+    } else {
+      set('--ce-size', (15 * val('fontSize') / d.fontSize).toFixed(2) + 'px');
+      set('--ce-line', val('lineSpacing'));
+      set('--ce-tab', null);
+      set('--ce-font', BRAIN_FONTS[opts.fontFamily] || null);
+      set('--ce-case', opts.fontFamily === 'comic' ? 'uppercase' : null);
+      set('--ce-align', opts.textAlign || (node.border === 'manhua' ? 'center' : null));
+    }
+    textarea.wrap = codeLang ? (wrap ? 'soft' : 'off') : 'soft';
+    // Wrapped code: the copy under the textarea must wrap at the same width,
+    // so it gives up exactly the room the textarea's scrollbar takes.
+    hl.style.paddingRight = wrap ? 'calc(1.25rem + ' + Math.max(0, textarea.offsetWidth - textarea.clientWidth) + 'px)' : '';
+    if (!optsBox) return;
+    optsBox.dataset.mode = codeLang ? 'code' : 'text';
+    optsBox.querySelectorAll('.viz-ce-step').forEach(b => { b.querySelector('.v').textContent = val(b.dataset.opt); });
+    optsBox.querySelectorAll('.viz-ce-dd').forEach(b => {
+      const k = b.dataset.opt, v = val(k);
+      b.querySelector('.v').textContent = k === 'fontFamily' ? BRAIN_FONT_NAMES[v || ''] || 'Default' : String(v);
+      b.querySelectorAll('[data-value]').forEach(o => o.setAttribute('aria-selected', String(o.dataset.value === String(v == null ? '' : v))));
+    });
+    optsBox.querySelectorAll('.viz-ce-tg').forEach(b => b.setAttribute('aria-pressed', String(val(b.dataset.opt) !== false)));
+    const align = opts.textAlign || (node.border === 'manhua' ? 'center' : 'left');
+    optsBox.querySelectorAll('.viz-ce-seg [data-value]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.value === align)));
+  };
   const paintCode = () => {
     overlay.classList.toggle('is-code', !!codeLang);
-    textarea.wrap = codeLang ? 'off' : 'soft';
     textarea.placeholder = codeLang ? 'Write ' + _brainCodeLangName(codeLang) + '...' : 'Enter your idea...';
-    if (codeBtn) codeBtn.setAttribute('aria-pressed', codeLang ? 'true' : 'false');
+    if (modeBox) {
+      modeBox.dataset.active = codeLang ? 'code' : 'text';
+      modeBox.querySelectorAll('[data-mode]').forEach(b => b.setAttribute('aria-pressed', String((b.dataset.mode === 'code') === !!codeLang)));
+    }
+    paintOpts();
     const name = document.getElementById('viz-ce-lang-name');
     if (name) name.textContent = _brainCodeLangName(pickLang);
     if (langMenu) langMenu.querySelectorAll('[data-lang]').forEach(b => b.setAttribute('aria-selected', b.dataset.lang === pickLang ? 'true' : 'false'));
@@ -2005,7 +2087,7 @@ function brainOpenEditor(node) {
      text again. Only the one note's text is redrawn, so the editor keeps its
      focus and nothing flickers. */
   const applyLive = () => {
-    brain._livePreview = { id: nodeId, text: textarea.value, lang: codeLang };
+    brain._livePreview = { id: nodeId, text: textarea.value, lang: codeLang, opts: { ...opts } };
     const el = document.querySelector(`.viz-node[data-node-id="${nodeId}"]`);
     const inner = el && el.querySelector('.viz-node-inner');
     const content = el && el.querySelector('.viz-comment-content');
@@ -2015,6 +2097,7 @@ function brainOpenEditor(node) {
     el._liveEditAt = performance.now();
     const live = brain.nodes.find(x => x.id === nodeId);
     if (codeLang && !el.dataset.shape) el.dataset.code = codeLang; else delete el.dataset.code;
+    if (live && !el.dataset.shape) brainNoteVars(el, live);
     // A code note starts wider, as it renders; a size you dragged stays.
     if (inner && live && !live.userSized && !el.dataset.shape) inner.style.width = (codeLang ? 360 : 250) + 'px';
     content.innerHTML = live ? brainNoteBodyHTML(live, textarea.value)
@@ -2043,12 +2126,74 @@ function brainOpenEditor(node) {
     document.removeEventListener('pointerdown', outsideLang, true);
   };
   const outsideLang = ev => { if (!ev.target.closest || !ev.target.closest('.viz-ce-lang')) closeLangMenu(); };
-  if (codeBtn) codeBtn.onclick = () => {
-    codeLang = codeLang ? null : pickLang;
+  // Text | Code: converts the note between prose and a code block. The words
+  // are kept exactly as typed either way.
+  if (modeBox) modeBox.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => {
+    const want = b.dataset.mode === 'code' ? pickLang : null;
+    if (want === codeLang) return;
+    codeLang = want;
+    closeOptMenus(); closeLangMenu();
     paintCode(); applyLive();
     textarea.focus({ preventScroll: true });
+  });
+  // One settings dropdown open at a time; any press outside closes it.
+  const closeOptMenus = (except) => {
+    if (!optsBox) return;
+    optsBox.querySelectorAll('.viz-ce-dd').forEach(dd => {
+      if (dd === except) return;
+      dd.querySelector('.viz-ce-dd-menu').classList.add('hidden');
+      dd.querySelector('.viz-ce-dd-btn').setAttribute('aria-expanded', 'false');
+    });
+  };
+  const outsideOpts = ev => {
+    // The window went without Save or Close (another note opened over it, or the page changed).
+    if (!overlay.isConnected) { document.removeEventListener('pointerdown', outsideOpts, true); return; }
+    const t = ev.target;
+    if (!t.closest || !t.closest('.viz-ce-dd')) closeOptMenus();
+    if (optsBox && optsBox.classList.contains('is-open') && (!t.closest || !t.closest('.viz-ce-opts, .viz-ce-opts-btn'))) {
+      optsBox.classList.remove('is-open'); optsBtn.setAttribute('aria-expanded', 'false');
+    }
+  };
+  document.addEventListener('pointerdown', outsideOpts, true);
+  const setOpt = (k, v) => {
+    opts[k] = v === BRAIN_OPT_DEFAULTS[k] ? null : v;
+    paintOpts(); applyLive();
+  };
+  if (optsBox) {
+    optsBox.addEventListener('pointerdown', ev => ev.stopPropagation());   // not a header drag
+    optsBox.querySelectorAll('.viz-ce-step').forEach(b => b.querySelectorAll('[data-d]').forEach(btn => btn.onclick = () => {
+      const k = b.dataset.opt;
+      const cur = opts[k] != null ? opts[k] : BRAIN_OPT_DEFAULTS[k];
+      setOpt(k, Math.min(+b.dataset.max, Math.max(+b.dataset.min, cur + (+btn.dataset.d))));
+    }));
+    optsBox.querySelectorAll('.viz-ce-dd').forEach(dd => {
+      const btn = dd.querySelector('.viz-ce-dd-btn'), menu = dd.querySelector('.viz-ce-dd-menu');
+      btn.onclick = () => {
+        const open = menu.classList.contains('hidden');
+        closeOptMenus(dd); closeLangMenu();
+        menu.classList.toggle('hidden', !open);
+        btn.setAttribute('aria-expanded', String(open));
+      };
+      menu.querySelectorAll('[data-value]').forEach(o => o.onclick = () => {
+        const raw = o.dataset.value;
+        setOpt(dd.dataset.opt, dd.dataset.opt === 'fontFamily' ? (raw || null) : parseFloat(raw));
+        closeOptMenus();
+        textarea.focus({ preventScroll: true });
+      });
+    });
+    optsBox.querySelectorAll('.viz-ce-tg').forEach(b => b.onclick = () => {
+      const k = b.dataset.opt;
+      setOpt(k, (opts[k] != null ? opts[k] : BRAIN_OPT_DEFAULTS[k]) === false);
+    });
+    optsBox.querySelectorAll('.viz-ce-seg [data-value]').forEach(b => b.onclick = () => setOpt('textAlign', b.dataset.value));
+  }
+  if (optsBtn) optsBtn.onclick = () => {
+    const open = !optsBox.classList.contains('is-open');
+    optsBox.classList.toggle('is-open', open);
+    optsBtn.setAttribute('aria-expanded', String(open));
   };
   if (langBtn) langBtn.onclick = () => {
+    closeOptMenus();
     if (!langMenu.classList.contains('hidden')) { closeLangMenu(); return; }
     langMenu.classList.remove('hidden');
     langBtn.setAttribute('aria-expanded', 'true');
@@ -2070,6 +2215,7 @@ function brainOpenEditor(node) {
   document.getElementById('viz-comment-editor-reset').onclick = () => {
     textarea.value = savedText;
     codeLang = savedLang;
+    opts = { ...savedOpts };
     if (savedLang) pickLang = savedLang;
     paintCode();
     applyLive();
@@ -2088,10 +2234,13 @@ function brainOpenEditor(node) {
       // Looked up by id: an undo replaces the node objects, and the one this
       // editor opened with may be stale by then.
       const target = brain.nodes.find(n => n.id === nodeId);
-      if (target && ((target.commentContent || '') !== textarea.value || (target.codeLang || null) !== (codeLang || null))) {
+      const optsChanged = target && BRAIN_OPT_KEYS.some(k => (target[k] != null ? target[k] : null) !== opts[k]);
+      if (target && ((target.commentContent || '') !== textarea.value || (target.codeLang || null) !== (codeLang || null) || optsChanged)) {
         brainPushUndo();
         target.commentContent = textarea.value;
         if (codeLang) target.codeLang = codeLang; else delete target.codeLang;
+        BRAIN_OPT_KEYS.forEach(k => { if (opts[k] == null) delete target[k]; else target[k] = opts[k]; });
+        if (optsChanged) _brainRememberStyle(target);   // the next new note starts with these
         brainSaveCurrentVersion();
       }
       // The next new note starts the way this one was saved: as code in this
@@ -2104,6 +2253,7 @@ function brainOpenEditor(node) {
       overlay._discard();
     }
     closeLangMenu();
+    document.removeEventListener('pointerdown', outsideOpts, true);
     overlay.remove();
     if (typeof vizHoverClear === 'function') vizHoverClear();
   };
@@ -2961,7 +3111,8 @@ function brainPaintShape(el, node) {
    remembers that note's whole look, and the next note you make starts with
    it: switch one note to Manhua and the next one is Manhua too. Objects keep
    their own looks and are not remembered. */
-const BRAIN_STYLE_KEYS = ['border', 'bubble', 'color', 'bg', 'textColor', 'textAlign', 'fontFamily', 'lineSpacing', 'paraSpacing'];
+const BRAIN_STYLE_KEYS = ['border', 'bubble', 'color', 'bg', 'textColor', 'textAlign', 'fontFamily', 'lineSpacing', 'paraSpacing',
+  'fontSize', 'codeSize', 'codeLine', 'codeTab', 'codeWrap'];
 function _brainRememberStyle(node) {
   if (!node || node.shape) return;
   const style = {};
@@ -3081,6 +3232,42 @@ function _brainBlockComment(ta, open, close) {
     ? lead + body.slice(open.length, body.length - close.length).trim()
     : lead + open + ' ' + body + ' ' + close;
   edReplaceRange(ta, span.start, span.end, out, [span.start, span.start + out.length]);
+}
+
+/* ── Note settings (the note window's Text and Code settings) ──────────
+   Saved on the note, null meaning the default below; the right-click menu's
+   Align, Font and Spacing set the same fields. They reach the note on the
+   canvas as custom properties (brainNoteVars), and the open window's preview
+   wins while it is open (brainShownOpts). */
+const BRAIN_OPT_DEFAULTS = { fontSize: 14, lineSpacing: 1.5, fontFamily: null, textAlign: null,
+  codeSize: 12, codeLine: 1.5, codeTab: 4, codeWrap: true };
+const BRAIN_OPT_KEYS = Object.keys(BRAIN_OPT_DEFAULTS);
+
+/** A note's settings as saved: each key, or null for its default. */
+function brainNoteOpts(node) {
+  const o = {};
+  BRAIN_OPT_KEYS.forEach(k => { o[k] = node && node[k] != null ? node[k] : null; });
+  return o;
+}
+/** What the note shows: the open window's unsaved settings, or its own. */
+function brainShownOpts(node) {
+  const p = brain._livePreview;
+  return p && p.id === node.id && p.opts ? p.opts : brainNoteOpts(node);
+}
+/** Put a note's settings on its element (set, or cleared back to the CSS default). */
+function brainNoteVars(el, node) {
+  const o = brainShownOpts(node);
+  const put = (name, v) => { if (v == null || v === '') el.style.removeProperty(name); else el.style.setProperty(name, v); };
+  put('--note-align', o.textAlign);
+  put('--note-line', o.lineSpacing);
+  put('--note-size', o.fontSize != null ? o.fontSize + 'px' : null);
+  put('--note-font', BRAIN_FONTS[o.fontFamily] || null);
+  // Manga lettering is set in capitals; the other faces are not.
+  put('--note-case', BRAIN_FONTS[o.fontFamily] ? (o.fontFamily === 'comic' ? 'uppercase' : 'none') : null);
+  put('--code-size', o.codeSize != null ? o.codeSize + 'px' : null);
+  put('--code-line', o.codeLine);
+  put('--code-tab', o.codeTab);
+  if (o.codeWrap === false) el.dataset.wrap = '0'; else delete el.dataset.wrap;
 }
 
 function brainNoteParagraphs(text) {

@@ -777,10 +777,10 @@
   border-radius: 0;
   padding: 1rem 1.25rem;
   font-family: 'Consolas', 'Courier New', monospace;
-  font-size: 0.95rem;
-  line-height: 1.55;
+  font-size: var(--ce-size, 0.95rem);
+  line-height: var(--ce-line, 1.55);
   resize: none;   /* the window itself resizes */
-  tab-size: 4;
+  tab-size: var(--ce-tab, 4);
   outline: none;
   width: 100%;
 }
@@ -3186,6 +3186,7 @@
   color: var(--note-text, var(--text-primary));
   text-align: var(--note-align, left);
   line-height: var(--note-line, 1.5);
+  font-size: var(--note-size, 0.85rem);
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45);
 }
 .viz-node[data-type="comment"] .viz-comment-content p { margin: 0; }
@@ -5287,9 +5288,177 @@ body.viz-no-anim .app-sidebar {
    whose own text is transparent, so you type into one and read the other,
    the Coding Library editor's arrangement. The copy carries extra room
    bottom and right so it can scroll as far as the textarea with its bars. */
-.viz-ce-tools { display: flex; align-items: center; gap: 6px; }
+.viz-ce-tools { display: flex; align-items: center; gap: 8px; }
 .viz-comment-editor-header .viz-ce-tools span { flex: none; }
-.viz-ce-code-btn,
+.viz-comment-editor-header { container-type: inline-size; position: relative; }
+.viz-ce-opts { display: flex; align-items: center; }
+.viz-ce-optgroup { display: flex; align-items: center; gap: 4px; }
+.viz-ce-opts[data-mode="code"] .viz-ce-optgroup[data-for="text"],
+.viz-ce-opts[data-mode="text"] .viz-ce-optgroup[data-for="code"] { display: none; }
+.viz-ce-tools > .viz-ce-opts-btn { display: none; }
+
+/* Text | Code: one control, the active half lit by a highlight that slides. */
+.viz-ce-mode {
+  position: relative;
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  height: 28px;
+  padding: 2px;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  background: #0d1117;
+}
+.viz-ce-mode-ink {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  width: calc(50% - 2px);
+  border-radius: 6px;
+  background: rgba(6, 182, 212, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(6, 182, 212, 0.55);
+  transition: transform 0.28s var(--ease-spring, ease);
+  pointer-events: none;
+}
+.viz-ce-mode[data-active="code"] .viz-ce-mode-ink { transform: translateX(100%); }
+.viz-ce-mode button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 10px;
+  border: none;
+  background: none;
+  color: #8b949e;
+  font: 600 0.75rem/1 'Consolas', 'Courier New', monospace;
+  transition: color 0.15s ease;
+}
+.viz-ce-mode button svg { width: 14px; height: 14px; }
+.viz-ce-mode button:hover { color: #e6edf3; }
+.viz-ce-mode button[aria-pressed="true"] { color: #06b6d4; }
+
+/* The settings: steppers, small dropdowns, a toggle, an alignment trio. */
+.viz-ce-step,
+.viz-ce-seg {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.viz-ce-step button,
+.viz-ce-seg button,
+.viz-ce-tg,
+.viz-ce-dd-btn,
+.viz-ce-opts-btn {
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: #8b949e;
+  font: 600 0.8rem/1 'Consolas', 'Courier New', monospace;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.viz-ce-step button { width: 22px; }
+.viz-ce-step .v {
+  min-width: 22px;
+  text-align: center;
+  color: #e6edf3;
+  font: 600 0.75rem/1 'Consolas', 'Courier New', monospace;
+}
+.viz-ce-seg button { width: 26px; display: inline-flex; align-items: center; justify-content: center; }
+.viz-ce-seg button + button { border-left: 1px solid #30363d; }
+.viz-ce-seg button svg,
+.viz-ce-tg svg,
+.viz-ce-opts-btn svg { width: 14px; height: 14px; }
+.viz-ce-step button:hover,
+.viz-ce-seg button:hover,
+.viz-ce-tg:hover,
+.viz-ce-dd-btn:hover,
+.viz-ce-opts-btn:hover { color: #e6edf3; background: rgba(139, 148, 158, 0.16); }
+.viz-ce-seg button[aria-pressed="true"],
+.viz-ce-tg[aria-pressed="true"] { color: #06b6d4; background: rgba(6, 182, 212, 0.12); }
+.viz-ce-tg,
+.viz-ce-opts-btn {
+  width: 28px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+}
+.viz-ce-dd { position: relative; height: 26px; }
+.viz-ce-dd-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 7px;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  font-size: 0.72rem;
+}
+.viz-ce-dd-btn .v { color: #e6edf3; }
+.viz-ce-dd-btn svg { width: 13px; height: 13px; }
+.viz-ce-dd-btn .viz-ce-chev { width: 11px; height: 11px; transition: transform 0.2s ease; }
+.viz-ce-dd-btn[aria-expanded="true"] .viz-ce-chev { transform: rotate(180deg); }
+.viz-ce-dd-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 150px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+  z-index: 10;
+  cursor: default;
+}
+.viz-ce-dd-menu.hidden { display: none; }
+.viz-ce-dd-title {
+  padding: 4px 8px 2px;
+  color: #6e7681;
+  font: 600 0.65rem/1.2 'Consolas', 'Courier New', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.viz-ce-dd-menu button {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: #c9d1d9;
+  font: 600 0.78rem/1.2 'Consolas', 'Courier New', monospace;
+  text-align: left;
+  cursor: pointer;
+}
+.viz-ce-dd-menu button:hover { background: rgba(139, 148, 158, 0.16); color: #e6edf3; }
+.viz-ce-dd-menu button[aria-selected="true"] { color: #06b6d4; background: rgba(6, 182, 212, 0.1); }
+
+/* A narrow window: the settings fold behind one button and open below it. */
+@container (max-width: 640px) {
+  .viz-ce-tools > .viz-ce-opts-btn { display: inline-flex; }
+  .viz-ce-opts {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 12px;
+    z-index: 12;
+    padding: 6px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+    display: none;
+  }
+  .viz-ce-opts.is-open { display: flex; }
+  .viz-ce-opts-btn[aria-expanded="true"] { color: #06b6d4; background: rgba(6, 182, 212, 0.12); }
+}
+
 .viz-ce-lang-btn {
   display: inline-flex;
   align-items: center;
@@ -5303,11 +5472,8 @@ body.viz-no-anim .app-sidebar {
   font: 600 0.75rem/1 'Consolas', 'Courier New', monospace;
   transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
 }
-.viz-ce-code-btn svg,
 .viz-ce-lang-btn svg { width: 14px; height: 14px; }
-.viz-ce-code-btn:hover,
 .viz-ce-lang-btn:hover { color: #e6edf3; background: rgba(139, 148, 158, 0.16); }
-.viz-ce-code-btn[aria-pressed="true"] { color: #06b6d4; border-color: rgba(6, 182, 212, 0.55); background: rgba(6, 182, 212, 0.12); }
 .viz-ce-lang { position: relative; display: none; }
 .viz-comment-editor-overlay.is-code .viz-ce-lang { display: inline-flex; }
 .viz-ce-lang-btn { color: #e6edf3; }
@@ -5353,12 +5519,24 @@ body.viz-no-anim .app-sidebar {
   background: #000;
   color: #d4d4d4;
   font-family: 'Consolas', 'Courier New', monospace;
-  font-size: 0.95rem;
-  line-height: 1.55;
-  tab-size: 4;
+  font-size: var(--ce-size, 0.95rem);
+  line-height: var(--ce-line, 1.55);
+  tab-size: var(--ce-tab, 4);
   white-space: pre;
   overflow: hidden;
   pointer-events: none;
+}
+/* Text mode writes in the note's own face, size, spacing and alignment. */
+.viz-comment-editor-overlay:not(.is-code) .viz-comment-editor-textarea {
+  font-family: var(--ce-font, var(--font-sans));
+  text-align: var(--ce-align, left);
+  text-transform: var(--ce-case, none);
+}
+/* Wrapped code: both layers wrap the same way at the same width. */
+.viz-comment-editor-overlay.is-code.ce-wrap .viz-ce-hl,
+.viz-comment-editor-overlay.is-code.ce-wrap .viz-comment-editor-textarea {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .viz-ce-hl code { font: inherit; color: inherit; background: none; padding: 0; border: 0; }
 .viz-comment-editor-overlay.is-code .viz-comment-editor-textarea {
@@ -5384,15 +5562,21 @@ body.viz-no-anim .app-sidebar {
   border: 1px solid rgba(240, 246, 252, 0.08);
   color: #d4d4d4;
   font-family: 'Consolas', 'Courier New', monospace;
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: var(--code-size, 12px);
+  line-height: var(--code-line, 1.5);
   text-align: left;
   text-transform: none;
   text-shadow: none;
-  tab-size: 4;
+  tab-size: var(--code-tab, 4);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   hyphens: none;
+}
+/* Wrap long lines: off. The block scrolls sideways instead of growing. */
+.viz-node[data-wrap="0"] .viz-comment-content .brain-code {
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
 }
 .viz-node[data-type="comment"] .brain-code code { font: inherit; color: inherit; background: none; padding: 0; border: 0; }
 
