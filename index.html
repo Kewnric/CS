@@ -49,6 +49,7 @@
   <link rel="stylesheet" href="css/tree-extras.css">
   <link rel="stylesheet" href="css/cheatsheet.css">
   <link rel="stylesheet" href="css/library.css">
+  <link rel="stylesheet" href="css/lib-holo.css">
   <link rel="stylesheet" href="css/coding-hub.css">
   <link rel="stylesheet" href="css/folder-banner.css">
   <link rel="stylesheet" href="css/terminal.css">
@@ -399,6 +400,17 @@
           <span class="settings-item-info">
             <span class="settings-item-label" id="settings-hud-label">HUD Chrome On</span>
             <span class="settings-item-desc" id="settings-hud-desc">Frame, brackets and scan lines</span>
+          </span>
+          <i data-lucide="chevron-right" class="settings-item-chevron" aria-hidden="true"></i>
+        </button>
+        <!-- The little scenes that rise over the Library hub's cards on hover
+             (js/lib-holo.js). Off, nothing is built and nothing listens. -->
+        <button onclick="toggleLibHolo()" class="settings-item" type="button" id="settings-libholo-item"
+                aria-label="Library card characters" aria-pressed="true">
+          <span class="settings-item-icon"><i data-lucide="ghost" id="settings-libholo-icon" aria-hidden="true"></i></span>
+          <span class="settings-item-info">
+            <span class="settings-item-label" id="settings-libholo-label">Card Characters On</span>
+            <span class="settings-item-desc" id="settings-libholo-desc">Little scenes rise over Library cards on hover</span>
           </span>
           <i data-lucide="chevron-right" class="settings-item-chevron" aria-hidden="true"></i>
         </button>
@@ -902,6 +914,7 @@
   <script defer src="js/router.js"></script>
   <script defer src="js/routes/route-home.js"></script>
   <script defer src="js/routes/route-library.js"></script>
+  <script defer src="js/lib-holo.js"></script>
   <script defer src="js/routes/route-coding.js"></script>
   <script defer src="js/routes/route-browse.js"></script>
   <script defer src="js/routes/route-study.js"></script>

@@ -1,0 +1,794 @@
+/* ============================================================
+   LIB-HOLO.CSS — the holograms over the Library hub's cards
+   (js/lib-holo.js builds them; this file moves them)
+
+   Rules that keep this cheap:
+   - Every looping animation is keyed on .holo-run, which only a live card
+     carries, and a card that is not live has display:none on its hologram.
+     Nothing here runs while nothing is hovered.
+   - Only transform and opacity animate. One-shot entrances fill backwards,
+     never forwards (a finished forwards fill keeps its layer for good).
+   - Every selector ends in a class.
+   ============================================================ */
+
+.lib-card.holo-live { z-index: 3; }
+
+/* The hologram's box: 200 x 150, just above the card, its right edge a
+   little past the card's. It grows out of the card's corner glow -- the
+   transform origin is that glow, in the box's own pixels. */
+.lib-holo {
+  --holo: var(--lib-accent, var(--color-primary));
+  position: absolute;
+  right: -24px;
+  bottom: calc(100% + 4px);
+  width: 200px;
+  height: 150px;
+  z-index: 6;
+  display: none;
+  pointer-events: none;
+  transform-origin: 161px 164px;
+  transform: scale(0.08);
+  transition: transform 0.32s cubic-bezier(0.55, 0, 0.85, 0.35);
+}
+.lib-holo.lh-cheatsheet { --holo: #22d3ee; }
+.lib-card.holo-live .lib-holo { display: block; }
+/* Rising is the brand's spring; sinking back is quick and accelerates. */
+.lib-card.holo-on .lib-holo { transform: none; transition: transform 0.72s var(--ease-spring); }
+.lib-card.holo-still .lib-holo { transform: none; transition: none; }
+
+.lib-holo-stage {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.22s ease-in;
+}
+.lib-card.holo-on .lib-holo-stage { opacity: 1; transition: opacity 0.34s ease-out; }
+/* A soft glow behind the scene, in the card's colour. */
+.lib-holo-stage::before {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  top: 8%;
+  bottom: 2%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--holo) 24%, transparent), transparent);
+}
+/* The disc the scene stands on, and the beam from the corner glow to it. */
+.lib-holo-floor {
+  position: absolute;
+  left: 13%;
+  right: 13%;
+  bottom: -1px;
+  height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--holo) 55%, transparent), color-mix(in srgb, var(--holo) 14%, transparent) 72%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--holo) 55%, transparent), 0 0 14px color-mix(in srgb, var(--holo) 35%, transparent);
+}
+.lib-holo-beam {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 200px;
+  height: 170px;
+  background: radial-gradient(150px 34px at 161px 164px, color-mix(in srgb, var(--holo) 60%, transparent), transparent 75%);
+  clip-path: polygon(161px 166px, 24px 141px, 176px 141px);
+  opacity: 0.6;
+}
+.lib-holo-scene { position: absolute; inset: 0; }
+/* Scanlines, fading out toward the edge so the box never shows. */
+.lib-holo-scene::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(to bottom, color-mix(in srgb, var(--holo) 13%, transparent) 0 1px, transparent 1px 3px);
+  -webkit-mask: radial-gradient(closest-side, #000 55%, transparent);
+  mask: radial-gradient(closest-side, #000 55%, transparent);
+  pointer-events: none;
+}
+.lh-svg { position: absolute; left: 0; top: 0; width: 200px; height: 150px; overflow: visible; }
+/* A scene after _lhLift (lib-holo.js): the still parts in small overflow-
+   visible svgs, each moving part an HTML layer the GPU moves. Every layer
+   sits on its parent's origin and turns from it, as the SVG group did. */
+.lh-view, .lh-l { position: absolute; left: 0; top: 0; width: 0; height: 0; transform-origin: 0 0; }
+.lh-s { position: absolute; left: 0; top: 0; overflow: visible; }
+.lib-holo-sweep {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  top: 0;
+  height: 20px;
+  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--holo) 30%, transparent) 50%, transparent);
+  -webkit-mask: linear-gradient(to right, transparent, #000 25%, #000 75%, transparent);
+  mask: linear-gradient(to right, transparent, #000 25%, #000 75%, transparent);
+  opacity: 0;
+}
+
+/* THE BLUR, ONLY WHILE IT MOVES. A soft oval round the scene blurs the page
+   behind it while the scene rises (and again while it sinks), then fades
+   away once it has settled. It is a sibling of the stage, not inside it:
+   an ancestor below opacity 1 would wall the blur off from the page. */
+.lib-holo-aura {
+  position: absolute;
+  inset: -12px -16px -8px;
+  border-radius: 50%;
+  -webkit-backdrop-filter: blur(8px) saturate(1.25);
+  backdrop-filter: blur(8px) saturate(1.25);
+  -webkit-mask: radial-gradient(closest-side, #000 58%, transparent);
+  mask: radial-gradient(closest-side, #000 58%, transparent);
+  opacity: 0;
+  visibility: hidden;
+}
+.lib-card.holo-run.holo-live .lib-holo-aura { animation: lh-aura-out 0.4s ease-out; }
+.lib-card.holo-run.holo-on .lib-holo-aura { animation: lh-aura-in 0.85s ease-out; }
+@keyframes lh-aura-in {
+  0% { opacity: 0; visibility: visible; }
+  10%, 55% { opacity: 1; }
+  100% { opacity: 0; visibility: visible; }
+}
+@keyframes lh-aura-out {
+  0% { opacity: 0.5; visibility: visible; }
+  25% { opacity: 1; }
+  100% { opacity: 0; visibility: visible; }
+}
+
+/* A band of light that runs up through it now and then, and a rare flicker. */
+.lib-card.holo-run.holo-on .lib-holo-sweep { animation: lh-sweep 3.4s linear 0.1s infinite; }
+@keyframes lh-sweep {
+  0% { transform: translateY(132px); opacity: 0; }
+  6% { opacity: 0.85; }
+  38%, 100% { transform: translateY(-18px); opacity: 0; }
+}
+.lib-card.holo-run.holo-on .lib-holo-scene { animation: lh-flicker 5.2s linear 1s infinite; }
+@keyframes lh-flicker {
+  0%, 88%, 90%, 93%, 100% { opacity: 1; }
+  89% { opacity: 0.5; }
+  92% { opacity: 0.72; }
+}
+
+/* Type */
+.lh-mono { font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, ui-monospace, monospace; }
+.lh-jp { font-family: 'Hiragino Sans', 'Yu Gothic UI', 'Yu Gothic', Meiryo, 'Noto Sans JP', 'Noto Sans CJK JP', 'Malgun Gothic', sans-serif; font-weight: 800; }
+.lh-hand { font-family: 'Comic Neue', 'Segoe Print', 'Comic Sans MS', cursive; font-weight: 700; }
+
+/* ── Shared character motion ── */
+.holo-run .lh-blink { animation: lh-blink 4.2s infinite; }
+@keyframes lh-blink {
+  0%, 91%, 97%, 100% { transform: scaleY(1); }
+  94% { transform: scaleY(0.1); }
+}
+.holo-run .lh-breathe { animation: lh-breathe 1.7s ease-in-out infinite alternate; }
+@keyframes lh-breathe { to { transform: translateY(1.2px); } }
+.holo-run .lh-twinkle { animation: lh-twinkle 1.9s ease-in-out infinite backwards; }
+@keyframes lh-twinkle {
+  0%, 100% { opacity: 0.25; transform: scale(0.6); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+/* ── Coding Library ── */
+.holo-run .lhc-fore { animation: lhc-type 0.13s ease-in-out infinite alternate; }
+@keyframes lhc-type { to { transform: rotate(-8deg); } }
+.holo-run .lhc-head { animation: lhc-nod 0.26s ease-in-out infinite alternate; }
+@keyframes lhc-nod { to { transform: translateY(1.3px) rotate(1.5deg); } }
+.holo-run .lhc-hit { animation: lhc-hit 0.26s steps(1, end) infinite; }
+.holo-run .lhc-hit-b { animation-delay: -0.13s; }
+@keyframes lhc-hit {
+  0% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.holo-run .lhc-sweat { animation: lhc-sweat 1.9s ease-in infinite; }
+@keyframes lhc-sweat {
+  0%, 30% { opacity: 0; transform: translateY(-2px); }
+  45% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(8px); }
+}
+.holo-run .lhc-vent { animation: lhc-vent 0.45s ease-out infinite; }
+@keyframes lhc-vent {
+  0% { opacity: 0.75; transform: scale(0.4, 0.6); }
+  100% { opacity: 0; transform: scale(1.3, 1.5); }
+}
+/* The words: across at a steady pace, up fast and down accelerating -- a
+   parabola. Each word brings its own distance, height and spin. */
+.holo-run .lhc-jx { animation: lhc-jx 2s linear infinite backwards; }
+.holo-run .lhc-jy { animation: lhc-jy 2s linear infinite backwards; }
+@keyframes lhc-jx {
+  from { transform: translateX(0); }
+  to { transform: translateX(var(--dx)); }
+}
+@keyframes lhc-jy {
+  0% { transform: translateY(0) rotate(0deg) scale(0.3); opacity: 0; animation-timing-function: cubic-bezier(0.2, 0.75, 0.45, 1); }
+  7% { opacity: 1; }
+  42% { transform: translateY(var(--h)) rotate(calc(var(--r) * 0.45)) scale(1.05); animation-timing-function: cubic-bezier(0.55, 0, 0.85, 0.45); }
+  78% { opacity: 1; }
+  100% { transform: translateY(var(--f)) rotate(var(--r)) scale(0.85); opacity: 0; }
+}
+/* The code types line by line (each cover steps away toward its line's end)
+   and is backspaced all at once before it starts again. */
+.holo-run .lhc-l0 { animation: lhc-l0 6.4s linear infinite; }
+.holo-run .lhc-l1 { animation: lhc-l1 6.4s linear infinite; }
+.holo-run .lhc-l2 { animation: lhc-l2 6.4s linear infinite; }
+.holo-run .lhc-l3 { animation: lhc-l3 6.4s linear infinite; }
+.holo-run .lhc-l4 { animation: lhc-l4 6.4s linear infinite; }
+.holo-run .lhc-l5 { animation: lhc-l5 6.4s linear infinite; }
+.holo-run .lhc-l6 { animation: lhc-l6 6.4s linear infinite; }
+@keyframes lhc-l0 { 0%, 4% { transform: scaleX(1); animation-timing-function: steps(9, end); } 11%, 84% { transform: scaleX(0); animation-timing-function: steps(5, end); } 87%, 100% { transform: scaleX(1); } }
+@keyframes lhc-l1 { 0%, 13% { transform: scaleX(1); animation-timing-function: steps(8, end); } 20%, 84% { transform: scaleX(0); animation-timing-function: steps(5, end); } 87%, 100% { transform: scaleX(1); } }
+@keyframes lhc-l2 { 0%, 22% { transform: scaleX(1); animation-timing-function: steps(6, end); } 28%, 84% { transform: scaleX(0); animation-timing-function: steps(5, end); } 87%, 100% { transform: scaleX(1); } }
+@keyframes lhc-l3 { 0%, 30% { transform: scaleX(1); animation-timing-function: steps(6, end); } 36%, 84% { transform: scaleX(0); animation-timing-function: steps(5, end); } 87%, 100% { transform: scaleX(1); } }
+@keyframes lhc-l4 { 0%, 38% { transform: scaleX(1); animation-timing-function: steps(8, end); } 46%, 84% { transform: scaleX(0); animation-timing-function: steps(5, end); } 87%, 100% { transform: scaleX(1); } }
+@keyframes lhc-l5 { 0%, 48% { transform: scaleX(1); animation-timing-function: steps(5, end); } 53%, 84% { transform: scaleX(0); animation-timing-function: steps(5, end); } 87%, 100% { transform: scaleX(1); } }
+@keyframes lhc-l6 { 0%, 55% { transform: scaleX(1); animation-timing-function: steps(1, end); } 57%, 84% { transform: scaleX(0); animation-timing-function: steps(5, end); } 87%, 100% { transform: scaleX(1); } }
+
+/* ── Notes Library: tiles grade themselves in a wave ── */
+.holo-run .lhn-flip { animation: lhn-flip 7.6s infinite backwards; animation-delay: calc(var(--i) * 0.38s); }
+.holo-run .lhn-res { animation: lhn-res 7.6s infinite backwards; animation-delay: calc(var(--i) * 0.38s); }
+@keyframes lhn-flip {
+  0% { transform: scaleX(1); animation-timing-function: ease-in; }
+  4% { transform: scaleX(0); animation-timing-function: ease-out; }
+  8%, 68% { transform: scaleX(1); animation-timing-function: ease-in; }
+  72% { transform: scaleX(0); animation-timing-function: ease-out; }
+  76%, 100% { transform: scaleX(1); }
+}
+@keyframes lhn-res {
+  0%, 3.9% { opacity: 0; }
+  4%, 71.9% { opacity: 1; }
+  72%, 100% { opacity: 0; }
+}
+.holo-run .lhn-score { animation: lhn-score 7.6s infinite backwards; }
+@keyframes lhn-score {
+  0%, 44% { opacity: 0; transform: scale(0.4); }
+  48% { opacity: 1; transform: scale(1.14); }
+  52%, 70% { opacity: 1; transform: scale(1); }
+  74%, 100% { opacity: 0; transform: scale(0.85); }
+}
+.holo-run .lhn-q { animation: lhn-q 7.6s infinite backwards; }
+@keyframes lhn-q {
+  0%, 42% { opacity: 1; transform: scale(1); }
+  46%, 72% { opacity: 0; transform: scale(0.5); }
+  76%, 100% { opacity: 1; transform: scale(1); }
+}
+.holo-run .lhn-ex { animation: lhn-ex 7.6s infinite backwards; }
+@keyframes lhn-ex {
+  0%, 44% { opacity: 0; transform: scale(0.5); }
+  48% { opacity: 1; transform: scale(1.25); }
+  52%, 70% { opacity: 1; transform: scale(1); }
+  74%, 100% { opacity: 0; transform: scale(0.5); }
+}
+.holo-run .lhn-head { animation: lhn-head 3s ease-in-out infinite alternate; }
+@keyframes lhn-head {
+  from { transform: rotate(-3deg); }
+  to { transform: rotate(3deg); }
+}
+
+/* ── Snippet Library: pick a tile, place it, three times ── */
+.holo-run .lhs-arm { animation: lhs-arm 6.6s infinite backwards; }
+.holo-run .lhs-carry { animation: lhs-carry 6.6s infinite backwards; }
+@keyframes lhs-arm {
+  0%, 3% { transform: rotate(72deg); animation-timing-function: cubic-bezier(0.45, 0, 0.3, 1); }
+  15%, 17% { transform: rotate(-48deg); animation-timing-function: cubic-bezier(0.5, 0, 0.4, 1); }
+  25%, 27% { transform: rotate(72deg); animation-timing-function: cubic-bezier(0.45, 0, 0.3, 1); }
+  39%, 41% { transform: rotate(-18deg); animation-timing-function: cubic-bezier(0.5, 0, 0.4, 1); }
+  49%, 51% { transform: rotate(72deg); animation-timing-function: cubic-bezier(0.45, 0, 0.3, 1); }
+  63%, 65% { transform: rotate(12deg); animation-timing-function: cubic-bezier(0.5, 0, 0.4, 1); }
+  73%, 100% { transform: rotate(72deg); }
+}
+/* The arm's turn, undone: the carried tile stays upright. */
+@keyframes lhs-carry {
+  0%, 3% { transform: rotate(-72deg); animation-timing-function: cubic-bezier(0.45, 0, 0.3, 1); }
+  15%, 17% { transform: rotate(48deg); animation-timing-function: cubic-bezier(0.5, 0, 0.4, 1); }
+  25%, 27% { transform: rotate(-72deg); animation-timing-function: cubic-bezier(0.45, 0, 0.3, 1); }
+  39%, 41% { transform: rotate(18deg); animation-timing-function: cubic-bezier(0.5, 0, 0.4, 1); }
+  49%, 51% { transform: rotate(-72deg); animation-timing-function: cubic-bezier(0.45, 0, 0.3, 1); }
+  63%, 65% { transform: rotate(-12deg); animation-timing-function: cubic-bezier(0.5, 0, 0.4, 1); }
+  73%, 100% { transform: rotate(-72deg); }
+}
+.holo-run .lhs-c1 { animation: lhs-c1 6.6s infinite backwards; }
+.holo-run .lhs-c2 { animation: lhs-c2 6.6s infinite backwards; }
+.holo-run .lhs-c3 { animation: lhs-c3 6.6s infinite backwards; }
+@keyframes lhs-c1 { 0% { opacity: 0; } 3%, 15.8% { opacity: 1; } 16.6%, 100% { opacity: 0; } }
+@keyframes lhs-c2 { 0%, 25% { opacity: 0; } 27%, 39.8% { opacity: 1; } 40.6%, 100% { opacity: 0; } }
+@keyframes lhs-c3 { 0%, 49% { opacity: 0; } 51%, 63.8% { opacity: 1; } 64.6%, 100% { opacity: 0; } }
+.holo-run .lhs-p1 { animation: lhs-p1 6.6s infinite backwards; }
+.holo-run .lhs-p2 { animation: lhs-p2 6.6s infinite backwards; }
+.holo-run .lhs-p3 { animation: lhs-p3 6.6s infinite backwards; }
+@keyframes lhs-p1 { 0%, 15.8% { opacity: 0; transform: scale(1.3); } 16.6% { opacity: 1; } 21%, 86% { opacity: 1; transform: scale(1); } 92%, 100% { opacity: 0; transform: scale(1); } }
+@keyframes lhs-p2 { 0%, 39.8% { opacity: 0; transform: scale(1.3); } 40.6% { opacity: 1; } 45%, 86% { opacity: 1; transform: scale(1); } 92%, 100% { opacity: 0; transform: scale(1); } }
+@keyframes lhs-p3 { 0%, 63.8% { opacity: 0; transform: scale(1.3); } 64.6% { opacity: 1; } 69%, 86% { opacity: 1; transform: scale(1); } 92%, 100% { opacity: 0; transform: scale(1); } }
+.holo-run .lhs-rack { animation: lhs-rack 6.6s infinite backwards; }
+@keyframes lhs-rack {
+  0%, 64% { opacity: 0; }
+  68% { opacity: 0.35; }
+  84% { opacity: 0.15; }
+  92%, 100% { opacity: 0; }
+}
+.holo-run .lhs-tail { animation: lhs-tail 1.7s ease-in-out infinite alternate; }
+@keyframes lhs-tail {
+  from { transform: rotate(-5deg); }
+  to { transform: rotate(6deg); }
+}
+
+/* ── Memorization Typing ── */
+.holo-run .lht-ch { animation: lht-ch 5s infinite backwards; animation-delay: calc(var(--i) * 0.22s); }
+@keyframes lht-ch {
+  0% { opacity: 0; }
+  2%, 56% { opacity: 1; }
+  62%, 100% { opacity: 0; }
+}
+.holo-run .lht-caret { animation: lht-caret 5s infinite; }
+@keyframes lht-caret {
+  0% { transform: translateX(0); opacity: 1; animation-timing-function: steps(8, start); }
+  35.2% { transform: translateX(76.8px); }
+  56% { opacity: 1; }
+  58%, 100% { transform: translateX(76.8px); opacity: 0; }
+}
+.holo-run .lht-key { animation: lht-key 1s linear infinite backwards; }
+@keyframes lht-key {
+  0% { opacity: 0.95; }
+  25%, 100% { opacity: 0; }
+}
+.holo-run .lht-hand { animation: lht-hand 0.15s ease-in-out infinite alternate; }
+@keyframes lht-hand { to { transform: translateY(-2px); } }
+.holo-run .lht-head { animation: lht-head 0.3s ease-in-out infinite alternate; }
+@keyframes lht-head { to { transform: translateY(0.9px); } }
+.holo-run .lht-needle { animation: lht-needle 5s infinite; }
+@keyframes lht-needle {
+  0% { transform: rotate(14deg); animation-timing-function: cubic-bezier(0.3, 0.6, 0.4, 1); }
+  35% { transform: rotate(152deg); animation-timing-function: ease-in-out; }
+  39% { transform: rotate(138deg); }
+  43% { transform: rotate(150deg); }
+  48%, 58% { transform: rotate(146deg); animation-timing-function: ease-in-out; }
+  90%, 100% { transform: rotate(14deg); }
+}
+.holo-run .lht-ok { animation: lht-ok 5s infinite; }
+@keyframes lht-ok {
+  0%, 34% { opacity: 0; transform: scale(0.3); }
+  38% { opacity: 1; transform: scale(1.2); }
+  42%, 56% { opacity: 1; transform: scale(1); }
+  61%, 100% { opacity: 0; transform: scale(0.6); }
+}
+
+/* ── Cheat Sheet Library: real 3D, windows on a turning cylinder ── */
+.lhx-stage { position: absolute; inset: 0; perspective: 460px; perspective-origin: 50% 22%; }
+.lhx-world { position: absolute; inset: 0; transform-style: preserve-3d; }
+.lhx-char {
+  position: absolute;
+  left: 60px;
+  top: 38px;
+  width: 80px;
+  height: 100px;
+  transform: translateZ(0);
+  transform-origin: 50% 100%;
+}
+.lhx-svg { display: block; overflow: visible; }
+.lhx-ring { position: absolute; left: 100px; top: 92px; width: 0; height: 0; transform-style: preserve-3d; }
+/* Drawn at twice the size and scaled down, so the small type is real type
+   (a browser minimum font size cannot touch it). */
+.lhx-win {
+  position: absolute;
+  left: -44px;
+  top: -30px;
+  width: 88px;
+  height: 60px;
+  transform-style: preserve-3d;
+  transform: translateY(var(--y)) rotateY(var(--a)) translateZ(76px) scale(0.5);
+}
+.lhx-pop { width: 100%; height: 100%; }
+.lhx-face {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 6px 4px;
+  border: 2px solid rgba(103, 232, 249, 0.9);
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(8, 145, 178, 0.5), rgba(8, 47, 73, 0.75));
+  box-shadow: 0 0 16px rgba(34, 211, 238, 0.45), inset 0 0 12px rgba(34, 211, 238, 0.25);
+  color: #cffafe;
+  font: 600 10px/1.25 'JetBrains Mono', Consolas, monospace;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.lhx-face b {
+  display: block;
+  margin: 0 -6px 2px;
+  padding: 2px 6px;
+  background: rgba(34, 211, 238, 0.35);
+  color: #ecfeff;
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+}
+.holo-run .lhx-ring { animation: lhx-spin 24s linear infinite; }
+@keyframes lhx-spin {
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(-360deg); }
+}
+.holo-run .lhx-pop { animation: lhx-pop 0.55s var(--ease-spring) backwards; }
+@keyframes lhx-pop {
+  from { transform: scale(0, 0.15); opacity: 0; }
+  40% { opacity: 1; }
+}
+.holo-run .lhx-face { animation: lhx-dim 24s linear infinite; }
+@keyframes lhx-dim {
+  0%, 100% { opacity: 1; }
+  22%, 78% { opacity: 0.62; }
+  50% { opacity: 0.2; }
+}
+.holo-run .lhx-char { animation: lhx-appear 0.6s var(--ease-expo-out) backwards; }
+@keyframes lhx-appear {
+  0% { opacity: 0; transform: translateZ(0) scale(1.15, 0.05); }
+  45% { opacity: 0.9; }
+  70% { opacity: 0.5; }
+  100% { opacity: 1; transform: translateZ(0); }
+}
+.holo-run .lhx-cube { animation: lhx-cube 2.2s ease-in-out infinite alternate; }
+@keyframes lhx-cube {
+  from { transform: translateY(0) rotate(0deg); }
+  to { transform: translateY(-3px) rotate(18deg); }
+}
+
+/* ── Language Library ── */
+.holo-run .lhl-sway { animation: lhl-sway 1.8s ease-in-out infinite alternate; }
+@keyframes lhl-sway {
+  from { transform: rotate(-5deg); }
+  to { transform: rotate(5deg); }
+}
+.holo-run .lhl-mouth { animation: lhl-mouth 0.42s ease-in-out infinite alternate; }
+@keyframes lhl-mouth {
+  from { transform: scale(0.85, 0.35); }
+  to { transform: scale(1, 1.05); }
+}
+.holo-run .lhl-wx { animation: lhl-wx 3.2s infinite backwards; }
+.holo-run .lhl-wy { animation: lhl-wy 3.2s infinite backwards; }
+@keyframes lhl-wx {
+  from { transform: translateX(0); animation-timing-function: cubic-bezier(0.2, 0.8, 0.4, 1); }
+  to { transform: translateX(var(--dx)); }
+}
+@keyframes lhl-wy {
+  0% { transform: translateY(0) scale(0.5); opacity: 0; animation-timing-function: cubic-bezier(0.4, 0, 0.6, 1); }
+  6% { opacity: 0; }
+  16%, 70% { opacity: 1; }
+  100% { transform: translateY(var(--h)) scale(1.15); opacity: 0; }
+}
+
+/* ── Mindset: floating, two orbits ── */
+.holo-run .lhm-float { animation: lhm-float 2.8s ease-in-out infinite alternate; }
+@keyframes lhm-float { to { transform: translateY(-4px); } }
+.holo-run .lhm-aura { animation: lhm-aura 2.8s ease-in-out infinite alternate; }
+@keyframes lhm-aura {
+  from { transform: scale(0.94); opacity: 0.7; }
+  to { transform: scale(1.06); opacity: 1; }
+}
+/* An orbit is a side-to-side swing and an up-and-down swing a quarter turn
+   apart; up is behind the body, down in front. */
+.holo-run .lhm-ox { animation: lhm-ox 3s ease-in-out infinite alternate; }
+.holo-run .lhm-oy-f { animation: lhm-oy-f 3s ease-in-out infinite alternate; }
+.holo-run .lhm-oy-b { animation: lhm-oy-b 3s ease-in-out infinite alternate; }
+@keyframes lhm-ox {
+  from { transform: translateX(calc(var(--rx) * -1)); }
+  to { transform: translateX(var(--rx)); }
+}
+@keyframes lhm-oy-f {
+  0% { transform: translateY(calc(var(--ry) * -1)) scale(0.78); opacity: 0; }
+  44% { opacity: 0; }
+  56% { opacity: 1; }
+  100% { transform: translateY(var(--ry)) scale(1.08); opacity: 1; }
+}
+@keyframes lhm-oy-b {
+  0% { transform: translateY(calc(var(--ry) * -1)) scale(0.78); opacity: 0.8; }
+  44% { opacity: 0.8; }
+  56% { opacity: 0; }
+  100% { transform: translateY(var(--ry)) scale(1.08); opacity: 0; }
+}
+.holo-run .lhm-up { animation: lhm-up 2.4s ease-out infinite backwards; animation-delay: calc(var(--i) * 0.8s); }
+@keyframes lhm-up {
+  0% { transform: translateY(0) scale(0.4); opacity: 0; }
+  20% { opacity: 1; }
+  100% { transform: translateY(-22px) scale(1); opacity: 0; }
+}
+
+/* ── Insights: thinking, then the idea ── */
+.holo-run .lhi-fa,
+.holo-run .lhi-aa { animation: lhi-a 4.6s infinite backwards; }
+.holo-run .lhi-fb,
+.holo-run .lhi-ab { animation: lhi-b 4.6s infinite backwards; }
+@keyframes lhi-a {
+  0%, 37% { opacity: 1; }
+  39%, 82% { opacity: 0; }
+  86%, 100% { opacity: 1; }
+}
+@keyframes lhi-b {
+  0%, 37% { opacity: 0; }
+  39%, 82% { opacity: 1; }
+  86%, 100% { opacity: 0; }
+}
+.holo-run .lhi-think { animation: lhi-think 4.6s infinite backwards; }
+@keyframes lhi-think {
+  0% { opacity: 0; transform: translateY(4px); }
+  8%, 34% { opacity: 1; transform: translateY(0); }
+  38%, 100% { opacity: 0; transform: translateY(0); }
+}
+.holo-run .lhi-dot { animation: lhi-dot 0.6s ease-in-out infinite alternate backwards; }
+@keyframes lhi-dot {
+  from { transform: translateY(1.2px); }
+  to { transform: translateY(-1.6px); }
+}
+.holo-run .lhi-bulb { animation: lhi-bulb 4.6s infinite backwards; }
+@keyframes lhi-bulb {
+  0%, 37% { opacity: 0; transform: scale(0); animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
+  44%, 78% { opacity: 1; transform: scale(1); animation-timing-function: ease-in; }
+  84%, 100% { opacity: 0; transform: scale(0.5); }
+}
+.holo-run .lhi-rays { animation: lhi-rays 4.6s infinite backwards; }
+@keyframes lhi-rays {
+  0%, 40% { opacity: 0; }
+  46%, 78% { opacity: 1; }
+  82%, 100% { opacity: 0; }
+}
+.holo-run .lhi-spin { animation: lhi-spin 7s linear infinite; }
+@keyframes lhi-spin { to { transform: rotate(360deg); } }
+.holo-run .lhi-spark { animation: lhi-spark 4.6s infinite backwards; }
+@keyframes lhi-spark {
+  0%, 39% { opacity: 0; transform: translate(0, 0) scale(0.3); animation-timing-function: cubic-bezier(0.2, 0.8, 0.4, 1); }
+  41% { opacity: 1; }
+  58%, 100% { opacity: 0; transform: translate(var(--sx), var(--sy)) scale(1); }
+}
+.holo-run .lhi-ex { animation: lhi-ex 4.6s infinite backwards; }
+@keyframes lhi-ex {
+  0%, 38% { opacity: 0; transform: scale(0) rotate(-25deg); animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
+  45%, 76% { opacity: 1; transform: scale(1) rotate(0deg); }
+  81%, 100% { opacity: 0; transform: scale(0.6) rotate(0deg); }
+}
+.holo-run .lhi-head { animation: lhi-head 4.6s infinite backwards; }
+@keyframes lhi-head {
+  0%, 37% { transform: translateY(0) rotate(-4deg); }
+  40% { transform: translateY(-3px) rotate(0deg); }
+  44%, 82% { transform: translateY(0) rotate(0deg); }
+  90%, 100% { transform: translateY(0) rotate(-4deg); }
+}
+
+/* ── Remembrance: falling stars into a jar ── */
+.holo-run .lhr-fx { animation: lhr-fx 3.5s infinite; }
+.holo-run .lhr-fy { animation: lhr-fy 3.5s infinite; }
+@keyframes lhr-fx {
+  0% { transform: translateX(0); animation-timing-function: cubic-bezier(0.3, 0, 0.7, 1); }
+  90%, 100% { transform: translateX(var(--dx)); }
+}
+@keyframes lhr-fy {
+  0% { transform: translateY(0) rotate(0deg) scale(1); opacity: 0; animation-timing-function: cubic-bezier(0.45, 0, 0.85, 0.6); }
+  10% { opacity: 1; }
+  90% { transform: translateY(var(--dy)) rotate(var(--r)) scale(0.75); opacity: 1; animation-timing-function: linear; }
+  100% { transform: translateY(calc(var(--dy) + 9px)) rotate(var(--r)) scale(0.35); opacity: 0; }
+}
+/* A star lands every 0.7 s (the stars' negative delays); the glow answers. */
+.holo-run .lhr-glow { animation: lhr-glow 0.7s ease-out -0.35s infinite; }
+@keyframes lhr-glow {
+  0% { transform: scale(1.3); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.6; }
+}
+.holo-run .lhr-in { animation: lhr-in 1.4s ease-in-out infinite alternate; }
+@keyframes lhr-in { to { transform: translateY(-2.5px) rotate(20deg); } }
+
+/* ── Diary: three lines, a doodle, turn the page ── */
+.holo-run .lhd-l0 { animation: lhd-l0 7s linear infinite; }
+.holo-run .lhd-l1 { animation: lhd-l1 7s linear infinite; }
+.holo-run .lhd-l2 { animation: lhd-l2 7s linear infinite; }
+@keyframes lhd-l0 { 0%, 6% { transform: scaleX(1); } 20%, 81% { transform: scaleX(0); } 81.5%, 100% { transform: scaleX(1); } }
+@keyframes lhd-l1 { 0%, 22% { transform: scaleX(1); } 36%, 81% { transform: scaleX(0); } 81.5%, 100% { transform: scaleX(1); } }
+@keyframes lhd-l2 { 0%, 38% { transform: scaleX(1); } 50%, 81% { transform: scaleX(0); } 81.5%, 100% { transform: scaleX(1); } }
+.holo-run .lhd-heart { animation: lhd-heart 7s infinite; }
+@keyframes lhd-heart {
+  0%, 51% { transform: scale(0); animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
+  56%, 81% { transform: scale(1); }
+  81.5%, 100% { transform: scale(0); }
+}
+/* The pen's tip rides the edge of the cover as it uncovers each line. */
+.holo-run .lhd-pen { animation: lhd-pen 7s linear infinite; }
+@keyframes lhd-pen {
+  0% { transform: translate(7px, 22px); opacity: 0; }
+  4%, 6% { transform: translate(7px, 22px); opacity: 1; }
+  20% { transform: translate(78px, 22px); }
+  22% { transform: translate(7px, 38px); }
+  36% { transform: translate(78px, 38px); }
+  38% { transform: translate(7px, 54px); }
+  50% { transform: translate(78px, 54px); }
+  53% { transform: translate(70px, 70px); }
+  72% { transform: translate(72px, 74px); opacity: 1; }
+  75%, 100% { transform: translate(72px, 74px); opacity: 0; }
+}
+.holo-run .lhd-page { animation: lhd-page 7s infinite; }
+@keyframes lhd-page {
+  0%, 76% { transform: scaleX(1); animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.5); }
+  81.2% { transform: scaleX(0.02); animation-timing-function: cubic-bezier(0.1, 0.5, 0.5, 1); }
+  87%, 100% { transform: scaleX(1); }
+}
+.holo-run .lhd-hand { animation: lhd-hand 0.32s ease-in-out infinite alternate; }
+@keyframes lhd-hand {
+  from { transform: translate(-1.6px, 0) rotate(-6deg); }
+  to { transform: translate(1.6px, -0.6px) rotate(6deg); }
+}
+.holo-run .lhd-steam { animation: lhd-steam 2s ease-out infinite backwards; }
+@keyframes lhd-steam {
+  0% { opacity: 0; transform: translateY(2px) scaleY(0.6); }
+  30% { opacity: 0.8; }
+  100% { opacity: 0; transform: translateY(-8px) scaleY(1.1); }
+}
+
+/* ── Collection: treasures arc into the cabinet ── */
+.holo-run .lhk-fx { animation: lhk-fx 6s linear infinite backwards; }
+.holo-run .lhk-fy { animation: lhk-fy 6s infinite backwards; }
+@keyframes lhk-fx {
+  0%, 2% { transform: translateX(0); }
+  12%, 100% { transform: translateX(var(--dx)); }
+}
+@keyframes lhk-fy {
+  0%, 2% { transform: translateY(0) scale(0.4); opacity: 0; animation-timing-function: cubic-bezier(0.2, 0.75, 0.45, 1); }
+  4% { opacity: 1; }
+  7% { transform: translateY(var(--h)) scale(1); animation-timing-function: cubic-bezier(0.55, 0, 0.85, 0.45); }
+  12% { transform: translateY(var(--dy)) scale(1.18, 0.8); animation-timing-function: ease-out; }
+  15% { transform: translateY(var(--dy)) scale(0.92, 1.08); }
+  18%, 80% { transform: translateY(var(--dy)) scale(1); opacity: 1; }
+  86%, 100% { transform: translateY(var(--dy)) scale(0.6); opacity: 0; }
+}
+.holo-run .lhk-spark { animation: lhk-spark 6s infinite backwards; }
+@keyframes lhk-spark {
+  0%, 11.5% { opacity: 0; transform: scale(0.3) rotate(0deg); }
+  14% { opacity: 1; transform: scale(1.2) rotate(30deg); }
+  22%, 100% { opacity: 0; transform: scale(1.5) rotate(60deg); }
+}
+.holo-run .lhk-flap { animation: lhk-flap 0.5s ease-in-out infinite alternate; }
+.holo-run .lhk-flap-r { animation-name: lhk-flap-r; }
+@keyframes lhk-flap { to { transform: rotate(-14deg); } }
+@keyframes lhk-flap-r { to { transform: rotate(14deg); } }
+
+/* ── Progression: hop up the bars ── */
+.holo-run .lhp-bar { animation: lhp-bar 7s infinite backwards; animation-delay: calc(var(--i) * 0.15s); }
+@keyframes lhp-bar {
+  0% { transform: scaleY(0); animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
+  7%, 86% { transform: scaleY(1); animation-timing-function: ease-in; }
+  92%, 100% { transform: scaleY(0); }
+}
+.holo-run .lhp-x { animation: lhp-x 7s linear infinite; }
+@keyframes lhp-x {
+  0%, 10% { transform: translateX(40px); }
+  18%, 24% { transform: translateX(80px); }
+  32%, 38% { transform: translateX(106px); }
+  46%, 52% { transform: translateX(132px); }
+  60%, 89% { transform: translateX(158px); }
+  90%, 100% { transform: translateX(40px); }
+}
+/* Up with ease-out, down with ease-in: every hop is an arc. */
+.holo-run .lhp-y { animation: lhp-y 7s infinite; }
+@keyframes lhp-y {
+  0%, 10% { transform: translateY(136px); animation-timing-function: cubic-bezier(0.25, 0.7, 0.45, 1); }
+  14% { transform: translateY(100px); animation-timing-function: cubic-bezier(0.55, 0, 0.8, 0.4); }
+  18%, 24% { transform: translateY(114px); animation-timing-function: cubic-bezier(0.25, 0.7, 0.45, 1); }
+  28% { transform: translateY(84px); animation-timing-function: cubic-bezier(0.55, 0, 0.8, 0.4); }
+  32%, 38% { transform: translateY(98px); animation-timing-function: cubic-bezier(0.25, 0.7, 0.45, 1); }
+  42% { transform: translateY(66px); animation-timing-function: cubic-bezier(0.55, 0, 0.8, 0.4); }
+  46%, 52% { transform: translateY(80px); animation-timing-function: cubic-bezier(0.25, 0.7, 0.45, 1); }
+  56% { transform: translateY(46px); animation-timing-function: cubic-bezier(0.55, 0, 0.8, 0.4); }
+  60%, 64% { transform: translateY(60px); animation-timing-function: cubic-bezier(0.25, 0.7, 0.45, 1); }
+  67% { transform: translateY(52px); animation-timing-function: cubic-bezier(0.55, 0, 0.8, 0.4); }
+  70%, 72% { transform: translateY(60px); animation-timing-function: cubic-bezier(0.25, 0.7, 0.45, 1); }
+  75% { transform: translateY(52px); animation-timing-function: cubic-bezier(0.55, 0, 0.8, 0.4); }
+  78%, 89% { transform: translateY(60px); }
+  90%, 100% { transform: translateY(136px); }
+}
+.holo-run .lhp-fade { animation: lhp-fade 7s infinite; }
+@keyframes lhp-fade {
+  0% { opacity: 0; }
+  4%, 84% { opacity: 1; }
+  88%, 100% { opacity: 0; }
+}
+.holo-run .lhp-ad { animation: lhp-ad 7s infinite; }
+.holo-run .lhp-au { animation: lhp-au 7s infinite; }
+@keyframes lhp-ad { 0%, 60% { opacity: 1; } 61%, 82% { opacity: 0; } 83%, 100% { opacity: 1; } }
+@keyframes lhp-au { 0%, 60% { opacity: 0; } 61%, 82% { opacity: 1; } 83%, 100% { opacity: 0; } }
+.holo-run .lhp-lv { animation: lhp-lv 7s infinite; }
+@keyframes lhp-lv {
+  0%, 60% { opacity: 0; transform: scale(0.3); animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
+  65%, 82% { opacity: 1; transform: scale(1); }
+  87%, 100% { opacity: 0; transform: scale(1.1); }
+}
+.holo-run .lhp-sp { animation: lhp-sp 7s infinite backwards; }
+@keyframes lhp-sp {
+  0%, 60% { opacity: 0; transform: translate(0, 0) scale(0.3); animation-timing-function: cubic-bezier(0.2, 0.8, 0.4, 1); }
+  62% { opacity: 1; }
+  76%, 100% { opacity: 0; transform: translate(var(--sx), var(--sy)) scale(1); }
+}
+.holo-run .lhp-xp { animation: lhp-xp 7s ease-out infinite; }
+@keyframes lhp-xp {
+  0%, 18% { transform: scaleX(0.1); }
+  20%, 32% { transform: scaleX(0.34); }
+  34%, 46% { transform: scaleX(0.58); }
+  48%, 60% { transform: scaleX(0.82); }
+  62% { transform: scaleX(1); }
+  66%, 100% { transform: scaleX(0.12); }
+}
+.holo-run .lhp-l4 { animation: lhp-l4 7s infinite; }
+.holo-run .lhp-l5 { animation: lhp-l5 7s infinite; }
+@keyframes lhp-l4 { 0%, 60% { opacity: 1; } 61%, 87% { opacity: 0; } 88%, 100% { opacity: 1; } }
+@keyframes lhp-l5 { 0%, 60% { opacity: 0; } 61%, 87% { opacity: 1; } 88%, 100% { opacity: 0; } }
+
+/* ── Roadmap: walk the route ── */
+.holo-run .lhw-walk { animation: lhw-walk 7.5s linear infinite; }
+@keyframes lhw-walk {
+  0%, 4% { transform: translate(30px, 124px); }
+  16%, 20% { transform: translate(66px, 112px); }
+  32%, 36% { transform: translate(80px, 84px); }
+  48%, 52% { transform: translate(118px, 90px); }
+  64%, 68% { transform: translate(140px, 58px); }
+  80%, 91% { transform: translate(163px, 44px); }
+  92%, 100% { transform: translate(30px, 124px); }
+}
+.holo-run .lhw-fade { animation: lhw-fade 7.5s infinite; }
+@keyframes lhw-fade {
+  0% { opacity: 0; }
+  4%, 88% { opacity: 1; }
+  91%, 100% { opacity: 0; }
+}
+.holo-run .lhw-bob { animation: lhw-bob 0.2s ease-in-out infinite alternate; }
+@keyframes lhw-bob { to { transform: translateY(-1.4px); } }
+.holo-run .lhw-leg { animation: lhw-leg 0.4s ease-in-out infinite alternate; }
+.holo-run .lhw-leg-b { animation-delay: -0.4s; }
+@keyframes lhw-leg {
+  from { transform: rotate(-24deg); }
+  to { transform: rotate(24deg); }
+}
+.holo-run .lhw-p1 { animation: lhw-p1 7.5s infinite; }
+.holo-run .lhw-p2 { animation: lhw-p2 7.5s infinite; }
+.holo-run .lhw-p3 { animation: lhw-p3 7.5s infinite; }
+.holo-run .lhw-p4 { animation: lhw-p4 7.5s infinite; }
+@keyframes lhw-p1 { 0%, 15.5% { opacity: 0; transform: scale(0.4); animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); } 19%, 88% { opacity: 1; transform: scale(1); } 92%, 100% { opacity: 0; transform: scale(1); } }
+@keyframes lhw-p2 { 0%, 31.5% { opacity: 0; transform: scale(0.4); animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); } 35%, 88% { opacity: 1; transform: scale(1); } 92%, 100% { opacity: 0; transform: scale(1); } }
+@keyframes lhw-p3 { 0%, 47.5% { opacity: 0; transform: scale(0.4); animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); } 51%, 88% { opacity: 1; transform: scale(1); } 92%, 100% { opacity: 0; transform: scale(1); } }
+@keyframes lhw-p4 { 0%, 63.5% { opacity: 0; transform: scale(0.4); animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); } 67%, 88% { opacity: 1; transform: scale(1); } 92%, 100% { opacity: 0; transform: scale(1); } }
+.holo-run .lhw-flag { animation: lhw-flag 0.6s ease-in-out infinite alternate; }
+@keyframes lhw-flag {
+  from { transform: scaleX(1) skewY(0deg); }
+  to { transform: scaleX(0.86) skewY(6deg); }
+}
+.holo-run .lhw-conf { animation: lhw-conf 7.5s infinite backwards; }
+@keyframes lhw-conf {
+  0%, 79% { opacity: 0; transform: translate(0, 0) rotate(0deg); animation-timing-function: cubic-bezier(0.2, 0.8, 0.4, 1); }
+  81% { opacity: 1; }
+  92%, 100% { opacity: 0; transform: translate(var(--sx), var(--sy)) rotate(260deg); }
+}
+
+/* ── Placeholder: the builder robot ── */
+.holo-run .lhz-e { animation: lhz-e 6s infinite backwards; animation-delay: calc(var(--i) * 0.2s); }
+@keyframes lhz-e {
+  0% { opacity: 0; }
+  3%, 70% { opacity: 1; }
+  77%, 100% { opacity: 0; }
+}
+.holo-run .lhz-q { animation: lhz-q 6s infinite backwards; }
+@keyframes lhz-q {
+  0%, 40% { opacity: 0; transform: scale(0.4); animation-timing-function: cubic-bezier(0.34, 1.56, 0.64, 1); }
+  46%, 70% { opacity: 1; transform: scale(1); }
+  76%, 100% { opacity: 0; transform: scale(1.3); }
+}
+.holo-run .lhz-float { animation: lhz-float 1.6s ease-in-out infinite alternate; }
+@keyframes lhz-float { to { transform: translateY(-2.5px); } }
+.holo-run .lhz-jet { animation: lhz-jet 0.12s ease-in-out infinite alternate; }
+@keyframes lhz-jet {
+  from { transform: scaleY(0.7); opacity: 0.8; }
+  to { transform: scaleY(1.15); opacity: 1; }
+}
+.holo-run .lhz-led { animation: lhz-led 1.2s steps(1, end) infinite; }
+@keyframes lhz-led {
+  0% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+.holo-run .lhz-sp { animation: lhz-sp 0.55s ease-out infinite backwards; }
+@keyframes lhz-sp {
+  0% { opacity: 1; transform: translate(0, 0); }
+  100% { opacity: 0; transform: translate(var(--sx), var(--sy)); }
+}
+.holo-run .lhz-flash { animation: lhz-flash 0.18s ease-in-out infinite; }
+@keyframes lhz-flash {
+  0%, 100% { opacity: 0.2; transform: scale(0.6); }
+  50% { opacity: 0.9; transform: scale(1.1); }
+}

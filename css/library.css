@@ -967,6 +967,22 @@
 .lib-card-placeholder .lib-card-desc { min-height: 2.4em; }
 .lib-card-placeholder:hover { transform: none; opacity: 0.85; }
 .lib-card-placeholder .lib-card-arrow { color: var(--lib-accent); opacity: 0.8; }
+/* On the Library hub the card carries a hologram (lib-holo.css). Opacity on
+   the wrapper would dim it, and would wall off its background blur (an
+   ancestor below opacity 1 is a backdrop root: the blur sees nothing behind
+   it). So the dimming moves onto the card's own layers. */
+.lib-card-placeholder.is-spatial,
+.lib-card-placeholder.is-spatial:hover { opacity: 1; }
+.lib-card-placeholder.is-spatial .lib-card-bg,
+.lib-card-placeholder.is-spatial .lib-card-head,
+.lib-card-placeholder.is-spatial .lib-card-name,
+.lib-card-placeholder.is-spatial .lib-card-desc,
+.lib-card-placeholder.is-spatial .lib-card-chips { opacity: 0.72; }
+.lib-card-placeholder.is-spatial:hover .lib-card-bg,
+.lib-card-placeholder.is-spatial:hover .lib-card-head,
+.lib-card-placeholder.is-spatial:hover .lib-card-name,
+.lib-card-placeholder.is-spatial:hover .lib-card-desc,
+.lib-card-placeholder.is-spatial:hover .lib-card-chips { opacity: 0.85; }
 /* Browsers without color-mix still get a readable tile. */
 @supports not (background: color-mix(in srgb, red 16%, transparent)) {
   .lib-card-wing .lib-card-icon { background: var(--bg-surface-hover); }

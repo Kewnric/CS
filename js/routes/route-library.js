@@ -114,8 +114,10 @@ function libraryInit() {
 
   const active = document.getElementById('lib-hub-active');
   if (active) {
+    // scene: the little hologram that rises out of the card's corner on
+    // hover (js/lib-holo.js), named after the route it opens.
     const card = (route, cls, icon, name, desc, chips, pct, pctLabel, accent) =>
-      libSpatialCardHTML({ route, cls, icon, name, desc, chips, pct, pctLabel, accent });
+      libSpatialCardHTML({ route, cls, icon, name, desc, chips, pct, pctLabel, accent, scene: route });
 
     // Read straight from the cheat-sheet store; it is not part of `state`.
     let cheatCount = 0, cheatPages = 0;
@@ -190,7 +192,7 @@ function libraryInit() {
   const soon = document.getElementById('lib-hub-soon');
   if (soon) {
     soon.innerHTML = libSpatialCardHTML({
-      cls: 'lib-card-placeholder', role: 'note', onclick: 'libPlaceholderNote()',
+      cls: 'lib-card-placeholder', role: 'note', onclick: 'libPlaceholderNote()', scene: 'placeholder',
       icon: 'package-plus', arrow: 'sparkles', name: 'Placeholder Library',
       desc: 'Room for the next wing. Nothing lives here yet.',
       chips: _libStatChip('clock', 'Not built yet'),
@@ -200,6 +202,7 @@ function libraryInit() {
   const libRoot = document.querySelector('.lib-hub');
   if (typeof lucide !== 'undefined') lucide.createIcons(libRoot ? { root: libRoot } : undefined);
   libSpatialBind(libRoot);
+  if (typeof libHoloBind === 'function') libHoloBind(libRoot);
 }
 
 /* ── Spatial cards ────────────────────────────────────────────
@@ -225,7 +228,7 @@ function libSpatialCardHTML(o) {
   const click = o.onclick || `spaNavigate('${o.route}')`;
   return `
     <div class="lib-card is-spatial ${o.cls || ''}" onclick="${click}" role="${o.role || 'link'}" tabindex="0"
-         ${o.accent ? `style="--lib-accent:${o.accent};"` : ''}
+         ${o.accent ? `style="--lib-accent:${o.accent};"` : ''}${o.scene ? ` data-scene="${o.scene}"` : ''}
          onkeydown="if(event.key==='Enter')${click}">
       <div class="lib-card-inner">
         <div class="lib-card-bg"><div class="lib-card-glow"></div><div class="lib-card-light"></div></div>
@@ -287,10 +290,13 @@ function libSpatialBind(root) {
       }
       inner.style.transform = 'rotateX(' + (-at.y * LIB_TILT).toFixed(2) + 'deg) rotateY(' +
         (at.x * LIB_TILT).toFixed(2) + 'deg) translateZ(' + at.z.toFixed(1) + 'px)';
-      card.style.setProperty('--mx', ((at.x + 1) * 50).toFixed(1) + '%');
-      card.style.setProperty('--my', ((at.y + 1) * 50).toFixed(1) + '%');
-      card.style.setProperty('--tx', at.x.toFixed(3));
-      card.style.setProperty('--ty', at.y.toFixed(3));
+      // On the inner layer, where every reader of them lives (the light, the
+      // rim, the shadow). Set on the card, each frame restyled everything else
+      // in it too -- a Library card's whole hologram scene (lib-holo.js).
+      inner.style.setProperty('--mx', ((at.x + 1) * 50).toFixed(1) + '%');
+      inner.style.setProperty('--my', ((at.y + 1) * 50).toFixed(1) + '%');
+      inner.style.setProperty('--tx', at.x.toFixed(3));
+      inner.style.setProperty('--ty', at.y.toFixed(3));
       if (moving) raf = requestAnimationFrame(frame);
       else last = 0;
     };
