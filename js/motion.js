@@ -41,7 +41,22 @@ const Motion = (() => {
     if (LEVELS.indexOf(next) === -1) return;
     try { localStorage.setItem(LEVEL_KEY, next); } catch (e) { /* private mode */ }
     document.documentElement.setAttribute('data-motion', next);
+    syncOffClass();
     paintSetting();
+  }
+
+  /* "Off" is also a class on <html>, because that is what the one rule that
+     reaches every element is keyed on (css/mx-core.css says why). Kept in
+     step with the attribute here, and by an observer for anything that
+     writes the attribute itself. */
+  function syncOffClass() {
+    const root = document.documentElement;
+    const off = root.getAttribute('data-motion') === 'off';
+    if (root.classList.contains('mx-off') !== off) root.classList.toggle('mx-off', off);
+  }
+  syncOffClass();
+  if (typeof MutationObserver !== 'undefined') {
+    new MutationObserver(syncOffClass).observe(document.documentElement, { attributes: true, attributeFilter: ['data-motion'] });
   }
 
   function cycleLevel() {

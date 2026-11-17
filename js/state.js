@@ -373,6 +373,8 @@ document.addEventListener('visibilitychange', () => {
 });
 
 function _flushSaveData(opts) {
+  // A write nobody announced with saveData() (an import, a restore) is a change too.
+  if (!_saveDataPending || !(opts && opts.background)) _stateContentRev++;
   _saveDataPending = false;
   /* Compact the record before it is written anywhere. Done here rather than
      at the point of grading because it has to catch imported and merged
@@ -468,8 +470,19 @@ function _flushSaveData(opts) {
   } catch (e) { failed(e); }
 }
 
-/** Debounced localStorage persist — also clears the breadcrumb path cache. */
-function saveData() {
+/* How many times the saved data has changed, for anything that keeps a result
+   it would otherwise have to work out again on every render (the starter pack's
+   "update available" count hashes every program). saveData() is the one call
+   every change makes, so a result filed under this number is good until the
+   next one. Folding and unfolding a tree saves too, but changes nothing a
+   library's contents depend on: those callers pass 'ui' and are not counted. */
+let _stateContentRev = 0;
+function stateContentRev() { return _stateContentRev; }
+
+/** Debounced localStorage persist — also clears the breadcrumb path cache.
+ *  @param {string} [kind] 'ui' when only how a tree is folded changed. */
+function saveData(kind) {
+  if (kind !== 'ui') _stateContentRev++;
   _breadcrumbCache = new Map();
   _saveDataPending = true;
   clearTimeout(saveTimeout);
@@ -751,7 +764,7 @@ function setNodeExpanded(nodeId, open, scope) {
     siblingFolderIds(nodeId, scope).forEach(drop);
     if (!state.expandedNodes.includes(key)) state.expandedNodes.push(key);
   }
-  saveData();
+  saveData('ui');
 }
 
 /**
@@ -768,7 +781,7 @@ function collapseAllFolders(scope) {
   for (let i = state.expandedNodes.length - 1; i >= 0; i--) {
     if (mine.has(state.expandedNodes[i])) { state.expandedNodes.splice(i, 1); changed = true; }
   }
-  if (changed) saveData();
+  if (changed) saveData('ui');
 }
 
 function toggleNodeExpanded(nodeId, scope) {
@@ -806,7 +819,7 @@ function expandNodePath(nodeId) {
     });
     if (!state.expandedNodes.includes(id)) state.expandedNodes.push(id);
   });
-  saveData();
+  saveData('ui');
 }
 
 function isNodeExpanded(nodeId, scope) {

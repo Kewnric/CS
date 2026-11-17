@@ -802,30 +802,110 @@ function fuzzyMatch(str, pattern) {
    many with `el:`/`root:` that did nothing) rebuilt every icon on screen; the
    dashboard's stat card alone did it three times every four seconds.
 
-   This keeps Lucide's own drawing and skips the icons that are already drawn
-   with the name they carry now. An <i data-lucide> placeholder, or an <svg>
-   whose data-lucide was changed to swap the glyph, is drawn as before; the
-   whole document is still searched, so nothing that rendered before stops
-   rendering. Only the redundant redraws are gone. */
+   This skips the icons that are already drawn with the name they carry now.
+   An <i data-lucide> placeholder, or an <svg> whose data-lucide was changed
+   to swap the glyph, is drawn; the whole document is still searched, so
+   nothing that rendered before stops rendering.
+
+   The drawing is done here, from Lucide's own icon data. Lucide builds every
+   icon one createElementNS and one setAttribute at a time and searches the
+   document three more times around it; measured on a Coding Library folder
+   switch that was 4.4 ms of a 12.8 ms render. Each glyph is now built once
+   (by Lucide's createElement) and cloned after that, in one search. The
+   result is the same element Lucide makes: its default attributes, then
+   data-lucide, then opts.attrs, then the placeholder's own attributes, and
+   the classes merged as `lucide lucide-<name>` + the placeholder's + attrs'.
+   A custom `icons` set or name attribute still goes to Lucide itself. */
 (function () {
   if (typeof lucide === 'undefined' || !lucide.createIcons || lucide.createIcons.__drawnOnly) return;
   const draw = lucide.createIcons;
   const PENDING = 'data-lucide-pending';
-  const fast = function (opts) {
-    const o = opts || {};
-    if (o.nameAttr && o.nameAttr !== 'data-lucide') return draw(o);
-    const todo = [];
-    document.querySelectorAll('[data-lucide]').forEach(el => {
-      const name = el.getAttribute('data-lucide');
-      if (el.__lucideDrawn !== name || el.tagName.toLowerCase() !== 'svg') todo.push([el, name]);
-    });
-    if (!todo.length) return;
-    todo.forEach(([el, name]) => el.setAttribute(PENDING, name));
+  const glyphs = new Map();   // icon name -> a finished <svg> to clone, or null if Lucide has none
+  const pascal = (s) => s.replace(/(\w)(\w*)(_|-|\s*)/g, (g0, g1, g2) => g1.toUpperCase() + g2.toLowerCase());
+
+  function glyphFor(name) {
+    if (glyphs.has(name)) return glyphs.get(name);
+    let svg = null;
+    const node = lucide.icons && lucide.icons[pascal(name)];
+    if (node && typeof lucide.createElement === 'function') {
+      try { svg = lucide.createElement(node); } catch (e) { svg = null; }
+    }
+    glyphs.set(name, svg);
+    return svg;
+  }
+
+  // Lucide's class merge: split on spaces, trim, drop empties, keep first of each.
+  function mergeClasses(name, own, extra) {
+    const out = ['lucide', 'lucide-' + name];
+    const add = (str) => {
+      if (!str || typeof str !== 'string') return;
+      const parts = str.split(' ');
+      for (let i = 0; i < parts.length; i++) {
+        const c = parts[i].trim();
+        if (c && out.indexOf(c) === -1) out.push(c);
+      }
+    };
+    add(own);
+    if (extra) add(Array.isArray(extra) ? extra.join(' ') : extra);
+    return out.join(' ');
+  }
+
+  // The old way, for the few this cannot draw (a name Lucide does not have
+  // still gets Lucide's own warning).
+  function viaLucide(list, o) {
+    list.forEach(([el, name]) => el.setAttribute(PENDING, name));
     draw({ icons: o.icons, attrs: o.attrs || {}, nameAttr: PENDING });
     document.querySelectorAll('[' + PENDING + ']').forEach(el => {
       if (el.tagName.toLowerCase() === 'svg') el.__lucideDrawn = el.getAttribute(PENDING);
+      else el.__lucideMissing = el.getAttribute(PENDING);
       el.removeAttribute(PENDING);
     });
+  }
+
+  const fast = function (opts) {
+    const o = opts || {};
+    if (o.nameAttr && o.nameAttr !== 'data-lucide') return draw(o);
+    const found = document.querySelectorAll('[data-lucide]');
+    const todo = [];
+    for (let i = 0; i < found.length; i++) {
+      const el = found[i];
+      const name = el.getAttribute('data-lucide');
+      if (el.__lucideDrawn === name && el.namespaceURI === 'http://www.w3.org/2000/svg' && el.localName === 'svg') continue;
+      // A name Lucide has no glyph for was tried once; it is not tried on every call.
+      if (el.__lucideMissing === name) continue;
+      todo.push([el, name]);
+    }
+    if (!todo.length) return;
+    if (o.icons && o.icons !== lucide.icons) return viaLucide(todo, o);
+
+    const attrs = o.attrs || null;
+    const attrKeys = attrs ? Object.keys(attrs) : null;
+    const slow = [];
+    for (let i = 0; i < todo.length; i++) {
+      const el = todo[i][0], name = todo[i][1];
+      const base = name ? glyphFor(name) : null;
+      if (!base || !el.parentNode) { slow.push(todo[i]); continue; }
+      const svg = base.cloneNode(true);
+      svg.setAttribute('data-lucide', name);
+      if (attrKeys) {
+        for (let k = 0; k < attrKeys.length; k++) {
+          if (attrKeys[k] !== 'class') svg.setAttribute(attrKeys[k], String(attrs[attrKeys[k]]));
+        }
+      }
+      // The class is written where the placeholder had it (or last), as Lucide does.
+      let classed = false;
+      const src = el.attributes;
+      for (let k = 0; k < src.length; k++) {
+        if (src[k].name === 'class') {
+          svg.setAttribute('class', mergeClasses(name, src[k].value, attrs && attrs.class));
+          classed = true;
+        } else svg.setAttribute(src[k].name, src[k].value);
+      }
+      if (!classed) svg.setAttribute('class', mergeClasses(name, '', attrs && attrs.class));
+      svg.__lucideDrawn = name;
+      el.parentNode.replaceChild(svg, el);
+    }
+    if (slow.length) viaLucide(slow.filter(t => t[0].parentNode), o);
   };
   fast.__drawnOnly = true;
   lucide.createIcons = fast;

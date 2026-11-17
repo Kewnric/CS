@@ -461,8 +461,19 @@ With all three handled, all 1281 inline handlers resolve and there are no dead
 buttons.
 
 - **Lucide 0.408's `createIcons` ignores `root` and `el`** and redrew every icon on the page on every
-  call (a drawn `<svg>` keeps `data-lucide`). `js/utils.js` wraps it to draw only placeholders and
-  icons whose `data-lucide` changed, still through Lucide. Scoping a call does nothing; do not rely on it.
+  call (a drawn `<svg>` keeps `data-lucide`). `js/utils.js` replaces it: only placeholders and icons
+  whose `data-lucide` changed are drawn, each glyph built once by Lucide and cloned after (the same
+  element Lucide makes). Scoping a call does nothing; do not rely on it.
+- **A selector whose last part names no class, id or tag is tried on every element** of every page,
+  on every restyle: `:is(.a, .b):active`, `:is(.x, .y) > :nth-child(2)`, `[id$="-x"] > *`,
+  `html[data-motion="off"] *`, and a bare `::view-transition-old(...)` (write `html::view-...`).
+  176 of them made a full restyle 2.5x slower (25 ms vs 10 ms on the Coding Library). Write the list
+  out (`.a:active, .b:active`), key on a class rather than an attribute value, and measure a full
+  restyle before and after. Infinite animations of anything but transform/opacity/filter restyle the
+  page every frame; a stepped one is cheaper as a timer (see the tree row dither in tree-dnd.js).
+- **The Coding Library tree draws a shut folder's rows only when it opens** (`_browseFillOpened`,
+  `data-lazy` on the children box). Code that looks for a program's row must open its path first
+  (`expandNodePath` + `renderBrowseTree`). The Folders view draws every row while it is on.
 - **A finished animation with `fill: forwards` that touches transform, opacity or filter keeps its
   element composited for good.** Home had 470 such layers (heatmap cells, hero letters). Rest on the
   final keyframe and fill `backwards`. Count layers with CDP `LayerTree` when a page feels slow.

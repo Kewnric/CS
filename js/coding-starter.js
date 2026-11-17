@@ -1071,8 +1071,27 @@ function _csFreshPack() {
  * Returns 0 for a library that is not the pack; sorting that out is Repair's
  * job and the warning above already says so.
  */
+let _csPendingMemo = null;
 function codingStarterPendingCount() {
-  const target = codingLibraryIsStarter() ? _csLift() : (state.codingStash || null);
+  /* Asked on every browse render, and the answer hashes every program in the
+     pack (2 ms of a 12.8 ms folder switch, measured). It can only change when
+     the saved data does, so it is kept until then (state.js stateContentRev).
+     Which library is on screen, and the arrays themselves, are part of the
+     key: a swap or a load replaces them without going through saveData first. */
+  const onPack = codingLibraryIsStarter();
+  const rev = typeof stateContentRev === 'function' ? stateContentRev() : null;
+  const memo = _csPendingMemo;
+  if (memo && rev !== null && memo.rev === rev && memo.onPack === onPack
+      && memo.list === state.challenges && memo.n === (state.challenges || []).length
+      && memo.stash === (state.codingStash || null) && memo.fresh === _csFreshCache) return memo.count;
+  const count = _csPendingCountNow(onPack);
+  _csPendingMemo = { rev: rev, onPack: onPack, list: state.challenges, n: (state.challenges || []).length,
+    stash: state.codingStash || null, fresh: _csFreshCache, count: count };
+  return count;
+}
+
+function _csPendingCountNow(onPack) {
+  const target = onPack ? _csLift() : (state.codingStash || null);
   const cs = (target && target.challenges) || [];
   if (!cs.length || !cs.some(_csIsPackId) || cs.some(c => !_csIsPackId(c))) return 0;
 

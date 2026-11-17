@@ -86,8 +86,15 @@
     /* ── Press and release ────────────────────────────────────────────
        .btn and the sidebar already squash through `transform`; these are
        the pressable things that did not. */
-    :is(.card, .settings-item, .quick-action-card, .ss-preset, .tree-node-row, .home-stat-card.is-clickable,
-        .lib-stat-chip, .file-tab, .quest-tab, .lang-tab, .settings-fab, .mx-top-btn, .btn-icon, .hero-verse-btn):active {
+    /* Written out one class at a time. As :is(.card, .settings-item, ...):active
+       it named nothing the engine could file it under, so it was tried on
+       every element of every page (the second most expensive selector in
+       the app). Each class is doubled to keep the weight the list had: an
+       :is() weighs as its heaviest entry, .home-stat-card.is-clickable. */
+    .card.card:active, .settings-item.settings-item:active, .quick-action-card.quick-action-card:active, .ss-preset.ss-preset:active, .tree-node-row.tree-node-row:active,
+    .home-stat-card.is-clickable:active,
+    .lib-stat-chip.lib-stat-chip:active, .file-tab.file-tab:active, .quest-tab.quest-tab:active, .lang-tab.lang-tab:active,
+    .settings-fab.settings-fab:active, .mx-top-btn.mx-top-btn:active, .btn-icon.btn-icon:active, .hero-verse-btn.hero-verse-btn:active {
       scale: calc(1 - 0.03 * var(--mx-travel) - 0.012);
     }
     .mx-release { animation: mxRelease 320ms var(--ease-spring) !important; }
@@ -120,26 +127,28 @@
 
   html[data-motion="full"] {
     /* ── Icons by meaning ─────────────────────────────────────────── */
-    :is(button, a, [role="button"], .settings-item, .card, .sidebar-link):hover {
-      svg:is(.lucide-x, .lucide-plus) { animation: mxIcoTurn 420ms var(--ease-spring); }
-      svg:is(.lucide-refresh-cw, .lucide-rotate-cw, .lucide-rotate-ccw, .lucide-shuffle, .lucide-repeat, .lucide-settings-2) {
-        animation: mxIcoSpin 600ms var(--ease-standard);
-      }
-      svg:is(.lucide-download, .lucide-arrow-down, .lucide-chevron-down, .lucide-import) { animation: mxIcoDrop 480ms var(--ease-standard); }
-      svg:is(.lucide-upload, .lucide-arrow-up, .lucide-chevron-up, .lucide-share-2) { animation: mxIcoRise 480ms var(--ease-standard); }
-      svg:is(.lucide-chevron-right, .lucide-arrow-right, .lucide-play, .lucide-arrow-right-to-line) { animation: mxIcoNudge 420ms var(--ease-standard); }
-      svg:is(.lucide-chevron-left, .lucide-arrow-left) { animation: mxIcoNudgeBack 420ms var(--ease-standard); }
-      svg:is(.lucide-search, .lucide-pencil, .lucide-notebook-pen, .lucide-scissors, .lucide-palette, .lucide-sticker) {
-        animation: mxIcoTilt 520ms var(--ease-standard);
-      }
-      svg:is(.lucide-trash-2, .lucide-trash, .lucide-bell, .lucide-alert-triangle, .lucide-lock) { animation: mxIcoWiggle 520ms var(--ease-standard); }
-      svg:is(.lucide-copy, .lucide-check, .lucide-save, .lucide-star, .lucide-heart, .lucide-zap, .lucide-flame,
-             .lucide-lightbulb, .lucide-trophy, .lucide-sparkles, .lucide-eye, .lucide-volume-2, .lucide-moon, .lucide-sun) {
-        animation: mxIcoPop 420ms var(--ease-spring);
-      }
-      svg:is(.lucide-maximize, .lucide-maximize-2, .lucide-expand, .lucide-layers, .lucide-cloud, .lucide-hard-drive) {
-        animation: mxIcoGrow 460ms var(--ease-standard);
-      }
+    /* Each rule names the hovered control itself. Nested under one
+       `:is(button, a, ...):hover { }` wrapper they read better, but the
+       wrapper is a rule too (an empty one), and one the engine had to try
+       on every element of every page. Same elements, same weight. */
+    :is(button, a, [role="button"], .settings-item, .card, .sidebar-link):hover svg:is(.lucide-x, .lucide-plus) { animation: mxIcoTurn 420ms var(--ease-spring); }
+    :is(button, a, [role="button"], .settings-item, .card, .sidebar-link):hover svg:is(.lucide-refresh-cw, .lucide-rotate-cw, .lucide-rotate-ccw, .lucide-shuffle, .lucide-repeat, .lucide-settings-2) {
+      animation: mxIcoSpin 600ms var(--ease-standard);
+    }
+    :is(button, a, [role="button"], .settings-item, .card, .sidebar-link):hover svg:is(.lucide-download, .lucide-arrow-down, .lucide-chevron-down, .lucide-import) { animation: mxIcoDrop 480ms var(--ease-standard); }
+    :is(button, a, [role="button"], .settings-item, .card, .sidebar-link):hover svg:is(.lucide-upload, .lucide-arrow-up, .lucide-chevron-up, .lucide-share-2) { animation: mxIcoRise 480ms var(--ease-standard); }
+    :is(button, a, [role="button"], .settings-item, .card, .sidebar-link):hover svg:is(.lucide-chevron-right, .lucide-arrow-right, .lucide-play, .lucide-arrow-right-to-line) { animation: mxIcoNudge 420ms var(--ease-standard); }
+    :is(button, a, [role="button"], .settings-item, .card, .sidebar-link):hover svg:is(.lucide-chevron-left, .lucide-arrow-left) { animation: mxIcoNudgeBack 420ms var(--ease-standard); }
+    :is(button, a, [role="button"], .settings-item, .card, .sidebar-link):hover svg:is(.lucide-search, .lucide-pencil, .lucide-notebook-pen, .lucide-scissors, .lucide-palette, .lucide-sticker) {
+      animation: mxIcoTilt 520ms var(--ease-standard);
+    }
+    :is(button, a, [role="button"], .settings-item, .card, .sidebar-link):hover svg:is(.lucide-trash-2, .lucide-trash, .lucide-bell, .lucide-alert-triangle, .lucide-lock) { animation: mxIcoWiggle 520ms var(--ease-standard); }
+    :is(button, a, [role="button"], .settings-item, .card, .sidebar-link):hover svg:is(.lucide-copy, .lucide-check, .lucide-save, .lucide-star, .lucide-heart, .lucide-zap, .lucide-flame,
+           .lucide-lightbulb, .lucide-trophy, .lucide-sparkles, .lucide-eye, .lucide-volume-2, .lucide-moon, .lucide-sun) {
+      animation: mxIcoPop 420ms var(--ease-spring);
+    }
+    :is(button, a, [role="button"], .settings-item, .card, .sidebar-link):hover svg:is(.lucide-maximize, .lucide-maximize-2, .lucide-expand, .lucide-layers, .lucide-cloud, .lucide-hard-drive) {
+      animation: mxIcoGrow 460ms var(--ease-standard);
     }
   }
 }

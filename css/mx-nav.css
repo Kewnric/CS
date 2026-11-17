@@ -184,11 +184,23 @@ body.route-focused .mx-top-btn { display: none; }
     .sidebar-backdrop:not(.hidden) { animation: mxInFade var(--mx-base) ease-out backwards; }
 
     /* ── Tabs and panes ───────────────────────────────────────────── */
-    :is(.quest-tab, .lang-tab, .variant-tab, .bnm-tab, .study-tab, .pp-tab, .file-tab):is(.active, .is-active, .is-on) {
+    /* One selector per kind of tab: :is(a, b, ...):is(...) names nothing the
+       engine can file it under, and was tried on every element of every page. */
+    .quest-tab:is(.active, .is-active, .is-on),
+    .lang-tab:is(.active, .is-active, .is-on),
+    .variant-tab:is(.active, .is-active, .is-on),
+    .bnm-tab:is(.active, .is-active, .is-on),
+    .study-tab:is(.active, .is-active, .is-on),
+    .pp-tab:is(.active, .is-active, .is-on),
+    .file-tab:is(.active, .is-active, .is-on) {
       animation: mxTabOn 240ms var(--ease-expo-out) backwards;
     }
     /* A detail pane redrawn for a new selection. */
-    :is([id$="-detail-container"], #wing-detail, #mtl-detail, #lang-detail, #quest-details-container) > * {
+    /* The panes by name. [id$="-detail-container"] has to be read off every
+       element's parent before it can be ruled out; an id is ruled out at
+       once. A new detail pane is added here by its id. */
+    #analytics-detail-container > *, #notes-detail-container > *, #snippet-detail-container > *,
+    #wing-detail > *, #mtl-detail > *, #lang-detail > *, #quest-details-container > * {
       animation: mxPaneIn 260ms var(--ease-expo-out) backwards;
     }
     /* Back from an attempt: the row you came from says where you are. */

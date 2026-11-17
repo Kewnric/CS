@@ -50,9 +50,15 @@ html[data-motion="calm"] {
    switch (global.css): durations collapse rather than animations being
    removed, so anything that rests on an animation's last frame still gets
    there and every animationend / transitionend still fires. */
-html[data-motion="off"] *,
-html[data-motion="off"] *::before,
-html[data-motion="off"] *::after {
+/* Keyed on a class, not on the attribute. <html> always carries data-motion,
+   so the engine could not rule this out for any element without walking up
+   to <html> and reading the value: with motion on, that was the single most
+   expensive selector in the app (1 ms of every 25 ms full restyle). A class
+   that is simply absent is ruled out at once. index.html puts .mx-off on
+   before first paint and motion.js keeps it in step with the attribute. */
+html.mx-off *,
+html.mx-off *::before,
+html.mx-off *::after {
   animation-duration: 0.01ms !important;
   animation-delay: 0s !important;
   animation-iteration-count: 1 !important;
@@ -591,15 +597,18 @@ html[data-motion="off"]::view-transition-new(*) {
       animation: mxInRise 200ms var(--ease-expo-out) backwards;
       animation-delay: calc(20ms + var(--mx-i, 0) * 13ms);
     }
-    :is(.tree-context-menu, .viz-context-menu, .file-menu, .cs-table-menu) > :nth-child(2) { --mx-i: 1; }
-    :is(.tree-context-menu, .viz-context-menu, .file-menu, .cs-table-menu) > :nth-child(3) { --mx-i: 2; }
-    :is(.tree-context-menu, .viz-context-menu, .file-menu, .cs-table-menu) > :nth-child(4) { --mx-i: 3; }
-    :is(.tree-context-menu, .viz-context-menu, .file-menu, .cs-table-menu) > :nth-child(5) { --mx-i: 4; }
-    :is(.tree-context-menu, .viz-context-menu, .file-menu, .cs-table-menu) > :nth-child(6) { --mx-i: 5; }
-    :is(.tree-context-menu, .viz-context-menu, .file-menu, .cs-table-menu) > :nth-child(7) { --mx-i: 6; }
-    :is(.tree-context-menu, .viz-context-menu, .file-menu, .cs-table-menu) > :nth-child(8) { --mx-i: 7; }
-    :is(.tree-context-menu, .viz-context-menu, .file-menu, .cs-table-menu) > :nth-child(9) { --mx-i: 8; }
-    :is(.tree-context-menu, .viz-context-menu, .file-menu, .cs-table-menu) > :nth-child(n + 10) { --mx-i: 9; }
+    /* One selector per menu, not :is(a, b, c, d) > ...: a list in front of a
+       child selector cannot be ruled out early, so each of these nine was
+       tried in full on every element of every page. */
+    .tree-context-menu > :nth-child(2), .viz-context-menu > :nth-child(2), .file-menu > :nth-child(2), .cs-table-menu > :nth-child(2) { --mx-i: 1; }
+    .tree-context-menu > :nth-child(3), .viz-context-menu > :nth-child(3), .file-menu > :nth-child(3), .cs-table-menu > :nth-child(3) { --mx-i: 2; }
+    .tree-context-menu > :nth-child(4), .viz-context-menu > :nth-child(4), .file-menu > :nth-child(4), .cs-table-menu > :nth-child(4) { --mx-i: 3; }
+    .tree-context-menu > :nth-child(5), .viz-context-menu > :nth-child(5), .file-menu > :nth-child(5), .cs-table-menu > :nth-child(5) { --mx-i: 4; }
+    .tree-context-menu > :nth-child(6), .viz-context-menu > :nth-child(6), .file-menu > :nth-child(6), .cs-table-menu > :nth-child(6) { --mx-i: 5; }
+    .tree-context-menu > :nth-child(7), .viz-context-menu > :nth-child(7), .file-menu > :nth-child(7), .cs-table-menu > :nth-child(7) { --mx-i: 6; }
+    .tree-context-menu > :nth-child(8), .viz-context-menu > :nth-child(8), .file-menu > :nth-child(8), .cs-table-menu > :nth-child(8) { --mx-i: 7; }
+    .tree-context-menu > :nth-child(9), .viz-context-menu > :nth-child(9), .file-menu > :nth-child(9), .cs-table-menu > :nth-child(9) { --mx-i: 8; }
+    .tree-context-menu > :nth-child(n + 10), .viz-context-menu > :nth-child(n + 10), .file-menu > :nth-child(n + 10), .cs-table-menu > :nth-child(n + 10) { --mx-i: 9; }
 
     /* Settings rows cascade in behind the sheet. */
     #settings-modal:not(.hidden) .settings-items > * {

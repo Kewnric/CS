@@ -196,9 +196,95 @@ function toggleBrowseExpand(nodeId, e) {
     renderBrowseTree();
     return;
   }
+  // A folder drawn shut has no rows yet (see _browseTreeDrawAll): draw them
+  // before it opens, so the opening animates over its real height.
+  const filled = _browseFillOpened(container);
   treeSyncExpansion(container);
+  _browseMarkShut(container);
+  if (filled) {
+    // New rows: the selection and any ticks, banners and icons they carry.
+    treeApplySelection(container, browseActiveProgramId || browseActiveSetId || browseActiveNodeId);
+    if (typeof folderBannerHydrate === 'function') folderBannerHydrate(container);
+    if (typeof lucide !== 'undefined') lucide.createIcons({ root: container });
+  }
   // The DOM changed outside treeCommit, so re-record what it now looks like.
   treeSyncMarkup(container, browseBuildTreeHtml());
+}
+
+/* -- A shut folder's rows are drawn when it opens -----------------
+   The tree used to hold a row for every program in the library, shut folders
+   included: 240 rows and about 1,900 elements for the starter pack, of which
+   35 rows can be seen on arrival. Every one of them was built, given two
+   icons, styled and laid out on each visit, and restyled whenever the page as
+   a whole was (a navigation does that three times). Measured arriving here:
+   2,817 elements styled in 41 ms; a shut folder now costs its own row.
+
+   A shut folder's children box is marked data-lazy and left empty. Opening
+   one in place fills it first (_browseFillOpened); anything else that opens a
+   folder goes through renderBrowseTree, whose markup then has the rows in it.
+   A folder shut in place keeps its rows while it closes and is marked again,
+   so the next opening draws them fresh rather than as they were.
+
+   The Folders view (tree-folderview.js) is drawn FROM these rows, so while it
+   is on, every row is drawn as before. */
+let _browseTreeAllOnce = false;
+function _browseTreeDrawAll() {
+  return _browseTreeAllOnce || (typeof tfvMode === 'function' && tfvMode() === 'icons');
+}
+
+/* Switching to Folders: its handler (tree-folderview.js) stores the setting
+   and draws straight from the rows, so every row has to be there first.
+   Caught on the way down, before that handler runs. Switching back needs
+   nothing: the next render draws shut folders empty again. */
+document.addEventListener('click', (e) => {
+  const btn = e.target && e.target.closest ? e.target.closest('.tfv-seg button[data-tfv-mode="icons"]') : null;
+  if (!btn || !document.getElementById('browse-category-list')) return;
+  _browseTreeAllOnce = true;
+  try { renderBrowseTree(); } finally { _browseTreeAllOnce = false; }
+}, true);
+
+function _browseTreeQuery() {
+  const searchInput = document.getElementById('browse-search');
+  return searchInput ? searchInput.value.trim().toLowerCase() : '';
+}
+
+/** Draw the rows of every folder that is open in state but was drawn shut. */
+function _browseFillOpened(container) {
+  const boxes = container.querySelectorAll('.tree-children[data-lazy]');
+  if (!boxes.length) return false;
+  const query = _browseTreeQuery();
+  let filled = false;
+  boxes.forEach(box => {
+    // One inside a folder filled a moment ago went with the rows it replaced.
+    if (!box.isConnected || !box.hasAttribute('data-lazy')) return;
+    const nodeEl = box.parentElement;
+    const id = nodeEl && nodeEl.dataset ? nodeEl.dataset.nodeId : null;
+    const inner = box.querySelector(':scope > .tree-children-inner');
+    if (!id || !inner) return;
+    if (!isNodeExpanded(id, 'challenge')) {
+      // Still shut: rows left over from the last time it was open can go.
+      if (inner.firstElementChild) inner.textContent = '';
+      return;
+    }
+    if (id === '__root__') {
+      const rootList = libRootItems('browse', state.challenges, state.codingSets || []).filter(browseInView);
+      inner.innerHTML = renderTreeRecursive(null, 'challenge', 0, query, null, true, rootList);
+    } else {
+      const depth = parseInt(nodeEl.dataset.level, 10) || 0;
+      inner.innerHTML = renderTreeRecursive(id, 'challenge', depth + 1, query, null);
+    }
+    box.removeAttribute('data-lazy');
+    filled = true;
+  });
+  return filled;
+}
+
+/** A folder shut by hand is to be drawn fresh the next time it opens. */
+function _browseMarkShut(container) {
+  if (_browseTreeDrawAll()) return;
+  container.querySelectorAll('.tree-children.collapsed:not([data-lazy])').forEach(box => {
+    if (box.querySelector(':scope > .tree-children-inner')) box.setAttribute('data-lazy', '1');
+  });
 }
 
 let _browseHistoryIndex = null; // Pre-indexed map: challengeId → [history entries]
@@ -369,6 +455,7 @@ function browseBuildTreeHtml() {
       // a bare label, so the one place items came FROM was the one place they
       // could never be dragged back to.
       const rootOpen = isNodeExpanded('__root__', 'challenge');
+      const drawRootKids = rootOpen || _browseTreeDrawAll();
       html += `
         <div class="tree-node" data-level="0" data-node-id="__root__">
           <div class="tree-node-row"
@@ -381,9 +468,9 @@ function browseBuildTreeHtml() {
             <span class="tree-node-label" title="${escapeHTML(rootMeta.hint)}">${rootMeta.label}</span>
             <span class="tree-node-badge">${count}</span>
           </div>
-          <div class="tree-children ${rootOpen ? '' : 'collapsed'}" role="group">
+          <div class="tree-children ${rootOpen ? '' : 'collapsed'}" role="group"${drawRootKids ? '' : ' data-lazy="1"'}>
             <div class="tree-children-inner">
-              ${renderTreeRecursive(null, 'challenge', 0, query, null, true, rootList)}
+              ${drawRootKids ? renderTreeRecursive(null, 'challenge', 0, query, null, true, rootList) : ''}
             </div>
           </div>
         </div>
@@ -481,6 +568,8 @@ function renderTreeRecursive(parentId, scope, depth, query, activeId, itemsOnly,
       }
 
       const chevronClass = hasChildren || totalItems > 0 ? (expanded ? 'expanded' : '') : 'invisible';
+      // A shut folder's rows are drawn when it opens (see _browseTreeDrawAll).
+      const drawKids = expanded || _browseTreeDrawAll();
       const acc = treeAccentAttrs(folder);
 
       html += `
@@ -499,9 +588,9 @@ function renderTreeRecursive(parentId, scope, depth, query, activeId, itemsOnly,
             ${typeof getTierBadgeHTML === 'function' ? getTierBadgeHTML(folder.tier) : ''}
             <span class="tree-node-badge">${totalItems}</span>
           </div>
-          <div class="tree-children ${expanded ? '' : 'collapsed'}" role="group">
+          <div class="tree-children ${expanded ? '' : 'collapsed'}" role="group"${drawKids ? '' : ' data-lazy="1"'}>
             <div class="tree-children-inner">
-              ${renderTreeRecursive(folder.id, scope, depth + 1, query, activeId)}
+              ${drawKids ? renderTreeRecursive(folder.id, scope, depth + 1, query, activeId) : ''}
             </div>
           </div>
         </div>

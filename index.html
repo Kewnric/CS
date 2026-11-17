@@ -19,6 +19,8 @@
           : (window.innerWidth < 768 ? 'calm' : 'full');
       }
       document.documentElement.setAttribute('data-motion', motion);
+      // The stylesheets key "off" on a class as well (css/mx-core.css says why).
+      if (motion === 'off') document.documentElement.classList.add('mx-off');
       document.documentElement.classList.add('mx-boot');
     })();
   </script>

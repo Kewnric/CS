@@ -100,13 +100,19 @@
 /* The row's text over a showing picture: light, with a soft shadow. */
 /* (Not the count badge: it is a pill with its own background, already readable,
    and white text on the light themes' white pill disappeared.) */
-.tree-node-row.active:has(> .fb-layer) :is(.tree-node-label, .tree-node-count),
-.tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row:has(> .fb-layer) :is(.tree-node-label, .tree-node-count) {
+.tree-node-row.active:has(> .fb-layer) .tree-node-label,
+.tree-node-row.active:has(> .fb-layer) .tree-node-count,
+.tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row:has(> .fb-layer) .tree-node-label,
+.tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row:has(> .fb-layer) .tree-node-count {
   color: #f8fbff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
-.tree-node-row.active:has(> .fb-layer) :is(.tree-node-icon, .tree-node-chevron, .tree-node-lock),
-.tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row:has(> .fb-layer) :is(.tree-node-icon, .tree-node-chevron, .tree-node-lock) {
+.tree-node-row.active:has(> .fb-layer) .tree-node-icon,
+.tree-node-row.active:has(> .fb-layer) .tree-node-chevron,
+.tree-node-row.active:has(> .fb-layer) .tree-node-lock,
+.tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row:has(> .fb-layer) .tree-node-icon,
+.tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row:has(> .fb-layer) .tree-node-chevron,
+.tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row:has(> .fb-layer) .tree-node-lock {
   filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.8));
 }
 

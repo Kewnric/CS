@@ -1027,6 +1027,24 @@ function treeApplySelection(container, selectedId) {
   if (typeof folderBannerSyncPlay === 'function') folderBannerSyncPlay(container);
 }
 
+/* ── The selected row's dither ───────────────────────────────
+   One step every 0.4 s, on every selected row in every tree: the frames the
+   railDither keyframes used to step through (css/layout.css says why it is
+   not an animation any more). A row with no data-dither shows the first
+   frame, so one that has just been selected starts there, as before. Nothing
+   is done while the tab is hidden, with Motion: Off, or with reduced motion. */
+let _treeDitherStep = 0;
+const _treeDitherReduce = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : { matches: false };
+function treeDitherTick() {
+  if (document.hidden || _treeDitherReduce.matches || document.documentElement.classList.contains('mx-off')) return;
+  const rows = document.querySelectorAll('.tree-node-row.active');
+  if (!rows.length) return;
+  _treeDitherStep = (_treeDitherStep + 1) % 4;
+  const v = String(_treeDitherStep);
+  for (let i = 0; i < rows.length; i++) if (rows[i].dataset.dither !== v) rows[i].dataset.dither = v;
+}
+setInterval(treeDitherTick, 400);
+
 /* ── Picking several rows at once ──────────────────────────────
    The selection machinery already existed in library-common -- the card grids
    used it and a multi-row drag already moved everything ticked. The tree had

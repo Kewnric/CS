@@ -10,15 +10,15 @@
    The router wraps the #spa-content swap in document.startViewTransition().
    Browsers without support fall back to the existing .route-enter class.
    ---------------------------------------------------------------- */
-::view-transition-old(root),
-::view-transition-new(root) {
+html::view-transition-old(root),
+html::view-transition-new(root) {
   animation-duration: 260ms;
   animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
-::view-transition-old(root) {
+html::view-transition-old(root) {
   animation-name: mx-vt-out;
 }
-::view-transition-new(root) {
+html::view-transition-new(root) {
   animation-name: mx-vt-in;
 }
 @keyframes mx-vt-out {
@@ -45,11 +45,11 @@
 .app-sidebar {
   view-transition-name: ssp-sidebar;
 }
-::view-transition-group(ssp-sidebar) {
+html::view-transition-group(ssp-sidebar) {
   animation: none;
 }
-::view-transition-old(ssp-sidebar),
-::view-transition-new(ssp-sidebar) {
+html::view-transition-old(ssp-sidebar),
+html::view-transition-new(ssp-sidebar) {
   animation: none;
   mix-blend-mode: normal;
 }
@@ -58,7 +58,7 @@
    Only the incoming copy is kept. On the attempt screens, which hide the
    sidebar outright, there IS no incoming copy and it simply goes — which is
    what switching modes should look like. */
-::view-transition-old(ssp-sidebar) {
+html::view-transition-old(ssp-sidebar) {
   display: none;
 }
 /* ...except that leaving an attempt is the other half of that, and it went
@@ -87,15 +87,15 @@
 .hud-layer {
   view-transition-name: ssp-hud;
 }
-::view-transition-group(ssp-hud) {
+html::view-transition-group(ssp-hud) {
   animation: none;
 }
-::view-transition-old(ssp-hud),
-::view-transition-new(ssp-hud) {
+html::view-transition-old(ssp-hud),
+html::view-transition-new(ssp-hud) {
   animation: none;
   mix-blend-mode: normal;
 }
-::view-transition-old(ssp-hud) {
+html::view-transition-old(ssp-hud) {
   display: none;
 }
 
@@ -536,8 +536,8 @@ textarea:focus-visible,
   .mx-toast-progress {
     animation: none !important;
   }
-  ::view-transition-old(root),
-  ::view-transition-new(root) {
+  html::view-transition-old(root),
+  html::view-transition-new(root) {
     animation: none !important;
   }
   .mx-lift:hover {

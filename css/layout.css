@@ -1255,7 +1255,22 @@ details[open]>.snippet-folder-summary>.folder-icon {
      makes it read as density rather than as a texture laid over a bar. */
   -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.22) 38%, rgba(0,0,0,0.72) 72%, #000 100%);
   mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.22) 38%, rgba(0,0,0,0.72) 72%, #000 100%);
-  animation: railDither 1.6s steps(4, end) infinite;
+}
+
+/* The dither steps a cell at a time: four positions, 0.4 s each, the frames
+   railDither (motion.css) steps through. It was that animation, and a
+   background-position animation cannot run off the main thread: the browser
+   restyled the page 60 times a second for as long as a row was selected,
+   for a picture that changes 2.5 times a second. tree-dnd.js now moves the
+   selected row's data-dither on a 0.4 s timer instead, so the page is still
+   between steps. Off with Motion: Off and with reduced motion, as before. */
+@media (prefers-reduced-motion: no-preference) {
+  html:not(.mx-off) .tree-node[data-level] > .tree-node-row.active[data-dither="1"]::after,
+  html:not(.mx-off) .tree-node-row.active[data-dither="1"]::after { background-position: 0 0, -1px 1px, 0.75px 2.25px; }
+  html:not(.mx-off) .tree-node[data-level] > .tree-node-row.active[data-dither="2"]::after,
+  html:not(.mx-off) .tree-node-row.active[data-dither="2"]::after { background-position: 0 0, -2px 2px, -0.5px 3.5px; }
+  html:not(.mx-off) .tree-node[data-level] > .tree-node-row.active[data-dither="3"]::after,
+  html:not(.mx-off) .tree-node-row.active[data-dither="3"]::after { background-position: 0 0, -3px 3px, -1.75px 4.75px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

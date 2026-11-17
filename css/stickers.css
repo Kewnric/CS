@@ -65,10 +65,10 @@
    cross-fade showed the sidebar through a half-faded sticker (reading as
    "behind" again), and left the old page's stickers fading in place while
    their page slid away. */
-::view-transition-group(ssp-stickers) { animation: none; }
-::view-transition-old(ssp-stickers),
-::view-transition-new(ssp-stickers) { animation: none; mix-blend-mode: normal; }
-::view-transition-old(ssp-stickers) { display: none; }
+html::view-transition-group(ssp-stickers) { animation: none; }
+html::view-transition-old(ssp-stickers),
+html::view-transition-new(ssp-stickers) { animation: none; mix-blend-mode: normal; }
+html::view-transition-old(ssp-stickers) { display: none; }
 
 .stk-sticker {
   position: absolute;
