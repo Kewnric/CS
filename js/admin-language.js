@@ -64,7 +64,7 @@ function adminLanguageTemplate() {
         </div>`)
     : '<h1 class="lib-hub-title">Language Admin</h1>';
   return `
-    <div class="home-content">
+    <div class="home-content is-lang-admin">
       <div class="home-scroll lpv-adm-scroll" id="lang-admin-root">
         <div class="lpv-page lpv-adm lpv-tone-primary">
           <div class="lpv-adm-nav">

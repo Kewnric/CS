@@ -323,8 +323,27 @@ function renderBrowse() {
 /** Has this program been passed (a 100% graded attempt that is not archived)?
     The one meaning of "passed": what may be shown of its answer elsewhere
     (Freeground's copies, later the drills) is decided here. */
+let _passedMemo = null;
 function programPassed(challengeId) {
-  return (state.history || []).some(h => h && h.challengeId === challengeId && h.score === 100 && !h.isArchived);
+  /* Asked once per program in a row (Codex usage, Training, the drills), and
+     each answer walked the whole history: 192 programs x 1,500 attempts on
+     every Coding hub visit. The set of passed programs is built once and kept
+     until the saved data changes (state.js stateContentRev; archiving an
+     attempt saves). Without that counter -- an older cached state.js -- it
+     asks the history directly, as before. */
+  const list = state.history || [];
+  const rev = typeof stateContentRev === 'function' ? stateContentRev() : null;
+  if (rev === null) return list.some(h => h && h.challengeId === challengeId && h.score === 100 && !h.isArchived);
+  const m = _passedMemo;
+  if (!m || m.rev !== rev || m.list !== list || m.n !== list.length) {
+    const set = new Set();
+    for (let i = 0; i < list.length; i++) {
+      const h = list[i];
+      if (h && h.score === 100 && !h.isArchived) set.add(h.challengeId);
+    }
+    _passedMemo = { rev: rev, list: list, n: list.length, set: set };
+  }
+  return _passedMemo.set.has(challengeId);
 }
 
 /** A passed program's main file as a new template (Training hub). */

@@ -1317,16 +1317,19 @@ button.la-blank-slot { cursor: pointer; }
 
 /* The admin scrolls inside .home-content, whose bottom padding is a strip
    that sticky bars stop above -- content scrolled through underneath them.
-   The admin's own scroll area carries its bottom space instead. */
-.home-content:has(#lang-admin-root) { padding-bottom: 0; }
+   The admin's own scroll area carries its bottom space instead. Marked by a
+   class its template sets, not :has(#lang-admin-root): every page is built in
+   a .home-content, and that :has() was checked again on every change inside
+   any of them (each letter Home's greeting types). */
+.home-content.is-lang-admin { padding-bottom: 0; }
 
 /* ── No scrollbars in the Language Library ──
    Every pane, list and popover still scrolls by wheel, touch and keyboard;
    only the bars are gone. */
-.home-content:has(#lang-admin-root),
+.home-content.is-lang-admin,
 #lang-lib-root, #lang-lib-root *, #lang-admin-root, #lang-admin-root *,
 .la-shell, .la-shell *, .lq-shell, .lq-shell *, .lpv-pop, .lpv-pop * { scrollbar-width: none; }
-.home-content:has(#lang-admin-root)::-webkit-scrollbar,
+.home-content.is-lang-admin::-webkit-scrollbar,
 #lang-lib-root::-webkit-scrollbar, #lang-lib-root *::-webkit-scrollbar,
 #lang-admin-root::-webkit-scrollbar, #lang-admin-root *::-webkit-scrollbar,
 .la-shell::-webkit-scrollbar, .la-shell *::-webkit-scrollbar,

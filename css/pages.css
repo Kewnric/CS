@@ -886,9 +886,11 @@
    QUEST BOARD — Solo Leveling / Native App Theme
    ============================================================ */
 
-#spa-content > .messenger-layout:has(.system-status-bar) {
-  flex-direction: column !important;
-}
+/* There was a `#spa-content > .messenger-layout:has(.system-status-bar)` rule
+   here. The status bar is drawn inside .quest-board-layout, so it never
+   matched -- but a :has() over a whole subtree is checked again on every
+   change inside it, and .messenger-layout is every library's two panes: the
+   Coding Library re-ran it about 190 times on one folder switch. */
 
 .system-status-bar {
   background: var(--bg-surface);
@@ -1931,7 +1933,16 @@ button.review-wrong   { background-color: var(--color-danger)  !important; color
 .lib-card-coding { --lib-accent: var(--color-primary); }
 .lib-card-notes { --lib-accent: var(--color-warning); }
 .lib-card-snippets { --lib-accent: var(--color-accent); }
-.lib-card-glow { position: absolute; top: -40%; right: -25%; width: 60%; height: 90%; background: radial-gradient(circle, var(--lib-accent, var(--color-primary)) 0%, transparent 70%); opacity: 0.1; pointer-events: none; transition: opacity 0.2s ease; }
+/* A round glow centred just inside the top-right corner. It was a circle
+   painted in a box 60% of the card wide and 90% of it tall: on the Library
+   page's wide cards that box is nearly square and the circle fit, but on
+   the Coding hub's tall narrow cards it is twice as tall as wide, the
+   circle ran past its sides and was cut off in a straight line -- a lighter
+   rectangle in the corner. Now the box is square and the circle fades out
+   at its edge (closest-side), so nothing is cut. Same centre as before
+   (95% across, 5% down: margin-top percentages are of the WIDTH) and, on
+   the wide cards, the same size to within a few pixels. */
+.lib-card-glow { position: absolute; top: 5%; right: -25%; width: 60%; aspect-ratio: 1; margin-top: -30%; background: radial-gradient(circle closest-side, var(--lib-accent, var(--color-primary)) 0%, transparent 100%); opacity: 0.1; pointer-events: none; transition: opacity 0.2s ease; }
 .lib-card:hover .lib-card-glow { opacity: 0.2; }
 .lib-card-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 0.9rem; }
 .lib-card-icon { width: 46px; height: 46px; border-radius: 12px; display: flex; align-items: center; justify-content: center; }

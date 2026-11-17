@@ -1486,14 +1486,22 @@ details[open]>.snippet-folder-summary>.folder-icon {
   flex-direction: column;
   overflow: hidden;
   opacity: 1;
-  /* Slight delay on fade-in so space opens before content appears */
-  transition: opacity 0.7s ease 0.08s;
+  /* Slight delay on fade-in so space opens before content appears.
+     content-visibility turns visible at the START of an opening (a discrete
+     change to or from hidden keeps the visible value for the whole run). */
+  transition: opacity 0.7s ease 0.08s, content-visibility 0.7s allow-discrete;
 }
 
+/* A shut folder's rows are skipped: no style, layout or paint for anything
+   inside until it opens. They were invisible already (a zero-height row) but
+   still worked out on every pass over the page, in every tree: 2,600 of
+   Coding Analytics' 7,300 elements. It turns hidden at the END of the
+   0.7 s close, so the fade and the collapse play exactly as before. */
 .tree-children.collapsed .tree-children-inner {
   opacity: 0;
+  content-visibility: hidden;
   /* Fade out immediately before grid collapses */
-  transition: opacity 0.7s ease;
+  transition: opacity 0.7s ease, content-visibility 0.7s allow-discrete;
 }
 
 /* Stagger slide-in removed to prevent flicker */

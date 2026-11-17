@@ -447,10 +447,18 @@ textarea:focus-visible,
   }
 }
 .ac-dot {
-  opacity: 0;
-  animation: ac-dot-in 0.3s ease forwards;
-  animation-delay: 1.2s;
+  /* Rests on its last frame and fills backwards: a forwards fill kept every
+     dot's finished animation alive for as long as the chart was on screen --
+     1,500 of them on a long history, walked by every getAnimations() and
+     applied on every restyle. The delay still hides the dot until it pops. */
+  animation: ac-dot-in 0.3s ease 1.2s backwards;
+  /* That forwards fill also made every dot its own compositor layer (1,540
+     layers on Coding Analytics with a long history, 40 without). Drawn
+     straight onto the page instead, the dots sit where they did in the same
+     colours; only the antialiasing where many overlap differs. */
 }
+/* An attempt behind it: it can be clicked (analytics-chart.js _acDotClick). */
+.ac-dot[data-id] { cursor: pointer; }
 @keyframes ac-dot-in {
   from {
     opacity: 0;

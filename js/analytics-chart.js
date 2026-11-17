@@ -120,6 +120,15 @@ function _ac_trendSvg(series) {
     ? `${xAt(series[0].x)},${yAt(0)} ${linePts} ${xAt(series[n - 1].x)},${yAt(0)}`
     : '';
 
+  /* One <circle> per attempt, as drawn before, but nothing else per attempt.
+     Each used to carry a <title> child and its own onclick: with 1,500
+     attempts that was 3,000 elements and 1,500 handlers, most of the Coding
+     Analytics page, all styled and laid out on every pass. The tooltip text
+     rides in data-tip and becomes the dot's <title> as the pointer reaches it
+     (_acDotHover), so the browser's tooltip shows as before; one click
+     handler on the chart opens the attempt (_acDotClick). */
+  const titles = new Map();
+  if (typeof state !== 'undefined') (state.challenges || []).forEach((c) => { if (!titles.has(c.id)) titles.set(c.id, c.title); });
   const dots = series
     .map((p) => {
       const cx = xAt(p.x).toFixed(1),
@@ -130,19 +139,19 @@ function _ac_trendSvg(series) {
           : p.score >= 50
             ? 'var(--color-warning)'
             : 'var(--color-danger)';
-      const prog = p.challengeId && typeof state !== 'undefined'
-        ? ((state.challenges || []).find((c) => c.id === p.challengeId) || {}).title : null;
-      const when = p.time ? new Date(p.time).toLocaleString() : p.label;
+      const prog = p.challengeId ? titles.get(p.challengeId) : null;
+      const when = p.time ? _acWhenFmt(p.time) : p.label;
       const dur = p.duration ? ' · ' + (typeof anFmtTime === 'function' ? anFmtTime(p.duration) : p.duration + 's') : '';
       const nl = String.fromCharCode(10);
       const tip = (prog ? prog + nl : '') + when + nl + p.score + '%' + dur;
-      const click = p.id ? ` style="cursor:pointer" onclick="anOpenReviewById('${p.id}')"` : '';
-      return `<circle class="ac-dot" cx="${cx}" cy="${cy}" r="4"${click} fill="${color}" stroke="var(--bg-surface)" stroke-width="1.5"><title>${_ac_escape(tip)}</title></circle>`;
+      const id = p.id ? ` data-id="${_ac_escape(p.id)}"` : '';
+      return `<circle class="ac-dot" cx="${cx}" cy="${cy}" r="4"${id} data-tip="${_ac_escape(tip)}" fill="${color}" stroke="var(--bg-surface)" stroke-width="1.5"></circle>`;
     })
     .join('');
 
   return `
-    <svg class="ac-trend" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Score over time trend chart">
+    <svg class="ac-trend" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Score over time trend chart"
+         onpointerover="_acDotHover(event)" onclick="_acDotClick(event)">
       <defs>
         <linearGradient id="ac-area" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="var(--color-primary)" stop-opacity="0.32"/>
@@ -154,6 +163,35 @@ function _ac_trendSvg(series) {
       <polyline class="ac-line" points="${linePts}" fill="none" stroke="var(--color-primary)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
       ${dots}
     </svg>`;
+}
+
+/* An attempt's date and time, as Date#toLocaleString() writes it. That call
+   builds a new formatter every time, which across 1,500 dots was the most
+   expensive line on the page; this one is built once. */
+let _acWhenFormatter = null;
+function _acWhenFmt(t) {
+  if (!_acWhenFormatter) {
+    try {
+      _acWhenFormatter = new Intl.DateTimeFormat(undefined,
+        { year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' });
+    } catch (e) { _acWhenFormatter = { format: (x) => new Date(x).toLocaleString() }; }
+  }
+  return _acWhenFormatter.format(new Date(t));
+}
+
+/* The dot under the pointer gets its tooltip now (see _ac_trendSvg). */
+function _acDotHover(e) {
+  const dot = e.target && e.target.closest ? e.target.closest('.ac-dot[data-tip]') : null;
+  if (!dot || dot.firstChild) return;
+  const t = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+  t.textContent = dot.getAttribute('data-tip');
+  dot.appendChild(t);
+}
+
+/* A dot with an attempt behind it opens that attempt's review. */
+function _acDotClick(e) {
+  const dot = e.target && e.target.closest ? e.target.closest('.ac-dot[data-id]') : null;
+  if (dot && typeof anOpenReviewById === 'function') anOpenReviewById(dot.getAttribute('data-id'));
 }
 
 // Score distribution bars (0-19, 20-39, 40-59, 60-79, 80-100).

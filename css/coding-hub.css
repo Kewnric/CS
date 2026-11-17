@@ -21,7 +21,11 @@
   margin-right: auto;
 }
 
-/* The number that opens a tile from the keyboard. */
+/* The number that opens a tile from the keyboard. Shown as a keycap while
+   the tile is hovered or has focus, not all the time: at rest, a dim outlined
+   square with a faint digit in the corner of every tile read as a stray box,
+   not as a key. The page's subtitle says the numbers work; the cap appears
+   where you are about to act. Its space is kept, so nothing moves. */
 .lib-card-key {
   margin-left: auto;
   margin-right: 8px;
@@ -32,8 +36,15 @@
   font-family: var(--font-mono);
   font-size: 0.72rem;
   line-height: 1.5;
-  color: var(--text-tertiary);
-  background: transparent;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.lib-card:hover .lib-card-key,
+.lib-card:focus-within .lib-card-key { opacity: 1; }
+@media (hover: none) {
+  .lib-card-key { opacity: 1; }
 }
 
 /* A tile's shortcut: Continue, New tab. Above the card's own hover layers. */

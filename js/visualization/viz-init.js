@@ -16,8 +16,11 @@ const _vizListeners = {
 let _vizResizeObserver = null;
 
 function initVisualization() {
-  // Ensure any previous bindings are cleaned up before re-binding.
-  destroyVisualization();
+  // Ensure any previous bindings are cleaned up before re-binding. Not a
+  // leaving, so nothing is saved: the route saved when it was left, and
+  // writing the canvas again here (13 ms, compressed, every visit) would
+  // also put this tab's copy over one a cloud load had just stored.
+  destroyVisualization({ arriving: true });
 
   // Always open on the library map rather than Brain, so the pane, the
   // toolbar label and the strip agree on every route mount. Which libraries
@@ -46,7 +49,13 @@ function initVisualization() {
   } catch (_) { /* private mode */ }
 
   _withSuppress(() => {
-    loadData();
+    /* Re-read the library only when storage holds something this tab did not
+       write or read itself (another tab, a cloud load). Reading it back
+       unchanged cost 24 ms of decompressing on every visit -- and with a save
+       still waiting out its debounce, it put the older copy on disk over the
+       newer one in memory, losing the change. */
+    const raw = typeof storeIsCurrent === 'function' ? localStorage.getItem(getAppStorageKey()) : null;
+    if (raw === null || !storeIsCurrent(getAppStorageKey(), raw)) loadData();
     vizLoad();
     vizAutoPopulate();
     // Opening on Brain, the library map was drawn here only to be replaced by
@@ -122,7 +131,7 @@ function initVisualization() {
   if (typeof vizRenderViewsMenu === 'function') vizRenderViewsMenu();
   // Restore link arrow type label
   if (viz.defaultLinkArrowType && viz.defaultLinkArrowType !== 'arrow') {
-    if (typeof vizSetLinkArrowType === 'function') vizSetLinkArrowType(viz.defaultLinkArrowType);
+    if (typeof vizSetLinkArrowType === 'function') vizSetLinkArrowType(viz.defaultLinkArrowType, true);
   }
 
   const container = document.getElementById('viz-canvas-container');
@@ -301,7 +310,8 @@ function initVisualization() {
 
 /** Remove all document-level listeners added by initVisualization so they
  *  don't stack across SPA navigations. */
-function destroyVisualization() {
+function destroyVisualization(opts) {
+  const arriving = !!(opts && opts.arriving);
   // The Build Mode menu lives on <body>.
   if (typeof vizCloseBuildMenu === 'function') vizCloseBuildMenu();
   // Canvas only hides the app sidebar; no other page should inherit that.
@@ -344,7 +354,7 @@ function destroyVisualization() {
   if (typeof viz !== 'undefined') {
     viz._undoStack = [];
     // Any pending debounced write must land before the route goes away.
-    if (typeof vizSaveNow === 'function') vizSaveNow();
+    if (typeof vizSaveNow === 'function' && (!arriving || (typeof _vizSaveTimer !== 'undefined' && _vizSaveTimer))) vizSaveNow();
   }
   if (typeof brain !== 'undefined') brain._undoStack = [];
   if (typeof _vizResetRenderCache === 'function') _vizResetRenderCache();

@@ -176,6 +176,8 @@ function loadData() {
     try {
       // Compressed since store-codec.js; an older plain save reads as it is.
       const parsed = JSON.parse(storeDecode(saved));
+      // What memory now holds is what is stored (see storeIsCurrent).
+      if (typeof storeNoteText === 'function') storeNoteText(getAppStorageKey(), saved);
       state.categories = parsed.categories || state.categories;
       state.snippetCategories = parsed.snippetCategories || state.snippetCategories;
       state.categoryRequirements = parsed.categoryRequirements || {};

@@ -2578,7 +2578,8 @@ function vizToggleLinkTypeDropdown() {
  * labelled one — permanently wider, shifting every tool beside it. It swaps
  * the glyph and leaves the shape alone.
  */
-function vizSetLinkArrowType(type) {
+/** @param {boolean} [restoring] drawing the saved choice on arrival: nothing to save. */
+function vizSetLinkArrowType(type, restoring) {
   viz.defaultLinkArrowType = type;
   document.querySelectorAll('#viz-link-type-popup .viz-link-type-option').forEach(opt => {
     opt.classList.toggle('active', opt.dataset.type === type);
@@ -2601,7 +2602,7 @@ function vizSetLinkArrowType(type) {
     linkBtn.title = label;
     linkBtn.setAttribute('aria-label', label);
   }
-  vizSave();
+  if (!restoring) vizSave();
 }
 
 function vizCtxChangeIcon() {

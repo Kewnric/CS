@@ -616,7 +616,7 @@
   --due: var(--color-primary);
   position: relative;
   isolation: isolate;
-  overflow: hidden;
+  overflow: clip;
   container-type: inline-size;
   padding: 0.75rem 0.9rem;
   border: 1px solid color-mix(in srgb, var(--due) 22%, var(--border-color));
@@ -648,15 +648,25 @@
   pointer-events: none;
   animation: libDueBreathe 4s ease-in-out infinite alternate;
 }
-/* Now and then a glint crosses the whole panel. */
+/* Now and then a glint crosses the whole panel.
+   The layer is the glint's own picture (2.5x the panel, as the background
+   used to be sized) and it is the layer that moves, by transform: the
+   picture used to move inside a panel-sized layer by background-position,
+   which repainted the whole panel on every frame of the 8 s loop, for as
+   long as the page was open. Same pixels; translateX(-78%) and (18%) of
+   the layer are background-position 130% and -30% of the old one. The panel
+   clips rather than hides its overflow, so the wide layer gives it nothing
+   to scroll. */
 .lib-due-panel::after {
   content: '';
   position: absolute;
-  inset: 0;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 250%;
   z-index: 1;
   background: linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, 0.05) 50%, transparent 58%) no-repeat;
-  background-size: 250% 100%;
-  background-position: 130% 0;
+  transform: translateX(-78%);
   pointer-events: none;
   animation: libDueShine 8s ease-in-out 1.4s infinite;
 }
@@ -866,8 +876,8 @@
   to { opacity: 1; transform: scale(1.08); }
 }
 @keyframes libDueShine {
-  0% { background-position: 130% 0; }
-  28%, 100% { background-position: -30% 0; }
+  0% { transform: translateX(-78%); }
+  28%, 100% { transform: translateX(18%); }
 }
 @keyframes libDuePulse {
   0% { box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--color-primary) 85%, transparent), 0 0 0 0 color-mix(in srgb, var(--color-primary) 45%, transparent); }

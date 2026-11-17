@@ -66,14 +66,21 @@ function _cdxMatcher(e) {
   if (e.c === 'errors' || /^(array|string|pointer)$/.test(e.n)) return null;
   if (e.n === 'long long') return (toks) => toks.some((t, i) => t === 'long' && toks[i + 1] === 'long');
   if (e.n === '(type)') return (toks) => toks.some((t, i) => t === '(' && /^(int|double|float|char|long)$/.test(toks[i + 1] || '') && toks[i + 2] === ')');
-  if (e.n === '?:') return (toks) => toks.indexOf('?') !== -1;
-  if (e.n === '[]') return (toks) => toks.indexOf('[') !== -1;
+  if (e.n === '?:') return (toks) => _cdxHas(toks, '?');
+  if (e.n === '[]') return (toks) => _cdxHas(toks, '[');
   if (e.n === '()') return null;
   if (e.n === '#include' || e.n === '#define' || e.n === '#ifndef' || e.n === '#if') {
     const word = e.n.slice(1);
     return (toks) => toks.some((t, i) => t === '#' && toks[i + 1] === word);
   }
-  return (toks) => toks.indexOf(e.n) !== -1;
+  return (toks) => _cdxHas(toks, e.n);
+}
+
+/* Is this token in the list? codexUsage gives each source's list a Set of
+   its tokens: every entry is looked for in every source, and a search of
+   the array each time was most of the Coding hub's first draw. */
+function _cdxHas(toks, w) {
+  return toks.set ? toks.set.has(w) : toks.indexOf(w) !== -1;
 }
 
 /* The code that counts: programs you passed, templates you learned. */
@@ -96,7 +103,8 @@ function codexUsage() {
   const key = (state.history || []).length + ':' + (state.templateHistory || []).length + ':' + (state.challenges || []).length + ':' + (state.templates || []).length;
   if (_cdxUsage && _cdxUsage.key === key) return _cdxUsage.counts;
   const counts = {};
-  const sources = _cdxSources().map(s => ({ title: s.title, toks: tplTokens(s.code), plain: tplTokens(_cdxNoDirectives(s.code)) }));
+  const withSet = (toks) => { toks.set = new Set(toks); return toks; };
+  const sources = _cdxSources().map(s => ({ title: s.title, toks: withSet(tplTokens(s.code)), plain: withSet(tplTokens(_cdxNoDirectives(s.code))) }));
   codexAll().forEach(e => {
     const m = _cdxMatcher(e);
     if (!m) return;

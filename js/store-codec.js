@@ -171,10 +171,22 @@ let _storeInFlight = 0;
 /** True while a background write has not landed yet. */
 function storeBusy() { return _storeInFlight > 0; }
 
+/* The text this tab last wrote under, or read from, each key. A reader that
+   would only re-read what it already holds can ask storeIsCurrent and skip
+   the decompress (Visualize does on every visit). Anything written there by
+   someone else -- another tab, a cloud load, an import -- is different text,
+   so it is read as before. */
+const _storeKnown = Object.create(null);
+function storeNoteText(key, text) { _storeKnown[key] = text; }
+function storeIsCurrent(key, raw) { return raw != null && _storeKnown[key] === raw; }
+
 /** Store `json` under `key` now (compressed when worth it). Throws what setItem throws. */
 function storeWriteSync(key, json) {
   _storeGen[key] = (_storeGen[key] || 0) + 1;
-  localStorage.setItem(key, storeEncode(json));
+  const text = storeEncode(json);
+  delete _storeKnown[key];
+  localStorage.setItem(key, text);
+  _storeKnown[key] = text;
 }
 
 function _storeSameBytes(a, b) {
@@ -207,7 +219,9 @@ function storeWriteAsync(key, json, done, opts) {
     if (!current()) { finish(null); return; }
     try {
       if (yieldToOthers && localStorage.getItem(key) !== json) { finish(null); return; }
+      delete _storeKnown[key];
       localStorage.setItem(key, text);
+      _storeKnown[key] = text;
       finish(null);
     } catch (e) { finish(e); }
   };

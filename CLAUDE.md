@@ -474,6 +474,12 @@ buttons.
 - **The Coding Library tree draws a shut folder's rows only when it opens** (`_browseFillOpened`,
   `data-lazy` on the children box). Code that looks for a program's row must open its path first
   (`expandNodePath` + `renderBrowseTree`). The Folders view draws every row while it is on.
+- **Every tree's shut folders are `content-visibility: hidden`** (`.tree-children.collapsed
+  .tree-children-inner`, css/layout.css), switched at the END of the 0.7 s close. Nothing inside is
+  styled or laid out until the folder opens; read layout only from rows in open folders.
+- **Do not re-read the library from storage to be safe.** `loadData()` decompresses everything and,
+  with a save still in its debounce, puts the older disk copy over newer memory. Visualize now asks
+  `storeIsCurrent(key, raw)` (store-codec.js) and reloads only what another tab or a cloud load wrote.
 - **A finished animation with `fill: forwards` that touches transform, opacity or filter keeps its
   element composited for good.** Home had 470 such layers (heatmap cells, hero letters). Rest on the
   final keyframe and fill `backwards`. Count layers with CDP `LayerTree` when a page feels slow.

@@ -231,7 +231,7 @@ function libSpatialCardHTML(o) {
         <div class="lib-card-bg"><div class="lib-card-glow"></div><div class="lib-card-light"></div></div>
         <div class="lib-card-head">
           <div class="lib-card-icon"><i data-lucide="${o.icon}"></i></div>
-          ${o.key ? `<kbd class="lib-card-key" title="Press ${o.key}">${o.key}</kbd>` : ''}
+          ${o.key ? `<kbd class="lib-card-key" title="Shortcut: press ${o.key} to open this">${o.key}</kbd>` : ''}
           <i data-lucide="${o.arrow || 'arrow-up-right'}" class="lib-card-arrow"></i>
         </div>
         <h3 class="lib-card-name">${o.name}</h3>
