@@ -11,6 +11,10 @@ const brain = {
   pan: { x: 0, y: 0 },
   zoom: 1,
   selectedNodeId: null,
+  // The select tool's group (viz-select.js); selectedNodeId stays the one
+  // note the single-note actions (edit, copy) use.
+  selectedNodeIds: new Set(),
+  marquee: null,
   linkingFrom: null,
   linkModeEnabled: false,
   draggingNode: null,
@@ -89,7 +93,7 @@ function brainLoad() {
 }
 
 function brainSaveCurrentVersion() {
-  if (!brain.activeVersionId) return;
+  if (brain._batch || !brain.activeVersionId) return;
   const v = brain.versions.find(v => v.id === brain.activeVersionId);
   if (!v) return;
   // Inside a directory note the canvas on screen is that note's own (brain-dir.js).
@@ -1053,6 +1057,8 @@ function brainUpdateCanvasToolbar() {
 }
 
 function brainPushUndo() {
+  // A menu action applied to several notes is one edit: one undo step.
+  if (brain._batch) { if (brain._batchPushed) return; brain._batchPushed = true; }
   brain._undoStack.push(JSON.stringify({ 
     nodes: JSON.parse(JSON.stringify(brain.nodes)), 
     links: JSON.parse(JSON.stringify(brain.links)) 
@@ -1146,6 +1152,7 @@ function brainUpdateMinimap() {
 }
 
 function brainRenderCanvas() {
+  if (brain._batch) return;   // drawn once when the whole batch is done (brainForEachTarget)
   const container = document.getElementById('viz-canvas-container');
   const svg = document.getElementById('viz-canvas-svg');
   const nodesLayer = document.getElementById('viz-nodes-layer');
@@ -1211,13 +1218,18 @@ function brainRenderCanvas() {
     vizGetAllDescendants(brain._focusedParentId, brain.nodes, brain.links).forEach(d => brainFocusIds.add(d));
   }
   const brainVisibleNodes = brain.nodes.filter(n => !brainHiddenByCollapse.has(n.id));
+  // A selection only ever holds notes on the canvas on screen.
+  if (brain.selectedNodeIds.size) {
+    const here = new Set(brain.nodes.map(n => n.id));
+    brain.selectedNodeIds.forEach(id => { if (!here.has(id)) brain.selectedNodeIds.delete(id); });
+  }
   const brainVisibleIds = new Set(brainVisibleNodes.map(n => n.id));
 
   brainVisibleNodes.forEach(node => {
     const el = document.createElement('div');
     const isGlobe = viz.globeModeEnabled;
     const isGhost = brainBridgeGhostIds.has(node.id) || (brain._focusedParentId && !brainFocusIds.has(node.id));
-    el.className = `viz-node ${node.id === brain.selectedNodeId ? 'selected' : ''}${isGlobe ? ' viz-globe-node' : ''}${isGhost ? ' viz-bridge-ghost' : ''}`;
+    el.className = `viz-node ${node.id === brain.selectedNodeId || brain.selectedNodeIds.has(node.id) ? 'selected' : ''}${brain.selectedNodeIds.has(node.id) ? ' in-group' : ''}${isGlobe ? ' viz-globe-node' : ''}${isGhost ? ' viz-bridge-ghost' : ''}`;
     el.dataset.type = 'comment';
     vizApplyNodeColor(el, node.color);   // a palette name or a hex code
     vizApplyNodeBg(el, node.bg);
@@ -1291,7 +1303,7 @@ function brainRenderCanvas() {
       // A note that links to a library item: its tag and its button (brain-libref.js).
       if (node.ref && typeof brainRefDecorate === 'function') brainRefDecorate(el, node);
       // The check mark put on it from its menu (brainCtxToggleCheck).
-      if (node.checked) el.insertAdjacentHTML('beforeend', node.id === _brainCheckPop ? BRAIN_CHECK_BADGE.replace('brain-check-badge', 'brain-check-badge is-new') : BRAIN_CHECK_BADGE);
+      if (node.checked) el.insertAdjacentHTML('beforeend', _brainCheckPop && _brainCheckPop.has(node.id) ? BRAIN_CHECK_BADGE.replace('brain-check-badge', 'brain-check-badge is-new') : BRAIN_CHECK_BADGE);
       // A directory: the folder mark on its other corner (brain-dir.js).
       if (node.dir && typeof brainDirBadgeHTML === 'function') {
         el.classList.add('is-dir');
@@ -1530,6 +1542,15 @@ function brainNodeClick(e, nodeId) {
     }
     return;
   }
+  // The select tool, or Shift / Ctrl: the note joins the selection or leaves it.
+  // The release of a group drag is not a click: the group stays selected.
+  if (brain._hasDraggedGroup) { brain._hasDraggedGroup = false; return; }
+  if (viz.selectMode || e.shiftKey || e.ctrlKey || e.metaKey) {
+    brainToggleInSelection(nodeId);
+    return;
+  }
+  brain.selectedNodeIds.clear();
+  vizUpdateSelectionChip();
   brain.selectedNodeId = nodeId;
   _brainHarvestSize(nodeId);
   brainRenderCanvas();
@@ -1611,8 +1632,12 @@ function brainNodeMouseDown(e, nodeId) {
   if (e.pointerType === 'mouse' && e.button !== 0) return;
   e.stopPropagation();
   if (typeof viz !== 'undefined' && viz.colorModeEnabled) return;
+  if (viz.selectMode) return;   // the select tool only selects: nothing is dragged
   const node = brain.nodes.find(n => n.id === nodeId);
   if (!node) return;
+  // Pressing a note outside the group starts a fresh selection; a note in it
+  // drags the whole group.
+  if (!brain.selectedNodeIds.has(nodeId) && !(e.shiftKey || e.ctrlKey || e.metaKey)) brain.selectedNodeIds.clear();
   const inner = e.target.closest('.viz-node-inner');
   if (inner) {
     const rect = inner.getBoundingClientRect();
@@ -1657,10 +1682,23 @@ function brainNodeDrag(e) {
   }
   brain._prevDragPos = { x: e.clientX, y: e.clientY };
 
+  const gdx = newX - node.x, gdy = newY - node.y;
   node.x = newX;
   node.y = newY;
   const el = document.querySelector(`.viz-node[data-node-id="${node.id}"]`);
   if (el) { el.style.left = node.x + 'px'; el.style.top = node.y + 'px'; el.classList.add('dragging'); }
+  // The rest of the group comes along.
+  if (brain.selectedNodeIds.size > 1 && brain.selectedNodeIds.has(node.id) && (gdx || gdy)) {
+    brain._hasDraggedGroup = true;
+    brain.selectedNodeIds.forEach(id => {
+      if (id === node.id) return;
+      const o = brain.nodes.find(n => n.id === id);
+      if (!o) return;
+      o.x += gdx; o.y += gdy;
+      const oe = document.querySelector(`.viz-node[data-node-id="${id}"]`);
+      if (oe) { oe.style.left = o.x + 'px'; oe.style.top = o.y + 'px'; }
+    });
+  }
   vizSchedulePaint(() => { brainUpdateSVGLinks(); brainUpdateMinimap(); });
 }
 
@@ -1703,8 +1741,11 @@ function brainNodeDragEnd() {
   if (brain._hasDragged) {
     // Land on the grid the canvas draws, when snapping is on.
     if (brainOpts().snap && droppedId) {
-      const n = brain.nodes.find(x => x.id === droppedId);
-      if (n) { n.x = brainSnap(n.x); n.y = brainSnap(n.y); }
+      const group = brain.selectedNodeIds.has(droppedId) ? brain.selectedNodeIds : new Set([droppedId]);
+      group.forEach(id => {
+        const n = brain.nodes.find(x => x.id === id);
+        if (n) { n.x = brainSnap(n.x); n.y = brainSnap(n.y); }
+      });
     }
     brainRenderCanvas(); brainSaveCurrentVersion();
   }
@@ -1717,7 +1758,8 @@ let _brainPinch = null;
 
 function brainCanvasMouseDown(e) {
   if (e.target.closest('.viz-node') || e.target.closest('.viz-minimap')) return;
-  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 1) return;
+  if (e.button === 1) e.preventDefault();   // the middle button pans, never autoscrolls
   _brainPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (_brainPointers.size === 2) {
     const pts = [..._brainPointers.values()];
@@ -1729,6 +1771,11 @@ function brainCanvasMouseDown(e) {
     return;
   }
   if (_brainPointers.size > 2) return;
+  // The select tool's box (Shift or Ctrl draws one without it).
+  if (!vizPanPress(e) && (viz.selectMode || e.shiftKey || e.ctrlKey || e.metaKey) && brain.activeVersionId) {
+    brainMarqueeStart(e);
+    return;
+  }
   vizStopTween();
   brain.isPanning = true;
   brain.panStart = { x: e.clientX, y: e.clientY };
@@ -1755,6 +1802,7 @@ function brainCanvasMouseMove(e) {
     brainUpdateZoomDisplay();
     return;
   }
+  if (brain.marquee) { brainMarqueeMove(e); return; }
 
   if (brain.linkingFrom) {
     const tempLink = document.getElementById('viz-temp-link');
@@ -1792,6 +1840,7 @@ function brainCanvasMouseMove(e) {
 function brainCanvasMouseUp(e) {
   if (e && e.pointerId !== undefined) _brainPointers.delete(e.pointerId);
   if (_brainPointers.size < 2 && _brainPinch) { _brainPinch = null; brainSaveCurrentVersion(); }
+  if (brain.marquee) { brainMarqueeEnd(e); return; }
   if (!brain.isPanning) return;
   vizCancelScheduledPaint();
   brain.isPanning = false;
@@ -1801,10 +1850,7 @@ function brainCanvasMouseUp(e) {
   if (moved) { vizApplyTransform(); brainSaveCurrentVersion(); }
   // A click on empty canvas (a press that did not pan) deselects. Nothing did,
   // so a note's highlight or an object's dashed box stayed after clicking away.
-  else if (brain.selectedNodeId) {
-    brain.selectedNodeId = null;
-    document.querySelectorAll('#viz-nodes-layer .viz-node.selected').forEach(n => n.classList.remove('selected'));
-  }
+  else if (brain.selectedNodeId || brain.selectedNodeIds.size) brainClearSelection();
 }
 
 let _brainWheelSaveTimer = null;
@@ -2461,6 +2507,7 @@ function brainCancelLinking() {
 
 function brainToggleLinkMode() {
   brain.linkModeEnabled = !brain.linkModeEnabled;
+  if (brain.linkModeEnabled && viz.selectMode) vizToggleSelectMode(false);
 
   // Mirror vizToggleLinkMode: turn off color paint mode when enabling link mode
   if (brain.linkModeEnabled && viz.colorModeEnabled) {
@@ -2745,15 +2792,20 @@ function brainHideAllMenus() {
    border. Drawn inline (no icon pass needed) and above every border layer. */
 const BRAIN_CHECK_BADGE = '<span class="brain-check-badge" role="img" aria-label="Checked">'
   + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span>';
-let _brainCheckPop = null;   // the note whose mark was just put on: it pops in once
+let _brainCheckPop = null;   // the notes whose mark was just put on: they pop in once
 
+/** Check or uncheck the note -- or, for a selection, all of them the way the
+ *  right-clicked one goes, so a mixed group ends up all one way. */
 function brainCtxToggleCheck() {
   const node = brain.nodes.find(n => n.id === brain.contextNodeId);
   if (!node) return;
-  brainPushUndo();
-  if (node.checked) delete node.checked; else node.checked = true;
+  const on = !node.checked;
+  const targets = brainCtxTargets().filter(n => !!n.checked !== on);
   brainHideAllMenus();
-  _brainCheckPop = node.checked ? node.id : null;
+  if (!targets.length) return;
+  brainPushUndo();
+  targets.forEach(n => { if (on) n.checked = true; else delete n.checked; });
+  _brainCheckPop = on ? new Set(targets.map(n => n.id)) : null;
   brainRenderCanvas();
   _brainCheckPop = null;
   brainSaveCurrentVersion();
@@ -2763,6 +2815,7 @@ function brainNodeCtx(e, nodeId) {
   e.preventDefault(); e.stopPropagation();
   brainHideAllMenus();
   brain.contextNodeId = nodeId;
+  brainCtxPrepare(nodeId);   // one note, or every selected one (viz-select.js)
   const menu = document.getElementById('brain-node-ctx');
   if (!menu) return;
   const node = brain.nodes.find(n => n.id === nodeId);
@@ -2829,6 +2882,7 @@ function _brainShowColorTargetList(open) {
 /** Applies to the toggled target and keeps the menu open, so you can switch
  *  target and pick again. */
 function brainCtxPickColor(color) {
+  if (brainForEachTarget(() => brainCtxPickColor(color))) { _brainMarkNodeMenu(); return; }
   const node = brain.contextNodeId && brain.nodes.find(n => n.id === brain.contextNodeId);
   if (!node) return;
   const prop = BRAIN_COLOR_PROPS[brain._colorTarget || 'edge'];
@@ -3312,6 +3366,7 @@ function brainToggleNodeSub(e, key) {
 
 /** Set (or with null, clear back to default) one of the context note's settings. */
 function brainCtxSetNote(prop, value) {
+  if (brainForEachTarget(() => brainCtxSetNote(prop, value))) { brainHideAllMenus(); return; }
   const node = brain.contextNodeId && brain.nodes.find(n => n.id === brain.contextNodeId);
   if (!node) { brainHideAllMenus(); return; }
   if ((node[prop] == null ? null : node[prop]) === (value == null ? null : value)) { brainHideAllMenus(); return; }
@@ -3450,6 +3505,7 @@ function brainEnsureElectricFilter() {
 
 
 function brainCtxSetBorder(type) {
+  if (brainForEachTarget(() => brainCtxSetBorder(type))) { _brainMarkNodeMenu(); return; }
   const node = brain.contextNodeId && brain.nodes.find(n => n.id === brain.contextNodeId);
   if (!node || (node.border || null) === (type || null)) return;
   brainPushUndo();
@@ -3477,6 +3533,7 @@ const BRAIN_BUBBLE_IDS = new Set(BRAIN_BUBBLES.map(b => b[0]));
 let _brainBubbleRO = null;   // see brainRenderCanvas
 
 function brainCtxSetBubble(id) {
+  if (brainForEachTarget(() => brainCtxSetBubble(id))) { _brainMarkNodeMenu(); return; }
   const node = brain.contextNodeId && brain.nodes.find(n => n.id === brain.contextNodeId);
   if (!node || (node.bubble || 'speech') === id) return;
   brainPushUndo();
@@ -3711,8 +3768,9 @@ function brainCtxEditComment() {
 }
 
 function brainCtxDeleteNode() {
-  if (brain.contextNodeId) brainDeleteNode(brain.contextNodeId);
+  const targets = brainCtxTargets();
   brainHideAllMenus();
+  brainDeleteTargets(targets);   // one note, or every selected one, asked about once
 }
 
 
@@ -3731,6 +3789,7 @@ function brainCtxEditLinkColor(color) {
 }
 
 function brainCtxCollapseChildren() {
+  if (brainForEachTarget(() => brainCtxCollapseChildren())) { brainHideAllMenus(); return; }
   if (!brain.contextNodeId) { brainHideAllMenus(); return; }
   const node = brain.nodes.find(n => n.id === brain.contextNodeId);
   if (!node) { brainHideAllMenus(); return; }
@@ -3750,6 +3809,7 @@ function brainCtxCollapseChildren() {
 }
 
 function brainCtxExpandChildren() {
+  if (brainForEachTarget(() => brainCtxExpandChildren())) { brainHideAllMenus(); return; }
   if (!brain.contextNodeId) { brainHideAllMenus(); return; }
   const node = brain.nodes.find(n => n.id === brain.contextNodeId);
   if (!node || !node.collapsed) { brainHideAllMenus(); return; }

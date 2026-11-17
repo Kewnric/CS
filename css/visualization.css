@@ -3604,14 +3604,46 @@
 /* ── Marquee selection ─────────────────────────────────────────
    Shift-drag on empty canvas. Selection used to be a single id, so delete,
    colour and move were all one-node operations. */
+/* The selection box: Windows' blue, a thin solid edge over a light wash. */
 .viz-marquee {
   position: absolute;
-  border: 1.5px dashed var(--color-primary);
-  background: var(--color-primary-glow);
-  border-radius: var(--radius-sm);
+  border: 1px solid #3b82f6;
+  background: rgba(59, 130, 246, 0.16);
+  border-radius: 2px;
   pointer-events: none;
   z-index: 40;
 }
+
+/* ── The select tool (viz-select.js) ──────────────────────────
+   A crosshair over empty canvas, a pointer over a node (a click selects),
+   a hand while Space is held. Nothing to drag, so no ports. */
+.viz-canvas-container.select-mode { cursor: crosshair; }
+.viz-canvas-container.select-mode .viz-node { cursor: pointer; }
+.viz-canvas-container.select-mode .viz-port,
+.viz-canvas-container.select-mode .shape-rotate,
+.viz-canvas-container.select-mode .bb-resize { display: none; }
+.viz-canvas-container.select-mode .viz-link-group { pointer-events: none; }
+/* A node in the selection: a blue ring, clear on any border or colour. */
+.viz-node.in-group .viz-node-inner {
+  outline: 2px solid #3b82f6;
+  outline-offset: 3px;
+}
+.viz-canvas-container.space-pan,
+.viz-canvas-container.space-pan .viz-node { cursor: grab; }
+
+/* A menu for several nodes: the line at its top says so, and the actions
+   that only make sense for one step aside. */
+.viz-ctx-multi {
+  margin: 2px 2px 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(59, 130, 246, 0.14);
+  color: #93c5fd;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.viz-ctx-multi.hidden { display: none; }
+.viz-context-menu.is-multi .ctx-single { display: none !important; }
 .viz-node.viz-marquee-hit .viz-node-inner {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 2px var(--color-primary-glow);

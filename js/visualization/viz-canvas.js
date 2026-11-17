@@ -558,6 +558,7 @@ function vizRenderCanvas() {
 
     const cl = el.classList;
     cl.toggle('selected', node.id === viz.selectedNodeId || viz.selectedNodeIds.has(node.id));
+    cl.toggle('in-group', viz.selectedNodeIds.has(node.id));   // the select tool's blue ring
     cl.toggle('viz-globe-node', info.globe);
     cl.toggle('viz-fog-of-war', info.fog);
     cl.toggle('not-linked', !linkedIds.has(node.id) && node.type !== 'root' && node.type !== 'comment');
@@ -743,6 +744,7 @@ function vizNodeMouseDown(e, nodeId) {
   if (e.pointerType === 'mouse' && e.button !== 0) return;
   e.stopPropagation();
   if (viz.linkModeEnabled || viz.linkingFrom || viz.colorModeEnabled) return;
+  if (viz.selectMode) return;   // the select tool only selects: nothing is dragged
   const node = viz.nodes.find(n => n.id === nodeId);
   if (!node) return;
 
@@ -976,7 +978,8 @@ let _vizPinch = null;
 function vizCanvasMouseDown(e) {
   if (viz.activeModule === 'brain') { brainCanvasMouseDown(e); return; }
   if (e.target.closest('.viz-node') || e.target.closest('.viz-minimap')) return;
-  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  if (e.pointerType === 'mouse' && e.button !== 0 && e.button !== 1) return;
+  if (e.button === 1) e.preventDefault();   // the middle button pans, never autoscrolls
 
   _vizPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (_vizPointers.size === 2) { _vizStartPinch(); return; }
@@ -986,7 +989,9 @@ function vizCanvasMouseDown(e) {
   if (viz.linkingFrom) { vizCancelLinking(); return; }
 
   const container = document.getElementById('viz-canvas-container');
-  if (e.shiftKey || e.ctrlKey || e.metaKey) {
+  // The select tool's box; Shift adds to the selection, and Shift or Ctrl
+  // draws one without the tool. A middle-button or Space drag pans.
+  if (!vizPanPress(e) && (viz.selectMode || e.shiftKey || e.ctrlKey || e.metaKey)) {
     const rect = container.getBoundingClientRect();
     viz.marquee = {
       x0: (e.clientX - rect.left - viz.pan.x) / viz.zoom,
@@ -1120,6 +1125,11 @@ function vizCanvasMouseUp(e) {
       if (viz.selectedNodeIds.size && !viz.selectedNodeId) viz.selectedNodeId = [...viz.selectedNodeIds][0];
       vizRenderCanvas();
       vizUpdateSelectionChip();
+    } else if (!m.add) {
+      // A click on empty canvas: the selection was cleared when it began.
+      viz.selectedNodeId = null;
+      vizRenderCanvas();
+      vizUpdateSelectionChip();
     }
     return;
   }
@@ -1141,7 +1151,7 @@ function vizCanvasMouseUp(e) {
 function vizUpdateSelectionChip() {
   const el = document.getElementById('viz-selection-chip');
   if (!el) return;
-  const n = viz.selectedNodeIds.size;
+  const n = (viz.activeModule === 'brain' ? brain.selectedNodeIds : viz.selectedNodeIds).size;
   el.classList.toggle('hidden', n < 2);
   if (n >= 2) el.innerHTML = `<i data-lucide="box-select" style="width:11px;height:11px;"></i> ${n} selected`
     + ` <button type="button" class="viz-chip-x" onclick="vizClearSelection()" aria-label="Clear selection">&times;</button>`;
@@ -1149,6 +1159,7 @@ function vizUpdateSelectionChip() {
 }
 
 function vizClearSelection() {
+  if (viz.activeModule === 'brain') { brainClearSelection(); return; }
   viz.selectedNodeIds.clear();
   vizRenderCanvas();
   vizUpdateSelectionChip();

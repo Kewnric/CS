@@ -1693,6 +1693,15 @@ function vizContentDragLeave(e) {
 
 function vizNodeClick(e, nodeId) {
   e.stopPropagation();
+  // The select tool: a click adds the node to the selection or takes it out.
+  if (viz.selectMode) {
+    if (viz.selectedNodeIds.has(nodeId)) viz.selectedNodeIds.delete(nodeId);
+    else viz.selectedNodeIds.add(nodeId);
+    viz.selectedNodeId = viz.selectedNodeIds.has(nodeId) ? nodeId : ([...viz.selectedNodeIds][0] || null);
+    vizRenderCanvas();
+    vizUpdateSelectionChip();
+    return;
+  }
 
   const nodeEl = e.target.closest('.viz-node');
   const isFogged = nodeEl && nodeEl.classList.contains('viz-fog-of-war');
@@ -1913,6 +1922,7 @@ function vizNodeCtx(e, nodeId) {
   if (el && el.classList.contains('viz-fog-of-war')) return;
 
   viz.contextNodeId = nodeId;
+  const many = vizCtxPrepare(nodeId) > 1;   // one node, or every selected one (viz-select.js)
 
   const menu = document.getElementById('viz-node-ctx');
   if (!menu) return;
@@ -1945,7 +1955,12 @@ function vizNodeCtx(e, nodeId) {
   const expandBtn = document.getElementById('viz-ctx-expand-btn');
   if (collapseBtn && expandBtn) {
     const hasChildren = viz.links.some(l => l.from === nodeId && !l.isCustom);
-    if (node.collapsed) {
+    if (many) {
+      // A group: offer whichever of the two any of them can take.
+      const ts = vizCtxTargets();
+      collapseBtn.style.display = ts.some(t => !t.collapsed && viz.links.some(l => l.from === t.id && !l.isCustom)) ? 'flex' : 'none';
+      expandBtn.style.display = ts.some(t => t.collapsed) ? 'flex' : 'none';
+    } else if (node.collapsed) {
       collapseBtn.style.display = 'none';
       expandBtn.style.display = 'flex';
     } else if (hasChildren) {
@@ -1966,12 +1981,18 @@ function vizNodeCtx(e, nodeId) {
 
 function vizCtxEditColor(color) {
   vizPushUndo();
-  if (viz.contextNodeId) vizEditNodeColor(viz.contextNodeId, color);
+  const targets = vizCtxTargets();
+  if (targets.length > 1) {
+    targets.forEach(n => { n.color = color; });
+    vizRenderCanvas(); vizSave();
+  } else if (viz.contextNodeId) vizEditNodeColor(viz.contextNodeId, color);
   vizHideAllMenus();
 }
 
 function vizCtxDeleteNode() {
-  if (viz.contextNodeId) vizDeleteNode(viz.contextNodeId);
+  // Several selected: the Delete key's path, asked about once.
+  if (vizCtxTargets().length > 1) vizDeleteSelection();
+  else if (viz.contextNodeId) vizDeleteNode(viz.contextNodeId);
   vizHideAllMenus();
 }
 
@@ -2040,12 +2061,12 @@ function vizCtxAddLink() {
 }
 
 function vizCtxCollapseChildren() {
-  if (viz.contextNodeId) vizCollapseChildren(viz.contextNodeId);
+  vizCtxTargets().filter(n => !n.collapsed).forEach(n => vizCollapseChildren(n.id));
   vizHideAllMenus();
 }
 
 function vizCtxExpandChildren() {
-  if (viz.contextNodeId) vizExpandChildren(viz.contextNodeId);
+  vizCtxTargets().filter(n => n.collapsed).forEach(n => vizExpandChildren(n.id));
   vizHideAllMenus();
 }
 
@@ -2478,6 +2499,7 @@ function vizToggleFlowyDrag() {
 
 function vizToggleColorMode() {
   viz.colorModeEnabled = !viz.colorModeEnabled;
+  if (viz.colorModeEnabled && viz.selectMode) vizToggleSelectMode(false);
   if (viz.colorModeEnabled) vizClosePopups('viz-color-mode-popup');
 
   // Turn off link mode for the currently active module

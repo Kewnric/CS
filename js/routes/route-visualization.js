@@ -300,7 +300,12 @@ function vizTemplate() {
 
                 <!-- Edit: the modes that change what a click does. -->
                 <div class="vtb-panel" data-cat="edit" role="tabpanel" aria-label="Edit">
-                <!-- ── Edit: the two modes that change what a click does ── -->
+                <!-- ── Edit: the modes that change what a click does ── -->
+                <!-- Select (V): a drag on empty canvas draws a box, a click adds
+                     a node; nothing is dragged while it is on (viz-select.js). -->
+                <button class="viz-zoom-btn viz-toolbar-pill-btn" id="viz-select-toggle-btn" onclick="vizToggleSelectMode()" title="Select (V): drag a box, click to add" aria-label="Select tool" aria-pressed="false">
+                  <i data-lucide="box-select" style="width:12px;height:12px;"></i>
+                </button>
                 <div class="viz-toolbar-dropdown">
                   <button class="viz-zoom-btn viz-toolbar-pill-btn" id="viz-link-toggle-btn" onclick="vizToggleLinkMode()" title="Link mode (L)" aria-label="Link mode" aria-pressed="false">
                     <i data-lucide="link" style="width:12px;height:12px;"></i>
@@ -449,17 +454,18 @@ function vizTemplate() {
 
     <!-- Node Context Menu -->
     <div id="viz-node-ctx" class="viz-context-menu hidden" role="menu">
+      <div class="viz-ctx-multi hidden" id="viz-ctx-multi"></div>
       <div class="viz-color-picker">${vizSwatchesHTML('vizCtxEditColor')}</div>
       <div class="viz-ctx-divider"></div>
-      <button class="viz-ctx-item" id="viz-ctx-change-icon-btn" onclick="vizCtxChangeIcon()"><i data-lucide="image"></i> Change Icon</button>
-      <button class="viz-ctx-item" onclick="vizCtxRenameNode()"><i data-lucide="pencil"></i> Rename</button>
-      <button class="viz-ctx-item" onclick="vizCtxAddChild()"><i data-lucide="git-branch"></i> Add Child Node</button>
-      <button class="viz-ctx-item" onclick="vizCtxAddChildFolder()"><i data-lucide="folder-plus"></i> Add Category</button>
-      <button class="viz-ctx-item" onclick="vizCtxAddLink()"><i data-lucide="link"></i> Add Link</button>
-      <button class="viz-ctx-item" id="viz-ctx-edit-comment-btn" style="display:none;" onclick="vizCtxEditComment()"><i data-lucide="edit-2"></i> Edit Comment</button>
-      <div class="viz-ctx-divider"></div>
-      <button class="viz-ctx-item" onclick="vizCtxFocusHere()"><i data-lucide="crosshair"></i> Show only what is near this</button>
-      <button class="viz-ctx-item" id="viz-ctx-reveal-btn" onclick="vizCtxReveal()"><i data-lucide="list-tree"></i> Find in the list</button>
+      <button class="viz-ctx-item ctx-single" id="viz-ctx-change-icon-btn" onclick="vizCtxChangeIcon()"><i data-lucide="image"></i> Change Icon</button>
+      <button class="viz-ctx-item ctx-single" onclick="vizCtxRenameNode()"><i data-lucide="pencil"></i> Rename</button>
+      <button class="viz-ctx-item ctx-single" onclick="vizCtxAddChild()"><i data-lucide="git-branch"></i> Add Child Node</button>
+      <button class="viz-ctx-item ctx-single" onclick="vizCtxAddChildFolder()"><i data-lucide="folder-plus"></i> Add Category</button>
+      <button class="viz-ctx-item ctx-single" onclick="vizCtxAddLink()"><i data-lucide="link"></i> Add Link</button>
+      <button class="viz-ctx-item ctx-single" id="viz-ctx-edit-comment-btn" style="display:none;" onclick="vizCtxEditComment()"><i data-lucide="edit-2"></i> Edit Comment</button>
+      <div class="viz-ctx-divider ctx-single"></div>
+      <button class="viz-ctx-item ctx-single" onclick="vizCtxFocusHere()"><i data-lucide="crosshair"></i> Show only what is near this</button>
+      <button class="viz-ctx-item ctx-single" id="viz-ctx-reveal-btn" onclick="vizCtxReveal()"><i data-lucide="list-tree"></i> Find in the list</button>
       <div class="viz-ctx-divider"></div>
       <button class="viz-ctx-item" id="viz-ctx-collapse-btn" style="display:none;" onclick="vizCtxCollapseChildren()"><i data-lucide="chevrons-up"></i> Collapse Children</button>
       <button class="viz-ctx-item" id="viz-ctx-expand-btn" style="display:none;" onclick="vizCtxExpandChildren()"><i data-lucide="chevrons-down"></i> Expand Children</button>
@@ -500,9 +506,11 @@ function vizTemplate() {
          row. Every control keeps its id and handler; only the arrangement is
          new. It used to be fourteen rows. -->
     <div id="brain-node-ctx" class="viz-context-menu brain-note-menu hidden" role="menu">
+      <!-- Several notes selected: the menu acts on all of them (viz-select.js). -->
+      <div class="viz-ctx-multi hidden" id="brain-ctx-multi"></div>
       <!-- A library link's own controls (brain-libref.js): what its button does,
            the other action once, and pointing it at something else. -->
-      <div id="brain-ctx-ref" class="brain-ctx-ref hidden">
+      <div id="brain-ctx-ref" class="brain-ctx-ref ctx-single hidden">
         <div class="brain-ctx-ref-head">
           <span class="brain-ctx-ref-ic"><i data-lucide="link-2"></i></span>
           <span class="brain-ctx-ref-text"><b id="brain-ctx-ref-name">Library link</b><span id="brain-ctx-ref-where"></span></span>
@@ -582,11 +590,11 @@ function vizTemplate() {
 
       <!-- Actions, one row. -->
       <div class="bnm-actions">
-        <button type="button" class="bnm-act" onclick="brainCtxEditComment()" title="Edit Comment"><i data-lucide="edit-2"></i><span>Edit</span></button>
-        <button type="button" class="bnm-act" onclick="brainCtxStartLink()" title="Add Link"><i data-lucide="link"></i><span>Link</span></button>
+        <button type="button" class="bnm-act ctx-single" onclick="brainCtxEditComment()" title="Edit Comment"><i data-lucide="edit-2"></i><span>Edit</span></button>
+        <button type="button" class="bnm-act ctx-single" onclick="brainCtxStartLink()" title="Add Link"><i data-lucide="link"></i><span>Link</span></button>
         <button type="button" class="bnm-act" id="brain-ctx-check-btn" aria-pressed="false" onclick="brainCtxToggleCheck()" title="Put a check mark on this note"><i data-lucide="circle-check"></i><span>Check</span></button>
         <!-- A switch: on, the note has a canvas of its own and a double-click opens it (brain-dir.js). -->
-        <button type="button" class="bnm-act" id="brain-ctx-dir-btn" aria-pressed="false" onclick="brainCtxToggleDir()" title="Directory: give this note a canvas of its own"><i data-lucide="folder-tree"></i><span>Directory</span></button>
+        <button type="button" class="bnm-act ctx-single" id="brain-ctx-dir-btn" aria-pressed="false" onclick="brainCtxToggleDir()" title="Directory: give this note a canvas of its own"><i data-lucide="folder-tree"></i><span>Directory</span></button>
         <button type="button" class="bnm-act" id="brain-ctx-collapse-btn" style="display:none;" onclick="brainCtxCollapseChildren()" title="Collapse Children"><i data-lucide="chevrons-up"></i><span>Collapse</span></button>
         <button type="button" class="bnm-act" id="brain-ctx-expand-btn" style="display:none;" onclick="brainCtxExpandChildren()" title="Expand Children"><i data-lucide="chevrons-down"></i><span>Expand</span></button>
         <button type="button" class="bnm-act danger" onclick="brainCtxDeleteNode()" title="Delete"><i data-lucide="trash-2"></i><span>Delete</span></button>

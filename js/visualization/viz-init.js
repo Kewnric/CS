@@ -30,6 +30,8 @@ function initVisualization() {
   viz.selectedNodeIds = new Set();
   viz.focusNodeId = null;
   viz.marquee = null;
+  viz.selectMode = false;
+  if (typeof brain !== 'undefined') { brain.selectedNodeIds = new Set(); brain.marquee = null; }
   if (typeof _vizResetRenderCache === 'function') _vizResetRenderCache();
 
   // Suppress cloud uploads while we hydrate state from local cache + populate
@@ -211,9 +213,9 @@ function initVisualization() {
     const isBrain = viz.activeModule === 'brain';
 
     // Select all on the canvas.
-    if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A') && !isBrain) {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A')) {
       e.preventDefault();
-      vizSelectAll();
+      if (isBrain) brainSelectAll(); else vizSelectAll();
       return;
     }
     // Canvas only — the same chord as zen mode on the coding attempt.
@@ -246,13 +248,18 @@ function initVisualization() {
     // modifier belongs to the browser or the OS.
     if (e.ctrlKey || e.metaKey || e.altKey) return;
 
+    // V: the select tool, on either canvas.
+    if (e.key === 'v' || e.key === 'V') { vizToggleSelectMode(); return; }
     if (isBrain) {
       if (e.key === 'Escape') {
         const wasLinking = !!brain.linkingFrom;
         brainCancelLinking(); brainHideAllMenus();
+        // A selection clears first; the next Esc turns the select tool off.
+        if (!wasLinking && (brain.selectedNodeIds.size || (viz.selectMode && brain.selectedNodeId))) { brainClearSelection(); return; }
+        if (!wasLinking && viz.selectMode) { vizToggleSelectMode(false); return; }
         if (!wasLinking && vizIsZen()) vizToggleZen(false);
       }
-      if (e.key === 'Delete') { if (brain.selectedNodeId) brainDeleteNode(brain.selectedNodeId); }
+      if (e.key === 'Delete') brainDeleteSelection();
       if (e.key === 'f' || e.key === 'F') { brainZoomReset(); }
       if (e.key === 'l' || e.key === 'L') { brainToggleLinkMode(); }
       if (e.key === '+' || e.key === '=') { brainZoomIn(); }
@@ -263,6 +270,7 @@ function initVisualization() {
     if (e.key === 'Escape') {
       if (viz.focusNodeId) { vizClearFocus(); return; }
       if (viz.selectedNodeIds.size) { vizClearSelection(); return; }
+      if (viz.selectMode) { vizToggleSelectMode(false); return; }
       const wasLinking = !!viz.linkingFrom;
       vizCancelLinking(); vizHideAllMenus(); vizHideNodePopup();
       if (!wasLinking && vizIsZen()) vizToggleZen(false);

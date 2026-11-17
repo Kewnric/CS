@@ -61,6 +61,8 @@ const viz = {
      "primary" for the things that only make sense for one (rename, popup). */
   selectedNodeIds: new Set(),
   marquee: null,
+  // The select tool (viz-select.js): a left-drag draws a box, a click adds.
+  selectMode: false,
   savedViews: [],
   /* The header stat chips are filters now: null | 'placed' | 'starred'. */
   paneFilter: null,
@@ -326,6 +328,7 @@ function vizToggleLinkMode() {
   }
 
   viz.linkModeEnabled = !viz.linkModeEnabled;
+  if (viz.linkModeEnabled && viz.selectMode) vizToggleSelectMode(false);
 
   // Turn off color mode if enabling link mode
   if (viz.linkModeEnabled && viz.colorModeEnabled) {
