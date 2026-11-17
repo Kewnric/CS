@@ -869,6 +869,20 @@
   max-width: 520px;
 }
 
+/* No glass (js/glass.js). Where the browser composites without the graphics
+   card, a backdrop blur re-blurs the whole screen on the CPU on every frame
+   that anything moves under it: Session Setup and Settings opened at ~18 fps,
+   and every .modal-overlay shares this scrim. All blurs go; the shared scrim
+   darkens a little instead. The class on <html> lets the ancestor filter
+   reject these for every element while it is off. */
+html.no-glass *,
+html.no-glass *::before,
+html.no-glass *::after {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+html.no-glass .modal-overlay::before { background: rgba(0, 0, 0, 0.7); }
+
 .modal-icon {
   margin-bottom: var(--space-md);
   display: flex;

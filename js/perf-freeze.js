@@ -84,6 +84,8 @@ function perfFreezeCheck() {
   if (open.length) {
     clearTimeout(_pf.thaw);
     _pf.thaw = 0;
+    // A blurred window has just opened: time whether the blur lags here.
+    if (!_pf.open && typeof glassProbe === 'function') glassProbe();
     _pf.open = true;
     _pfFreeze(open);   // also catches loops that started behind it since
     return;

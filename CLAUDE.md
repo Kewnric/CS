@@ -544,7 +544,14 @@ buttons.
   overlay (`PERF_FREEZE_SEL`; add a new overlay class there) and `perfFreezeActive()` tells fast painters to
   hold still. Page switches skip the View Transition (`snapshot: false`, router.js): its snapshot of the
   whole old screen dropped a frame on every switch (80-120 ms into an attempt); pages come in by their own
-  entrances.
+  entrances. **Where the browser composites without the GPU** (hardware acceleration off, GPU blocklisted
+  or crashed) any motion under a blur re-blurs the screen on the CPU: Session Setup and Settings opened at
+  ~18 fps, 60 without the blur. `js/glass.js` times the first blurred windows to open (`glassProbe`, from
+  perf-freeze) and, if their frames are slow while the main thread is idle (long-animation-frame script +
+  render time), sets `html.no-glass`, which drops every backdrop-filter (css/components.css), and
+  remembers it (`ssp.glass.slow`; Settings > Blur: Auto / Off / On). Headless Chromium draws in software
+  too, so the probe is off under webdriver unless `ssp.glass.test` is set. Measure blur changes with
+  `--disable-gpu-compositing` as well as with the GPU: GPU-only numbers hid this for three rounds.
 - **A finished animation with `fill: forwards` that touches transform, opacity or filter keeps its
   element composited for good.** Home had 470 such layers (heatmap cells, hero letters). Rest on the
   final keyframe and fill `backwards`. Count layers with CDP `LayerTree` when a page feels slow.

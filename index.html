@@ -22,6 +22,14 @@
       // The stylesheets key "off" on a class as well (css/mx-core.css says why).
       if (motion === 'off') document.documentElement.classList.add('mx-off');
       document.documentElement.classList.add('mx-boot');
+      // No backdrop blur where it was measured to lag, before first paint
+      // (js/glass.js owns it).
+      try {
+        var glass = localStorage.getItem('ssp.glass');
+        if (glass === 'off' || (glass !== 'on' && localStorage.getItem('ssp.glass.slow') === '1')) {
+          document.documentElement.classList.add('no-glass');
+        }
+      } catch (e) {}
     })();
   </script>
   <meta charset="UTF-8">
@@ -411,6 +419,17 @@
           <span class="settings-item-info">
             <span class="settings-item-label" id="settings-libholo-label">Card Characters On</span>
             <span class="settings-item-desc" id="settings-libholo-desc">Little scenes rise over Library cards on hover</span>
+          </span>
+          <i data-lucide="chevron-right" class="settings-item-chevron" aria-hidden="true"></i>
+        </button>
+        <!-- Blur behind windows (js/glass.js): Auto turns it off on a browser
+             that draws without the graphics card, where it made windows lag. -->
+        <button onclick="toggleGlass()" class="settings-item" type="button" id="settings-glass-item"
+                aria-label="Blur behind windows" aria-pressed="true">
+          <span class="settings-item-icon"><i data-lucide="droplets" id="settings-glass-icon" aria-hidden="true"></i></span>
+          <span class="settings-item-info">
+            <span class="settings-item-label" id="settings-glass-label">Blur: Auto</span>
+            <span class="settings-item-desc" id="settings-glass-desc">Frosted glass; turns itself off if it makes windows lag</span>
           </span>
           <i data-lucide="chevron-right" class="settings-item-chevron" aria-hidden="true"></i>
         </button>
@@ -943,6 +962,7 @@
   <script defer src="js/auth-accounts.js"></script>
   <script defer src="js/status-window.js"></script>
   <script defer src="js/sidebar-wheel.js"></script>
+  <script defer src="js/glass.js"></script>
   <script defer src="js/perf-freeze.js"></script>
 
   <script>
