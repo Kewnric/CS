@@ -61,9 +61,9 @@
   <link rel="stylesheet" href="css/brain-borders.css">
   <link rel="stylesheet" href="css/demo.css">
   <link rel="stylesheet" href="css/auth.css">
-  <link rel="stylesheet" href="css/quest-board.css">
   <link rel="stylesheet" href="css/login.css">
   <link rel="stylesheet" href="css/status-window.css">
+  <link rel="stylesheet" href="css/quest-board.css">
   <link rel="stylesheet" href="css/quest-hud.css">
   <link rel="stylesheet" href="css/language.css">
   <link rel="stylesheet" href="css/lang-pages.css">
@@ -927,11 +927,12 @@
   <script defer src="js/storage-meter.js"></script>
   <script defer src="js/routes/register.js"></script>
   <script defer src="js/firebase-auth.js"></script>
-
-  <script>
   <script defer src="js/auth-accounts.js"></script>
   <script defer src="js/status-window.js"></script>
   <script defer src="js/sidebar-wheel.js"></script>
+  <script defer src="js/perf-freeze.js"></script>
+
+  <script>
     window.addEventListener('DOMContentLoaded', () => {
       initTheme();
       registerAllRoutes();
@@ -943,9 +944,6 @@
     // Guarded to http/https (skips file://) so it never errors when opened directly.
     if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !location.search.includes('nosw')) {
       window.addEventListener('load', () => {
-  <script defer src="js/perf-freeze.js"></script>
-
-  <script>
         navigator.serviceWorker.register('sw.js').catch((e) => console.warn('[PWA] SW registration failed:', e));
       });
     }
