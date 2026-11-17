@@ -113,6 +113,9 @@
   function showTip(link) {
     const bar = document.querySelector('.app-sidebar');
     if (!tip || !bar || bar.classList.contains('expanded') || window.innerWidth < 768) return;
+    // The auto-collapse (navigation.js) is about to open the sidebar under the
+    // pointer, labels and all; a tip now would only flash.
+    if (typeof _sbAutoWillOpen === 'function' && _sbAutoWillOpen()) return;
     const text = link.getAttribute('aria-label') || link.textContent.trim();
     if (!text) return;
     const r = link.getBoundingClientRect();

@@ -17,13 +17,148 @@ function toggleSidebar() {
     if (backdrop) backdrop.classList.toggle('hidden', isOpen);
     if (btn) btn.setAttribute('aria-expanded', String(!isOpen));
   } else {
-    sidebar.style.width = '';
-    sidebar.style.flexBasis = '';
-    sidebar.classList.toggle('expanded');
-    localStorage.setItem('sidebarExpanded', sidebar.classList.contains('expanded'));
-    if (btn) btn.setAttribute('aria-expanded', String(sidebar.classList.contains('expanded')));
-    if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+    const open = !sidebar.classList.contains('expanded');
+    _sbSetExpanded(sidebar, open, true);
+    // A click is the user deciding, and hovering does not overrule it: shut
+    // with the pointer still on the sidebar, it stays shut until the pointer
+    // leaves and comes back.
+    _sbAuto.hold = !open && _sbAuto.inside;
+    _sbAutoArm();
   }
+}
+
+/* Open or fold the desktop sidebar. `remember` is for a click: it is saved as
+   the sidebar's state (and synced). Opening and folding on their own are not,
+   so hovering never writes storage or schedules a cloud save. */
+function _sbSetExpanded(sidebar, open, remember) {
+  sidebar.style.width = '';
+  sidebar.style.flexBasis = '';
+  sidebar.classList.toggle('expanded', open);
+  const btn = document.querySelector('.sidebar-toggle-btn');
+  if (btn) btn.setAttribute('aria-expanded', String(open));
+  // The rail's label tip is for the folded rail; opened under the pointer it
+  // would be left hanging beside a label that now says the same thing.
+  if (open) {
+    const tip = document.querySelector('.mx-rail-tip.is-on');
+    if (tip) tip.classList.remove('is-on');
+  }
+  if (!remember) return;
+  localStorage.setItem('sidebarExpanded', open);
+  if (typeof scheduleCloudSave === 'function') scheduleCloudSave();
+}
+
+/* ── Auto-collapse ────────────────────────────────────────────
+   On unless switched off: right-click the toggle to switch it (ssp.sidebarAuto,
+   '0' = off). While on, resting the pointer anywhere on the sidebar opens it,
+   and once the pointer has been off it for 15 s, with no keyboard focus inside,
+   it folds back to the icon rail. Left-click still opens and shuts it by hand.
+   The one sign of the mode is the toggle's icon: an hourglass while the timer
+   is on, the menu bars while it is off. Wider than 768px only -- below that the
+   opened sidebar is the same 72px rail (layout.css) and a phone has the drawer. */
+const SIDEBAR_AUTO_KEY = 'ssp.sidebarAuto';
+const SIDEBAR_AUTO_IDLE_MS = 15000;
+const SIDEBAR_AUTO_OPEN_MS = 140;   // passing over on the way to the screen edge does not open it
+const _sbAuto = { on: true, inside: false, hold: false, idle: 0, open: 0 };
+
+function _sbAutoUsable() {
+  return _sbAuto.on && window.innerWidth > 768;
+}
+
+/* True while hovering the folded rail will open it (read by mx-nav.js). */
+function _sbAutoWillOpen() {
+  return _sbAutoUsable() && !_sbAuto.hold;
+}
+
+/* Focus put there by the keyboard keeps it open; a link that was clicked keeps
+   focus too, and that must not. */
+function _sbKeyFocusInside(sidebar) {
+  const el = document.activeElement;
+  if (!el || !sidebar.contains(el)) return false;
+  try { return el.matches(':focus-visible'); } catch (e) { return false; }
+}
+
+/* (Re)start the 15 s, or stop them when there is nothing to fold. */
+function _sbAutoArm() {
+  clearTimeout(_sbAuto.idle);
+  _sbAuto.idle = 0;
+  const sidebar = document.querySelector('.app-sidebar');
+  if (!sidebar || !_sbAutoUsable() || _sbAuto.inside || !sidebar.classList.contains('expanded')) return;
+  if (_sbKeyFocusInside(sidebar)) return;
+  _sbAuto.idle = setTimeout(() => {
+    _sbAuto.idle = 0;
+    if (!_sbAutoUsable() || _sbAuto.inside || _sbKeyFocusInside(sidebar)) return;
+    _sbSetExpanded(sidebar, false, false);
+  }, SIDEBAR_AUTO_IDLE_MS);
+}
+
+function _sbAutoPaint() {
+  const icon = document.querySelector('.sidebar-toggle-btn [data-lucide]');
+  if (!icon) return;
+  const name = _sbAuto.on ? 'hourglass' : 'menu';
+  if (icon.getAttribute('data-lucide') === name) return;
+  icon.setAttribute('data-lucide', name);
+  if (typeof lucide !== 'undefined') lucide.createIcons();
+}
+
+function sidebarAutoToggle() {
+  _sbAuto.on = !_sbAuto.on;
+  try { localStorage.setItem(SIDEBAR_AUTO_KEY, _sbAuto.on ? '1' : '0'); } catch (e) { /* private mode */ }
+  _sbAutoPaint();
+  clearTimeout(_sbAuto.open);
+  _sbAuto.open = 0;
+  // Switched on with the pointer on the toggle: the 15 s start once it leaves.
+  _sbAutoArm();
+}
+
+function initSidebarAuto() {
+  const sidebar = document.querySelector('.app-sidebar');
+  const btn = document.querySelector('.sidebar-toggle-btn');
+  if (!sidebar || !btn || sidebar._sbAutoBound) return;
+  sidebar._sbAutoBound = true;
+  try { _sbAuto.on = localStorage.getItem(SIDEBAR_AUTO_KEY) !== '0'; } catch (e) { /* private mode */ }
+  _sbAutoPaint();
+  btn.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    sidebarAutoToggle();
+  });
+  /* Leaving is also noticed from the page: pointerleave does not always come
+     (after a right-click Chromium can skip it, and a sidebar hidden under the
+     pointer by an attempt route never gets one), and without it the 15 s would
+     never start. The page-wide watch is only on while the pointer is inside. */
+  const leave = () => {
+    document.removeEventListener('pointermove', watch, true);
+    _sbAuto.inside = false;
+    _sbAuto.hold = false;
+    clearTimeout(_sbAuto.open);
+    _sbAuto.open = 0;
+    _sbAutoArm();
+  };
+  const watch = e => {
+    if (e.pointerType !== 'touch' && !sidebar.contains(e.target)) leave();
+  };
+  sidebar.addEventListener('pointerenter', e => {
+    if (e.pointerType === 'touch') return;
+    _sbAuto.inside = true;
+    document.addEventListener('pointermove', watch, true);
+    clearTimeout(_sbAuto.idle);
+    _sbAuto.idle = 0;
+    if (!_sbAutoUsable() || _sbAuto.hold || sidebar.classList.contains('expanded')) return;
+    clearTimeout(_sbAuto.open);
+    _sbAuto.open = setTimeout(() => {
+      _sbAuto.open = 0;
+      if (_sbAuto.inside && !_sbAuto.hold && _sbAutoUsable() && !sidebar.classList.contains('expanded')) {
+        _sbSetExpanded(sidebar, true, false);
+      }
+    }, SIDEBAR_AUTO_OPEN_MS);
+  });
+  sidebar.addEventListener('pointerleave', e => {
+    if (e.pointerType !== 'touch') leave();
+  });
+  sidebar.addEventListener('focusin', () => { clearTimeout(_sbAuto.idle); _sbAuto.idle = 0; });
+  // After the focus has landed, so the check sees where it went.
+  sidebar.addEventListener('focusout', () => setTimeout(_sbAutoArm, 0));
+  // A sidebar restored open starts its 15 s now.
+  _sbAutoArm();
 }
 
 /* Any route change closes the drawer. Tapping a nav item used to leave it
@@ -138,6 +273,7 @@ function initTheme() {
     if (localStorage.getItem('sidebarExpanded') === 'true') {
       sidebar.classList.add('expanded');
     }
+    initSidebarAuto();
   }
 
   // 4. Re-enable transitions and animations after first paint.
