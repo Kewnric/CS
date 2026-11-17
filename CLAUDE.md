@@ -335,7 +335,11 @@ marks correct work wrong, silently.
 - **Sidebar wheel** (`js/sidebar-wheel.js`): notches move `.is-wheel-target`; the page opens after 320 ms still.
 - **Parallel sessions**: give each Playwright run its own port (a config importing `playwright.config.js` with
   another `baseURL`/`webServer` port, `reuseExistingServer: false`): a shared 8754 server is shut down by
-  whichever run ends first.
+  whichever run ends first. To commit a file another session also has uncommitted lines in, **never**
+  `git apply --cached --unidiff-zero` a subset of hunks: they land by line number and shift (that broke the
+  live index.html once). Write the wanted version to a temp file (the working copy minus the other
+  session's whole blocks), `git hash-object -w` + `git update-index --cacheinfo`, diff it against the last
+  good commit, and boot it headless before pushing.
 
 ---
 
@@ -534,6 +538,12 @@ buttons.
 - **Do not re-read the library from storage to be safe.** `loadData()` decompresses everything and,
   with a save still in its debounce, puts the older disk copy over newer memory. Visualize now asks
   `storeIsCurrent(key, raw)` (store-codec.js) and reloads only what another tab or a cloud load wrote.
+- **A backdrop blur is redrawn every frame that anything under it changes.** One endless glow behind the
+  Session Setup window took the Coding Library from 60 to ~22 fps; the stopwatch's 30 ms writes did the
+  same to the Run Code window. `js/perf-freeze.js` pauses endless animations behind any full-screen blurred
+  overlay (`PERF_FREEZE_SEL`; add a new overlay class there) and `perfFreezeActive()` tells fast painters to
+  hold still. Navigations into and out of an attempt skip the View Transition (`snapshot: false`): its
+  snapshot of the whole old screen froze a frame for 80-120 ms.
 - **A finished animation with `fill: forwards` that touches transform, opacity or filter keeps its
   element composited for good.** Home had 470 such layers (heatmap cells, hero letters). Rest on the
   final keyframe and fill `backwards`. Count layers with CDP `LayerTree` when a page feels slow.
