@@ -542,8 +542,9 @@ buttons.
   Session Setup window took the Coding Library from 60 to ~22 fps; the stopwatch's 30 ms writes did the
   same to the Run Code window. `js/perf-freeze.js` pauses endless animations behind any full-screen blurred
   overlay (`PERF_FREEZE_SEL`; add a new overlay class there) and `perfFreezeActive()` tells fast painters to
-  hold still. Navigations into and out of an attempt skip the View Transition (`snapshot: false`): its
-  snapshot of the whole old screen froze a frame for 80-120 ms.
+  hold still. Page switches skip the View Transition (`snapshot: false`, router.js): its snapshot of the
+  whole old screen dropped a frame on every switch (80-120 ms into an attempt); pages come in by their own
+  entrances.
 - **A finished animation with `fill: forwards` that touches transform, opacity or filter keeps its
   element composited for good.** Home had 470 such layers (heatmap cells, hero letters). Rest on the
   final keyframe and fill `backwards`. Count layers with CDP `LayerTree` when a page feels slow.

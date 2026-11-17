@@ -295,11 +295,12 @@ const SpaRouter = (() => {
     if (window.Motion && typeof Motion.withViewTransition === 'function') {
       Motion.withViewTransition(renderAndInit, {
         rootClass: chromeSwap ? 'vt-chrome-swap' : null,
-        /* Into an attempt and back out, the whole screen changes, and a View
-           Transition first snapshots all of the old one: an 80-120 ms frozen
-           frame on Start and Resume. Those are drawn directly; the launch's
-           staged entrances still play (data-nav-dir). */
-        snapshot: !chromeSwap,
+        /* No snapshot. A View Transition first captures the whole old screen,
+           and that cost a dropped frame on EVERY page switch (80-120 ms into
+           an attempt); drawn directly, a switch drops none once a page has
+           been seen. The page still comes in with its own entrance
+           (.route-enter, and the staged arrivals keyed on data-nav-dir). */
+        snapshot: false,
         dir: navDir,
         onDone: () => { if (typeof Motion.afterNav === 'function') Motion.afterNav(hash, navDir); },
       });

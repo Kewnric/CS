@@ -222,6 +222,31 @@ document.addEventListener('input', function (e) {
   uisfxKey();
 }, true);
 
+/* The audio engine takes ~40 ms to start, and the first page switch's sound
+   used to start it, so the first switch after loading hitched. It is started
+   in idle time after the first click or key instead (before one the browser
+   would not let it run anyway); the first switch then finds it ready. */
+function _uisfxWarm() {
+  const go = () => {
+    try {
+      if (typeof sfxEnabled === 'function' && !sfxEnabled()) return;
+      const ctx = typeof _sfxContext === 'function' ? _sfxContext() : null;
+      if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+    } catch (e) { /* no sound is better than an error */ }
+  };
+  if (typeof requestIdleCallback === 'function') requestIdleCallback(go, { timeout: 1500 });
+  else setTimeout(go, 300);
+}
+(function _uisfxWarmOnFirstGesture() {
+  const once = () => {
+    document.removeEventListener('pointerdown', once, true);
+    document.removeEventListener('keydown', once, true);
+    _uisfxWarm();
+  };
+  document.addEventListener('pointerdown', once, true);
+  document.addEventListener('keydown', once, true);
+})();
+
 /* Moving between screens. */
 new MutationObserver(function () {
   const r = document.body.dataset.route;

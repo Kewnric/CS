@@ -22,7 +22,10 @@ const PERF_FREEZE_SEL = '.modal-overlay, .smp-overlay, .run-code-overlay, .cheat
   + '.mx-overlay, .mt-overlay, .np-sheet-overlay, .np-zoom-overlay, .np-edit-overlay, .padm-overlay, '
   + '.set-builder-overlay, .prereq-picker-overlay, .nb-tags-overlay, .nb-import-overlay, .acct-recovery, .sw-overlay';
 
-const _pf = { els: new Map(), anims: new Set(), queued: false, watched: new WeakSet(), open: false };
+const _pf = { els: new Map(), anims: new Set(), queued: false, watched: new WeakSet(), open: false, thaw: 0 };
+/* A closing window fades out over ~0.2-0.3 s, still blurred; letting the page
+   move again during that fade re-blurred it every frame. */
+const PERF_FREEZE_THAW_MS = 380;
 
 /** Is a blurred window covering the page? Painters that tick fast (the
  *  stopwatch's milliseconds) hold still meanwhile. */
@@ -77,17 +80,30 @@ function _pfThaw() {
 function perfFreezeCheck() {
   _pf.queued = false;
   const open = perfFreezeOpen();
-  _pf.open = open.length > 0;
   open.forEach(_pfWatch);
-  if (open.length) _pfFreeze(open);   // also catches loops that started behind it since
-  else if (_pf.els.size || _pf.anims.size) _pfThaw();
+  if (open.length) {
+    clearTimeout(_pf.thaw);
+    _pf.thaw = 0;
+    _pf.open = true;
+    _pfFreeze(open);   // also catches loops that started behind it since
+    return;
+  }
+  if (!_pf.els.size && !_pf.anims.size) { _pf.open = false; return; }
+  if (_pf.thaw) return;
+  _pf.thaw = setTimeout(() => {
+    _pf.thaw = 0;
+    if (perfFreezeOpen().length) return;
+    _pf.open = false;
+    _pfThaw();
+  }, PERF_FREEZE_THAW_MS);
 }
 
 function _pfQueue() {
   if (_pf.queued) return;
   _pf.queued = true;
-  // After the change has been styled: the blur and display are read from it.
-  setTimeout(perfFreezeCheck, 0);
+  // Before the next frame: the window's first frame is already a still page.
+  // Reading its blur and display styles it now, which the frame needs anyway.
+  queueMicrotask(perfFreezeCheck);
 }
 
 const _pfClassObs = new MutationObserver(_pfQueue);

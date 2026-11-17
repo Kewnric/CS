@@ -306,8 +306,8 @@ const Motion = (() => {
   // opts.snapshot: false draws the update directly, with no View Transition --
   // the direction and the class still go on and come off as usual, so a
   // page's own staged entrances (data-nav-dir) play. A View Transition first
-  // snapshots the whole old screen; into and out of an attempt that was an
-  // 80-120 ms frozen frame.
+  // snapshots the whole old screen: a dropped frame on every page switch, an
+  // 80-120 ms frozen one into an attempt. The router always passes it.
   let vtClassSeq = 0;
   let vtClassOn = null;
   let vtDirOn = false;

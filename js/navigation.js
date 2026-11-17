@@ -293,6 +293,19 @@ function initTheme() {
     entryAnimationsEnabled = true;
     if (sidebar) sidebar.classList.remove('no-transition');
     document.body.classList.remove('no-entry-animation');
+    // The rule above does not stop an animation, it makes it last 0 s, and
+    // giving the duration back resumed every entrance near its START: what
+    // was already on screen (the login page, the first route) vanished and
+    // played in again -- the double stutter on load. So what already played
+    // is put at its end. Only CSS animations: the rule touched nothing else,
+    // and no entrance can have started for real while it was on.
+    try {
+      if (typeof document.getAnimations === 'function' && typeof CSSAnimation === 'function') {
+        document.getAnimations().forEach((an) => {
+          if (an instanceof CSSAnimation && an.effect && an.effect.getTiming().iterations !== Infinity) { try { an.finish(); } catch (e) { /* plays on */ } }
+        });
+      }
+    } catch (e) { /* no animation API: nothing to put right */ }
     initSidebarBottom();
   };
   requestAnimationFrame(() => requestAnimationFrame(enableEntryAnimations));
