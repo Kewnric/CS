@@ -6681,3 +6681,152 @@ button.brain-dir-crumb:hover { color: var(--text-primary); background: color-mix
   .viz-canvas-container.brain-dir-out > * { animation: none; }
   .brain-dir-back { transition: none; }
 }
+
+/* ── Task notes (brain-tasks.js) ───────────────────────────────
+   A pill on the note's bottom edge: the time left, play/pause, and reset on
+   hover. While it runs, a bar inside drains by ONE transform animation sized
+   to the time left (set when it starts), so nothing is redrawn per frame; the
+   digits change once a second. Done, it turns green beside the check mark. */
+.viz-node > .brain-task {
+  position: absolute;
+  left: 50%;
+  bottom: -13px;
+  z-index: 8;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 4px 0 8px;
+  overflow: hidden;
+  border: 1px solid rgba(240, 246, 252, 0.14);
+  border-radius: 999px;
+  background: #0d1117;
+  color: #c9d1d9;
+  font: 700 0.72rem/1 'Consolas', 'Courier New', monospace;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.45), 0 6px 14px -6px rgba(0, 0, 0, 0.7);
+  transform: translateX(-50%);
+  cursor: default;
+}
+.brain-task .bt-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: rgba(240, 246, 252, 0.08);
+  pointer-events: none;
+}
+.brain-task .bt-bar i {
+  position: absolute;
+  inset: 0;
+  background: #22d3ee;
+  transform-origin: left center;
+  animation: btDrain linear backwards;   /* duration set inline: the time left */
+}
+.brain-task .bt-bar i.is-still { animation: none; }
+@keyframes btDrain { from { transform: scaleX(var(--bt-from, 1)); } to { transform: scaleX(0); } }
+.brain-task .bt-ic { display: inline-flex; color: #8b949e; }
+.brain-task .bt-ic svg { width: 13px; height: 13px; }
+.brain-task .bt-time { min-width: 2.6em; text-align: center; }
+.brain-task button {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #c9d1d9;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+.brain-task button svg { width: 11px; height: 11px; }
+.brain-task .bt-play { background: rgba(34, 211, 238, 0.16); color: #22d3ee; }
+.brain-task .bt-play:hover { background: #22d3ee; color: #0d1117; }
+.brain-task .bt-reset { width: 0; opacity: 0; margin-left: -5px; }
+.viz-node:hover > .brain-task .bt-reset,
+.brain-task:focus-within .bt-reset { width: 20px; opacity: 1; margin-left: 0; }
+.brain-task .bt-reset:hover { background: rgba(240, 246, 252, 0.12); color: #fff; }
+.brain-task[data-state="running"] { border-color: rgba(34, 211, 238, 0.55); color: #e6fbff; }
+.brain-task[data-state="running"] .bt-ic { color: #22d3ee; }
+.brain-task[data-state="paused"] { border-color: rgba(250, 204, 21, 0.5); }
+.brain-task[data-state="paused"] .bt-ic,
+.brain-task[data-state="paused"] .bt-time { color: #facc15; }
+.brain-task[data-state="done"] { border-color: rgba(16, 185, 129, 0.55); color: #6ee7b7; }
+.brain-task[data-state="done"] .bt-ic { color: #10b981; }
+.brain-task[data-state="done"] .bt-play { background: rgba(16, 185, 129, 0.14); color: #10b981; }
+.brain-task[data-state="done"] .bt-play:hover { background: #10b981; color: #0d1117; }
+
+/* The pulse: a glowing dot that runs once along the arrow to the next step. */
+.brain-task-pulse {
+  position: absolute;
+  left: -7px;
+  top: -7px;
+  z-index: 30;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffffff 0 28%, #67e8f9 45%, rgba(34, 211, 238, 0) 72%);
+  box-shadow: 0 0 14px 4px rgba(34, 211, 238, 0.55);
+  pointer-events: none;
+}
+/* ...and where it lands, one ring goes out from the note. */
+.viz-node.bt-arrive::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  z-index: 9;
+  border: 2px solid #22d3ee;
+  border-radius: 14px;
+  pointer-events: none;
+  animation: btArrive 0.8s cubic-bezier(0.2, 0.8, 0.3, 1) backwards;
+  opacity: 0;
+}
+@keyframes btArrive {
+  from { opacity: 0.95; transform: scale(0.96); }
+  to { opacity: 0; transform: scale(1.12); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brain-task .bt-bar i { animation: none; }
+  .viz-node.bt-arrive::before { animation: none; }
+}
+
+/* The note menu's timer: presets and your own time. */
+.bnm-task { margin-top: 0.4rem; padding-top: 0.35rem; border-top: 1px solid var(--border-color); }
+.bnm-task.hidden { display: none; }
+.bnm-task-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; }
+.bnm-task-row button,
+.bnm-task-custom button {
+  padding: 0.3rem 0;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.66rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+.bnm-task-row button:hover,
+.bnm-task-custom button:hover { color: var(--text-primary); border-color: #22d3ee; }
+.bnm-task-row button.active { color: #0d1117; background: #22d3ee; border-color: #22d3ee; }
+.bnm-task-custom { display: flex; gap: 4px; margin-top: 4px; }
+.bnm-task-custom input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--text-primary) 4%, transparent);
+  color: var(--text-primary);
+  font: 700 0.72rem 'Consolas', 'Courier New', monospace;
+}
+.bnm-task-custom input:focus { outline: none; border-color: #22d3ee; }
+.bnm-task-custom input.is-bad { border-color: var(--color-danger); }
+.bnm-task-custom button { padding: 0.3rem 0.7rem; }
+.bnm-act#brain-ctx-task-btn.is-on { color: #22d3ee; }
+.bnm-act.hidden { display: none; }

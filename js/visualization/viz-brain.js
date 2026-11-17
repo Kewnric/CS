@@ -85,6 +85,9 @@ function brainLoad() {
     brain.folders = d.folders || [];
     brain.activeVersionId = d.activeVersionId || null;
     brain.rootOpen = d.rootOpen !== false;
+    // Countdowns are re-read from what was loaded (brain-tasks.js), after the
+    // caller has put the canvas on screen.
+    if (typeof brainTasksBoot === 'function') setTimeout(brainTasksBoot, 0);
   } catch (e) {
     console.warn('[Brain] load failed', e);
     // The next save would write an empty brain over it; keep a copy first.
@@ -1074,6 +1077,7 @@ function brainUndo() {
   brain.nodes = snap.nodes;
   brain.links = snap.links;
   brainRenderCanvas(); brainSaveCurrentVersion();
+  if (typeof _btSchedule === 'function') _btSchedule();
 }
 
 /* ── Brain's camera, through the shared one ───────────────────
@@ -1304,6 +1308,8 @@ function brainRenderCanvas() {
       if (node.ref && typeof brainRefDecorate === 'function') brainRefDecorate(el, node);
       // The check mark put on it from its menu (brainCtxToggleCheck).
       if (node.checked) el.insertAdjacentHTML('beforeend', _brainCheckPop && _brainCheckPop.has(node.id) ? BRAIN_CHECK_BADGE.replace('brain-check-badge', 'brain-check-badge is-new') : BRAIN_CHECK_BADGE);
+      // A task: its countdown pill on the bottom edge (brain-tasks.js).
+      if (typeof brainTaskDecorate === 'function') brainTaskDecorate(el, node);
       // A directory: the folder mark on its other corner (brain-dir.js).
       if (node.dir && typeof brainDirBadgeHTML === 'function') {
         el.classList.add('is-dir');
@@ -1617,6 +1623,7 @@ function brainPasteNode(fromId) {
     while (brain.nodes.some(n => n.x === x && n.y === y)) { x += 32; y += 32; }
     copy.x = x; copy.y = y;
   }
+  if (copy.task) { copy.task = { dur: copy.task.dur, state: 'idle' }; delete copy.checked; }   // a copy starts fresh
   brain.nodes.push(copy);
   brain.selectedNodeId = copy.id;
   brainRenderCanvas(); brainSaveCurrentVersion();
@@ -2804,11 +2811,19 @@ function brainCtxToggleCheck() {
   brainHideAllMenus();
   if (!targets.length) return;
   brainPushUndo();
-  targets.forEach(n => { if (on) n.checked = true; else delete n.checked; });
+  // A task checked by hand is finished now and its next step starts; one
+  // unchecked is ready to run again (brain-tasks.js).
+  const started = [];
+  targets.forEach(n => {
+    if (on) { n.checked = true; if (typeof brainTaskFinishNow === 'function') started.push(...brainTaskFinishNow(n)); }
+    else { delete n.checked; if (typeof brainTaskUndone === 'function') brainTaskUndone(n); }
+  });
   _brainCheckPop = on ? new Set(targets.map(n => n.id)) : null;
   brainRenderCanvas();
   _brainCheckPop = null;
   brainSaveCurrentVersion();
+  if (started.length && typeof brainTaskPulses === 'function') brainTaskPulses(started);
+  if (typeof _btSchedule === 'function') _btSchedule();
 }
 
 function brainNodeCtx(e, nodeId) {
@@ -2849,6 +2864,7 @@ function brainNodeCtx(e, nodeId) {
     if (label) label.textContent = on ? 'Uncheck' : 'Check';
   }
   if (typeof brainDirSyncCtx === 'function') brainDirSyncCtx(node);   // the Directory switch
+  if (typeof brainTaskSyncCtx === 'function') brainTaskSyncCtx(node);  // the Task switch and its timer
   if (typeof vizPositionMenu === 'function') vizPositionMenu(menu, e.clientX, e.clientY);
   else { menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px'; menu.classList.remove('hidden'); }
   _brainMarkNodeMenu();

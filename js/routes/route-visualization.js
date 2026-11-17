@@ -588,11 +588,16 @@ function vizTemplate() {
         </div>
       </div>
 
+      <!-- A task's time: presets and your own (brain-tasks.js). -->
+      ${typeof brainTaskMenuHTML === 'function' ? brainTaskMenuHTML() : ''}
+
       <!-- Actions, one row. -->
       <div class="bnm-actions">
         <button type="button" class="bnm-act ctx-single" onclick="brainCtxEditComment()" title="Edit Comment"><i data-lucide="edit-2"></i><span>Edit</span></button>
         <button type="button" class="bnm-act ctx-single" onclick="brainCtxStartLink()" title="Add Link"><i data-lucide="link"></i><span>Link</span></button>
         <button type="button" class="bnm-act" id="brain-ctx-check-btn" aria-pressed="false" onclick="brainCtxToggleCheck()" title="Put a check mark on this note"><i data-lucide="circle-check"></i><span>Check</span></button>
+        <!-- A switch: on, the note is a task with a countdown (brain-tasks.js). -->
+        <button type="button" class="bnm-act" id="brain-ctx-task-btn" aria-pressed="false" onclick="brainCtxToggleTask()" title="Make this a task with a countdown"><i data-lucide="timer"></i><span>Task</span></button>
         <!-- A switch: on, the note has a canvas of its own and a double-click opens it (brain-dir.js). -->
         <button type="button" class="bnm-act ctx-single" id="brain-ctx-dir-btn" aria-pressed="false" onclick="brainCtxToggleDir()" title="Directory: give this note a canvas of its own"><i data-lucide="folder-tree"></i><span>Directory</span></button>
         <button type="button" class="bnm-act" id="brain-ctx-collapse-btn" style="display:none;" onclick="brainCtxCollapseChildren()" title="Collapse Children"><i data-lucide="chevrons-up"></i><span>Collapse</span></button>

@@ -1948,6 +1948,7 @@ function vizNodeCtx(e, nodeId) {
       ? (node.type === 'folder' ? 'Delete from library…' : 'Delete from library…')
       : 'Remove from canvas';
   }
+  if (delLabel && many) delLabel.textContent = 'Delete ' + vizCtxTargets().length + ' selected…';
   const revealBtn = document.getElementById('viz-ctx-reveal-btn');
   if (revealBtn) revealBtn.style.display = (node.dataId && node.dataId !== 'root') ? 'flex' : 'none';
 
