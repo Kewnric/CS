@@ -1440,6 +1440,9 @@ function _paintTimer(el, main, ms) {
   const [a, b] = el.children;
   if (a.textContent !== main) a.textContent = main;
   const msText = '.' + String(ms).padStart(3, '0');
+  // Under a blurred window each of these 30 writes a second re-blurred the
+  // whole screen; the seconds still move (perf-freeze.js).
+  if (typeof perfFreezeActive === 'function' && perfFreezeActive()) return;
   if (b.textContent !== msText) b.textContent = msText;
 }
 

@@ -302,6 +302,12 @@ const Motion = (() => {
   // the same rule, so mx-nav.css can pick the keyframes for that direction.
   //
   // opts.onDone: called once when the transition settles, however it ends.
+  //
+  // opts.snapshot: false draws the update directly, with no View Transition --
+  // the direction and the class still go on and come off as usual, so a
+  // page's own staged entrances (data-nav-dir) play. A View Transition first
+  // snapshots the whole old screen; into and out of an attempt that was an
+  // 80-120 ms frozen frame.
   let vtClassSeq = 0;
   let vtClassOn = null;
   let vtDirOn = false;
@@ -359,6 +365,13 @@ const Motion = (() => {
       rootEl.classList.remove(rootClass);
       vtClassOn = null;
     };
+    if (opts && opts.snapshot === false) {
+      // In a transition for the length of the update, so the page's staged
+      // entrances are put on (mx-pages.js M.scan); there is nothing to skip.
+      vtCurrent = { skipTransition() {} };
+      try { updateFn(); } finally { dropClass(); }
+      return null;
+    }
     try {
       const vt = document.startViewTransition(updateFn);
       vtCurrent = vt;

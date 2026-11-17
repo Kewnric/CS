@@ -943,6 +943,9 @@
     // Guarded to http/https (skips file://) so it never errors when opened directly.
     if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !location.search.includes('nosw')) {
       window.addEventListener('load', () => {
+  <script defer src="js/perf-freeze.js"></script>
+
+  <script>
         navigator.serviceWorker.register('sw.js').catch((e) => console.warn('[PWA] SW registration failed:', e));
       });
     }
