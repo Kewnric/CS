@@ -1344,6 +1344,7 @@ function brainRenderCanvas() {
       else if (node.border === 'manhua') brainPaintBubbles();
       brainSizeElectric(el, inner);
       if (node.shape) brainPaintShape(el, node);
+      if (node.task && typeof brainTaskLayout === 'function') brainTaskLayout(el);   // the timer's leader line
       // ResizeObserver always fires once for the current size the moment it
       // starts observing. Treating that as a resize baked the first layout's
       // height into the note for good, and the text was then clipped as soon as
@@ -1359,6 +1360,7 @@ function brainRenderCanvas() {
         vizFitNoteHeight(inner);
         brainSizeElectric(el, inner);
         if (node.shape) brainPaintShape(el, node);
+        if (node.task && typeof brainTaskLayout === 'function') brainTaskLayout(el);
         if (brainFitBubble(el, inner)) brainUpdateSVGLinks();
         else if (node.border === 'manhua') brainPaintBubbles();
         // Typing in the open editor changes the size too; that is not a
@@ -1623,7 +1625,10 @@ function brainPasteNode(fromId) {
     while (brain.nodes.some(n => n.x === x && n.y === y)) { x += 32; y += 32; }
     copy.x = x; copy.y = y;
   }
-  if (copy.task) { copy.task = { dur: copy.task.dur, state: 'idle' }; delete copy.checked; }   // a copy starts fresh
+  if (copy.task) {   // a copy starts fresh, its timer where the original's floats
+    copy.task = copy.task.pos ? { dur: copy.task.dur, state: 'idle', pos: copy.task.pos } : { dur: copy.task.dur, state: 'idle' };
+    delete copy.checked;
+  }
   brain.nodes.push(copy);
   brain.selectedNodeId = copy.id;
   brainRenderCanvas(); brainSaveCurrentVersion();

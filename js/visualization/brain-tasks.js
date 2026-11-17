@@ -45,7 +45,9 @@ const _BT_SVG = {
   pause: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h3.5v16H7zM13.5 4H17v16h-3.5z" fill="currentColor"/></svg>',
   reset: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>',
   timer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 2h4"/><path d="M12 14l3-3"/><circle cx="12" cy="14" r="8"/></svg>',
-  done: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>'
+  done: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>',
+  home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>',
+  remove: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>'
 };
 
 /* ── Time ─────────────────────────────────────────────────────── */
@@ -89,6 +91,15 @@ function _btLastDur() {
 function _btName(node) {
   const line = String((node && node.commentContent) || '').split('\n').map(s => s.trim()).find(Boolean) || 'Task';
   return line.length > 40 ? line.slice(0, 39) + '…' : line;
+}
+
+/** The task in a new state. What a task carries from state to state -- its
+ *  time, where its timer floats, when it was first started -- is kept. */
+function _btTask(old, state, extra) {
+  const t = { dur: old.dur, state };
+  if (old.pos) t.pos = old.pos;
+  if (old.startedAt) t.startedAt = old.startedAt;
+  return Object.assign(t, extra || {});
 }
 
 /* ── Where tasks live ─────────────────────────────────────────── */
@@ -175,8 +186,10 @@ function _btFire() {
 /** One step is over: check it, start what its arrows lead to, and show it. */
 function _btFinish(c, n, endAt, report, now) {
   const g = _btGraph(c);
-  n.task = { dur: n.task.dur, state: 'done' };
+  n.task = _btTask(n.task, 'done', { doneAt: endAt });
   n.checked = true;
+  n.checkedAt = n.updatedAt = endAt;
+  if (!g.live) c.v.updatedAt = Math.max(c.v.updatedAt || 0, endAt);   // on screen, the version save stamps it
   const started = _btStartNext(g, n, endAt);
   const recent = now - endAt < BRAIN_TASK_RECENT_MS;
   report.finished.push(n);
@@ -197,7 +210,7 @@ function _btStartNext(g, n, endAt) {
     const m = g.nodes.find(x => x.id === l.to);
     if (!m || !m.task || m.task.state === 'done' || m.task.state === 'running') return;
     const left = m.task.state === 'paused' && m.task.left > 0 ? m.task.left : m.task.dur;
-    m.task = { dur: m.task.dur, state: 'running', endsAt: endAt + left * 1000 };
+    m.task = _btTask(m.task, 'running', { endsAt: endAt + left * 1000, startedAt: m.task.startedAt || endAt });
     started.push({ m, link: l });
   });
   return started;
@@ -255,7 +268,9 @@ function brainTaskSet(nodeIds, durSecs) {
   brainPushUndo();
   nodes.forEach(n => {
     if (durSecs == null) { delete n.task; return; }
+    const pos = n.task && n.task.pos;
     n.task = { dur: durSecs, state: 'idle' };
+    if (pos) n.task.pos = pos;   // a new time keeps the timer where you put it
     delete n.checked;
   });
   if (durSecs != null) { try { localStorage.setItem('ssp.brainTaskDur', String(durSecs)); } catch (_) { /* private mode */ } }
@@ -270,7 +285,8 @@ function brainTaskPlay(nodeId) {
   _btAudioWake();   // a press is what lets the chime play later
   if (t.state === 'running') { brainTaskPause(nodeId); return; }
   const left = t.state === 'paused' && t.left > 0 ? t.left : t.dur;
-  f.n.task = { dur: t.dur, state: 'running', endsAt: Date.now() + left * 1000 };
+  f.n.task = _btTask(t, 'running', { endsAt: Date.now() + left * 1000,
+    startedAt: t.startedAt && t.state !== 'done' ? t.startedAt : Date.now() });
   if (t.state === 'done') delete f.n.checked;   // done and played again: a fresh run
   _btCommit(f.live);
   brainTaskRepaint(nodeId);
@@ -280,7 +296,7 @@ function brainTaskPlay(nodeId) {
 function brainTaskPause(nodeId) {
   const f = _btFind(nodeId);
   if (!f || !f.n.task || f.n.task.state !== 'running') return;
-  f.n.task = { dur: f.n.task.dur, state: 'paused', left: brainTaskLeft(f.n.task) };
+  f.n.task = _btTask(f.n.task, 'paused', { left: brainTaskLeft(f.n.task) });
   _btCommit(f.live);
   brainTaskRepaint(nodeId);
   _btSchedule();
@@ -290,7 +306,7 @@ function brainTaskReset(nodeId) {
   const f = _btFind(nodeId);
   if (!f || !f.n.task) return;
   const wasDone = f.n.task.state === 'done';
-  f.n.task = { dur: f.n.task.dur, state: 'idle' };
+  f.n.task = _btTask({ dur: f.n.task.dur, pos: f.n.task.pos }, 'idle');
   if (wasDone) delete f.n.checked;
   _btCommit(f.live);
   if (wasDone) brainRenderCanvas(); else brainTaskRepaint(nodeId);
@@ -301,17 +317,26 @@ function brainTaskReset(nodeId) {
 function brainTaskFinishNow(node) {
   if (!node || !node.task || node.task.state === 'done') return [];
   const g = { nodes: brain.nodes, links: brain.links, live: true };
-  node.task = { dur: node.task.dur, state: 'done' };
-  const started = _btStartNext(g, node, Date.now());
+  const now = Date.now();
+  node.task = _btTask(node.task, 'done', { doneAt: now });
+  const started = _btStartNext(g, node, now);
   return started;
 }
 
 /** Unchecked by hand: a done task is ready to run again. */
 function brainTaskUndone(node) {
-  if (node && node.task && node.task.state === 'done') node.task = { dur: node.task.dur, state: 'idle' };
+  if (node && node.task && node.task.state === 'done') node.task = _btTask({ dur: node.task.dur, pos: node.task.pos }, 'idle');
 }
 
-/* ── The pill ─────────────────────────────────────────────────── */
+/* ── The floating timer ──────────────────────────────────────────
+   Not on the note: a small indicator floating above it (top-right by
+   default, clear of every port), tied to it by a leader line that ends in a
+   dot on the note's nearest edge. At rest it shows the time and a small
+   progress ring; hovering turns the ring into play / pause. Right-click it
+   for reset, a new time, putting it back, or removing it. Drag it anywhere:
+   task.pos is its offset from the note's top-left, in canvas px, and moving
+   it is not an edit. The bob and the halo are transform/opacity loops; the
+   ring is redrawn once a second with the digits. */
 
 function brainTaskPillHTML(node) {
   const t = node.task;
@@ -320,54 +345,113 @@ function brainTaskPillHTML(node) {
   const frac = t.dur > 0 ? Math.min(1, left / t.dur) : 0;
   const running = t.state === 'running';
   const label = t.state === 'done' ? 'Done' : brainTaskFmt(left);
-  const bar = running
-    ? `<span class="bt-bar"><i style="--bt-from:${frac.toFixed(4)};animation-duration:${left.toFixed(2)}s"></i></span>`
-    : `<span class="bt-bar"><i class="is-still" style="transform:scaleX(${frac.toFixed(4)})"></i></span>`;
   const playLabel = running ? 'Pause' : (t.state === 'paused' ? 'Resume' : (t.state === 'done' ? 'Run again' : 'Start'));
-  return `<div class="brain-task" data-state="${t.state}" title="Task: ${brainTaskFmt(t.dur)}">${bar}`
-    + `<span class="bt-ic">${t.state === 'done' ? _BT_SVG.done : _BT_SVG.timer}</span>`
-    + `<span class="bt-time">${label}</span>`
-    + `<button type="button" class="bt-play" title="${playLabel}" aria-label="${playLabel}">${running ? _BT_SVG.pause : _BT_SVG.play}</button>`
-    + `<button type="button" class="bt-reset" title="Reset to ${brainTaskFmt(t.dur)}" aria-label="Reset">${_BT_SVG.reset}</button></div>`;
+  const place = t.pos ? ` style="left:${t.pos.x}px;top:${t.pos.y}px"` : '';
+  const stateWord = { idle: 'Ready', running: 'Running', paused: 'Paused', done: 'Done' }[t.state] || '';
+  return `<span class="bt-lead" data-state="${t.state}" aria-hidden="true"><i></i></span>`
+    + `<div class="brain-task${t.pos ? ' is-placed' : ''}" data-state="${t.state}"${place} role="timer"`
+    + ` title="${stateWord} · ${brainTaskFmt(t.dur)} timer — drag to move, right-click for more">`
+    + `<span class="bt-float"><span class="bt-halo" aria-hidden="true"></span>`
+    + `<span class="bt-knob"><span class="bt-ring" style="--p:${frac.toFixed(4)}">${t.state === 'done' ? _BT_SVG.done : ''}</span>`
+    + `<button type="button" class="bt-play" title="${playLabel}" aria-label="${playLabel}">${running ? _BT_SVG.pause : (t.state === 'done' ? _BT_SVG.reset : _BT_SVG.play)}</button></span>`
+    + `<span class="bt-time">${label}</span></span></div>`;
 }
 
-/** Put the pill on a rendered note (brainRenderCanvas) and wire its buttons. */
+/** Put the timer on a rendered note (brainRenderCanvas) and wire it. */
 function brainTaskDecorate(el, node) {
   el.classList.toggle('is-task', !!node.task);
   if (!node.task) return;
   el.insertAdjacentHTML('beforeend', brainTaskPillHTML(node));
   _btBindPill(el.querySelector(':scope > .brain-task'), node.id);
+  setTimeout(() => brainTaskLayout(el), 0);   // after the note has its size
   _btEnsureTick();
+}
+
+/** Aim the leader line from the timer to the nearest point of the note. */
+function brainTaskLayout(el) {
+  const bub = el && el.querySelector(':scope > .brain-task');
+  const lead = el && el.querySelector(':scope > .bt-lead');
+  const inner = el && el.querySelector(':scope > .viz-node-inner');
+  if (!bub || !lead || !inner) return;
+  const W = inner.offsetWidth, H = inner.offsetHeight;
+  const cx = bub.offsetLeft + bub.offsetWidth / 2, cy = bub.offsetTop + bub.offsetHeight / 2;
+  const tx = Math.max(0, Math.min(W, cx)), ty = Math.max(0, Math.min(H, cy));
+  const dx = cx - tx, dy = cy - ty;
+  const len = Math.hypot(dx, dy) - bub.offsetHeight / 2;   // to the timer's edge, not its middle
+  lead.classList.toggle('is-off', len < 6);
+  if (len < 6) return;
+  lead.style.left = tx + 'px';
+  lead.style.top = ty + 'px';
+  lead.style.width = len + 'px';
+  lead.style.transform = `rotate(${Math.atan2(dy, dx)}rad)`;
 }
 
 function _btBindPill(pill, nodeId) {
   if (!pill) return;
-  // The pill is not the note: no drag, no editor, no selection.
-  pill.addEventListener('pointerdown', e => e.stopPropagation());
+  // The timer is not the note: pressing it never drags, edits or selects it.
   pill.addEventListener('dblclick', e => e.stopPropagation());
   pill.addEventListener('click', e => {
     e.stopPropagation();
-    if (e.target.closest('.bt-reset')) brainTaskReset(nodeId);
-    else if (e.target.closest('.bt-play')) brainTaskPlay(nodeId);
+    if (pill._btDragged) { pill._btDragged = false; return; }
+    if (e.target.closest('.bt-play')) brainTaskPlay(nodeId);
+  });
+  pill.addEventListener('contextmenu', e => brainTaskMenu(e, nodeId));
+  pill.addEventListener('pointerdown', e => {
+    e.stopPropagation();
+    if (e.button !== 0 || e.target.closest('.bt-play')) return;
+    _btDragStart(e, pill, nodeId);
   });
 }
 
-/** Redraw one note's pill in place. */
+/* Dragging the timer: by its own position inside the note, so it moves with
+   the note afterwards. Saved once on release, without an undo step. */
+function _btDragStart(e, pill, nodeId) {
+  const el = pill.parentElement;
+  const z = brain.zoom || 1;
+  const d = { sx: e.clientX, sy: e.clientY, x: pill.offsetLeft, y: pill.offsetTop, moved: false };
+  try { pill.setPointerCapture(e.pointerId); } catch (_) { /* gone */ }
+  const move = ev => {
+    const dx = (ev.clientX - d.sx) / z, dy = (ev.clientY - d.sy) / z;
+    if (!d.moved && Math.hypot(ev.clientX - d.sx, ev.clientY - d.sy) < 3) return;
+    if (!d.moved) { d.moved = true; pill.classList.add('is-placed', 'is-dragging'); }
+    d.nx = Math.round(d.x + dx); d.ny = Math.round(d.y + dy);
+    pill.style.left = d.nx + 'px';
+    pill.style.top = d.ny + 'px';
+    brainTaskLayout(el);
+  };
+  const up = () => {
+    pill.removeEventListener('pointermove', move);
+    pill.removeEventListener('pointerup', up);
+    pill.removeEventListener('pointercancel', up);
+    pill.classList.remove('is-dragging');
+    if (!d.moved) return;
+    pill._btDragged = true;   // the click that ends a drag is not a press
+    const f = _btFind(nodeId);
+    if (!f || !f.n.task) return;
+    f.n.task.pos = { x: d.nx, y: d.ny };
+    _btCommit(f.live);
+  };
+  pill.addEventListener('pointermove', move);
+  pill.addEventListener('pointerup', up);
+  pill.addEventListener('pointercancel', up);
+}
+
+/** Redraw one note's timer in place. */
 function brainTaskRepaint(nodeId) {
   const el = document.querySelector(`#viz-nodes-layer > .viz-node[data-node-id="${nodeId}"]`);
   const node = brain.nodes.find(n => n.id === nodeId);
   if (!el || !node) return;
-  const old = el.querySelector(':scope > .brain-task');
-  if (old) old.remove();
+  el.querySelectorAll(':scope > .brain-task, :scope > .bt-lead').forEach(x => x.remove());
   if (node.task) {
     el.insertAdjacentHTML('beforeend', brainTaskPillHTML(node));
     _btBindPill(el.querySelector(':scope > .brain-task'), nodeId);
+    brainTaskLayout(el);
   }
   el.classList.toggle('is-task', !!node.task);
   _btEnsureTick();
 }
 
-/** The digits: once a second, only while a running pill is on screen. */
+/** The digits and the ring: once a second, only while a running timer is on screen. */
 function _btEnsureTick() {
   if (_btTick || !document.querySelector('.brain-task[data-state="running"]')) return;
   _btTick = setInterval(() => {
@@ -376,13 +460,89 @@ function _btEnsureTick() {
     pills.forEach(p => {
       const el = p.parentElement;
       const n = el && brain.nodes.find(x => x.id === el.dataset.nodeId);
+      if (!n || !n.task) return;
+      const left = brainTaskLeft(n.task);
       const out = p.querySelector('.bt-time');
-      if (n && n.task && out) {
-        const txt = brainTaskFmt(brainTaskLeft(n.task));
-        if (out.textContent !== txt) out.textContent = txt;
-      }
+      const txt = brainTaskFmt(left);
+      if (out && out.textContent !== txt) out.textContent = txt;
+      const ring = p.querySelector('.bt-ring');
+      if (ring && n.task.dur > 0) ring.style.setProperty('--p', Math.min(1, left / n.task.dur).toFixed(4));
     });
   }, 1000);
+}
+
+/* ── The timer's own menu (right-click it) ──────────────────────── */
+
+let _btMenuNode = null;
+
+function brainTaskMenu(e, nodeId) {
+  e.preventDefault();
+  e.stopPropagation();
+  brainHideAllMenus();
+  const node = brain.nodes.find(n => n.id === nodeId);
+  if (!node || !node.task) return;
+  _btMenuNode = nodeId;
+  let menu = document.getElementById('brain-task-ctx');
+  if (!menu) {
+    menu = document.createElement('div');
+    menu.id = 'brain-task-ctx';
+    menu.className = 'viz-context-menu bnm-menu brain-task-menu hidden';
+    menu.setAttribute('role', 'menu');
+    document.body.appendChild(menu);
+    menu.addEventListener('click', _btMenuClick);
+    menu.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter' && ev.target.id === 'brain-task-ctx-custom') { ev.preventDefault(); _btMenuCustom(); }
+    });
+  }
+  const t = node.task;
+  const running = t.state === 'running';
+  const word = { idle: 'Ready', running: 'Running', paused: 'Paused', done: 'Done' }[t.state];
+  const act = (a, icon, label, cls) => `<button type="button" class="bnm-act${cls ? ' ' + cls : ''}" data-act="${a}" title="${label}">${icon}<span>${label}</span></button>`;
+  menu.innerHTML = `<div class="btm-head"><b>${t.state === 'done' ? 'Done' : brainTaskFmt(brainTaskLeft(t))}</b><span>${word} · ${brainTaskFmt(t.dur)} timer</span></div>
+    <div class="bnm-actions btm-acts">
+      ${act('play', running ? _BT_SVG.pause : _BT_SVG.play, running ? 'Pause' : (t.state === 'paused' ? 'Resume' : 'Start'))}
+      ${act('reset', _BT_SVG.reset, 'Reset')}
+      ${t.pos ? act('home', _BT_SVG.home, 'Put back') : ''}
+      ${act('remove', _BT_SVG.remove, 'Remove', 'danger')}
+    </div>
+    <div class="bnm-label">Time</div>
+    <div class="bnm-task-row" role="group" aria-label="Task time">
+      ${BRAIN_TASK_PRESETS.map(m => `<button type="button" data-secs="${m * 60}" class="${t.dur === m * 60 ? 'active' : ''}">${m}m</button>`).join('')}
+    </div>
+    <div class="bnm-task-custom">
+      <input id="brain-task-ctx-custom" type="text" inputmode="numeric" placeholder="mm:ss" value="${brainTaskFmt(t.dur)}" aria-label="Custom time, minutes:seconds">
+      <button type="button" data-act="custom">Set</button>
+    </div>`;
+  if (typeof vizPositionMenu === 'function') vizPositionMenu(menu, e.clientX, e.clientY);
+  else { menu.style.left = e.clientX + 'px'; menu.style.top = e.clientY + 'px'; menu.classList.remove('hidden'); }
+}
+
+function _btMenuClick(e) {
+  const b = e.target.closest('button');
+  const id = _btMenuNode;
+  if (!b || !id) return;
+  if (b.dataset.secs) { brainTaskSet([id], +b.dataset.secs); brainHideAllMenus(); return; }
+  const a = b.dataset.act;
+  if (a === 'custom') { _btMenuCustom(); return; }
+  brainHideAllMenus();
+  if (a === 'play') brainTaskPlay(id);
+  else if (a === 'reset') brainTaskReset(id);
+  else if (a === 'remove') brainTaskSet([id], null);
+  else if (a === 'home') {
+    const f = _btFind(id);
+    if (f && f.n.task) { delete f.n.task.pos; _btCommit(f.live); brainTaskRepaint(id); }
+  }
+}
+
+function _btMenuCustom() {
+  const input = document.getElementById('brain-task-ctx-custom');
+  const secs = brainTaskParse(input && input.value);
+  if (secs == null) {
+    if (input) { input.classList.add('is-bad'); setTimeout(() => input.classList.remove('is-bad'), 600); }
+    return;
+  }
+  brainTaskSet([_btMenuNode], secs);
+  brainHideAllMenus();
 }
 
 /* ── The pulse ────────────────────────────────────────────────── */

@@ -6682,83 +6682,145 @@ button.brain-dir-crumb:hover { color: var(--text-primary); background: color-mix
   .brain-dir-back { transition: none; }
 }
 
-/* ── Task notes (brain-tasks.js) ───────────────────────────────
-   A pill on the note's bottom edge: the time left, play/pause, and reset on
-   hover. While it runs, a bar inside drains by ONE transform animation sized
-   to the time left (set when it starts), so nothing is redrawn per frame; the
-   digits change once a second. Done, it turns green beside the check mark. */
+/* ── Task notes: the floating timer (brain-tasks.js) ──────────────
+   A small indicator floating above its note (top-right by default, clear of
+   every port), on a leader line that ends in a dot on the note's nearest
+   edge. At rest: a progress ring and the time. Hover: the ring becomes play /
+   pause. It bobs gently and, while running, a halo breathes out of it --
+   transform/opacity loops that close on their first frame. The ring is a
+   conic gradient whose --p the 1 s tick sets, so nothing paints per frame. */
 .viz-node > .brain-task {
+  --bt-c: #22d3ee;
   position: absolute;
-  left: 50%;
-  bottom: -13px;
-  z-index: 8;
+  right: 0;
+  top: -46px;
+  z-index: 12;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.viz-node > .brain-task.is-placed { right: auto; }
+.viz-node > .brain-task.is-dragging { cursor: grabbing; }
+.brain-task[data-state="idle"] { --bt-c: #8b949e; }
+.brain-task[data-state="paused"] { --bt-c: #facc15; }
+.brain-task[data-state="done"] { --bt-c: #10b981; }
+.brain-task .bt-float {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  height: 24px;
-  padding: 0 4px 0 8px;
-  overflow: hidden;
-  border: 1px solid rgba(240, 246, 252, 0.14);
+  gap: 6px;
+  height: 28px;
+  padding: 0 11px 0 4px;
+  border: 1px solid color-mix(in srgb, var(--bt-c) 45%, transparent);
   border-radius: 999px;
-  background: #0d1117;
-  color: #c9d1d9;
-  font: 700 0.72rem/1 'Consolas', 'Courier New', monospace;
+  background: rgba(13, 17, 23, 0.92);
+  color: #e6edf3;
+  font: 700 0.74rem/1 'Consolas', 'Courier New', monospace;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
-  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.45), 0 6px 14px -6px rgba(0, 0, 0, 0.7);
-  transform: translateX(-50%);
-  cursor: default;
+  box-shadow: 0 8px 20px -8px rgba(0, 0, 0, 0.75), 0 0 14px -6px var(--bt-c);
+  animation: btBob 3.4s ease-in-out infinite;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
-.brain-task .bt-bar {
+.brain-task:hover .bt-float { border-color: var(--bt-c); animation-play-state: paused; }   /* a still target under the pointer */
+.brain-task.is-dragging .bt-float { animation-play-state: paused; box-shadow: 0 14px 28px -10px rgba(0, 0, 0, 0.8), 0 0 18px -4px var(--bt-c); }
+@keyframes btBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+.brain-task .bt-halo {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 2px;
-  background: rgba(240, 246, 252, 0.08);
+  inset: -1px;
+  border: 1px solid var(--bt-c);
+  border-radius: inherit;
+  opacity: 0;
   pointer-events: none;
 }
-.brain-task .bt-bar i {
+.brain-task[data-state="running"] .bt-halo { animation: btHalo 2.6s ease-out infinite; }
+@keyframes btHalo {
+  0% { opacity: 0; transform: scale(0.94); }
+  18% { opacity: 0.55; }
+  100% { opacity: 0; transform: scale(1.22, 1.5); }
+}
+/* The ring and, in the same spot, play / pause: the button is always there
+   (and clickable), shown only while the timer is hovered. */
+.brain-task .bt-knob { position: relative; width: 20px; height: 20px; flex: none; }
+.brain-task .bt-ring {
+  position: absolute;
+  inset: 2px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--bt-c);
+  background: conic-gradient(var(--bt-c) calc(var(--p, 1) * 1turn), rgba(240, 246, 252, 0.14) 0);
+  -webkit-mask: radial-gradient(circle, transparent 4.5px, #000 5px);
+  mask: radial-gradient(circle, transparent 4.5px, #000 5px);
+  transition: opacity var(--transition-fast), transform var(--transition-spring);
+}
+.brain-task[data-state="done"] .bt-ring { -webkit-mask: none; mask: none; background: color-mix(in srgb, var(--bt-c) 22%, transparent); }
+.brain-task .bt-ring svg { width: 10px; height: 10px; }
+.brain-task .bt-play {
   position: absolute;
   inset: 0;
-  background: #22d3ee;
-  transform-origin: left center;
-  animation: btDrain linear backwards;   /* duration set inline: the time left */
-}
-.brain-task .bt-bar i.is-still { animation: none; }
-@keyframes btDrain { from { transform: scaleX(var(--bt-from, 1)); } to { transform: scaleX(0); } }
-.brain-task .bt-ic { display: inline-flex; color: #8b949e; }
-.brain-task .bt-ic svg { width: 13px; height: 13px; }
-.brain-task .bt-time { min-width: 2.6em; text-align: center; }
-.brain-task button {
-  display: inline-grid;
+  display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: transparent;
-  color: #c9d1d9;
+  background: var(--bt-c);
+  color: #0d1117;
   cursor: pointer;
-  transition: background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity var(--transition-fast), transform var(--transition-spring);
 }
-.brain-task button svg { width: 11px; height: 11px; }
-.brain-task .bt-play { background: rgba(34, 211, 238, 0.16); color: #22d3ee; }
-.brain-task .bt-play:hover { background: #22d3ee; color: #0d1117; }
-.brain-task .bt-reset { width: 0; opacity: 0; margin-left: -5px; }
-.viz-node:hover > .brain-task .bt-reset,
-.brain-task:focus-within .bt-reset { width: 20px; opacity: 1; margin-left: 0; }
-.brain-task .bt-reset:hover { background: rgba(240, 246, 252, 0.12); color: #fff; }
-.brain-task[data-state="running"] { border-color: rgba(34, 211, 238, 0.55); color: #e6fbff; }
-.brain-task[data-state="running"] .bt-ic { color: #22d3ee; }
-.brain-task[data-state="paused"] { border-color: rgba(250, 204, 21, 0.5); }
-.brain-task[data-state="paused"] .bt-ic,
+.brain-task .bt-play svg { width: 10px; height: 10px; }
+.brain-task:hover .bt-play,
+.brain-task .bt-play:focus-visible { opacity: 1; transform: scale(1); }
+.brain-task:hover .bt-ring { opacity: 0; transform: scale(0.6); }
+.brain-task .bt-time { min-width: 2.7em; text-align: center; }
+.brain-task[data-state="idle"] .bt-time { color: #8b949e; }
 .brain-task[data-state="paused"] .bt-time { color: #facc15; }
-.brain-task[data-state="done"] { border-color: rgba(16, 185, 129, 0.55); color: #6ee7b7; }
-.brain-task[data-state="done"] .bt-ic { color: #10b981; }
-.brain-task[data-state="done"] .bt-play { background: rgba(16, 185, 129, 0.14); color: #10b981; }
-.brain-task[data-state="done"] .bt-play:hover { background: #10b981; color: #0d1117; }
+.brain-task[data-state="done"] .bt-time { color: #6ee7b7; }
+
+/* The leader: from the note's nearest edge (the dot) to the timer. Placed by
+   brainTaskLayout as a rotated line; it fades in from the note's end. */
+.viz-node > .bt-lead {
+  --bt-c: #22d3ee;
+  position: absolute;
+  z-index: 11;
+  height: 0;
+  border-top: 1.5px dashed color-mix(in srgb, var(--bt-c) 55%, transparent);
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+.viz-node > .bt-lead.is-off { display: none; }
+.bt-lead[data-state="idle"] { --bt-c: #8b949e; }
+.bt-lead[data-state="paused"] { --bt-c: #facc15; }
+.bt-lead[data-state="done"] { --bt-c: #10b981; }
+.bt-lead i {
+  position: absolute;
+  left: -4px;
+  top: -4.75px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--bt-c);
+  box-shadow: 0 0 0 2px rgba(13, 17, 23, 0.9), 0 0 8px var(--bt-c);
+}
+.bt-lead[data-state="running"] i { animation: btDot 2.6s ease-in-out infinite; }
+@keyframes btDot { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.viz-canvas-container.viz-far .bt-float,
+.viz-canvas-container.viz-far .bt-halo,
+.viz-canvas-container.viz-far .bt-lead i { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .brain-task .bt-float, .brain-task .bt-halo, .bt-lead i { animation: none !important; }
+}
+
+/* The timer's own menu (right-click it). */
+.brain-task-menu { width: 232px; }
+.btm-head { display: flex; align-items: baseline; gap: 8px; padding: 0.15rem 0.3rem 0.1rem; }
+.btm-head b { font: 800 1.05rem/1 'Consolas', 'Courier New', monospace; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.btm-head span { font-size: 0.66rem; color: var(--text-tertiary); font-weight: 700; }
+.btm-acts { margin-bottom: 0.15rem; }
+.btm-acts svg { width: 15px; height: 15px; }
 
 /* The pulse: a glowing dot that runs once along the arrow to the next step. */
 .brain-task-pulse {
@@ -6790,7 +6852,6 @@ button.brain-dir-crumb:hover { color: var(--text-primary); background: color-mix
   to { opacity: 0; transform: scale(1.12); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .brain-task .bt-bar i { animation: none; }
   .viz-node.bt-arrive::before { animation: none; }
 }
 
