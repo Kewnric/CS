@@ -126,9 +126,12 @@ works fully offline.
 are different things — setting both to the same value makes the boss bar read
 100% on load.
 
-**Boss HP bar** measures similarity between what you have typed and the
-reference `code`, per file. Max HP is the reference's significant-character
-count. No reference means no bar.
+**Boss HP bar** (`_bossFight`, shared with practice sets) measures the code still
+to write: max HP is the significant characters the starter leaves missing from
+the reference `code` (the whole reference with no starter), so a fresh attempt
+opens at full HP; current HP is the edits between your code and the reference
+(|a| + |b| - 2·LCS, summed over files), capped at full. No reference means no
+bar. Tests: `tests/boss-hp-starter.spec.js`.
 
 **Run Code** (`preprocessMultiFile` → `mergeTranslationUnit`) builds one
 translation unit: it inlines `#include "local.h"` from the file you are on,

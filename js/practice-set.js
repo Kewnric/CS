@@ -547,18 +547,12 @@ function _psetUpdateBossBar(_ignoredCode, opts) {
     return;
   }
 
-  const normCur = (typeof _bossNormalize === 'function') ? _bossNormalize(mainCode) : (mainCode).replace(/\s+/g, '');
-  const normTgt = (typeof _bossNormalize === 'function') ? _bossNormalize(target) : target.replace(/\s+/g, '');
-  let sim = 0;
-  if (typeof calculateSimilarity === 'function') sim = calculateSimilarity(normCur, normTgt);
-  else sim = normCur === normTgt ? 1 : 0;
-
-  const healthPercent = Math.max(0, 100 - sim * 100);
-  // Max HP = the reference's significant-character count, so the readout counts
-  // real characters still to match rather than an arbitrary number.
-  if (typeof _bossBarPaint === 'function') {
-    _bossBarPaint(healthPercent, Object.assign({ maxHp: normTgt.length }, opts || {}));
-  }
+  // Max HP is the code the problem's starter leaves to write (see _bossFight),
+  // so a problem that opens with starter code opens at full HP.
+  const starter = (p.files && p.files[0]) ? (p.files[0].starterCode || '') : (p.starterCode || '');
+  const fight = _bossFight([{ cur: mainCode, tgt: target, starter }]);
+  if (!fight) { _bossBarNoTarget(); return; }
+  _bossBarPaint(fight.pct, Object.assign({ maxHp: fight.maxHp }, opts || {}));
 }
 
 /* ── The set's draft on disk ────────────────────────────────────

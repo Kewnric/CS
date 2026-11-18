@@ -2105,57 +2105,80 @@ function _updateBossHealthBarNow(currentCode) {
     state.userFiles[state.activeFileIndex].userCode = currentCode;
   }
 
-  let totalSim = 0;
-  let totalWeight = 0;
-
-  // 2. Aggregate similarity across ALL files in the challenge
+  // 2. Every file in the challenge, each with the starter it opens with.
+  let parts;
   if (state.activeVariant.files && state.activeVariant.files.length > 0 && state.userFiles) {
-    state.activeVariant.files.forEach((targetFile, index) => {
+    parts = state.activeVariant.files.map((targetFile, index) => {
       const userFile = state.userFiles.find(uf => uf.name === targetFile.name && uf.ext === targetFile.ext) || state.userFiles[index];
-      const uCode = userFile ? (userFile.userCode || '') : '';
-      const tCode = targetFile.code || '';
-      
-      // Normalize by stripping comments + whitespace so neither indentation nor
-      // comments move the health bar.
-      const normalizedCurrent = _bossNormalize(uCode);
-      const normalizedTarget = _bossNormalize(tCode);
-
-      const weight = normalizedTarget.length || 1;
-      let sim = 0;
-      if (typeof calculateSimilarity === 'function') {
-        sim = calculateSimilarity(normalizedCurrent, normalizedTarget);
-      } else {
-        sim = normalizedCurrent === normalizedTarget ? 1 : 0;
-      }
-      
-      totalSim += (sim * weight);
-      totalWeight += weight;
+      return {
+        cur: userFile ? (userFile.userCode || '') : '',
+        tgt: targetFile.code || '',
+        starter: targetFile.starterCode || ''
+      };
     });
   } else {
     // Legacy single-file fallback
-    const targetCode = state.activeVariant.code || '';
-    if (!targetCode) return;
-
-    const normalizedCurrent = _bossNormalize(currentCode);
-    const normalizedTarget = _bossNormalize(targetCode);
-
-    totalWeight = normalizedTarget.length || 1;
-    let sim = 0;
-    if (typeof calculateSimilarity === 'function') {
-      sim = calculateSimilarity(normalizedCurrent, normalizedTarget);
-    } else {
-      sim = normalizedCurrent === normalizedTarget ? 1 : 0;
-    }
-    totalSim = sim * totalWeight;
+    if (!state.activeVariant.code) return;
+    parts = [{ cur: currentCode, tgt: state.activeVariant.code, starter: state.activeVariant.starterCode || '' }];
   }
 
-  // 3. Calculate final global percentage.
-  // totalWeight is the reference's significant-character count — that IS the
-  // boss's max HP, so the readout counts real characters left to match.
-  const overallSim = totalWeight > 0 ? (totalSim / totalWeight) : 0;
-  const healthPercent = Math.max(0, 100 - (overallSim * 100));
+  const fight = _bossFight(parts);
+  if (!fight) { _bossBarNoTarget(); return; }
+  _bossBarPaint(fight.pct, { maxHp: fight.maxHp });
+}
 
-  _bossBarPaint(healthPercent, { maxHp: totalWeight });
+/**
+ * Edits between some code and the reference, in significant characters: the
+ * reference characters it lacks plus the ones it has that the reference does
+ * not (|a| + |b| - 2·LCS). Read back out of calculateSimilarity, which is
+ * 2·LCS / (|a| + |b|), so the large-file shortcut in there still applies.
+ */
+function _bossEditsLeft(normCur, normTgt) {
+  const n = normCur.length, m = normTgt.length;
+  if (normCur === normTgt) return 0;
+  if (!n || !m || typeof calculateSimilarity !== 'function') return n + m;
+  return Math.max(0, Math.round((n + m) * (1 - calculateSimilarity(normCur, normTgt))));
+}
+
+/* The starter never changes while you type, so its distance to the reference
+   is worked out once per pair rather than on every keystroke. */
+const _bossStarterEdits = new Map();
+function _bossStarterEditsLeft(normStarter, normTgt) {
+  const key = normStarter + '\u0001' + normTgt;
+  let d = _bossStarterEdits.get(key);
+  if (d === undefined) {
+    if (_bossStarterEdits.size > 32) _bossStarterEdits.clear();
+    d = _bossEditsLeft(normStarter, normTgt);
+    _bossStarterEdits.set(key, d);
+  }
+  return d;
+}
+
+/**
+ * The boss's HP over a program's files ({ cur, tgt, starter }, raw code).
+ *
+ * HP is the code still to WRITE. Starter code is given, so it deals no damage:
+ * max HP is what the starter leaves missing from the reference, a fresh attempt
+ * opens at full HP, and every correct character written takes one. Wrong
+ * characters count against you the same way, and undoing the starter cannot
+ * push the bar past full. With no starter, max HP is the whole reference.
+ *
+ * @returns {{pct:number, maxHp:number}|null} null when no file has a reference
+ */
+function _bossFight(parts) {
+  let left = 0, max = 0, whole = 0;
+  parts.forEach(p => {
+    const tgt = _bossNormalize(p.tgt);
+    if (!tgt) return;                       // no reference for this file: no HP in it
+    left += _bossEditsLeft(_bossNormalize(p.cur), tgt);
+    max += _bossStarterEditsLeft(_bossNormalize(p.starter), tgt);
+    whole += tgt.length;
+  });
+  if (!whole) return null;
+  // A starter that already IS the reference leaves nothing to write; measure
+  // against the whole reference then, so the bar still means something.
+  if (!max) max = whole;
+  return { pct: Math.min(100, (left / max) * 100), maxHp: max };
 }
 
 /* ============================================================
@@ -2676,10 +2699,11 @@ function _bossPaintTicks() {
 /**
  * Shared boss-bar painter (single-practice page + multi-problem session).
  *
- * HP is literal, not cosmetic: max HP is the number of significant characters in
- * the reference solution (comments and whitespace stripped, exactly as the
- * similarity check sees it), and current HP is how many of those you haven't
- * matched yet. Writing correct code is what deals damage.
+ * HP is literal, not cosmetic: max HP is the significant characters (comments
+ * and whitespace stripped) the starter code leaves to write -- the whole
+ * reference when there is no starter -- and current HP is the edits still
+ * between your code and the reference (see _bossFight). Writing correct code is
+ * what deals damage; starter code deals none.
  *
  * @param {number} healthPercent 0–100
  * @param {object} [opts] .instant skips the hit reaction; .maxHp sets the character total
@@ -2746,8 +2770,8 @@ function _bossBarPaint(healthPercent, opts) {
     if (delta > 0) { _bossHealAccum += delta; _bossDmgAccum = 0; }
     else if (delta < 0) { _bossDmgAccum -= delta; _bossHealAccum = 0; }
 
-    /* Scaled to the program, not to the bar. _bossMaxHp IS the reference's
-       significant-character count, so 100/_bossMaxHp is what one character is
+    /* Scaled to the program, not to the bar. _bossMaxHp IS a count of
+       significant characters, so 100/_bossMaxHp is what one character is
        worth in percentage points; firing at nine tenths of that means any
        single character you add or delete shows, on a short program and a long
        one alike. The 220ms cooldown inside the burst still caps the rate, and
