@@ -16,6 +16,12 @@
    The file tabs, add/rename/delete and the menus are this screen's own,
    because the attempt's versions autosave a draft.
 
+   THE SHELF. Save to shelf (the topbar button, Alt+S, the tab's menu) opens
+   the picker (#fg-keep-pop): name, category, new category / subcategory.
+   Closing a scratch that is not kept discards it, with an Undo; a kept one
+   is put away. Ctrl+P lists open tabs, then the shelf as a tree of
+   categories (fgShelfRows), folded open per device in ssp.fg.fold.
+
    SAVING. Typing writes the live buffer to ssp.fg.buffer (per storage mode)
    within 400 ms; the buffer goes into state.freeground on a tab switch, a
    run, closing, leaving, hiding the page and every 30 s. A buffer newer than
@@ -146,6 +152,9 @@ function freegroundTemplate() {
           <button class="btn btn-ghost practice-icon-btn" onclick="fgNewTabUI()" title="New freeground (Alt+N)" aria-label="New freeground">
             <i data-lucide="plus" style="width:16px;height:16px;" aria-hidden="true"></i>
           </button>
+          <button class="btn btn-ghost fg-keep-btn" id="fg-keep-btn" onclick="fgOpenKeepPicker(fgStore().activeId, this)" title="Save to shelf (Alt+S)" aria-label="Save to shelf">
+            <i data-lucide="archive" aria-hidden="true"></i><span class="fg-keep-label">Save to shelf</span>
+          </button>
           <button class="btn btn-ghost practice-icon-btn" id="fg-switch-btn" onclick="fgOpenSwitcher()" title="All freegrounds and the shelf (Ctrl+P)" aria-label="All freegrounds">
             <i data-lucide="layers" style="width:16px;height:16px;" aria-hidden="true"></i>
           </button>
@@ -261,6 +270,7 @@ function freegroundDestroy() {
   clearInterval(f.timer);
   clearTimeout(f.bufTimer);
   _fgCloseMenu();
+  fgCloseKeepPicker();
   fgCloseSwitcher();
   if (typeof zdockUnmount === 'function') zdockUnmount();
   if (typeof _termClose === 'function') _termClose();
@@ -459,21 +469,48 @@ function fgRenderStrip() {
            role="tab" aria-selected="${on}" tabindex="${on ? 0 : -1}" data-fg-tab="${t.id}"
            title="${name}${i < 9 ? ' (Alt+' + (i + 1) + ')' : ''} — double-click to rename, right-click for more">
         ${t.pinned ? '<i data-lucide="pin" class="fg-tab-pin" aria-hidden="true"></i>' : ''}
+        ${t.kept ? '<i data-lucide="archive" class="fg-tab-kept" aria-hidden="true"></i>' : ''}
         <span class="fg-tab-name">${name}</span>
         <span class="fg-tab-dot" aria-hidden="true" title="Changed since the last run"></span>
         ${t.pinned ? '' : `<button type="button" class="fg-tab-x" data-fg-close="${t.id}" tabindex="-1"
-                title="Close (Alt+W). It is kept on the shelf." aria-label="Close ${name}"><i data-lucide="x"></i></button>`}
+                title="${t.kept ? 'Close (Alt+W). It stays on the shelf.' : 'Close (Alt+W). Not on the shelf, so it is discarded (Undo for a few seconds).'}" aria-label="Close ${name}"><i data-lucide="x"></i></button>`}
       </div>`;
   }).join('');
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: host });
   const cur = host.querySelector('.fg-tab.is-active');
   if (cur && cur.scrollIntoView) cur.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  _fgPaintKeepBtn();
 }
 
-/** After an Undo or anything else that changed the tabs from outside. */
-function fgOnStoreChanged() {
+/** The Save to shelf button says whether the open tab is kept, and where. */
+function _fgPaintKeepBtn() {
+  const b = document.getElementById('fg-keep-btn');
+  if (!b) return;
+  const t = fgActiveTab();
+  const kept = !!(t && t.kept);
+  b.classList.toggle('is-kept', kept);
+  b.title = kept
+    ? 'On the shelf, in ' + (fgCatLabel(t.catId) || 'no category') + '. Click to move it, rename it or take it off (Alt+S).'
+    : 'Save to shelf (Alt+S). A scratch that is not on the shelf is discarded when you close it.';
+  b.setAttribute('aria-label', kept ? 'On the shelf: move, rename or take off' : 'Save to shelf');
+  const label = b.querySelector('.fg-keep-label');
+  if (label) label.textContent = kept ? 'On the shelf' : 'Save to shelf';
+}
+
+/**
+ * After an Undo or anything else that changed the tabs from outside.
+ * @param {string|null} [activateId] a tab that came back and should be shown
+ */
+function fgOnStoreChanged(activateId) {
   if (!_fg) return;
-  fgRenderStrip();
+  if (activateId && fgFindTab(activateId)) {
+    fgActivate(activateId);
+    const ta = document.getElementById('editor-textarea');
+    if (ta && !document.getElementById('fg-switcher')) ta.focus();
+  } else {
+    if (!fgActiveTab()) { const first = fgOpenTabs()[0]; if (first) fgActivate(first.id, { noCommit: true }); }
+    fgRenderStrip();
+  }
   if (document.getElementById('fg-switcher')) _fgRenderSwitcher();
 }
 
@@ -515,10 +552,15 @@ function fgCloseTabUI(id) {
   fgCommit();
   _fg.dirty.delete(id);
   const wasActive = fgStore().activeId === id;
+  const kept = !!t.kept;
+  // A discard shows its own Undo toast (fgCloseTab → pushUndo).
   const next = fgCloseTab(id);
-  if (wasActive && next) fgActivate(next, { noCommit: true });
-  else fgRenderStrip();
-  if (typeof toast === 'function') toast('"' + t.name + '" is on the shelf. Ctrl+P finds it.', { type: 'info', duration: 2200 });
+  if (wasActive && next) {
+    fgActivate(next, { noCommit: true });
+    const ta = document.getElementById('editor-textarea');
+    if (ta) { ta.focus(); _fgCaretToStarter(ta); }
+  } else fgRenderStrip();
+  if (kept && typeof toast === 'function') toast('"' + t.name + '" is on the shelf. Ctrl+P finds it.', { type: 'info', duration: 2200 });
 }
 
 function _fgStripClick(e) {
@@ -608,6 +650,41 @@ function _fgMenuKey(e) {
   if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); _fgCloseMenu(); }
 }
 
+/**
+ * A small menu under `anchor` (one at a time, #fg-tab-menu).
+ * @param {string} title
+ * @param {Array<[string, string, string, string, string?]>} items  [act, icon, text, hint, extra class]
+ * @param {Element} anchor
+ * @param {function(string)} onAct
+ */
+function _fgShowMenu(title, items, anchor, onAct) {
+  _fgCloseMenu();
+  const el = document.createElement('div');
+  el.id = 'fg-tab-menu';
+  el.className = 'file-menu fg-tab-menu';
+  el.setAttribute('role', 'menu');
+  el.innerHTML = '<div class="file-menu-title">' + escapeHTML(title) + '</div>' + items.map(([act, icon, text, hint, cls]) =>
+    '<button type="button" role="menuitem" class="file-menu-item' + (cls ? ' ' + cls : '') + '" data-act="' + act + '">'
+    + '<i data-lucide="' + icon + '"></i><span><strong>' + escapeHTML(text) + '</strong>'
+    + (hint ? '<em>' + escapeHTML(hint) + '</em>' : '') + '</span></button>').join('');
+  document.body.appendChild(el);
+  const r = (anchor || document.body).getBoundingClientRect();
+  const top = r.bottom + 4;
+  el.style.top = Math.max(6, top + el.offsetHeight > window.innerHeight - 6 ? r.top - el.offsetHeight - 4 : top) + 'px';
+  el.style.left = Math.max(6, Math.min(r.left, window.innerWidth - el.offsetWidth - 6)) + 'px';
+  el.addEventListener('click', (ev) => {
+    const b = ev.target.closest('.file-menu-item');
+    if (!b) return;
+    _fgCloseMenu();
+    onAct(b.getAttribute('data-act'));
+  });
+  document.addEventListener('mousedown', _fgMenuOutside, true);
+  document.addEventListener('keydown', _fgMenuKey, true);
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: el });
+  const first = el.querySelector('.file-menu-item');
+  if (first) first.focus();
+}
+
 function fgTabMenu(id, anchor) {
   const t = fgFindTab(id);
   if (!t) return;
@@ -618,46 +695,30 @@ function fgTabMenu(id, anchor) {
     ['rename', 'pencil', 'Rename…', 'F2'],
     ['duplicate', 'copy-plus', 'Duplicate', ''],
     ['pin', t.pinned ? 'pin-off' : 'pin', t.pinned ? 'Unpin' : 'Pin', 'Pinned tabs stay first and are not closed by Close others.'],
-    ['close', 'x', 'Close', 'Alt+W. It is kept on the shelf.'],
-    ['others', 'x-square', 'Close others', ''],
+    t.kept ? ['keep', 'archive', 'Move or rename on the shelf…', 'In ' + (fgCatLabel(t.catId) || 'no category') + '. Alt+S']
+      : ['keep', 'archive', 'Save to shelf…', 'Alt+S. Then closing it puts it away instead of discarding it.']
+  ];
+  if (t.kept) items.push(['unkeep', 'archive', 'Remove from shelf', 'It stays open; closing it then discards it.']);
+  items.push(
+    ['close', 'x', 'Close', t.kept ? 'Alt+W. It stays on the shelf.' : 'Alt+W. Not on the shelf, so it is discarded (with Undo).'],
+    ['others', 'x-square', 'Close others', 'Ones on the shelf are put away; the rest are discarded.'],
     ['copy', 'clipboard-copy', 'Copy ' + file.name + file.ext, ''],
     ['download', 'download', 'Download ' + file.name + file.ext, '']
-  ];
+  );
   if (typeof fgSaveAsSnippet === 'function') items.push(['snippet', 'code', 'Save as snippet…', 'The selection, or the whole file.']);
   if (typeof fgSaveAsProgram === 'function') items.push(['program', 'file-code', 'Save as program…', 'Opens the program form with this code as the answer.']);
   if (typeof tplMakeFrom === 'function') items.push(['template', 'puzzle', 'Save as template…', 'The selection, or the whole file; mark the names that change.']);
-
-  const el = document.createElement('div');
-  el.id = 'fg-tab-menu';
-  el.className = 'file-menu fg-tab-menu';
-  el.setAttribute('role', 'menu');
-  el.innerHTML = '<div class="file-menu-title">' + escapeHTML(t.name) + '</div>' + items.map(([act, icon, text, hint]) =>
-    '<button type="button" role="menuitem" class="file-menu-item" data-act="' + act + '">'
-    + '<i data-lucide="' + icon + '"></i><span><strong>' + escapeHTML(text) + '</strong>'
-    + (hint ? '<em>' + escapeHTML(hint) + '</em>' : '') + '</span></button>').join('');
-  document.body.appendChild(el);
-  const r = (anchor || document.body).getBoundingClientRect();
-  el.style.top = (r.bottom + 4) + 'px';
-  el.style.left = Math.max(6, Math.min(r.left, window.innerWidth - el.offsetWidth - 6)) + 'px';
-  el.addEventListener('click', (ev) => {
-    const b = ev.target.closest('.file-menu-item');
-    if (!b) return;
-    _fgCloseMenu();
-    _fgMenuAct(b.getAttribute('data-act'), id);
-  });
-  document.addEventListener('mousedown', _fgMenuOutside, true);
-  document.addEventListener('keydown', _fgMenuKey, true);
-  if (typeof lucide !== 'undefined') lucide.createIcons({ root: el });
-  const first = el.querySelector('.file-menu-item');
-  if (first) first.focus();
+  _fgShowMenu(t.name, items, anchor, (act) => _fgMenuAct(act, id, anchor));
 }
 
-function _fgMenuAct(act, id) {
+function _fgMenuAct(act, id, anchor) {
   const t = fgFindTab(id);
   if (!t) return;
   if (act === 'rename') fgStartRename(id);
   else if (act === 'duplicate') { const d = fgDuplicateTab(id); if (d) fgActivate(d.id, { noCommit: true }); }
   else if (act === 'pin') { fgPinTab(id, !t.pinned); fgRenderStrip(); }
+  else if (act === 'keep') fgOpenKeepPicker(id, anchor && anchor.isConnected ? anchor : document.getElementById('fg-keep-btn'));
+  else if (act === 'unkeep') _fgUnkeepUI(id);
   else if (act === 'close') fgCloseTabUI(id);
   else if (act === 'others') { fgCloseOthers(id); fgActivate(id, { noCommit: true }); }
   else if (act === 'copy' || act === 'download') {
@@ -681,7 +742,222 @@ function _fgMenuAct(act, id) {
   else if (act === 'template' && typeof tplMakeFrom === 'function') fgSaveAsTemplate(id);
 }
 
+/* ── Save to shelf: the picker ─────────────────────────────── */
+
+/** Back to where the keyboard was: the switcher's search if it is open, else the code. */
+function _fgFocusBack() {
+  const q = document.getElementById('fg-sw-q');
+  const el = q || document.getElementById('editor-textarea');
+  if (el) el.focus();
+}
+
+/**
+ * Turn `holder` into a name field. Enter or leaving the field keeps the text,
+ * Esc gives null. `done` re-renders, which removes the field.
+ */
+function _fgInlineName(holder, current, done, label) {
+  if (!holder) return;
+  const input = document.createElement('input');
+  input.className = 'fg-rename-input fg-name-input';
+  input.value = current;
+  input.maxLength = FG_LIMITS.nameMax;
+  input.setAttribute('aria-label', label || 'Category name');
+  holder.replaceWith(input);
+  input.focus();
+  input.select();
+  let over = false;
+  const finish = (keep) => { if (over) return; over = true; done(keep ? input.value : null); };
+  input.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+}
+
+function fgCloseKeepPicker() {
+  const el = document.getElementById('fg-keep-pop');
+  if (el) el.remove();
+  document.removeEventListener('mousedown', _fgPickOutside, true);
+  if (_fg) _fg.pick = null;
+}
+
+function _fgPickOutside(e) {
+  const el = document.getElementById('fg-keep-pop');
+  if (!el || el.contains(e.target)) return;
+  // The Save button toggles it; its own click closes it.
+  if (e.target.closest && e.target.closest('#fg-keep-btn')) return;
+  fgCloseKeepPicker();
+}
+
+/**
+ * Save a tab to the shelf, or move / rename / take off one already there.
+ * @param {string} tabId
+ * @param {Element} [anchor] what it opens under
+ */
+function fgOpenKeepPicker(tabId, anchor) {
+  if (!_fg) return;
+  if (document.getElementById('fg-keep-pop')) { fgCloseKeepPicker(); _fgFocusBack(); return; }
+  const t = fgFindTab(tabId);
+  if (!t) return;
+  _fgCloseMenu();
+  fgCommit();
+  const start = t.kept ? t.catId : _fg.lastCat;
+  _fg.pick = { tabId, catId: fgFindCat(start) ? start : null };
+  const el = document.createElement('div');
+  el.id = 'fg-keep-pop';
+  el.className = 'file-menu fg-keep-pop';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-label', t.kept ? 'On the shelf' : 'Save to shelf');
+  el.innerHTML = `
+    <div class="file-menu-title">${t.kept ? 'On the shelf' : 'Save to shelf'}</div>
+    <label class="fg-kp-field"><span>Name</span>
+      <input id="fg-kp-name" class="fg-kp-input" maxlength="${FG_LIMITS.nameMax}" value="${escapeHTML(t.name)}" spellcheck="false" autocomplete="off"></label>
+    <div class="fg-kp-label">Category</div>
+    <div class="fg-kp-cats" id="fg-kp-cats" role="listbox" aria-label="Category"></div>
+    <div class="fg-kp-new">
+      <button type="button" class="btn btn-ghost btn-sm" data-kp="newcat" title="A new category at the top"><i data-lucide="folder-plus"></i> New category</button>
+      <button type="button" class="btn btn-ghost btn-sm" data-kp="newsub" title="A new category inside the chosen one"><i data-lucide="folder-plus"></i> New subcategory</button>
+    </div>
+    <div class="fg-kp-actions">
+      ${t.kept ? '<button type="button" class="btn btn-ghost btn-sm fg-kp-remove" data-kp="remove" title="It stays open; closing it then discards it">Remove from shelf</button>' : ''}
+      <span class="fg-kp-gap"></span>
+      <button type="button" class="btn btn-ghost btn-sm" data-kp="cancel">Cancel</button>
+      <button type="button" class="btn btn-primary btn-sm" data-kp="save"><i data-lucide="archive"></i> ${t.kept ? 'Save' : 'Save to shelf'}</button>
+    </div>`;
+  document.body.appendChild(el);
+  _fgRenderPickCats();
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: el });
+  const r = (anchor || document.getElementById('fg-keep-btn') || document.body).getBoundingClientRect();
+  const below = r.bottom + 6;
+  el.style.top = Math.max(6, below + el.offsetHeight > window.innerHeight - 6 ? window.innerHeight - el.offsetHeight - 6 : below) + 'px';
+  el.style.left = Math.max(6, Math.min(r.right - el.offsetWidth, window.innerWidth - el.offsetWidth - 6)) + 'px';
+  el.addEventListener('click', _fgPickClick);
+  el.addEventListener('dblclick', (e) => {
+    if (e.target.closest('[data-kp-cat]') && !e.target.closest('.fg-name-input')) _fgPickSave();
+  });
+  el.addEventListener('keydown', _fgPickKey);
+  document.addEventListener('mousedown', _fgPickOutside, true);
+  const name = el.querySelector('#fg-kp-name');
+  if (name) { name.focus(); name.select(); }
+}
+
+function _fgRenderPickCats() {
+  const box = document.getElementById('fg-kp-cats');
+  if (!box || !_fg || !_fg.pick) return;
+  const every = new Set(fgCats().map(c => c.id));
+  const rows = [{ id: null, name: 'No category', depth: 0 }].concat(fgShelfRows(every, '')
+    .filter(r => r.kind === 'cat').map(r => ({ id: r.cat.id, name: r.cat.name, depth: r.depth })));
+  box.innerHTML = rows.map(r => {
+    const sel = r.id === _fg.pick.catId;
+    return `<div class="fg-kp-cat${sel ? ' is-sel' : ''}${r.id ? '' : ' is-none'}" role="option" aria-selected="${sel}"
+      data-kp-cat="${r.id || ''}" style="--fg-depth:${r.depth}"><i data-lucide="${r.id ? 'folder' : 'minus'}" aria-hidden="true"></i><span class="fg-kp-name">${escapeHTML(r.name)}</span></div>`;
+  }).join('');
+  if (typeof lucide !== 'undefined') lucide.createIcons({ root: box });
+  const sel = box.querySelector('.fg-kp-cat.is-sel');
+  if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest' });
+  const sub = document.querySelector('#fg-keep-pop [data-kp="newsub"]');
+  if (sub) sub.disabled = !_fg.pick.catId || fgCatPath(_fg.pick.catId).length >= FG_LIMITS.catDepth;
+}
+
+function _fgPickClick(e) {
+  if (!_fg || !_fg.pick || e.target.closest('.fg-name-input')) return;
+  const cat = e.target.closest('[data-kp-cat]');
+  if (cat) { _fg.pick.catId = cat.getAttribute('data-kp-cat') || null; _fgRenderPickCats(); return; }
+  const b = e.target.closest('[data-kp]');
+  if (!b) return;
+  const act = b.getAttribute('data-kp');
+  if (act === 'save') _fgPickSave();
+  else if (act === 'cancel') { fgCloseKeepPicker(); _fgFocusBack(); }
+  else if (act === 'remove') { const id = _fg.pick.tabId; fgCloseKeepPicker(); _fgUnkeepUI(id); _fgFocusBack(); }
+  else if (act === 'newcat' || act === 'newsub') {
+    const c = fgNewCat('New category', act === 'newsub' ? _fg.pick.catId : null);
+    if (!c) return;
+    _fg.pick.catId = c.id;
+    _fgRenderPickCats();
+    _fgInlineName(document.querySelector('#fg-kp-cats [data-kp-cat="' + c.id + '"] .fg-kp-name'), c.name, (name) => {
+      if (name) fgRenameCat(c.id, name);
+      _fgRenderPickCats();
+      if (document.getElementById('fg-switcher')) _fgRenderSwitcher();
+      const n = document.getElementById('fg-kp-name');
+      if (n) n.focus();
+    });
+  }
+}
+
+function _fgPickKey(e) {
+  if (!_fg || !_fg.pick || (e.target.closest && e.target.closest('.fg-name-input'))) return;
+  if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fgCloseKeepPicker(); _fgFocusBack(); return; }
+  if (e.key === 'Enter' && !e.target.closest('button')) { e.preventDefault(); e.stopPropagation(); _fgPickSave(); return; }
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    e.stopPropagation();
+    const ids = Array.from(document.querySelectorAll('#fg-kp-cats [data-kp-cat]')).map(x => x.getAttribute('data-kp-cat') || null);
+    const i = ids.indexOf(_fg.pick.catId);
+    _fg.pick.catId = ids[Math.max(0, Math.min(ids.length - 1, i + (e.key === 'ArrowDown' ? 1 : -1)))];
+    _fgRenderPickCats();
+  }
+}
+
+function _fgPickSave() {
+  if (!_fg || !_fg.pick) return;
+  const { tabId, catId } = _fg.pick;
+  const t = fgFindTab(tabId);
+  if (!t) { fgCloseKeepPicker(); return; }
+  const was = !!t.kept;
+  const nameEl = document.getElementById('fg-kp-name');
+  if (nameEl && fgCleanName(nameEl.value)) fgRenameTab(tabId, nameEl.value);
+  fgKeepTab(tabId, catId);
+  _fg.lastCat = catId;
+  // Open the way to it, so the list shows it where it went.
+  const fold = _fgFoldGet();
+  fgCatPath(catId).forEach(c => fold.add(c.id));
+  _fgFoldSave(fold);
+  fgCloseKeepPicker();
+  fgRenderStrip();
+  if (document.getElementById('fg-switcher')) _fgRenderSwitcher();
+  const where = fgCatLabel(catId);
+  if (typeof toast === 'function') {
+    toast((was ? '"' + t.name + '" is now' : 'Saved "' + t.name + '" to the shelf,') + ' in ' + (where || 'no category') + '.', { type: 'success', duration: 2200 });
+  }
+  _fgFocusBack();
+}
+
+/** Off the shelf: it stays open, and closing it now discards it. */
+function _fgUnkeepUI(id) {
+  const t = fgFindTab(id);
+  if (!t || !t.kept) return;
+  fgUnkeepTab(id);
+  fgRenderStrip();
+  if (document.getElementById('fg-switcher')) _fgRenderSwitcher();
+  if (typeof toast === 'function') toast('"' + t.name + '" is off the shelf. Closing it now discards it.', { type: 'info', duration: 2600 });
+}
+
 /* ── Every freeground and the shelf (Ctrl+P) ───────────────── */
+
+const FG_FOLD_KEY = 'ssp.fg.fold';
+
+/** The shelf categories folded open on this device (layout, not synced). */
+function _fgFoldGet() {
+  try {
+    const a = JSON.parse(localStorage.getItem(FG_FOLD_KEY) || '[]');
+    return new Set(Array.isArray(a) ? a : []);
+  } catch (e) { return new Set(); }
+}
+
+function _fgFoldSave(set) {
+  const live = Array.from(set).filter(id => fgFindCat(id));
+  try { localStorage.setItem(FG_FOLD_KEY, JSON.stringify(live)); } catch (e) { /* private mode: folds just are not remembered */ }
+}
+
+/** Fold a category open (on true), shut (false) or the other way (undefined). */
+function _fgToggleFold(id, on) {
+  const set = _fgFoldGet();
+  const want = on === undefined ? !set.has(id) : !!on;
+  if (want) set.add(id); else set.delete(id);
+  _fgFoldSave(set);
+  _fgRenderSwitcher();
+}
 
 function fgCloseSwitcher() {
   const ov = document.getElementById('fg-switcher');
@@ -701,7 +977,7 @@ function fgOpenSwitcher() {
         <input id="fg-sw-q" class="fg-sw-input" placeholder="Find a freeground by name or code…" autocomplete="off" spellcheck="false" aria-label="Find a freeground">
       </div>
       <div class="fg-sw-list" id="fg-sw-list" role="listbox" aria-label="Freegrounds"></div>
-      <div class="fg-sw-foot"><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>Enter</kbd> open · <kbd>Esc</kbd> close</div>
+      <div class="fg-sw-foot"><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>←</kbd><kbd>→</kbd> fold · <kbd>Enter</kbd> open · right-click for more · <kbd>Esc</kbd> close</div>
     </div>`;
   document.body.appendChild(ov);
   _fg.swSel = 0;
@@ -710,6 +986,7 @@ function fgOpenSwitcher() {
   ov.addEventListener('keydown', _fgSwitcherKey);
   ov.addEventListener('mousedown', (e) => { if (e.target === ov) fgCloseSwitcher(); });
   ov.addEventListener('click', _fgSwitcherClick);
+  ov.addEventListener('contextmenu', _fgSwitcherMenu);
   _fgRenderSwitcher();
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: ov });
   q.focus();
@@ -736,36 +1013,150 @@ function _fgAgo(ts) {
   return Math.round(h / 24) + ' d ago';
 }
 
+function _fgQuery() {
+  return ((document.getElementById('fg-sw-q') || {}).value || '').trim().toLowerCase();
+}
+
+/* Open tabs first, then the shelf: a tree of categories (fgShelfRows), or a
+   flat list of matches while searching. Every row is one stop for the arrows. */
 function _fgSwitcherRows() {
-  const q = ((document.getElementById('fg-sw-q') || {}).value || '').trim().toLowerCase();
-  const match = (t) => !q || t.name.toLowerCase().includes(q)
-    || (t.files || []).some(f => String(f.code || '').toLowerCase().includes(q));
-  const open = fgOpenTabs().filter(match).map(t => ({ t, shelf: false }));
-  const shelf = fgShelfTabs().filter(match).map(t => ({ t, shelf: true }));
+  const q = _fgQuery();
+  const open = fgOpenTabs().filter(t => fgTabMatches(t, q))
+    .map(t => ({ kind: 'tab', tab: t, depth: 0, path: '', section: 'open' }));
+  const shelf = fgShelfRows(_fgFoldGet(), q).map(r => Object.assign({ section: 'shelf' }, r));
   return open.concat(shelf);
+}
+
+function _fgCatRowHTML(r, i) {
+  const name = escapeHTML(r.cat.name);
+  const sel = i === _fg.swSel;
+  return `
+      <div class="fg-sw-row fg-sw-cat${sel ? ' is-sel' : ''}" role="option" aria-selected="${sel}" aria-expanded="${r.open}"
+           data-fg-cat="${r.cat.id}" style="--fg-depth:${r.depth}">
+        <i data-lucide="${r.open ? 'chevron-down' : 'chevron-right'}" class="fg-sw-chev" aria-hidden="true"></i>
+        <i data-lucide="${r.open ? 'folder-open' : 'folder'}" class="fg-sw-folder" aria-hidden="true"></i>
+        <span class="fg-sw-text"><strong class="fg-sw-catname">${name}</strong></span>
+        <span class="fg-sw-count" title="${r.count} kept in here">${r.count}</span>
+        <button type="button" class="fg-sw-del fg-sw-more" data-fg-catmenu="${r.cat.id}" title="New subcategory, rename, delete" aria-label="More for ${name}"><i data-lucide="more-horizontal"></i></button>
+      </div>`;
+}
+
+function _fgTabRowHTML(r, i) {
+  const t = r.tab;
+  const sel = i === _fg.swSel;
+  const shelf = r.section === 'shelf';
+  const active = t.id === fgStore().activeId;
+  const icon = t.shelved ? 'archive' : (t.pinned ? 'pin' : 'file-code');
+  const name = escapeHTML(t.name);
+  return `
+      <div class="fg-sw-row${sel ? ' is-sel' : ''}${active ? ' is-active' : ''}" role="option" aria-selected="${sel}"
+           data-fg-row="${t.id}" data-fg-sec="${r.section}" style="--fg-depth:${r.depth}">
+        <i data-lucide="${icon}" aria-hidden="true"></i>
+        <span class="fg-sw-text"><strong>${name}</strong><em>${escapeHTML(r.path || _fgFirstLine(t))}</em></span>
+        ${!shelf && t.kept ? '<i data-lucide="archive" class="fg-sw-keptmark" aria-label="On the shelf"></i>' : ''}
+        ${shelf && !t.shelved ? '<span class="fg-sw-when fg-sw-isopen">open</span>' : `<span class="fg-sw-when">${_fgAgo(t.updatedAt)}</span>`}
+        ${shelf && t.shelved ? `<button type="button" class="fg-sw-del" data-fg-del="${t.id}" title="Delete for good" aria-label="Delete ${name} for good"><i data-lucide="trash-2"></i></button>` : ''}
+      </div>`;
 }
 
 function _fgRenderSwitcher() {
   const list = document.getElementById('fg-sw-list');
   if (!list || !_fg) return;
   const rows = _fgSwitcherRows();
+  const q = _fgQuery();
+  _fg.swRows = rows;
   _fg.swSel = Math.min(_fg.swSel || 0, Math.max(rows.length - 1, 0));
-  let lastShelf = null;
-  list.innerHTML = rows.length ? rows.map((r, i) => {
-    const head = r.shelf !== lastShelf ? `<div class="fg-sw-section">${r.shelf ? 'On the shelf' : 'Open'}</div>` : '';
-    lastShelf = r.shelf;
-    const active = r.t.id === fgStore().activeId;
-    return head + `
-      <div class="fg-sw-row${i === _fg.swSel ? ' is-sel' : ''}${active ? ' is-active' : ''}" role="option" aria-selected="${i === _fg.swSel}" data-fg-row="${r.t.id}">
-        <i data-lucide="${r.shelf ? 'archive' : (r.t.pinned ? 'pin' : 'file-code')}" aria-hidden="true"></i>
-        <span class="fg-sw-text"><strong>${escapeHTML(r.t.name)}</strong><em>${escapeHTML(_fgFirstLine(r.t))}</em></span>
-        <span class="fg-sw-when">${_fgAgo(r.t.updatedAt)}</span>
-        ${r.shelf ? `<button type="button" class="fg-sw-del" data-fg-del="${r.t.id}" title="Delete for good" aria-label="Delete ${escapeHTML(r.t.name)} for good"><i data-lucide="trash-2"></i></button>` : ''}
+  const shelfHead = `
+      <div class="fg-sw-section fg-sw-shelfhead"><span>Shelf</span>
+        <button type="button" class="fg-sw-newcat" data-fg-newcat="1" title="A new category at the top of the shelf"><i data-lucide="folder-plus" aria-hidden="true"></i> New category</button>
       </div>`;
-  }).join('') : '<div class="fg-sw-empty">No freeground matches.</div>';
+  let html = '';
+  let section = null;
+  rows.forEach((r, i) => {
+    if (r.section !== section) {
+      section = r.section;
+      html += section === 'open' ? '<div class="fg-sw-section">Open</div>' : shelfHead;
+    }
+    html += r.kind === 'cat' ? _fgCatRowHTML(r, i) : _fgTabRowHTML(r, i);
+  });
+  if (!rows.some(r => r.section === 'shelf')) {
+    html += shelfHead + `<div class="fg-sw-hint">${q ? 'Nothing on the shelf matches.'
+      : 'Nothing kept yet. Save to shelf (Alt+S) keeps a scratch here; a scratch that is not kept is discarded when you close it.'}</div>`;
+  }
+  list.innerHTML = html;
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: list });
   const sel = list.querySelector('.fg-sw-row.is-sel');
   if (sel && sel.scrollIntoView) sel.scrollIntoView({ block: 'nearest' });
+}
+
+/** Select the first row that `pred` accepts (from the last render). */
+function _fgSelectRow(pred) {
+  const i = (_fg.swRows || []).findIndex(pred);
+  if (i !== -1) _fg.swSel = i;
+}
+
+/** A new category under `parentId` (null: at the top), named in place. */
+function _fgNewCatUI(parentId) {
+  const c = fgNewCat('New category', parentId);
+  if (!c) return;
+  if (parentId) { const fold = _fgFoldGet(); fgCatPath(parentId).forEach(x => fold.add(x.id)); _fgFoldSave(fold); }
+  const q = document.getElementById('fg-sw-q');
+  if (q && q.value) q.value = '';
+  _fgRenderSwitcher();
+  _fgSelectRow(r => r.kind === 'cat' && r.cat.id === c.id);
+  _fgRenderSwitcher();
+  _fgRenameCatUI(c.id);
+}
+
+function _fgRenameCatUI(id) {
+  const c = fgFindCat(id);
+  const label = document.querySelector('#fg-sw-list [data-fg-cat="' + id + '"] .fg-sw-catname');
+  if (!c || !label) return;
+  _fgInlineName(label, c.name, (name) => {
+    if (name !== null && !fgRenameCat(id, name) && typeof toast === 'function') {
+      toast('A category needs a name.', { type: 'warning', duration: 2000 });
+    }
+    _fgRenderSwitcher();
+    _fgFocusBack();
+  });
+}
+
+function _fgCatMenu(id, anchor) {
+  const c = fgFindCat(id);
+  if (!c) return;
+  const items = [];
+  if (fgCatPath(id).length < FG_LIMITS.catDepth) items.push(['sub', 'folder-plus', 'New subcategory', '']);
+  items.push(['rename', 'pencil', 'Rename', ''],
+    ['delete', 'trash-2', 'Delete category', 'What it holds moves up a level. Undo brings it back.', 'is-danger']);
+  _fgShowMenu(fgCatLabel(id), items, anchor, (act) => {
+    if (act === 'sub') _fgNewCatUI(id);
+    else if (act === 'rename') _fgRenameCatUI(id);
+    else if (act === 'delete') { fgDeleteCat(id); _fgRenderSwitcher(); _fgFocusBack(); }
+  });
+}
+
+function _fgListTabMenu(id, anchor) {
+  const t = fgFindTab(id);
+  if (!t) return;
+  const items = [['open', 'file-code', 'Open', '']];
+  items.push(t.kept ? ['move', 'folder-open', 'Move to category…', 'In ' + (fgCatLabel(t.catId) || 'no category')]
+    : ['keep', 'archive', 'Save to shelf…', '']);
+  if (t.shelved) items.push(['delete', 'trash-2', 'Delete for good', 'Undo brings it back.', 'is-danger']);
+  _fgShowMenu(t.name, items, anchor, (act) => {
+    if (act === 'open') _fgSwitcherOpen(id);
+    else if (act === 'move' || act === 'keep') fgOpenKeepPicker(id, anchor && anchor.isConnected ? anchor : document.getElementById('fg-sw-q'));
+    else if (act === 'delete') { fgDeleteTab(id); _fgRenderSwitcher(); _fgFocusBack(); }
+  });
+}
+
+function _fgSwitcherMenu(e) {
+  if (e.target.closest('.fg-name-input')) return;
+  const cat = e.target.closest('[data-fg-cat]');
+  const row = e.target.closest('[data-fg-row]');
+  if (!cat && !row) return;
+  e.preventDefault();
+  if (cat) _fgCatMenu(cat.getAttribute('data-fg-cat'), cat);
+  else _fgListTabMenu(row.getAttribute('data-fg-row'), row);
 }
 
 function _fgSwitcherOpen(id) {
@@ -778,11 +1169,15 @@ function _fgSwitcherOpen(id) {
   if (!state.activeChallenge || state.activeChallenge.id !== 'fg:' + id) fgActivate(id, { noCommit: true });
   else fgRenderStrip();
   const ta = document.getElementById('editor-textarea');
-  if (ta) ta.focus();
+  if (ta) { ta.focus(); _fgCaretToStarter(ta); }
 }
 
+/* Left and Right fold only while the search is empty: with text in it they
+   move the caret, and a search shows no categories anyway. */
 function _fgSwitcherKey(e) {
-  const rows = _fgSwitcherRows();
+  if (e.target.closest && e.target.closest('.fg-name-input')) return;
+  const rows = _fg.swRows || _fgSwitcherRows();
+  const r = rows[_fg.swSel];
   if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fgCloseSwitcher(); const ta = document.getElementById('editor-textarea'); if (ta) ta.focus(); return; }
   if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
     e.preventDefault();
@@ -791,16 +1186,52 @@ function _fgSwitcherKey(e) {
     _fgRenderSwitcher();
     return;
   }
+  if ((e.key === 'ArrowRight' || e.key === 'ArrowLeft') && !_fgQuery() && r) {
+    if (r.kind === 'cat') {
+      e.preventDefault();
+      if (e.key === 'ArrowRight') { if (!r.open) _fgToggleFold(r.cat.id, true); return; }
+      if (r.open) { _fgToggleFold(r.cat.id, false); return; }
+    }
+    if (e.key === 'ArrowLeft' && r.section === 'shelf' && r.depth > 0) {
+      e.preventDefault();
+      for (let i = _fg.swSel - 1; i >= 0; i--) {
+        if (rows[i].kind === 'cat' && rows[i].depth === r.depth - 1) { _fg.swSel = i; break; }
+      }
+      _fgRenderSwitcher();
+    }
+    return;
+  }
+  if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
+    const el = document.querySelector('#fg-sw-list .fg-sw-row.is-sel');
+    if (!r || !el) return;
+    e.preventDefault();
+    if (r.kind === 'cat') _fgCatMenu(r.cat.id, el); else _fgListTabMenu(r.tab.id, el);
+    return;
+  }
   if (e.key === 'Enter') {
     e.preventDefault();
-    const r = rows[_fg.swSel];
-    if (r) _fgSwitcherOpen(r.t.id);
+    if (!r) return;
+    if (r.kind === 'cat') _fgToggleFold(r.cat.id);
+    else _fgSwitcherOpen(r.tab.id);
   }
 }
 
 /* Delete is two clicks on the same button: the first turns it into "Delete?",
    the second deletes, and an Undo follows. No dialog over a dialog. */
 function _fgSwitcherClick(e) {
+  if (e.target.closest('.fg-name-input')) return;
+  const more = e.target.closest('[data-fg-catmenu]');
+  if (more) { e.stopPropagation(); _fgCatMenu(more.getAttribute('data-fg-catmenu'), more); return; }
+  if (e.target.closest('[data-fg-newcat]')) { e.stopPropagation(); _fgNewCatUI(null); return; }
+  const cat = e.target.closest('[data-fg-cat]');
+  if (cat) {
+    const id = cat.getAttribute('data-fg-cat');
+    _fgSelectRow(r => r.kind === 'cat' && r.cat.id === id);
+    _fgToggleFold(id);
+    const q = document.getElementById('fg-sw-q');
+    if (q) q.focus();
+    return;
+  }
   const del = e.target.closest('[data-fg-del]');
   if (del) {
     e.stopPropagation();
@@ -919,7 +1350,7 @@ function _fgKeydown(e) {
   // a key pressed while it fades is meant for the screen.
   if (document.querySelector('.modal-overlay:not(.hidden):not([data-mx-ghost])')) return;
   if (document.getElementById('run-code-overlay')) return;
-  if (document.getElementById('fg-tab-menu')) return;
+  if (document.getElementById('fg-tab-menu') || document.getElementById('fg-keep-pop')) return;
   if (e.target && e.target.classList && e.target.classList.contains('fg-rename-input')) return;
   const findBar = document.getElementById('ed-find-bar');
   const findOpen = !!(findBar && findBar.classList.contains('open'));
@@ -932,6 +1363,8 @@ function _fgKeydown(e) {
   if (e.altKey && !ctrl) {
     if (!e.shiftKey && e.code === 'KeyN') { e.preventDefault(); fgNewTabUI(); return; }
     if (!e.shiftKey && e.code === 'KeyW') { e.preventDefault(); fgCloseTabUI(active); return; }
+    // Alt+S, not Ctrl+Shift+S: that one is the app's cloud save (firebase-auth.js).
+    if (!e.shiftKey && e.code === 'KeyS') { e.preventDefault(); fgOpenKeepPicker(active, document.getElementById('fg-keep-btn')); return; }
     const m = /^Digit([1-9])$/.exec(e.code || '');
     if (m && !e.shiftKey) { e.preventDefault(); const t = fgOpenTabs()[+m[1] - 1]; if (t) fgSwitchTo(t.id); return; }
     if (!e.shiftKey && (e.code === 'BracketRight' || e.code === 'BracketLeft')) { e.preventDefault(); fgCycle(e.code === 'BracketRight' ? 1 : -1); return; }

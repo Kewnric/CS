@@ -32,7 +32,8 @@ const TRAIN_FIELDS = {
   typeStats:       { domain: 'training',   empty: () => ({ keys: {}, seqs: {}, decayedAt: 0 }) },
   drillLog:        { domain: 'training',   empty: () => ({ sureWrong: [] }) },
   codex:           { domain: 'training',   empty: () => ({ notes: {}, edits: {}, custom: [], seen: {} }) },
-  freeground:      { domain: 'freeground', empty: () => ({ tabs: [], activeId: null }) }
+  // No `ver` here: freeground.js migrates a store without one (see its header).
+  freeground:      { domain: 'freeground', empty: () => ({ tabs: [], activeId: null, cats: [] }) }
 };
 
 /** The cloud documents these fields live in. */

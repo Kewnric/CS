@@ -5,13 +5,25 @@
    output. It lives in state.freeground (js/train-store.js), so it is saved,
    exported and synced like the library, in a cloud document of its own.
 
-     state.freeground = { tabs: [tab], activeId }
+     state.freeground = { tabs: [tab], activeId, cats: [cat], ver: 2 }
      tab = { id, name, files: [{ id, name, ext, code }], activeFile, lastRun,
-             pinned, shelved, from, createdAt, updatedAt }
+             pinned, shelved, kept, catId, from, createdAt, updatedAt }
+     cat = { id, name, parentId }      a shelf category; parentId null at the top
 
-   CLOSING IS NOT DELETING. Closing a tab puts it on the shelf; only the shelf
-   can delete one, behind a question and an Undo. Open tabs keep the order of
-   the array, pinned ones first.
+   THE SHELF HOLDS WHAT YOU KEPT. Save to shelf marks a tab `kept` (it stays
+   open and keeps saving). Closing a kept tab puts it away on the shelf;
+   closing one that was never kept discards it, with an Undo. Only the shelf
+   deletes a kept one, behind a question and an Undo. Open tabs keep the order
+   of the array, pinned ones first.
+
+   CATEGORIES nest (8 levels, 100 in all). Deleting one moves what it held up
+   to its parent. Which ones are folded open is the screen's, per device.
+
+   ver 2 is the kept/categories format. A store without it (an old save, or an
+   old device's cloud document) is migrated when first read: shelved tabs that
+   are still an untouched starter go, everything else was kept before, so it
+   stays kept. ver is NOT in the field's empty value (train-store.js), or an old
+   document would be stamped as migrated without being migrated.
 
    The screen is js/routes/route-freeground.js. This file never touches the
    editor, so its rules can be read (and tested) on their own.
@@ -23,7 +35,9 @@ const FG_LIMITS = {
   chars: 200000,       // per freeground
   total: 600000,       // every freeground together, so the cloud document fits
   lastRunLines: 200,
-  nameMax: 40
+  nameMax: 40,
+  cats: 100,           // shelf categories, every level together
+  catDepth: 8          // levels of categories
 };
 
 const FG_DEFAULT_STARTER = '/**\n *    author:\n**/\n#include <stdio.h>\nint main(){\n\t\n\treturn 0;\n}';
@@ -32,9 +46,37 @@ const FG_OLD_STARTER = '#include <stdio.h>\n\nint main(void) {\n    \n    return
 
 function fgStore() {
   if (!state.freeground || typeof state.freeground !== 'object' || !Array.isArray(state.freeground.tabs)) {
-    state.freeground = { tabs: [], activeId: null };
+    state.freeground = { tabs: [], activeId: null, cats: [], ver: 2 };
   }
-  return state.freeground;
+  const s = state.freeground;
+  if (s.ver !== 2) _fgMigrate(s);
+  return s;
+}
+
+/** A tab that is nothing but a starter nobody typed in. */
+function _fgIsBlankStarter(t) {
+  const files = (t && t.files) || [];
+  if (files.length !== 1) return false;
+  const code = String(files[0].code || '').replace(/\s+$/, '');
+  return [FG_DEFAULT_STARTER, FG_OLD_STARTER, fgDefaultStarter()].some(s => String(s).replace(/\s+$/, '') === code);
+}
+
+/* Once per store without ver 2. Not saved here: the next save carries it, and
+   until then it is simply done again on the next read. */
+function _fgMigrate(s) {
+  const seen = new Set();
+  s.tabs = s.tabs.filter(t => {
+    if (!t || typeof t !== 'object' || !t.id || seen.has(t.id)) return false;
+    seen.add(t.id);
+    const blank = _fgIsBlankStarter(t);
+    if (blank && t.shelved) return false;
+    if (typeof t.kept !== 'boolean') t.kept = !blank;
+    if (t.catId === undefined) t.catId = null;
+    return true;
+  });
+  if (!Array.isArray(s.cats)) s.cats = [];
+  if (s.activeId && !s.tabs.some(t => t.id === s.activeId)) s.activeId = null;
+  s.ver = 2;
 }
 
 function fgTabs() { return fgStore().tabs; }
@@ -132,7 +174,7 @@ function fgNewTab(opts) {
   const now = Date.now();
   const tab = {
     id: generateId(), name: fgCleanName(o.name) || fgNextName(), files, activeFile: 0, lastRun: '',
-    pinned: false, shelved: false, from: o.from || null, createdAt: now, updatedAt: now
+    pinned: false, shelved: false, kept: false, catId: null, from: o.from || null, createdAt: now, updatedAt: now
   };
   fgTabs().push(tab);
   fgStore().activeId = tab.id;
@@ -150,25 +192,62 @@ function fgRenameTab(id, name) {
 }
 
 /**
- * Put a tab on the shelf. If it was the active one, its open neighbour takes
- * over; with no open tab left a new one is made, so the strip is never empty.
+ * Take tabs out, with one Undo that puts each back where it was (once, however
+ * often the Undo runs). A restored scratch-N whose name was taken meanwhile
+ * gets the next free one.
+ * @param {object[]} list
+ * @param {string} label  the Undo's label
+ * @param {boolean} [show] the Undo asks the screen to show the first one again
+ */
+function _fgDiscard(list, label, show) {
+  const tabs = fgTabs();
+  const gone = list.map(t => ({ t, i: tabs.indexOf(t) })).filter(x => x.i !== -1).sort((a, b) => a.i - b.i);
+  for (let k = gone.length - 1; k >= 0; k--) tabs.splice(gone[k].i, 1);
+  if (!gone.length || typeof pushUndo !== 'function') return;
+  pushUndo(label, () => {
+    const now = fgTabs();
+    let back = 0;
+    gone.forEach(({ t, i }) => {
+      if (now.some(x => x.id === t.id)) return;
+      if (/^scratch-\d+$/.test(t.name) && now.some(x => x.name === t.name)) t.name = fgNextName();
+      t.shelved = false;
+      now.splice(Math.min(i, now.length), 0, t);
+      back++;
+    });
+    if (!back) return;
+    if (typeof saveData === 'function') saveData();
+    if (typeof fgOnStoreChanged === 'function') fgOnStoreChanged(show ? gone[0].t.id : null);
+  });
+}
+
+/**
+ * Close a tab. A kept one goes on the shelf; one never kept is discarded,
+ * with an Undo. If it was the active one, its open neighbour takes over; with
+ * no open tab left a new one is made first, so the strip is never empty.
  * @returns {string|null} the id that is active now
  */
 function fgCloseTab(id) {
   const t = fgFindTab(id);
-  if (!t) return fgStore().activeId;
+  const s = fgStore();
+  if (!t) return s.activeId;
   const open = fgOpenTabs();
   const at = open.indexOf(t);
-  t.shelved = true;
-  t.pinned = false;
-  t.updatedAt = Date.now();
-  const s = fgStore();
+  const rest = open.filter(x => x !== t);
   if (s.activeId === id) {
-    const rest = fgOpenTabs();
     const next = rest[Math.min(Math.max(at, 0), rest.length - 1)] || null;
     s.activeId = next ? next.id : null;
-    if (!next) fgNewTab({});
+    // Made before the old one goes, so it does not take the old one's name.
+    if (!next && fgTabs().length < FG_LIMITS.tabs) fgNewTab({});
   }
+  if (t.kept) {
+    t.shelved = true;
+    t.pinned = false;
+    t.updatedAt = Date.now();
+  } else {
+    _fgDiscard([t], 'Closed "' + t.name + '" (not on the shelf)', true);
+  }
+  // At the limit there was no room until the old one went.
+  if (!s.activeId || !fgFindTab(s.activeId) || fgFindTab(s.activeId).shelved) fgNewTab({});
   if (typeof saveData === 'function') saveData();
   return s.activeId;
 }
@@ -183,11 +262,180 @@ function fgReopenTab(id) {
   return true;
 }
 
-/** Shelve every open, unpinned tab except `keepId`. */
+/** Close every open, unpinned tab except `keepId`: kept ones to the shelf, the rest discarded (one Undo). */
 function fgCloseOthers(keepId) {
-  fgOpenTabs().forEach(t => { if (t.id !== keepId && !t.pinned) { t.shelved = true; t.updatedAt = Date.now(); } });
+  const others = fgOpenTabs().filter(t => t.id !== keepId && !t.pinned);
+  const now = Date.now();
+  others.forEach(t => { if (t.kept) { t.shelved = true; t.updatedAt = now; } });
+  const drop = others.filter(t => !t.kept);
+  if (drop.length) {
+    _fgDiscard(drop, drop.length === 1 ? 'Closed "' + drop[0].name + '" (not on the shelf)'
+      : 'Closed ' + drop.length + ' freegrounds not on the shelf');
+  }
   fgStore().activeId = keepId;
   if (typeof saveData === 'function') saveData();
+  return drop.length;
+}
+
+/* ── Keeping and categories ───────────────────────────────── */
+
+/** Mark a tab kept, in category `catId` (null, or one that is gone: no category). */
+function fgKeepTab(id, catId) {
+  const t = fgFindTab(id);
+  if (!t) return false;
+  t.kept = true;
+  t.catId = catId && fgFindCat(catId) ? catId : null;
+  t.updatedAt = Date.now();
+  if (typeof saveData === 'function') saveData();
+  return true;
+}
+
+/** Off the shelf: an ordinary open scratch again, discarded when closed. */
+function fgUnkeepTab(id) {
+  const t = fgFindTab(id);
+  if (!t) return false;
+  t.kept = false;
+  t.catId = null;
+  t.shelved = false;
+  if (typeof saveData === 'function') saveData();
+  return true;
+}
+
+function fgCats() {
+  const s = fgStore();
+  if (!Array.isArray(s.cats)) s.cats = [];
+  return s.cats;
+}
+
+function fgFindCat(id) { return id ? (fgCats().find(c => c.id === id) || null) : null; }
+
+/** The category and its parents, top first. Stops at a loop or a missing parent. */
+function fgCatPath(id) {
+  const out = [];
+  const seen = new Set();
+  let c = fgFindCat(id);
+  while (c && !seen.has(c.id)) {
+    seen.add(c.id);
+    out.unshift(c);
+    c = fgFindCat(c.parentId);
+  }
+  return out;
+}
+
+/** "Arrays / Sorting", or '' for no category. */
+function fgCatLabel(id) { return fgCatPath(id).map(c => c.name).join(' / '); }
+
+/** A new category under `parentId` (null: at the top). Null for a blank name or at a limit. */
+function fgNewCat(name, parentId) {
+  const clean = fgCleanName(name);
+  if (!clean) return null;
+  if (fgCats().length >= FG_LIMITS.cats) {
+    _fgNote('The shelf has ' + FG_LIMITS.cats + ' categories, the most there can be.');
+    return null;
+  }
+  const parent = fgFindCat(parentId);
+  if (parent && fgCatPath(parent.id).length >= FG_LIMITS.catDepth) {
+    _fgNote('Categories go ' + FG_LIMITS.catDepth + ' levels deep at most.');
+    return null;
+  }
+  const cat = { id: generateId(), name: clean, parentId: parent ? parent.id : null };
+  fgCats().push(cat);
+  if (typeof saveData === 'function') saveData();
+  return cat;
+}
+
+function fgRenameCat(id, name) {
+  const c = fgFindCat(id);
+  const clean = fgCleanName(name);
+  if (!c || !clean) return false;
+  if (c.name !== clean) { c.name = clean; if (typeof saveData === 'function') saveData(); }
+  return true;
+}
+
+/** Delete a category. What it held (subcategories and scratches) moves up to its parent. Undo puts it all back. */
+function fgDeleteCat(id) {
+  const cats = fgCats();
+  const i = cats.findIndex(c => c.id === id);
+  if (i === -1) return false;
+  const cat = cats[i];
+  const up = fgFindCat(cat.parentId) ? cat.parentId : null;
+  const kidCats = cats.filter(c => c.parentId === id).map(c => c.id);
+  const kidTabs = fgTabs().filter(t => t.catId === id).map(t => t.id);
+  kidCats.forEach(k => { fgFindCat(k).parentId = up; });
+  kidTabs.forEach(k => { fgFindTab(k).catId = up; });
+  cats.splice(i, 1);
+  if (typeof saveData === 'function') saveData();
+  if (typeof pushUndo === 'function') {
+    pushUndo('Delete category "' + cat.name + '"', () => {
+      if (fgFindCat(id)) return;
+      fgCats().splice(Math.min(i, fgCats().length), 0, cat);
+      kidCats.forEach(k => { const c = fgFindCat(k); if (c) c.parentId = id; });
+      kidTabs.forEach(k => { const t = fgFindTab(k); if (t) t.catId = id; });
+      if (typeof saveData === 'function') saveData();
+      if (typeof fgOnStoreChanged === 'function') fgOnStoreChanged(null);
+    });
+  }
+  return true;
+}
+
+/** Does a tab's name or code contain `q` (already lower case)? */
+function fgTabMatches(t, q) {
+  return !q || String(t.name || '').toLowerCase().includes(q)
+    || (t.files || []).some(f => String(f.code || '').toLowerCase().includes(q));
+}
+
+/**
+ * The shelf as rows to draw: each category (natural name order), then what is
+ * inside it if it is open (subcategories, then its scratches newest first),
+ * then the scratches with no category. Only kept tabs.
+ * With a search: every kept tab that matches, flat, with its category's path.
+ * @param {Set<string>} openSet  ids of the categories folded open
+ * @param {string} query
+ * @returns {Array<{kind:'cat', cat, depth, count, open} | {kind:'tab', tab, depth, path}>}
+ */
+function fgShelfRows(openSet, query) {
+  const open = openSet instanceof Set ? openSet : new Set(openSet || []);
+  const recent = (a, b) => (b.updatedAt || 0) - (a.updatedAt || 0);
+  const kept = fgTabs().filter(t => t.kept);
+  const q = String(query || '').trim().toLowerCase();
+  if (q) {
+    return kept.filter(t => fgTabMatches(t, q)).sort(recent)
+      .map(t => ({ kind: 'tab', tab: t, depth: 0, path: fgCatLabel(t.catId) }));
+  }
+  const cats = fgCats();
+  const byName = (a, b) => String(a.name).localeCompare(String(b.name), undefined, { numeric: true, sensitivity: 'base' });
+  const kids = (pid) => cats.filter(c => (fgFindCat(c.parentId) ? c.parentId : null) === pid).sort(byName);
+  const tabsIn = (cid) => kept.filter(t => (fgFindCat(t.catId) ? t.catId : null) === cid).sort(recent);
+  const seen = new Set();
+  const count = (c, path) => {
+    if (path.has(c.id)) return 0;
+    path.add(c.id);
+    const n = tabsIn(c.id).length + kids(c.id).reduce((s, k) => s + count(k, path), 0);
+    path.delete(c.id);
+    return n;
+  };
+  const rows = [];
+  const walk = (c, depth) => {
+    if (seen.has(c.id)) return;
+    seen.add(c.id);
+    const isOpen = open.has(c.id);
+    rows.push({ kind: 'cat', cat: c, depth, count: count(c, new Set()), open: isOpen });
+    if (!isOpen) { kids(c.id).forEach(k => _fgMarkSeen(k, seen, kids)); return; }
+    kids(c.id).forEach(k => walk(k, depth + 1));
+    tabsIn(c.id).forEach(t => rows.push({ kind: 'tab', tab: t, depth: depth + 1, path: '' }));
+  };
+  kids(null).forEach(c => walk(c, 0));
+  // A loop in a damaged save leaves categories no top one reaches: show them at the top.
+  cats.filter(c => !seen.has(c.id)).sort(byName).forEach(c => walk(c, 0));
+  tabsIn(null).forEach(t => rows.push({ kind: 'tab', tab: t, depth: 0, path: '' }));
+  return rows;
+}
+
+/* A folded category's subcategories are reached, just not drawn. */
+function _fgMarkSeen(c, seen, kids) {
+  if (seen.has(c.id)) return;
+  seen.add(c.id);
+  kids(c.id).forEach(k => _fgMarkSeen(k, seen, kids));
 }
 
 /** Delete for good, with an Undo that puts it back where it was. */
@@ -204,6 +452,7 @@ function fgDeleteTab(id) {
   if (typeof saveData === 'function') saveData();
   if (typeof pushUndo === 'function') {
     pushUndo('Delete freeground "' + gone.name + '"', () => {
+      if (fgFindTab(gone.id)) return;
       fgTabs().splice(Math.min(i, fgTabs().length), 0, gone);
       if (typeof saveData === 'function') saveData();
       if (typeof fgOnStoreChanged === 'function') fgOnStoreChanged();

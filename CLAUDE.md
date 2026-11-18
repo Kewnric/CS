@@ -239,6 +239,12 @@ that the starter does not have).
   has no DOM, so the replay re-runs it over the recorded keys. Screen preferences are per
   device in `ssp.typeConfig`.
 - **Wings** (`js/wings/`) — newer libraries sharing a schema-driven core.
+- **Freeground** (`js/freeground.js` rules, no DOM; `js/routes/route-freeground.js` screen) — scratch
+  tabs. Only a **kept** tab (Save to shelf: topbar button, Alt+S, tab menu) survives closing; closing an
+  unkept one discards it with an Undo. The shelf is a tree of categories (`state.freeground.cats`, 8 deep,
+  100 at most) in the Ctrl+P list; which are folded open is per device (`ssp.fg.fold`, not synced). A store
+  without `ver: 2` is migrated when first read (`_fgMigrate`), so `ver` must never go in train-store's empty
+  value. After any change: `node tools/test-freeground.js`.
 
 **Tree bullets and the order lock** (`js/tree-dnd.js`, every tree that commits through
 `treeCommit`: Coding, Notebooks, Snippets, Visualize, Brain). Right-click a row → "Bullets for
