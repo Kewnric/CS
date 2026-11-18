@@ -347,6 +347,16 @@
 
   </div>
 
+  <!-- Cloud sync state, just above the gear; shown only while signed in.
+       firebase-auth.js _paintSyncFab sets data-state; CSS picks the icon. -->
+  <button id="sync-fab" class="sync-fab hidden" onclick="manualCloudSave()" onmouseenter="_paintSyncFab()" type="button"
+    data-state="synced" title="All synced" aria-label="Cloud sync: all synced">
+    <i data-lucide="cloud" class="sf-i sf-i-cloud" aria-hidden="true"></i>
+    <i data-lucide="refresh-cw" class="sf-i sf-i-saving" aria-hidden="true"></i>
+    <i data-lucide="cloud-off" class="sf-i sf-i-off" aria-hidden="true"></i>
+    <span class="sf-dot" aria-hidden="true"></span>
+  </button>
+
   <!-- Floating settings button (bottom-right) -->
   <button id="settings-fab" class="settings-fab" onclick="openSettingsModal()" type="button" title="Settings"
     aria-label="Open settings" aria-haspopup="dialog">

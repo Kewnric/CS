@@ -73,6 +73,10 @@ let _cloudIsDirty = false;
 let _cloudIsSaving = false;
 let _lastCloudSaveAt = null;
 let _cloudSaveTimer = null;
+// Why the last save failed ('' once one works), and whether that run of
+// failures has had its one popup. Successes pop nothing up: the sync icon says.
+let _cloudLastError = '';
+let _cloudErrorToasted = false;
 const CLOUD_SAVE_DEBOUNCE_MS = 5000; // auto-save 5s after last change
 
 // Multi-tab coordination via BroadcastChannel
@@ -107,6 +111,7 @@ async function manualCloudSave() {
     showCloudToast('Sign in to save to cloud', true);
     return;
   }
+  _cloudErrorToasted = false;   // asked for: a failure this time says so
   await flushCloudNow();
 }
 
@@ -1500,8 +1505,9 @@ async function saveToFirestore(uid) {
     _cloudIsSaving = false;
     _lastCloudSaveAt = Date.now();
     _cloudBaseline = _lastCloudSaveAt;
+    _cloudLastError = '';
+    _cloudErrorToasted = false;
     _updateCloudStatusUI();
-    showCloudToast('Saved to cloud');
     // Then the pictures the library uses, each its own document (js/media-store.js).
     if (typeof mediaCloudPush === 'function') mediaCloudPush(uid).catch(() => {});
     // Notify other tabs that cloud data changed
@@ -1546,7 +1552,9 @@ async function saveToFirestore(uid) {
         }
       }
     }
-    showCloudToast(msg, true);
+    _cloudLastError = msg;
+    _updateCloudStatusUI();
+    if (!_cloudErrorToasted) { _cloudErrorToasted = true; showCloudToast(msg, true); }
     return false;
   }
 }
@@ -1676,10 +1684,31 @@ function updateCloudUserBadge() {
     _updateCloudStatusUI();
   } else {
     badge.classList.add('hidden');
+    _paintSyncFab();
   }
 }
 
+/** The sync icon above the gear: hidden unless signed in; data-state picks
+    the icon and dot (components.css), the title says when or why. */
+function _paintSyncFab() {
+  const btn = document.getElementById('sync-fab');
+  if (!btn) return;
+  const on = storageMode === 'online' && !!currentFirebaseUser;
+  btn.classList.toggle('hidden', !on);
+  if (!on) return;
+  let st, label;
+  if (_cloudIsSaving) { st = 'saving'; label = 'Saving to the cloud...'; }
+  else if (navigator.onLine === false) { st = 'offline'; label = 'Offline. Changes stay on this device and sync when you are back online.'; }
+  else if (_cloudLastError) { st = 'error'; label = 'Last save failed: ' + _cloudLastError + ' Click to try again.'; }
+  else if (_cloudIsDirty) { st = 'dirty'; label = 'Changes waiting to sync. Click to save now.'; }
+  else { st = 'synced'; label = (_lastCloudSaveAt ? 'Synced ' + _agoText(_lastCloudSaveAt) : 'All synced') + '. Click to save now.'; }
+  if (btn.dataset.state !== st) btn.dataset.state = st;
+  btn.title = label;
+  btn.setAttribute('aria-label', 'Cloud sync: ' + label);
+}
+
 function _updateCloudStatusUI() {
+  _paintSyncFab();
   const dot = document.getElementById('cu-status-dot');
   const txt = document.getElementById('cu-status-text');
   const btn = document.getElementById('cu-save-btn');
