@@ -1614,7 +1614,9 @@ function scheduleCloudSave() {
   if (storageMode === 'online' && currentFirebaseUser) {
     clearTimeout(_cloudSaveTimer);
     _cloudSaveTimer = setTimeout(() => {
-      if (_cloudIsDirty && !_cloudIsSaving) flushCloudNow();
+      // Offline, the write would only time out after a minute and report a
+      // failure; it waits for the 'online' event instead (_flushIfWaiting).
+      if (_cloudIsDirty && !_cloudIsSaving && navigator.onLine !== false) flushCloudNow();
     }, CLOUD_SAVE_DEBOUNCE_MS);
   }
 }
@@ -1622,6 +1624,21 @@ function scheduleCloudSave() {
 /** Run `fn` with cloud-save suppression — useful during init flows where
  *  helpers like vizAutoPopulate or checkDailyReset call saveData/vizSave/etc
  *  but no real user change has occurred yet. */
+/* Saving when it matters. Hiding the tab is the last moment a phone reliably
+   runs the page, and state.js has just written everything locally and marked
+   it unsaved (its listener runs first: it loads first), so the cloud save
+   goes now, not after the 5 s delay. Back online, whatever waited goes up. */
+function _flushIfWaiting() {
+  if (storageMode !== 'online' || !currentFirebaseUser) return;
+  if (!_cloudIsDirty || _cloudIsSaving || _suppressCloudSave || navigator.onLine === false) return;
+  clearTimeout(_cloudSaveTimer);
+  _cloudSaveTimer = null;
+  flushCloudNow();
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') _flushIfWaiting(); });
+window.addEventListener('online', () => { _paintSyncFab(); _flushIfWaiting(); });
+window.addEventListener('offline', () => _paintSyncFab());
+
 function withCloudSaveSuppressed(fn) {
   const prev = _suppressCloudSave;
   _suppressCloudSave = true;
