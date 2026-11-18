@@ -56,17 +56,12 @@ function csLoad() {
   try { const v = localStorage.getItem('csView'); if (v === 'list' || v === 'grid') cs.view = v; } catch (e) { /* none */ }
   try {
     const key = csKey();
-    let raw = _csRead(key);
-    // One-time carry-over: the library used to be shared by both modes. An
-    // online account reading for the first time inherits what was there
-    // rather than opening onto an empty shelf.
-    if (!raw && key !== 'cheatsheetLibrary') {
-      const shared = _csRead('cheatsheetLibrary');
-      if (shared && shared.sheets && shared.sheets.length) {
-        raw = shared;
-        try { localStorage.setItem(key, JSON.stringify({ sheets: shared.sheets })); } catch (e) { /* full */ }
-      }
-    }
+    const raw = _csRead(key);
+    /* There used to be a carry-over here: a cloud account with no sheets of
+       its own yet took Guest's (from when both modes shared one library). It
+       made every NEW account start with Guest's cheat sheets, and upload them
+       to its cloud. An account's sheets come from its cloud (firebase-auth.js
+       _restoreCheatSheets); Guest's stay Guest's. */
     cs.sheets = (raw && raw.sheets) || [];
   } catch (e) { cs.sheets = []; }
 }

@@ -27,6 +27,7 @@ const STO_GROUPS = [
   [/^(vizCanvasData|brainCanvasData)/, 'Visualize boards'],
   [/^questBoardData/, 'Quest Board'],
   [/^cheatsheetLibrary/, 'Cheat sheets'],
+  [/^ssp\.profile\./, 'Other profiles\' attempts in progress'],   // parked by js/profile-keys.js
   [/(draft|inprogress)/i, 'Attempts in progress'],
   [/^ssp\.stickers/, 'Sticker placements'],
 ];

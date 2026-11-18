@@ -3,8 +3,11 @@
    ============================================================ */
 
 // ── State ─────────────────────────────────────────────────────
-let questState = {
-  player: {
+/** A new player. Also what a profile switch resets to (firebase-auth.js
+ *  _flushAllInMemoryDomains), so no field of one profile's player is left
+ *  for the next. */
+function questPlayerDefaults() {
+  return {
     level: 1,
     xp: 0,
     job: 'Shadow Monarch',
@@ -17,7 +20,11 @@ let questState = {
        stay worth something or breaking it means nothing. */
     freezes: 0,
     lastDailyCompleted: null
-  },
+  };
+}
+
+let questState = {
+  player: questPlayerDefaults(),
   quests: [],
   activeTab: 'active',
   activeQuestId: null,

@@ -262,6 +262,8 @@ async function acctSubmit(ev) {
     if (pass.length < 8) { lpError(ACCT_ERRORS['auth/weak-password']); return; }
     if (pass !== pass2) { lpError(ACCT_ERRORS['ssp/mismatch']); return; }
   }
+  // From inside the app, leaving the account in use first settles its unsaved changes (firebase-auth.js).
+  if (typeof authLeaveAccountOk === 'function' && !(await authLeaveAccountOk())) return;
   _lpBusy = true;
   try {
     if (_lpTab === 'create') await acctRegister(user, pass);

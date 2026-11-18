@@ -216,7 +216,9 @@ const FB_READS_PACKED = true;
 /** What is already on this device, so the choice isn't blind. */
 function _localDataSummary() {
   let raw = null;
-  try { raw = localStorage.getItem(typeof getAppStorageKey === 'function' ? getAppStorageKey() : 'appData'); }
+  // Guest's own library, whatever mode the tab is in: opened from inside a
+  // cloud session, the mode's key counted the ACCOUNT's programs under Guest.
+  try { raw = localStorage.getItem('codePlatformData'); }
   catch (e) { return null; }
   if (!raw) return null;
   try {
@@ -412,10 +414,12 @@ function applyPendingShare() {
 /* ---------- Choose Local ---------- */
 
 function chooseLocalMode() {
+  if (_appBooted) { _switchToGuestHere(); return; }
   storageMode = 'local';
   sessionStorage.setItem('storageMode', 'local');
   authSetRemembered(_pickerRemember() ? 'local' : null);
   hideStorageModePicker();
+  if (typeof profileKeysEnter === 'function') profileKeysEnter('guest');   // Guest's own drafts (profile-keys.js)
   _flushAllInMemoryDomains();
   loadData();
   if (typeof repairDataIntegrity === 'function') repairDataIntegrity();
@@ -424,10 +428,71 @@ function chooseLocalMode() {
   // (with their saved positions) instead of an empty array.
   if (typeof vizLoad === 'function') vizLoad();
   if (typeof brainLoad === 'function') brainLoad();
+  /* The flush above emptied the Quest Board and the cheat sheets too, and
+     loadData reads neither: the board stayed empty, at level 1, until the
+     Quest Board page was opened, and the first XP or penalty in between
+     saved that empty board over Guest's real one. */
+  withCloudSaveSuppressed(() => {
+    try { if (typeof loadQuestData === 'function') loadQuestData(); } catch (e) { console.warn('[Guest] quest board:', e); }
+    try { if (typeof csLoad === 'function') csLoad(); } catch (e) { /* the cheat-sheet page reads them itself */ }
+  });
   _rerenderActiveRoute();
   finishBoot();
   // Navigate home so the user sees fresh local data, same as Google sign-in flow
   if (typeof spaNavigate === 'function') spaNavigate('home');
+}
+
+/* ---------- Changing profile from inside the app ----------
+   "Change Storage Mode" opens the login page over an app that is already
+   running one profile. Every module keeps what it loaded in memory, and much
+   of it outlived _flushAllInMemoryDomains: the last profile's cheat sheets,
+   typing items, wings, language words, quest player, a cloud save already on
+   its timer (which then wrote into the NEXT account). So a switch made from
+   inside the app ends by reloading the page into the new profile -- the boot
+   path starts from nothing -- and leaving an account is a sign-out of it on
+   this device, with the same question about unsaved changes. */
+
+/** Before this tab leaves its signed-in account: unsaved cloud changes are saved, let go, or the switch is called off. */
+async function authLeaveAccountOk() {
+  if (!_appBooted || storageMode !== 'online' || !currentFirebaseUser) return true;
+  if (!_cloudIsDirty && !_cloudIsSaving) return true;
+  return await _confirmUnsavedSignOut();
+}
+
+/** The account's copies leave this device, as on sign-out: its library cache and its drafts. */
+function _forgetAccountHere(uid) {
+  _wipeOnlineCaches();
+  if (uid && typeof profileKeysDrop === 'function') profileKeysDrop('u:' + uid);
+}
+
+/** Start the tab again in `mode`, with nothing of the profile before it in memory or in the tab's session. */
+function _reloadInto(mode) {
+  clearTimeout(_cloudSaveTimer);
+  _cloudSaveTimer = null;
+  _cloudIsDirty = false;      // settled by authLeaveAccountOk; the unload guard must not ask again
+  _cloudIsSaving = false;
+  let share = null;
+  try { share = sessionStorage.getItem(PENDING_SHARE_KEY); sessionStorage.clear(); } catch (e) { /* blocked */ }
+  try {
+    if (share) sessionStorage.setItem(PENDING_SHARE_KEY, share);
+    sessionStorage.setItem('storageMode', mode);
+  } catch (e) { /* blocked: the picker asks again */ }
+  window.location.reload();
+}
+
+async function _switchToGuestHere() {
+  if (storageMode === 'local') {           // Guest already: nothing changes hands
+    authSetRemembered(_pickerRemember() ? 'local' : null);
+    hideStorageModePicker();
+    return;
+  }
+  if (!(await authLeaveAccountOk())) return;
+  const uid = currentFirebaseUser && currentFirebaseUser.uid;
+  try { await fbAuth.signOut(); } catch (e) { console.warn('[Firebase] Sign-out before Guest failed:', e); }
+  currentFirebaseUser = null;
+  _forgetAccountHere(uid);
+  authSetRemembered(_pickerRemember() ? 'local' : null);
+  _reloadInto('local');
 }
 
 /* ---------- Choose Online (Google Sign-In) ---------- */
@@ -439,6 +504,7 @@ async function chooseOnlineMode() {
     showCloudToast(AUTH_ERRORS['ssp/offline'], true);
     return;
   }
+  if (!(await authLeaveAccountOk())) return;
 
   _resetSigninProgress();
   _showSigninLoadingView();
@@ -494,6 +560,7 @@ function _failSignin(err) {
 
 /** Shared tail of every successful sign-in: popup, redirect, or restored. */
 async function _afterSignedIn(user) {
+  if (_appBooted) { _afterSignedInHere(user); return; }
   _signinProgressTo(65, 'Authenticating user...');
   currentFirebaseUser = user;
   storageMode = 'online';
@@ -513,6 +580,23 @@ async function _afterSignedIn(user) {
     showCloudToast('Signed in as ' + (user.displayName || user.email));
     if (typeof spaNavigate === 'function') spaNavigate('home');
   }, 380);
+}
+
+/** A sign-in made from inside the app (see "Changing profile" above). */
+function _afterSignedInHere(user) {
+  if (storageMode === 'online' && currentFirebaseUser && currentFirebaseUser.uid === user.uid) {
+    // The same account again: nothing changes hands.
+    currentFirebaseUser = user;
+    if (_pickerRemember()) authSetRemembered('online');
+    hideStorageModePicker();
+    _showSigninChooseView();
+    return;
+  }
+  _signinProgressTo(80, 'Opening your save file...');
+  if (storageMode === 'online' && currentFirebaseUser) _forgetAccountHere(currentFirebaseUser.uid);
+  if (_pickerRemember()) authSetRemembered('online');
+  // Firebase keeps the new sign-in across the reload; bootApp restores it.
+  _reloadInto('online');
 }
 
 /** Completes a redirect sign-in after the page reloads. Called from bootApp. */
@@ -545,7 +629,14 @@ async function loadFromFirestore(uid) {
   // schedule unwanted uploads back to Firestore on every sign-in.
   const __prevSuppress = _suppressCloudSave;
   _suppressCloudSave = true;
+  // A save still waiting on its timer belongs to whoever was in before, and
+  // the stamp it is checked against is theirs.
+  clearTimeout(_cloudSaveTimer);
+  _cloudSaveTimer = null;
+  _cloudBaseline = 0;
   try {
+    _claimOnlineCaches(uid);
+    if (typeof profileKeysEnter === 'function') profileKeysEnter('u:' + uid);   // this account's drafts (profile-keys.js)
     _flushAllInMemoryDomains();
 
     const rootDoc = await fbDb.collection('users').doc(uid).get();
@@ -583,6 +674,7 @@ async function loadFromFirestore(uid) {
     } else {
       console.log('[Firebase] No cloud data for this account. Seeding defaults.');
       seedDefaultData();
+      _restoreCheatSheets([]);   // a new account starts with none, not with what memory held
       _cacheAllToLocalStorage();
       await saveToFirestore(uid);
     }
@@ -593,7 +685,8 @@ async function loadFromFirestore(uid) {
     // must NOT do after an account switch clears localStorage. If the cache has
     // data for this account, restore it; otherwise leave state as-is (empty from
     // _flushAllInMemoryDomains) so there is nothing to accidentally save over
-    // the user's real cloud data.
+    // the user's real cloud data. The cache is this account's: _claimOnlineCaches
+    // emptied it above if it was anyone else's.
     try {
       const cached = localStorage.getItem(getAppStorageKey());
       if (cached) {
@@ -937,6 +1030,28 @@ function _flushAllInMemoryDomains() {
   state.sessionData = null;
   state.timeLimit = 0;
   state.lastDiffs = [];
+  /* Everything else a profile owns. These were left as they were, so an
+     account with no cloud copy yet (a new one) was seeded with the previous
+     profile's coding sets, typing items, wings, language words, deadlines,
+     events and histories, and saved them to its own cloud. */
+  state.codingSets = [];
+  state.codingStash = null;
+  state.codingPackLayout = 0;
+  state.review = {};
+  state.deadlines = {};
+  state.events = [];
+  state.mistakes = [];
+  state.snippetHistory = [];
+  state.langWords = [];
+  state.langSets = [];
+  state.langScenarios = [];
+  state.langHistory = [];
+  state.langRun = null;
+  state.typeItems = [];
+  state.typeHistory = [];
+  state.wings = {};
+  // The cheat sheets live outside `state` (cheatsheet.js) and go up with the app document.
+  if (typeof cs !== 'undefined' && cs) { cs.sheets = []; cs.openId = null; }
 
   // Viz canvas
   if (typeof viz !== 'undefined') {
@@ -964,15 +1079,45 @@ function _flushAllInMemoryDomains() {
     brain.links = [];
   }
 
-  // Quests
+  // Quests: the whole player. Only xp and level were reset (and a `streakDays`
+  // the player does not have), so streak, best streak, completed count, title
+  // and freezes carried into the next profile.
   if (typeof questState !== 'undefined') {
     questState.quests = [];
-    if (questState.player) {
-      questState.player.xp = 0;
-      questState.player.level = 1;
-      questState.player.streakDays = 0;
-    }
+    if (typeof questPlayerDefaults === 'function') questState.player = questPlayerDefaults();
+    else if (questState.player) { questState.player.xp = 0; questState.player.level = 1; }
   }
+}
+
+/* ============================================================
+   THE CLOUD-MODE CACHES BELONG TO ONE ACCOUNT
+   ------------------------------------------------------------
+   The *_online keys are one slot, not one per account. Sign-out empties
+   it, but a tab closed while signed in does not, and the next account in
+   then had the last one's library as its "cache": the fallback when its
+   cloud load failed, and the unsaved Freeground typing. ssp.onlineOwner
+   names the account the slot holds; anyone else finds it empty.
+   ============================================================ */
+const ONLINE_OWNER_KEY = 'ssp.onlineOwner';
+const ONLINE_CACHE_KEYS = [
+  'codePlatformData_online', 'vizCanvasData_online', 'brainCanvasData_online',
+  'questBoardData_online', 'cheatsheetLibrary_online', 'ssp.fg.buffer_online'
+];
+
+/** Empty the cloud-mode slot. Never the mode's key by name: in a tab that has not been
+ *  told it is online, getAppStorageKey() is Guest's library. */
+function _wipeOnlineCaches() {
+  ONLINE_CACHE_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch (e) { /* blocked */ } });
+  try { localStorage.removeItem(ONLINE_OWNER_KEY); } catch (e) { /* blocked */ }
+}
+
+/** The slot is about to hold `uid`'s library: anyone else's goes first. */
+function _claimOnlineCaches(uid) {
+  let owner = null;
+  try { owner = localStorage.getItem(ONLINE_OWNER_KEY); } catch (e) { return; }
+  if (owner === uid) return;
+  _wipeOnlineCaches();
+  try { localStorage.setItem(ONLINE_OWNER_KEY, uid); } catch (e) { /* full: claimed again next time */ }
 }
 
 /** Write all current domains to localStorage caches (skips cloud upload). */
@@ -1073,8 +1218,11 @@ function _fromFirestore(v) {
    which panels are folded, Spotify's tokens and the remember-me choice (a
    key and a device decision), the media caches, the login picture, the
    Freeground buffer, per-account welcome flags, stickers (their pictures
-   are on this device only) and the glass speed probe. Add a new key here
-   only if it is the person's data or taste, not this screen's layout.
+   are on this device only; each profile keeps its own, js/stickers.js) and
+   the glass speed probe. Add a new key here only if it is the person's data
+   or taste, not this screen's layout. A key that is the person's DATA
+   (not taste) also goes on PROFILE_OWNED_KEYS (js/profile-keys.js), or one
+   profile's values are what the next one signed in here starts with.
    docs/superpowers/specs/2026-11-18-cloud-sync-icon-design.md
    ============================================================ */
 const SYNC_PREF_KEYS = [
@@ -1616,7 +1764,8 @@ function scheduleCloudSave() {
     _cloudSaveTimer = setTimeout(() => {
       // Offline, the write would only time out after a minute and report a
       // failure; it waits for the 'online' event instead (_flushIfWaiting).
-      if (_cloudIsDirty && !_cloudIsSaving && navigator.onLine !== false) flushCloudNow();
+      // Not while an account is being loaded: memory is half one account, half nothing.
+      if (_cloudIsDirty && !_cloudIsSaving && !_suppressCloudSave && navigator.onLine !== false) flushCloudNow();
     }, CLOUD_SAVE_DEBOUNCE_MS);
   }
 }
@@ -1846,20 +1995,19 @@ function _showThreeButtonDialog(title, message, actions, onChoice) {
 
 async function _doSignOut() {
   try {
+    const uid = currentFirebaseUser && currentFirebaseUser.uid;
     await fbAuth.signOut();
     currentFirebaseUser = null;
     storageMode = null;
     sessionStorage.removeItem('storageMode');
     localStorage.removeItem('storageMode'); // clean up legacy key from older builds
 
-    // Wipe ALL cached cloud data from localStorage so next sign-in starts clean
-    localStorage.removeItem(getAppStorageKey());
-    localStorage.removeItem('codePlatformData_online');
-    localStorage.removeItem('vizCanvasData_online');
-    localStorage.removeItem('brainCanvasData_online');
-    localStorage.removeItem('questBoardData_online');
-    localStorage.removeItem('cheatsheetLibrary_online');
-    localStorage.removeItem('ssp.fg.buffer_online');   // Freeground's unsaved typing
+    /* Wipe ALL cached cloud data from localStorage so next sign-in starts
+       clean, and this account's drafts (profile-keys.js). By name: this used
+       to remove getAppStorageKey() as well, which in a tab restored by
+       "Remember me" (where the mode was never stored for the tab) was
+       GUEST's library. */
+    _forgetAccountHere(uid);
 
     // Also wipe sessionStorage so nothing carries over to the next account
     try { sessionStorage.clear(); } catch (e) {}
@@ -1943,6 +2091,9 @@ async function bootApp() {
 
   if (savedMode === 'local') {
     storageMode = 'local';
+    // "Remember me" brings a new browser session straight here; the tab must know its mode too.
+    try { sessionStorage.setItem('storageMode', 'local'); } catch (e) { /* blocked: Guest is the default anyway */ }
+    if (typeof profileKeysEnter === 'function') profileKeysEnter('guest');
     loadData();
     if (typeof repairDataIntegrity === 'function') repairDataIntegrity();
     finishBoot();
@@ -1960,6 +2111,11 @@ async function bootApp() {
       unsub();
       if (user) {
         currentFirebaseUser = user;
+        /* Every get*StorageKey() reads the mode from the TAB's session. A new
+           browser session restored by "Remember me" comes here with none, so
+           the account's library was cached into Guest's keys, its saves went
+           there, and signing out deleted Guest's library. */
+        try { sessionStorage.setItem('storageMode', 'online'); } catch (e) { /* blocked */ }
         updateCloudUserBadge();
         _signinProgressTo(70, 'Syncing cloud data...');
         await loadFromFirestore(user.uid);

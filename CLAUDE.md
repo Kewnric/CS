@@ -351,6 +351,19 @@ marks correct work wrong, silently.
   recovery email (sidebar account card → `acctOpenRecovery`): the account moves to it, and `usernames/<name>`
   keeps it AES-GCM-encrypted with a PBKDF2 key from the password (needs the Firestore rule in the file's header).
   Tests stub `fbAuth.*`, `loadFromFirestore` and `_acctLookup`; never create real accounts.
+- **Profiles on one device** (Guest and each account). Nothing of one may show in, or be saved into,
+  another. (1) The `*_online` keys are one slot: `ssp.onlineOwner` names its account, and
+  `loadFromFirestore` empties it for anyone else (`_claimOnlineCaches`); sign-out removes those keys
+  BY NAME (`_wipeOnlineCaches`) -- never `getAppStorageKey()`, which is Guest's library in a tab that
+  was not told its mode. Every boot path stores the tab's mode in sessionStorage (all `get*StorageKey`
+  read it there; "Remember me" restores used to skip it). (2) Device-kept data that is the person's
+  (drafts, `anSrsState`, `editorLineMarks`, `demoSeenLessons`, `ssp.actionUse`) is
+  `PROFILE_OWNED_KEYS` in `js/profile-keys.js`: `ssp.profileOwner` says whose values the keys hold,
+  entering another profile parks them in `ssp.profile.<id>`, sign-out drops the account's. Taste and
+  layout stay the device's. (3) Switching profile from inside the app (Change Storage Mode) asks about
+  unsaved changes (`authLeaveAccountOk`), signs the old account out of the device and RELOADS into the
+  new one (`_reloadInto`): memory is never carried across. `_flushAllInMemoryDomains` still clears every
+  field a profile owns, for the boot-time picker. `node tools/test-profiles.js`.
 - **Status Window** (`js/status-window.js`, `css/status-window.css`): from `finishBoot`; full the first time per
   account (`ssp.welcome.seen.<key>`), brief once a day (`ssp.welcome.day.<key>`). Skipped under
   `navigator.webdriver` unless `ssp.welcome.test` is set, so it never covers what other tests click.
@@ -480,9 +493,16 @@ multi-problem, SQL, notebook), or Alt+Shift+S anywhere.
   pane's size when it was put down (`bh` 0 when the content scrolled: it rides with the content);
   `x`/`y` are measured in that pane. Read the place through `_stkPos(it, host)`, never raw `it.x`.
   A gesture first `_stkPin`s the sticker to the pane as it is, so x/y are exact while it runs.
-- Placements: localStorage `ssp.stickers` (other tabs follow via the `storage` event). Pictures:
-  IndexedDB `ssp-stickers` (device only, not in the data export; Reset Data clears both). Huge
-  pictures are scaled to 2000px once, as WebP.
+- Placements: localStorage `ssp.stickers@<profile>` (other tabs in the same profile follow via the
+  `storage` event). Pictures: IndexedDB `ssp-stickers` (device only, not in the data export), each
+  record's `owners` lists the profiles using it. Huge pictures are scaled to 2000px once, as WebP.
+- **Each profile has its own stickers**: `'guest'`, `'u:<uid>'`, and `'device'` for the login page
+  (`_stkWho`). Only the profile in the tab is in memory; every `_stkSync` first runs
+  `_stkEnsureProfile`, which saves the leaving profile's pending change to its own key and swaps.
+  Removing a picture or Reset Data only drops this profile from `owners` (deleted when none are left).
+  The one shared list from before (`ssp.stickers`) is nobody's: its login-page stickers move to the
+  device at start (`_stkLegacySplit`), the rest and the unowned pictures wait until a profile keeps or
+  deletes them from the tray's note (`_stkLegacyClaim` / `_stkLegacyAskDrop`). `node tools/test-profiles.js`.
 - Settings' Storage row (`js/storage-meter.js`): localStorage against ~5 MB (measured in Chrome:
   5,242,773 characters) and `navigator.storage.estimate()` for IndexedDB + the offline cache. Its
   action rows: Compress now, old recovery copies (Download / Delete), unused pictures (Clean up now),

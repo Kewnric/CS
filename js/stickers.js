@@ -35,11 +35,23 @@
    container always clips what is in it), so it goes in one fixed layer over
    the whole app and follows its pane's scroll by transform.
 
-   STORAGE. Placements are small and live in localStorage (ssp.stickers).
-   Pictures are big and live in IndexedDB, on this device only.
+   STORAGE. Placements are small and live in localStorage, pictures are big
+   and live in IndexedDB, on this device only.
+
+   WHOSE STICKERS. Each profile has its own: Guest, every account signed in
+   on this device, and the login page itself (it shows before anyone is in,
+   so its stickers are the device's). Placements are kept per profile in
+   ssp.stickers@<profile> ('device', 'guest', 'u:<uid>'); a picture record
+   lists the profiles that use it in `owners`. Only the profile in the tab
+   is ever in memory, so one account's stickers cannot show, or be saved,
+   in another. They all used to share one list (ssp.stickers): whose each
+   one was is not known, so they wait in that key -- the login page's go to
+   the device at once -- until a profile takes them or deletes them from
+   the tray (_stkLegacy*).
    ============================================================ */
 
-const STK_KEY = 'ssp.stickers';
+const STK_KEY = 'ssp.stickers';             // the one shared list from before profiles; read only to hand it on
+const STK_PROFILE_KEY = 'ssp.stickers@';    // + profile id
 const STK_TRAY_KEY = 'ssp.stickers.tray';
 const STK_DB_NAME = 'ssp-stickers';
 const STK_MAX_SIDE = 2000;          // pictures bigger than this are scaled down once, on the way in
@@ -70,6 +82,9 @@ let _stkDbPromise = null;
 let _stkRo = null;
 let _stkLastPage = null;            // what the tray's page strip last showed; null = draw it next sync
 let _stkTargetShown = null;         // the pane outlined while something is carried
+let _stkProfile = null;             // whose stickers are in memory ('' = nobody has entered yet; null = none loaded)
+let _stkLegacy = null;              // { items, pics } waiting from before profiles, or null
+const _stkLegacyToasted = new Set();   // profiles told about them on this page load
 
 /* ── Small helpers ───────────────────────────────────────── */
 
@@ -108,13 +123,37 @@ function _stkTyping() {
   return false;
 }
 
+/* ── Whose stickers ──────────────────────────────────────── */
+
+/** The profile whose stickers belong on screen: 'device' on the login page,
+ *  'guest' or 'u:<uid>' in the app, '' before anyone is in. */
+function _stkWho() {
+  if (_stkPicker()) return 'device';
+  if (typeof storageMode === 'undefined') return 'guest';          // no accounts in this build: one set
+  if (typeof _appBooted !== 'undefined' && !_appBooted) return '';
+  return typeof profileCurrentId === 'function' ? profileCurrentId() : 'guest';
+}
+
+/** A person's own profile (where stickers from before profiles can be taken), not the login page. */
+function _stkIsPerson(who) { return who === 'guest' || /^u:/.test(who || ''); }
+
+function _stkKeyFor(who) { return STK_PROFILE_KEY + who; }
+
+/** A picture record's owners; a record from before profiles has none (null). */
+function _stkOwners(rec) { return rec && Array.isArray(rec.owners) ? rec.owners : null; }
+
+/** A list of placements as stored, cleaned. */
+function _stkParse(raw) {
+  try {
+    const v = JSON.parse(raw || 'null');
+    return v && Array.isArray(v.items) ? v.items.filter(s => s && s.id && s.img) : [];
+  } catch (e) { return []; }
+}
+
 /* ── Storage: placements ─────────────────────────────────── */
 
 function _stkLoad() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(STK_KEY) || 'null');
-    _stkItems = raw && Array.isArray(raw.items) ? raw.items.filter(s => s && s.id && s.img) : [];
-  } catch (e) { _stkItems = []; }
+  _stkItems = _stkProfile ? _stkParse(localStorage.getItem(_stkKeyFor(_stkProfile))) : [];
 }
 
 function _stkSave() {
@@ -122,12 +161,15 @@ function _stkSave() {
   _stkSaveTimer = setTimeout(_stkSaveNow, 200);
 }
 
+/** Write the profile's placements. False when they could not be written. */
 function _stkSaveNow() {
   clearTimeout(_stkSaveTimer);
   _stkSaveTimer = null;
+  if (!_stkProfile) return false;
   try {
-    localStorage.setItem(STK_KEY, JSON.stringify({ v: 1, items: _stkItems }));
+    localStorage.setItem(_stkKeyFor(_stkProfile), JSON.stringify({ v: 1, items: _stkItems }));
     _stkSaveWarned = false;
+    return true;
   } catch (e) {
     console.warn('[Stickers] Could not save placements:', e);
     if (!_stkSaveWarned && typeof toast === 'function') {
@@ -171,14 +213,51 @@ function _stkRememberImg(rec) {
   _stkImgs.set(rec.id, { id: rec.id, url: URL.createObjectURL(rec.blob), w: rec.w, h: rec.h, name: rec.name || '', added: rec.added || 0 });
 }
 
-/** Read the pictures in. With `onlyNew`, keep the ones already in memory (another tab added some). */
+/** Every picture record on this device, whoever owns it. */
+function _stkAllRecords() {
+  return _stkIdb('readonly', st => st.getAll()).then(all => (all || []).filter(r => r && r.id));
+}
+
+/** Write and delete picture records in one go. */
+function _stkWriteRecords(put, del) {
+  if (!(put && put.length) && !(del && del.length)) return Promise.resolve();
+  return _stkIdb('readwrite', st => {
+    (put || []).forEach(r => st.put(r));
+    (del || []).forEach(id => st.delete(id));
+    return null;
+  });
+}
+
+/** Read the profile's pictures in. With `onlyNew`, keep the ones already in memory (another tab added some). */
 async function _stkLoadImages(onlyNew) {
+  const who = _stkProfile;
+  if (!who) return;
   try {
-    const all = await _stkIdb('readonly', st => st.getAll());
-    (all || []).forEach(rec => { if (!onlyNew || !_stkImgs.has(rec.id)) _stkRememberImg(rec); });
+    const all = await _stkAllRecords();
+    if (_stkProfile !== who) return;     // the tab changed hands while they were read
+    all.forEach(rec => {
+      const own = _stkOwners(rec);
+      if (!own || own.indexOf(who) < 0) return;
+      if (!onlyNew || !_stkImgs.has(rec.id)) _stkRememberImg(rec);
+    });
   } catch (e) {
     console.warn('[Stickers] Pictures could not be read:', e);
   }
+}
+
+/** Profile `who` stops using pictures `ids` (all of its own when `ids` is null); one nobody uses any more is deleted. */
+async function _stkDisown(ids, who) {
+  if (!who) return;
+  const want = ids ? new Set(ids) : null;
+  const put = [], del = [];
+  (await _stkAllRecords()).forEach(rec => {
+    if (want && !want.has(rec.id)) return;
+    const own = _stkOwners(rec);
+    if (!own || own.indexOf(who) < 0) return;
+    const rest = own.filter(o => o !== who);
+    if (rest.length) { rec.owners = rest; put.push(rec); } else del.push(rec.id);
+  });
+  await _stkWriteRecords(put, del);
 }
 
 /** Read a picture's size and, if it is huge, scale it down once so it is not decoded at full size on every page. */
@@ -211,14 +290,17 @@ function _stkPrepare(file) {
 async function _stkAddFiles(files) {
   const list = Array.from(files || []).filter(f => f && /^image\//.test(f.type));
   const added = [];
+  const who = _stkProfile;
+  if (!who) return added;
   for (const f of list) {
     try {
       const p = await _stkPrepare(f);
-      const rec = { id: _stkUid('si_'), blob: p.blob, w: p.w, h: p.h, name: f.name || 'picture', added: Date.now() };
+      const rec = { id: _stkUid('si_'), blob: p.blob, w: p.w, h: p.h, name: f.name || 'picture', added: Date.now(), owners: [who] };
       try { await _stkIdb('readwrite', st => st.put(rec)); }
       catch (e) {
         if (typeof toast === 'function') toast('This picture can be used now, but this browser would not save it for next time.', { type: 'warning' });
       }
+      if (_stkProfile !== who) break;    // saved for the profile it was added in; this tab has moved on
       _stkRememberImg(rec);
       added.push(rec.id);
     } catch (e) {
@@ -233,7 +315,7 @@ async function _stkForgetImage(id) {
   const img = _stkImgs.get(id);
   if (img && img.url) URL.revokeObjectURL(img.url);
   _stkImgs.delete(id);
-  try { await _stkIdb('readwrite', st => st.delete(id)); } catch (e) { /* already gone */ }
+  try { await _stkDisown([id], _stkProfile); } catch (e) { /* already gone */ }
 }
 
 /** How many bytes the sticker pictures take (Settings' storage meter). */
@@ -243,8 +325,11 @@ function stkPictureBytes() {
     .catch(() => 0);
 }
 
-/** Every sticker and every picture, gone. Reset Data calls this. */
+/** This profile's stickers and pictures, gone; a picture another profile also
+ *  uses stays for that one. Reset Data calls this: it resets the profile in
+ *  the tab, not every account that has used this device. */
 function stkResetAll() {
+  const who = _stkProfile;
   clearTimeout(_stkSaveTimer);
   _stkSaveTimer = null;
   _stkItems = [];
@@ -253,9 +338,185 @@ function stkResetAll() {
   _stkEls.clear();
   _stkImgs.forEach(m => { if (m.url) URL.revokeObjectURL(m.url); });
   _stkImgs.clear();
-  try { localStorage.removeItem(STK_KEY); localStorage.removeItem(STK_TRAY_KEY); } catch (e) { /* nothing to remove */ }
+  try {
+    if (who) localStorage.removeItem(_stkKeyFor(who));
+    localStorage.removeItem(STK_TRAY_KEY);
+  } catch (e) { /* nothing to remove */ }
   _stkSync();
-  return _stkIdb('readwrite', st => st.clear()).catch(() => {});
+  return _stkDisown(null, who).catch(() => {});
+}
+
+/* ── Changing hands ──────────────────────────────────────── */
+
+/** Memory holds the stickers of whoever is in the tab now. Every sync asks first. */
+function _stkEnsureProfile() {
+  const who = _stkWho();
+  if (who === _stkProfile) return;
+  if (_stkSaveTimer) _stkSaveNow();          // the last change goes to the profile it was made in
+  if (_stkDrag) {
+    if (_stkDrag.raf) cancelAnimationFrame(_stkDrag.raf);
+    window.removeEventListener('pointermove', _stkOnMove, true);
+    window.removeEventListener('pointerup', _stkOnUp, true);
+    window.removeEventListener('pointercancel', _stkOnUp, true);
+    document.body.classList.remove('stk-dragging', 'stk-drag-move');
+    _stkDrag = null;
+    _stkShowTarget(null);
+  }
+  _stkSel = null;
+  _stkEls.forEach(el => el.remove());
+  _stkEls.clear();
+  _stkImgs.forEach(m => { if (m.url) URL.revokeObjectURL(m.url); });
+  _stkImgs.clear();
+  _stkProfile = who;
+  _stkLoad();
+  _stkLastPage = null;
+  _stkTrayRender();
+  _stkLegacyPaint();
+  if (!who) {
+    // Nobody to place them for: close the tray rather than let pictures be added to no one.
+    if (_stkMode) {
+      _stkMode = false;
+      document.body.classList.remove('stk-editing');
+      const tray = document.getElementById('stk-tray');
+      if (tray) tray.hidden = true;
+    }
+    return;
+  }
+  _stkLoadImages().then(() => {
+    if (_stkProfile !== who) return;
+    _stkTrayRender();
+    _stkLastPage = null;
+    _stkQueue();
+  });
+  _stkLegacyNudge(who);
+}
+
+/* ── Stickers from before profiles ───────────────────────────
+   They were one list for everyone on the device, so whose each one is cannot
+   be told. The login page's are the device's and go to it at once. The rest,
+   and the pictures no profile owns, wait in the old key until someone keeps
+   them in their own profile (from the tray) or deletes them. Until then they
+   show nowhere, which is the point. */
+
+/** Once per load, before anything shows: the old list's login-page stickers go to the device, with their pictures. */
+async function _stkLegacySplit() {
+  let raw = null;
+  try { raw = localStorage.getItem(STK_KEY); } catch (e) { return; }
+  if (raw === null) return;
+  const all = _stkParse(raw);
+  const login = all.filter(s => s.route === 'picker');
+  const rest = all.filter(s => s.route !== 'picker');
+  if (login.length) {
+    try {
+      const imgs = new Set(login.map(s => s.img));
+      const put = (await _stkAllRecords()).filter(r => imgs.has(r.id));
+      put.forEach(r => { const o = _stkOwners(r) || []; if (o.indexOf('device') < 0) o.push('device'); r.owners = o; });
+      await _stkWriteRecords(put);
+      const dev = _stkParse(localStorage.getItem(_stkKeyFor('device')));
+      const add = login.filter(s => !dev.some(d => d.id === s.id));
+      localStorage.setItem(_stkKeyFor('device'), JSON.stringify({ v: 1, items: dev.concat(add) }));
+    } catch (e) {
+      console.warn('[Stickers] The login page\'s stickers could not be moved yet; tried again next time.', e);
+      return;
+    }
+  }
+  try {
+    if (rest.length) { if (login.length) localStorage.setItem(STK_KEY, JSON.stringify({ v: 1, items: rest })); }
+    else localStorage.removeItem(STK_KEY);
+  } catch (e) { /* the login page's are copied; the next load finds them there already */ }
+}
+
+/** What waits: placements in the old list, and pictures that no profile owns. */
+async function _stkLegacyCount() {
+  let items = 0, pics = 0;
+  try { items = _stkParse(localStorage.getItem(STK_KEY)).length; } catch (e) { items = 0; }
+  try { pics = (await _stkAllRecords()).filter(r => !_stkOwners(r)).length; } catch (e) { pics = 0; }
+  _stkLegacy = (items || pics) ? { items, pics } : null;
+  _stkLegacyPaint();
+  return _stkLegacy;
+}
+
+function _stkLegacyWords(L) {
+  const parts = [];
+  if (L.items) parts.push(L.items === 1 ? '1 sticker' : L.items + ' stickers');
+  if (L.pics) parts.push(L.pics === 1 ? '1 picture' : L.pics + ' pictures');
+  return parts.join(' and ');
+}
+
+/** The tray's note about them: only in a person's own profile, and only while some wait. */
+function _stkLegacyPaint() {
+  const box = document.getElementById('stk-legacy');
+  if (!box) return;
+  const L = _stkIsPerson(_stkProfile) ? _stkLegacy : null;
+  box.hidden = !L;
+  if (!L) return;
+  const t = box.querySelector('.stk-legacy-text');
+  if (t) t.textContent = _stkLegacyWords(L) + ' from before each account kept its own stickers. Nobody sees them until a profile keeps them.';
+}
+
+/** Said once per page load in each profile while any wait, so stickers that stopped showing are not taken for lost. */
+function _stkLegacyNudge(who) {
+  if (!_stkLegacy || !_stkIsPerson(who) || _stkLegacyToasted.has(who) || typeof toast !== 'function') return;
+  _stkLegacyToasted.add(who);
+  toast('Stickers are kept per account now. The ones from before are waiting in the sticker tray.', {
+    type: 'info', duration: 8000, action: { label: 'Open', onClick: () => stkToggleMode(true) }
+  });
+}
+
+/** This profile keeps them: the placements join its own, and it becomes an owner of their pictures and of every unowned one. */
+async function _stkLegacyClaim() {
+  const who = _stkProfile;
+  if (!_stkIsPerson(who)) return;
+  const items = _stkParse(localStorage.getItem(STK_KEY));
+  const need = new Set(items.map(s => s.img));
+  let pics = 0;
+  try {
+    const put = [];
+    (await _stkAllRecords()).forEach(r => {
+      const o = _stkOwners(r);
+      if (!o) { r.owners = [who]; put.push(r); pics++; }
+      else if (need.has(r.id) && o.indexOf(who) < 0) { o.push(who); put.push(r); }
+    });
+    await _stkWriteRecords(put);
+  } catch (e) {
+    if (typeof toast === 'function') toast('They could not be moved: this browser would not update their pictures.', { type: 'error' });
+    return;
+  }
+  const mine = who === _stkProfile ? _stkItems : _stkParse(localStorage.getItem(_stkKeyFor(who)));
+  const next = mine.concat(items.filter(s => !mine.some(m => m.id === s.id)));
+  try { localStorage.setItem(_stkKeyFor(who), JSON.stringify({ v: 1, items: next })); }
+  catch (e) {
+    if (typeof toast === 'function') toast('They could not be moved: the app\'s storage in this browser is full.', { type: 'error', duration: 7000 });
+    return;
+  }
+  // Only once they are safely in this profile's list does the old one go.
+  try { localStorage.removeItem(STK_KEY); } catch (e) { /* counted again below */ }
+  if (who === _stkProfile) {
+    clearTimeout(_stkSaveTimer);
+    _stkSaveTimer = null;
+    _stkItems = next;
+    await _stkLoadImages(true);
+    _stkTrayRender();
+    _stkLastPage = null;
+    _stkSync();
+  }
+  await _stkLegacyCount();
+  if (typeof toast === 'function') toast(_stkLegacyWords({ items: items.length, pics }) + (items.length + pics === 1 ? ' is' : ' are') + ' in this profile now.', { type: 'success' });
+}
+
+/** Nobody keeps them. */
+function _stkLegacyAskDrop() {
+  const L = _stkLegacy;
+  if (!L) return;
+  const go = async () => {
+    try { localStorage.removeItem(STK_KEY); } catch (e) { /* counted again below */ }
+    try { await _stkWriteRecords([], (await _stkAllRecords()).filter(r => !_stkOwners(r)).map(r => r.id)); }
+    catch (e) { /* counted again below */ }
+    await _stkLegacyCount();
+  };
+  const msg = 'The ' + _stkLegacyWords(L) + ' from before are in no profile, so this deletes them from this device for good.';
+  if (typeof showConfirm === 'function') showConfirm('Delete them?', msg, go, { confirmLabel: 'Delete' });
+  else if (confirm('Delete them? ' + msg)) go();
 }
 
 /* ── Hosts: which pane a sticker belongs to ──────────────── */
@@ -622,6 +883,7 @@ function _stkQueue() {
 function _stkSync() {
   _stkQueued = false;
   if (!_stkReady) return;
+  _stkEnsureProfile();
   // Panes that went away with a re-render or a route change.
   _stkHosts.forEach(h => { if (!h.isConnected) _stkDetach(h); });
   _stkKidsDirty.forEach(h => { if (h.isConnected && _stkHosts.has(h)) _stkObserveKids(h); });
@@ -1219,8 +1481,17 @@ function stkRemove(id) {
   if (_stkSel === id) _stkSel = null;
   _stkSave();
   _stkSync();
+  const who = _stkProfile;
+  const undo = () => {
+    // Put back where it was taken from, even if the tab has since changed hands.
+    if (_stkProfile === who) { _stkItems.splice(Math.min(i, _stkItems.length), 0, gone); _stkSave(); _stkSync(); return; }
+    try {
+      const list = _stkParse(localStorage.getItem(_stkKeyFor(who)));
+      if (!list.some(s => s.id === gone.id)) localStorage.setItem(_stkKeyFor(who), JSON.stringify({ v: 1, items: list.concat([gone]) }));
+    } catch (e) { /* full: it stays removed */ }
+  };
   if (typeof toast === 'function') {
-    toast('Sticker removed.', { type: 'info', duration: 4000, action: { label: 'Undo', onClick: () => { _stkItems.splice(Math.min(i, _stkItems.length), 0, gone); _stkSave(); _stkSync(); } } });
+    toast('Sticker removed.', { type: 'info', duration: 4000, action: { label: 'Undo', onClick: undo } });
   }
 }
 
@@ -1237,7 +1508,15 @@ function _stkNudge(it, dx, dy) {
 
 /** Open or close sticker mode. With no argument it flips. */
 function stkToggleMode(on) {
-  _stkMode = typeof on === 'boolean' ? on : !_stkMode;
+  const next = typeof on === 'boolean' ? on : !_stkMode;
+  if (next && _stkReady) {
+    _stkEnsureProfile();
+    if (!_stkProfile) {
+      if (typeof toast === 'function') toast('Stickers open once you are in: sign in, or choose Guest.', { type: 'info' });
+      return;
+    }
+  }
+  _stkMode = next;
   document.body.classList.toggle('stk-editing', _stkMode);
   if (_stkMode) {
     _stkTrayOpen();
@@ -1276,6 +1555,13 @@ function _stkTrayOpen() {
         '<button type="button" class="stk-tray-btn" data-tray="add">' + _stkIco('image-plus', 15) + 'Add pictures</button>' +
         '<button type="button" class="stk-tray-btn is-primary" data-tray="done">' + _stkIco('check', 15) + 'Done</button>' +
       '</div>' +
+      '<div class="stk-legacy" id="stk-legacy" hidden>' +
+        '<span class="stk-legacy-text"></span>' +
+        '<span class="stk-legacy-acts">' +
+          '<button type="button" class="stk-tray-btn is-primary" data-tray="claim">' + _stkIco('download', 15) + 'Keep them here</button>' +
+          '<button type="button" class="stk-tray-btn" data-tray="drop">' + _stkIco('trash-2', 15) + 'Delete</button>' +
+        '</span>' +
+      '</div>' +
       '<div class="stk-tray-label">Your pictures</div>' +
       '<div class="stk-strip" id="stk-lib"></div>' +
       '<div class="stk-tray-label">On this page</div>' +
@@ -1294,6 +1580,7 @@ function _stkTrayOpen() {
   }
   tray.hidden = false;
   _stkTrayRender();
+  _stkLegacyPaint();
   _stkLastPage = null;
   _stkTrayPosition(tray);
 }
@@ -1356,6 +1643,8 @@ function _stkOnTrayClick(e) {
   if (btn) {
     if (btn.dataset.tray === 'add') document.getElementById('stk-file').click();
     if (btn.dataset.tray === 'done') stkToggleMode(false);
+    if (btn.dataset.tray === 'claim') _stkLegacyClaim();
+    if (btn.dataset.tray === 'drop') _stkLegacyAskDrop();
     return;
   }
   const forget = e.target.closest('[data-forget]');
@@ -1638,7 +1927,10 @@ async function _stkOnPaste(e) {
 
 /** Another tab changed the stickers: take its list, and any pictures it added, rather than later saving over them. */
 function _stkOnStorage(e) {
-  if (e.key !== STK_KEY) return;
+  // Another tab kept or deleted the stickers from before profiles.
+  if (e.key === STK_KEY) { _stkLegacyCount(); return; }
+  // Only this profile's own list; another tab may be in another profile.
+  if (!_stkProfile || e.key !== _stkKeyFor(_stkProfile)) return;
   _stkLoad();
   const missing = _stkItems.some(s => !_stkImgs.has(s.img));
   (missing ? _stkLoadImages(true) : Promise.resolve()).then(() => {
@@ -1655,8 +1947,10 @@ function _stkOwnNode(n) {
 }
 
 async function stkInit() {
-  _stkLoad();
-  await _stkLoadImages();
+  // Whose stickers to show is settled by the first sync (_stkEnsureProfile):
+  // nobody's until the login page is up or a profile has been entered.
+  try { await _stkLegacySplit(); } catch (e) { console.warn('[Stickers] Older stickers could not be sorted:', e); }
+  await _stkLegacyCount();
   _stkReady = true;
 
   if (typeof ResizeObserver !== 'undefined') {
