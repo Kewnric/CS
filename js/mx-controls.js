@@ -7,7 +7,8 @@
      not only a message in the corner. That covers every button that already
      reports through toast(), without touching any of them.
    - Glow: one soft light follows the pointer across cards. It is a single
-     element in a fixed layer, clipped to the card under it; no card's own
+     element in a fixed layer, clipped to the card under it as that card is
+     now (cards move under a still pointer, see follow()); no card's own
      markup or pseudo-elements are involved.
 
    One closure, nothing at the top level. Adds Motion.feedback, Motion.fx.
@@ -88,20 +89,64 @@
 
   /* ---------- Pointer glow ---------------------------------- */
   let glow = null, card = null, frame = 0, px = 0, py = 0;
+  let clip = '', still = 0, spa = null, mo = null, ro = null;
 
+  /* The light follows its card, not only the pointer.
+
+     It is drawn where the pointer is and clipped to where the card is, but
+     the pointer only reports when IT moves, and cards move under a still
+     pointer: the card's own hover lift, the grid's entrance coming back from
+     an attempt, a pane drawn again, the sidebar folding. Clipped once and
+     left, the light kept the card's old box and showed outside it -- a pale
+     band under the card, over whatever was there now -- until the mouse
+     moved. So it is checked again every frame until its card has held still
+     for STILL_FRAMES frames, and woken whenever the page changes under it.
+     It goes out when its card is gone or no longer under the pointer. */
+  const STILL_FRAMES = 8;
+
+  // Clip the light to the card as it is now. True if nothing moved.
   function place() {
-    frame = 0;
-    if (!glow || !card) return;
-    if (!card.isConnected) { leave(); return; }
     const r = card.getBoundingClientRect();
     glow.style.translate = px + 'px ' + py + 'px';
     // Keep the light inside the card it is over, corners included.
     const rad = parseFloat(getComputedStyle(card).borderTopLeftRadius) || 0;
-    glow.parentNode.style.clipPath = 'inset(' + r.top + 'px ' + (window.innerWidth - r.right) + 'px ' +
+    const next = 'inset(' + r.top + 'px ' + (window.innerWidth - r.right) + 'px ' +
       (window.innerHeight - r.bottom) + 'px ' + r.left + 'px round ' + rad + 'px)';
+    if (next === clip) return true;
+    clip = next;
+    glow.parentNode.style.clipPath = next;
+    return false;
+  }
+
+  function follow() {
+    frame = 0;
+    if (!glow || !card) return;
+    // The fx layer takes no pointer events, so it is not what this finds.
+    const top = card.isConnected ? document.elementFromPoint(px, py) : null;
+    if (!top || !card.contains(top)) { douse(); return; }
+    still = place() ? still + 1 : 0;
+    if (still < STILL_FRAMES) frame = requestAnimationFrame(follow);
+  }
+
+  function wake() {
+    if (!card) return;
+    still = 0;
+    if (!frame) frame = requestAnimationFrame(follow);
+  }
+
+  // What can move a card without a pointermove is watched only while one is lit.
+  function watch(on) {
+    if (!spa || !spa.isConnected) spa = document.getElementById('spa-content');
+    if (!spa) return;
+    if (!on) { if (mo) mo.disconnect(); if (ro) ro.disconnect(); return; }
+    if (!mo && typeof MutationObserver !== 'undefined') mo = new MutationObserver(wake);
+    if (!ro && typeof ResizeObserver !== 'undefined') ro = new ResizeObserver(wake);
+    if (mo) mo.observe(spa, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'hidden'] });
+    if (ro) ro.observe(spa);
   }
 
   function leave() {
+    if (card) watch(false);
     card = null;
     if (glow) glow.classList.remove('is-on');
   }
@@ -116,16 +161,6 @@
     if (!glow || !card) return;
     leave();
     glow.style.visibility = 'hidden';
-  }
-
-  // After a click, once its handlers have run: is the card still what is
-  // under the pointer? (The fx layer takes no pointer events, so it is not
-  // what elementFromPoint finds.)
-  function recheck() {
-    if (!card) return;
-    if (!card.isConnected) { douse(); return; }
-    const top = document.elementFromPoint(px, py);
-    if (!top || !card.contains(top)) douse();
   }
 
   // mx-popups.js calls this as any popup opens, whatever opened it (a click,
@@ -149,16 +184,22 @@
       // its action cards lit the panel behind them. Only the actions glow.
       if (c && c.id === 'home-actions') c = null;
       if (!c || !c.closest('#spa-content')) { if (card) leave(); return; }
+      if (!card) watch(true);
       card = c;
       px = e.clientX;
       py = e.clientY;
       if (glow.style.visibility) glow.style.visibility = '';
       glow.classList.add('is-on');
-      if (!frame) frame = requestAnimationFrame(place);
+      wake();
     }, { passive: true });
     document.addEventListener('scroll', function () { if (card) leave(); }, { capture: true, passive: true });
     document.addEventListener('pointerleave', leave);
-    document.addEventListener('click', function () { if (card) requestAnimationFrame(recheck); }, true);
+    // After a click, once its handlers have run; and as anything starts to
+    // animate (an entrance, the hover lift, the sidebar's width).
+    document.addEventListener('click', wake, true);
+    const moving = function (e) { if (card && e.target !== glow) wake(); };
+    document.addEventListener('animationstart', moving, true);
+    document.addEventListener('transitionstart', moving, true);
     window.addEventListener('hashchange', douse);
   }
 
