@@ -229,11 +229,16 @@ function _solRecompute(opts) {
   const o = opts || {};
   _solFiles.forEach(f => {
     if (!f.canRecompute) return;
-    f.diffs = computeDiffs(_solLeftCode(f), _solRightCode(f), {
+    const res = computeDiffs(_solLeftCode(f), _solRightCode(f), {
       ignoreComments: _solOpts.ignoreComments,
       ignoreWhitespace: _solOpts.ignoreWhitespace,
       ignoreNames: _solOpts.ignoreNames
-    }).diffs;
+    });
+    f.diffs = res.diffs;
+    /* Which of your names stands for which of the reference's. The highlight
+       and the explanations need it too, or they go on comparing the names as
+       written after the comparison has said they are the same. */
+    f.names = res.names || null;
   });
   _solutionFileDiffs = _solFiles;
   _solutionActiveFile = _solActiveFile;
@@ -241,7 +246,7 @@ function _solRecompute(opts) {
   const f = _solFiles[_solActiveFile];
   _solPaintPanelTitles();
   renderSolutionFileTabs();
-  renderDiffPanels((f && f.diffs) || []);
+  renderDiffPanels((f && f.diffs) || [], (f && f.names) || null);
   _solRenderBreakdown();
   if (_solSearch.q) solRunSearch(true);
   if (o.scrollToFirst) _solScrollToFirstDiff();
@@ -412,7 +417,7 @@ function _solRenderOptions() {
     <span class="sol-opt-label">Compare</span>
     ${row('opt-ignore-comments', 'Ignore comments', _solOpts.ignoreComments, 'Strip // and /* */ before comparing. Off means comments must match too.', !canRecompute)}
     ${row('opt-ignore-ws', 'Ignore whitespace', _solOpts.ignoreWhitespace, 'Collapse all spacing before comparing. Off means indentation counts.', !canRecompute)}
-    ${row('opt-ignore-names', 'Ignore variable names', _solOpts.ignoreNames, 'Number identifiers by first appearance, so int x, y matches int a, b. Keywords, the standard library and text inside quotes are never renamed.', !canRecompute)}
+    ${row('opt-ignore-names', 'Ignore variable names', _solOpts.ignoreNames, 'Pair each of your names with the reference\'s by where it is used, so int x, y matches int a, b even with an extra variable or another order. Keywords, the standard library and text inside quotes are never renamed.', !canRecompute)}
     <span class="ed-tool-sep" aria-hidden="true"></span>
     <span class="sol-opt-label">Show</span>
     ${row('opt-show-comments', "Reference's comments", _solOpts.showComments, "Display comments from the source beside each line, greyed out — they never affect the comparison.")}
@@ -581,7 +586,7 @@ function _solNumHTML(n, side) {
   return `<span class="diff-line-number">${n}</span>`;
 }
 
-function renderDiffPanels(diffs) {
+function renderDiffPanels(diffs, names) {
   const actualContainer = document.getElementById('diff-actual');
   const expectedContainer = document.getElementById('diff-expected');
 
@@ -595,7 +600,7 @@ function renderDiffPanels(diffs) {
   const _userText = diffs.filter(d => d.status !== 'missing').map(d => _solText(d, 'actual'));
   let _depth = 0;
   _userText.forEach(l => { for (const ch of l) { if (ch === '{') _depth++; else if (ch === '}') _depth--; } });
-  const _explainCtx = { bracesBalanced: _depth === 0, userLines: _userText.map(l => l.replace(/\s+/g, '')) };
+  const _explainCtx = { bracesBalanced: _depth === 0, userLines: _userText.map(l => l.replace(/\s+/g, '')), names: names || null };
 
   // Build filtered/grouped list
   let items;
@@ -635,7 +640,7 @@ function renderDiffPanels(diffs) {
       if (lineStatus === 'partial' || lineStatus === 'wrong') {
         const aTxt = _solText(line, 'actual'), eTxt = _solText(line, 'expected');
         const charResult = typeof computeLineDiffs === 'function'
-          ? computeLineDiffs(aTxt, eTxt, _solGran)
+          ? computeLineDiffs(aTxt, eTxt, _solGran, names)
           : computeCharDiffs(aTxt, eTxt);
         line.actualChars = charResult.actualChars;
         line.expectedChars = charResult.expectedChars;

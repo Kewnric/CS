@@ -226,6 +226,18 @@ pure (`peekRender`); after any change to it run `node tools/test-code-peek.js .`
 Right-click either eye for its settings (`ssp.peek`: hide the target's comments
 that the starter does not have).
 
+**Solution page diff** (`js/diff.js` `computeDiffs`, drawn by `js/solution.js`; also the reference-match
+score). With names ignored, your names are PAIRED with the reference's by where they are used
+(`diffPairNames`: a token alignment where any name may face any other, votes, one partner each), not
+numbered by first appearance, so an extra variable or another declaration order no longer shifts every
+name. The pairs come back as `names` and must reach the in-line highlight (`computeLineDiffs(…, names)`)
+and the explanations (`ctx.names`), or those go back to marking `x` against `n`. `_diffCanonC` folds
+forms that are the same program (`main(void)`, `++i;`/`i += 1;`, `x = x + E` when E binds tighter,
+`return (x);`), never where a value is used; with whitespace ignored a lone `{`, an `else` after `}` and
+a do-while's `while` join the line above; leading `#include`s follow the reference's order. Every rewrite
+keeps line i on line i. After any change: `node tools/test-diff.js .` (also runs every pack reference
+against itself renamed, Allman-braced and in the other statement style; all must match).
+
 ---
 
 ## Libraries

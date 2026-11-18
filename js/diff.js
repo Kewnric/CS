@@ -153,8 +153,15 @@ function computeWordDiffs(actualLine, expectedLine) {
   return { actualChars, expectedChars, ratio: matchA.size / total };
 }
 
-/** Char- or word-level diff for one line pair, per the caller's granularity. */
-function computeLineDiffs(actualLine, expectedLine, granularity) {
+/**
+ * Char- or word-level diff for one line pair, per the caller's granularity.
+ * Pass computeDiffs' `names` when it compared with names ignored, so the
+ * highlight agrees with the comparison: a paired name is then a match.
+ */
+function computeLineDiffs(actualLine, expectedLine, granularity, names) {
+  if (names && names.user && names.expected) {
+    return _diffNamedLineDiffs(actualLine, expectedLine, granularity, names);
+  }
   return granularity === 'word'
     ? computeWordDiffs(actualLine, expectedLine)
     : computeCharDiffs(actualLine, expectedLine);
@@ -262,7 +269,19 @@ const DIFF_C_RESERVED = new Set((
   'strlen strcpy strncpy strcat strncat strcmp strncmp strchr strrchr strstr strtok ' +
   'memcpy memset memmove memcmp atoi atof atol strtol strtod ' +
   'sqrt pow ceil floor round fabs log log10 sin cos tan time clock ' +
-  'isalpha isdigit isalnum isupper islower isspace toupper tolower'
+  'isalpha isdigit isalnum isupper islower isspace toupper tolower ' +
+  /* The rest of what a C course reaches for. A library name that is not on
+     this list gets paired with whatever sits in its place on the other side,
+     so `fmod` against `remainder` would have read as the same call. */
+  '_Bool defined stdin stdout stderr perror getc putc fgetc fputc ungetc freopen setbuf setvbuf getenv ' +
+  'strdup strspn strcspn strpbrk memchr atoll strtoul strtoll div ldiv labs llabs ' +
+  'isprint ispunct isxdigit iscntrl isgraph isblank ' +
+  'exp exp2 log2 cbrt fmod fmin fmax hypot trunc lround atan atan2 asin acos sinh cosh tanh isnan isinf ' +
+  'INT_MAX INT_MIN UINT_MAX LONG_MAX LONG_MIN LLONG_MAX LLONG_MIN CHAR_MAX CHAR_MIN SHRT_MAX SHRT_MIN ' +
+  'FLT_MAX FLT_MIN DBL_MAX DBL_MIN RAND_MAX EXIT_SUCCESS EXIT_FAILURE SEEK_SET SEEK_CUR SEEK_END BUFSIZ ' +
+  'CLOCKS_PER_SEC M_PI NAN INFINITY time_t clock_t tm localtime gmtime mktime strftime difftime ctime asctime ' +
+  'int8_t int16_t int32_t int64_t uint8_t uint16_t uint32_t uint64_t intptr_t uintptr_t ptrdiff_t ' +
+  'va_list va_start va_arg va_end assert'
 ).split(' '));
 
 /**
@@ -285,11 +304,435 @@ function alphaNormalizeC(code) {
   );
 }
 
-/* `int main()` and `int main(void)` are the same function. They were being
-   reported as a difference on line 2 of a correct submission, which is noise
-   of exactly the kind this pass exists to remove. */
+/* ── C as tokens ──────────────────────────────────────────────
+   Joining every token's text gives the source back exactly, newlines and all,
+   so anything rewritten through these keeps line i on line i. Kinds:
+     id   an identifier
+     lit  a string, a character literal or a comment: compared as written
+     pp   a directive that holds no names (`#include <stdio.h>`, `#pragma`),
+          or the head of one that does (`#define`, `#ifndef`): the names after
+          the head are ordinary ids, so `#define MAX 10` pairs with
+          `#define SIZE 10` the way `int x` pairs with `int n`
+     nl   a newline
+     ws   other whitespace
+     op   a number, an operator or a punctuation mark */
+const _DIFF_LEX_RE = new RegExp([
+  /(\/\/[^\n]*|\/\*[\s\S]*?(?:\*\/|$(?![\s\S])))/.source,
+  /("(?:[^"\\\n]|\\.)*"?|'(?:[^'\\\n]|\\.)*'?)/.source,
+  /(^[ \t]*#[ \t]*(?:define|undef|ifdef|ifndef|if|elif)\b)/.source,
+  /(^[ \t]*#[^\n]*)/.source,
+  /([A-Za-z_]\w*)/.source,
+  /(\n)/.source,
+  /([^\S\n]+)/.source,
+  /(\d[\w.]*|\+\+|--|->|&&|\|\||<<=?|>>=?|[-+*\/%&|^!=<>]=|[^\s\w"'])/.source
+].join('|'), 'gm');
+
+function _diffLexC(src) {
+  const s = String(src || '');
+  const out = [];
+  const re = _DIFF_LEX_RE;
+  re.lastIndex = 0;
+  let m;
+  while ((m = re.exec(s))) {
+    out.push({
+      t: m[0],
+      k: m[1] || m[2] ? 'lit' : m[3] || m[4] ? 'pp' : m[5] ? 'id' : m[6] ? 'nl' : m[7] ? 'ws' : 'op'
+    });
+  }
+  return out;
+}
+
+function _diffRenamable(tok) {
+  return tok.k === 'id' && !DIFF_C_RESERVED.has(tok.t);
+}
+
+/* ── Code that is the same program written another way ─────────
+   Each of these was being shown as a difference on a submission that passed
+   every test, and the pack's own references use both forms of most of them,
+   so whichever one a learner wrote, some program marked it:
+
+     int main()  /  int main(void)               the same function
+     ++i;  /  i += 1;  /  i = i + 1;  /  i++;    the same statement
+     for (...; ...; ++i)  /  (...; i++)          the same loop
+     sum = sum + a[i];  /  sum += a[i];          the same assignment
+     return (x);  /  return x;                   the same return
+
+   An increment is only rewritten where its value is thrown away -- a whole
+   statement, or a for loop's step -- because that is the only place the forms
+   agree: `printf("%d", ++i)` and `printf("%d", i++)` print different numbers
+   and must stay different. `x = x op E` becomes `x op= E` only when E binds
+   tighter than op, since `x = x - a + b` is not `x -= a + b`. Nothing here
+   crosses a newline, so line i stays line i, and literals are never touched. */
+
+/** The token stream with what each pass needs to know about where a token sits. */
+function _diffStmtView(code) {
+  const toks = _diffLexC(code);
+  const sig = [];                                   // indices of the tokens that carry meaning
+  toks.forEach((t, i) => { if (t.k !== 'ws' && t.k !== 'nl' && !(t.k === 'lit' && t.t[0] === '/')) sig.push(i); });
+  const T = p => (p >= 0 && p < sig.length ? toks[sig[p]] : null);
+  const txt = p => { const t = T(p); return t ? t.t : ''; };
+
+  /* Where a value is discarded: the start of a statement (never inside
+     parentheses, so a for loop's condition is not one), or a for loop's step,
+     which runs from its second `;` to its `)`, each comma at that level
+     starting another piece of it. */
+  const parens = [];                                // per open '(': { kw, semis, from }
+  const depth = new Array(sig.length).fill(0);      // parentheses open around each token
+  const match = new Map();                          // '(' <-> ')'
+  const ctrlClose = new Set();                      // ')' closing an if/while/for/switch header
+  const stepOf = new Map();                         // a step-clause token -> the ')' that ends it
+  for (let p = 0; p < sig.length; p++) {
+    const t = txt(p);
+    depth[p] = parens.length;
+    if (t === '(') {
+      const before = txt(p - 1);
+      parens.push({ kw: /^(if|while|for|switch)$/.test(before) ? before : '', semis: 0, from: -1, at: p });
+    } else if (t === ')') {
+      const o = parens.pop();
+      if (!o) continue;
+      match.set(o.at, p); match.set(p, o.at);
+      if (o.kw) ctrlClose.add(p);
+      if (o.kw === 'for' && o.from >= 0) {
+        for (let q = o.from; q < p; q++) if (depth[q] === depth[o.from]) stepOf.set(q, p);
+      }
+    } else if (t === ';' && parens.length) {
+      const o = parens[parens.length - 1];
+      if (o.kw === 'for' && ++o.semis === 2) o.from = p + 1;
+    }
+  }
+  const atStatement = p => {
+    if (depth[p] !== 0) return false;
+    const b = txt(p - 1);
+    // `:` ends a `case 1:` or a label; at the top level it cannot be a ?: that an assignment follows.
+    return p === 0 || b === ';' || b === '{' || b === '}' || b === ':' || b === 'else' || b === 'do' || ctrlClose.has(p - 1);
+  };
+  /** How the expression starting at p ends, when its value is discarded there. */
+  const endsAt = p => {
+    const close = stepOf.get(p);
+    if (close != null && (stepOf.get(p - 1) == null || txt(p - 1) === ',')) {
+      return q => q === close || (txt(q) === ',' && stepOf.get(q) === close);
+    }
+    return atStatement(p) ? (q => txt(q) === ';') : null;
+  };
+  return {
+    toks, sig, T, txt, match, endsAt,
+    /* No newline between two tokens, so blanking what lies between keeps the lines. */
+    sameLine: (p, q) => { for (let i = sig[p]; i <= sig[q]; i++) if (toks[i].k === 'nl' || toks[i].t.includes('\n')) return false; return true; },
+    blank: (p, q) => { for (let i = sig[p] + 1; i <= sig[q]; i++) toks[i].t = ''; },
+    text: () => toks.map(t => t.t).join('')
+  };
+}
+
+const _DIFF_BINARY = new Set(['+', '-', '*', '/', '%', '<<', '>>', '<', '>', '<=', '>=', '==', '!=',
+  '&', '^', '|', '&&', '||', '?', ':', '=', '+=', '-=', '*=', '/=', '%=', '&=', '^=', '|=', '<<=', '>>=', ',']);
+
+/* x = x op E  ->  x op= E, when nothing at E's top level binds as loosely as op. */
+function _diffCanonCompound(code) {
+  const v = _diffStmtView(code);
+  const { T, txt } = v;
+  for (let p = 0; p < v.sig.length; p++) {
+    const a = T(p);
+    if (!a || a.k !== 'id' || DIFF_C_RESERVED.has(a.t) || txt(p + 1) !== '=' || txt(p + 2) !== a.t) continue;
+    const op = txt(p + 3);
+    if (!/^([-+*\/%&|^]|<<|>>)$/.test(op)) continue;
+    const ends = v.endsAt(p);
+    if (!ends) continue;
+    const tighter = op === '+' || op === '-' ? new Set(['*', '/', '%']) : new Set();
+    let q = p + 4, nest = 0, ok = q < v.sig.length, prevOperand = false;
+    for (; q < v.sig.length; q++) {
+      const t = txt(q), k = T(q).k;
+      if (nest === 0 && q > p + 4 && ends(q)) break;
+      if (t === '{' || t === '}' || t === ';') { ok = false; break; }
+      if (t === '(' || t === '[') { nest++; prevOperand = false; continue; }
+      if (t === ')' || t === ']') { if (--nest < 0) { ok = false; break; } prevOperand = true; continue; }
+      if (nest === 0 && prevOperand && _DIFF_BINARY.has(t) && !tighter.has(t)) { ok = false; break; }
+      if (k === 'id' || k === 'lit' || /^\d/.test(t)) prevOperand = true;
+      else if (t !== '++' && t !== '--') prevOperand = false;   // a postfix ++ keeps the operand, a prefix one has none yet
+    }
+    if (!ok || q >= v.sig.length || q === p + 4 || !v.sameLine(p, q)) continue;
+    v.T(p + 1).t = op + '=';
+    v.blank(p + 1, p + 3);
+    p = q;
+  }
+  return v.text();
+}
+
+/* ++i, i += 1, i -= 1  ->  i++, i--, where the value is discarded. */
+function _diffCanonIncrement(code) {
+  const v = _diffStmtView(code);
+  const { T, txt } = v;
+  for (let p = 0; p < v.sig.length; p++) {
+    const ends = v.endsAt(p);
+    if (!ends) continue;
+    const a = T(p), b = T(p + 1);
+    if (!a || !b) continue;
+    let id = null, op = null, last = -1;
+    if ((a.t === '++' || a.t === '--') && b.k === 'id' && ends(p + 2)) {                          // ++i
+      id = b.t; op = a.t; last = p + 1;
+    } else if (a.k === 'id' && (b.t === '+=' || b.t === '-=') && txt(p + 2) === '1' && ends(p + 3)) { // i += 1
+      id = a.t; op = b.t[0] + b.t[0]; last = p + 2;
+    }
+    if (id && !DIFF_C_RESERVED.has(id) && v.sameLine(p, last)) {
+      a.t = id + op;
+      v.blank(p, last);
+      p = last;
+    }
+  }
+  return v.text();
+}
+
+/* `name(void)` declares the same function as `name()`; `return (x);` is `return x;`. */
+function _diffCanonParens(code) {
+  const v = _diffStmtView(code);
+  const { T, txt, toks, sig } = v;
+  for (let p = 1; p + 2 < sig.length; p++) {
+    if (txt(p) === '(' && txt(p + 1) === 'void' && txt(p + 2) === ')' && T(p - 1).k === 'id' && v.sameLine(p, p + 2)) {
+      v.blank(p, p + 2);
+      T(p + 2).t = ')';
+    }
+  }
+  for (let p = 0; p + 1 < sig.length; p++) {
+    if (txt(p) !== 'return' || txt(p + 1) !== '(') continue;
+    const c = v.match.get(p + 1);
+    if (c == null || txt(c + 1) !== ';' || !v.sameLine(p, c)) continue;
+    // `return(x)` has nothing between return and x once the bracket goes, so leave a space.
+    T(p + 1).t = sig[p + 1] === sig[p] + 1 ? ' ' : '';
+    T(c).t = '';
+  }
+  return toks.map(t => t.t).join('');
+}
+
 function _diffCanonC(code) {
-  return String(code || '').replace(/\(\s*void\s*\)/g, '()');
+  return _diffCanonParens(_diffCanonIncrement(_diffCanonCompound(String(code || ''))));
+}
+
+/* ============================================================
+   PAIRING NAMES, NOT NUMBERING THEM
+   ------------------------------------------------------------
+   Numbering names by first appearance (alphaNormalizeC, still what the boss
+   bar uses) is right only while both programs mention their names in the
+   same order. One extra variable broke it:
+
+       int r, x;  scanf("%d", &x);   ->   int v1, v2;  scanf("%d", &v2);
+       int n;     scanf("%d", &n);   ->   int v1;      scanf("%d", &v1);
+
+   and from there every line that used x was reported as "Different name: the
+   reference calls this n, you wrote x" -- with "Ignore variable names" on. A
+   different declaration order (`int b, a;`) did the same.
+
+   So the names are paired by WHERE THEY ARE USED. Both programs are lined up
+   token by token with any name allowed to stand against any other (keywords,
+   the library, numbers and punctuation must match exactly), every place
+   where your name sits against one of the reference's is a vote for that
+   pair, and the pairs are taken strongest first, one partner each. x sat
+   against n in every line, so x is n. A name of yours with no partner gets a
+   name of its own that nothing in the reference has, so it still differs.
+
+   Still consistent, never blanking: two variables used in each other's
+   places are still a difference, because each can only be paired once.
+   ============================================================ */
+
+const _DIFF_PAIR_CELLS = 4000000;   // the token-alignment table, at most (8 MB)
+
+/**
+ * Pair the user's names with the reference's.
+ * @returns {{user: Map<string,string>, expected: Map<string,string>}}
+ *   each side's name -> the shared name it is compared under
+ */
+function diffPairNames(userCode, expectedCode) {
+  const sig = src => _diffLexC(src).filter(t => t.k !== 'ws' && t.k !== 'nl');
+  const A = sig(userCode), B = sig(expectedCode);
+  const ANY = '\u0001';
+  const ka = A.map(t => (_diffRenamable(t) ? ANY : t.t));
+  const kb = B.map(t => (_diffRenamable(t) ? ANY : t.t));
+
+  const votes = new Map();
+  const vote = (i, j) => {
+    if (ka[i] !== ANY) return;
+    const key = A[i].t + '\u0000' + B[j].t;
+    const v = votes.get(key);
+    if (v) v.n++; else votes.set(key, { u: A[i].t, e: B[j].t, n: 1, at: j });
+  };
+
+  // What both share at the ends needs no table.
+  let lo = 0;
+  while (lo < ka.length && lo < kb.length && ka[lo] === kb[lo]) { vote(lo, lo); lo++; }
+  let hiA = ka.length, hiB = kb.length;
+  while (hiA > lo && hiB > lo && ka[hiA - 1] === kb[hiB - 1]) { hiA--; hiB--; vote(hiA, hiB); }
+
+  const n = hiA - lo, m = hiB - lo;
+  const aligned = !(n > 0 && m > 0) || n * m <= _DIFF_PAIR_CELLS;
+  if (n > 0 && m > 0 && aligned) {
+    const W = m + 1;
+    const dp = new Uint16Array((n + 1) * W);        // LCS of the suffixes; min(n, m) <= 2000 here
+    for (let i = n - 1; i >= 0; i--) {
+      for (let j = m - 1; j >= 0; j--) {
+        dp[i * W + j] = ka[lo + i] === kb[lo + j]
+          ? dp[(i + 1) * W + j + 1] + 1
+          : Math.max(dp[(i + 1) * W + j], dp[i * W + j + 1]);
+      }
+    }
+    let i = 0, j = 0;
+    while (i < n && j < m) {
+      if (ka[lo + i] === kb[lo + j]) { vote(lo + i, lo + j); i++; j++; }
+      else if (dp[(i + 1) * W + j] >= dp[i * W + j + 1]) i++;
+      else j++;
+    }
+  }
+
+  const u2e = new Map(), taken = new Set();
+  [...votes.values()]
+    .sort((x, y) => y.n - x.n || x.at - y.at)
+    .forEach(v => { if (!u2e.has(v.u) && !taken.has(v.e)) { u2e.set(v.u, v.e); taken.add(v.e); } });
+
+  const order = toks => [...new Set(toks.filter(_diffRenamable).map(t => t.t))];
+  const uOrder = order(A), eOrder = order(B);
+  if (!aligned) {
+    // Too long to line up: what is left is paired by order of first appearance.
+    const ul = uOrder.filter(x => !u2e.has(x)), el = eOrder.filter(x => !taken.has(x));
+    for (let k = 0; k < Math.min(ul.length, el.length); k++) u2e.set(ul[k], el[k]);
+  }
+
+  const expected = new Map(), user = new Map();
+  eOrder.forEach((name, k) => expected.set(name, 'v' + (k + 1)));
+  let own = 0;
+  uOrder.forEach(name => {
+    const partner = u2e.get(name);
+    user.set(name, partner != null ? expected.get(partner) : 'u' + (++own));
+  });
+  return { user, expected };
+}
+
+/** The source with every name replaced by the one it is compared under. */
+function diffRenameC(code, names) {
+  let out = '';
+  for (const t of _diffLexC(code)) out += (t.k === 'id' && names.has(t.t)) ? names.get(t.t) : t.t;
+  return out;
+}
+
+/* ── Line breaks are whitespace too ───────────────────────────
+   With whitespace ignored, where a line breaks should not matter either, and
+   the one place C programs disagree about it is the brace:
+
+       if (n % 2 == 0) {          if (x % 2 == 0)
+           ...                    {
+       } else {                       ...
+                                  }
+                                  else
+                                  {
+
+   The right-hand one is a correct program and was coming back as seven
+   differences. A line that is only `{` therefore joins the line above it, and
+   so do an `else` after a closing brace and a do-while's `while (...);`.
+   Both programs go through the same joins, so this can only remove a
+   difference of layout, never hide one of content. The joined row keeps the
+   first line's number. */
+function _diffJoinsUp(prev, row) {
+  if (row.norm === '{') return !/^#/.test(prev.norm);
+  if (/^else\b/.test(row.stripped.trim())) return /\}$/.test(prev.norm);
+  if (/^while\(.*\);$/.test(row.norm)) return prev.norm === '}';
+  return false;
+}
+
+function _diffJoinLayout(rows, normalizeLine) {
+  const glue = (x, y) => String(x).replace(/\s+$/, '') + ' ' + String(y).replace(/^\s+/, '');
+  const out = [];
+  rows.forEach(r => {
+    const prev = out[out.length - 1];
+    if (!prev || !_diffJoinsUp(prev, r)) { out.push(r); return; }
+    // Comments stay beside the joined row: rebuild raw as the code plus them.
+    const notes = [diffLineComment(prev.raw, prev.plain), diffLineComment(r.raw, r.plain)].filter(Boolean);
+    prev.stripped = glue(prev.stripped, r.stripped);
+    prev.norm = normalizeLine(prev.stripped);
+    prev.plain = glue(prev.plain, r.plain);
+    prev.raw = notes.length ? prev.plain + ' ' + notes.join(' ') : prev.plain;
+  });
+  return out;
+}
+
+/* `#include <stdlib.h>` above `#include <stdio.h>` is the same program as
+   below it, but a line alignment cannot see a swap: it came back as one
+   missing line and one extra. So the includes at the top of your file are
+   put in the reference's order before aligning, any the reference does not
+   have after them. Each row keeps its own line number, so the left panel
+   can read 2, 1 there -- which is what you wrote. */
+function _diffAlignIncludes(uRows, cRows) {
+  const isInc = r => /^\s*#\s*include\b/.test(r.norm);
+  const block = rows => {
+    const s = rows.findIndex(isInc);
+    if (s < 0) return null;
+    let e = s;
+    while (e < rows.length && isInc(rows[e])) e++;
+    return { s, e };
+  };
+  const bu = block(uRows), bc = block(cRows);
+  if (!bu || !bc) return uRows;
+  const pool = uRows.slice(bu.s, bu.e), ordered = [];
+  cRows.slice(bc.s, bc.e).forEach(t => {
+    const i = pool.findIndex(r => r.norm === t.norm);
+    if (i >= 0) ordered.push(pool.splice(i, 1)[0]);
+  });
+  return uRows.slice(0, bu.s).concat(ordered, pool, uRows.slice(bu.e));
+}
+
+/* ── Highlighting under paired names ──────────────────────────
+   The line comparison was renaming and the highlight inside a line was not:
+   `printf("%d is Even", x);` against `printf("%d is Even\n", n);` was paired
+   correctly as one changed line, then drawn with `x` and `n` in red beside
+   the `\n` that was the real difference. Here a paired name is one unit,
+   compared under its shared name, so x against n is a match and only the
+   `\n` is marked. Names inside quotes are text, as everywhere else. */
+function _diffLineUnits(line, names, granularity) {
+  const units = [];
+  _diffLexC(line).forEach(tok => {
+    if (tok.k === 'ws' || tok.k === 'nl') { units.push({ text: tok.t, key: null }); return; }
+    if (tok.k === 'id' && names.has(tok.t)) { units.push({ text: tok.t, key: '\u0001' + names.get(tok.t) }); return; }
+    const pieces = granularity === 'word' ? diffTokenize(tok.t) : Array.from(tok.t);
+    pieces.forEach(p => units.push({ text: p, key: /^\s+$/.test(p) ? null : p }));
+  });
+  return units;
+}
+
+/* The same LCS as computeCharLCS, walked from the front, so among equally long
+   answers the one that keeps the shared beginning together wins. Walked from
+   the back, `"%d is Even"` against `"%d is Even\n"` matched your final n to
+   the n of `\n` and marked the n of "Even" as missing, beside the backslash. */
+function _diffLcsFromFront(a, b) {
+  const n = a.length, m = b.length, W = m + 1;
+  const dp = new Uint16Array((n + 1) * W);
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      dp[i * W + j] = a[i] === b[j] ? dp[(i + 1) * W + j + 1] + 1 : Math.max(dp[(i + 1) * W + j], dp[i * W + j + 1]);
+    }
+  }
+  const matchA = new Set(), matchB = new Set();
+  let i = 0, j = 0;
+  while (i < n && j < m) {
+    if (a[i] === b[j]) { matchA.add(i++); matchB.add(j++); }
+    else if (dp[(i + 1) * W + j] >= dp[i * W + j + 1]) i++;
+    else j++;
+  }
+  return { matchA, matchB, lcsLength: dp[0] };
+}
+
+function _diffNamedLineDiffs(actualLine, expectedLine, granularity, names) {
+  const ua = _diffLineUnits(actualLine, names.user, granularity);
+  const ue = _diffLineUnits(expectedLine, names.expected, granularity);
+  const ia = [], ie = [];
+  ua.forEach((u, i) => { if (u.key != null) ia.push(i); });
+  ue.forEach((u, i) => { if (u.key != null) ie.push(i); });
+  const ka = ia.map(i => ua[i].key), ke = ie.map(i => ue[i].key);
+  const { matchA, matchB } = _diffLcsFromFront(ka, ke);
+  const keysE = new Set(ke);
+
+  const stA = ua.map(() => 'neutral'), stE = ue.map(() => 'neutral');
+  ia.forEach((ui, k) => { stA[ui] = matchA.has(k) ? 'match' : (keysE.has(ka[k]) ? 'offset' : 'wrong'); });
+  ie.forEach((ui, k) => { stE[ui] = matchB.has(k) ? 'match' : 'missing'; });
+  return {
+    actualChars: ua.map((u, i) => ({ char: u.text, status: stA[i] })),
+    expectedChars: ue.map((u, i) => ({ char: u.text, status: stE[i] })),
+    ratio: matchA.size / (Math.max(ka.length, ke.length) || 1)
+  };
 }
 
 /**
@@ -301,8 +744,10 @@ function _diffCanonC(code) {
  *   .ignoreComments  strip `//` and `/* *\/` before comparing (default true)
  *   .ignoreWhitespace  collapse all whitespace before comparing (default true);
  *                      when false, indentation and inner spacing count
- *   .ignoreNames     number identifiers by first appearance before comparing
- *                      (default true), so `int x, y` matches `int a, b`
+ *   .ignoreNames     pair each of your names with the reference's by where it
+ *                      is used (default true), so `int x, y` matches `int a, b`;
+ *                      the pairs come back as `names` for the highlight
+ *                      (computeLineDiffs) and the explanations to use too
  *
  * Every returned row carries the ORIGINAL 1-based line number it came from in
  * each file (actualLine / expectedLine) plus the untouched source line
@@ -336,9 +781,13 @@ function computeDiffs(userCode, expectedCode, opts) {
   const plainULines = strippedUser.split('\n');
   const plainCLines = strippedExpected.split('\n');
 
+  let names = null;
   if (ignoreNames) {
-    strippedUser = alphaNormalizeC(_diffCanonC(strippedUser));
-    strippedExpected = alphaNormalizeC(_diffCanonC(strippedExpected));
+    strippedUser = _diffCanonC(strippedUser);
+    strippedExpected = _diffCanonC(strippedExpected);
+    names = diffPairNames(strippedUser, strippedExpected);
+    strippedUser = diffRenameC(strippedUser, names.user);
+    strippedExpected = diffRenameC(strippedExpected, names.expected);
   }
 
   const normalizeLine = ignoreWhitespace
@@ -347,7 +796,7 @@ function computeDiffs(userCode, expectedCode, opts) {
 
   // Process data using strictly the stripped versions
   const stripULines = strippedUser.split('\n');
-  const uLinesData = [];
+  let uLinesData = [];
   for (let i = 0; i < stripULines.length; i++) {
     const stripped = stripULines[i];
     const norm = normalizeLine(stripped);
@@ -357,7 +806,7 @@ function computeDiffs(userCode, expectedCode, opts) {
   }
 
   const stripCLines = strippedExpected.split('\n');
-  const cLinesData = [];
+  let cLinesData = [];
   for (let i = 0; i < stripCLines.length; i++) {
     const stripped = stripCLines[i];
     const norm = normalizeLine(stripped);
@@ -365,6 +814,13 @@ function computeDiffs(userCode, expectedCode, opts) {
       cLinesData.push({ stripped: stripped, norm: norm, raw: rawCLines[i] != null ? rawCLines[i] : stripped, plain: plainCLines[i] != null ? plainCLines[i] : stripped, lineNo: i + 1 });
     }
   }
+
+  // Where a brace or an else sits is layout, once whitespace is ignored (see _diffJoinLayout).
+  if (ignoreWhitespace) {
+    uLinesData = _diffJoinLayout(uLinesData, normalizeLine);
+    cLinesData = _diffJoinLayout(cLinesData, normalizeLine);
+  }
+  uLinesData = _diffAlignIncludes(uLinesData, cLinesData);
 
   const n = uLinesData.length;
   const m = cLinesData.length;
@@ -512,7 +968,7 @@ function computeDiffs(userCode, expectedCode, opts) {
     }
   }
 
-  return { diffs, scoreCount: totalScore, cLinesLen: cLinesData.length || 1 };
+  return { diffs, scoreCount: totalScore, cLinesLen: cLinesData.length || 1, names };
 }
 
 /* ============================================================
@@ -545,7 +1001,8 @@ function _diffCount(s, ch) {
 
 /**
  * @param {object} row a diff row from computeDiffs
- * @param {{bracesBalanced:boolean, userLines:string[]}} [ctx] the whole submission, whitespace-stripped
+ * @param {{bracesBalanced:boolean, userLines:string[], names?:object}} [ctx] the whole submission,
+ *   whitespace-stripped, and computeDiffs' `names` when it compared with names ignored
  * @returns {?{text:string, kind:string}} short explanation, or null
  */
 function explainDiffLine(row, ctx) {
@@ -635,9 +1092,35 @@ function explainDiffLine(row, ctx) {
     }
   }
 
+  /* A single different name. With names ignored, a name is only "different"
+     when it is not the reference's name's partner: x against n, once x is
+     paired with n, is the same variable, and saying "the reference calls this
+     n, you wrote x" was telling the reader to fix something that was right. */
+  const names = ctx && ctx.names && ctx.names.user && ctx.names.expected ? ctx.names : null;
+  if (names) {
+    const ids = s => _diffLexC(s).filter(t => t.k === 'id').map(t => t.t);
+    const nA = ids(a), nE = ids(e);
+    if (nA.length === nE.length) {
+      const changed = [];
+      for (let i = 0; i < nE.length; i++) {
+        const ka = names.user.has(nA[i]) ? names.user.get(nA[i]) : nA[i];
+        const ke = names.expected.has(nE[i]) ? names.expected.get(nE[i]) : nE[i];
+        if (ka !== ke) changed.push([nA[i], nE[i], ke]);
+      }
+      if (changed.length === 1) {
+        const [wrote, refName, shared] = changed[0];
+        let yours = null;
+        names.user.forEach((to, from) => { if (yours == null && to === shared) yours = from; });
+        return yours
+          ? { kind: 'name', text: `Different variable: the reference uses \`${refName}\` here, which is your \`${yours}\`, but you wrote \`${wrote}\`.` }
+          : { kind: 'name', text: `Different name here: the reference uses \`${refName}\`, you wrote \`${wrote}\`.` };
+      }
+    }
+  }
+
   // A single renamed identifier
   const idE = _diffIdents(e), idA = _diffIdents(a);
-  if (idE.length === idA.length) {
+  if (!names && idE.length === idA.length) {
     const changed = [];
     for (let i = 0; i < idE.length; i++) if (idE[i] !== idA[i]) changed.push([idA[i], idE[i]]);
     if (changed.length === 1) {
