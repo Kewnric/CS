@@ -649,7 +649,7 @@ async function _loadV2Domains(uid) {
   const userRef = fbDb.collection('users').doc(uid);
   const domRef = (name) => userRef.collection('domains').doc(name);
 
-  const [appDoc, histDoc, vizDoc, brainDoc, questsDoc, settingsDoc, stashDoc, trainingDoc, fgDoc] = await Promise.all([
+  const [appDoc, histDoc, vizDoc, brainDoc, questsDoc, settingsDoc, stashDoc, trainingDoc, fgDoc, prefsDoc] = await Promise.all([
     domRef('app').get(),
     domRef('history').get(),
     domRef('viz').get(),
@@ -658,7 +658,8 @@ async function _loadV2Domains(uid) {
     domRef('settings').get(),
     domRef('stash').get(),
     domRef('training').get(),
-    domRef('freeground').get()
+    domRef('freeground').get(),
+    domRef('prefs').get()
   ]);
   // Inner lists went up wrapped (see _sanitizeForFirestore); unwrap them here.
   const dataOf = (doc) => _fromFirestore(doc.data());
@@ -681,7 +682,11 @@ async function _loadV2Domains(uid) {
     _restorePracticeDrafts(st.practiceDraft);
     _restoreDraft('ssp.sqlAttemptDraft', st.sqlDraft);
     _restoreDraft('npAttemptInProgress', st.npDraft);
+    _restorePsetDrafts(st.psetDrafts);
   }
+
+  // Preferences: none saved yet means this device's stay, and go up next save.
+  if (prefsDoc.exists) _applyRestoredPrefs(_restorePrefs(dataOf(prefsDoc)));
 
   // App (core data — excludes history)
   if (appDoc.exists) {
@@ -1050,6 +1055,132 @@ function _fromFirestore(v) {
   return v;
 }
 
+/* ============================================================
+   PREFERENCES AND DEVICE-KEPT DATA — the `prefs` document
+   ------------------------------------------------------------
+   These live in their own localStorage keys, read by the features that own
+   them, and used to stay on the device: a new device, or a sign-out, lost
+   them. Each listed key now rides up as { k, v } (the raw string, so no
+   feature changes how it reads its own key) and is written back on load.
+   A key the account has not saved is left as it is on this device.
+
+   NOT LISTED, ON PURPOSE: where windows and panes sit and how big they are,
+   which panels are folded, Spotify's tokens and the remember-me choice (a
+   key and a device decision), the media caches, the login picture, the
+   Freeground buffer, per-account welcome flags, stickers (their pictures
+   are on this device only) and the glass speed probe. Add a new key here
+   only if it is the person's data or taste, not this screen's layout.
+   docs/superpowers/specs/2026-11-18-cloud-sync-icon-design.md
+   ============================================================ */
+const SYNC_PREF_KEYS = [
+  // Data
+  'anSrsState', 'demoSeenLessons', 'editorLineMarks', 'ssp.dailyGoal', 'ssp.themeEdits', 'ssp.actionUse',
+  // What lists show and how
+  'analyticsHideItems', 'anRange', 'browseHideItems', 'browseRowShow', 'csView', 'homeCarouselSource',
+  'libraryPrefs', 'notesRowShow', 'snipRowShow', 'snippetsHideItems', 'solutionDiffPrefs', 'ssp.hideVerse',
+  'ssp.treeColorTarget', 'studyHideItems',
+  // Editor, terminal, practice
+  'editorFontSize', 'editorWordWrap', 'lineNumbersHidden', 'ssp.editorFx', 'ssp.editorFxBlur',
+  'ssp.editorFxOverlay', 'ssp.editorFxSparks', 'ssp.editorFxTilt', 'ssp.peek', 'terminalCompilerOpts',
+  'ssp.termEngine', 'ssp.bossBreak', 'ssp.bossShake',
+  // Typing, sound, voice
+  'ssp.typeConfig', 'ssp.typingSfx', 'ssp.typingSfxVoice', 'ssp.typingSfxVol', 'ssp.speech',
+  'ssp.ost.autoplay', 'ssp.ambient', 'ssp.ambientTheme',
+  // Look and motion
+  'ssp.motion', 'ssp.glass', 'ssp.libHolo', 'ssp.hud', 'ssp.sidebarAuto', 'ssp.windowMemoryOff',
+  // Language, notebooks, demos, drills, Codex
+  'lang.studyLang', 'lang.refLang', 'lang.autoskip', 'ssp.lang.autoVoice', 'ssp.langAutoSpeak',
+  'ssp.langDrillPrefs', 'ssp.np.autoVoice', 'ssp.np.shuffle', 'npTextAlign', 'demoVoice', 'demoVoiceOpts',
+  'demoAutoOpen', 'ssp.drillMode', 'ssp.drillSource', 'ssp.codexLookup',
+  // Notes and the canvas
+  'ssp.brainNoteStyle', 'ssp.brainLinkStyle', 'ssp.brainCodeLang', 'ssp.brainNewNoteCode', 'ssp.brainTaskDur',
+  'brainCanvasOpts', 'vizForceSettings', 'ssp.vizBrainDefault', 'ssp.vizRecentColors'
+];
+const _SYNC_PREF_SET = new Set(SYNC_PREF_KEYS);
+
+/** True for a localStorage key that follows the account. */
+function syncPrefIsSynced(key) { return _SYNC_PREF_SET.has(String(key)); }
+
+/** The `prefs` document: every synced key this device has, as raw strings. */
+function _prefsForCloud() {
+  const items = [];
+  SYNC_PREF_KEYS.forEach(k => {
+    let v = null;
+    try { v = localStorage.getItem(k); } catch (e) { /* no storage */ }
+    if (v !== null) items.push({ k, v });
+  });
+  return { items };
+}
+
+/** Writes the account's preferences to this device; returns the keys that changed. */
+function _restorePrefs(doc) {
+  const changed = [];
+  ((doc && Array.isArray(doc.items)) ? doc.items : []).forEach(it => {
+    if (!it || !syncPrefIsSynced(it.k) || typeof it.v !== 'string') return;
+    try {
+      if (localStorage.getItem(it.k) !== it.v) { localStorage.setItem(it.k, it.v); changed.push(it.k); }
+    } catch (e) { /* private mode, or full */ }
+  });
+  return changed;
+}
+
+/** What can change in place does; the rest reads its key on the next load. */
+function _applyRestoredPrefs(changed) {
+  const has = (k) => changed.indexOf(k) !== -1;
+  try { if (has('ssp.themeEdits') && typeof themeEditApply === 'function') themeEditApply(); } catch (e) { /* next load */ }
+  try { if (has('ssp.motion') && window.Motion && Motion.setLevel) Motion.setLevel(localStorage.getItem('ssp.motion')); } catch (e) { /* next load */ }
+  try { if (has('ssp.glass') && typeof glassApply === 'function') glassApply(); } catch (e) { /* next load */ }
+  try {
+    if ((has('editorFontSize') || has('editorWordWrap') || has('lineNumbersHidden')) && typeof applyEditorViewSettings === 'function') applyEditorViewSettings();
+  } catch (e) { /* next load */ }
+}
+
+/** Practice-set drafts from the cloud, merged per set: the newer one wins. */
+function _restorePsetDrafts(incoming) {
+  if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) return;
+  try {
+    let mine = {};
+    try { mine = JSON.parse(localStorage.getItem('ssp.psetDrafts') || 'null') || {}; } catch (e) { mine = {}; }
+    Object.keys(incoming).forEach(id => {
+      const d = incoming[id];
+      if (d && typeof d === 'object' && (!mine[id] || (mine[id].savedAt || 0) < (d.savedAt || 0))) mine[id] = d;
+    });
+    const keep = typeof PSET_DRAFTS_MAX === 'number' ? PSET_DRAFTS_MAX : 4;
+    Object.keys(mine).sort((a, b) => (mine[b].savedAt || 0) - (mine[a].savedAt || 0)).slice(keep).forEach(k => { delete mine[k]; });
+    localStorage.setItem('ssp.psetDrafts', JSON.stringify(mine));
+  } catch (e) { /* private mode, or too big to store */ }
+}
+
+/* A synced key changing asks for a cloud save, wherever it is written from:
+   the ~60 places that write these keys need not know about the cloud. Only a
+   real change counts (several write the same value on every paint), and
+   only while signed in; the load's own write-back runs with saves
+   suppressed. */
+(function _watchSyncedKeys() {
+  if (typeof Storage === 'undefined') return;
+  const proto = Storage.prototype;
+  const get = proto.getItem, set = proto.setItem, remove = proto.removeItem;
+  const isLocal = (store) => { try { return store === window.localStorage; } catch (e) { return false; } };
+  const touched = (store, key, before) => {
+    if (!syncPrefIsSynced(key) || !isLocal(store)) return;
+    if (storageMode !== 'online' || !currentFirebaseUser) return;
+    if (get.call(store, key) === before) return;
+    scheduleCloudSave();
+  };
+  proto.setItem = function (key, value) {
+    const before = syncPrefIsSynced(key) ? get.call(this, key) : null;
+    const r = set.call(this, key, value);
+    try { touched(this, key, before); } catch (e) { /* never break a write */ }
+    return r;
+  };
+  proto.removeItem = function (key) {
+    const before = syncPrefIsSynced(key) ? get.call(this, key) : null;
+    const r = remove.call(this, key);
+    try { touched(this, key, before); } catch (e) { /* never break a write */ }
+    return r;
+  };
+})();
+
 /** Strip values Firestore can't store: undefined, functions, Set, Map, DOM nodes,
  *  Date (converted to ms), circular refs; wrap a list held directly in a list.
  *  Returns a deep-cloned plain object. */
@@ -1217,8 +1348,13 @@ async function saveToFirestore(uid) {
          on and nowhere else. It carries savedAt like the others, so the
          newer of two devices' drafts wins the same way. Measured at 8.9KB
          for a 120-question attempt, against a 1MB document cap. */
-      npDraft: _draftForCloud('npAttemptInProgress')
+      npDraft: _draftForCloud('npAttemptInProgress'),
+      // Practice sets keep a draft per set too (practice-set.js), merged per set on load.
+      psetDrafts: _draftForCloud('ssp.psetDrafts')
     }) || {};
+
+    // Preferences and the data kept in their own keys (SYNC_PREF_KEYS).
+    const prefsPayload = _sanitizeForFirestore(_prefsForCloud()) || {};
 
     // History domain (separated — grows unbounded)
     const historyPayload = _sanitizeForFirestore({
@@ -1300,7 +1436,7 @@ async function saveToFirestore(uid) {
        so an oversized stash does not fail by itself, it fails EVERY domain with
        it -- app, history, settings, all of it -- and reports a raw Firestore
        error instead of the sentence that says what to do about it. */
-    const domains = { app: appPayload, history: historyPayload, stash: stashPayload, viz: vizPayload, brain: brainPayload, quests: questsPayload, settings: settingsPayload, training: trainingPayload, freeground: fgPayload };
+    const domains = { app: appPayload, history: historyPayload, stash: stashPayload, viz: vizPayload, brain: brainPayload, quests: questsPayload, settings: settingsPayload, training: trainingPayload, freeground: fgPayload, prefs: prefsPayload };
     for (const [name, payload] of Object.entries(domains)) {
       /* UTF-8 BYTES, which is what Firestore counts. String length counts
          UTF-16 units, and every em dash and arrow in this app's own copy is
@@ -1338,6 +1474,7 @@ async function saveToFirestore(uid) {
     batch.set(domRef('settings'), settingsPayload);
     batch.set(domRef('training'), trainingPayload);
     batch.set(domRef('freeground'), fgPayload);
+    batch.set(domRef('prefs'), prefsPayload);
 
     // Commit with timeout
     const writePromise = batch.commit();
