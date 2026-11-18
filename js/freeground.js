@@ -26,7 +26,9 @@ const FG_LIMITS = {
   nameMax: 40
 };
 
-const FG_DEFAULT_STARTER = '#include <stdio.h>\n\nint main(void) {\n    \n    return 0;\n}\n';
+const FG_DEFAULT_STARTER = '/**\n *    author:\n**/\n#include <stdio.h>\nint main(){\n\t\n\treturn 0;\n}';
+/** The default until 2026-11-18. Settings saved a copy of it; that copy still means "the default". */
+const FG_OLD_STARTER = '#include <stdio.h>\n\nint main(void) {\n    \n    return 0;\n}\n';
 
 function fgStore() {
   if (!state.freeground || typeof state.freeground !== 'object' || !Array.isArray(state.freeground.tabs)) {
@@ -65,7 +67,26 @@ function fgTotalChars() { return fgTabs().reduce((n, t) => n + fgTabChars(t), 0)
 /** The starter a new freeground opens with (Settings may change it later). */
 function fgDefaultStarter() {
   const p = state.trainPrefs && state.trainPrefs.fgStarter;
-  return typeof p === 'string' ? p : FG_DEFAULT_STARTER;
+  return typeof p === 'string' && p !== FG_OLD_STARTER ? p : FG_DEFAULT_STARTER;
+}
+
+/**
+ * Where the caret goes in starter code: the end of the first blank line in
+ * main's body, after its indent (line 6 of the default). -1 if there is none.
+ */
+function fgStarterCaret(code) {
+  const s = String(code == null ? '' : code);
+  const m = /\bmain\s*\([^)]*\)\s*\{/.exec(s);
+  if (!m) return -1;
+  let nl = s.indexOf('\n', m.index + m[0].length);
+  while (nl !== -1) {
+    const end = s.indexOf('\n', nl + 1);
+    const line = s.slice(nl + 1, end === -1 ? s.length : end);
+    if (/^[ \t]*$/.test(line)) return nl + 1 + line.length;
+    if (line.indexOf('}') !== -1) return -1;
+    nl = end;
+  }
+  return -1;
 }
 
 /** A name as stored: trimmed, single-spaced, at most 40 characters. '' if blank. */

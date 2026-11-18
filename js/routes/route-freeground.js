@@ -247,7 +247,7 @@ function freegroundInit() {
   document.addEventListener('visibilitychange', _fg.onVis);
   _fg.timer = setInterval(() => fgCommit(), FG_COMMIT_MS);
 
-  if (ta) ta.focus();
+  if (ta) { ta.focus(); _fgCaretToStarter(ta); }
 }
 
 function freegroundDestroy() {
@@ -481,7 +481,7 @@ function fgSwitchTo(id) {
   if (!_fg || id === fgStore().activeId) return;
   fgActivate(id);
   const ta = document.getElementById('editor-textarea');
-  if (ta) ta.focus();
+  if (ta) { ta.focus(); _fgCaretToStarter(ta); }
 }
 
 function fgCycle(step) {
@@ -498,12 +498,14 @@ function fgNewTabUI() {
   if (!t) return;
   fgActivate(t.id, { noCommit: true });
   const ta = document.getElementById('editor-textarea');
-  if (ta) {
-    ta.focus();
-    // Inside main's body, on the empty line, ready to type.
-    const at = ta.value.indexOf('\n    \n');
-    if (at !== -1) ta.setSelectionRange(at + 5, at + 5);
-  }
+  if (ta) { ta.focus(); _fgCaretToStarter(ta); }
+}
+
+/** On an untouched starter, put the caret inside main's body, on the indented empty line. */
+function _fgCaretToStarter(ta) {
+  if (!ta || ta.value !== fgDefaultStarter()) return;
+  const at = fgStarterCaret(ta.value);
+  if (at !== -1) ta.setSelectionRange(at, at);
 }
 
 function fgCloseTabUI(id) {

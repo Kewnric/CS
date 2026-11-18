@@ -35,7 +35,7 @@ function trainSettingsOpen() {
   trainSettingsClose();
   const p = _trainPrefs();
   const dock = typeof zdockPrefs === 'function' ? zdockPrefs() : { on: true, fade: true };
-  const starter = typeof p.fgStarter === 'string' ? p.fgStarter : (typeof FG_DEFAULT_STARTER === 'string' ? FG_DEFAULT_STARTER : '');
+  const starter = typeof fgDefaultStarter === 'function' ? fgDefaultStarter() : (typeof p.fgStarter === 'string' ? p.fgStarter : '');
   const ov = document.createElement('div');
   ov.id = 'train-settings';
   ov.className = 'modal-overlay';
@@ -97,7 +97,11 @@ function trainSettingsSave() {
   p.mixTemplates = Math.round(num('tset-mix', 1, 5, 2));
   p.flashPerLine = Math.round(num('tset-flash', 0.2, 2, 0.6) * 10) / 10;
   const starter = (document.getElementById('tset-starter') || {}).value;
-  if (typeof starter === 'string') p.fgStarter = starter;
+  // The default is not stored, so a later change to it reaches everyone who never wrote their own.
+  if (typeof starter === 'string') {
+    if (typeof FG_DEFAULT_STARTER === 'string' && starter === FG_DEFAULT_STARTER) delete p.fgStarter;
+    else p.fgStarter = starter;
+  }
   if (typeof saveData === 'function') saveData();
   try {
     const cur = JSON.parse(localStorage.getItem('ssp.zenDock') || '{}');
