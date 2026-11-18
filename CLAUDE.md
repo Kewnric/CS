@@ -118,6 +118,15 @@ cells), and the cloud save is one batch, so one such list fails every domain: `_
 wraps it as `{ $arr: [...] }` and `_loadV2Domains` reads every domain doc through `dataOf` →
 `_fromFirestore`, which unwraps it. A new cloud reader must do the same. Test:
 `tests/cloud-nested-arrays.spec.js` (runs the real SDK's batch check, no network).
+**Preferences and data kept in their own keys** sync through `SYNC_PREF_KEYS` (firebase-auth.js) as the
+`prefs` domain doc (`{ items: [{k, v}] }`, raw strings; a key the account lacks keeps the device's).
+**A new localStorage key that is the person's data or taste goes on that list**; layout (positions, sizes,
+folded panels), secrets and device caches never do. Writing a listed key while signed in schedules a cloud
+save by itself (a `Storage.prototype` wrapper). Practice-set drafts ride in `stash`, merged per set.
+**Save state shows on `#sync-fab`** (above the gear, `_paintSyncFab`): no toast on success, one per run of
+failures. Hiding the tab or coming back online saves at once; offline, the timed save waits.
+Proof for Google and username alike: `tests/cloud-sync.spec.js` (two-device round trip: every doc the fresh
+device saves must equal the first device's).
 
 ---
 
