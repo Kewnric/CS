@@ -113,7 +113,11 @@ under it would leave the next old load unable to read the library. A new reader 
 declare itself and be added to `STORE_COMPACT_GROUPS`. An unreadable compressed
 save goes down the same path as unreadable JSON: copy set aside, saving paused.
 `storageMode` chooses local vs cloud; Firebase auth is optional and the app
-works fully offline.
+works fully offline. Firestore refuses a list directly inside a list (a cheat-sheet table's rows of
+cells), and the cloud save is one batch, so one such list fails every domain: `_sanitizeForFirestore`
+wraps it as `{ $arr: [...] }` and `_loadV2Domains` reads every domain doc through `dataOf` →
+`_fromFirestore`, which unwraps it. A new cloud reader must do the same. Test:
+`tests/cloud-nested-arrays.spec.js` (runs the real SDK's batch check, no network).
 
 ---
 

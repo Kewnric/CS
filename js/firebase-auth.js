@@ -660,21 +660,23 @@ async function _loadV2Domains(uid) {
     domRef('training').get(),
     domRef('freeground').get()
   ]);
+  // Inner lists went up wrapped (see _sanitizeForFirestore); unwrap them here.
+  const dataOf = (doc) => _fromFirestore(doc.data());
 
   /* Freeground, templates, training and Codex (js/train-store.js). A missing
      document reads as empty, like every field above: keeping what was in
      memory would carry one account's data into the next one signed in. */
   if (typeof trainFieldsRead === 'function') {
-    trainFieldsRead(trainingDoc.exists ? trainingDoc.data() : {}, { domain: 'training' });
+    trainFieldsRead(trainingDoc.exists ? dataOf(trainingDoc) : {}, { domain: 'training' });
     const runs = {};
     ((state.freeground || {}).tabs || []).forEach(t => { if (t && t.id && t.lastRun) runs[t.id] = t.lastRun; });
-    trainFieldsRead(fgDoc.exists ? fgDoc.data() : {}, { domain: 'freeground' });
+    trainFieldsRead(fgDoc.exists ? dataOf(fgDoc) : {}, { domain: 'freeground' });
     ((state.freeground || {}).tabs || []).forEach(t => { if (t && !t.lastRun && runs[t.id]) t.lastRun = runs[t.id]; });
   }
 
   // The parked library and the unfinished attempts; see the write side.
   if (stashDoc.exists) {
-    const st = stashDoc.data();
+    const st = dataOf(stashDoc);
     state.codingStash = st.codingStash || state.codingStash || null;
     _restorePracticeDrafts(st.practiceDraft);
     _restoreDraft('ssp.sqlAttemptDraft', st.sqlDraft);
@@ -683,7 +685,7 @@ async function _loadV2Domains(uid) {
 
   // App (core data — excludes history)
   if (appDoc.exists) {
-    const d = appDoc.data();
+    const d = dataOf(appDoc);
     state.challenges = migrateLegacyData(d.challenges || []);
     state.snippets = d.snippets || [];
     state.notebooks = d.notebooks || [];
@@ -715,7 +717,7 @@ async function _loadV2Domains(uid) {
 
   // History (separated for size management)
   if (histDoc.exists) {
-    const d = histDoc.data();
+    const d = dataOf(histDoc);
     state.history = d.history || [];
     state.notebookHistory = d.notebookHistory || [];
     state.snippetHistory = d.snippetHistory || [];
@@ -725,7 +727,7 @@ async function _loadV2Domains(uid) {
 
   // Viz
   if (vizDoc.exists && typeof viz !== 'undefined') {
-    const v = vizDoc.data();
+    const v = dataOf(vizDoc);
     viz.nodes = v.nodes || [];
     viz.links = v.links || [];
     viz.pan = v.pan || { x: 0, y: 0 };
@@ -742,7 +744,7 @@ async function _loadV2Domains(uid) {
 
   // Brain
   if (brainDoc.exists && typeof brain !== 'undefined') {
-    const d = brainDoc.data();
+    const d = dataOf(brainDoc);
     brain.versions = d.versions || [];
     brain.folders = d.folders || [];
     brain.activeVersionId = d.activeVersionId || null;
@@ -750,7 +752,7 @@ async function _loadV2Domains(uid) {
 
   // Quests
   if (questsDoc.exists && typeof questState !== 'undefined') {
-    const d = questsDoc.data();
+    const d = dataOf(questsDoc);
     questState.quests = (typeof migrateQuest === 'function')
       ? (d.quests || []).map(migrateQuest) : (d.quests || []);
     if (d.player) questState.player = d.player;
@@ -759,7 +761,7 @@ async function _loadV2Domains(uid) {
 
   // Settings
   if (settingsDoc.exists) {
-    const s = settingsDoc.data();
+    const s = dataOf(settingsDoc);
     if (s.theme) {
       localStorage.setItem('theme', s.theme);
       document.documentElement.setAttribute('data-theme', s.theme);
@@ -1022,8 +1024,35 @@ function _cacheAllToLocalStorage() {
 /* ============================================================
    SAVE TO FIRESTORE — pushes all domains
    ============================================================ */
+/* A LIST DIRECTLY INSIDE A LIST is the one plain-JSON shape Firestore refuses
+   ("Nested arrays are not supported"), and the save is one batch, so a single
+   cheat-sheet table (rows of cells) failed every domain's save at once. Such a
+   list goes up wrapped as { $arr: [...] } and _fromFirestore unwraps it on
+   load. Saves from before this never held a wrapper: they could not be
+   written at all. tests/cloud-nested-arrays.spec.js */
+const FS_NESTED_KEY = '$arr';
+
+/** A domain document as the app keeps it: wrapped inner lists unwrapped. */
+function _fromFirestore(v) {
+  if (Array.isArray(v)) {
+    return v.map(item => {
+      const wrapped = item && typeof item === 'object' && !Array.isArray(item)
+        && Object.keys(item).length === 1 && Array.isArray(item[FS_NESTED_KEY]);
+      return _fromFirestore(wrapped ? item[FS_NESTED_KEY] : item);
+    });
+  }
+  // Plain maps only: a Firestore Timestamp or other class keeps its methods.
+  if (v && typeof v === 'object' && Object.getPrototypeOf(v) === Object.prototype) {
+    const out = {};
+    for (const k of Object.keys(v)) out[k] = _fromFirestore(v[k]);
+    return out;
+  }
+  return v;
+}
+
 /** Strip values Firestore can't store: undefined, functions, Set, Map, DOM nodes,
- *  Date (converted to ms), circular refs. Returns a deep-cloned plain object. */
+ *  Date (converted to ms), circular refs; wrap a list held directly in a list.
+ *  Returns a deep-cloned plain object. */
 function _sanitizeForFirestore(v, seen) {
   seen = seen || new WeakSet();
   if (v === null || v === undefined) return null;
@@ -1043,7 +1072,10 @@ function _sanitizeForFirestore(v, seen) {
   if (seen.has(v)) return null;
   seen.add(v);
   if (Array.isArray(v)) {
-    return v.map(item => _sanitizeForFirestore(item, seen));
+    return v.map(item => {
+      const s = _sanitizeForFirestore(item, seen);
+      return Array.isArray(s) ? { [FS_NESTED_KEY]: s } : s;
+    });
   }
   const out = {};
   for (const k of Object.keys(v)) {
