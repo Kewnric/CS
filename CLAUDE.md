@@ -401,9 +401,15 @@ marks correct work wrong, silently.
 
 `js/ambient.js` puts `.amb-host` on the two attempt panes and paints three
 layers behind them: a tiled field (`::before`), a glow (`::after`), and drifting
-shards. **Nothing in `css/ambient.css` may be bigger than the pane or
-transformed** — both panes scroll, and an oversized layer grows their
-scrollbars. Layers are `inset: 0` and move by `background-position`.
+shards, plus a scene of four layers. **Nothing may reach the pane itself bigger
+than the pane or transformed** — both panes scroll, and an oversized layer grows
+their scrollbars. Everything lives in `.amb-pin` (and the scene in `.amb-scene`),
+both `overflow: hidden`, so the layers inside are a little bigger than the pane
+and move by **transform only**: the field is one tile larger and slides one tile,
+the scene layers are wider by their swing, the glow scales about its pool. They
+used to move by `background-position` / `background-size` / `mask-size`, which
+repainted the whole pane every frame: 290% of a core without the GPU, 30% of the
+GPU with it, on an idle attempt. Never animate a background or a mask here.
 
 Four looks, chosen from the topbar gem: Crystals (id `default`), Fireflies,
 Starry night, Off. The theme class goes on the **body**, because two of the
@@ -552,9 +558,24 @@ buttons.
   ~18 fps, 60 without the blur. `js/glass.js` times the first blurred windows to open (`glassProbe`, from
   perf-freeze) and, if their frames are slow while the main thread is idle (long-animation-frame script +
   render time), sets `html.no-glass`, which drops every backdrop-filter (css/components.css), and
-  remembers it (`ssp.glass.slow`; Settings > Blur: Auto / Off / On). Headless Chromium draws in software
+  remembers it (`ssp.glass.slow`). Headless Chromium draws in software
   too, so the probe is off under webdriver unless `ssp.glass.test` is set. Measure blur changes with
   `--disable-gpu-compositing` as well as with the GPU: GPU-only numbers hid this for three rounds.
+  **Settings > Blur: Light / Off / Full**, Light the default (stored `ssp.glass` absent = `'auto'`): full-screen
+  windows dim instead of frosting (`html.glass-lite`, the list in css/components.css — a new full-screen blurred
+  window joins it AND `PERF_FREEZE_SEL`). The radius buys nothing: without the GPU Settings opened at 47-49 fps
+  with blur(10px), (4px) or (2px), 60 with none. perf-freeze still pauses what is behind a window whose blur
+  the setting dropped (`_pfBlurDropped`): covered, it cost ~5% of the GPU for nothing.
+- **What actually cost the GPU** (new headless, `channel: 'chromium'`, gets the real GPU; Windows'
+  `\GPU Engine(pid_<gpu process>*engtype_3D)\Running Time` counter gives its 3D time): an animated `filter` on
+  the boss bar's tiny SVG crystal in its 3D context was 13 of an idle attempt's 15% (now a static glow); the
+  starter fill's per-character `opacity`/`filter` spans (`Layerize` took a quarter of every frame: hide waiting
+  characters by `visibility`); blur on letters in flight. Compositor-only loops (transform/opacity, var() in
+  keyframes included) cost ~nothing — until anything restyles on the main thread (a toast, a timer write), and
+  then every running animation is restyled with it, so keep the count of endless ones low. Custom properties
+  written every frame on a container (the boss tilt's old `--mx/--my/--tx/--ty` on the whole bar) restyle and
+  repaint everything under it that reads them: hovering the bar was 20% of the GPU, 7% now that the light moves
+  by transform (`--gx/--gy` on the face only) and the slab shadows do not lean.
 - **A finished animation with `fill: forwards` that touches transform, opacity or filter keeps its
   element composited for good.** Home had 470 such layers (heatmap cells, hero letters). Rest on the
   final keyframe and fill `backwards`. Count layers with CDP `LayerTree` when a page feels slow.

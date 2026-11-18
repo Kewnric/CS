@@ -1,24 +1,33 @@
-/* GLASS.JS -- the frosted blur behind windows, and taking it away where it lags.
+/* GLASS.JS -- the frosted blur behind windows, and how much of it to draw.
+
+   Settings > Blur has three levels:
+   - Light (the default, stored as 'auto'): panels keep their glass, but a
+     window that covers the whole screen dims the page instead of frosting it
+     (<html>.glass-lite, css/components.css). A full-screen blur is redone on
+     every frame of a window's entrance and whenever anything behind it moves,
+     and a smaller radius does not make it cheaper: measured without the GPU,
+     Settings opened at 47-49 fps with blur(10px), blur(4px) or blur(2px) and
+     at 60 with none; with the GPU it was 4-6% of the GPU's time to open.
+   - Full ('on'): the frost behind windows too, as it used to be.
+   - Off ('off'): no backdrop blur anywhere (<html>.no-glass).
 
    A backdrop blur is cheap when the graphics card composites the page. When
    the browser composites on the CPU instead (Chrome with hardware
    acceleration off, or its GPU blocklisted or crashed), every frame in which
-   anything moves under a blur re-blurs the whole screen in software: Session
-   Setup and Settings opened at ~18 fps instead of 60, and the same scrim is
-   behind every .modal-overlay in the app (and ~70 other blurs). Without the
-   blur they open at 60 either way.
-
+   anything moves under a blur re-blurs it in software: Session Setup and
+   Settings opened at ~18 fps instead of 60 under the old full-screen frost.
    A page cannot ask how the browser composites (WebGL still names the card),
    so it is measured: the first blurred full-screen windows to open
    (perf-freeze.js calls glassProbe) are timed for half a second. If most of
    their frames take over 30 ms while the main thread sits idle, the blur is
-   what is slow: <html>.no-glass takes every backdrop blur away
-   (css/components.css) and this device remembers it (ssp.glass.slow).
+   what is slow: <html>.no-glass takes every backdrop blur away and this
+   device remembers it (ssp.glass.slow). Under Light that is any full-screen
+   window still blurred (none of the app's own are).
 
-   Settings > Blur: Auto (that), Off, On. Picking Auto again measures afresh.
-   The class is put on before first paint by the inline script in index.html. */
+   Picking Light again measures afresh. The classes are put on before first
+   paint by the inline script in index.html. */
 
-const GLASS_KEY = 'ssp.glass';            // 'auto' (default) | 'off' | 'on'
+const GLASS_KEY = 'ssp.glass';            // 'auto' = Light (default) | 'off' | 'on' = Full
 const GLASS_SLOW_KEY = 'ssp.glass.slow';  // '1' once Auto found the blur slow here
 const GLASS_PROBE_MS = 500;
 const GLASS_SLOW_FRAME = 30;              // ms: under ~33 fps
@@ -41,7 +50,10 @@ function glassOn() {
 }
 
 function glassApply() {
-  document.documentElement.classList.toggle('no-glass', !glassOn());
+  const root = document.documentElement;
+  const on = glassOn();
+  root.classList.toggle('no-glass', !on);
+  root.classList.toggle('glass-lite', on && glassMode() === 'auto');
 }
 
 /** Time the frames of a blurred window opening; turn the blur off if they
@@ -94,7 +106,7 @@ function glassProbe() {
   requestAnimationFrame(tick);
 }
 
-/** The Settings row: Auto -> Off -> On -> Auto. */
+/** The Settings row: Light -> Off -> Full -> Light. */
 function toggleGlass() {
   const next = { auto: 'off', off: 'on', on: 'auto' }[glassMode()];
   try {
@@ -105,7 +117,7 @@ function toggleGlass() {
   glassApply();
   _syncGlassRow();
   if (typeof toast === 'function') {
-    toast({ auto: 'Blur: Auto -- off by itself if it lags', off: 'Blur off', on: 'Blur on' }[next], { type: 'info', duration: 1800 });
+    toast({ auto: 'Blur: Light -- windows dim the page instead of frosting it', off: 'Blur off', on: 'Blur: Full -- frosted glass behind windows too' }[next], { type: 'info', duration: 1800 });
   }
 }
 
@@ -117,11 +129,11 @@ function _syncGlassRow() {
   row.setAttribute('aria-pressed', String(on));
   const label = document.getElementById('settings-glass-label');
   const desc = document.getElementById('settings-glass-desc');
-  if (label) label.textContent = 'Blur: ' + (m === 'auto' ? 'Auto' : m === 'on' ? 'On' : 'Off');
+  if (label) label.textContent = 'Blur: ' + (m === 'auto' ? 'Light' : m === 'on' ? 'Full' : 'Off');
   if (desc) {
-    desc.textContent = m === 'off' ? 'Windows dim the page instead of frosting it'
-      : m === 'on' ? 'Frosted glass behind windows, always'
-      : on ? 'Frosted glass; turns itself off if it makes windows lag'
+    desc.textContent = m === 'off' ? 'No frosted glass anywhere'
+      : m === 'on' ? 'Frosted glass behind windows too (uses the most graphics)'
+      : on ? 'Frosted panels; windows dim the page instead of frosting it'
       : 'Off here: this browser draws without the graphics card';
   }
   if (typeof _setLucideIcon === 'function') {

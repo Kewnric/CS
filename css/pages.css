@@ -13,7 +13,12 @@
    and fill forwards, which kept every finished letter transformed and
    filtered for as long as it was on screen -- each one its own composited
    layer (99 on the dashboard alone). The last keyframe is the resting style,
-   so ending the animation changes nothing you can see. */
+   so ending the animation changes nothing you can see.
+   No blur on the way in either: each letter in flight carried its own
+   filter, about 6% of the GPU for the seconds the greeting, subtitle and
+   verse take to type (entering Home: 16% -> 10%). The letter still rises,
+   settles from a touch larger and fades up, so it still lands rather than
+   appears. */
 .miside-char {
   display: inline-block;
   animation: letterFocus 0.45s cubic-bezier(0.23, 1, 0.32, 1) backwards;
@@ -21,9 +26,9 @@
 .miside-char.space { width: 0.3em; }
 
 @keyframes letterFocus {
-  0%   { filter: blur(8px); opacity: 0; transform: translateY(4px) scale(1.08); }
-  50%  { filter: blur(2px); opacity: 0.7; }
-  100% { filter: blur(0);   opacity: 1; transform: translateY(0) scale(1); }
+  0%   { opacity: 0; transform: translateY(4px) scale(1.08); }
+  50%  { opacity: 0.7; }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 .miside-char.glow {
@@ -144,10 +149,12 @@
   gap: 0.875rem;
 }
 
+/* Glass colours, no backdrop blur: the tiles sit on the page's own solid
+   background, 70-80% opaque, so a blur of what is behind them showed nothing
+   -- but each tile re-blurred on every frame of its entrance and hover lift
+   (Home's entrance: 27% -> 18% of the compositor's time without a GPU). */
 .home-stat-card {
   background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   padding: 1.25rem 1rem;
@@ -537,16 +544,23 @@
   pointer-events: none;
   cursor: default;
   opacity: 0;
+  /* Hidden, not just see-through, once it has faded: the tooltip stays in the
+     page after the tour, and at opacity 0 its blur and shadow were still
+     composited on every screen. */
+  visibility: hidden;
   transform: translateY(8px) scale(0.97);
   transition: opacity 0.35s ease,
               transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
               top 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-              left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+              left 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              visibility 0s linear 0.35s;
 }
 .tutorial-tooltip.visible {
   opacity: 1;
+  visibility: visible;
   pointer-events: auto;
   transform: translateY(0) scale(1);
+  transition-delay: 0s;
 }
 
 .tutorial-tooltip-arrow {

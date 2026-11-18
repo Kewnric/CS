@@ -1,5 +1,5 @@
 /* ============================================================
-   PERF-FREEZE — nothing animates behind a blurred window
+   PERF-FREEZE — nothing animates behind a window that covers the page
    ------------------------------------------------------------
    A backdrop blur is redrawn on every frame in which anything under it
    changes. The page has a few endless loops (the sidebar rail's glow, a
@@ -10,9 +10,11 @@
    blurred out of sight anyway -- the blur is drawn once and stays.
 
    An open window counts when it is fixed over (nearly) the whole screen and
-   has a backdrop blur, on itself or on its ::before. A floating window
-   (the terminal's dash, the note editor unblurred) has none, so the page
-   behind keeps moving. Each frozen element gets an inline
+   has a backdrop blur, on itself or on its ::before -- or would have, but
+   Settings > Blur (Light, the default, or Off) dims the page instead: what
+   moves behind a dimmed window is still drawn every frame for nothing. A
+   floating window (the terminal's dash, the note editor unblurred) is marked
+   .is-floating and does not count, so the page behind keeps moving. Each frozen element gets an inline
    animation-play-state that is taken off again (so its own CSS, hover pauses
    included, rules it afterwards); animations on pseudo-elements and script
    animations are paused and played through the API.
@@ -39,7 +41,16 @@ function _pfHasBlur(el) {
   return blurred(getComputedStyle(el)) || blurred(getComputedStyle(el, '::before'));
 }
 
-/** The blurred windows covering the screen right now. */
+/** Was this window's blur taken away by Settings > Blur (Light or Off)? It
+ *  still covers the page, dimmed, and what moves behind it is still drawn for
+ *  nothing: Session Setup left open cost 0% of the GPU paused, ~5% not. */
+function _pfBlurDropped() {
+  const c = document.documentElement.classList;
+  return c.contains('glass-lite') || c.contains('no-glass');
+}
+
+/** The windows covering the screen right now: blurred, or dimmed where the
+ *  blur setting took their blur away. */
 function perfFreezeOpen() {
   const out = [];
   document.querySelectorAll(PERF_FREEZE_SEL).forEach(el => {
@@ -48,7 +59,7 @@ function perfFreezeOpen() {
     if (cs.display === 'none' || cs.visibility === 'hidden' || cs.position !== 'fixed') return;
     const r = el.getBoundingClientRect();
     if (r.width < innerWidth * 0.9 || r.height < innerHeight * 0.9) return;
-    if (_pfHasBlur(el)) out.push(el);
+    if (_pfHasBlur(el) || _pfBlurDropped()) out.push(el);
   });
   return out;
 }
@@ -85,7 +96,7 @@ function perfFreezeCheck() {
     clearTimeout(_pf.thaw);
     _pf.thaw = 0;
     // A blurred window has just opened: time whether the blur lags here.
-    if (!_pf.open && typeof glassProbe === 'function') glassProbe();
+    if (!_pf.open && typeof glassProbe === 'function' && open.some(_pfHasBlur)) glassProbe();
     _pf.open = true;
     _pfFreeze(open);   // also catches loops that started behind it since
     return;

@@ -562,7 +562,15 @@ function sampleSyncToolbar(el) {
   });
 }
 
-document.addEventListener('selectionchange', () => {
+document.addEventListener('selectionchange', (e) => {
+  /* Only the sample editors (contenteditable divs) have a toolbar to sync. A
+     textarea or input fires this on every write to its value -- the code
+     editor's starter fill does ~40 a second -- and reading the selection then
+     forced a full layout each time. */
+  const t = e.target;
+  if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT')) return;
+  const ae = document.activeElement;
+  if (ae && (ae.tagName === 'TEXTAREA' || ae.tagName === 'INPUT')) return;
   const sel = window.getSelection();
   if (!sel || !sel.rangeCount) return;
   let node = sel.getRangeAt(0).startContainer;

@@ -314,15 +314,17 @@ function _ambFill(host) {
    Four layers, all of them empty elements the stylesheet fills per theme:
 
      .amb-cast    light with a direction — shafts, or a low warm wash
-     .amb-far     the distant treeline, small and pale, barely moving
+     .amb-far     the distant treeline, small and pale, standing still
      .amb-canopy  growth hanging in from the top corners
      .amb-under   growth standing up from the bottom edge
 
-   The parallax is the point of having three of them: far sways least and
-   slowest, canopy most. Same rule as everything else here — inset:0 and NEVER
-   transformed, because both panes scroll and a transformed layer grows their
-   scrollbars. Every one of these sways by background-position, which moves a
-   painted image without the box following it.
+   The parallax is the point of having three of them: the far line holds
+   still, the growth below sways a little and the canopy most. Both panes
+   scroll, and a layer that is wider than its pane or transformed grows their
+   scrollbars unless something cuts it off: the scene is inset:0 and
+   overflow:hidden inside the pin (overflow:hidden too), so the layers in it
+   are a little wider than the pane and sway by transform -- painted once, and
+   moved by the compositor (css/ambient.css says what background-position cost).
 
    Idempotent, like _ambFill: a pane that still has its scene is left alone. */
 function _ambScene(host) {

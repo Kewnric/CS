@@ -22,12 +22,15 @@
       // The stylesheets key "off" on a class as well (css/mx-core.css says why).
       if (motion === 'off') document.documentElement.classList.add('mx-off');
       document.documentElement.classList.add('mx-boot');
-      // No backdrop blur where it was measured to lag, before first paint
-      // (js/glass.js owns it).
+      // How much backdrop blur to draw, before first paint (js/glass.js owns
+      // it): none where it was measured to lag or is switched off, no
+      // full-screen frost at Light (the default), all of it at Full.
       try {
         var glass = localStorage.getItem('ssp.glass');
         if (glass === 'off' || (glass !== 'on' && localStorage.getItem('ssp.glass.slow') === '1')) {
           document.documentElement.classList.add('no-glass');
+        } else if (glass !== 'on') {
+          document.documentElement.classList.add('glass-lite');
         }
       } catch (e) {}
     })();
@@ -428,8 +431,8 @@
                 aria-label="Blur behind windows" aria-pressed="true">
           <span class="settings-item-icon"><i data-lucide="droplets" id="settings-glass-icon" aria-hidden="true"></i></span>
           <span class="settings-item-info">
-            <span class="settings-item-label" id="settings-glass-label">Blur: Auto</span>
-            <span class="settings-item-desc" id="settings-glass-desc">Frosted glass; turns itself off if it makes windows lag</span>
+            <span class="settings-item-label" id="settings-glass-label">Blur: Light</span>
+            <span class="settings-item-desc" id="settings-glass-desc">Frosted panels; windows dim the page instead of frosting it</span>
           </span>
           <i data-lucide="chevron-right" class="settings-item-chevron" aria-hidden="true"></i>
         </button>

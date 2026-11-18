@@ -1392,7 +1392,13 @@ async function animateStarterCode(code, textarea, preCode) {
       speed: 18,
       onProgress: (typed) => {
         updateBossHealthBar(typed);
-        if (typeof updateLineNumbers === 'function') updateLineNumbers(textarea);
+        /* The gutter only changes when a line is added. Rebuilt for every
+           character it was the fill's main script cost: the whole gutter's
+           HTML, a fold scan of the whole text and a forced layout, ~40
+           times a second. The finish (onComplete) draws it once more. */
+        if (typed.length === 1 || typed.charCodeAt(typed.length - 1) === 10) {
+          if (typeof updateLineNumbers === 'function') updateLineNumbers(textarea);
+        }
       },
       onComplete: () => {
         if (typeof state !== 'undefined') state.userCode = code;
@@ -1440,15 +1446,19 @@ function _paintTimer(el, main, ms) {
   const [a, b] = el.children;
   if (a.textContent !== main) a.textContent = main;
   const msText = '.' + String(ms).padStart(3, '0');
-  // Under a blurred window each of these 30 writes a second re-blurred the
+  // Under a blurred window each of these writes re-blurred the
   // whole screen; the seconds still move (perf-freeze.js).
   if (typeof perfFreezeActive === 'function' && perfFreezeActive()) return;
   if (b.textContent !== msText) b.textContent = msText;
 }
 
 /**
- * Counting up refreshes ~30×/s so the millisecond field actually moves; a
+ * Counting up refreshes 10×/s so the millisecond field still runs; a
  * countdown only changes once a second, so it stays on a 1 s tick.
+ * It was 30×/s: each write restyles, lays out and repaints the frosted pill,
+ * about 2-3% of a core in both the page and the compositor on an idle
+ * attempt, and three digits changing faster than the eye reads them gave
+ * nothing for it.
  */
 function _practiceStartTimerTicker() {
   if (window.activeTimerInterval) clearInterval(window.activeTimerInterval);
@@ -1457,7 +1467,7 @@ function _practiceStartTimerTicker() {
      already over, and the clearInterval it makes then must have this interval
      to clear -- painted first, it cleared nothing and the new interval went on
      to grade the attempt again a second later. */
-  window.activeTimerInterval = setInterval(updatePracticeTimerDisplay, countingDown ? 1000 : 33);
+  window.activeTimerInterval = setInterval(updatePracticeTimerDisplay, countingDown ? 1000 : 100);
   updatePracticeTimerDisplay();
 }
 
@@ -2394,8 +2404,13 @@ function bossSetVisible(on) {
    It turns the topbar's centre, not just the plate, so the crystal turns with
    it. The plate is wide and short, so it tips mostly on its long axis and only
    a little at the ends. Eased per frame so it turns with weight; mouse only,
-   and still under reduced motion. The slabs' sides and shadows lean with it
-   (--tx/--ty). */
+   and still under reduced motion.
+   The light on the face follows the pointer by a transform on the face's own
+   ::after (--gx/--gy, set on the face alone). The tilt used to set four custom
+   properties on the whole bar every frame -- the light's position and the
+   slabs' shadow lean -- which restyled the bar and repainted its filtered
+   shadows each frame: hovering it took 20% of the GPU's 3D time, 4% without.
+   The shadows no longer lean. */
 const BOSS_TILT_X = 9;   // degrees: top and bottom edges
 const BOSS_TILT_Y = 3;   // degrees: the two ends
 const BOSS_LIFT = 3;     // px forward while hovered
@@ -2407,6 +2422,7 @@ function _bossSpatialBind() {
   el._bossSpatial = true;
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const to = { x: 0, y: 0, z: 0 }, at = { x: 0, y: 0, z: 0 };
+  const face = el.querySelector('.sao-plate-face');
   let raf = 0, last = 0, over = false;
   const frame = now => {
     raf = 0;
@@ -2421,16 +2437,18 @@ function _bossSpatialBind() {
     });
     if (!over && !moving) {
       el.style.transform = '';
-      ['--mx', '--my', '--tx', '--ty'].forEach(p => el.style.removeProperty(p));
+      if (face) { face.style.removeProperty('--gx'); face.style.removeProperty('--gy'); }
       last = 0;
       return;
     }
     el.style.transform = 'perspective(700px) rotateX(' + (-at.y * BOSS_TILT_X).toFixed(2) + 'deg) rotateY(' +
       (at.x * BOSS_TILT_Y).toFixed(2) + 'deg) translateZ(' + at.z.toFixed(1) + 'px)';
-    el.style.setProperty('--mx', ((at.x + 1) * 50).toFixed(1) + '%');
-    el.style.setProperty('--my', ((at.y + 1) * 50).toFixed(1) + '%');
-    el.style.setProperty('--tx', at.x.toFixed(3));
-    el.style.setProperty('--ty', at.y.toFixed(3));
+    // Percent of the light's own box, which is twice the face: 25% of it is
+    // half the face, from the middle to an edge.
+    if (face) {
+      face.style.setProperty('--gx', (at.x * 25).toFixed(2) + '%');
+      face.style.setProperty('--gy', (at.y * 25).toFixed(2) + '%');
+    }
     if (moving) raf = requestAnimationFrame(frame);
     else last = 0;
   };

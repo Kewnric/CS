@@ -883,6 +883,39 @@ html.no-glass *::after {
 }
 html.no-glass .modal-overlay::before { background: rgba(0, 0, 0, 0.7); }
 
+/* Light glass: Settings > Blur: Light, the default (js/glass.js). A window
+   that covers the whole screen dims the page instead of frosting it; the
+   panels inside keep their glass. A full-screen blur is redone on every frame
+   of the window's entrance and whenever anything behind it moves, and its
+   radius buys nothing back: measured without the GPU, Settings opened at
+   47-49 fps with blur(10px), blur(4px) or blur(2px) alike (40-48% of the
+   compositor's time) and at 60 with none. Blur: Full brings the frost back.
+   Every full-screen blurred window is listed, each selector ending in its
+   class; a new one belongs here and in PERF_FREEZE_SEL (js/perf-freeze.js). */
+html.glass-lite .modal-overlay::before,
+html.glass-lite .smp-overlay,
+html.glass-lite .run-code-overlay,
+html.glass-lite .cheat-overlay,
+html.glass-lite .viz-comment-editor-overlay,
+html.glass-lite .np-sheet-overlay,
+html.glass-lite .np-zoom-overlay,
+html.glass-lite .np-edit-backdrop,
+html.glass-lite .padm-overlay,
+html.glass-lite .set-builder-overlay,
+html.glass-lite .prereq-picker-overlay,
+html.glass-lite .nb-tags-overlay,
+html.glass-lite .nb-import-overlay,
+html.glass-lite .acct-recovery,
+html.glass-lite .mindmap-overlay,
+html.glass-lite .mindmap-overlay::before,
+html.glass-lite .sidebar-backdrop {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+/* The shared scrim was 55% black under a blur; without one the page behind
+   reads sharper, so it darkens a little to keep the window in front. */
+html.glass-lite .modal-overlay::before { background: rgba(0, 0, 0, 0.66); }
+
 .modal-icon {
   margin-bottom: var(--space-md);
   display: flex;

@@ -417,8 +417,10 @@
 /* Frosted glass rather than a flat black chip. The clock is the one thing on
    the topbar that is always moving, and as a solid panel it read as another
    button in the row. Translucent, with a lit top edge and a shadow under it, it
-   sits above the bar instead of in it — and the blur picks up whatever is
-   behind, so it belongs to the screen rather than to the toolbar. */
+   sits above the bar instead of in it.
+   No backdrop blur: what is behind it is the topbar's flat #161b22, and a
+   blur of a flat colour is that colour (the saturate moved it 2-4 levels).
+   It cost a re-blur on every tick of the clock. */
 .timer-display {
   display: flex;
   align-items: center;
@@ -427,8 +429,6 @@
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.07);
   border: 1px solid rgba(255, 255, 255, 0.16);
-  backdrop-filter: blur(14px) saturate(150%);
-  -webkit-backdrop-filter: blur(14px) saturate(150%);
   /* Top lip catching light, bottom edge in shadow, and a soft drop under the
      whole pill — the three things that make a surface read as glass. */
   box-shadow:
@@ -1225,29 +1225,29 @@ mark.diff-hit.current {
   animation: pulseHighlight 2.5s infinite ease-in-out;
 }
 
-/* --- MiSide Character Reveal Animation --- */
+/* --- MiSide Character Reveal Animation ---
+   The starter code typing itself in (SyntaxTextAnimator). Every character is
+   its own span for the length of the fill -- 1,500 of them for a Pre-Final
+   program, for tens of seconds. Each used to carry a blur filter (4px while
+   waiting, blur(0) once shown) and its reveal filled FORWARDS, so every
+   character already typed stayed a filtered, composited layer until the fill
+   ended: 223 layers four seconds in, half the compositor's time. Now a plain
+   fade that rests visible and fills backwards, so a shown character is just
+   text again. A waiting character is hidden by visibility, not opacity:
+   opacity 0 is still an effect per span, and sorting 1,500 of them into
+   layers took a quarter of every frame (Layerize, 1 s of a 4 s fill). */
 .miside-char-hidden {
-  opacity: 0;
-  filter: blur(4px);
+  visibility: hidden;
   display: inline;
 }
 
 .miside-char-reveal {
-  opacity: 1;
-  filter: blur(0);
   display: inline;
-  animation: misideReveal 0.15s ease-out forwards;
+  animation: misideReveal 0.15s ease-out backwards;
 }
 
 @keyframes misideReveal {
-  0% {
-    opacity: 0;
-    filter: blur(4px);
-  }
-  100% {
-    opacity: 1;
-    filter: blur(0);
-  }
+  from { opacity: 0; }
 }
 
 /* --- Run Code Button --- */
@@ -2178,17 +2178,21 @@ mark.diff-hit.current {
   animation: saoCrystalHalo 2.8s ease-in-out infinite;
   pointer-events: none;
 }
+/* The glow and the shine hold still; the halo behind (::before, opacity and
+   transform only) does the breathing. The glow used to pulse its two
+   drop-shadows and the shine its opacity, on all four blades, forever: a
+   filter on an SVG inside the spinning 3D context, re-rendered every frame.
+   Measured on an idle attempt (RX 580, 1080p): 14.8% of the GPU's 3D engine
+   with the pulse, 1.9% without it. */
 .sao-crystal-gem {
   position: relative;
   display: block;
   width: 100%;
   height: 100%;
-  filter: drop-shadow(0 0 2px rgba(255, 80, 135, 0.6)) drop-shadow(0 0 6px rgba(255, 0, 80, 0.3));
-  animation: saoCrystalGlow 2.8s ease-in-out infinite;
+  filter: drop-shadow(0 0 2.5px rgba(255, 90, 145, 0.65)) drop-shadow(0 0 7px rgba(255, 0, 80, 0.34));
 }
 .sao-crystal-shine {
-  opacity: 0.2;
-  animation: saoCrystalShine 3.6s ease-in-out infinite;
+  opacity: 0.3;
 }
 
 @keyframes saoCrystalFloat {
@@ -2198,14 +2202,6 @@ mark.diff-hit.current {
 @keyframes saoCrystalHalo {
   0%, 100% { opacity: 0.45; transform: scale(0.9); }
   50%      { opacity: 0.8;  transform: scale(1.08); }
-}
-@keyframes saoCrystalGlow {
-  0%, 100% { filter: drop-shadow(0 0 2px rgba(255, 80, 135, 0.55)) drop-shadow(0 0 5px rgba(255, 0, 80, 0.26)); }
-  50%      { filter: drop-shadow(0 0 3.5px rgba(255, 110, 160, 0.75)) drop-shadow(0 0 9px rgba(255, 0, 80, 0.42)); }
-}
-@keyframes saoCrystalShine {
-  0%, 100% { opacity: 0.12; }
-  50%      { opacity: 0.5; }
 }
 
 /* ---------- The detached "]" bracket — spine right, notch opening left ---------- */
@@ -2271,38 +2267,47 @@ mark.diff-hit.current {
   clip-path: polygon(0 0, 100% 0, calc(100% - var(--sao-chamfer)) 100%, 0 100%);
 }
 
-/* The light that follows the pointer while the plate is tilted
-   (_bossSpatialBind sets --mx/--my). Inside the clipped face, so it stays on
-   the metal and never spills past the chamfer. */
+/* The light that follows the pointer while the plate is tilted. Inside the
+   clipped face, so it stays on the metal and never spills past the chamfer.
+   Twice the face's size with the light at its middle, and moved by transform
+   (_bossSpatialBind sets --gx/--gy on the face): the compositor moves it and
+   nothing is repainted. It used to be the gradient's centre that moved
+   (--mx/--my on the whole bar), a restyle and repaint every frame. */
 .sao-plate-face::after {
   content: '';
   position: absolute;
-  inset: 0;
+  left: -50%;
+  top: -50%;
+  width: 200%;
+  height: 200%;
   z-index: 2;
   pointer-events: none;
-  background: radial-gradient(160px circle at var(--mx, 50%) var(--my, 50%),
+  background: radial-gradient(160px circle at 50% 50%,
     rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.05) 45%, transparent 70%);
+  transform: translate(var(--gx, 0%), var(--gy, 0%));
   opacity: 0;
   transition: opacity 0.25s ease;
 }
-.practice-topbar-center.is-tilting .sao-plate-face::after { opacity: 1; }
+/* Its own layer only while it is in use, so moving it repaints nothing. */
+.practice-topbar-center.is-tilting .sao-plate-face::after { opacity: 1; will-change: transform; }
 
 /* The assembly sits ON the topbar rather than being painted into it. clip-path
    crops a box-shadow, so each metal piece's shadow is a filter on a wrapper
    around it (.sao-slab) -- the only way to get one that follows the chamfer.
 
    And it has THICKNESS. Two hard 1px shadows in darker frame tones stack under
-   every clipped edge as the slab's side, then the soft shadow it casts. The
-   side and the shadow lean against the tilt (--tx/--ty).
+   every clipped edge as the slab's side, then the soft shadow it casts. They
+   do not lean with the tilt any more: that was a filter changing on every
+   slab on every frame of a hover.
 
    NOT ON THE WRAPPER. A filter there flattened the whole bar into one picture,
    which the tilt then resampled -- the blur -- and nothing in it could stand
    forward of anything else. On the slabs it only flattens the metal. */
 .sao-slab {
   filter:
-    drop-shadow(calc(var(--tx, 0) * -1px) 1px 0 #2e3238)
-    drop-shadow(calc(var(--tx, 0) * -1px) 1px 0 #1e2125)
-    drop-shadow(calc(var(--tx, 0) * -3px) calc(3px - var(--ty, 0) * 1px) 4px rgba(0, 0, 0, 0.6));
+    drop-shadow(0 1px 0 #2e3238)
+    drop-shadow(0 1px 0 #1e2125)
+    drop-shadow(0 3px 4px rgba(0, 0, 0, 0.6));
 }
 
 /* Depth. The tilt turns .practice-topbar-center, so the crystal turns with the
@@ -2635,11 +2640,23 @@ mark.diff-hit.current {
   100% { opacity: 0;    transform: scale(1.5) rotate(6deg); }
 }
 
-/* Under 25% HP the outline throbs — the boss is nearly down. */
-.sao-boss.boss-critical .sao-track { animation: saoCritical 0.9s ease-in-out infinite; }
+/* Under 25% HP the outline throbs — the boss is nearly down. The lit outline
+   is a layer over the track's own grey that fades in and out, on the
+   compositor; it was the track's background animating, so the bar restyled
+   and repainted every frame for the last quarter of every attempt. The well
+   (inset 1px, drawn after) covers all but the outline, as it covers the grey. */
+.sao-track::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: hsl(var(--sao-hue) 100% 72%);
+  opacity: 0;
+  pointer-events: none;
+}
+.sao-boss.boss-critical .sao-track::before { animation: saoCritical 0.9s ease-in-out infinite; }
 @keyframes saoCritical {
-  0%, 100% { background: #ededed; }
-  50%      { background: hsl(var(--sao-hue) 100% 72%); }
+  0%, 100% { opacity: 0; }
+  50%      { opacity: 1; }
 }
 
 /* Slain: the crystal goes dark and stops turning. */
@@ -2655,7 +2672,7 @@ mark.diff-hit.current {
   .sao-crystal-spin,
   .sao-crystal-gem,
   .sao-crystal-shine,
-  .sao-boss.boss-critical .sao-track,
+  .sao-boss.boss-critical .sao-track::before,
   .sao-crystal.boss-lock::after,
   .sao-crystal.boss-lock .sao-crystal-gem { animation: none !important; }
   .sao-fill, .sao-ghost { transition: none !important; }

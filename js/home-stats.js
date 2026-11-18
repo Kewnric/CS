@@ -217,7 +217,12 @@ function homeStartStatCycle() {
   homeStopStatCycle();
   // setInterval rather than rAF: a background tab never paints, and coming
   // back to a card frozen on whichever library it started on looks broken.
-  _homeStatTimer = setInterval(() => { if (!_homeStatPaused) homeCycleStatLib(); }, 4000);
+  // Not under a blurred window either (Settings opens over Home): each swap
+  // animates three cards, and every frame of it re-blurred the whole screen.
+  _homeStatTimer = setInterval(() => {
+    if (_homeStatPaused || (typeof perfFreezeActive === 'function' && perfFreezeActive())) return;
+    homeCycleStatLib();
+  }, 4000);
 
   // Rotating out from under someone mid-read is the one thing a cycling card
   // must not do.
