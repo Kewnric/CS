@@ -79,10 +79,12 @@ const _CVS_PARTS = {
     '<span class="cvs-rock"></span><span class="cvs-tower"></span><span class="cvs-lamp cvs-a"></span>',
   sakura:
     '<span class="cvs-dawn cvs-a"></span><span class="cvs-ridge cvs-fuji"></span>' +
-    '<span class="cvs-mist cvs-a"></span>' +
-    '<span class="cvs-branch cvs-a"><span class="cvs-bloom" style="left:10%;top:12%;--b:38px"></span>' +
-    '<span class="cvs-bloom" style="left:34%;top:4%;--b:30px"></span><span class="cvs-bloom" style="left:52%;top:26%;--b:26px"></span>' +
-    '<span class="cvs-bloom" style="left:20%;top:44%;--b:24px"></span><span class="cvs-bloom" style="left:70%;top:10%;--b:20px"></span></span>',
+    '<span class="cvs-mist cvs-a"></span><span class="cvs-meadow"></span>' +
+    '<span class="cvs-tree"><span class="cvs-crown cvs-a">' +
+    [[10, 38, 30], [6, 22, 40], [20, 12, 44], [24, 30, 36], [34, 9, 46], [40, 30, 32],
+     [50, 7, 38], [52, 24, 40], [68, 19, 42], [82, 29, 32], [92, 15, 28]]
+      .map(([x, y, b]) => '<span class="cvs-bloom" style="left:' + x + '%;top:' + y + '%;--b:' + b + 'px"></span>').join('') +
+    '</span></span>',
   autumn:
     '<span class="cvs-lowsun cvs-a"></span><span class="cvs-rays cvs-a"></span>' +
     '<span class="cvs-canopy cvs-canopy-far"></span><span class="cvs-trunks"></span>' +
@@ -107,7 +109,7 @@ const _CVS_SWARMS = {
   snow:       [{ k: 'flake', n: 16, x: [-10, 100], y: [-22, 14], dx: [12, 44], dy: [112, 142], t: [5, 10], s: [1.2, 3.2] }],
   lighthouse: [{ k: 'mote', n: 8, x: [14, 40], y: [70, 86], dx: [-10, 18], dy: [-28, -12], t: [1.8, 3.2], s: [1, 1.8] },
                { k: 'bird', n: 2, x: [-14, -4], y: [8, 28], dx: [380, 430], dy: [-10, 10], t: [18, 26], s: [1, 1.2] }],
-  sakura:     [{ k: 'petal', n: 11, x: [-15, 85], y: [-26, 40], dx: [70, 170], dy: [80, 132], t: [6, 11], s: [5, 8], r: [180, 600], h: [328, 352] }],
+  sakura:     [{ k: 'petal', n: 11, x: [-4, 58], y: [-8, 38], dx: [70, 170], dy: [80, 132], t: [6, 11], s: [5, 8], r: [180, 600], h: [328, 352] }],
   autumn:     [{ k: 'leaf', n: 10, x: [-10, 90], y: [-28, 26], dx: [40, 150], dy: [90, 140], t: [6, 11], s: [6, 10], r: [240, 900], h: [6, 48] }]
 };
 
@@ -149,10 +151,34 @@ function _cvsSwarm(spec, rnd) {
   return out;
 }
 
-/** The cover for a program without a picture. seed: its id (stable), else its title. */
-function coverSceneHTML(seed) {
+/* NEIGHBOURS NEVER MATCH. In a grid the scenes go round one shuffled cycle of
+   all twelve, in card order: side by side they differ by one step, a row apart
+   by the column count, and both are less than a full cycle up to 11 columns.
+   The shuffle is seeded by the list, so each folder has its own order. */
+const _cvsOrders = new Map();
+function _cvsOrder(list) {
+  let order = _cvsOrders.get(list);
+  if (order) return order;
+  order = COVER_SCENES.slice();
+  const rnd = _cvsRand(_cvsHash('order:' + list));
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    const t = order[i]; order[i] = order[j]; order[j] = t;
+  }
+  if (_cvsOrders.size > 200) _cvsOrders.clear();
+  _cvsOrders.set(list, order);
+  return order;
+}
+
+/** The cover for a program without a picture.
+ *  seed: its id (stable), else its title -- tint, loop phase and particles.
+ *  slot: { i, list } its place in a grid, which picks the scene; without one
+ *  the id picks it. */
+function coverSceneHTML(seed, slot) {
   const h = _cvsHash(String(seed || '?'));
-  const key = COVER_SCENES[h % COVER_SCENES.length];
+  const key = (slot && typeof slot.i === 'number')
+    ? _cvsOrder(String(slot.list || ''))[slot.i % COVER_SCENES.length]
+    : COVER_SCENES[h % COVER_SCENES.length];
   const tint = ((h >>> 8) % 41) - 20;           // -20..20 degrees: two of a kind still differ
   const phase = ((h >>> 16) % 900) / 100;       // 0..9 s into every loop, so a grid is not in step
   const rnd = _cvsRand(h ^ 0x9E3779B9);

@@ -790,7 +790,7 @@ function _buildChallengeCardCompact(c) {
     </div>`;
 }
 
-function _buildChallengeCard(c, query) {
+function _buildChallengeCard(c, query, slot) {
   if (browseCardLayout() === 'compact') return _buildChallengeCardCompact(c);
   const vCount = c.variants.length;
   const logs = (_browseHistoryIndex && _browseHistoryIndex[c.id]) || [];
@@ -805,7 +805,7 @@ function _buildChallengeCard(c, query) {
   const slipped = lastScore >= 0 && bestScore >= 0 && lastScore < bestScore;
   const coverHtml = c.coverImage
     ? `<div class="nb-card-cover"><img src="${mediaSrc(c.coverImage, 'thumb')}" alt="" loading="lazy" decoding="async" /></div>`
-    : (typeof coverSceneHTML === 'function' ? coverSceneHTML(c.id || c.title) : libCoverFallbackHTML(c.title, 'file-code-2'));
+    : (typeof coverSceneHTML === 'function' ? coverSceneHTML(c.id || c.title, slot) : libCoverFallbackHTML(c.title, 'file-code-2'));
   const resumable = browseHasResumable(c);
   const selecting = libSelectMode('browse');
   return `
@@ -1901,7 +1901,9 @@ function renderBrowseContent() {
     const showSets = kind !== 'programs';
     const showProgs = kind !== 'sets';
     const setCardsHtml = (showSets && currentPage === 1) ? sets.map(s => _buildSetCard(s)).join('') : '';
-    const progCardsHtml = showProgs ? pageChallenges.map(c => _buildChallengeCard(c, query)).join('') : '';
+    // Each card's place in the grid, so neighbouring covers never share a scene (cover-scenes.js).
+    const coverList = challenges.length ? String(challenges[0].id) : '';
+    const progCardsHtml = showProgs ? pageChallenges.map((c, i) => _buildChallengeCard(c, query, { i, list: coverList })).join('') : '';
 
     // The ladder replaces the card grid — it IS the alternative reading of the
     // same list, not a decoration on top of it.

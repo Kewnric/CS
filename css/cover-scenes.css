@@ -565,34 +565,49 @@
     hsl(calc(330deg + var(--cvs-h)) 55% 72%) 58%, hsl(calc(20deg + var(--cvs-h)) 80% 84%) 100%);
 }
 .cvs-sakura .cvs-dawn {
-  left: 54%; top: 14%; width: 92px; height: 92px; border-radius: 50%;
+  left: 70%; top: 10%; width: 92px; height: 92px; border-radius: 50%;
   background: radial-gradient(circle, #fff6ef 0 18%, hsl(calc(12deg + var(--cvs-h)) 100% 82% / 0.6) 34%, transparent 70%);
   animation: cvsBob 9s ease-in-out var(--cvs-d) infinite alternate;
 }
 .cvs-sakura .cvs-fuji {
   height: 58%;
   background: linear-gradient(180deg, #fdf5fa 0 15%, hsl(calc(285deg + var(--cvs-h)) 22% 64%) 30%, hsl(calc(280deg + var(--cvs-h)) 24% 46%));
-  clip-path: polygon(0 100%, 0 86%, 22% 58%, 40% 7%, 46% 3%, 52% 7%, 70% 58%, 100% 82%, 100% 100%);
+  clip-path: polygon(0 100%, 0 90%, 30% 72%, 55% 9%, 61% 5%, 67% 9%, 84% 56%, 100% 74%, 100% 100%);
 }
 .cvs-sakura .cvs-mist { background: radial-gradient(50% 50% at 50% 50%, rgba(255, 228, 240, 0.32), transparent 72%); bottom: 0; }
-.cvs-sakura .cvs-branch {
-  left: -4%; top: -8%; width: 72%; height: 72%;
-  transform-origin: 0 0;
+.cvs-sakura .cvs-meadow {
+  left: 0; right: 0; bottom: 0; height: 13%;
+  background:
+    radial-gradient(3px 1.5px at 18% 60%, hsl(345 100% 92%), transparent),
+    radial-gradient(3px 1.5px at 36% 40%, hsl(345 100% 90%), transparent),
+    radial-gradient(3px 1.5px at 58% 70%, hsl(345 100% 92%), transparent),
+    linear-gradient(180deg, hsl(calc(320deg + var(--cvs-h)) 30% 58% / 0), hsl(calc(325deg + var(--cvs-h)) 28% 40%) 70%);
+}
+/* A tree, not a stick: a trunk that forks into three limbs, under a full
+   crown of blossom that sways from where the limbs meet. */
+.cvs-sakura .cvs-tree { left: 0; bottom: 0; width: 46%; height: 100%; }
+.cvs-sakura .cvs-tree::before {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, hsl(calc(330deg + var(--cvs-h)) 28% 12%), hsl(calc(340deg + var(--cvs-h)) 24% 22%));
+  clip-path: polygon(12% 100%, 15% 78%, 18% 62%, 16% 48%, 10% 34%, 4% 26%, 7% 24%, 14% 33%, 20% 44%, 24% 36%,
+    30% 22%, 34% 12%, 37% 13%, 33% 26%, 28% 40%, 36% 34%, 52% 26%, 66% 22%, 66% 25%, 52% 31%, 34% 42%, 27% 52%,
+    26% 66%, 28% 82%, 32% 100%);
+}
+.cvs-sakura .cvs-crown {
+  inset: 0;
+  transform-origin: 24% 50%;
   animation: cvsBranch 6s ease-in-out var(--cvs-d) infinite alternate;
 }
-.cvs-sakura .cvs-branch::before {
-  content: ''; position: absolute; inset: 0;
-  background: hsl(calc(330deg + var(--cvs-h)) 30% 14%);
-  clip-path: polygon(0 0, 100% 20%, 100% 23%, 62% 22%, 42% 48%, 39% 46%, 54% 24%, 30% 22%, 24% 52%, 21% 51%, 26% 21%, 0 14%);
-}
 .cvs-sakura .cvs-bloom {
-  width: var(--b); height: var(--b); margin: calc(var(--b) / -2) 0 0 calc(var(--b) / -2);
+  width: var(--b); height: calc(var(--b) * 0.82); margin: calc(var(--b) * -0.41) 0 0 calc(var(--b) / -2);
   border-radius: 50%;
   background:
-    radial-gradient(circle at 30% 30%, hsl(350 100% 96%) 0 10%, transparent 26%),
-    radial-gradient(circle at 70% 40%, hsl(345 100% 94%) 0 9%, transparent 24%),
-    radial-gradient(circle at 46% 72%, hsl(340 100% 95%) 0 9%, transparent 24%),
-    radial-gradient(circle, hsl(calc(338deg + var(--cvs-h)) 80% 80%) 0 40%, hsl(calc(330deg + var(--cvs-h)) 70% 70% / 0) 72%);
+    radial-gradient(circle at 32% 30%, hsl(350 100% 97%) 0 8%, transparent 22%),
+    radial-gradient(circle at 64% 38%, hsl(345 100% 95%) 0 8%, transparent 22%),
+    radial-gradient(circle at 44% 66%, hsl(342 100% 94%) 0 7%, transparent 20%),
+    radial-gradient(circle at 74% 70%, hsl(348 100% 96%) 0 6%, transparent 18%),
+    radial-gradient(circle at 50% 40%, hsl(calc(343deg + var(--cvs-h)) 90% 88%) 0 30%, hsl(calc(336deg + var(--cvs-h)) 75% 76%) 50%,
+      hsl(calc(330deg + var(--cvs-h)) 60% 62% / 0) 72%);
 }
 
 /* ── 12. Autumn grove ──────────────────────────────────────── */
