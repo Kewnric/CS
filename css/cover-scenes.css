@@ -1,0 +1,404 @@
+/* ============================================================
+   COVER-SCENES.CSS — the animated covers (js/cover-scenes.js)
+   ------------------------------------------------------------
+   Ten scenes, each a few absolutely placed layers. --cvs-h tints a scene a
+   little per card, --cvs-d starts its loops at a different point per card.
+   Only .cvs-a parts move, only by transform or opacity, and only while the
+   cover carries .cvs-run (in view, Motion on). Every loop closes: either it
+   alternates, or it moves exactly one tile of a repeating background.
+   ============================================================ */
+
+.lib-cover-scene { isolation: isolate; background: #0a0e1f; }
+.lib-cover-scene > span { position: absolute; display: block; pointer-events: none; }
+.lib-cover-scene span span { position: absolute; display: block; }
+
+/* Shared stars: a tile of dots. */
+.lib-cover-scene .cvs-stars {
+  inset: 0;
+  background-image:
+    radial-gradient(1px 1px at 8% 18%, #fff 99%, transparent),
+    radial-gradient(1px 1px at 23% 42%, #dbe6ff 99%, transparent),
+    radial-gradient(1.4px 1.4px at 37% 12%, #fff 99%, transparent),
+    radial-gradient(1px 1px at 52% 30%, #fff 99%, transparent),
+    radial-gradient(1px 1px at 64% 9%, #cfe3ff 99%, transparent),
+    radial-gradient(1.4px 1.4px at 78% 26%, #fff 99%, transparent),
+    radial-gradient(1px 1px at 90% 14%, #fff 99%, transparent),
+    radial-gradient(1px 1px at 96% 40%, #dbe6ff 99%, transparent);
+  opacity: 0.75;
+}
+.lib-cover-scene .cvs-stars.cvs-tw {
+  transform: translate(3.5%, 9%);
+  animation: cvsTwinkle 3.2s ease-in-out var(--cvs-d) infinite alternate;
+}
+@keyframes cvsTwinkle { from { opacity: 0.15; } to { opacity: 0.95; } }
+
+/* A ridge or skyline cut out of a plain block. */
+.lib-cover-scene .cvs-ridge { left: 0; right: 0; bottom: 0; }
+
+/* ── 1. Aurora ─────────────────────────────────────────────── */
+.lib-cover-scene.cvs-aurora {
+  background: linear-gradient(180deg, hsl(calc(228deg + var(--cvs-h)) 62% 8%) 0%,
+    hsl(calc(210deg + var(--cvs-h)) 55% 15%) 68%, hsl(calc(195deg + var(--cvs-h)) 45% 22%) 100%);
+}
+.cvs-aurora .cvs-rib {
+  left: -30%; width: 160%; top: -8%; height: 78%;
+  transform-origin: 50% 100%;
+  background: radial-gradient(48% 34% at 50% 62%, hsl(calc(150deg + var(--cvs-h)) 90% 62% / 0.55), transparent 72%);
+  animation: cvsSway 9s ease-in-out var(--cvs-d) infinite alternate;
+}
+.cvs-aurora .cvs-rib2 {
+  top: -18%;
+  background: radial-gradient(40% 26% at 44% 66%, hsl(calc(285deg + var(--cvs-h)) 80% 66% / 0.42), transparent 72%);
+  animation-duration: 12s;
+  animation-direction: alternate-reverse;
+}
+@keyframes cvsSway {
+  from { transform: translateX(-9%) skewX(-14deg) scaleY(0.9); }
+  to   { transform: translateX(9%) skewX(12deg) scaleY(1.12); }
+}
+.cvs-aurora .cvs-ridge-far {
+  height: 46%;
+  background: hsl(calc(222deg + var(--cvs-h)) 40% 13%);
+  clip-path: polygon(0 62%, 9% 40%, 17% 54%, 28% 22%, 38% 48%, 47% 30%, 58% 56%, 68% 18%, 79% 46%, 88% 32%, 100% 50%, 100% 100%, 0 100%);
+}
+.cvs-aurora .cvs-ridge-near {
+  height: 34%;
+  background: hsl(calc(225deg + var(--cvs-h)) 45% 6%);
+  clip-path: polygon(0 48%, 12% 70%, 24% 34%, 36% 64%, 50% 40%, 63% 72%, 76% 38%, 88% 62%, 100% 44%, 100% 100%, 0 100%);
+}
+
+/* ── 2. Sunset sea ─────────────────────────────────────────── */
+.lib-cover-scene.cvs-sunset {
+  background: linear-gradient(180deg, hsl(calc(262deg + var(--cvs-h)) 45% 20%) 0%,
+    hsl(calc(328deg + var(--cvs-h)) 58% 42%) 46%, hsl(calc(22deg + var(--cvs-h)) 92% 60%) 66%);
+}
+.cvs-sunset .cvs-sun {
+  left: 50%; top: 30%; width: 84px; height: 84px; margin-left: -42px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff4d2 0 22%, hsl(calc(36deg + var(--cvs-h)) 100% 66%) 34%,
+    hsl(calc(20deg + var(--cvs-h)) 100% 60% / 0.35) 52%, transparent 70%);
+  animation: cvsBob 8s ease-in-out var(--cvs-d) infinite alternate;
+}
+@keyframes cvsBob { from { transform: translateY(0); } to { transform: translateY(6px); } }
+.lib-cover-scene .cvs-sea { left: 0; right: 0; bottom: 0; height: 36%; }
+.cvs-sunset .cvs-sea {
+  background: linear-gradient(180deg, hsl(calc(318deg + var(--cvs-h)) 42% 30%), hsl(calc(252deg + var(--cvs-h)) 50% 11%));
+}
+.cvs-sunset .cvs-glint {
+  left: 50%; bottom: 3%; width: 54px; height: 31%; margin-left: -27px;
+  background: repeating-linear-gradient(180deg, hsl(calc(40deg + var(--cvs-h)) 100% 78% / 0.75) 0 2px, transparent 2px 7px);
+  border-radius: 40%;
+  animation: cvsGlint 2.6s ease-in-out var(--cvs-d) infinite alternate;
+}
+@keyframes cvsGlint { from { opacity: 0.35; transform: scaleX(0.8); } to { opacity: 0.9; transform: scaleX(1.15); } }
+.lib-cover-scene .cvs-waves {
+  --tile: 38px;
+  left: 0; bottom: 0; height: 36%; width: calc(100% + var(--tile));
+  background-image:
+    radial-gradient(12px 2px at 50% 30%, rgba(255, 255, 255, 0.22), transparent 70%),
+    radial-gradient(9px 1.6px at 20% 78%, rgba(255, 255, 255, 0.16), transparent 70%);
+  background-size: var(--tile) 13px;
+  animation: cvsSlide 5s linear var(--cvs-d) infinite;
+}
+@keyframes cvsSlide { to { transform: translateX(calc(-1 * var(--tile))); } }
+
+/* ── 3. City at night ──────────────────────────────────────── */
+.lib-cover-scene.cvs-city {
+  background: linear-gradient(180deg, hsl(calc(232deg + var(--cvs-h)) 55% 9%) 0%,
+    hsl(calc(260deg + var(--cvs-h)) 45% 18%) 62%, hsl(calc(320deg + var(--cvs-h)) 55% 32%) 100%);
+}
+.cvs-city .cvs-moon {
+  right: 12%; top: 14%; width: 18px; height: 18px; border-radius: 50%;
+  background: radial-gradient(circle at 40% 40%, #fff9e8, #e9dcc0 60%, #cbbf9f);
+  box-shadow: 0 0 18px 4px rgba(255, 244, 214, 0.25);
+}
+.cvs-city .cvs-track { left: 0; right: 0; top: 22%; height: 4px; animation: cvsFly 18s linear var(--cvs-d) infinite; }
+.cvs-city .cvs-plane {
+  left: 0; top: 0; width: 3px; height: 3px; border-radius: 50%;
+  background: #ff6b81; box-shadow: 0 0 6px 2px rgba(255, 107, 129, 0.6);
+}
+@keyframes cvsFly { from { transform: translateX(-4%); } to { transform: translateX(104%); } }
+.cvs-city .cvs-far {
+  left: 0; right: 0; bottom: 0; height: 62%;
+  background: hsl(calc(250deg + var(--cvs-h)) 32% 20%);
+  clip-path: polygon(0 40%, 6% 40%, 6% 22%, 12% 22%, 12% 48%, 19% 48%, 19% 12%, 23% 12%, 23% 6%, 26% 6%, 26% 40%,
+    34% 40%, 34% 28%, 41% 28%, 41% 52%, 47% 52%, 47% 18%, 55% 18%, 55% 44%, 61% 44%, 61% 8%, 66% 8%, 66% 36%,
+    73% 36%, 73% 24%, 80% 24%, 80% 50%, 86% 50%, 86% 16%, 93% 16%, 93% 42%, 100% 42%, 100% 100%, 0 100%);
+}
+.cvs-city .cvs-near,
+.cvs-city .cvs-wins {
+  left: 0; right: 0; bottom: 0; height: 44%;
+  clip-path: polygon(0 30%, 9% 30%, 9% 10%, 17% 10%, 17% 44%, 24% 44%, 24% 0, 31% 0, 31% 36%, 39% 36%, 39% 18%,
+    48% 18%, 48% 50%, 55% 50%, 55% 6%, 63% 6%, 63% 40%, 71% 40%, 71% 22%, 79% 22%, 79% 54%, 85% 54%, 85% 12%,
+    93% 12%, 93% 34%, 100% 34%, 100% 100%, 0 100%);
+}
+.cvs-city .cvs-near { background: #06070f; }
+.cvs-city .cvs-wins {
+  background-image: radial-gradient(1.3px 1.8px at 50% 50%, hsl(calc(44deg + var(--cvs-h)) 100% 72% / 0.85) 90%, transparent);
+  background-size: 9px 8px;
+  opacity: 0.55;
+}
+.cvs-city .cvs-wins2 {
+  background-image: radial-gradient(1.3px 1.8px at 50% 50%, hsl(calc(195deg + var(--cvs-h)) 100% 78% / 0.9) 90%, transparent);
+  background-size: 13px 11px;
+  background-position: 4px 3px;
+  animation: cvsBlink 4.2s steps(1) var(--cvs-d) infinite;
+}
+@keyframes cvsBlink { 0%, 100% { opacity: 0.2; } 30% { opacity: 0.75; } 62% { opacity: 0.4; } 80% { opacity: 0.9; } }
+
+/* ── 4. Deep space ─────────────────────────────────────────── */
+.lib-cover-scene.cvs-space {
+  background:
+    radial-gradient(60% 85% at 18% 30%, hsl(calc(282deg + var(--cvs-h)) 70% 34% / 0.55), transparent 70%),
+    radial-gradient(50% 75% at 86% 72%, hsl(calc(200deg + var(--cvs-h)) 80% 38% / 0.45), transparent 70%),
+    #050616;
+}
+.cvs-space .cvs-field {
+  --tile: 140px;
+  left: 0; top: 0; bottom: 0; width: calc(100% + var(--tile));
+  background-image:
+    radial-gradient(1px 1px at 12px 16px, #fff 99%, transparent),
+    radial-gradient(1px 1px at 52px 74px, #cfe3ff 99%, transparent),
+    radial-gradient(1.5px 1.5px at 86px 28px, #fff 99%, transparent),
+    radial-gradient(1px 1px at 118px 58px, #fff 99%, transparent),
+    radial-gradient(1px 1px at 30px 96px, #fde68a 99%, transparent);
+  background-size: var(--tile) 110px;
+  animation: cvsSlide 36s linear var(--cvs-d) infinite;
+}
+.cvs-space .cvs-planet {
+  right: 17%; top: 50%; width: 62px; height: 62px; margin-top: -31px; border-radius: 50%;
+  background: radial-gradient(circle at 34% 30%, hsl(calc(32deg + var(--cvs-h)) 85% 72%),
+    hsl(calc(12deg + var(--cvs-h)) 62% 42%) 55%, hsl(calc(262deg + var(--cvs-h)) 52% 12%) 100%);
+  box-shadow: 0 0 26px hsl(calc(20deg + var(--cvs-h)) 90% 60% / 0.3);
+  animation: cvsBob 10s ease-in-out var(--cvs-d) infinite alternate;
+}
+.cvs-space .cvs-ring {
+  right: calc(17% - 24px); top: 50%; width: 110px; height: 26px; margin-top: -13px; border-radius: 50%;
+  border: 2px solid hsl(calc(40deg + var(--cvs-h)) 85% 76% / 0.7);
+  animation: cvsRing 10s ease-in-out var(--cvs-d) infinite alternate;
+}
+.cvs-space .cvs-ring-back { border-bottom-color: transparent; opacity: 0.55; }
+.cvs-space .cvs-ring-front { border-top-color: transparent; }
+@keyframes cvsRing { from { transform: translateY(0) rotate(-14deg); } to { transform: translateY(6px) rotate(-14deg); } }
+.cvs-space .cvs-comet {
+  left: 0; top: 0; width: 46px; height: 1.5px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.95));
+  opacity: 0;
+  animation: cvsComet 9s linear var(--cvs-d) infinite;
+}
+@keyframes cvsComet {
+  0%   { transform: translate(-60px, 8px) rotate(14deg); opacity: 0; }
+  4%   { opacity: 1; }
+  22%  { transform: translate(360px, 96px) rotate(14deg); opacity: 0; }
+  100% { transform: translate(360px, 96px) rotate(14deg); opacity: 0; }
+}
+
+/* ── 5. Neon rain ──────────────────────────────────────────── */
+.lib-cover-scene.cvs-rain { background: linear-gradient(180deg, #090d22, hsl(calc(232deg + var(--cvs-h)) 45% 15%) 64%, #0a0d1d); }
+.cvs-rain .cvs-glow {
+  left: 18%; top: 4%; width: 64%; height: 82%;
+  background: radial-gradient(closest-side, hsl(calc(322deg + var(--cvs-h)) 100% 60% / 0.45), transparent);
+  animation: cvsFlicker 7s linear var(--cvs-d) infinite;
+}
+.cvs-rain .cvs-sign {
+  left: 50%; top: 26%; width: 92px; height: 32px; margin-left: -46px;
+  border: 2px solid hsl(calc(322deg + var(--cvs-h)) 100% 74%);
+  border-radius: 9px;
+  box-shadow: 0 0 12px hsl(calc(322deg + var(--cvs-h)) 100% 62% / 0.8), inset 0 0 9px hsl(calc(322deg + var(--cvs-h)) 100% 62% / 0.55);
+  animation: cvsFlicker 7s linear var(--cvs-d) infinite;
+}
+.cvs-rain .cvs-sign::before {
+  content: '</>';
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font: 800 15px/1 var(--font-mono, monospace);
+  letter-spacing: 0.08em;
+  color: hsl(calc(322deg + var(--cvs-h)) 100% 86%);
+  text-shadow: 0 0 8px hsl(calc(322deg + var(--cvs-h)) 100% 62%);
+}
+@keyframes cvsFlicker {
+  0%, 44%, 50%, 54%, 100% { opacity: 1; }
+  46% { opacity: 0.35; } 52% { opacity: 0.55; }
+}
+.cvs-rain .cvs-street {
+  left: 0; right: 0; bottom: 0; height: 26%;
+  background: linear-gradient(180deg, hsl(calc(322deg + var(--cvs-h)) 80% 50% / 0.22), transparent);
+  animation: cvsShimmer 3s ease-in-out var(--cvs-d) infinite alternate;
+}
+@keyframes cvsShimmer { from { opacity: 0.45; } to { opacity: 1; } }
+.cvs-rain .cvs-drops {
+  --tile: 28px;
+  left: -8%; right: -8%; top: calc(-1 * var(--tile)); bottom: 0;
+  background-image:
+    radial-gradient(0.6px 7px at 50% 50%, rgba(190, 210, 255, 0.55), transparent),
+    radial-gradient(0.6px 6px at 20% 10%, rgba(190, 210, 255, 0.4), transparent);
+  background-size: 13px var(--tile), 19px var(--tile);
+  animation: cvsRainFall 0.55s linear infinite;
+}
+/* Skewed, the drops repeat along the slant (tan 10deg = 0.1763 across per
+   tile down), so the loop moves along it too or it jumps sideways. */
+@keyframes cvsRainFall {
+  from { transform: translate(0, 0) skewX(-10deg); }
+  to   { transform: translate(calc(var(--tile) * -0.1763), var(--tile)) skewX(-10deg); }
+}
+
+/* ── 6. Fireflies ──────────────────────────────────────────── */
+.lib-cover-scene.cvs-forest {
+  background: linear-gradient(180deg, hsl(calc(200deg + var(--cvs-h)) 40% 10%) 0%,
+    hsl(calc(170deg + var(--cvs-h)) 35% 15%) 62%, hsl(calc(150deg + var(--cvs-h)) 35% 9%) 100%);
+}
+.cvs-forest .cvs-moonglow {
+  right: 10%; top: -20%; width: 120px; height: 120px;
+  background: radial-gradient(closest-side, rgba(230, 245, 255, 0.28), transparent);
+}
+.cvs-forest .cvs-pines { left: 0; right: 0; bottom: 0; }
+.cvs-forest .cvs-pines-far {
+  height: 72%;
+  background: hsl(calc(165deg + var(--cvs-h)) 30% 15%);
+  clip-path: polygon(0 60%, 4% 30%, 8% 58%, 12% 22%, 17% 56%, 22% 34%, 27% 60%, 32% 16%, 37% 52%, 42% 30%, 47% 58%,
+    52% 20%, 57% 54%, 62% 36%, 67% 60%, 72% 18%, 77% 50%, 82% 32%, 87% 58%, 92% 24%, 96% 50%, 100% 36%, 100% 100%, 0 100%);
+}
+.cvs-forest .cvs-fog {
+  left: -20%; width: 140%; bottom: 14%; height: 42%;
+  background: radial-gradient(50% 50% at 50% 50%, rgba(200, 235, 225, 0.16), transparent 72%);
+  animation: cvsDrift 13s ease-in-out var(--cvs-d) infinite alternate;
+}
+@keyframes cvsDrift { from { transform: translateX(-7%); } to { transform: translateX(7%); } }
+.cvs-forest .cvs-pines-near {
+  height: 50%;
+  background: hsl(calc(160deg + var(--cvs-h)) 40% 6%);
+  clip-path: polygon(0 50%, 6% 12%, 12% 54%, 19% 26%, 26% 64%, 34% 8%, 41% 58%, 49% 30%, 56% 66%, 64% 14%, 71% 56%,
+    79% 28%, 86% 62%, 93% 18%, 100% 54%, 100% 100%, 0 100%);
+}
+.cvs-forest .cvs-ff {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: hsl(calc(62deg + var(--cvs-h)) 100% 72%);
+  box-shadow: 0 0 7px 2px hsl(calc(62deg + var(--cvs-h)) 100% 60% / 0.65);
+  animation: cvsWander var(--t) ease-in-out var(--cvs-d) infinite alternate,
+             cvsPulse calc(var(--t) * 0.45) ease-in-out var(--cvs-d) infinite alternate;
+}
+@keyframes cvsWander { from { transform: translate(0, 0); } 50% { transform: translate(9px, -7px); } to { transform: translate(-6px, -13px); } }
+@keyframes cvsPulse { from { opacity: 0.15; } to { opacity: 1; } }
+
+/* ── 7. Dunes ──────────────────────────────────────────────── */
+.lib-cover-scene.cvs-dunes {
+  background: linear-gradient(180deg, hsl(calc(18deg + var(--cvs-h)) 62% 30%) 0%,
+    hsl(calc(32deg + var(--cvs-h)) 85% 54%) 58%, hsl(calc(42deg + var(--cvs-h)) 92% 72%) 100%);
+}
+.cvs-dunes .cvs-lowsun {
+  left: 22%; top: 34%; width: 70px; height: 70px; border-radius: 50%;
+  background: radial-gradient(circle, #fff5dc 0 24%, hsl(calc(38deg + var(--cvs-h)) 100% 70% / 0.7) 40%, transparent 70%);
+  animation: cvsBob 9s ease-in-out var(--cvs-d) infinite alternate;
+}
+.cvs-dunes .cvs-cloud {
+  left: -10%; top: 12%; width: 120%; height: 22%;
+  background: radial-gradient(30% 50% at 30% 50%, rgba(255, 236, 210, 0.3), transparent 70%),
+              radial-gradient(24% 40% at 72% 40%, rgba(255, 236, 210, 0.22), transparent 70%);
+  animation: cvsDrift 16s ease-in-out var(--cvs-d) infinite alternate;
+}
+.cvs-dunes .cvs-dune { border-radius: 50% 50% 0 0 / 100% 100% 0 0; }
+.cvs-dunes .cvs-dune1 { left: -20%; width: 90%; bottom: -8%; height: 44%; background: linear-gradient(180deg, hsl(calc(28deg + var(--cvs-h)) 62% 48%), hsl(calc(22deg + var(--cvs-h)) 55% 32%)); }
+.cvs-dunes .cvs-dune2 { left: 30%; width: 100%; bottom: -14%; height: 50%; background: linear-gradient(180deg, hsl(calc(24deg + var(--cvs-h)) 58% 40%), hsl(calc(18deg + var(--cvs-h)) 52% 24%)); }
+.cvs-dunes .cvs-dune3 { left: -10%; width: 70%; bottom: -26%; height: 46%; background: linear-gradient(180deg, hsl(calc(18deg + var(--cvs-h)) 50% 26%), hsl(calc(14deg + var(--cvs-h)) 48% 14%)); }
+.cvs-dunes .cvs-sand {
+  --tile: 60px;
+  left: 0; bottom: 0; height: 40%; width: calc(100% + var(--tile));
+  background-image:
+    radial-gradient(1px 1px at 10px 12px, rgba(255, 240, 210, 0.6) 99%, transparent),
+    radial-gradient(1px 1px at 38px 26px, rgba(255, 240, 210, 0.45) 99%, transparent),
+    radial-gradient(1px 1px at 52px 6px, rgba(255, 240, 210, 0.5) 99%, transparent);
+  background-size: var(--tile) 34px;
+  animation: cvsSlide 7s linear var(--cvs-d) infinite;
+}
+
+/* ── 8. Code rain ──────────────────────────────────────────── */
+.lib-cover-scene.cvs-stream {
+  background: radial-gradient(85% 95% at 50% 120%, hsl(calc(168deg + var(--cvs-h)) 80% 24% / 0.65), transparent 70%), #040a12;
+}
+.cvs-stream .cvs-grid {
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(90deg, hsl(calc(160deg + var(--cvs-h)) 90% 60% / 0.07) 0 1px, transparent 1px 14px),
+    repeating-linear-gradient(0deg, hsl(calc(160deg + var(--cvs-h)) 90% 60% / 0.05) 0 1px, transparent 1px 14px);
+}
+.cvs-stream .cvs-glyph {
+  inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  animation: cvsShimmer 3.4s ease-in-out var(--cvs-d) infinite alternate;
+}
+.cvs-stream .cvs-glyph::before {
+  content: '{ }';
+  font: 800 30px/1 var(--font-mono, monospace);
+  color: hsl(calc(160deg + var(--cvs-h)) 90% 72% / 0.85);
+  text-shadow: 0 0 14px hsl(calc(160deg + var(--cvs-h)) 90% 55% / 0.8);
+}
+.cvs-stream .cvs-col {
+  top: 0; width: 2px; height: 62%; border-radius: 1px;
+  background: linear-gradient(180deg, transparent, hsl(calc(160deg + var(--cvs-h)) 90% 62% / 0.15) 30%,
+    hsl(calc(160deg + var(--cvs-h)) 90% 66% / 0.85) 92%, #eafff6);
+  transform: translateY(-110%);
+  animation: cvsColFall var(--t) linear var(--o) infinite;
+}
+@keyframes cvsColFall { from { transform: translateY(-110%); } to { transform: translateY(190%); } }
+
+/* ── 9. Snowy peaks ────────────────────────────────────────── */
+.lib-cover-scene.cvs-snow {
+  background: linear-gradient(180deg, hsl(calc(218deg + var(--cvs-h)) 45% 20%) 0%,
+    hsl(calc(212deg + var(--cvs-h)) 40% 42%) 70%, hsl(calc(205deg + var(--cvs-h)) 35% 60%) 100%);
+}
+.cvs-snow .cvs-peaks-far {
+  height: 64%;
+  background: linear-gradient(180deg, #dfe8f7 0 16%, hsl(calc(215deg + var(--cvs-h)) 22% 52%) 30%, hsl(calc(218deg + var(--cvs-h)) 28% 34%));
+  clip-path: polygon(0 70%, 14% 28%, 24% 52%, 38% 6%, 52% 50%, 62% 30%, 76% 62%, 88% 20%, 100% 54%, 100% 100%, 0 100%);
+  opacity: 0.8;
+}
+.cvs-snow .cvs-peaks {
+  height: 48%;
+  background: linear-gradient(180deg, #f2f6ff 0 18%, hsl(calc(216deg + var(--cvs-h)) 25% 40%) 34%, hsl(calc(220deg + var(--cvs-h)) 35% 16%));
+  clip-path: polygon(0 62%, 18% 12%, 30% 46%, 44% 0, 60% 52%, 72% 24%, 86% 58%, 100% 30%, 100% 100%, 0 100%);
+}
+.cvs-snow .cvs-flakes {
+  --tile: 40px;
+  left: 0; right: 0; top: calc(-1 * var(--tile)); bottom: 0;
+  background-image:
+    radial-gradient(1.4px 1.4px at 6px 8px, #fff 99%, transparent),
+    radial-gradient(1px 1px at 24px 22px, #fff 99%, transparent),
+    radial-gradient(1.6px 1.6px at 34px 4px, #fff 99%, transparent);
+  background-size: var(--tile) var(--tile);
+  opacity: 0.85;
+  animation: cvsFallTile 5s linear var(--cvs-d) infinite;
+}
+.cvs-snow .cvs-flakes2 { background-size: var(--tile) var(--tile); background-position: 18px 12px; opacity: 0.5; animation-duration: 8s; }
+@keyframes cvsFallTile { to { transform: translateY(var(--tile)); } }
+
+/* ── 10. Lighthouse ────────────────────────────────────────── */
+.lib-cover-scene.cvs-lighthouse {
+  background: linear-gradient(180deg, hsl(calc(232deg + var(--cvs-h)) 52% 9%) 0%, hsl(calc(214deg + var(--cvs-h)) 45% 22%) 70%);
+}
+.cvs-lighthouse .cvs-sea { height: 30%; background: linear-gradient(180deg, hsl(calc(218deg + var(--cvs-h)) 50% 16%), hsl(calc(226deg + var(--cvs-h)) 55% 7%)); }
+.cvs-lighthouse .cvs-waves { height: 30%; }
+.cvs-lighthouse .cvs-rock {
+  left: 12%; bottom: 18%; width: 30%; height: 18%;
+  background: #05070e; border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+}
+.cvs-lighthouse .cvs-tower {
+  left: calc(25% - 7px); bottom: 30%; width: 14px; height: 48px;
+  background: repeating-linear-gradient(180deg, #e9edf5 0 8px, #c9474b 8px 16px);
+  clip-path: polygon(26% 0, 74% 0, 100% 100%, 0 100%);
+}
+.cvs-lighthouse .cvs-lamp {
+  left: calc(25% - 6px); bottom: calc(30% + 46px); width: 12px; height: 12px; border-radius: 50%;
+  background: radial-gradient(circle, #fffbe6 0 30%, hsl(calc(48deg + var(--cvs-h)) 100% 70% / 0.6) 50%, transparent 72%);
+  animation: cvsShimmer 1.6s ease-in-out var(--cvs-d) infinite alternate;
+}
+.cvs-lighthouse .cvs-beam {
+  left: 25%; bottom: calc(30% + 52px - 18px); width: 260px; height: 36px;
+  transform-origin: 0 50%;
+  background: linear-gradient(90deg, hsl(calc(50deg + var(--cvs-h)) 100% 82% / 0.55), transparent 85%);
+  clip-path: polygon(0 46%, 100% 0, 100% 100%, 0 54%);
+  animation: cvsSweep 6s ease-in-out var(--cvs-d) infinite alternate;
+}
+@keyframes cvsSweep { from { transform: rotate(-26deg) scaleX(0.85); } to { transform: rotate(14deg) scaleX(1.05); } }
+
+/* ── Still unless running ──────────────────────────────────── */
+.lib-cover-scene:not(.cvs-run) span.cvs-a { animation-play-state: paused; }

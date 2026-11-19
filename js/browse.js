@@ -805,7 +805,7 @@ function _buildChallengeCard(c, query) {
   const slipped = lastScore >= 0 && bestScore >= 0 && lastScore < bestScore;
   const coverHtml = c.coverImage
     ? `<div class="nb-card-cover"><img src="${mediaSrc(c.coverImage, 'thumb')}" alt="" loading="lazy" decoding="async" /></div>`
-    : libCoverFallbackHTML(c.title, 'file-code-2');
+    : (typeof coverSceneHTML === 'function' ? coverSceneHTML(c.id || c.title) : libCoverFallbackHTML(c.title, 'file-code-2'));
   const resumable = browseHasResumable(c);
   const selecting = libSelectMode('browse');
   return `
