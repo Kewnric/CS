@@ -39,6 +39,7 @@ const SIDEBAR_WHEEL_NOTCH = 40;   // px of wheel delta per step
     target = (target + step + ls.length) % ls.length;
     clear();
     ls[target].classList.add('is-wheel-target');
+    if (typeof uisfxTick === 'function') uisfxTick();       // one tick per notch (ui-sfx.js)
   }, { passive: false });
 
   function settle() {
@@ -47,6 +48,9 @@ const SIDEBAR_WHEEL_NOTCH = 40;   // px of wheel delta per step
     const l = target >= 0 ? links()[target] : null;
     target = -1;
     clear();
-    if (l && !l.classList.contains('active')) l.click();
+    if (!l || l.classList.contains('active')) return;
+    // The ticks were the sound; opening the page adds none.
+    if (typeof uisfxQuietly === 'function') uisfxQuietly(() => l.click());
+    else l.click();
   }
 })();

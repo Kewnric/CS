@@ -146,9 +146,30 @@ function uisfxToggle(on) {
  */
 function uisfxNavigate() {
   if (!uisfxOn()) return;
+  if (_uisfxHushNavAt && Date.now() - _uisfxHushNavAt < 2500) { _uisfxHushNavAt = 0; return; }
   if (Date.now() - _uisfxLastClick < 450) return;
   uisfxTone(520, { dur: 0.05, gain: 0.1, type: 'sine' });
   uisfxTone(780, { dur: 0.07, gain: 0.09, type: 'sine', at: 0.045 });
+}
+
+/* The sidebar wheel (sidebar-wheel.js): one tick per notch as the highlight
+   moves, and the page it settles on opens quietly. It used to be silent while
+   moving, then the link's click sounded, and the route chime came on top
+   whenever the page took over 450 ms to render: one sound, two, or none
+   (wheeling back to the page you were on) for the same gesture. */
+let _uisfxLastTick = 0, _uisfxHushNavAt = 0, _uisfxQuiet = false;
+function uisfxTick() {
+  if (!uisfxOn()) return;
+  const now = Date.now();
+  if (now - _uisfxLastTick < 30) return;
+  _uisfxLastTick = now;
+  uisfxTone(1700, { dur: 0.026, gain: 0.07, type: 'sine', lowpass: 4500 });
+}
+/** Run fn (a navigation) with no click sound and no route chime. */
+function uisfxQuietly(fn) {
+  _uisfxHushNavAt = Date.now();
+  _uisfxQuiet = true;
+  try { fn(); } finally { _uisfxQuiet = false; }
 }
 
 function uisfxOpen() {
@@ -180,7 +201,7 @@ function _uisfxKindOf(el) {
 }
 
 document.addEventListener('click', function (e) {
-  if (!uisfxOn() || !e.target) return;
+  if (_uisfxQuiet || !uisfxOn() || !e.target) return;
   const el = e.target.closest ? e.target : null;
   if (!el) return;
 
