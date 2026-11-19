@@ -123,6 +123,13 @@ wraps it as `{ $arr: [...] }` and `_loadV2Domains` reads every domain doc throug
 **A new localStorage key that is the person's data or taste goes on that list**; layout (positions, sizes,
 folded panels), secrets and device caches never do. Writing a listed key while signed in schedules a cloud
 save by itself (a `Storage.prototype` wrapper). Practice-set drafts ride in `stash`, merged per set.
+**A refresh while signed in opens from this device's copy** (`_bootFromDeviceCopy`), not a download: the
+`*_online` keys hold the account, and `ssp.cloudCopy` ({uid, stamp, clean}) vouches for them. It is written
+only by a full cloud load or a cloud save, marked unclean by `markCloudDirty`, and dropped with the caches or on
+any failed `localStorage.setItem` (the wrapper below). Then one read of the root doc (`_cloudCheckAfterDeviceBoot`):
+another device's newer save (`savedBy` is the device id) reloads into the full load (`ssp.cloudFullLoad`, once).
+So the device copy must be COMPLETE: `_cacheAllToLocalStorage` writes the app blob with `_flushSaveData()`, never
+a field list of its own. Tests: `tests/cloud-sync.spec.js` "refresh while signed in".
 **Save state shows on `#sync-fab`** (above the gear, `_paintSyncFab`): no toast on success, one per run of
 failures. Hiding the tab or coming back online saves at once; offline, the timed save waits.
 Proof for Google and username alike: `tests/cloud-sync.spec.js` (two-device round trip: every doc the fresh

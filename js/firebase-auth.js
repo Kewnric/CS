@@ -96,6 +96,8 @@ let _suppressCloudSave = false;
  *  vizSave(), brainSave(), saveQuestData(), toggleTheme(), etc. */
 function markCloudDirty() {
   _cloudIsDirty = true;
+  _cloudChangeSeq++;
+  if (_cloudCopyCleanFor) _cloudCopySave(_cloudCopyCleanFor, false);   // this device's copy is now ahead
   _updateCloudStatusUI();
 }
 
@@ -667,6 +669,7 @@ async function loadFromFirestore(uid) {
       // Remember which cloud revision this session is built on. Any save that
       // finds a NEWER one knows another device wrote in the meantime.
       _cloudBaseline = _stampOf(rootData.lastSaved);
+      _cloudCopySave(uid, true);   // the copy above now matches this revision
       _rerenderActiveRoute();
       console.log('[Firebase] Loaded cloud data for', uid);
       // The pictures this library uses that this device has not got (js/media-store.js).
@@ -1101,12 +1104,14 @@ function _flushAllInMemoryDomains() {
 const ONLINE_OWNER_KEY = 'ssp.onlineOwner';
 const ONLINE_CACHE_KEYS = [
   'codePlatformData_online', 'vizCanvasData_online', 'brainCanvasData_online',
-  'questBoardData_online', 'cheatsheetLibrary_online', 'ssp.fg.buffer_online'
+  'questBoardData_online', 'cheatsheetLibrary_online', 'ssp.fg.buffer_online',
+  'ssp.cloudCopy'   // CLOUD_COPY_KEY: says the slot can be opened without a download
 ];
 
 /** Empty the cloud-mode slot. Never the mode's key by name: in a tab that has not been
  *  told it is online, getAppStorageKey() is Guest's library. */
 function _wipeOnlineCaches() {
+  _cloudCopyCleanFor = null;
   ONLINE_CACHE_KEYS.forEach(k => { try { localStorage.removeItem(k); } catch (e) { /* blocked */ } });
   try { localStorage.removeItem(ONLINE_OWNER_KEY); } catch (e) { /* blocked */ }
 }
@@ -1120,29 +1125,135 @@ function _claimOnlineCaches(uid) {
   try { localStorage.setItem(ONLINE_OWNER_KEY, uid); } catch (e) { /* full: claimed again next time */ }
 }
 
+/* ============================================================
+   OPENING FROM THIS DEVICE'S COPY
+   Refreshing while signed in used to download every domain before anything
+   showed, on every reload. The *_online keys already hold the account, so a
+   refresh now opens from them and asks the cloud only whether another device
+   has saved since (one small read of the root document). The copy is trusted
+   only when this record says it is complete and whose it is:
+     uid    the account it holds (ssp.onlineOwner must agree)
+     stamp  the cloud revision it matches (_cloudBaseline at the time)
+     clean  false while it has changes the cloud has not got
+   Written only after a full cloud load or a cloud save; dropped with the
+   caches and on any failed local write (a full quota leaves the copy behind
+   the cloud), so anything doubtful takes the full load instead.
+   ============================================================ */
+const CLOUD_COPY_KEY = 'ssp.cloudCopy';
+let _cloudChangeSeq = 0;         // bumped by every markCloudDirty
+let _cloudCopyCleanFor = null;   // the uid whose record says clean, so marking it dirty is one write
+let _cloudCopyBroken = false;    // a local write failed in this page: never vouch for the copy
+
+/** This device, named in every cloud save (root `savedBy`) so a refresh can
+ *  tell its own last save from another device's. Never synced. */
+function _deviceId() {
+  let id = null;
+  try { id = localStorage.getItem('ssp.deviceId'); } catch (e) { return ''; }
+  if (!id) {
+    id = 'd' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    try { localStorage.setItem('ssp.deviceId', id); } catch (e) { /* full: a new one next time */ }
+  }
+  return id;
+}
+
+function _cloudCopyRead() {
+  try {
+    const r = JSON.parse(localStorage.getItem(CLOUD_COPY_KEY) || 'null');
+    return (r && r.v === 1 && typeof r.uid === 'string' && r.uid) ? r : null;
+  } catch (e) { return null; }
+}
+
+function _cloudCopySave(uid, clean) {
+  if (_cloudCopyBroken || !uid) return;
+  try {
+    localStorage.setItem(CLOUD_COPY_KEY, JSON.stringify({ v: 1, uid: uid, stamp: _cloudBaseline || 0, clean: !!clean }));
+    _cloudCopyCleanFor = clean ? uid : null;
+  } catch (e) { /* the setItem wrapper has already dropped it */ }
+}
+
+/** A local write failed: the copy may be behind the cloud. Full load next time. */
+function _cloudCopyDistrust() {
+  _cloudCopyBroken = true;
+  _cloudCopyCleanFor = null;
+  try { localStorage.removeItem(CLOUD_COPY_KEY); } catch (e) { /* blocked */ }
+}
+
+/** Open `user`'s account from this device's copy, the way Guest opens.
+ *  False, having changed nothing that matters, when the copy cannot be trusted. */
+function _bootFromDeviceCopy(user) {
+  let full = null;
+  try { full = sessionStorage.getItem('ssp.cloudFullLoad'); sessionStorage.removeItem('ssp.cloudFullLoad'); } catch (e) { /* blocked */ }
+  if (full) return false;                                  // asked for the full load (_cloudReloadForNewer)
+  const rec = _cloudCopyRead();
+  if (!rec || !user || rec.uid !== user.uid) return false;
+  if (getAppStorageKey() !== 'codePlatformData_online') return false;   // the tab does not know it is online
+  let owner = null, raw = null;
+  try { owner = localStorage.getItem(ONLINE_OWNER_KEY); raw = localStorage.getItem(getAppStorageKey()); } catch (e) { return false; }
+  if (owner !== user.uid || !raw) return false;
+  try { JSON.parse(storeDecode(raw)); } catch (e) { return false; }   // unreadable here: the cloud has it
+  withCloudSaveSuppressed(() => {
+    if (typeof profileKeysEnter === 'function') profileKeysEnter('u:' + user.uid);   // this account's drafts
+    _flushAllInMemoryDomains();
+    loadData();
+    if (typeof repairDataIntegrity === 'function') repairDataIntegrity();
+    if (typeof vizLoad === 'function') vizLoad();
+    if (typeof brainLoad === 'function') brainLoad();
+    // loadData reads neither (see chooseLocalMode); the board may also hold what it read at startup.
+    try { if (typeof loadQuestData === 'function') loadQuestData(); } catch (e) { console.warn('[Firebase] quest board:', e); }
+    try { if (typeof csLoad === 'function') csLoad(); } catch (e) { /* the cheat-sheet page reads them itself */ }
+  });
+  if (typeof saveIsBlocked === 'function' && saveIsBlocked()) {
+    if (typeof allowSavingAgain === 'function') allowSavingAgain();   // the full load replaces it all
+    return false;
+  }
+  _cloudBaseline = rec.stamp || 0;
+  _cloudIsDirty = !rec.clean;
+  _cloudCopyCleanFor = rec.clean ? user.uid : null;
+  _lastCloudSaveAt = Date.now();
+  return true;
+}
+
+/** After opening from the copy: has another device saved since it was made? */
+async function _cloudCheckAfterDeviceBoot(uid) {
+  let root = null;
+  try {
+    const doc = await fbDb.collection('users').doc(uid).get();
+    root = doc.exists ? (doc.data() || {}) : null;
+  } catch (e) { return; }   // offline: the copy stands; changes go up when the connection is back
+  if (!currentFirebaseUser || currentFirebaseUser.uid !== uid) return;
+  const remote = root ? _stampOf(root.lastSaved) : 0;
+  // 2s of slack, as in _cloudConflictBlocks, for clock skew against the server stamp.
+  if (root && remote > _cloudBaseline + 2000) {
+    if (root.savedBy && root.savedBy === _deviceId()) {
+      /* This device saved it (as the last tab closed, or in another tab). Its
+         local copy is written before its cloud save, so the copy has it. */
+      _cloudBaseline = remote;
+      if (!_cloudIsDirty) _cloudCopySave(uid, true);
+    } else if (!_cloudIsDirty && !(typeof _saveDataPending !== 'undefined' && _saveDataPending)) {
+      _cloudReloadForNewer();   // another device's work, nothing changed here yet: the full load
+      return;
+    }
+    /* Otherwise both sides have changes: the save below meets the newer
+       revision and asks which to keep (_cloudConflictBlocks). */
+  }
+  if (_cloudIsDirty) scheduleCloudSave();   // changes the copy has that never reached the cloud
+  if (typeof mediaCloudPull === 'function') mediaCloudPull(uid).catch(() => {});
+}
+
+/** Reload into the full cloud load, once. Never without the flag: that would loop. */
+function _cloudReloadForNewer() {
+  try { sessionStorage.setItem('ssp.cloudFullLoad', '1'); } catch (e) { return; }
+  location.reload();
+}
+
 /** Write all current domains to localStorage caches (skips cloud upload). */
 function _cacheAllToLocalStorage() {
-  // App
-  try {
-    storeSetJSON(getAppStorageKey(), ({
-      categories: getNodeNamesForScope('challenge'),
-      snippetCategories: getNodeNamesForScope('snippet'),
-      notebookCategories: getNodeNamesForScope('notebook'),
-      nodes: state.nodes,
-      expandedNodes: state.expandedNodes,
-      codingPackLayout: state.codingPackLayout || 0,
-      langRun: state.langRun || null,
-      categoryRequirements: state.categoryRequirements,
-      snippetProgress: state.snippetProgress,
-      badges: state.badges,
-      snippets: state.snippets,
-      notebooks: state.notebooks,
-      notebookHistory: state.notebookHistory,
-      challenges: state.challenges,
-      history: state.history,
-      activeAttempts: state.activeAttempts
-    }));
-  } catch (e) { /* ignore */ }
+  /* App: the whole save, by the writer every other save uses (state.js). This
+     wrote a shorter list of its own, without the practice sets, reviews,
+     wings, typing items, mistakes, training data and the parked library --
+     harmless while every refresh downloaded everything again, not once a
+     refresh opens from this copy. */
+  try { if (typeof _flushSaveData === 'function') _flushSaveData(); } catch (e) { /* ignore */ }
 
   // Viz
   if (typeof viz !== 'undefined') {
@@ -1322,7 +1433,12 @@ function _restorePsetDrafts(incoming) {
   };
   proto.setItem = function (key, value) {
     const before = syncPrefIsSynced(key) ? get.call(this, key) : null;
-    const r = set.call(this, key, value);
+    let r;
+    try { r = set.call(this, key, value); } catch (err) {
+      // It did not land (a full quota): this device's copy of the account may now be behind the cloud.
+      if (isLocal(this)) { try { _cloudCopyDistrust(); } catch (e) { /* never mask the error */ } }
+      throw err;
+    }
     try { touched(this, key, before); } catch (e) { /* never break a write */ }
     return r;
   };
@@ -1433,6 +1549,7 @@ async function saveToFirestore(uid) {
   _cloudIsSaving = true;
   _updateCloudStatusUI();
   try {
+    const seqAtStart = _cloudChangeSeq;   // a change after this is not in the upload
     const batch = fbDb.batch();
     const userRef = fbDb.collection('users').doc(uid);
     const domRef = (name) => userRef.collection('domains').doc(name);
@@ -1440,7 +1557,8 @@ async function saveToFirestore(uid) {
     // Root doc — metadata only (overwrites old V1 fields if migrating)
     batch.set(userRef, {
       schemaVersion: FIRESTORE_SCHEMA_VERSION,
-      lastSaved: firebase.firestore.FieldValue.serverTimestamp()
+      lastSaved: firebase.firestore.FieldValue.serverTimestamp(),
+      savedBy: _deviceId()
     });
 
     // App domain (core data — excludes history for size management)
@@ -1653,6 +1771,7 @@ async function saveToFirestore(uid) {
     _cloudIsSaving = false;
     _lastCloudSaveAt = Date.now();
     _cloudBaseline = _lastCloudSaveAt;
+    _cloudCopySave(uid, seqAtStart === _cloudChangeSeq);
     _cloudLastError = '';
     _cloudErrorToasted = false;
     _updateCloudStatusUI();
@@ -2102,10 +2221,23 @@ async function bootApp() {
 
   if (savedMode === 'online') {
     storageMode = 'online';
-    showStorageModePicker();
-    _showSigninLoadingView();
-    _resetSigninProgress();
-    _signinProgressTo(25, 'Restoring session...');
+    const showRestoring = () => {
+      showStorageModePicker();
+      _showSigninLoadingView();
+      _resetSigninProgress();
+      _signinProgressTo(25, 'Restoring session...');
+    };
+    /* With the account's copy on this device the app normally opens before
+       the loading screen would even be seen (_bootFromDeviceCopy). */
+    let restoringTimer = 0;
+    if (_cloudCopyRead()) restoringTimer = setTimeout(() => { restoringTimer = 0; showRestoring(); }, 600);
+    else showRestoring();
+    const restoringNow = () => {
+      if (!restoringTimer) return;
+      clearTimeout(restoringTimer);
+      restoringTimer = 0;
+      showRestoring();
+    };
 
     const unsub = fbAuth.onAuthStateChanged(async (user) => {
       unsub();
@@ -2117,6 +2249,17 @@ async function bootApp() {
            there, and signing out deleted Guest's library. */
         try { sessionStorage.setItem('storageMode', 'online'); } catch (e) { /* blocked */ }
         updateCloudUserBadge();
+        if (_bootFromDeviceCopy(user)) {
+          clearTimeout(restoringTimer);
+          restoringTimer = 0;
+          hideStorageModePicker();
+          _resetSigninProgress();
+          _showSigninChooseView();
+          finishBoot();
+          _cloudCheckAfterDeviceBoot(user.uid).catch(e => console.warn('[Firebase] refresh check:', e));
+          return;
+        }
+        restoringNow();
         _signinProgressTo(70, 'Syncing cloud data...');
         await loadFromFirestore(user.uid);
         _signinProgressFinish('Welcome back!');
@@ -2126,6 +2269,7 @@ async function bootApp() {
           finishBoot();
         }, 320);
       } else {
+        restoringNow();   // signed out meanwhile: the picker must be on screen to sign in
         _resetSigninProgress();
         _showSigninChooseView();
       }
