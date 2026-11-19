@@ -3185,6 +3185,7 @@ body[data-route="visualization"] .sync-fab { display: none; }
 .settings-storage { align-items: flex-start; }
 .settings-storage .settings-item-icon { margin-top: 2px; }
 .settings-storage .settings-item-info { gap: 0.55rem; }
+.sto-block[hidden] { display: none; }
 .sto-block {
   display: flex;
   flex-direction: column;

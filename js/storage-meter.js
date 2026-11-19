@@ -72,11 +72,36 @@ function _stoBlock(name, used, limit, limitText, notes) {
     '<span class="sto-note">' + notes.map(_stoEsc).join(' · ') + '</span>';
 }
 
+/* The cloud copy, while signed in: what the last save stored (firebase-auth.js
+   CLOUD_USE_KEY). Firestore has no small limit on an account, only on one
+   document (1 MiB), so the bar is the biggest document against that. */
+const STO_CLOUD_DOC = 1048576;
+function _stoCloudPaint(box) {
+  if (!box) return;
+  const online = typeof storageMode !== 'undefined' && storageMode === 'online' &&
+    typeof currentFirebaseUser !== 'undefined' && currentFirebaseUser;
+  box.hidden = !online;
+  if (!online) { box.innerHTML = ''; return; }
+  let use = null;
+  try { use = JSON.parse(localStorage.getItem('ssp.cloudUse')); } catch (e) { /* none yet */ }
+  if (!use || use.uid !== currentFirebaseUser.uid) {
+    box.innerHTML = '<span class="sto-note">Cloud copy: measured after the next save.</span>';
+    return;
+  }
+  const notes = ['stored ' + _stoSize(use.stored) + ' in ' + use.docs + ' documents'];
+  if (use.raw > use.stored * 1.2) notes.push('compressed from ' + _stoSize(use.raw));
+  if (use.at) notes.push('last saved ' + new Date(use.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }));
+  box.innerHTML = _stoBlock('Cloud copy', use.largest, STO_CLOUD_DOC, '1 MB a document', notes);
+  box.title = 'Your account in the cloud. There is no small limit on the whole account; each document it is ' +
+    'saved in can hold about 1 MB, and anything bigger is split. The bar is the biggest document.';
+}
+
 /** Fill in the Storage row of Settings. */
 async function storageMeterPaint() {
   const localBox = document.getElementById('sto-local');
   const otherBox = document.getElementById('sto-other');
   if (!localBox || !otherBox) return;
+  _stoCloudPaint(document.getElementById('sto-cloud'));
 
   const local = _stoLocalUse();
   if (!local) {

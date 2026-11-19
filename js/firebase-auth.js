@@ -653,7 +653,8 @@ async function loadFromFirestore(uid) {
     if (rootDoc.exists) {
       const rootData = rootDoc.data();
 
-      if (rootData.schemaVersion >= FIRESTORE_SCHEMA_VERSION) {
+      const rootVer = typeof rootData.schema === 'number' ? rootData.schema : rootData.schemaVersion;
+      if (rootVer >= FIRESTORE_SCHEMA_VERSION) {
         // V2+ subcollection format — load domains in parallel
         await _loadV2Domains(uid);
       } else {
@@ -1105,7 +1106,8 @@ const ONLINE_OWNER_KEY = 'ssp.onlineOwner';
 const ONLINE_CACHE_KEYS = [
   'codePlatformData_online', 'vizCanvasData_online', 'brainCanvasData_online',
   'questBoardData_online', 'cheatsheetLibrary_online', 'ssp.fg.buffer_online',
-  'ssp.cloudCopy'   // CLOUD_COPY_KEY: says the slot can be opened without a download
+  'ssp.cloudCopy',  // CLOUD_COPY_KEY: says the slot can be opened without a download
+  'ssp.cloudUse'    // CLOUD_USE_KEY: the last save's sizes
 ];
 
 /** Empty the cloud-mode slot. Never the mode's key by name: in a tab that has not been
@@ -1560,6 +1562,52 @@ const FS_PARTS_KEY = '$parts';
 const FS_PART_CHARS = 300000;
 const FS_MAX_PARTS = 24;
 const FS_COMMIT_CEILING = 9 * 1048576;
+const FS_Z_KEY = '$z';           // the parts are deflated JSON, base64
+const FS_Z_MIN = 16384;          // smaller domains stay plain maps, readable in the console
+const FS_B64_PART = 900000;      // base64 is ASCII: a byte a character
+const FIRESTORE_FORMAT = 3;      // root `schema`: compressed parts (2 was plain maps, one each)
+const FS_OLD_READER_TRAP = 'compressed: open the latest StudySession Pro';
+const CLOUD_USE_KEY = 'ssp.cloudUse';   // the last save's sizes (Settings > Storage); this device only
+
+function _fsChunk(text, n) {
+  const out = [];
+  for (let i = 0; i < text.length; i += n) out.push(text.slice(i, i + n));
+  return out.length ? out : [''];
+}
+
+function _fsB64(bytes) {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
+}
+
+function _fsUnB64(b64) {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+/** `json` deflated, in fflate's worker where there is one, and read back
+ *  before it is trusted; null when it cannot be (then it goes up uncompressed). */
+function _fsDeflate(json) {
+  return new Promise((resolve) => {
+    if (typeof fflate === 'undefined' || typeof TextEncoder === 'undefined' || typeof btoa === 'undefined') { resolve(null); return; }
+    let bytes;
+    try { bytes = new TextEncoder().encode(json); } catch (e) { resolve(null); return; }
+    const check = (z) => {
+      try { resolve(_fsInflateBytes(z) === json ? z : null); } catch (e) { resolve(null); }
+    };
+    const now = () => { try { check(fflate.deflateSync(bytes, { level: 6 })); } catch (e) { resolve(null); } };
+    if (typeof fflate.deflate === 'function' && typeof Worker !== 'undefined') {
+      try { fflate.deflate(bytes, { level: 6 }, (err, z) => { if (err || !z) now(); else check(z); }); } catch (e) { now(); }
+    } else now();
+  });
+}
+
+function _fsInflateBytes(z) {
+  return new TextDecoder('utf-8', { fatal: true }).decode(fflate.inflateSync(z));
+}
 
 function _fsSplitText(text) {
   const parts = [];
@@ -1586,7 +1634,8 @@ async function _fsJoinDomain(domRef, name, doc) {
     if (typeof s !== 'string') throw new Error('Cloud domain "' + name + '" is missing part ' + parts.indexOf(p) + '.');
     return s;
   }).join('');
-  const value = JSON.parse(text);   // a damaged part throws: the load fails and keeps this device's copy
+  // Deflated parts are base64 (the format since FIRESTORE_FORMAT 3); a damaged part throws, the load fails and keeps this device's copy.
+  const value = JSON.parse(head[FS_Z_KEY] ? _fsInflateBytes(_fsUnB64(text)) : text);
   return { exists: true, data: () => value };
 }
 
@@ -1601,15 +1650,25 @@ async function saveToFirestore(uid) {
   _updateCloudStatusUI();
   try {
     const seqAtStart = _cloudChangeSeq;   // a change after this is not in the upload
+    let cloudUse = null;                  // what this save stores, for the Storage row
     const batch = fbDb.batch();
     const userRef = fbDb.collection('users').doc(uid);
     const domRef = (name) => userRef.collection('domains').doc(name);
 
     // Root doc — metadata only (overwrites old V1 fields if migrating)
+    /* THE ROOT KEEPS OLDER BUILDS FROM READING AN EMPTY LIBRARY. Domains now go
+       up compressed and in parts, which a build from before cannot read: it
+       would take every split domain for empty and its next save would upload
+       that. So the format is named in `schema`, not `schemaVersion`: an older
+       build, finding no schemaVersion, takes its V1 path, which reads `app`
+       here first, and the trap in it throws before anything is changed -- its
+       load then fails and it keeps that device's own copy. One stale load per
+       device after a release, never a wipe. */
     batch.set(userRef, {
-      schemaVersion: FIRESTORE_SCHEMA_VERSION,
+      schema: FIRESTORE_FORMAT,
       lastSaved: firebase.firestore.FieldValue.serverTimestamp(),
-      savedBy: _deviceId()
+      savedBy: _deviceId(),
+      app: { challenges: FS_OLD_READER_TRAP }
     });
 
     // App domain (core data — excludes history for size management)
@@ -1759,7 +1818,7 @@ async function saveToFirestore(uid) {
        it -- app, history, settings, all of it -- and reports a raw Firestore
        error instead of the sentence that says what to do about it. */
     const domains = { app: appPayload, history: historyPayload, stash: stashPayload, viz: vizPayload, brain: brainPayload, quests: questsPayload, settings: settingsPayload, training: trainingPayload, freeground: fgPayload, prefs: prefsPayload };
-    const split = {};
+    const measured = {};
     let totalBytes = 0;
     for (const [name, payload] of Object.entries(domains)) {
       /* UTF-8 BYTES, which is what Firestore counts. String length counts
@@ -1778,14 +1837,34 @@ async function saveToFirestore(uid) {
           : json.length;
       } catch (e) {}
       totalBytes += size;
-      if (size <= DOC_BYTE_CEILING) continue;
-      /* TOO BIG FOR ONE DOCUMENT: SPLIT IT, DON'T FAIL. This threw, and since
-         the save is one batch, a library that outgrew 1 MB (the starter pack
-         alone is most of it) stopped every domain reaching the cloud, with a
-         message asking to delete programs. The domain now goes up as its JSON
-         text in parts, which also keeps it byte-for-byte as it is. */
-      const parts = _fsSplitText(json);
-      if (parts.length > FS_MAX_PARTS) {
+      measured[name] = { json, size };
+    }
+
+    /* COMPRESSED, like the copy on this device. A domain of 16 KB or more goes
+       up as its JSON deflated (fflate, in its worker, read back before it is
+       trusted), as base64 text in parts:
+         domains/<name>       { $parts: n, $z: 1 }
+         domains/<name>__pN   { s: base64 }
+       The library falls from ~1.3 MB to a fraction of that. Always in parts, even
+       one: the build before this reads a $parts head as JSON text, and on base64
+       that fails loudly (its load keeps the device's copy) rather than reading
+       an empty library. A domain that will not compress goes up as JSON text in
+       parts when over the cap (the earlier format), else plain as always. */
+    const names = Object.keys(domains);
+    const zipped = await Promise.all(names.map(n => measured[n].json.length >= FS_Z_MIN ? _fsDeflate(measured[n].json) : null));
+    const plan = {};
+    let storedBytes = 0, largestDoc = 0, docCount = 0;
+    names.forEach((name, i) => {
+      const { json, size } = measured[name];
+      let parts = null, head = null;
+      if (zipped[i]) {
+        parts = _fsChunk(_fsB64(zipped[i]), FS_B64_PART);
+        head = { [FS_PARTS_KEY]: parts.length, [FS_Z_KEY]: 1 };
+      } else if (size > DOC_BYTE_CEILING) {
+        parts = _fsSplitText(json);
+        head = { [FS_PARTS_KEY]: parts.length };
+      }
+      if (parts && parts.length > FS_MAX_PARTS) {
         const hint = name === 'history' ? 'Trim practice history (Analytics → delete old attempts).'
           : name === 'app' ? 'Reduce challenges/snippets/notebooks.'
           : name === 'stash' ? 'The parked library is too big. Switch the coding library over to it so it is not being carried as a spare, or clear it.'
@@ -1794,22 +1873,31 @@ async function saveToFirestore(uid) {
         err.code = 'doc-too-large';
         throw err;
       }
-      split[name] = parts;
-    }
+      plan[name] = { head, parts };
+      if (!parts) {
+        storedBytes += size; largestDoc = Math.max(largestDoc, size); docCount++;
+      } else {
+        const bytes = zipped[i] ? parts.reduce((n, t) => n + t.length, 0) : size;
+        storedBytes += bytes;
+        docCount += 1 + parts.length;
+        largestDoc = Math.max(largestDoc, zipped[i] ? Math.max.apply(null, parts.map(t => t.length)) : Math.ceil(size / parts.length));
+      }
+    });
     // One commit carries every document, and Firestore caps a commit at 10 MiB.
-    if (totalBytes > FS_COMMIT_CEILING) {
-      const err = new Error('Cloud save too large (' + (totalBytes / 1048576).toFixed(1) + ' MB). Trim practice history or remove unused programs.');
+    if (storedBytes > FS_COMMIT_CEILING) {
+      const err = new Error('Cloud save too large (' + (storedBytes / 1048576).toFixed(1) + ' MB). Trim practice history or remove unused programs.');
       err.code = 'doc-too-large';
       throw err;
     }
 
     // Add all domain docs to the atomic batch (a split one as its head and parts).
-    for (const [name, payload] of Object.entries(domains)) {
-      const parts = split[name];
-      if (!parts) { batch.set(domRef(name), payload); continue; }
-      batch.set(domRef(name), { [FS_PARTS_KEY]: parts.length });
+    for (const name of names) {
+      const { head, parts } = plan[name];
+      if (!parts) { batch.set(domRef(name), domains[name]); continue; }
+      batch.set(domRef(name), head);
       parts.forEach((text, i) => batch.set(domRef(name + '__p' + i), { s: text }));
     }
+    cloudUse = { uid: uid, stored: storedBytes, raw: totalBytes, largest: largestDoc, docs: docCount };
 
     // Commit with timeout
     const writePromise = batch.commit();
@@ -1841,6 +1929,10 @@ async function saveToFirestore(uid) {
     _lastCloudSaveAt = Date.now();
     _cloudBaseline = _lastCloudSaveAt;
     _cloudCopySave(uid, !changedMeanwhile);
+    if (cloudUse) {
+      cloudUse.at = Date.now();
+      try { localStorage.setItem(CLOUD_USE_KEY, JSON.stringify(cloudUse)); } catch (e) { /* full */ }
+    }
     _cloudLastError = '';
     _cloudErrorToasted = false;
     _updateCloudStatusUI();

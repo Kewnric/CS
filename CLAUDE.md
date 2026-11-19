@@ -123,10 +123,14 @@ wraps it as `{ $arr: [...] }` and `_loadV2Domains` reads every domain doc throug
 **A new localStorage key that is the person's data or taste goes on that list**; layout (positions, sizes,
 folded panels), secrets and device caches never do. Writing a listed key while signed in schedules a cloud
 save by itself (a `Storage.prototype` wrapper). Practice-set drafts ride in `stash`, merged per set.
-**A domain over one document's 1 MB goes up in parts** (`_fsSplitText`): its JSON text as `domains/<name>__p0..`
-(`{ s }`) under a head `{ $parts: n }`, joined back by `_fsJoinDomain` before `dataOf`. The starter pack alone puts
-`app` past 1 MB; this used to throw and, the save being one batch, stop every domain. Test: `tests/cloud-sync.spec.js`
-"bigger than one cloud document".
+**Cloud domains of 16 KB or more go up compressed** (`_fsDeflate`, fflate, read back before trusted): base64 in
+`domains/<name>__p0..` (`{ s }`) under a head `{ $parts: n, $z: 1 }`; one that will not compress but is over 1 MB goes
+up as JSON text in parts (`{ $parts }`); small ones stay plain maps. `_fsJoinDomain` puts them back before `dataOf`.
+The starter pack alone puts `app` past Firestore's 1 MB a document; that used to throw and, the save being one batch,
+stop every domain. **The root names the format in `schema` (3), not `schemaVersion`**, and carries
+`app: { challenges: FS_OLD_READER_TRAP }`: an older build, finding no schemaVersion, takes its V1 path and throws on
+the trap before changing anything, instead of reading split domains as empty and saving that. Keep both. The last
+save's sizes (`ssp.cloudUse`) fill Settings > Storage's "Cloud copy". Tests: `tests/cloud-sync.spec.js`.
 **A refresh while signed in opens from this device's copy** (`_bootFromDeviceCopy`), not a download: the
 `*_online` keys hold the account, and `ssp.cloudCopy` ({uid, stamp, clean}) vouches for them. It is written
 only by a full cloud load or a cloud save, marked unclean by `markCloudDirty`, and dropped with the caches or on
