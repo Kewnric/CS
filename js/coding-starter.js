@@ -151,13 +151,28 @@ function _csProgram(id, folder, title, description, samples, tests, reqs) {
    state.history, not on the challenge, so replacing the object by id keeps
    every attempt, score and streak attached to it. */
 
-/** A cheap, stable hash of the fields the pack owns. */
-function _csFingerprint(ch) {
+/* KEY ORDER IS NOT CONTENT. The cloud (Firestore) hands every saved object
+   back with its keys in alphabetical order, so comparing by JSON.stringify
+   called every set and nearly every program "changed" after each sign-in:
+   measured, the 12 sets were always pending (Update cleared them only until
+   the next sign-in) and 191 of 192 programs were taken for your own edits and
+   frozen out of every pack fix. _csStable writes keys sorted and leaves out
+   null/undefined ones (the cloud stores undefined as null). */
+function _csStable(v) {
+  if (Array.isArray(v)) return '[' + v.map(_csStable).join(',') + ']';
+  if (v && typeof v === 'object') {
+    return '{' + Object.keys(v).sort().filter(k => v[k] != null)
+      .map(k => JSON.stringify(k) + ':' + _csStable(v[k])).join(',') + '}';
+  }
+  return JSON.stringify(v === undefined ? null : v);
+}
+
+function _csHash(ch, str) {
   const v = (ch.variants && ch.variants[0]) || {};
   const parts = [
     ch.title || '', ch.description || '', ch.parentId || '',
-    JSON.stringify(v.samples || []),
-    JSON.stringify(v.tests || []),
+    str(v.samples || []),
+    str(v.tests || []),
     JSON.stringify((v.files || []).map(f => [f.name, f.ext, f.starterCode || '', f.code || ''])),
     v.code || ''
   ].join('\u0001');
@@ -165,6 +180,44 @@ function _csFingerprint(ch) {
   let h = 5381;
   for (let i = 0; i < parts.length; i++) h = ((h * 33) ^ parts.charCodeAt(i)) >>> 0;
   return h.toString(36);
+}
+
+/** A cheap, stable hash of the fields the pack owns. 'k1:' marks the
+ *  key-order-free kind; a stamp without it is the old JSON.stringify one. */
+function _csFingerprint(ch) { return 'k1:' + _csHash(ch, _csStable); }
+
+/* x with its keys put back in the order tpl (the shipped pack) writes them,
+   so an old stamp can be checked against a copy the cloud has re-sorted. */
+function _csOrderLike(x, tpl) {
+  if (Array.isArray(x)) {
+    const t = Array.isArray(tpl) ? tpl : [];
+    return x.map((y, i) => _csOrderLike(y, t[i] !== undefined ? t[i] : t[0]));
+  }
+  if (!x || typeof x !== 'object') return x;
+  const t = (tpl && typeof tpl === 'object' && !Array.isArray(tpl)) ? tpl : {};
+  const keys = Object.keys(t).filter(k => k in x)
+    .concat(Object.keys(x).filter(k => !(k in t)))
+    .filter(k => !(x[k] === null && t[k] === undefined));
+  const out = {};
+  keys.forEach(k => { out[k] = _csOrderLike(x[k], t[k]); });
+  return out;
+}
+
+/** Is this installed program still exactly as the pack put it there?
+ *  f is the shipped program with the same id, used to read an old stamp. */
+function _csUntouched(have, f) {
+  const fp = have.packFp ? String(have.packFp) : '';
+  if (!fp) return true;
+  if (fp.indexOf(':') !== -1) return fp === _csFingerprint(have);
+  if (fp === _csHash(have, JSON.stringify)) return true;
+  if (!f) return false;
+  const hv = (have.variants && have.variants[0]) || {};
+  const fv = (f.variants && f.variants[0]) || {};
+  const like = Object.assign({}, have, { variants: [Object.assign({}, hv, {
+    samples: _csOrderLike(hv.samples || [], fv.samples || []),
+    tests: _csOrderLike(hv.tests || [], fv.tests || [])
+  })] });
+  return fp === _csHash(like, JSON.stringify);
 }
 
 function _csStamp(pack) {
@@ -297,7 +350,7 @@ function updateCodingStarterPack() {
     /* No stamp means it predates this mechanism. Those were installed before
        anything could edit them through the pack UI, so treat them as
        untouched rather than freezing them out of every future update. */
-    const untouched = !have.packFp || have.packFp === _csFingerprint(have);
+    const untouched = _csUntouched(have, f);
     if (!untouched) {
       // Yours to keep -- but it still belongs in the folder the pack gives it.
       if (freshParent[f.id] && have.parentId !== freshParent[f.id]) {
@@ -335,7 +388,7 @@ function updateCodingStarterPack() {
     if (!have) { setPos[fs.id] = target.sets.length; target.sets.push(fs); sets++; return; }
     /* A pack set is a list of pointers into the library, so refreshing one is
        safe unless the problem list itself was changed. */
-    if (JSON.stringify(have.problems || []) === JSON.stringify(fs.problems || [])) return;
+    if (_csStable(have.problems || []) === _csStable(fs.problems || [])) return;
     if (have.userEdited) { kept++; return; }
     target.sets[setPos[fs.id]] = fs;
     sets++;
@@ -1106,14 +1159,16 @@ function _csPendingCountNow(onPack) {
   (fresh.challenges || []).forEach(f => {
     const have = byId[f.id];
     if (!have) { count++; return; }
-    const untouched = !have.packFp || have.packFp === _csFingerprint(have);
-    if (untouched && have.packFp !== f.packFp) count++;
+    /* Untouched means its content is what was installed, so comparing that
+       content with the shipped program asks the same question as comparing
+       the stamps -- and still works for a stamp of the old kind. */
+    if (_csUntouched(have, f) && _csFingerprint(have) !== f.packFp) count++;
   });
 
   (fresh.sets || []).forEach(fs => {
     const have = (target.sets || []).find(x => x.id === fs.id);
     if (!have) { count++; return; }
-    if (JSON.stringify(have.problems || []) === JSON.stringify(fs.problems || [])) return;
+    if (_csStable(have.problems || []) === _csStable(fs.problems || [])) return;
     if (!have.userEdited) count++;
   });
 
