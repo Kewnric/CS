@@ -249,3 +249,32 @@
     transition: opacity 0.12s ease;
   }
 }
+
+/* ── Moving banners (folder-banner.js) ────────────────────────
+   A still picture drifts slowly about its focal point. The drift is always
+   attached and paused, and only runs while the banner should move: its row
+   is selected (a click keeps it going) or hovered, it is pinned ("Keep this
+   banner moving"), or "Animate all banners" is on. Paused, it holds where it
+   is instead of snapping back. Transform only, so it costs no repaints.
+   GIFs move by playing (the JS swaps the still for the GIF on the same rules). */
+.fb-layer:not(.is-gif) > .fb-img {
+  animation: fbDrift 18s ease-in-out infinite alternate;
+  animation-play-state: paused;
+}
+.tree-node-row.active > .fb-layer > .fb-img,
+.tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row:hover > .fb-layer > .fb-img,
+.tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row > .fb-layer.is-pinned > .fb-img,
+html.fb-anim-all .tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row > .fb-layer > .fb-img {
+  animation-play-state: running;
+}
+@keyframes fbDrift {
+  from { transform: scale(var(--fb-z, 1)) translate(0, 0); }
+  to   { transform: scale(calc(var(--fb-z, 1) * 1.14)) translate(-3%, -2%); }
+}
+html[data-motion="off"] .fb-layer > .fb-img,
+html[data-motion="calm"] .fb-layer > .fb-img { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .fb-layer > .fb-img { animation: none !important; }
+}
+/* The crop window's preview is a selected row too; it holds still to be cropped. */
+.bc-row > .fb-layer > .fb-img { animation: none !important; }

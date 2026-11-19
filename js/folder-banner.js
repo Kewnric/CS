@@ -71,7 +71,29 @@ function folderBannerHTML(rec) {
   const b = rec && rec.banner;
   if (!b || typeof b !== 'object' || typeof mediaIsRef !== 'function' || !mediaIsRef(b.src)) return '';
   if (typeof mediaInfo !== 'function' || !mediaInfo(b.src)) return '';
-  return folderBannerLayerHTML(b.src, folderBannerVars(b));
+  return folderBannerLayerHTML(b.src, folderBannerVars(b), b.play === 'always' ? 'is-pinned' : '');
+}
+
+/* ── Moving banners ──────────────────────────────────────────
+   A banner moves while it shows and its row is hovered or selected (a click
+   keeps it going), always when pinned (banner.play = 'always', "Keep this
+   banner moving"), and every shown banner when "Animate all banners" is on
+   (libraryPrefs bannerAnimAll, synced). A GIF plays; a still picture drifts
+   slowly about its focal point (css/folder-banner.css fbDrift), pausing where
+   it is rather than snapping back. Motion Off / Calm stop the drift. */
+function folderBannerAnimAll() {
+  return typeof getLibPref === 'function' && !!getLibPref('bannerAnimAll', false);
+}
+
+function folderBannerSetAnimAll(on) {
+  if (typeof setLibPref === 'function') setLibPref('bannerAnimAll', on ? true : null);
+  document.documentElement.classList.toggle('fb-anim-all', !!on);
+  folderBannerSyncPlay(document);
+}
+
+if (typeof document !== 'undefined') {
+  const apply = () => document.documentElement.classList.toggle('fb-anim-all', folderBannerAnimAll());
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply); else apply();
 }
 
 /* ── GIF stills ──────────────────────────────────────────── */
@@ -128,6 +150,7 @@ function _fbWantsPlay(layer, hover) {
   const host = layer.closest('.tree-node-row, .tfv-tile');
   if (!host) return false;
   if (host.classList.contains('active')) return true;
+  if ((layer.classList.contains('is-pinned') || folderBannerAnimAll()) && _fbShown(host)) return true;
   const over = hover !== undefined ? hover : (host.matches(':hover') || host.matches(':focus-visible'));
   return !!over && _fbShown(host);
 }
@@ -293,7 +316,13 @@ function folderBannerMenuItems(rec, commit) {
   if (b) {
     if (mediaInfo(b.src)) items.push({ icon: 'crop', label: 'Adjust banner…', fn: () => folderBannerAdjust(rec, commit) });
     items.push({ icon: 'image-off', label: 'Remove banner', fn: () => folderBannerRemove(rec, commit) });
+    const pinned = b.play === 'always';
+    items.push({ icon: pinned ? 'pause' : 'play', label: pinned ? 'Stop keeping this banner moving' : 'Keep this banner moving',
+      fn: () => { if (pinned) delete b.play; else b.play = 'always'; commit(); } });
   }
+  const all = folderBannerAnimAll();
+  items.push({ icon: all ? 'pause-circle' : 'play-circle', label: all ? 'Stop animating all banners' : 'Animate all banners',
+    fn: () => folderBannerSetAnimAll(!all) });
   return items;
 }
 

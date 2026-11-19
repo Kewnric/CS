@@ -16,7 +16,7 @@ let _bcLive = null;   // the open window's state, or null
 function _bcClampB(b) {
   const c = (v, lo, hi, d) => { v = Number(v); if (!isFinite(v)) v = d; return Math.min(hi, Math.max(lo, v)); };
   const r = v => Math.round(v * 100) / 100;
-  return {
+  const out = {
     src: b.src,
     x: r(c(b.x, 0, 100, 50)),
     y: r(c(b.y, 0, 100, 50)),
@@ -24,6 +24,8 @@ function _bcClampB(b) {
     dim: r(c(b.dim, 0, 0.7, 0.3)),
     tint: r(c(b.tint, 0, 1, 1))     // the selected row's cyan wash over the picture
   };
+  if (b.play === 'always') out.play = 'always';   // "Keep this banner moving" survives a re-crop
+  return out;
 }
 
 /* The preview layers always show the real picture, so a GIF moves here
