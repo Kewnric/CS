@@ -14,13 +14,6 @@
 }
 .chub-back { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
 
-.chub-grid {
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  max-width: 900px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
 /* The number that opens a tile from the keyboard. Shown as a keycap while
    the tile is hovered or has focus, not all the time: at rest, a dim outlined
    square with a faint digit in the corner of every tile read as a stray box,
