@@ -123,6 +123,10 @@ wraps it as `{ $arr: [...] }` and `_loadV2Domains` reads every domain doc throug
 **A new localStorage key that is the person's data or taste goes on that list**; layout (positions, sizes,
 folded panels), secrets and device caches never do. Writing a listed key while signed in schedules a cloud
 save by itself (a `Storage.prototype` wrapper). Practice-set drafts ride in `stash`, merged per set.
+**A domain over one document's 1 MB goes up in parts** (`_fsSplitText`): its JSON text as `domains/<name>__p0..`
+(`{ s }`) under a head `{ $parts: n }`, joined back by `_fsJoinDomain` before `dataOf`. The starter pack alone puts
+`app` past 1 MB; this used to throw and, the save being one batch, stop every domain. Test: `tests/cloud-sync.spec.js`
+"bigger than one cloud document".
 **A refresh while signed in opens from this device's copy** (`_bootFromDeviceCopy`), not a download: the
 `*_online` keys hold the account, and `ssp.cloudCopy` ({uid, stamp, clean}) vouches for them. It is written
 only by a full cloud load or a cloud save, marked unclean by `markCloudDirty`, and dropped with the caches or on

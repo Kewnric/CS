@@ -757,18 +757,11 @@ async function _loadV2Domains(uid) {
   const userRef = fbDb.collection('users').doc(uid);
   const domRef = (name) => userRef.collection('domains').doc(name);
 
-  const [appDoc, histDoc, vizDoc, brainDoc, questsDoc, settingsDoc, stashDoc, trainingDoc, fgDoc, prefsDoc] = await Promise.all([
-    domRef('app').get(),
-    domRef('history').get(),
-    domRef('viz').get(),
-    domRef('brain').get(),
-    domRef('quests').get(),
-    domRef('settings').get(),
-    domRef('stash').get(),
-    domRef('training').get(),
-    domRef('freeground').get(),
-    domRef('prefs').get()
-  ]);
+  const names = ['app', 'history', 'viz', 'brain', 'quests', 'settings', 'stash', 'training', 'freeground', 'prefs'];
+  const read = await Promise.all(names.map(n => domRef(n).get()));
+  // A domain too big for one document was saved in parts (_fsSplitText): put it back together.
+  const [appDoc, histDoc, vizDoc, brainDoc, questsDoc, settingsDoc, stashDoc, trainingDoc, fgDoc, prefsDoc] =
+    await Promise.all(read.map((doc, i) => _fsJoinDomain(domRef, names[i], doc)));
   // Inner lists went up wrapped (see _sanitizeForFirestore); unwrap them here.
   const dataOf = (doc) => _fromFirestore(doc.data());
 
@@ -1556,6 +1549,47 @@ async function _cloudConflictBlocks(uid) {
   });
 }
 
+/* A DOMAIN IN PARTS. Over the one-document cap, a domain's JSON text goes up
+   as domains/<name>__p0, __p1, ... ({ s: text }) under a head document
+   { $parts: n } in its usual place. 300,000 UTF-16 units is at most 900 KB of
+   UTF-8 (three bytes a unit at worst), so every part fits; a cut never falls
+   between the two halves of a surrogate pair, which would make both parts
+   invalid strings. Parts left over from a bigger save are never read: the head
+   says how many there are. */
+const FS_PARTS_KEY = '$parts';
+const FS_PART_CHARS = 300000;
+const FS_MAX_PARTS = 24;
+const FS_COMMIT_CEILING = 9 * 1048576;
+
+function _fsSplitText(text) {
+  const parts = [];
+  let i = 0;
+  while (i < text.length) {
+    let end = Math.min(i + FS_PART_CHARS, text.length);
+    const c = text.charCodeAt(end - 1);
+    if (end < text.length && c >= 0xD800 && c <= 0xDBFF) end--;   // keep a surrogate pair together
+    parts.push(text.slice(i, end));
+    i = end;
+  }
+  return parts;
+}
+
+/** `doc` as read, or, when it is the head of a domain in parts, the whole
+ *  domain put back together (in the same shape a read gives: exists, data()). */
+async function _fsJoinDomain(domRef, name, doc) {
+  const head = doc && doc.exists ? doc.data() : null;
+  const n = head && typeof head[FS_PARTS_KEY] === 'number' ? head[FS_PARTS_KEY] : 0;
+  if (!n) return doc;
+  const parts = await Promise.all(Array.from({ length: n }, (_, i) => domRef(name + '__p' + i).get()));
+  const text = parts.map(p => {
+    const s = p.exists ? (p.data() || {}).s : null;
+    if (typeof s !== 'string') throw new Error('Cloud domain "' + name + '" is missing part ' + parts.indexOf(p) + '.');
+    return s;
+  }).join('');
+  const value = JSON.parse(text);   // a damaged part throws: the load fails and keeps this device's copy
+  return { exists: true, data: () => value };
+}
+
 async function saveToFirestore(uid) {
   if (!uid) return false;
   if (await _cloudConflictBlocks(uid)) {
@@ -1725,6 +1759,8 @@ async function saveToFirestore(uid) {
        it -- app, history, settings, all of it -- and reports a raw Firestore
        error instead of the sentence that says what to do about it. */
     const domains = { app: appPayload, history: historyPayload, stash: stashPayload, viz: vizPayload, brain: brainPayload, quests: questsPayload, settings: settingsPayload, training: trainingPayload, freeground: fgPayload, prefs: prefsPayload };
+    const split = {};
+    let totalBytes = 0;
     for (const [name, payload] of Object.entries(domains)) {
       /* UTF-8 BYTES, which is what Firestore counts. String length counts
          UTF-16 units, and every em dash and arrow in this app's own copy is
@@ -1734,14 +1770,22 @@ async function saveToFirestore(uid) {
          pass here and still be refused. The limit is also not purely payload:
          Firestore charges for field names and its own per-document overhead,
          so the ceiling leaves room for that instead of aiming at the cap. */
-      let size = 0;
+      let size = 0, json = '';
       try {
-        const json = JSON.stringify(payload);
+        json = JSON.stringify(payload);
         size = (typeof TextEncoder !== 'undefined')
           ? new TextEncoder().encode(json).length
           : json.length;
       } catch (e) {}
-      if (size > DOC_BYTE_CEILING) {
+      totalBytes += size;
+      if (size <= DOC_BYTE_CEILING) continue;
+      /* TOO BIG FOR ONE DOCUMENT: SPLIT IT, DON'T FAIL. This threw, and since
+         the save is one batch, a library that outgrew 1 MB (the starter pack
+         alone is most of it) stopped every domain reaching the cloud, with a
+         message asking to delete programs. The domain now goes up as its JSON
+         text in parts, which also keeps it byte-for-byte as it is. */
+      const parts = _fsSplitText(json);
+      if (parts.length > FS_MAX_PARTS) {
         const hint = name === 'history' ? 'Trim practice history (Analytics → delete old attempts).'
           : name === 'app' ? 'Reduce challenges/snippets/notebooks.'
           : name === 'stash' ? 'The parked library is too big. Switch the coding library over to it so it is not being carried as a spare, or clear it.'
@@ -1750,19 +1794,22 @@ async function saveToFirestore(uid) {
         err.code = 'doc-too-large';
         throw err;
       }
+      split[name] = parts;
+    }
+    // One commit carries every document, and Firestore caps a commit at 10 MiB.
+    if (totalBytes > FS_COMMIT_CEILING) {
+      const err = new Error('Cloud save too large (' + (totalBytes / 1048576).toFixed(1) + ' MB). Trim practice history or remove unused programs.');
+      err.code = 'doc-too-large';
+      throw err;
     }
 
-    // Add all domain docs to the atomic batch
-    batch.set(domRef('app'), appPayload);
-    batch.set(domRef('history'), historyPayload);
-    batch.set(domRef('stash'), stashPayload);
-    batch.set(domRef('viz'), vizPayload);
-    batch.set(domRef('brain'), brainPayload);
-    batch.set(domRef('quests'), questsPayload);
-    batch.set(domRef('settings'), settingsPayload);
-    batch.set(domRef('training'), trainingPayload);
-    batch.set(domRef('freeground'), fgPayload);
-    batch.set(domRef('prefs'), prefsPayload);
+    // Add all domain docs to the atomic batch (a split one as its head and parts).
+    for (const [name, payload] of Object.entries(domains)) {
+      const parts = split[name];
+      if (!parts) { batch.set(domRef(name), payload); continue; }
+      batch.set(domRef(name), { [FS_PARTS_KEY]: parts.length });
+      parts.forEach((text, i) => batch.set(domRef(name + '__p' + i), { s: text }));
+    }
 
     // Commit with timeout
     const writePromise = batch.commit();
