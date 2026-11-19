@@ -36,8 +36,10 @@ function codingHubTemplate() {
           <h1 class="lib-hub-title">Coding Library</h1>
           <p class="lib-hub-subtitle">Solve programs, or write anything you like. Press a number to jump.</p>
         </section>
-        <h2 class="lib-hub-section-title"><i data-lucide="door-open"></i> Your collections</h2>
-        <div class="lib-hub-grid stagger-children chub-grid" id="chub-grid"></div>
+        <section>
+          <h2 class="lib-hub-section-title"><i data-lucide="door-open"></i> Your collections</h2>
+          <div class="lib-hub-grid stagger-children chub-grid" id="chub-grid"></div>
+        </section>
       </div>
     </div>`;
 }
