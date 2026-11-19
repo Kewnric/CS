@@ -19,14 +19,14 @@
 .lib-holo {
   --holo: var(--lib-accent, var(--color-primary));
   position: absolute;
-  right: -24px;
+  left: calc(50% - 100px);
   bottom: calc(100% + 4px);
   width: 200px;
   height: 150px;
   z-index: 6;
   display: none;
   pointer-events: none;
-  transform-origin: 161px 164px;
+  transform-origin: 100px 164px;
   transform: scale(0.08);
   transition: transform 0.32s cubic-bezier(0.55, 0, 0.85, 0.35);
 }
@@ -71,8 +71,8 @@
   top: 0;
   width: 200px;
   height: 170px;
-  background: radial-gradient(150px 34px at 161px 164px, color-mix(in srgb, var(--holo) 60%, transparent), transparent 75%);
-  clip-path: polygon(161px 166px, 24px 141px, 176px 141px);
+  background: radial-gradient(150px 34px at 100px 164px, color-mix(in srgb, var(--holo) 60%, transparent), transparent 75%);
+  clip-path: polygon(100px 166px, 24px 141px, 176px 141px);
   opacity: 0.6;
 }
 .lib-holo-scene { position: absolute; inset: 0; }
