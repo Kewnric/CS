@@ -265,6 +265,8 @@ async function acctSubmit(ev) {
   // From inside the app, leaving the account in use first settles its unsaved changes (firebase-auth.js).
   if (typeof authLeaveAccountOk === 'function' && !(await authLeaveAccountOk())) return;
   _lpBusy = true;
+  const btn = document.getElementById('lp-submit');
+  if (btn) { btn.classList.add('is-busy'); btn.setAttribute('aria-busy', 'true'); }
   try {
     if (_lpTab === 'create') await acctRegister(user, pass);
     else await acctSignIn(user, pass);
@@ -277,6 +279,7 @@ async function acctSubmit(ev) {
     if (field) field.focus();
   } finally {
     _lpBusy = false;
+    if (btn) { btn.classList.remove('is-busy'); btn.removeAttribute('aria-busy'); }
   }
 }
 

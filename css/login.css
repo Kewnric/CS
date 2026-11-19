@@ -389,6 +389,12 @@
 .lp-primary:hover svg { transform: translateX(3px); }
 .lp-primary:active { transform: translateY(0) scale(0.99); }
 .lp-primary:focus-visible { outline: 2px solid #c7d2fe; outline-offset: 2px; }
+/* Checking the username and password: the arrow gives way to a spinner. */
+.lp-spinner { display: none; width: 18px; height: 18px; border: 2px solid rgba(255, 255, 255, 0.35); border-top-color: #fff; border-radius: 50%; }
+.lp-primary.is-busy { cursor: progress; }
+.lp-primary.is-busy svg { display: none; }
+.lp-primary.is-busy .lp-spinner { display: inline-block; animation: lpSpin 0.7s linear infinite; }
+@keyframes lpSpin { to { transform: rotate(360deg); } }
 
 /* Forgot password: replaces the tabs and the form. */
 .lp-forgot { display: none; }
