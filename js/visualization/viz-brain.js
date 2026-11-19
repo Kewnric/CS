@@ -1949,7 +1949,13 @@ function brainAddCommentNode(x, y) {
   const cx = x !== undefined ? x : ((-brain.pan.x / brain.zoom) + 200);
   const cy = y !== undefined ? y : ((-brain.pan.y / brain.zoom) + 200);
   const id = 'bn_' + generateId();
-  const node = { id, commentContent: '', color: null, x: cx + (Math.random() - 0.5) * 40, y: cy + (Math.random() - 0.5) * 40 };
+  /* A double-click or "Add note here" puts the note's corner exactly where it
+     was asked for. Only the toolbar's add, which has no place, scatters a
+     little so a few in a row do not stack; the scatter used to apply to all of
+     them, so a note landed up to 20 units off the spot (more, zoomed in). */
+  const placed = x !== undefined && y !== undefined;
+  const scatter = () => placed ? 0 : (Math.random() - 0.5) * 40;
+  const node = { id, commentContent: '', color: null, x: cx + scatter(), y: cy + scatter() };
   Object.assign(node, _brainLastStyle());   // the look you last gave a note
   // ...and Code mode, if the last note you saved was code.
   let lastCode = '';

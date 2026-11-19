@@ -689,6 +689,12 @@
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-glow);
 }
+/* The library search boxes show their focus as the glow above; the app-wide
+   focus ring (motion.css input:focus-visible) drew a second, inner violet
+   border inside them, since a text box matches :focus-visible on every click. */
+.search-input:focus-visible,
+.quest-search-input:focus-visible,
+.viz-search-input:focus-visible { outline: none; }
 
 .search-input::placeholder {
   color: var(--text-tertiary);

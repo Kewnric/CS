@@ -49,11 +49,16 @@ function _uisfxBus() {
   return _uisfxOut;
 }
 
+/* THE SIDEBAR SOUNDS ON EVERY PAGE. Visualize and the Quest Board are quiet
+   (their canvases are clicked constantly), and that silence also took the
+   sidebar's own sounds: leaving either page made none, by click or by wheel,
+   while every other page did. While a sound is the sidebar's this is set. */
+let _uisfxSidebar = false;
 function uisfxOn() {
   if (typeof sfxEnabled === 'function' && !sfxEnabled()) return false;
   const r = document.body.dataset.route;
   if (!r) return false;
-  return UISFX_SILENT_ROUTES.indexOf(r) === -1;
+  return _uisfxSidebar || UISFX_SILENT_ROUTES.indexOf(r) === -1;
 }
 
 /**
@@ -159,11 +164,14 @@ function uisfxNavigate() {
    (wheeling back to the page you were on) for the same gesture. */
 let _uisfxLastTick = 0, _uisfxHushNavAt = 0, _uisfxQuiet = false;
 function uisfxTick() {
-  if (!uisfxOn()) return;
-  const now = Date.now();
-  if (now - _uisfxLastTick < 30) return;
-  _uisfxLastTick = now;
-  uisfxTone(1700, { dur: 0.026, gain: 0.07, type: 'sine', lowpass: 4500 });
+  _uisfxSidebar = true;   // only the sidebar wheel ticks
+  try {
+    if (!uisfxOn()) return;
+    const now = Date.now();
+    if (now - _uisfxLastTick < 30) return;
+    _uisfxLastTick = now;
+    uisfxTone(1700, { dur: 0.026, gain: 0.07, type: 'sine', lowpass: 4500 });
+  } finally { _uisfxSidebar = false; }
 }
 /** Run fn (a navigation) with no click sound and no route chime. */
 function uisfxQuietly(fn) {
@@ -201,6 +209,11 @@ function _uisfxKindOf(el) {
 }
 
 document.addEventListener('click', function (e) {
+  _uisfxSidebar = !!(e.target && e.target.closest && e.target.closest('#app-sidebar-nav'));
+  try { _uisfxClickSound(e); } finally { _uisfxSidebar = false; }
+}, true);
+
+function _uisfxClickSound(e) {
   if (_uisfxQuiet || !uisfxOn() || !e.target) return;
   const el = e.target.closest ? e.target : null;
   if (!el) return;
@@ -222,7 +235,7 @@ document.addEventListener('click', function (e) {
   if (kind === 'danger') uisfxDanger();
   else if (kind === 'primary') uisfxPrimary();
   else if (kind === 'click') uisfxClick();
-}, true);
+}
 
 /* Hover, on the things that are meant to feel pickable. Not on every button:
    a toolbar you sweep past on the way somewhere else should stay quiet. */

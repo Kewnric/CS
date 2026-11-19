@@ -202,3 +202,54 @@
 @media (prefers-reduced-motion: reduce) {
   .sw-window, .sw-window::after, .sw-scan, .sw-edge, .sw-caret, .sw-xp-bar i, .sw-cell { animation: none; }
 }
+
+/* THE DAILY GREETING, PLAINLY. It was a slim cyan "[ SYSTEM ]" panel at the
+   top, which read as a notification to decode rather than a hello. Now it is
+   the greeting itself, large, in the middle of the page, with the streak,
+   level and last session as chips under it. It still goes by itself, or on a
+   click. The first-time window (is-full) keeps its system look. */
+.sw-overlay.is-brief {
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse 60% 45% at 50% 50%, rgba(4, 8, 22, 0.72), rgba(4, 8, 22, 0) 100%);
+}
+.sw-overlay.is-brief .sw-window {
+  width: min(720px, 100%);
+  padding: 28px 32px;
+  text-align: center;
+  border: 0;
+  border-radius: 24px;
+  background: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  color: #f1f5f9;
+}
+.sw-overlay.is-brief .sw-window::after,
+.sw-overlay.is-brief .sw-scan,
+.sw-overlay.is-brief .sw-edge,
+.sw-overlay.is-brief .sw-head { display: none; }
+.sw-overlay.is-brief .sw-title {
+  margin: 0 0 10px;
+  font-size: clamp(2rem, 5.2vw, 3.6rem);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  text-shadow: 0 6px 30px rgba(0, 0, 0, 0.6);
+}
+.sw-overlay.is-brief .sw-sub {
+  margin: 0 0 18px;
+  font-size: clamp(1rem, 1.6vw, 1.2rem);
+  color: rgba(226, 232, 240, 0.9);
+  text-shadow: 0 2px 14px rgba(0, 0, 0, 0.7);
+}
+.sw-overlay.is-brief .sw-brief-stats { justify-content: center; gap: 10px; font-size: 0.88rem; color: #e2e8f0; }
+.sw-overlay.is-brief .sw-brief-stats span {
+  padding: 6px 13px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.62);
+}
+.sw-overlay.is-brief .sw-brief-stats svg { color: #a5b4fc; }
