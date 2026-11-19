@@ -570,8 +570,14 @@ async function _afterSignedIn(user) {
   if (_pickerRemember()) authSetRemembered('online');
   updateCloudUserBadge();
 
-  _signinProgressTo(85, 'Syncing cloud data...');
-  await loadFromFirestore(user.uid);
+  /* This device's copy of the account, when it can be trusted, as on a
+     refresh. It may hold changes that never reached the cloud (the tab was
+     closed first), and a download would put the older cloud copy over them. */
+  const fromCopy = _bootFromDeviceCopy(user);
+  if (!fromCopy) {
+    _signinProgressTo(85, 'Syncing cloud data...');
+    await loadFromFirestore(user.uid);
+  }
 
   _signinProgressFinish('Complete!');
 
@@ -581,6 +587,7 @@ async function _afterSignedIn(user) {
     finishBoot();
     showCloudToast('Signed in as ' + (user.displayName || user.email));
     if (typeof spaNavigate === 'function') spaNavigate('home');
+    if (fromCopy) _cloudCheckAfterDeviceBoot(user.uid).catch(e => console.warn('[Firebase] sign-in check:', e));
   }, 380);
 }
 
@@ -1176,6 +1183,16 @@ function _cloudCopyDistrust() {
   _cloudCopyBroken = true;
   _cloudCopyCleanFor = null;
   try { localStorage.removeItem(CLOUD_COPY_KEY); } catch (e) { /* blocked */ }
+}
+
+/** Would leaving now lose anything? Not while this device's copy is trusted:
+ *  it has every change, and the next open (refresh or sign-in) sends them up. */
+function _cloudCopyHolds() {
+  if (_cloudCopyBroken || !currentFirebaseUser) return false;
+  const rec = _cloudCopyRead();
+  let owner = null;
+  try { owner = localStorage.getItem(ONLINE_OWNER_KEY); } catch (e) { return false; }
+  return !!rec && rec.uid === currentFirebaseUser.uid && owner === rec.uid;
 }
 
 /** Open `user`'s account from this device's copy, the way Guest opens.
@@ -2155,7 +2172,10 @@ function _attachUnloadGuard() {
   window.addEventListener('beforeunload', (e) => {
     // Flush pending auto-save timer on tab close
     if (_cloudSaveTimer) { clearTimeout(_cloudSaveTimer); _cloudSaveTimer = null; }
-    if (storageMode === 'online' && (_cloudIsDirty || _cloudIsSaving)) {
+    /* Only when leaving could lose something. With a trusted copy on this
+       device the changes are safe here and go up on the next open, so a
+       refresh no longer asks. */
+    if (storageMode === 'online' && (_cloudIsDirty || _cloudIsSaving) && !_cloudCopyHolds()) {
       e.preventDefault();
       e.returnValue = 'You have unsaved cloud changes. Are you sure you want to leave?';
       return e.returnValue;

@@ -128,7 +128,9 @@ save by itself (a `Storage.prototype` wrapper). Practice-set drafts ride in `sta
 only by a full cloud load or a cloud save, marked unclean by `markCloudDirty`, and dropped with the caches or on
 any failed `localStorage.setItem` (the wrapper below). Then one read of the root doc (`_cloudCheckAfterDeviceBoot`):
 another device's newer save (`savedBy` is the device id) reloads into the full load (`ssp.cloudFullLoad`, once).
-So the device copy must be COMPLETE: `_cacheAllToLocalStorage` writes the app blob with `_flushSaveData()`, never
+Signing in from the login page uses the same copy (`_afterSignedIn`): it may hold changes the cloud never got,
+which a download would cover. Hence the leave prompt (`_attachUnloadGuard`) asks only when `_cloudCopyHolds()` is
+false. So the device copy must be COMPLETE: `_cacheAllToLocalStorage` writes the app blob with `_flushSaveData()`, never
 a field list of its own. Tests: `tests/cloud-sync.spec.js` "refresh while signed in".
 **Save state shows on `#sync-fab`** (above the gear, `_paintSyncFab`): no toast on success, one per run of
 failures. Hiding the tab or coming back online saves at once; offline, the timed save waits.
