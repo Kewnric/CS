@@ -20,7 +20,7 @@
   --holo: var(--lib-accent, var(--color-primary));
   position: absolute;
   left: calc(50% - 100px);
-  bottom: calc(100% - 12px);
+  bottom: calc(100% - 68px);
   width: 200px;
   height: 150px;
   z-index: 6;
