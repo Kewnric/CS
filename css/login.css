@@ -12,7 +12,7 @@
 .smp-overlay.lp-page {
   padding: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(380px, 480px);
+  grid-template: minmax(100vh, auto) / minmax(0, 1fr);
   align-items: stretch;
   justify-content: stretch;
   overflow-y: auto;
@@ -23,6 +23,7 @@
 
 /* ── The art side ──────────────────────────────────────────── */
 .lp-art {
+  grid-area: 1 / 1;
   position: relative;
   min-height: 100vh;
   overflow: hidden;
@@ -40,7 +41,7 @@
   pointer-events: none;
   background:
     linear-gradient(0deg, rgba(5, 6, 15, 0.9) 0%, transparent 42%),
-    linear-gradient(90deg, transparent 72%, rgba(5, 6, 15, 0.55) 100%);
+    radial-gradient(70% 70% at 50% 50%, rgba(5, 6, 15, 0.35), rgba(5, 6, 15, 0.6));
 }
 .lp-sky { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .lp-art.has-img .lp-sky { display: none; }
@@ -186,25 +187,28 @@
 
 /* ── The panel ─────────────────────────────────────────────── */
 .lp-page .smp-card.lp-panel {
+  grid-area: 1 / 1;
+  place-self: center;
+  z-index: 2;
   position: relative;
   max-width: none;
-  width: auto;
-  min-height: 100vh;
+  width: min(760px, calc(100vw - 2rem));
+  min-height: 0;
+  margin: 2rem 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 2.4rem 2.4rem 2rem;
+  padding: 2.6rem 3.2rem 2.2rem;
   overflow: visible;
-  border: 0;
-  border-left: 1px solid rgba(165, 180, 252, 0.18);
-  border-radius: 0;
+  border: 1px solid rgba(165, 180, 252, 0.18);
+  border-radius: 20px;
   background:
     radial-gradient(90% 40% at 50% 0%, rgba(99, 102, 241, 0.16), transparent 70%),
     linear-gradient(180deg, rgba(14, 16, 38, 0.97), rgba(8, 9, 24, 0.99));
-  box-shadow: -30px 0 80px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 30px 90px rgba(0, 0, 0, 0.6);
   animation: lpPanelIn 0.7s var(--ease-expo-out) backwards;
 }
-@keyframes lpPanelIn { from { opacity: 0; transform: translateX(24px); } }
+@keyframes lpPanelIn { from { opacity: 0; transform: translateY(18px); } }
 /* The inner frame, and a gilded ornament at each of its corners. */
 .lp-panel::before {
   content: '';
@@ -308,6 +312,8 @@
   color: var(--text-primary);
   font: 500 0.94rem/1 var(--font-sans);
 }
+.lp-page .lp-input input:focus,
+.lp-page .lp-input input:focus-visible { outline: none; box-shadow: none; border: 0; }
 .lp-input input::placeholder { color: var(--text-tertiary); }
 .lp-eye {
   display: grid;
@@ -441,18 +447,12 @@
 .lp-page .smp-remember { margin-top: 0.9rem; }
 
 @media (max-width: 900px) {
-  .smp-overlay.lp-page { grid-template-columns: 1fr; grid-template-rows: auto auto; }
-  .lp-art { min-height: 230px; }
+  .lp-tagline { display: none; }
   .lp-moon { width: 70px; height: 70px; right: 10%; }
   .lp-tagline h2 { font-size: 1.35rem; max-width: none; }
   .lp-page .smp-card.lp-panel {
-    min-height: 0;
     padding: 1.6rem 1.25rem 1.5rem;
-    border-left: 0;
-    border-top: 1px solid rgba(165, 180, 252, 0.18);
-    animation-name: lpPanelUp;
   }
-  @keyframes lpPanelUp { from { opacity: 0; transform: translateY(18px); } }
 }
 
 @media (prefers-reduced-motion: reduce) {
