@@ -10,13 +10,12 @@
 
    Every tree renderer drops folderBannerHTML(rec) in as the FIRST child of
    the folder's .tree-node-row. Whether it shows is pure CSS
-   (css/folder-banner.css): the row is .active, or its folder is open.
+   (css/folder-banner.css): the row is .active or hovered, or its folder is open.
    Selection is a class toggle (treeCommit) and the expand toggles act in
    place, so the fades run on real state changes and never on a rebuild.
 
    GIFS: a still copy of the first frame (canvas, kept in memory) is shown
-   until the row is selected, or hovered while its banner is showing; then
-   the real GIF plays. A hidden banner never decodes the moving picture.
+   until the row is selected or hovered; then the real GIF plays. A hidden banner never decodes the moving picture.
 
    A banner whose picture is not on this device draws nothing: the row stays
    plain, never a blank or broken banner.
@@ -152,7 +151,7 @@ function _fbWantsPlay(layer, hover) {
   if (host.classList.contains('active')) return true;
   if ((layer.classList.contains('is-pinned') || folderBannerAnimAll()) && _fbShown(host)) return true;
   const over = hover !== undefined ? hover : (host.matches(':hover') || host.matches(':focus-visible'));
-  return !!over && _fbShown(host);
+  return !!over;   // a hovered row shows its banner (css/folder-banner.css)
 }
 
 function _fbApply(layer, hover) {

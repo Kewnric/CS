@@ -35,6 +35,7 @@
    it, where the rounded edge is smoothed. The selected row keeps its drop
    shadow. */
 .tree-node-row.active:has(> .fb-layer:is(:not(.is-gif), .has-frame)),
+.tree-node-row:hover:has(> .fb-layer:is(:not(.is-gif), .has-frame)),
 .tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row:has(> .fb-layer:is(:not(.is-gif), .has-frame)) {
   background: transparent;
   box-shadow: none;
@@ -84,13 +85,15 @@
   transition: opacity 0.25s ease;
 }
 
-/* Shown: selected, or the folder is open. A GIF waits for its still frame. */
+/* Shown: selected, hovered, or the folder is open. A GIF waits for its still frame. */
 .tree-node-row.active > .fb-layer:is(:not(.is-gif), .has-frame),
+.tree-node-row:hover > .fb-layer:is(:not(.is-gif), .has-frame),
 .tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row > .fb-layer:is(:not(.is-gif), .has-frame) {
   opacity: 1;
   transition-duration: 0.3s;
 }
 .tree-node-row.active > .fb-layer > .fb-img,
+.tree-node-row:hover > .fb-layer > .fb-img,
 .tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row > .fb-layer > .fb-img {
   transform: scale(var(--fb-z, 1));
 }
@@ -102,6 +105,8 @@
    and white text on the light themes' white pill disappeared.) */
 .tree-node-row.active:has(> .fb-layer) .tree-node-label,
 .tree-node-row.active:has(> .fb-layer) .tree-node-count,
+.tree-node-row:hover:has(> .fb-layer) .tree-node-label,
+.tree-node-row:hover:has(> .fb-layer) .tree-node-count,
 .tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row:has(> .fb-layer) .tree-node-label,
 .tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row:has(> .fb-layer) .tree-node-count {
   color: #f8fbff;
@@ -110,6 +115,9 @@
 .tree-node-row.active:has(> .fb-layer) .tree-node-icon,
 .tree-node-row.active:has(> .fb-layer) .tree-node-chevron,
 .tree-node-row.active:has(> .fb-layer) .tree-node-lock,
+.tree-node-row:hover:has(> .fb-layer) .tree-node-icon,
+.tree-node-row:hover:has(> .fb-layer) .tree-node-chevron,
+.tree-node-row:hover:has(> .fb-layer) .tree-node-lock,
 .tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row:has(> .fb-layer) .tree-node-icon,
 .tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row:has(> .fb-layer) .tree-node-chevron,
 .tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row:has(> .fb-layer) .tree-node-lock {
@@ -262,7 +270,7 @@
   animation-play-state: paused;
 }
 .tree-node-row.active > .fb-layer > .fb-img,
-.tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row:hover > .fb-layer > .fb-img,
+.tree-node-row:hover > .fb-layer > .fb-img,
 .tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row > .fb-layer.is-pinned > .fb-img,
 html.fb-anim-all .tree-node:has(> .tree-children:not(.collapsed)) > .tree-node-row > .fb-layer > .fb-img {
   animation-play-state: running;
