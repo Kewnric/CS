@@ -221,6 +221,26 @@ function closeSettingsModal() {
   if (modal) modal.classList.add('hidden');
 }
 
+/* Which Settings sections are open, per device (layout, so never synced).
+   Appearance is open the first time. */
+const SETTINGS_GROUPS_KEY = 'ssp.settingsGroups';
+(function settingsGroupsWire() {
+  const wire = () => {
+    const modal = document.getElementById('settings-modal');
+    if (!modal || modal._groupsWired) return;
+    modal._groupsWired = true;
+    let open = ['appearance'];
+    try { const v = JSON.parse(localStorage.getItem(SETTINGS_GROUPS_KEY)); if (Array.isArray(v)) open = v; } catch (e) { /* first visit */ }
+    modal.querySelectorAll('details.settings-group').forEach(d => { d.open = open.indexOf(d.dataset.group) !== -1; });
+    modal.addEventListener('toggle', () => {
+      const now = [...modal.querySelectorAll('details.settings-group[open]')].map(d => d.dataset.group);
+      try { localStorage.setItem(SETTINGS_GROUPS_KEY, JSON.stringify(now)); } catch (e) { /* full */ }
+    }, true);
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
+  else wire();
+})();
+
 // Legacy no-op kept for safety — the sidebar-bottom markup was replaced by the
 // settings popup (#settings-modal) opened from the bottom-right gear button.
 function toggleSidebarBottom() {

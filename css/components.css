@@ -2615,7 +2615,14 @@ body[data-route="visualization"] .sync-fab { display: none; }
   text-align: left;
   padding: 0;
   overflow: hidden;
+  /* The header and the account card stay put; the list under them scrolls.
+     It used to be clipped by the overflow above with nothing scrolling, so the
+     wheel did nothing and the last rows could not be reached. */
+  display: flex;
+  flex-direction: column;
 }
+.settings-modal-header,
+.settings-modal-content .cloud-user-badge { flex: none; }
 
 .settings-modal-header {
   display: flex;
@@ -2667,7 +2674,58 @@ body[data-route="visualization"] .sync-fab { display: none; }
   flex-direction: column;
   gap: 2px;
   padding: 0.75rem;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
+
+/* Sections that open like dropdowns (<details>; navigation.js settingsGroupsWire). */
+.settings-group { flex: none; }
+.settings-group-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.62rem 0.75rem;
+  border-radius: var(--radius-md);
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transition: background 0.15s, color 0.15s;
+}
+.settings-group-head::-webkit-details-marker { display: none; }
+.settings-group-head:hover,
+.settings-group-head:focus-visible { background: var(--bg-surface-hover); color: var(--text-primary); }
+.settings-group-head svg { width: 15px; height: 15px; flex: none; color: var(--color-primary); }
+.settings-group-count {
+  margin-left: auto;
+  padding: 0 0.45rem;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--bg-surface);
+  color: var(--text-tertiary);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+.settings-group-head .settings-group-chev { color: var(--text-tertiary); transition: transform 0.2s ease; }
+.settings-group[open] > .settings-group-head .settings-group-chev { transform: rotate(180deg); }
+.settings-group[open] > .settings-group-head { color: var(--text-primary); }
+.settings-group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 0.35rem 1.1rem;
+  padding-left: 0.35rem;
+  border-left: 1px solid var(--border-color);
+}
+.settings-group[open] > .settings-group-body { animation: settingsGroupIn 0.22s var(--ease-expo-out, ease); }
+@keyframes settingsGroupIn { from { opacity: 0; transform: translateY(-4px); } }
 
 .settings-item {
   display: flex;
