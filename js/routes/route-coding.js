@@ -21,7 +21,7 @@ let _chubKey = null;
 
 function codingHubTemplate() {
   return `
-    <div class="home-content">
+    <div class="home-content chub-host">
       <div class="home-scroll lib-hub chub">
         <div class="chub-top">
           <button onclick="spaNavigate('library')" class="btn-back-dark chub-back">

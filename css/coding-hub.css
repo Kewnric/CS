@@ -5,14 +5,17 @@
    button they can carry, and sizes the page for two to four tiles.
    ============================================================ */
 
+.chub-host { position: relative; }
 .chub-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 0.5rem;
   margin-bottom: 0.25rem;
 }
 .chub-back { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
+/* Pinned to the content area's left edge, where the Hackathon page's Back sits. */
+.chub-host .chub-back { position: absolute; left: 30px; top: 36px; z-index: 2; }
 
 /* The number that opens a tile from the keyboard. Shown as a keycap while
    the tile is hovered or has focus, not all the time: at rest, a dim outlined
@@ -56,5 +59,7 @@
 
 @media (max-width: 640px) {
   .chub-grid { grid-template-columns: 1fr; }
+  .chub-top { justify-content: space-between; }
+  .chub-host .chub-back { position: static; }
   .lib-card-key { display: none; }
 }
