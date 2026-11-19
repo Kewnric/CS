@@ -44,7 +44,7 @@ function _thubTab() {
 
 function trainingTemplate() {
   return `
-    <div class="home-content">
+    <div class="home-content chub-host">
       <div class="home-scroll lib-hub thub">
         <div class="chub-top">
           <button onclick="spaNavigate('coding')" class="btn-back-dark chub-back">

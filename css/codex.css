@@ -5,7 +5,7 @@
 
 .lib-card-codex .lib-card-icon { color: #f59e0b; }
 
-.cdx-top { align-items: center; }
+.cdx-top { align-items: center; justify-content: space-between; }
 .cdx-h1 { display: inline-flex; align-items: center; gap: 8px; margin: 0; font-size: 1.25rem; color: var(--text-primary); }
 .cdx-h1 svg { color: #f59e0b; }
 .cdx-progress { min-width: 80px; text-align: right; }
