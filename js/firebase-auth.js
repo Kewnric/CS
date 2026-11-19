@@ -1767,14 +1767,20 @@ async function saveToFirestore(uid) {
       if (timeoutId) clearTimeout(timeoutId);
     }
 
-    _cloudIsDirty = false;
+    /* A change made while this save was in flight is not in it. Clearing the
+       flag anyway left that change on this device only -- and its timer had
+       already met a save running and given up -- so it reached the cloud only
+       with the next change, or never if there was none. */
+    const changedMeanwhile = seqAtStart !== _cloudChangeSeq;
+    _cloudIsDirty = changedMeanwhile;
     _cloudIsSaving = false;
     _lastCloudSaveAt = Date.now();
     _cloudBaseline = _lastCloudSaveAt;
-    _cloudCopySave(uid, seqAtStart === _cloudChangeSeq);
+    _cloudCopySave(uid, !changedMeanwhile);
     _cloudLastError = '';
     _cloudErrorToasted = false;
     _updateCloudStatusUI();
+    if (changedMeanwhile) scheduleCloudSave();   // the usual 5 s wait, then the rest goes up
     // Then the pictures the library uses, each its own document (js/media-store.js).
     if (typeof mediaCloudPush === 'function') mediaCloudPush(uid).catch(() => {});
     // Notify other tabs that cloud data changed
