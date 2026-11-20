@@ -580,6 +580,33 @@ function _mdUnorphan(id) {
   if (g.orphans[id]) { delete g.orphans[id]; _mdGcSave(g); }
 }
 
+/* AN ACCOUNT'S PICTURES THAT ONLY THIS DEVICE HAS. One over 1 MB, or one not
+   uploaded yet, is here and nowhere else. A picture is kept while a save on
+   this device names it, and an account's saves leave the device when it
+   signs out or another account takes the slot: Guest's Clean up or Reset
+   then deleted that account's only copy at once, and the daily clean-up two
+   weeks later. Each account's list, written after its cloud save, counts as
+   a save that names them; Reset Data drops the list of the account it resets. */
+const MEDIA_ONLY_KEY = 'ssp.media.only.';
+
+function _mdOnlyHereRead(key) {
+  try {
+    const v = JSON.parse(localStorage.getItem(key) || '[]');
+    return Array.isArray(v) ? v.filter(id => typeof id === 'string') : [];
+  } catch (e) { return []; }
+}
+
+/** The pictures `uid`'s library uses that its cloud has not got, and this device has. */
+function _mdOnlyHereSave(uid, live, known) {
+  if (!uid) return;
+  const ids = [];
+  live.forEach(id => { if (!known.has(id) && _mdPics.has(id)) ids.push(id); });
+  try {
+    if (ids.length) localStorage.setItem(MEDIA_ONLY_KEY + uid, JSON.stringify(ids));
+    else localStorage.removeItem(MEDIA_ONLY_KEY + uid);
+  } catch (e) { /* full: the daily clean-up's two weeks still stand */ }
+}
+
 /** Every id any save on this device, or anything open now, mentions; null if a save could not be read. */
 function _mdUsedIds() {
   const used = new Set();
@@ -593,7 +620,10 @@ function _mdUsedIds() {
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
       // This file's own bookkeeping lists ids without using them.
-      if (!k || k.lastIndexOf('ssp.media.', 0) === 0) continue;
+      if (!k) continue;
+      // An account's pictures that only this device has count as used (see _mdOnlyHereSave).
+      if (k.lastIndexOf(MEDIA_ONLY_KEY, 0) === 0) { _mdOnlyHereRead(k).forEach(id => used.add(id)); continue; }
+      if (k.lastIndexOf('ssp.media.', 0) === 0) continue;
       const raw = localStorage.getItem(k) || '';
       scan(typeof storeDecode === 'function' ? storeDecode(raw) : raw);
     }
@@ -707,7 +737,9 @@ async function mediaCloudPush(uid) {
   try {
     await mediaReady();
     const known = _mdCloudKnown(uid);
-    for (const id of _mdLiveIds()) {
+    const live = _mdLiveIds();
+    _mdOnlyHereSave(uid, live, known);   // before the uploads: one failing part-way still leaves them kept
+    for (const id of live) {
       if (known.has(id) || !_mdPics.has(id)) continue;
       const rec = await _mdIdb('readonly', st => st.get(id));
       if (!rec || !rec.blob) continue;
@@ -721,6 +753,7 @@ async function mediaCloudPush(uid) {
       _mdCloudRemember(uid, known);
       sent++;
     }
+    _mdOnlyHereSave(uid, live, known);   // what the uploads did not take
     if (sent) console.log('[media] Copied', sent, 'picture(s) to the cloud.');
   } catch (e) {
     console.warn('[media] Pictures could not be copied to the cloud; tried again after the next save.', e);

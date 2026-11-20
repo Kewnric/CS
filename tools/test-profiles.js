@@ -392,6 +392,192 @@ const list = (...items) => JSON.stringify({ v: 1, items });
     eq(quests('online', Object.assign({ questBoardData_online: '{"quests":["a"]}' }, old)), ['a'], 'an account gets its own');
   }
 
+  /* ── Two tabs, two profiles: the shared profile keys ─────────── */
+
+  {
+    const { ctx, st } = keys({ anSrsState: 'G', 'ssp.typeConfig': 'taste',
+      'ssp.profileOwner': 'guest', 'ssp.profile.u:A': JSON.stringify({ anSrsState: 'A', 'ssp.psetDrafts': '{"a":1}' }) });
+    ok(ctx.profileKeysHeldBy('guest', st) && !ctx.profileKeysHeldBy('u:A', st), 'the keys say whose they hold');
+    eq(ctx.profileKeysOwnRaw('u:A', 'anSrsState', st), 'A', 'a tab behind reads its own parked review schedule, not the front tab\'s');
+    eq(ctx.profileKeysOwnRaw('u:A', 'ssp.psetDrafts', st), '{"a":1}', 'and its own drafts');
+    eq(ctx.profileKeysOwnRaw('guest', 'anSrsState', st), 'G', 'the front tab reads the keys');
+    eq(ctx.profileKeysOwnRaw('u:A', 'ssp.typeConfig', st), 'taste', 'a key no profile owns reads as it is');
+    eq(ctx.profileKeysOwnRaw('u:B', 'anSrsState', st), null, 'a profile with nothing parked has nothing');
+    const old = keys({ anSrsState: 'G' });
+    ok(old.ctx.profileKeysHeldBy('guest', old.st), 'a device from before owners holds Guest\'s');
+  }
+
+  {
+    // The tab coming to the front takes its profile's keys back.
+    const st = storage({ anSrsState: 'G', 'ssp.profileOwner': 'guest', 'ssp.profile.u:A': JSON.stringify({ anSrsState: 'A' }) });
+    const on = {};
+    const doc = { visibilityState: 'visible', addEventListener: (t, f) => { on[t] = f; } };
+    const ctx = { console: { log() {}, error() {}, warn() {} }, localStorage: st, document: doc,
+      window: { addEventListener: (t, f) => { on['w:' + t] = f; } } };
+    vm.createContext(ctx);
+    vm.runInContext(JS('profile-keys.js') + '\nvar storageMode = "online", currentFirebaseUser = { uid: "A" };', ctx);
+    ok(typeof on.visibilitychange === 'function' && typeof on['w:focus'] === 'function', 'it listens for the tab coming to the front');
+    doc.visibilityState = 'hidden';
+    on.visibilitychange();
+    eq(st.getItem('anSrsState'), 'G', 'a tab going behind takes nothing');
+    doc.visibilityState = 'visible';
+    on.visibilitychange();
+    eq([st.getItem('ssp.profileOwner'), st.getItem('anSrsState')], ['u:A', 'A'], 'the account\'s tab in front has its own review schedule');
+    eq(JSON.parse(st.getItem('ssp.profile.guest')), { anSrsState: 'G' }, 'and Guest\'s is parked, not lost');
+    vm.runInContext('storageMode = null;', ctx);
+    on['w:focus']();
+    eq(st.getItem('ssp.profileOwner'), 'u:A', 'a tab in no profile yet (the login page) takes nothing');
+  }
+
+  /* ── media-store.js: an account's pictures only this device has ── */
+
+  {
+    const src = JS('media-store.js');
+    const pick = (re) => { const m = src.match(re); if (!m) throw new Error('not found: ' + re); return m[0]; };
+    const ls = webStorage({
+      'ssp.media.only.A': JSON.stringify(['mbig_1']),   // account A, signed out: its library is gone from the device
+      codePlatformData: JSON.stringify({ img: 'media:mguest_1' }),
+      'ssp.media.gc': JSON.stringify({ orphans: { mlost_1: 1 } })
+    });
+    const ctx = { console: { log() {}, error() {}, warn() {} }, localStorage: ls, storeDecode: s => s, document: { querySelectorAll: () => [] },
+      _mdPics: new Map([['mbig_1', {}], ['mguest_1', {}], ['mpushed_1', {}], ['mnew_1', {}]]) };
+    vm.createContext(ctx);
+    vm.runInContext([
+      pick(/const MEDIA_PREFIX = [^\n]*\n/), pick(/const MEDIA_REF_RE = [^\n]*\n/), pick(/const MEDIA_ONLY_KEY = [^\n]*\n/),
+      pick(/function _mdOnlyHereRead\(key\) \{[\s\S]*?\n\}\n/), pick(/function _mdOnlyHereSave\(uid, live, known\) \{[\s\S]*?\n\}\n/),
+      pick(/function _mdUsedIds\(\) \{[\s\S]*?\n\}\n/)
+    ].join('\n'), ctx);
+    const used = vm.runInContext('Array.from(_mdUsedIds()).sort()', ctx);
+    eq(used, ['mbig_1', 'mguest_1'], 'Guest\'s clean-up keeps the signed-out account\'s only copies, and Guest\'s own');
+    // After B's save: one picture the cloud has, one it has not got yet, one this device does not have.
+    vm.runInContext('_mdOnlyHereSave("B", new Set(["mpushed_1", "mnew_1", "mgone_1"]), new Set(["mpushed_1"]))', ctx);
+    eq(JSON.parse(ls.getItem('ssp.media.only.B')), ['mnew_1'], 'an account lists what only this device has of its pictures');
+    vm.runInContext('_mdOnlyHereSave("B", new Set(["mpushed_1"]), new Set(["mpushed_1"]))', ctx);
+    eq(ls.getItem('ssp.media.only.B'), null, 'and drops the list once the cloud has them all');
+  }
+
+  /* ── firebase-auth.js: a failed load, the account slot, other tabs ── */
+
+  /** firebase-auth.js under stubs: Firebase, the page, and the rest of the app. `get` is every Firestore read. */
+  function auth(o) {
+    class Storage {
+      getItem(k) { return Object.prototype.hasOwnProperty.call(this, k) ? this[k] : null; }
+      setItem(k, v) { this[k] = String(v); }
+      removeItem(k) { delete this[k]; }
+      clear() { Object.keys(this).forEach(k => { delete this[k]; }); }
+      key(i) { const k = Object.keys(this)[i]; return k === undefined ? null : k; }
+      get length() { return Object.keys(this).length; }
+    }
+    const ls = Object.assign(new Storage(), o.local || {});
+    const ss = Object.assign(new Storage(), { storageMode: 'online' });
+    const on = {}, toasts = [], calls = [];
+    const ref = { get: o.get || (async () => { throw new Error('offline'); }) };
+    ref.collection = () => ({ doc: () => ref });
+    const db = { collection: () => ({ doc: () => ref }), batch: () => { calls.push('batch'); throw new Error('no cloud here'); } };
+    const fbAuthStub = { setPersistence() {}, onAuthStateChanged() { return () => {}; } };
+    const ctx = {
+      console: { log() {}, error() {}, warn() {} }, Storage, localStorage: ls, sessionStorage: ss,
+      navigator: { onLine: true }, setTimeout, clearTimeout, setInterval: () => 0, clearInterval() {},
+      location: { reload: () => calls.push('reload') },
+      document: { addEventListener() {}, getElementById: () => null, visibilityState: 'visible', body: null, documentElement: { setAttribute() {} } },
+      addEventListener: (t, f) => { on[t] = f; },
+      firebase: {
+        initializeApp() {},
+        auth: Object.assign(() => fbAuthStub, { Auth: { Persistence: { LOCAL: 'L', SESSION: 'S' } } }),
+        firestore: Object.assign(() => db, { FieldValue: { serverTimestamp: () => null } })
+      },
+      // The rest of the app, as far as these paths reach.
+      state: { challenges: ['old'] }, viz: { nodes: ['old'] }, brain: {}, questState: { quests: [] }, cs: { sheets: [] },
+      storeDecode: s => s, saveIsBlocked: () => false, repairDataIntegrity() {}, vizLoad() {}, brainLoad() {}, loadQuestData() {}, csLoad() {},
+      loadData: () => calls.push('loadData'), migrateLegacyData: x => x,
+      saveStopForThisPage: () => calls.push('stop saving')
+    };
+    ctx.window = ctx;
+    vm.createContext(ctx);
+    vm.runInContext(JS('profile-keys.js'), ctx);
+    vm.runInContext(JS('constants.js'), ctx);
+    vm.runInContext(JS('firebase-auth.js'), ctx);
+    ctx.showCloudToast = (m) => toasts.push(m);
+    ctx._updateCloudStatusUI = () => {};
+    vm.runInContext('storageMode = "online"; currentFirebaseUser = { uid: "A" };', ctx);
+    return { ctx, ls, on, toasts, calls, run: (s) => vm.runInContext(s, ctx) };
+  }
+  const COPY_A = { 'ssp.onlineOwner': 'A', 'ssp.cloudCopy': JSON.stringify({ v: 1, uid: 'A', stamp: 5000, clean: true }),
+    codePlatformData_online: JSON.stringify({ challenges: ['A-lib'] }) };
+
+  {
+    // The cloud cannot be read, and this device has a trusted copy of the account: it opens, as a refresh would.
+    const { run, toasts, calls } = auth({ local: Object.assign({}, COPY_A) });
+    await run('loadFromFirestore("A")');
+    ok(calls.includes('loadData'), 'a failed cloud load opens this device\'s copy instead');
+    eq(run('_cloudLoadFailedFor'), null, 'saving stays allowed');
+    eq(run('_cloudBaseline'), 5000, 'checked against the copy\'s revision, so a newer cloud still asks first');
+    ok(/copy of your account on this device/.test(toasts.join(' ')), 'and says which copy is open');
+  }
+
+  {
+    // No trusted copy (the slot held another account): nothing may go up over the real cloud copy.
+    const { run, ls, toasts, calls } = auth({ local: Object.assign({}, COPY_A, { 'ssp.onlineOwner': 'B',
+      'ssp.cloudCopy': JSON.stringify({ v: 1, uid: 'B', stamp: 1, clean: true }) }) });
+    await run('loadFromFirestore("A")');
+    eq(run('_cloudLoadFailedFor'), 'A', 'a failed load with no copy to open marks the account');
+    eq(ls.getItem('ssp.cloudCopy'), null, 'and nothing vouches for the partial copy this page will write');
+    const saved = await run('_cloudIsDirty = true; saveToFirestore("A")');
+    ok(saved === false && !calls.includes('batch'), 'a later save does not reach the cloud');
+    ok(/reload/i.test(toasts[toasts.length - 1]), 'and the person is told to reload');
+  }
+
+  {
+    // Two tabs, two accounts: another tab signs in to B and claims the device's account slot.
+    const { run, ls, on, calls } = auth({ local: Object.assign({}, COPY_A) });
+    run('_cloudIsDirty = true;');
+    ok(typeof on.storage === 'function', 'the tab listens for other tabs');
+    on.storage({ key: 'ssp.onlineOwner', newValue: 'A', storageArea: ls });
+    eq(run('_tabStale'), false, 'the same account in another tab changes nothing');
+    on.storage({ key: 'ssp.onlineOwner', newValue: 'B', storageArea: ls });
+    await new Promise(r => setTimeout(r, 0));
+    eq(run('_tabStale'), true, 'another account taking the slot stops this tab');
+    ok(calls.includes('stop saving'), 'the library save on its timer is stopped');
+    eq(calls.filter(c => c === 'batch').length, 1, 'what it had not sent goes to its own cloud once');
+    ls.setItem('codePlatformData_online', 'A writes again');
+    ls.removeItem('ssp.onlineOwner');
+    eq([ls.getItem('codePlatformData_online'), ls.getItem('ssp.onlineOwner')], [COPY_A.codePlatformData_online, 'A'],
+      'and nothing more is written to the device, so B\'s copy never holds A\'s library');
+    const again = await run('saveToFirestore("A")');
+    ok(again === false && calls.filter(c => c === 'batch').length === 1, 'no save after that one');
+  }
+
+  {
+    // Signed out in another tab: the slot is emptied, and this tab stops too.
+    const { run, on, ls } = auth({ local: Object.assign({}, COPY_A) });
+    on.storage({ key: 'ssp.onlineOwner', newValue: null, storageArea: ls });
+    eq(run('_tabStale'), true, 'signing this account out in another tab stops this one');
+  }
+
+  {
+    // The device-copy record is only ever the slot owner's.
+    const { run, ls } = auth({ local: { 'ssp.onlineOwner': 'B' } });
+    run('_cloudCopySave("A", true)');
+    eq(ls.getItem('ssp.cloudCopy'), null, 'no copy record is written for an account the slot does not hold');
+    ls.setItem('ssp.onlineOwner', 'A');
+    run('_cloudCopySave("A", true)');
+    eq(JSON.parse(ls.getItem('ssp.cloudCopy')).uid, 'A', 'and it is for the one it does');
+  }
+
+  {
+    // A cloud save from a tab behind Guest's sends the account's own drafts and review schedule.
+    const { run } = auth({ local: Object.assign({}, COPY_A, { 'ssp.profileOwner': 'guest', anSrsState: 'G', 'ssp.psetDrafts': '{"g":1}',
+      'ssp.profile.u:A': JSON.stringify({ anSrsState: 'A', 'ssp.psetDrafts': '{"a":1}' }), 'ssp.typeConfig': 'taste' }) });
+    const items = run('_prefsForCloud().items');
+    const v = (k) => (items.find(i => i.k === k) || {}).v;
+    eq([v('anSrsState'), v('ssp.typeConfig')], ['A', 'taste'], 'the prefs document gets the account\'s review schedule, not Guest\'s');
+    eq(run('_draftForCloud("ssp.psetDrafts")'), { a: 1 }, 'and the stash its drafts');
+    eq([run('_cloudSavedConcernsThisTab({ uid: "A" })'), run('_cloudSavedConcernsThisTab({ uid: "B" })')], [true, false],
+      '"updated in another tab" is only for another tab of the same account');
+    run('storageMode = "local";');
+    eq(run('_cloudSavedConcernsThisTab({ uid: "A" })'), false, 'never for Guest');
+  }
+
   console.log((failed ? 'FAILED ' + failed + ', ' : '') + passed + ' passed');
   process.exit(failed ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

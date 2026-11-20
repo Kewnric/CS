@@ -346,6 +346,17 @@ function saveIsBlocked() { return _loadFailed; }
 function allowSavingAgain() { _loadFailed = false; }
 
 /**
+ * Write nothing more for the rest of this page: another tab has taken this
+ * device's account slot (firebase-auth.js _onlineSlotChanged), and what this
+ * page would save belongs to the account it is no longer allowed to keep here.
+ */
+function saveStopForThisPage() {
+  clearTimeout(saveTimeout);
+  _saveDataPending = false;
+  _loadFailed = true;
+}
+
+/**
  * Begin again after data that could not be read.
  *
  * Removes only the live key. The copy set aside when the read failed is left

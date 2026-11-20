@@ -632,12 +632,17 @@ async function _resumeRedirectSignin() {
 /* ============================================================
    LOAD FROM FIRESTORE — restores all domains
    ============================================================ */
+/* The account whose cloud load failed in this page: no save may reach its
+   cloud until a reload loads it properly (see loadFromFirestore's catch). */
+let _cloudLoadFailedFor = null;
+
 async function loadFromFirestore(uid) {
   // Suppress cloud uploads during the entire load — flushing, seeding defaults,
   // re-rendering routes etc. all call saveData/vizSave which would otherwise
   // schedule unwanted uploads back to Firestore on every sign-in.
   const __prevSuppress = _suppressCloudSave;
   _suppressCloudSave = true;
+  let dirtyAfter = false;   // unsaved changes once loaded: only a device copy opened instead can have them
   // A save still waiting on its timer belongs to whoever was in before, and
   // the stamp it is checked against is theirs.
   clearTimeout(_cloudSaveTimer);
@@ -691,6 +696,20 @@ async function loadFromFirestore(uid) {
     }
   } catch (err) {
     console.error('[Firebase] Load failed:', err);
+    /* THE CLOUD COULD NOT BE READ, so this page holds no revision of it. The
+       next save used to put what it had -- the library from the cache at
+       best, and an empty canvas, brain, quest board and training data -- over
+       the account's real cloud copy, with nothing to ask first (no baseline
+       to compare against). This device's copy opens instead when it can be
+       trusted, as a refresh opens it, and later saves are checked against its
+       revision. Otherwise nothing is sent to the cloud until a reload. */
+    if (_bootFromDeviceCopy({ uid })) {
+      dirtyAfter = _cloudIsDirty;
+      showCloudToast('Could not reach the cloud. Opened the copy of your account on this device.', true);
+      return;
+    }
+    _cloudLoadFailedFor = uid;
+    _cloudCopyDistrust();   // what this page writes to the device copy is not the whole account
     // IMPORTANT: Do NOT call seedDefaultData() or loadData() here.
     // loadData() seeds defaults when localStorage is empty — exactly what we
     // must NOT do after an account switch clears localStorage. If the cache has
@@ -723,10 +742,10 @@ async function loadFromFirestore(uid) {
         // else: leave state.nodes = [] (already flushed) — never seed on network error
       }
     } catch (e) { /* cache unreadable — leave state empty, safer than seeding defaults */ }
-    showCloudToast('Cloud load failed — using cached/local data. Please reload and try again.', true);
+    showCloudToast('Cloud load failed. Nothing is saved to your cloud until you reload the page.', true);
   } finally {
     _suppressCloudSave = __prevSuppress;
-    _cloudIsDirty = false;
+    _cloudIsDirty = dirtyAfter;
     _updateCloudStatusUI();
   }
 }
@@ -1128,6 +1147,82 @@ function _claimOnlineCaches(uid) {
 }
 
 /* ============================================================
+   TWO ACCOUNTS IN TWO TABS
+   ------------------------------------------------------------
+   A second tab signing in to another account claims the slot above, and
+   signing this account out in another tab empties it. This tab, still
+   running its account, went on saving its library, canvas and sheets into
+   the slot: into the other account's device copy, which that account's next
+   refresh opened as its own and then saved to its cloud. So this tab stops.
+   What it has not sent goes up to its own cloud once more (memory is still
+   its own), it writes nothing more on this device, and a cover asks for a
+   reload, which opens its account again (the other tab then stops in turn).
+   ============================================================ */
+let _tabStale = false;       // another tab has this device's account slot: nothing more is saved here
+let _tabFinalSave = false;   // the one save allowed after that, of this tab's own work
+
+/** Another tab changed whose account the slot holds (a `storage` event on ONLINE_OWNER_KEY). */
+function _onlineSlotChanged(newOwner) {
+  if (_tabStale || storageMode !== 'online' || !currentFirebaseUser) return;
+  if (newOwner === currentFirebaseUser.uid) return;
+  const uid = currentFirebaseUser.uid;
+  _tabStale = true;
+  // Nothing more on this device: a write already on a timer would land in the other account's copy.
+  clearTimeout(_cloudSaveTimer);
+  _cloudSaveTimer = null;
+  _cloudCopyCleanFor = null;
+  try { if (typeof saveStopForThisPage === 'function') saveStopForThisPage(); } catch (e) { /* state.js not loaded */ }
+  const send = _cloudIsDirty && !_cloudIsSaving && navigator.onLine !== false;
+  const unsent = _cloudIsDirty && !send && !_cloudIsSaving;
+  _showSlotLostCover((newOwner ? 'Another tab on this device signed in to a different account.' : 'This account was signed out in another tab.') +
+    ' Two accounts cannot share this device at once, so this tab saves nothing more here.' +
+    (send || _cloudIsSaving ? ' Changes it had not saved are being sent to your cloud now.' : '') +
+    (unsent ? ' It is offline, so its latest changes could not be sent.' : ''));
+  if (send) {
+    _tabFinalSave = true;
+    saveToFirestore(uid).catch(() => false).then(() => { _tabFinalSave = false; });
+  }
+}
+
+/** True while this tab may write to this device's storage (see the wrapper below). */
+function _tabMayWriteHere() { return !_tabStale; }
+
+function _showSlotLostCover(why) {
+  if (typeof document === 'undefined' || !document.body || document.getElementById('slot-lost-cover')) return;
+  const cover = document.createElement('div');
+  cover.id = 'slot-lost-cover';
+  cover.setAttribute('role', 'alertdialog');
+  cover.setAttribute('aria-modal', 'true');
+  cover.style.cssText = 'position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,0.72);';
+  const box = document.createElement('div');
+  box.style.cssText = 'max-width:420px;width:100%;background:var(--bg-secondary,#1e1e24);color:var(--text-primary,#f2f2f2);border-radius:12px;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,0.5);font-size:0.9375rem;line-height:1.5;';
+  const title = document.createElement('div');
+  title.style.cssText = 'font-weight:700;font-size:1.0625rem;margin-bottom:8px;';
+  title.textContent = 'This tab has stopped saving';
+  const msg = document.createElement('p');
+  msg.style.cssText = 'margin:0 0 16px;';
+  msg.textContent = why + ' Reload to keep working in this account.';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn btn-primary';
+  btn.textContent = 'Reload';
+  btn.style.cssText = 'width:100%;';
+  btn.onclick = () => { window.location.reload(); };
+  box.append(title, msg, btn);
+  cover.appendChild(box);
+  document.body.appendChild(cover);
+  try { btn.focus(); } catch (e) { /* not focusable yet */ }
+}
+
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('storage', (e) => {
+    if (!e || e.key !== ONLINE_OWNER_KEY) return;
+    try { if (e.storageArea && e.storageArea !== localStorage) return; } catch (err) { return; }
+    _onlineSlotChanged(e.newValue);
+  });
+}
+
+/* ============================================================
    OPENING FROM THIS DEVICE'S COPY
    Refreshing while signed in used to download every domain before anything
    showed, on every reload. The *_online keys already hold the account, so a
@@ -1168,6 +1263,8 @@ function _cloudCopyRead() {
 function _cloudCopySave(uid, clean) {
   if (_cloudCopyBroken || !uid) return;
   try {
+    // Only for the account the slot holds: another tab may have given it to another one.
+    if (localStorage.getItem(ONLINE_OWNER_KEY) !== uid) { _cloudCopyCleanFor = null; return; }
     localStorage.setItem(CLOUD_COPY_KEY, JSON.stringify({ v: 1, uid: uid, stamp: _cloudBaseline || 0, clean: !!clean }));
     _cloudCopyCleanFor = clean ? uid : null;
   } catch (e) { /* the setItem wrapper has already dropped it */ }
@@ -1378,11 +1475,25 @@ const _SYNC_PREF_SET = new Set(SYNC_PREF_KEYS);
 function syncPrefIsSynced(key) { return _SYNC_PREF_SET.has(String(key)); }
 
 /** The `prefs` document: every synced key this device has, as raw strings. */
+/** A key as it is for the profile in this tab: a profile's own keys may hold
+ *  another tab's profile while this one is behind it (profile-keys.js). */
+function _ownKeyRaw(key) {
+  try {
+    if (typeof profileKeysOwnRaw === 'function') return profileKeysOwnRaw(profileCurrentId(), key);
+    return localStorage.getItem(key);
+  } catch (e) { return null; }
+}
+
+/** True while the shared profile keys hold this tab's profile. */
+function _holdsOwnKeys() {
+  try { return typeof profileKeysHeldBy !== 'function' || profileKeysHeldBy(profileCurrentId()); }
+  catch (e) { return true; }
+}
+
 function _prefsForCloud() {
   const items = [];
   SYNC_PREF_KEYS.forEach(k => {
-    let v = null;
-    try { v = localStorage.getItem(k); } catch (e) { /* no storage */ }
+    const v = _ownKeyRaw(k);
     if (v !== null) items.push({ k, v });
   });
   return { items };
@@ -1444,6 +1555,8 @@ function _restorePsetDrafts(incoming) {
     scheduleCloudSave();
   };
   proto.setItem = function (key, value) {
+    // A tab another account has taken this device from writes nothing here (_onlineSlotChanged).
+    if (isLocal(this) && !_tabMayWriteHere()) return undefined;
     const before = syncPrefIsSynced(key) ? get.call(this, key) : null;
     let r;
     try { r = set.call(this, key, value); } catch (err) {
@@ -1455,6 +1568,7 @@ function _restorePsetDrafts(incoming) {
     return r;
   };
   proto.removeItem = function (key) {
+    if (isLocal(this) && !_tabMayWriteHere()) return undefined;
     const before = syncPrefIsSynced(key) ? get.call(this, key) : null;
     const r = remove.call(this, key);
     try { touched(this, key, before); } catch (e) { /* never break a write */ }
@@ -1641,6 +1755,18 @@ async function _fsJoinDomain(domRef, name, doc) {
 
 async function saveToFirestore(uid) {
   if (!uid) return false;
+  /* Not into a cloud this page never loaded (loadFromFirestore), nor from a
+     tab another account has taken this device from (_onlineSlotLost), apart
+     from that tab's one last save of its own work. */
+  const refused = _cloudLoadFailedFor === uid
+    ? 'Your cloud save could not be loaded, so nothing is sent to it. Reload the page to try again.'
+    : (_tabStale && !_tabFinalSave ? 'This tab has stopped saving: another tab is using this device for a different account. Reload to continue here.' : '');
+  if (refused) {
+    _cloudLastError = refused;
+    _updateCloudStatusUI();
+    if (!_cloudErrorToasted) { _cloudErrorToasted = true; showCloudToast(refused, true); }
+    return false;
+  }
   if (await _cloudConflictBlocks(uid)) {
     _cloudIsSaving = false;
     _updateCloudStatusUI();
@@ -1721,7 +1847,9 @@ async function saveToFirestore(uid) {
     const stashPayload = _sanitizeForFirestore({
       codingStash: state.codingStash || null,
       // The map of program drafts (practice.js); one per program now.
-      practiceDraft: (typeof practiceDraftMap === 'function') ? practiceDraftMap() : _draftForCloud('ssp.practiceDraft'),
+      // From a tab behind another profile's, its own parked map (practiceDraftMap reads the keys).
+      practiceDraft: (typeof practiceDraftMap === 'function' && _holdsOwnKeys()) ? practiceDraftMap()
+        : (_draftForCloud('ssp.practiceDrafts') || _draftForCloud('ssp.practiceDraft')),
       sqlDraft: _draftForCloud('ssp.sqlAttemptDraft'),
       /* The notebook attempt too. Home lists all three under Resume, from
          the same keys that resume them, but only two of them travelled --
@@ -1931,7 +2059,8 @@ async function saveToFirestore(uid) {
     _cloudCopySave(uid, !changedMeanwhile);
     if (cloudUse) {
       cloudUse.at = Date.now();
-      try { localStorage.setItem(CLOUD_USE_KEY, JSON.stringify(cloudUse)); } catch (e) { /* full */ }
+      // Part of the account slot: only while it is this account's.
+      try { if (localStorage.getItem(ONLINE_OWNER_KEY) === uid) localStorage.setItem(CLOUD_USE_KEY, JSON.stringify(cloudUse)); } catch (e) { /* full */ }
     }
     _cloudLastError = '';
     _cloudErrorToasted = false;
@@ -1941,7 +2070,7 @@ async function saveToFirestore(uid) {
     if (typeof mediaCloudPush === 'function') mediaCloudPush(uid).catch(() => {});
     // Notify other tabs that cloud data changed
     if (_syncChannel) {
-      try { _syncChannel.postMessage({ type: 'cloud-saved', tabId: _tabId, at: Date.now() }); } catch (e) {}
+      try { _syncChannel.postMessage({ type: 'cloud-saved', tabId: _tabId, at: Date.now(), uid: uid }); } catch (e) {}
     }
     return true;
   } catch (err) {
@@ -1997,7 +2126,7 @@ async function saveToFirestore(uid) {
    long before anything is graded. */
 function _draftForCloud(key) {
   try {
-    const raw = localStorage.getItem(key);
+    const raw = _ownKeyRaw(key);
     if (!raw) return null;
     const d = JSON.parse(raw);
     return (d && typeof d === 'object') ? d : null;
@@ -2331,12 +2460,18 @@ function _attachUnloadGuard() {
   if (_syncChannel) {
     _syncChannel.onmessage = (evt) => {
       if (!evt.data || evt.data.tabId === _tabId) return;
-      if (evt.data.type === 'cloud-saved') {
+      if (evt.data.type === 'cloud-saved' && _cloudSavedConcernsThisTab(evt.data)) {
         showCloudToast('Another tab saved changes — click "Reload" to sync.', false);
         _showStaleTabBanner();
       }
     };
   }
+}
+
+/** Only another tab of this same account has news for this one: Guest's tab, or
+ *  another account's, was told "data was updated" by every cloud save. */
+function _cloudSavedConcernsThisTab(msg) {
+  return storageMode === 'online' && !!currentFirebaseUser && !!msg && msg.uid === currentFirebaseUser.uid;
 }
 
 /** Show a non-intrusive banner letting the user reload to pick up changes from another tab. */

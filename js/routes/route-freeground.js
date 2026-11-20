@@ -344,7 +344,7 @@ function fgCommit(force) {
   if (!changed && !force) return;
   t.updatedAt = Date.now();
   if (typeof saveData === 'function') saveData();
-  try { localStorage.setItem(FG_REV_KEY, JSON.stringify({ tab: t.id, at: t.updatedAt, page: _fg.page })); } catch (e) { /* full */ }
+  try { localStorage.setItem(FG_REV_KEY, JSON.stringify({ tab: t.id, at: t.updatedAt, page: _fg.page, who: _fgWho() })); } catch (e) { /* full */ }
 }
 
 function fgKeepMine() {
@@ -426,12 +426,17 @@ function _fgApplyBuffer() {
   try { localStorage.removeItem(fgBufferKey()); } catch (e) { /* none */ }
 }
 
+/** The profile this tab is in (profile-keys.js), so another profile's tab is not taken for this one's. */
+function _fgWho() { return typeof profileCurrentId === 'function' ? profileCurrentId() : ''; }
+
 function _fgOnStorage(e) {
   if (!_fg || e.key !== FG_REV_KEY || !e.newValue) return;
   let v = null;
   try { v = JSON.parse(e.newValue); } catch (err) { return; }
   const t = fgActiveTab();
   if (!v || v.page === _fg.page || !t || v.tab !== t.id) return;
+  // A tab of another profile edited ITS Freeground (a backup brought into both shares the ids): not this one.
+  if (typeof v.who === 'string' && v.who !== _fgWho()) return;
   const bar = document.getElementById('fg-conflict');
   if (bar) bar.hidden = false;
 }

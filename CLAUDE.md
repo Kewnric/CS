@@ -400,7 +400,15 @@ marks correct work wrong, silently.
   field a profile owns, for the boot-time picker. (4) **Reset Data** (`handleDataReset`, io.js) empties only the
   tab's profile: its keys come from the `get*StorageKey` getters, never both modes' names, and it refuses when
   `storageMode` and the tab's saved mode disagree. Signed in, the reload waits for the cloud save.
-  `node tools/test-profiles.js`.
+  (5) **Two tabs, two profiles**: the tab in front takes its profile's owned keys back (`profileKeysTakeBack`),
+  and a cloud save reads its own values through `_ownKeyRaw` / `profileKeysOwnRaw` (parked when another tab is in
+  front), never the keys directly. Two ACCOUNTS cannot share the slot: a `storage` event on `ssp.onlineOwner`
+  stops the older tab (`_onlineSlotChanged`): one last cloud save of its own work, then the Storage wrapper drops
+  every local write and a cover asks for a reload. `_cloudCopySave` and `ssp.cloudUse` write only for the slot's
+  owner. (6) **A failed cloud load** opens the device copy if it is trusted, else sets `_cloudLoadFailedFor`
+  and no save reaches that cloud until a reload. (7) **Pictures only this device has** of an account (over 1 MB,
+  or not uploaded yet) are listed in `ssp.media.only.<uid>`, which the clean-up counts as used, so Guest's
+  Clean up or Reset cannot delete them. `node tools/test-profiles.js`.
 - **Status Window** (`js/status-window.js`, `css/status-window.css`): from `finishBoot`; full the first time per
   account (`ssp.welcome.seen.<key>`), brief once a day (`ssp.welcome.day.<key>`). Skipped under
   `navigator.webdriver` unless `ssp.welcome.test` is set, so it never covers what other tests click.

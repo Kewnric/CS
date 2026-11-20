@@ -98,6 +98,50 @@ function profileKeysEnter(id, store) {
   }
 }
 
+/** True while the keys hold profile `id`'s values (a device from before owners: Guest's). */
+function profileKeysHeldBy(id, store) {
+  const st = _pfkStore(store);
+  if (!st || !id) return false;
+  try {
+    const owner = st.getItem(PROFILE_OWNER_KEY);
+    return (owner === null || owner === undefined ? 'guest' : owner) === id;
+  } catch (e) { return false; }
+}
+
+/**
+ * What `key` holds for profile `id`, whoever's values the keys hold now. Two
+ * tabs on two profiles share these keys: the one in front holds them, and a
+ * tab behind finds its own values parked. A cloud save from that tab read the
+ * keys and sent the OTHER profile's drafts and review schedule to its own
+ * cloud. Any key that is not a profile's reads as it is.
+ */
+function profileKeysOwnRaw(id, key, store) {
+  const st = _pfkStore(store);
+  if (!st) return null;
+  try {
+    if (!id || PROFILE_OWNED_KEYS.indexOf(key) === -1 || profileKeysHeldBy(id, st)) return st.getItem(key);
+    const parked = JSON.parse(st.getItem(PROFILE_PARK_PREFIX + id) || 'null');
+    return (parked && typeof parked[key] === 'string') ? parked[key] : null;
+  } catch (e) { return null; }
+}
+
+/* THE TAB IN FRONT HOLDS ITS OWN PROFILE'S KEYS. Opening Guest in a second
+   tab parked the account's drafts, review schedule and line marks, and the
+   account's tab then showed Guest's and wrote its own work into Guest's. Now
+   a tab coming to the front takes its profile's values back (and parks the
+   other tab's), so whatever you are working in is your own. */
+function profileKeysTakeBack() {
+  try {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return false;
+    const id = profileCurrentId();
+    return id ? profileKeysEnter(id) : false;
+  } catch (e) { return false; }
+}
+if (typeof document !== 'undefined' && document.addEventListener) {
+  document.addEventListener('visibilitychange', profileKeysTakeBack);
+}
+if (typeof window !== 'undefined' && window.addEventListener) window.addEventListener('focus', profileKeysTakeBack);
+
 /** Signing out of `id` on this device: its values go, from the keys and from the parked copies. */
 function profileKeysDrop(id, store) {
   const st = _pfkStore(store);

@@ -340,6 +340,8 @@ function handleDataReset() {
       });
       // Stickers: this profile's placements and the pictures only it uses (IndexedDB).
       if (typeof stkResetAll === 'function') stkResetAll();
+      // The account's pictures that only this device has go with its library (media-store.js).
+      if (uid && typeof MEDIA_ONLY_KEY === 'string') localStorage.removeItem(MEDIA_ONLY_KEY + uid);
 
       /* The empty library, written now: the picture clean-up below reads the
          saves on the device, and must see this one empty. */
