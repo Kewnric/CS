@@ -127,6 +127,35 @@ const ODD_EVEN = L('#include <stdio.h>', '', 'int main(void) {', '    int n;', '
     w && w.kind === 'name' && /`count`/.test(w.text) && /your `n`/.test(w.text) && /wrote `sum`/.test(w.text), w && w.text);
 }
 
+{ // one of your variables doing two of the reference's jobs (reported: "Count down with a for")
+  const ref = L('#include <stdio.h>', '', 'int main(void) {', '    int n;', '    scanf("%d", &n);', '    for (int i = n; i >= 1; i--) {',
+    '        printf("%d\\n", i);', '    }', '    return 0;', '}');
+  const user = L('#include <stdio.h>', 'int main(){', '\tint x;', '\tscanf("%d", &x);', '\tfor(int i = 1; i <= x; x--){',
+    '\t\tprintf("%d\\n", x);', '\t}', '\treturn 0;', '}');
+  const r = computeDiffs(user, ref);
+  const rows = bad(r);
+  check('two jobs: only the loop header differs', rows.length === 1 && rows[0].actualLine === 5, show(rows));
+  if (rows[0]) {
+    for (const g of ['char', 'word']) {
+      const m = marks(rows[0], r.names, g);
+      // `1 ; i <= x` against `n ; i >= 1`: the 1, the < and the x facing the reference's 1, never your i.
+      check(`two jobs (${g}): no name of yours is marked against a name`,
+        !/i/.test(m.a) && (m.a.match(/x/g) || []).length <= 1, JSON.stringify(m));
+      check(`two jobs (${g}): the reference's names are not marked missing`, !/i/.test(m.e), JSON.stringify(m));
+    }
+    const w = why(r, rows[0]);
+    check('two jobs: the header is not explained as a different variable', !w || w.kind !== 'name', w && w.text);
+  }
+}
+
+{ // a name in another's place on ONE line is a slip, even when it is there twice
+  const ref = L('int main(void) {', '    int a, b;', '    scanf("%d %d", &a, &b);', '    printf("%d\\n", a * a);', '    return 0;', '}');
+  const user = L('int main(void) {', '    int a, b;', '    scanf("%d %d", &a, &b);', '    printf("%d\\n", b * b);', '    return 0;', '}');
+  const r = computeDiffs(user, ref);
+  const rows = bad(r);
+  check('one-line slip: still a difference', rows.length === 1 && rows[0].actualLine === 4, show(rows));
+}
+
 { // functions, parameters and macros pair like variables
   const ref = L('#include <stdio.h>', '#define SIZE 5', 'int square(int v) {', '    return v * v;', '}',
     'int main(void) {', '    int i;', '    for (i = 0; i < SIZE; i++) {', '        printf("%d\\n", square(i));', '    }', '    return 0;', '}');

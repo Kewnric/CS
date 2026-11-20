@@ -534,13 +534,45 @@ function _diffCanonC(code) {
 
 const _DIFF_PAIR_CELLS = 4000000;   // the token-alignment table, at most (8 MB)
 
+/* ── One name, two jobs ───────────────────────────────────────
+   The pairing above is one to one, and a learner's program need not be:
+
+       int n;  scanf("%d", &n);               int x;  scanf("%d", &x);
+       for (int i = n; i >= 1; i--)           for (int i = 1; i <= x; x--)
+           printf("%d\n", i);                     printf("%d\n", x);
+
+   x is the reference's n where it is read and its i where it is counted down
+   and printed. Whichever partner x got, the lines doing its other job came
+   back as differences made of nothing but a name. So a name of yours may also
+   stand for a second reference name, when you use it in that name's place on
+   TWO OR MORE lines: that is how your program is written. On one line it is
+   a slip (`b - a` for `a - b`, `b * b` for `a * a`) and stays marked. These
+   go back as `names.also` (your shared name -> the reference's shared names it
+   may also be) and the line comparison, the highlight and the explanations all
+   read them through _diffNameAlso. */
+function _diffNameAlso(names, userKey, refKey) {
+  if (!names || !names.also) return false;
+  const s = names.also.get(userKey);
+  return !!s && s.has(refKey);
+}
+
 /**
  * Pair the user's names with the reference's.
- * @returns {{user: Map<string,string>, expected: Map<string,string>}}
- *   each side's name -> the shared name it is compared under
+ * @returns {{user: Map<string,string>, expected: Map<string,string>, also: Map<string,Set<string>>}}
+ *   each side's name -> the shared name it is compared under; `also`: one of
+ *   your shared names -> the reference's shared names it may stand for as well
  */
 function diffPairNames(userCode, expectedCode) {
-  const sig = src => _diffLexC(src).filter(t => t.k !== 'ws' && t.k !== 'nl');
+  // Each token keeps its line, so a second job can be told from a one-line slip.
+  const sig = src => {
+    const out = [];
+    let line = 0;
+    _diffLexC(src).forEach(t => {
+      if (t.k !== 'ws' && t.k !== 'nl') { t.line = line; out.push(t); }
+      for (let p = t.t.indexOf('\n'); p >= 0; p = t.t.indexOf('\n', p + 1)) line++;
+    });
+    return out;
+  };
   const A = sig(userCode), B = sig(expectedCode);
   const ANY = '\u0001';
   const ka = A.map(t => (_diffRenamable(t) ? ANY : t.t));
@@ -551,7 +583,7 @@ function diffPairNames(userCode, expectedCode) {
     if (ka[i] !== ANY) return;
     const key = A[i].t + '\u0000' + B[j].t;
     const v = votes.get(key);
-    if (v) v.n++; else votes.set(key, { u: A[i].t, e: B[j].t, n: 1, at: j });
+    if (v) { v.n++; v.lines.add(B[j].line); } else votes.set(key, { u: A[i].t, e: B[j].t, n: 1, at: j, lines: new Set([B[j].line]) });
   };
 
   // What both share at the ends needs no table.
@@ -563,18 +595,23 @@ function diffPairNames(userCode, expectedCode) {
   const n = hiA - lo, m = hiB - lo;
   const aligned = !(n > 0 && m > 0) || n * m <= _DIFF_PAIR_CELLS;
   if (n > 0 && m > 0 && aligned) {
+    /* A real token lined up with the same token is worth more than any name
+       lined up with any name. Counted alike, `1 ; i <= x` against
+       `n ; i >= 1` could line up your i with the reference's n (skipping a
+       `;` to get there) as readily as i with i, and the pairs came out
+       crossed. Weights 2 and 1: min(n, m) <= 2000 here, so 4000 fits. */
+    const wt = k => (k === ANY ? 1 : 2);
     const W = m + 1;
-    const dp = new Uint16Array((n + 1) * W);        // LCS of the suffixes; min(n, m) <= 2000 here
+    const dp = new Uint16Array((n + 1) * W);        // best weighted alignment of the suffixes
     for (let i = n - 1; i >= 0; i--) {
       for (let j = m - 1; j >= 0; j--) {
-        dp[i * W + j] = ka[lo + i] === kb[lo + j]
-          ? dp[(i + 1) * W + j + 1] + 1
-          : Math.max(dp[(i + 1) * W + j], dp[i * W + j + 1]);
+        const skip = Math.max(dp[(i + 1) * W + j], dp[i * W + j + 1]);
+        dp[i * W + j] = ka[lo + i] === kb[lo + j] ? Math.max(skip, dp[(i + 1) * W + j + 1] + wt(ka[lo + i])) : skip;
       }
     }
     let i = 0, j = 0;
     while (i < n && j < m) {
-      if (ka[lo + i] === kb[lo + j]) { vote(lo + i, lo + j); i++; j++; }
+      if (ka[lo + i] === kb[lo + j] && dp[i * W + j] === dp[(i + 1) * W + j + 1] + wt(ka[lo + i])) { vote(lo + i, lo + j); i++; j++; }
       else if (dp[(i + 1) * W + j] >= dp[i * W + j + 1]) i++;
       else j++;
     }
@@ -600,7 +637,16 @@ function diffPairNames(userCode, expectedCode) {
     const partner = u2e.get(name);
     user.set(name, partner != null ? expected.get(partner) : 'u' + (++own));
   });
-  return { user, expected };
+
+  const also = new Map();
+  votes.forEach(v => {
+    if (v.lines.size < 2) return;                   // one line: a slip, not a second job
+    const uk = user.get(v.u), ek = expected.get(v.e);
+    if (uk == null || ek == null || uk === ek) return;
+    if (!also.has(uk)) also.set(uk, new Set());
+    also.get(uk).add(ek);
+  });
+  return { user, expected, also };
 }
 
 /** The source with every name replaced by the one it is compared under. */
@@ -697,18 +743,19 @@ function _diffLineUnits(line, names, granularity) {
    answers the one that keeps the shared beginning together wins. Walked from
    the back, `"%d is Even"` against `"%d is Even\n"` matched your final n to
    the n of `\n` and marked the n of "Even" as missing, beside the backslash. */
-function _diffLcsFromFront(a, b) {
+function _diffLcsFromFront(a, b, same) {
+  const eq = same || ((x, y) => x === y);
   const n = a.length, m = b.length, W = m + 1;
   const dp = new Uint16Array((n + 1) * W);
   for (let i = n - 1; i >= 0; i--) {
     for (let j = m - 1; j >= 0; j--) {
-      dp[i * W + j] = a[i] === b[j] ? dp[(i + 1) * W + j + 1] + 1 : Math.max(dp[(i + 1) * W + j], dp[i * W + j + 1]);
+      dp[i * W + j] = eq(a[i], b[j]) ? dp[(i + 1) * W + j + 1] + 1 : Math.max(dp[(i + 1) * W + j], dp[i * W + j + 1]);
     }
   }
   const matchA = new Set(), matchB = new Set();
   let i = 0, j = 0;
   while (i < n && j < m) {
-    if (a[i] === b[j]) { matchA.add(i++); matchB.add(j++); }
+    if (eq(a[i], b[j])) { matchA.add(i++); matchB.add(j++); }
     else if (dp[(i + 1) * W + j] >= dp[i * W + j + 1]) i++;
     else j++;
   }
@@ -722,7 +769,10 @@ function _diffNamedLineDiffs(actualLine, expectedLine, granularity, names) {
   ua.forEach((u, i) => { if (u.key != null) ia.push(i); });
   ue.forEach((u, i) => { if (u.key != null) ie.push(i); });
   const ka = ia.map(i => ua[i].key), ke = ie.map(i => ue[i].key);
-  const { matchA, matchB } = _diffLcsFromFront(ka, ke);
+  // A name doing its second job (see _diffNameAlso) is a match too.
+  const same = (x, y) => x === y ||
+    (x[0] === '\u0001' && y[0] === '\u0001' && _diffNameAlso(names, x.slice(1), y.slice(1)));
+  const { matchA, matchB } = _diffLcsFromFront(ka, ke, same);
   const keysE = new Set(ke);
 
   const stA = ua.map(() => 'neutral'), stE = ue.map(() => 'neutral');
@@ -853,6 +903,29 @@ function computeDiffs(userCode, expectedCode, opts) {
   }
   const cSpan = cIntern.size + 1;
 
+  /* Two lines are the same when their compared text is, or when they differ
+     only where one of your names is doing its second job (_diffNameAlso).
+     The renamed text has every renamable name as its shared name, so this
+     reads the shared names straight off the tokens. Same memo keys as simAt. */
+  const alsoOn = !!(names && names.also && names.also.size);
+  const lineToks = s => _diffLexC(ignoreWhitespace ? s : s.replace(/\s+$/, ''))
+    .filter(t => t.k !== 'nl' && !(ignoreWhitespace && t.k === 'ws'));
+  const sameCache = new Map();
+  function sameAt(i, j) {
+    const u = uLinesData[i], c = cLinesData[j];
+    if (u.norm === c.norm) return true;
+    if (!alsoOn) return false;
+    const key = uId[i] * cSpan + cId[j];
+    let s = sameCache.get(key);
+    if (s === undefined) {
+      const ta = lineToks(u.stripped), tc = lineToks(c.stripped);
+      s = ta.length === tc.length && ta.every((x, k) => x.t === tc[k].t ||
+        (_diffRenamable(x) && _diffRenamable(tc[k]) && _diffNameAlso(names, x.t, tc[k].t)));
+      sameCache.set(key, s);
+    }
+    return s;
+  }
+
   const simCache = new Map();
   function simAt(i, j) {
     const key = uId[i] * cSpan + cId[j];
@@ -873,10 +946,7 @@ function computeDiffs(userCode, expectedCode, opts) {
 
   for (let i = 1; i <= n; i++) {
     for (let j = 1; j <= m; j++) {
-      const normU = uLinesData[i - 1].norm;
-      const normC = cLinesData[j - 1].norm;
-
-      if (normU === normC) {
+      if (sameAt(i - 1, j - 1)) {
         dp[i][j] = dp[i - 1][j - 1];
       } else {
         /* DO NOT MEASURE A SIMILARITY THAT CANNOT CHANGE THE ANSWER.
@@ -911,7 +981,7 @@ function computeDiffs(userCode, expectedCode, opts) {
       const uData = uLinesData[i2 - 1];
       const cData = cLinesData[j2 - 1];
 
-      if (uData.norm === cData.norm && dp[i2][j2] === dp[i2 - 1][j2 - 1]) {
+      if (sameAt(i2 - 1, j2 - 1) && dp[i2][j2] === dp[i2 - 1][j2 - 1]) {
         diffs.unshift({
           status: 'perfect',
           actual: uData.stripped,
@@ -1098,14 +1168,19 @@ function explainDiffLine(row, ctx) {
      n, you wrote x" was telling the reader to fix something that was right. */
   const names = ctx && ctx.names && ctx.names.user && ctx.names.expected ? ctx.names : null;
   if (names) {
-    const ids = s => _diffLexC(s).filter(t => t.k === 'id').map(t => t.t);
-    const nA = ids(a), nE = ids(e);
-    if (nA.length === nE.length) {
+    /* Only when the lines are the same apart from names. Names counted off by
+       position on two differently shaped lines -- `i = 1; i <= x` against
+       `i = n; i >= 1` -- put your i beside the reference's n and blamed it. */
+    const toks = s => _diffLexC(s).filter(t => t.k !== 'ws' && t.k !== 'nl');
+    const shape = ts => ts.map(t => (_diffRenamable(t) ? '\u0001' : t.t)).join('\u0000');
+    const tA = toks(a), tE = toks(e);
+    const nA = tA.filter(_diffRenamable).map(t => t.t), nE = tE.filter(_diffRenamable).map(t => t.t);
+    if (shape(tA) === shape(tE)) {
       const changed = [];
       for (let i = 0; i < nE.length; i++) {
         const ka = names.user.has(nA[i]) ? names.user.get(nA[i]) : nA[i];
         const ke = names.expected.has(nE[i]) ? names.expected.get(nE[i]) : nE[i];
-        if (ka !== ke) changed.push([nA[i], nE[i], ke]);
+        if (ka !== ke && !_diffNameAlso(names, ka, ke)) changed.push([nA[i], nE[i], ke]);
       }
       if (changed.length === 1) {
         const [wrote, refName, shared] = changed[0];

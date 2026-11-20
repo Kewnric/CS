@@ -247,8 +247,13 @@ that the starter does not have).
 score). With names ignored, your names are PAIRED with the reference's by where they are used
 (`diffPairNames`: a token alignment where any name may face any other, votes, one partner each), not
 numbered by first appearance, so an extra variable or another declaration order no longer shifts every
-name. The pairs come back as `names` and must reach the in-line highlight (`computeLineDiffs(…, names)`)
-and the explanations (`ctx.names`), or those go back to marking `x` against `n`. `_diffCanonC` folds
+name. The alignment weighs a real token 2 and name-against-name 1, so names line up inside matching
+structure. One name may do two of the reference's jobs (`x` read as `n`, then counted down as `i`):
+a name used in a second reference name's place on 2+ lines goes in `names.also` and matches there too
+(`_diffNameAlso`); on one line it is a slip and stays marked. The pairs come back as `names` and must
+reach the in-line highlight (`computeLineDiffs(…, names)`) and the explanations (`ctx.names`), or those
+go back to marking `x` against `n`. The "different variable" explanation only fires when the two lines
+are the same apart from names. `_diffCanonC` folds
 forms that are the same program (`main(void)`, `++i;`/`i += 1;`, `x = x + E` when E binds tighter,
 `return (x);`), never where a value is used; with whitespace ignored a lone `{`, an `else` after `}` and
 a do-while's `while` join the line above; leading `#include`s follow the reference's order. Every rewrite
