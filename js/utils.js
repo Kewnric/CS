@@ -1161,3 +1161,46 @@ function _paginationRange(current, total) {
   for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) pages.add(i);
   return [...pages].sort((a, b) => a - b);
 }
+/* ── A selection dragged out of a text box is not a click ────────
+   Press in a text box, drag to select its text, let go outside it: the
+   browser fires `click` on the nearest element holding both ends -- the
+   backdrop, the canvas, the page. Every popup that closes on a click outside
+   it (a backdrop's `e.target === overlay`, a document listener's
+   `!menu.contains(e.target)`) read that as a click outside and closed with the
+   text half selected. About forty popups close that way, so that click is
+   stopped here, once, in the window's capture phase, before any of them sees
+   it. Only a press that began in a field (input, textarea, an editable region)
+   with the main button and ended outside it: a click from the keyboard or from
+   script (detail 0) always goes through, and so does one released inside the
+   field. `select` is left out -- its list is the browser's own and never
+   lands a click outside -- and so are the inputs nobody drags in (a checkbox
+   pressed and released on its label is a real toggle). A range slider is in:
+   dragging one past the popup's edge closed it the same way. */
+const _SEL_DRAG_SKIP = new Set(['checkbox', 'radio', 'button', 'submit', 'reset', 'image', 'file', 'color']);
+function _selDragField(target) {
+  const el = target && target.nodeType === 1 ? target : (target && target.parentElement) || null;
+  if (!el || typeof el.closest !== 'function') return null;
+  const field = el.closest('input, textarea');
+  if (field) return _SEL_DRAG_SKIP.has(String(field.type || '').toLowerCase()) ? null : field;
+  return el.isContentEditable ? el.closest('[contenteditable]:not([contenteditable="false"])') : null;
+}
+
+/** True when this click only ended a drag that started in `field`. */
+function _selDragIsNotClick(field, e) {
+  if (!field || !field.isConnected || !e || !e.detail) return false;
+  const t = e.target;
+  return !(t && t.nodeType && field.contains(t));
+}
+
+(function () {
+  if (typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
+  let downIn = null;
+  window.addEventListener('pointerdown', (e) => {
+    downIn = e.button === 0 && e.isPrimary !== false ? _selDragField(e.target) : null;
+  }, true);
+  window.addEventListener('click', (e) => {
+    const field = downIn;
+    downIn = null;
+    if (_selDragIsNotClick(field, e)) e.stopImmediatePropagation();
+  }, true);
+})();

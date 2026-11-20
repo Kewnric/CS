@@ -584,6 +584,15 @@ and the same picture migrated on two devices gets the same id.
 
 ## Traps that have already cost time
 
+**A text selection dragged out of a box fires `click` on the page.** Press in an input, drag to select,
+let go outside: the browser sends `click` to the nearest element holding both ends (the backdrop, the
+canvas, `body`), and every popup that closes on a click outside closed mid-selection. `js/utils.js`
+(`_selDragField` / `_selDragIsNotClick`) stops that one click in the window's capture phase, before any
+popup sees it: a press that began in an input, textarea, editable region or range slider with the main
+button and ended outside it. Keyboard and script clicks (`detail` 0) always go through. So a new popup
+that closes on `click` outside needs nothing of its own; one that closes on `pointerdown`/`mousedown`
+outside never had the problem. Test: `node tools/test-drag-click.js .`
+
 **Verify by measuring, not reasoning — then check the measurement.** Every
 alarming finding this codebase has produced so far has been the tool, not the
 code. A scan that reports 117 broken things in an app that visibly works is
