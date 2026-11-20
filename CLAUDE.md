@@ -397,7 +397,10 @@ marks correct work wrong, silently.
   layout stay the device's. (3) Switching profile from inside the app (Change Storage Mode) asks about
   unsaved changes (`authLeaveAccountOk`), signs the old account out of the device and RELOADS into the
   new one (`_reloadInto`): memory is never carried across. `_flushAllInMemoryDomains` still clears every
-  field a profile owns, for the boot-time picker. `node tools/test-profiles.js`.
+  field a profile owns, for the boot-time picker. (4) **Reset Data** (`handleDataReset`, io.js) empties only the
+  tab's profile: its keys come from the `get*StorageKey` getters, never both modes' names, and it refuses when
+  `storageMode` and the tab's saved mode disagree. Signed in, the reload waits for the cloud save.
+  `node tools/test-profiles.js`.
 - **Status Window** (`js/status-window.js`, `css/status-window.css`): from `finishBoot`; full the first time per
   account (`ssp.welcome.seen.<key>`), brief once a day (`ssp.welcome.day.<key>`). Skipped under
   `navigator.webdriver` unless `ssp.welcome.test` is set, so it never covers what other tests click.

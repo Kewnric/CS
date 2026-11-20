@@ -273,6 +273,125 @@ const list = (...items) => JSON.stringify({ v: 1, items });
     ok(!db.has('onlyA'), 'one only the account used is deleted');
   }
 
+  /* ── Reset Data (io.js) empties the profile in the tab, no other ── */
+
+  // Every profile's saves on one device: Guest's plain keys and the account's *_online copy.
+  const DEVICE = () => ({
+    codePlatformData: 'G-lib', vizCanvasData: 'G-viz', brainCanvasData: 'G-brain', cheatsheetLibrary: 'G-cheats',
+    questBoardData_v3: 'G-quest', questBoardData_v2: 'G-quest2', questBoardData: 'G-quest1',
+    codePlatformData_online: 'A-lib', vizCanvasData_online: 'A-viz', brainCanvasData_online: 'A-brain',
+    questBoardData_online: 'A-quest', cheatsheetLibrary_online: 'A-cheats',
+    'ssp.onlineOwner': 'A', 'ssp.cloudCopy': '{"v":1,"uid":"A","stamp":1,"clean":true}',
+    'ssp.profile.guest': '{"anSrsState":"g"}', theme: 'dark'
+  });
+  const GUEST_KEYS = ['codePlatformData', 'vizCanvasData', 'brainCanvasData', 'cheatsheetLibrary',
+    'questBoardData_v3', 'questBoardData_v2', 'questBoardData', 'ssp.profile.guest'];
+  const ACCOUNT_KEYS = ['codePlatformData_online', 'vizCanvasData_online', 'brainCanvasData_online',
+    'questBoardData_online', 'cheatsheetLibrary_online', 'ssp.onlineOwner', 'ssp.cloudCopy'];
+
+  /** Web Storage as the browser has it: Object.keys lists the stored keys. */
+  function webStorage(init) {
+    const proto = {
+      getItem(k) { return Object.prototype.hasOwnProperty.call(this, k) ? this[k] : null; },
+      setItem(k, v) { this[k] = String(v); },
+      removeItem(k) { delete this[k]; },
+      clear() { Object.keys(this).forEach(k => { delete this[k]; }); },
+      key(i) { const k = Object.keys(this)[i]; return k === undefined ? null : k; }
+    };
+    Object.defineProperty(proto, 'length', { get() { return Object.keys(this).length; } });
+    return Object.assign(Object.create(proto), init || {});
+  }
+
+  /** io.js's handleDataReset with both confirms answered yes. `cloudMs`: how long the cloud save takes. */
+  async function reset(o) {
+    const ls = webStorage(DEVICE());
+    const ss = webStorage(o.tabMode ? { storageMode: o.tabMode } : {});
+    const log = [];
+    const ctx = {
+      console: { log: console.log, error: console.error, warn() {} },
+      Promise, localStorage: ls, sessionStorage: ss,
+      // The reset's own waits, a thousand times shorter.
+      setTimeout: (fn, ms) => setTimeout(fn, (ms || 0) / 1000),
+      window: { location: { reload: () => log.push('reload'), hash: '' } },
+      storageMode: o.mode, currentFirebaseUser: o.uid ? { uid: o.uid } : null,
+      state: { challenges: ['mine'] },
+      viz: { nodes: ['n'] }, brain: { versions: ['v'] }, questState: { quests: ['q'] }, cs: { sheets: ['s'] },
+      showConfirm: (t, m, go) => go(),
+      showMessage: (t) => log.push('message:' + t),
+      buildDefaultSeed: () => ({ nodes: [], challenges: [], snippets: [], notebooks: [], expandedNodes: [],
+        categoryRequirements: {}, snippetProgress: {}, badges: [], notebookHistory: [], history: [], activeAttempts: {}, review: {} }),
+      trainFieldsReset() {},
+      saveData: () => log.push('saveData'),
+      _flushSaveData: () => log.push('flush'),
+      stkResetAll: () => log.push('stickers'),
+      // Stands in for firebase-auth.js's: empties what the profile has in memory.
+      _flushAllInMemoryDomains() { ctx.viz.nodes = []; ctx.brain.versions = []; ctx.questState.quests = []; ctx.cs.sheets = []; },
+      saveToFirestore(uid) {
+        log.push('cloud:' + uid + ' ' + [ctx.viz.nodes, ctx.brain.versions, ctx.questState.quests, ctx.cs.sheets].map(a => a.length).join(''));
+        return new Promise(r => setTimeout(() => { log.push('cloud saved'); r(true); }, o.cloudMs || 0));
+      },
+      // What the picture clean-up sees: a picture is kept while any save on the device names it.
+      mediaGc: () => { log.push('media sees ' + Object.keys(ls).filter(k => /^vizCanvasData/.test(k)).sort().join(',')); return Promise.resolve(); }
+    };
+    vm.createContext(ctx);
+    vm.runInContext(JS('constants.js'), ctx);
+    vm.runInContext(JS('io.js'), ctx);
+    vm.runInContext('handleDataReset()', ctx);
+    for (let i = 0; i < 100 && !log.includes('reload') && !log.some(l => l.startsWith('message:')); i++) await new Promise(r => setTimeout(r, 5));
+    await new Promise(r => setTimeout(r, 30));
+    return { ls, ss, log, ctx };
+  }
+
+  {
+    // A cloud account resets: Guest's library, canvas, brain, quests and sheets are not its to delete.
+    const { ls, ss, log } = await reset({ mode: 'online', tabMode: 'online', uid: 'A', cloudMs: 5 });
+    const dev = DEVICE();
+    GUEST_KEYS.forEach(k => eq(ls.getItem(k), dev[k], 'an account\'s reset leaves Guest\'s ' + k));
+    ['vizCanvasData_online', 'brainCanvasData_online', 'questBoardData_online', 'cheatsheetLibrary_online']
+      .forEach(k => eq(ls.getItem(k), null, 'the account\'s ' + k + ' is reset'));
+    ok(log.includes('cloud:A 0000'), 'the cloud gets the empty canvas, brain, quests and sheets, not the old ones in memory');
+    ok(log.includes('media sees vizCanvasData'), 'the picture clean-up still sees Guest\'s canvas, so Guest\'s pictures stay');
+    ok(log.indexOf('cloud saved') !== -1 && log.indexOf('cloud saved') < log.indexOf('reload'), 'the reload waits for the cloud save');
+    eq(ss.getItem('storageMode'), 'online', 'the tab stays in the account');
+  }
+
+  {
+    // Guest resets: the account's device copy is not Guest's, and ssp.cloudCopy still vouches for it.
+    const { ls, log } = await reset({ mode: 'local', tabMode: 'local' });
+    const dev = DEVICE();
+    ACCOUNT_KEYS.forEach(k => eq(ls.getItem(k), dev[k], 'Guest\'s reset leaves the account\'s ' + k));
+    ['vizCanvasData', 'brainCanvasData', 'cheatsheetLibrary', 'questBoardData_v3', 'questBoardData_v2', 'questBoardData']
+      .forEach(k => eq(ls.getItem(k), null, 'Guest\'s ' + k + ' is reset'));
+    ok(!log.some(l => l.startsWith('cloud:')), 'Guest\'s reset sends nothing to any cloud');
+    ok(log.includes('reload'), 'and reloads');
+  }
+
+  {
+    // A tab whose saved mode disagrees with the mode it runs in would reset the wrong profile's keys: it resets nothing.
+    const { ls, log } = await reset({ mode: 'online', tabMode: null, uid: 'A' });
+    const dev = DEVICE();
+    eq(Object.keys(ls).sort(), Object.keys(dev).sort(), 'no key is removed');
+    GUEST_KEYS.concat(ACCOUNT_KEYS).forEach(k => eq(ls.getItem(k), dev[k], 'nor changed: ' + k));
+    ok(!log.includes('saveData') && !log.includes('reload'), 'nothing is saved or reloaded');
+    ok(log.some(l => l.startsWith('message:')), 'and the person is told');
+  }
+
+  {
+    // An account with no quest board of its own never opens Guest's from before v3.
+    const src = JS('quest-board.js').match(/function loadQuestData\(\) \{[\s\S]*?\n\}\n/)[0];
+    const quests = (mode, init) => {
+      const ctx = { console: { log() {}, error() {}, warn() {} }, localStorage: webStorage(init), sessionStorage: webStorage({ storageMode: mode }),
+        questState: { quests: [], player: {} }, migrateQuest: q => q, checkDailyReset() {} };
+      vm.createContext(ctx);
+      vm.runInContext(JS('constants.js') + '\n' + src + '\nloadQuestData();', ctx);
+      return ctx.questState.quests;
+    };
+    const old = { questBoardData_v2: '{"quests":["guest"]}' };
+    eq(quests('online', old), [], 'an account does not get Guest\'s old board');
+    eq(quests('local', old), ['guest'], 'Guest still does');
+    eq(quests('online', Object.assign({ questBoardData_online: '{"quests":["a"]}' }, old)), ['a'], 'an account gets its own');
+  }
+
   console.log((failed ? 'FAILED ' + failed + ', ' : '') + passed + ' passed');
   process.exit(failed ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

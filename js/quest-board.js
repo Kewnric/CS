@@ -175,9 +175,14 @@ function migrateChecklist(items) {
 // ── Persistence ───────────────────────────────────────────────
 function loadQuestData() {
   try {
-    const raw = localStorage.getItem(getQuestStorageKey())
-      || localStorage.getItem('questBoardData_v2')
-      || localStorage.getItem('questBoardData');
+    /* The boards from before v3 are Guest's (there were no accounts then). An
+       account with no board of its own yet -- a new one, or one just reset --
+       starts empty rather than opening Guest's and saving it to its cloud. */
+    const key = getQuestStorageKey();
+    const raw = localStorage.getItem(key)
+      || (key === 'questBoardData_v3'
+        ? (localStorage.getItem('questBoardData_v2') || localStorage.getItem('questBoardData'))
+        : null);
     if (raw) {
       const data = JSON.parse(raw);
       questState.quests = (data.quests || []).map(migrateQuest);

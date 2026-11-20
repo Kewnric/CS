@@ -256,6 +256,33 @@ function handleDataImport(e) {
 function handleDataReset() {
   showConfirm("Reset All Data", "⚠️ This will permanently delete ALL your programs, snippets, notebooks, and history. This cannot be undone.\n\nAre you sure you want to continue?", () => {
     showConfirm("Final Confirmation", "🚨 Last chance — are you absolutely certain? All data will be replaced with defaults and CANNOT be recovered.", () => {
+      /* RESET EMPTIES THE PROFILE IN THIS TAB, AND NO OTHER. Guest and the
+         signed-in account keep their canvas, brain, quest board and cheat
+         sheets in keys of their own (Guest's plain, the account's *_online).
+         This used to remove both sets by name: resetting a cloud account
+         deleted Guest's visualization -- and the picture clean-up below,
+         finding nothing that used them any more, deleted Guest's pictures --
+         and resetting Guest emptied the account's device copy while
+         ssp.cloudCopy still vouched for it, so the next sign-in opened without
+         them and saved that to the cloud. The keys now come from the tab's
+         mode (constants.js), and only while it agrees with the mode the app
+         runs in: a tab not told it is online would name Guest's keys. */
+      const mode = typeof storageMode !== 'undefined' ? storageMode : null;
+      let tabMode = null;
+      try { tabMode = sessionStorage.getItem('storageMode'); } catch (e) { /* blocked: refused below */ }
+      if (!mode || mode !== tabMode) {
+        showMessage("Nothing Was Reset", "This tab could not tell which profile it is in, so nothing was deleted. Reload the page and try again.", true);
+        return;
+      }
+      const online = mode === 'online';
+      const uid = online && typeof currentFirebaseUser !== 'undefined' && currentFirebaseUser ? currentFirebaseUser.uid : null;
+
+      /* Memory first: every field this profile owns, the canvas, brain, quests
+         and sheets included (they live outside `state`). Left as they were,
+         the cloud save below uploaded them again and the reset never reached
+         the account's cloud. */
+      if (typeof _flushAllInMemoryDomains === 'function') _flushAllInMemoryDomains();
+
       // Build the canonical default seed (shared with first-time boot)
       const seed = buildDefaultSeed();
 
@@ -302,46 +329,47 @@ function handleDataReset() {
       };
       if (typeof trainFieldsReset === 'function') trainFieldsReset();
 
-      saveData();
-
-      // If signed in to cloud, push the default seed to firestore so the user's
-      // cloud storage also reflects the reset.
-      if (typeof storageMode !== 'undefined' && storageMode === 'online' && typeof currentFirebaseUser !== 'undefined' && currentFirebaseUser && typeof saveToFirestore === 'function') {
-        saveToFirestore(currentFirebaseUser.uid).catch(() => {});
-      }
-
-      // Clear auxiliary local data, but PRESERVE storageMode so the user doesn't
-      // get bounced back to the picker on the reload.
-      localStorage.removeItem(typeof getCheatStorageKey === 'function' ? getCheatStorageKey() : 'cheatsheetLibrary');
-      localStorage.removeItem('vizCanvasData');
-      localStorage.removeItem('brainCanvasData');
-      localStorage.removeItem('vizCanvasData_online');
-      localStorage.removeItem('brainCanvasData_online');
-      localStorage.removeItem('questBoardData');
-      localStorage.removeItem('questBoardData_v2');
-      localStorage.removeItem('questBoardData_v3');
-      localStorage.removeItem('questBoardData_online');
+      // This profile's canvas, brain, quest board and cheat sheets; the other profiles' stay.
+      const ownKeys = [getVizStorageKey(), getBrainStorageKey(), getQuestStorageKey(), getCheatStorageKey()];
+      // Guest's boards from before v3, which loadQuestData still reads for Guest.
+      if (!online) ownKeys.push('questBoardData_v2', 'questBoardData');
+      ownKeys.forEach(key => localStorage.removeItem(key));
       localStorage.removeItem('sidebarExpanded');
       Object.keys(localStorage).forEach(key => {
         if (key.startsWith('tutorial_done_')) localStorage.removeItem(key);
       });
       // Stickers: this profile's placements and the pictures only it uses (IndexedDB).
       if (typeof stkResetAll === 'function') stkResetAll();
+
+      /* The empty library, written now: the picture clean-up below reads the
+         saves on the device, and must see this one empty. */
+      saveData();
+      try { _flushSaveData(); } catch (e) { /* the reload's own save covers it */ }
+
+      /* Signed in: the account's cloud gets the reset too, and the reload waits
+         for it (a reload cuts a save off, and the next open would then load the
+         old library back from the cloud). Capped, so an unreachable cloud still
+         reloads. */
+      const cloud = uid && typeof saveToFirestore === 'function'
+        ? Promise.race([
+          saveToFirestore(uid).catch(e => console.warn('[Reset] cloud copy not reset', e)),
+          new Promise(r => setTimeout(r, 15000))
+        ])
+        : Promise.resolve();
+
+      // Clear the tab's session data, but PRESERVE storageMode so the user doesn't
+      // get bounced back to the picker on the reload.
       const savedStorageMode = sessionStorage.getItem('storageMode');
       sessionStorage.clear();
       if (savedStorageMode) sessionStorage.setItem('storageMode', savedStorageMode);
 
       showMessage("Success", "Data has been reset to defaults. The page will now reload.");
-      /* The covers and images the reset library no longer uses (js/media-store.js):
-         written first, so the clean-up sees the empty library rather than the old
-         one, and finished before the reload. A library this reset did not touch
-         (the other storage mode's) keeps its pictures. */
-      try { _flushSaveData(); } catch (e) { /* the reload's own save covers it */ }
-      // Their key is gone; the copy in memory must not keep their pictures alive (or be saved back).
-      if (typeof cs !== 'undefined' && cs) cs.sheets = [];
+      /* The covers and images no save on this device uses any more
+         (js/media-store.js), finished before the reload. The other profiles'
+         saves are still here, so their pictures stay. */
       const pictures = typeof mediaGc === 'function'
         ? mediaGc({ now: true }).catch(e => console.warn('[Reset] pictures not cleared', e)) : Promise.resolve();
-      Promise.all([pictures, new Promise(r => setTimeout(r, 1200))]).then(() => window.location.reload());
+      Promise.all([pictures, cloud, new Promise(r => setTimeout(r, 1200))]).then(() => window.location.reload());
     }); // inner confirm
   }); // outer confirm
 }
