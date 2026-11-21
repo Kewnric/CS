@@ -450,6 +450,11 @@ marks correct work wrong, silently.
   flex gaps); `initResizerDrag(e, el, onClick)` treats a press that moves < 4px as a click (fold).
 - **Note editor**: Text | Code switch (`#viz-ce-mode`) with per-mode settings saved on the note
   (`BRAIN_OPT_DEFAULTS`); they reach the canvas as `--note-*` / `--code-*` vars (`brainNoteVars`).
+  Right-click its text box (`dictMenu`, `js/dictation.js`) for **voice typing** (also Ctrl+Shift+Space): the
+  browser's SpeechRecognition, free, Chrome/Edge only. Half-heard words show in the bar in the footer; each
+  settled phrase goes in at the caret via `execCommand('insertText')` (one undo step), shaped by the pure
+  `dictShape` (spacing, capitals, spoken punctuation). `dictDetach(textarea)` wherever the editor goes away.
+  Prefs `ssp.dictation` (synced). After any change: `node tools/test-dictation.js`.
 - Run the full Playwright suite with `--workers=2`: at higher parallelism the single http-server makes
   random `page.goto` calls time out.
 

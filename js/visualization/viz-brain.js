@@ -2043,6 +2043,7 @@ function brainOpenEditor(node) {
   let carry = null;
   if (overlay) {
     if (typeof overlay._discard === 'function') overlay._discard();
+    if (typeof dictDetach === 'function') dictDetach(overlay.querySelector('textarea'));   // voice typing stays with its note
     const prevWin = overlay.querySelector('.viz-comment-editor-window');
     carry = { floating: overlay.classList.contains('is-floating'), at: prevWin ? prevWin.style.translate : '' };
     overlay.remove();
@@ -2191,6 +2192,21 @@ function brainOpenEditor(node) {
     brainUpdateSVGLinks();
   };
   textarea.addEventListener('input', () => { paintHl(); applyLive(); });
+  /* Right-click the text box: voice typing (and Cut / Copy / Paste), from
+     dictation.js. What you say goes in at the caret like typing, so it is
+     the same preview until Save & Close. Shift+right-click is the browser's
+     own menu. */
+  const dictCtx = { bar: overlay.querySelector('.viz-comment-editor-footer'), isCode: () => !!codeLang };
+  textarea.addEventListener('contextmenu', e => {
+    if (e.shiftKey || typeof dictMenu !== 'function') return;
+    dictMenu(e, textarea, dictCtx);
+  });
+  overlay.addEventListener('keydown', e => {
+    if (typeof dictIsShortcut !== 'function' || !dictIsShortcut(e)) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (!e.repeat) dictToggle(textarea, dictCtx);
+  }, true);
   // Code gets the code editor's keys; prose keeps Tab-to-indent.
   textarea.addEventListener('keydown', e => codeLang ? _brainCodeKey(e, textarea, codeLang) : _brainEditorTabKey(e, textarea));
   // Phone keyboards say nothing in keydown; beforeinput carries the character
@@ -2313,6 +2329,8 @@ function brainOpenEditor(node) {
     brainRenderCanvas();
   };
   const finish = (keep) => {
+    // The mic goes off first; words still being heard go in, so Save keeps them.
+    if (typeof dictDetach === 'function') dictDetach(textarea);
     if (keep) {
       brain._livePreview = null;
       // Looked up by id: an undo replaces the node objects, and the one this

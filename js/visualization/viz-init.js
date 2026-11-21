@@ -330,6 +330,7 @@ function destroyVisualization(opts) {
   const noteEditor = document.getElementById('viz-comment-editor-overlay');
   if (noteEditor) {
     if (typeof noteEditor._discard === 'function') noteEditor._discard();
+    if (typeof dictDetach === 'function') dictDetach(noteEditor.querySelector('textarea'));   // and its mic
     noteEditor.remove();
   }
   if (typeof brain !== 'undefined') brain._livePreview = null;

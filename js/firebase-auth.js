@@ -1457,7 +1457,7 @@ const SYNC_PREF_KEYS = [
   'ssp.editorFxOverlay', 'ssp.editorFxSparks', 'ssp.editorFxTilt', 'ssp.peek', 'terminalCompilerOpts',
   'ssp.termEngine', 'ssp.bossBreak', 'ssp.bossShake',
   // Typing, sound, voice
-  'ssp.typeConfig', 'ssp.typingSfx', 'ssp.typingSfxVoice', 'ssp.typingSfxVol', 'ssp.speech',
+  'ssp.typeConfig', 'ssp.typingSfx', 'ssp.typingSfxVoice', 'ssp.typingSfxVol', 'ssp.speech', 'ssp.dictation',
   'ssp.ost.autoplay', 'ssp.ambient', 'ssp.ambientTheme',
   // Look and motion
   'ssp.motion', 'ssp.glass', 'ssp.libHolo', 'ssp.hud', 'ssp.sidebarAuto', 'ssp.windowMemoryOff',
