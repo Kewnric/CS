@@ -396,7 +396,10 @@ marks correct work wrong, silently.
   entering another profile parks them in `ssp.profile.<id>`, sign-out drops the account's. Taste and
   layout stay the device's. (3) Switching profile from inside the app (Change Storage Mode) asks about
   unsaved changes (`authLeaveAccountOk`), signs the old account out of the device and RELOADS into the
-  new one (`_reloadInto`): memory is never carried across. `_flushAllInMemoryDomains` still clears every
+  new one (`_reloadInto`): memory is never carried across. That reload (and Reset Data's) clears the tab's
+  sessionStorage with `sessionClearKeepingSignIn`, never `sessionStorage.clear()`: without "Remember me" the
+  Firebase sign-in itself lives there (`firebase:authUser:…`), and clearing it sent the person back to an
+  empty login form. `_flushAllInMemoryDomains` still clears every
   field a profile owns, for the boot-time picker. (4) **Reset Data** (`handleDataReset`, io.js) empties only the
   tab's profile: its keys come from the `get*StorageKey` getters, never both modes' names, and it refuses when
   `storageMode` and the tab's saved mode disagree. Signed in, the reload waits for the cloud save.

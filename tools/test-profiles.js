@@ -305,7 +305,7 @@ const list = (...items) => JSON.stringify({ v: 1, items });
   /** io.js's handleDataReset with both confirms answered yes. `cloudMs`: how long the cloud save takes. */
   async function reset(o) {
     const ls = webStorage(DEVICE());
-    const ss = webStorage(o.tabMode ? { storageMode: o.tabMode } : {});
+    const ss = webStorage(Object.assign(o.tabMode ? { storageMode: o.tabMode } : {}, o.session || {}));
     const log = [];
     const ctx = {
       console: { log: console.log, error: console.error, warn() {} },
@@ -336,6 +336,8 @@ const list = (...items) => JSON.stringify({ v: 1, items });
     vm.createContext(ctx);
     vm.runInContext(JS('constants.js'), ctx);
     vm.runInContext(JS('io.js'), ctx);
+    // firebase-auth.js's helper for clearing the tab's session without signing it out.
+    vm.runInContext((JS('firebase-auth.js').match(/function sessionClearKeepingSignIn\(\) \{[\s\S]*?\n\}\n/) || [''])[0], ctx);
     vm.runInContext('handleDataReset()', ctx);
     for (let i = 0; i < 100 && !log.includes('reload') && !log.some(l => l.startsWith('message:')); i++) await new Promise(r => setTimeout(r, 5));
     await new Promise(r => setTimeout(r, 30));
@@ -344,7 +346,8 @@ const list = (...items) => JSON.stringify({ v: 1, items });
 
   {
     // A cloud account resets: Guest's library, canvas, brain, quests and sheets are not its to delete.
-    const { ls, ss, log } = await reset({ mode: 'online', tabMode: 'online', uid: 'A', cloudMs: 5 });
+    const { ls, ss, log } = await reset({ mode: 'online', tabMode: 'online', uid: 'A', cloudMs: 5,
+      session: { 'firebase:authUser:KEY:[DEFAULT]': '{"uid":"A"}', cm_practiceChallenge: 'p1' } });
     const dev = DEVICE();
     GUEST_KEYS.forEach(k => eq(ls.getItem(k), dev[k], 'an account\'s reset leaves Guest\'s ' + k));
     ['vizCanvasData_online', 'brainCanvasData_online', 'questBoardData_online', 'cheatsheetLibrary_online']
@@ -353,6 +356,8 @@ const list = (...items) => JSON.stringify({ v: 1, items });
     ok(log.includes('media sees vizCanvasData'), 'the picture clean-up still sees Guest\'s canvas, so Guest\'s pictures stay');
     ok(log.indexOf('cloud saved') !== -1 && log.indexOf('cloud saved') < log.indexOf('reload'), 'the reload waits for the cloud save');
     eq(ss.getItem('storageMode'), 'online', 'the tab stays in the account');
+    eq(ss.getItem('firebase:authUser:KEY:[DEFAULT]'), '{"uid":"A"}', 'and signed in: Firebase keeps a session sign-in in the tab');
+    eq(ss.getItem('cm_practiceChallenge'), null, "the rest of the tab's session is cleared");
   }
 
   {
@@ -490,7 +495,8 @@ const list = (...items) => JSON.stringify({ v: 1, items });
       state: { challenges: ['old'] }, viz: { nodes: ['old'] }, brain: {}, questState: { quests: [] }, cs: { sheets: [] },
       storeDecode: s => s, saveIsBlocked: () => false, repairDataIntegrity() {}, vizLoad() {}, brainLoad() {}, loadQuestData() {}, csLoad() {},
       loadData: () => calls.push('loadData'), migrateLegacyData: x => x,
-      saveStopForThisPage: () => calls.push('stop saving')
+      saveStopForThisPage: () => calls.push('stop saving'),
+      PENDING_SHARE_KEY: 'ssp.pendingShare'   // state.js
     };
     ctx.window = ctx;
     vm.createContext(ctx);
@@ -500,7 +506,7 @@ const list = (...items) => JSON.stringify({ v: 1, items });
     ctx.showCloudToast = (m) => toasts.push(m);
     ctx._updateCloudStatusUI = () => {};
     vm.runInContext('storageMode = "online"; currentFirebaseUser = { uid: "A" };', ctx);
-    return { ctx, ls, on, toasts, calls, run: (s) => vm.runInContext(s, ctx) };
+    return { ctx, ls, ss, on, toasts, calls, run: (s) => vm.runInContext(s, ctx) };
   }
   const COPY_A = { 'ssp.onlineOwner': 'A', 'ssp.cloudCopy': JSON.stringify({ v: 1, uid: 'A', stamp: 5000, clean: true }),
     codePlatformData_online: JSON.stringify({ challenges: ['A-lib'] }) };
@@ -576,6 +582,26 @@ const list = (...items) => JSON.stringify({ v: 1, items });
       '"updated in another tab" is only for another tab of the same account');
     run('storageMode = "local";');
     eq(run('_cloudSavedConcernsThisTab({ uid: "A" })'), false, 'never for Guest');
+  }
+
+  {
+    /* Guest signs in to an account from inside the app (username or Google): the
+       tab reloads into it. Without "Remember me" Firebase keeps that sign-in in the
+       tab's sessionStorage; clearing it all signed the person out, and the reload
+       showed the login form empty again. */
+    const { run, ss, calls } = auth({});
+    const AUTH_KEY = 'firebase:authUser:KEY:[DEFAULT]';
+    run('storageMode = "local"; currentFirebaseUser = null; _appBooted = true;');
+    ss.setItem('storageMode', 'local');
+    ss.setItem(AUTH_KEY, '{"uid":"B"}');
+    ss.setItem('ssp.pendingShare', 'share');
+    ss.setItem('cm_practiceChallenge', 'guest-prog');
+    run('_afterSignedInHere({ uid: "B" })');
+    ok(calls.includes('reload'), 'the tab reloads into the account');
+    eq(ss.getItem(AUTH_KEY), '{"uid":"B"}', 'still signed in, so the reload opens the account, not an empty login form');
+    eq(ss.getItem('storageMode'), 'online', 'in cloud mode');
+    eq(ss.getItem('ssp.pendingShare'), 'share', 'a share waiting for the account rides along');
+    eq(ss.getItem('cm_practiceChallenge'), null, "and nothing else of Guest's tab");
   }
 
   console.log((failed ? 'FAILED ' + failed + ', ' : '') + passed + ' passed');

@@ -359,10 +359,12 @@ function handleDataReset() {
         ])
         : Promise.resolve();
 
-      // Clear the tab's session data, but PRESERVE storageMode so the user doesn't
-      // get bounced back to the picker on the reload.
+      // Clear the tab's session data, but PRESERVE storageMode and Firebase's own
+      // sign-in (firebase-auth.js) so the user doesn't get bounced back to the
+      // picker on the reload.
       const savedStorageMode = sessionStorage.getItem('storageMode');
-      sessionStorage.clear();
+      if (typeof sessionClearKeepingSignIn === 'function') sessionClearKeepingSignIn();
+      else sessionStorage.clear();
       if (savedStorageMode) sessionStorage.setItem('storageMode', savedStorageMode);
 
       showMessage("Success", "Data has been reset to defaults. The page will now reload.");

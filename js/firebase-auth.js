@@ -467,6 +467,21 @@ function _forgetAccountHere(uid) {
   if (uid && typeof profileKeysDrop === 'function') profileKeysDrop('u:' + uid);
 }
 
+/** Empty the tab's sessionStorage, except Firebase's own keys (`firebase:authUser:…`).
+ *  Without "Remember me" the sign-in is SESSION-persisted, which means it lives in
+ *  this tab's sessionStorage: clearing everything signed the person out, so the
+ *  reload after signing in from inside the app showed the login form again, empty.
+ *  Those keys only ever hold the account Firebase has signed in now. */
+function sessionClearKeepingSignIn() {
+  const keep = [];
+  for (let i = 0; i < sessionStorage.length; i++) {
+    const k = sessionStorage.key(i);
+    if (k && k.indexOf('firebase:') === 0) keep.push([k, sessionStorage.getItem(k)]);
+  }
+  sessionStorage.clear();
+  keep.forEach(([k, v]) => sessionStorage.setItem(k, v));
+}
+
 /** Start the tab again in `mode`, with nothing of the profile before it in memory or in the tab's session. */
 function _reloadInto(mode) {
   clearTimeout(_cloudSaveTimer);
@@ -474,7 +489,7 @@ function _reloadInto(mode) {
   _cloudIsDirty = false;      // settled by authLeaveAccountOk; the unload guard must not ask again
   _cloudIsSaving = false;
   let share = null;
-  try { share = sessionStorage.getItem(PENDING_SHARE_KEY); sessionStorage.clear(); } catch (e) { /* blocked */ }
+  try { share = sessionStorage.getItem(PENDING_SHARE_KEY); sessionClearKeepingSignIn(); } catch (e) { /* blocked */ }
   try {
     if (share) sessionStorage.setItem(PENDING_SHARE_KEY, share);
     sessionStorage.setItem('storageMode', mode);
