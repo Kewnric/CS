@@ -416,6 +416,16 @@ marks correct work wrong, silently.
   account (`ssp.welcome.seen.<key>`), brief once a day (`ssp.welcome.day.<key>`). Skipped under
   `navigator.webdriver` unless `ssp.welcome.test` is set, so it never covers what other tests click.
 - **Sidebar wheel** (`js/sidebar-wheel.js`): notches move `.is-wheel-target`; the page opens after 320 ms still.
+- **Card Characters** (Settings row → `openCardCharacters`, `js/lib-holo-studio.js` + `css/lib-holo-studio.css`):
+  each Library hub card's hologram (`js/lib-holo.js`) can be your own GIF/PNG/WebP/JPG instead of its drawn
+  scene. The file is stored untouched (`mediaPut`, so a GIF stays animated); `ssp.libHoloPics` (synced,
+  `{ v: 1, cards: { <data-scene>: Pic } }`) holds the reference plus crop, optional background removal,
+  outline/glow, size/nudge/flip, tint/scanlines/opacity/speed. `js/lib-holo-pics.js` decodes (ImageDecoder,
+  else its own GIF reader, else one still), prepares crop → key → scale → tint → outline into ImageBitmaps
+  and plays them on a canvas in the usual beam; first frames are prepared in idle time when the Library opens,
+  the animation on hover, ≤ 64 MB a card / 160 MB in all (LRU), released in `libraryDestroy`. `_mdLiveIds`
+  scans the key so the files follow the account (≤ 1 MB). A file not on this device falls back to the drawn
+  scene. The window's preview uses the same renderer. After any change: `node tools/test-lib-holo-pics.js`.
 - **Parallel sessions**: give each Playwright run its own port (a config importing `playwright.config.js` with
   another `baseURL`/`webServer` port, `reuseExistingServer: false`): a shared 8754 server is shut down by
   whichever run ends first. To commit a file another session also has uncommitted lines in, **never**

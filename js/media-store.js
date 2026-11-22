@@ -720,6 +720,9 @@ function _mdLiveIds() {
   };
   [typeof state !== 'undefined' ? state : null, typeof cs !== 'undefined' && cs ? cs.sheets : null]
     .forEach(o => { if (o) { try { scan(JSON.stringify(o)); } catch (e) { /* skip */ } } });
+  // The Library cards' own pictures (Settings > Card Characters, lib-holo-pics.js): their
+  // settings sync as a preference, so the files must follow too.
+  try { scan(localStorage.getItem('ssp.libHoloPics')); } catch (e) { /* storage blocked */ }
   return used;
 }
 

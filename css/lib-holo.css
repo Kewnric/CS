@@ -87,6 +87,10 @@
   pointer-events: none;
 }
 .lh-svg { position: absolute; left: 0; top: 0; width: 200px; height: 150px; overflow: visible; }
+/* Your own picture in place of the drawn scene (js/lib-holo-pics.js), and its
+   "Scanlines" switch in Settings > Card Characters. */
+.lhp-canvas { position: absolute; left: 0; top: 0; width: 200px; height: 150px; }
+.lib-holo.lhp-noscan .lib-holo-scene::after { display: none; }
 /* A scene after _lhLift (lib-holo.js): the still parts in small overflow-
    visible svgs, each moving part an HTML layer the GPU moves. Every layer
    sits on its parent's origin and turns from it, as the SVG group did. */

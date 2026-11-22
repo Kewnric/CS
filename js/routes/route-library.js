@@ -596,7 +596,10 @@ function libraryComingSoon(key) {
   else if (typeof showMessage === 'function') showMessage('Coming soon', `${name} is under construction.`);
 }
 
-function libraryDestroy() { }
+function libraryDestroy() {
+  // Card Characters' prepared pictures (lib-holo-pics.js) are let go with the Library.
+  if (typeof lhpRelease === 'function') lhpRelease();
+}
 
 // Reads the cheat sheets through storeDecode: they may be stored compressed (store-codec.js).
 const LIB_READS_PACKED_CS = true;

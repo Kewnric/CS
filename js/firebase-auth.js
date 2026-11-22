@@ -1475,7 +1475,7 @@ const SYNC_PREF_KEYS = [
   'ssp.typeConfig', 'ssp.typingSfx', 'ssp.typingSfxVoice', 'ssp.typingSfxVol', 'ssp.speech', 'ssp.dictation',
   'ssp.ost.autoplay', 'ssp.ambient', 'ssp.ambientTheme',
   // Look and motion
-  'ssp.motion', 'ssp.glass', 'ssp.libHolo', 'ssp.hud', 'ssp.sidebarAuto', 'ssp.windowMemoryOff',
+  'ssp.motion', 'ssp.glass', 'ssp.libHolo', 'ssp.libHoloPics', 'ssp.hud', 'ssp.sidebarAuto', 'ssp.windowMemoryOff',
   // Language, notebooks, demos, drills, Codex
   'lang.studyLang', 'lang.refLang', 'lang.autoskip', 'ssp.lang.autoVoice', 'ssp.langAutoSpeak',
   'ssp.langDrillPrefs', 'ssp.np.autoVoice', 'ssp.np.shuffle', 'npTextAlign', 'demoVoice', 'demoVoiceOpts',

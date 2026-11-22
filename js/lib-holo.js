@@ -48,7 +48,8 @@ function libHoloStill() {
 }
 
 /* ── The Settings switch ──────────────────────────────────────
-   "Card Characters" in Settings, per device (ssp.libHolo, '0' = off). Off,
+   "Card Characters" in Settings (its window, js/lib-holo-studio.js), synced
+  with the account (ssp.libHolo, '0' = off). Off,
    nothing is bound and nothing is built: no listeners, no layers, no
    animation, no blur. Switched off while the Library is on screen, every
    hologram and listener there is taken down at once; switched on, they are
@@ -80,11 +81,16 @@ function _syncLibHoloRow() {
   const row = document.getElementById('settings-libholo-item');
   if (!row) return;
   const on = libHoloEnabled();
-  row.setAttribute('aria-pressed', String(on));
+  row.dataset.on = String(on);
+  const n = typeof lhpCount === 'function' ? lhpCount() : 0;
   const label = document.getElementById('settings-libholo-label');
   const desc = document.getElementById('settings-libholo-desc');
   if (label) label.textContent = on ? 'Card Characters On' : 'Card Characters Off';
-  if (desc) desc.textContent = on ? 'Little scenes rise over Library cards on hover' : 'Library cards stay still';
+  if (desc) {
+    desc.textContent = !on ? 'Library cards stay still'
+      : n ? `${n} card${n === 1 ? '' : 's'} with your own picture; the rest rise with their scenes`
+        : 'Little scenes rise over Library cards on hover, or your own pictures';
+  }
   if (typeof _setLucideIcon === 'function') {
     _setLucideIcon(document.getElementById('settings-libholo-icon'), on ? 'ghost' : 'eye-off');
   }
@@ -113,6 +119,8 @@ function libHoloBind(root) {
     });
     on('blur', () => { h.focus = false; sync(); });
   });
+  // Your own pictures (lib-holo-pics.js): their first frames, in idle time.
+  if (typeof lhpWarm === 'function') lhpWarm(root);
 }
 
 /* Everything libHoloBind and a hover put there, gone. */
@@ -128,6 +136,7 @@ function libHoloUnbind(root) {
     const holo = card.querySelector(':scope > .lib-holo');
     if (holo) holo.remove();
   });
+  if (typeof lhpRelease === 'function') lhpRelease();
 }
 
 function _libHoloSet(card, on) {
@@ -151,9 +160,13 @@ function _libHoloSet(card, on) {
       void holo.offsetWidth;
     }
     card.classList.add('holo-on');
+    if (typeof lhpCardOn === 'function' && holo.querySelector('.lhp-canvas')) lhpCardOn(card);
   } else {
     card.classList.remove('holo-on');
-    h.timer = setTimeout(() => card.classList.remove('holo-live', 'holo-run', 'holo-still'), LIB_HOLO_OUT_MS);
+    h.timer = setTimeout(() => {
+      card.classList.remove('holo-live', 'holo-run', 'holo-still');
+      if (typeof lhpCardOff === 'function') lhpCardOff(card);
+    }, LIB_HOLO_OUT_MS);
   }
 }
 
@@ -163,10 +176,13 @@ function _libHoloSet(card, on) {
 function libHoloHTML(key) {
   const scene = LIB_HOLO_SCENES[key];
   if (!scene) return '';
-  return `<div class="lib-holo lh-${key}" aria-hidden="true">` +
+  // Your own picture, when the card has one (Settings > Card Characters, lib-holo-pics.js).
+  const pic = typeof lhpFor === 'function' ? lhpFor(key) : null;
+  const noScan = pic && !pic.look.scan ? ' lhp-noscan' : '';
+  return `<div class="lib-holo lh-${key}${noScan}" aria-hidden="true">` +
     '<div class="lib-holo-aura"></div>' +
     '<div class="lib-holo-stage"><div class="lib-holo-beam"></div><div class="lib-holo-floor"></div>' +
-    `<div class="lib-holo-scene">${scene()}</div><div class="lib-holo-sweep"></div></div></div>`;
+    `<div class="lib-holo-scene">${pic ? lhpSceneHTML(key) : scene()}</div><div class="lib-holo-sweep"></div></div></div>`;
 }
 
 /* ── Lifting a scene onto the compositor ──────────────────────
