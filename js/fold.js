@@ -270,8 +270,8 @@ function _edApplyView(ta, text, caretLine) {
 function _edFoldSync(ta) {
   const preCode = document.getElementById('editor-code');
   if (preCode) {
-    preCode.innerHTML = (typeof syntaxHighlight === 'function'
-      ? syntaxHighlight(ta.value) : escapeHTML(ta.value)) + '<br/>';
+    preCode.innerHTML = (typeof edHighlight === 'function'
+      ? edHighlight(ta.value) : escapeHTML(ta.value)) + '<br/>';
   }
   if (typeof updateLineNumbers === 'function') updateLineNumbers(ta);
   // Downstream state must never see the folded view.

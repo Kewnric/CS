@@ -33,6 +33,12 @@ const C_SYSTEM_HEADERS = [
 
 let _fdState = null;
 
+/** The types this dialog offers: the caller's (o.exts, e.g. a Freeground tab in another language), else C's. */
+function _fdExts() {
+  const own = _fdState && _fdState.opts && _fdState.opts.exts;
+  return Array.isArray(own) && own.length ? own : FILE_EXTS;
+}
+
 /** UTILS_H — the guard macro for a header called utils. */
 function fdGuardMacro(name) {
   return String(name).replace(/[^A-Za-z0-9]/g, '_').toUpperCase() + '_H';
@@ -114,8 +120,10 @@ function openFileDialog(o) {
   closeFileDialog();
   const rename = o.mode === 'rename';
   const files = o.files || [];
-  const cur = rename ? (files[o.index] || { name: '', ext: '.h' }) : null;
   _fdState = { opts: o, anchor: o.anchor || document.activeElement };
+  const exts = _fdExts();
+  const firstExt = exts.some(e => e.ext === '.h') ? '.h' : exts[0].ext;
+  const cur = rename ? (files[o.index] || { name: '', ext: firstExt }) : null;
 
   const missing = rename ? [] : fdMissingIncludes(o.mainCode, files);
 
@@ -140,7 +148,7 @@ function openFileDialog(o) {
         <input id="fd-name" class="form-input" placeholder="Filename*" spellcheck="false"
                autocomplete="off" aria-label="Filename" value="${rename ? escapeHTML(cur.name) : ''}" />
         <select id="fd-ext" class="form-select" aria-label="File type">
-          ${FILE_EXTS.map(e => `<option value="${e.ext}"${(rename ? cur.ext : '.h') === e.ext ? ' selected' : ''}>${e.ext}</option>`).join('')}
+          ${exts.concat(rename && !exts.some(e => e.ext === cur.ext) ? [{ ext: cur.ext }] : []).map(e => `<option value="${e.ext}"${(rename ? cur.ext : firstExt) === e.ext ? ' selected' : ''}>${e.ext}</option>`).join('')}
         </select>
       </div>
 
@@ -177,7 +185,7 @@ function openFileDialog(o) {
   const absorbExt = () => {
     const m = nameEl.value.match(/^(.*)(\.[A-Za-z]+)$/);
     if (!m) return;
-    const hit = FILE_EXTS.find(e => e.ext.toLowerCase() === m[2].toLowerCase());
+    const hit = _fdExts().find(e => e.ext.toLowerCase() === m[2].toLowerCase());
     if (!hit) return;
     nameEl.value = m[1];
     extEl.value = hit.ext;
@@ -191,7 +199,7 @@ function openFileDialog(o) {
       const full = chip.dataset.file;
       const m = full.match(/^(.*?)(\.[A-Za-z]+)?$/);
       nameEl.value = (m && m[1]) || full;
-      const hit = FILE_EXTS.find(e => e.ext.toLowerCase() === ((m && m[2]) || '').toLowerCase());
+      const hit = _fdExts().find(e => e.ext.toLowerCase() === ((m && m[2]) || '').toLowerCase());
       if (hit) extEl.value = hit.ext;
       _fdPaint();
       nameEl.focus();
@@ -242,7 +250,7 @@ function _fdPaint() {
   // What this extension does — the old copy claimed the list depended on a
   // "currently selected language" that has never existed anywhere in this app.
   const hintEl = document.getElementById('fd-hint');
-  const meta = FILE_EXTS.find(e => e.ext === ext);
+  const meta = _fdExts().find(e => e.ext === ext);
   if (hintEl) hintEl.textContent = meta ? meta.hint : '';
 
   // A header option only makes sense for a header

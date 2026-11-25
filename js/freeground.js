@@ -6,9 +6,15 @@
    exported and synced like the library, in a cloud document of its own.
 
      state.freeground = { tabs: [tab], activeId, cats: [cat], ver: 2 }
-     tab = { id, name, files: [{ id, name, ext, code }], activeFile, lastRun,
+     tab = { id, name, lang, files: [{ id, name, ext, code }], activeFile, lastRun,
              pinned, shelved, kept, catId, from, createdAt, updatedAt }
      cat = { id, name, parentId }      a shelf category; parentId null at the top
+
+   LANGUAGES. Each tab has one (FG_LANGS): C (the default, and what a tab
+   with no `lang` is), JavaScript, HTML, Assembly (8086, A86-style DOS .COM).
+   MySQL is listed as coming soon and never set. The language picks the
+   starter, the files' extension, the highlighting and what Run does
+   (route-freeground.js fgRun).
 
    THE SHELF HOLDS WHAT YOU KEPT. Save to shelf marks a tab `kept` (it stays
    open and keeps saving). Closing a kept tab puts it away on the shelf;
@@ -53,12 +59,93 @@ function fgStore() {
   return s;
 }
 
+/* ── Languages ─────────────────────────────────────────────── */
+
+const FG_LANGS = {
+  c: { id: 'c', name: 'C Programming', short: 'C', icon: 'file-code', ext: '.c', main: 'main',
+    hint: 'The default. Compiled in your browser, or by GCC online.' },
+  js: { id: 'js', name: 'JavaScript', short: 'JS', icon: 'braces', ext: '.js', main: 'main',
+    hint: 'Runs in your browser, like Node: console.log prints, prompt() reads a line.' },
+  html: { id: 'html', name: 'HTML', short: 'HTML', icon: 'globe', ext: '.html', main: 'index',
+    hint: 'A live preview beside the code. Add .css and .js files and link them.' },
+  asm: { id: 'asm', name: 'Assembly (8086)', short: 'ASM', icon: 'cpu', ext: '.asm', main: 'main',
+    hint: 'A86-style DOS .COM on an 80x25 screen: INT 21h, B800h video memory, keys.' },
+  mysql: { id: 'mysql', name: 'MySQL', short: 'SQL', icon: 'database', ext: '.sql', main: 'main', soon: true,
+    hint: 'Coming soon.' }
+};
+const FG_LANG_ORDER = ['c', 'js', 'html', 'asm', 'mysql'];
+const FG_LANG_STARTERS = {
+  js: '/**\n *    author:\n**/\n\n',
+  html: '<!DOCTYPE html>\n<html lang="en">\n<head>\n  <meta charset="UTF-8">\n'
+    + '  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n  <title>Freeground</title>\n'
+    + '  <style>\n    body { font-family: system-ui, sans-serif; }\n  </style>\n</head>\n<body>\n  \n</body>\n</html>\n',
+  asm: ';    author:\n\t\n\tint 20h\n'
+};
+
+/** A tab's language: one FG_LANGS can run, C when it has none. */
+function fgLangOf(tab) {
+  const l = tab && tab.lang;
+  return l && FG_LANGS[l] && !FG_LANGS[l].soon ? l : 'c';
+}
+
+/** What a new tab in `lang` opens with. */
+function fgLangStarter(lang) {
+  return FG_LANG_STARTERS[lang] || fgDefaultStarter();
+}
+
+/** A new tab's files in `lang`: one main file holding the starter. */
+function fgLangFiles(lang) {
+  const L = FG_LANGS[lang] && !FG_LANGS[lang].soon ? FG_LANGS[lang] : FG_LANGS.c;
+  return [{ name: L.main, ext: L.ext, code: fgLangStarter(L.id) }];
+}
+
+/** Where the caret goes in a starter: C inside main; the others on the first indented blank line, else the end. */
+function fgLangCaret(lang, code) {
+  const s = String(code == null ? '' : code);
+  if (lang === 'c' || !FG_LANG_STARTERS[lang]) return fgStarterCaret(s);
+  const m = /^[ \t]+$/m.exec(s);
+  return m ? m.index + m[0].length : s.length;
+}
+
+/**
+ * Change a tab's language. An untouched starter (or an empty tab) gets the
+ * new language's starter; code you wrote stays, and the files written in the
+ * old language take the new extension.
+ * @returns {'starter'|'kept'|'same'|false}
+ */
+function fgSetTabLang(id, lang) {
+  const t = fgFindTab(id);
+  const L = FG_LANGS[lang];
+  if (!t || !L || L.soon) return false;
+  const was = fgLangOf(t);
+  if (was === lang) return 'same';
+  let how;
+  if (_fgIsBlankStarter(t) || !fgTabChars(t)) {
+    t.files = fgLangFiles(lang).map(f => ({ id: generateId(), name: f.name, ext: f.ext, code: f.code }));
+    t.activeFile = 0;
+    t.lastRun = '';
+    how = 'starter';
+  } else {
+    const oldExt = FG_LANGS[was].ext;
+    t.files.forEach((f, i) => {
+      if (i !== 0 && f.ext !== oldExt) return;
+      if (!t.files.some(o => o !== f && o.name === f.name && o.ext === L.ext)) f.ext = L.ext;
+    });
+    how = 'kept';
+  }
+  t.lang = lang;
+  t.updatedAt = Date.now();
+  if (typeof saveData === 'function') saveData();
+  return how;
+}
+
 /** A tab that is nothing but a starter nobody typed in. */
 function _fgIsBlankStarter(t) {
   const files = (t && t.files) || [];
   if (files.length !== 1) return false;
   const code = String(files[0].code || '').replace(/\s+$/, '');
-  return [FG_DEFAULT_STARTER, FG_OLD_STARTER, fgDefaultStarter()].some(s => String(s).replace(/\s+$/, '') === code);
+  return [FG_DEFAULT_STARTER, FG_OLD_STARTER, fgDefaultStarter()].concat(Object.values(FG_LANG_STARTERS))
+    .some(s => String(s).replace(/\s+$/, '') === code);
 }
 
 /* Once per store without ver 2. Not saved here: the next save carries it, and
@@ -149,7 +236,7 @@ function _fgNote(msg, type) {
 
 /**
  * Make a freeground and make it the active one.
- * @param {{name?: string, files?: Array<{name?: string, ext?: string, code?: string}>, from?: string}} [opts]
+ * @param {{name?: string, lang?: string, files?: Array<{name?: string, ext?: string, code?: string}>, from?: string}} [opts]
  * @returns {object|null} the tab, or null at a limit (the user is told which)
  */
 function fgNewTab(opts) {
@@ -158,9 +245,10 @@ function fgNewTab(opts) {
     _fgNote('You have ' + FG_LIMITS.tabs + ' freegrounds, the most there can be. Delete some from the shelf first.');
     return null;
   }
-  const src = Array.isArray(o.files) && o.files.length ? o.files : [{ name: 'main', ext: '.c', code: fgDefaultStarter() }];
+  const lang = fgLangOf({ lang: o.lang });
+  const src = Array.isArray(o.files) && o.files.length ? o.files : fgLangFiles(lang);
   const files = src.slice(0, FG_LIMITS.files).map(f => ({
-    id: generateId(), name: String(f.name || 'main'), ext: f.ext || '.c', code: String(f.code == null ? '' : f.code)
+    id: generateId(), name: String(f.name || FG_LANGS[lang].main), ext: f.ext || FG_LANGS[lang].ext, code: String(f.code == null ? '' : f.code)
   }));
   const size = files.reduce((n, f) => n + f.code.length, 0);
   if (size > FG_LIMITS.chars) {
@@ -173,7 +261,7 @@ function fgNewTab(opts) {
   }
   const now = Date.now();
   const tab = {
-    id: generateId(), name: fgCleanName(o.name) || fgNextName(), files, activeFile: 0, lastRun: '',
+    id: generateId(), name: fgCleanName(o.name) || fgNextName(), lang, files, activeFile: 0, lastRun: '',
     pinned: false, shelved: false, kept: false, catId: null, from: o.from || null, createdAt: now, updatedAt: now
   };
   fgTabs().push(tab);
@@ -465,7 +553,7 @@ function fgDeleteTab(id) {
 function fgDuplicateTab(id) {
   const t = fgFindTab(id);
   if (!t) return null;
-  return fgNewTab({ name: fgCleanName(t.name + ' copy'), files: t.files.map(f => ({ name: f.name, ext: f.ext, code: f.code })), from: t.from });
+  return fgNewTab({ name: fgCleanName(t.name + ' copy'), lang: fgLangOf(t), files: t.files.map(f => ({ name: f.name, ext: f.ext, code: f.code })), from: t.from });
 }
 
 function fgPinTab(id, on) {

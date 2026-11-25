@@ -279,6 +279,17 @@ against itself renamed, Allman-braced and in the other statement style; all must
   100 at most) in the Ctrl+P list; which are folded open is per device (`ssp.fg.fold`, not synced). A store
   without `ver: 2` is migrated when first read (`_fgMigrate`), so `ver` must never go in train-store's empty
   value. After any change: `node tools/test-freeground.js`.
+  **Languages** (`tab.lang`, `FG_LANGS`; none = C): the button beside the title sets the open tab's
+  (`fgSetTabLang`: an untouched starter is swapped, written code stays); MySQL is listed as coming soon.
+  The stand-in program carries `fgLang`. Colouring: `edHighlight` (syntax.js) hands non-.c/.h files to
+  `js/fg-lang-syntax.js` by extension — every painter must give back the text unchanged. **JavaScript** runs
+  through the C terminal: `fgTermLang()` makes `_termInit` skip the C merge and `_termCompile` call
+  `fgJsRun` (`js/fg-run.js`), a blob Worker whose source is the prelude `fgJsWorkerMain` + the file; it answers
+  in the compiler's result shape and marks `prompt()` reads with TERM_MARK, so input works like scanf.
+  **HTML** opens a live preview pane (sandboxed iframe, linked .css/.js inlined). **Assembly** is 8086 in A86's
+  rules (leading 0 = hex, `b[es:di]`, `mov es,0b800`) on a DOS machine (`js/asm86.js`, no DOM: assembler +
+  CPU + INT 21h/10h/16h/1Ah, text memory at B800h, mode 13h) drawn by `js/fg-dos.js` (80x25 window, a slice
+  of instructions per frame, real keyboard). Tests: `node tools/test-asm86.js`, `node tools/test-fg-run.js`.
 
 **Tree bullets and the order lock** (`js/tree-dnd.js`, every tree that commits through
 `treeCommit`: Coding, Notebooks, Snippets, Visualize, Brain). Right-click a row → "Bullets for

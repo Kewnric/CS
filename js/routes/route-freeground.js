@@ -16,6 +16,14 @@
    The file tabs, add/rename/delete and the menus are this screen's own,
    because the attempt's versions autosave a draft.
 
+   LANGUAGES. The language button beside the title (fgOpenLangMenu) sets
+   the open tab's language (freeground.js fgSetTabLang); new tabs take the
+   language of the tab you are on. Run does what the language needs: C and
+   JavaScript go to the terminal (JS through fg-run.js), HTML opens the live
+   preview beside the code, Assembly opens the DOS screen (fg-dos.js). The
+   C-only tools (the execution stack, Save as program/snippet/template) are
+   hidden on the others.
+
    THE SHELF. Save to shelf (the topbar button, Alt+S, the tab's menu) opens
    the picker (#fg-keep-pop): name, category, new category / subcategory.
    Closing a scratch that is not kept discards it, with an Undo; a kept one
@@ -146,6 +154,8 @@ function freegroundTemplate() {
             <i data-lucide="chevron-left" style="width:18px;height:18px;"></i> Back
           </button>
           <span class="fg-title"><i data-lucide="terminal" aria-hidden="true"></i> Freeground</span>
+          <button type="button" class="fg-lang-btn" id="fg-lang-btn" onclick="fgOpenLangMenu(this)"
+                  title="Language of this tab" aria-haspopup="menu"></button>
         </div>
         <div class="fg-strip" id="fg-strip" role="tablist" aria-label="Freegrounds"></div>
         <div class="practice-topbar-right">
@@ -272,6 +282,8 @@ function freegroundDestroy() {
   _fgCloseMenu();
   fgCloseKeepPicker();
   fgCloseSwitcher();
+  if (typeof fgDosClose === 'function') fgDosClose();
+  if (typeof fgPreviewClose === 'function') fgPreviewClose();
   if (typeof zdockUnmount === 'function') zdockUnmount();
   if (typeof _termClose === 'function') _termClose();
   if (typeof skDestroy === 'function') skDestroy();
@@ -297,7 +309,7 @@ function fgBack() {
 /** The stand-in program the attempt's editor code runs on. */
 function fgSyntheticChallenge(tab) {
   return {
-    id: 'fg:' + tab.id, isFreeground: true, title: tab.name, tags: [],
+    id: 'fg:' + tab.id, isFreeground: true, fgLang: fgLangOf(tab), title: tab.name, tags: [],
     variants: [{ id: 'fg', name: '', description: '', starterCode: '', code: '',
       files: [], tests: [], samples: [], minRequirements: [], hints: [] }]
   };
@@ -324,6 +336,79 @@ function fgActivate(id, opts) {
   // be saved into this one.
   loadPracticeFile(state.activeFileIndex, { restored: true });
   _fgShowLastRun(t);
+  _fgApplyLang(t);
+}
+
+/* What the tab's language brings with it: the button's label, the C-only
+   execution stack, and the windows another language opened. */
+function _fgApplyLang(t) {
+  const lang = fgLangOf(t);
+  const L = FG_LANGS[lang];
+  const b = document.getElementById('fg-lang-btn');
+  if (b) {
+    b.innerHTML = '<i data-lucide="' + L.icon + '" aria-hidden="true"></i><span>' + escapeHTML(lang === 'c' ? 'C' : L.name) + '</span>'
+      + '<i data-lucide="chevron-down" class="fg-lang-chev" aria-hidden="true"></i>';
+    b.dataset.lang = lang;
+    b.setAttribute('aria-label', 'Language: ' + L.name + '. Change language');
+    if (typeof lucide !== 'undefined') lucide.createIcons({ root: b });
+  }
+  const stack = document.getElementById('ed-stack-btn');
+  if (stack) stack.style.display = lang === 'c' ? '' : 'none';
+  if (lang !== 'c') { if (typeof skDestroy === 'function') skDestroy(); }
+  else if (_fg && _fg.lang && _fg.lang !== 'c' && typeof skRestore === 'function') skRestore();
+  if (lang !== 'asm' && typeof fgDosClose === 'function' && document.getElementById('fg-dos')) fgDosClose();
+  if (typeof fgPreviewIsOpen === 'function' && fgPreviewIsOpen()) {
+    if (lang === 'html') fgPreviewRefresh(); else fgPreviewClose();
+  }
+  const ta = document.getElementById('editor-textarea');
+  if (ta) ta.placeholder = lang === 'asm' ? '; Write 8086 assembly. Ctrl+Enter runs it on a DOS screen.'
+    : lang === 'html' ? '<!-- Write a page. Ctrl+Enter shows the preview. -->'
+    : '// Write anything. Ctrl+Enter runs it.';
+  if (_fg) _fg.lang = lang;
+}
+
+/* ── Languages ─────────────────────────────────────────────── */
+
+function fgOpenLangMenu(anchor) {
+  const t = fgActiveTab();
+  if (!t) return;
+  if (document.getElementById('fg-tab-menu')) { _fgCloseMenu(); return; }
+  const cur = fgLangOf(t);
+  const items = FG_LANG_ORDER.map(id => {
+    const L = FG_LANGS[id];
+    return ['lang:' + id, L.icon, L.name + (id === 'c' ? ' (default)' : '') + (L.soon ? ' · Coming soon' : ''), L.hint,
+      (id === cur ? 'is-current' : '') + (L.soon ? ' is-soon' : '')];
+  });
+  _fgShowMenu('Language of "' + t.name + '"', items, anchor, (act) => fgPickLang(act.replace(/^lang:/, '')));
+}
+
+/**
+ * Set the open tab's language. Code you wrote stays (asked first); an untouched
+ * starter becomes the new language's starter.
+ */
+function fgPickLang(lang) {
+  const t = fgActiveTab();
+  const L = FG_LANGS[lang];
+  if (!t || !L) return;
+  if (L.soon) {
+    if (typeof toast === 'function') toast(L.name + ' is coming soon.', { type: 'info', duration: 2200 });
+    return;
+  }
+  if (fgLangOf(t) === lang) return;
+  fgCommit();
+  const go = () => {
+    const how = fgSetTabLang(t.id, lang);
+    if (!how || how === 'same') return;
+    fgActivate(t.id, { noCommit: true });
+    const ta = document.getElementById('editor-textarea');
+    if (ta) { ta.focus(); _fgCaretToStarter(ta); }
+    if (how === 'kept' && typeof toast === 'function') toast('"' + t.name + '" is ' + L.name + ' now. Your code is as it was.', { type: 'info', duration: 2600 });
+  };
+  const untouched = _fgIsBlankStarter(t) || !fgTabChars(t);
+  if (untouched || typeof showConfirm !== 'function') { go(); return; }
+  showConfirm('Make "' + t.name + '" ' + L.name + '?',
+    'Your code stays exactly as it is; only the colouring and what Run does change. For a fresh ' + L.name + ' starter, open a new tab instead (Alt+N).',
+    go, { confirmLabel: 'Switch to ' + L.name });
 }
 
 /**
@@ -359,6 +444,15 @@ function fgRun() {
   const t = fgActiveTab();
   if (t) { _fg.dirty.delete(t.id); fgRenderStrip(); }
   fgCommit();
+  const lang = fgLangOf(t);
+  if (lang === 'html') { if (typeof fgPreviewOpen === 'function') fgPreviewOpen(); return; }
+  if (lang === 'asm') {
+    const ta = document.getElementById('editor-textarea');
+    const f = (state.userFiles || [])[state.activeFileIndex || 0];
+    const code = ta ? ((typeof edFullSource === 'function') ? edFullSource(ta) : ta.value) : '';
+    if (typeof fgDosRun === 'function') fgDosRun(code, f ? f.name + f.ext : 'main.asm');
+    return;
+  }
   const out = document.getElementById('editor-output-body');
   if (out) out.classList.remove('fg-plain');
   if (typeof runCodeWithPiston === 'function') runCodeWithPiston();
@@ -475,6 +569,7 @@ function fgRenderStrip() {
            title="${name}${i < 9 ? ' (Alt+' + (i + 1) + ')' : ''} — double-click to rename, right-click for more">
         ${t.pinned ? '<i data-lucide="pin" class="fg-tab-pin" aria-hidden="true"></i>' : ''}
         ${t.kept ? '<i data-lucide="archive" class="fg-tab-kept" aria-hidden="true"></i>' : ''}
+        ${fgLangOf(t) !== 'c' ? '<span class="fg-tab-lang" data-lang="' + fgLangOf(t) + '">' + FG_LANGS[fgLangOf(t)].short + '</span>' : ''}
         <span class="fg-tab-name">${name}</span>
         <span class="fg-tab-dot" aria-hidden="true" title="Changed since the last run"></span>
         ${t.pinned ? '' : `<button type="button" class="fg-tab-x" data-fg-close="${t.id}" tabindex="-1"
@@ -536,7 +631,7 @@ function fgCycle(step) {
 function fgNewTabUI() {
   if (!_fg) return;
   fgCommit();
-  const t = fgNewTab({});
+  const t = fgNewTab({ lang: fgLangOf(fgActiveTab()) });
   if (!t) return;
   fgActivate(t.id, { noCommit: true });
   const ta = document.getElementById('editor-textarea');
@@ -545,8 +640,9 @@ function fgNewTabUI() {
 
 /** On an untouched starter, put the caret inside main's body, on the indented empty line. */
 function _fgCaretToStarter(ta) {
-  if (!ta || ta.value !== fgDefaultStarter()) return;
-  const at = fgStarterCaret(ta.value);
+  const lang = fgLangOf(fgActiveTab());
+  if (!ta || ta.value !== fgLangStarter(lang)) return;
+  const at = fgLangCaret(lang, ta.value);
   if (at !== -1) ta.setSelectionRange(at, at);
 }
 
@@ -710,9 +806,12 @@ function fgTabMenu(id, anchor) {
     ['copy', 'clipboard-copy', 'Copy ' + file.name + file.ext, ''],
     ['download', 'download', 'Download ' + file.name + file.ext, '']
   );
-  if (typeof fgSaveAsSnippet === 'function') items.push(['snippet', 'code', 'Save as snippet…', 'The selection, or the whole file.']);
-  if (typeof fgSaveAsProgram === 'function') items.push(['program', 'file-code', 'Save as program…', 'Opens the program form with this code as the answer.']);
-  if (typeof tplMakeFrom === 'function') items.push(['template', 'puzzle', 'Save as template…', 'The selection, or the whole file; mark the names that change.']);
+  // Snippets, programs and templates are C.
+  if (fgLangOf(t) === 'c') {
+    if (typeof fgSaveAsSnippet === 'function') items.push(['snippet', 'code', 'Save as snippet…', 'The selection, or the whole file.']);
+    if (typeof fgSaveAsProgram === 'function') items.push(['program', 'file-code', 'Save as program…', 'Opens the program form with this code as the answer.']);
+    if (typeof tplMakeFrom === 'function') items.push(['template', 'puzzle', 'Save as template…', 'The selection, or the whole file; mark the names that change.']);
+  }
   _fgShowMenu(t.name, items, anchor, (act) => _fgMenuAct(act, id, anchor));
 }
 
@@ -734,7 +833,8 @@ function _fgMenuAct(act, id, anchor) {
       const done = () => { if (typeof toast === 'function') toast('Copied ' + f.name + f.ext, { type: 'success', duration: 1600 }); };
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(f.userCode || '').then(done).catch(() => {});
     } else {
-      const blob = new Blob([f.userCode || ''], { type: 'text/x-c' });
+      const mime = { '.js': 'text/javascript', '.html': 'text/html', '.css': 'text/css', '.asm': 'text/plain', '.txt': 'text/plain' }[f.ext] || 'text/x-c';
+      const blob = new Blob([f.userCode || ''], { type: mime });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
       a.download = (f.name || 'main') + (f.ext || '.c');
@@ -1057,7 +1157,7 @@ function _fgTabRowHTML(r, i) {
       <div class="fg-sw-row${sel ? ' is-sel' : ''}${active ? ' is-active' : ''}" role="option" aria-selected="${sel}"
            data-fg-row="${t.id}" data-fg-sec="${r.section}" style="--fg-depth:${r.depth}">
         <i data-lucide="${icon}" aria-hidden="true"></i>
-        <span class="fg-sw-text"><strong>${name}</strong><em>${escapeHTML(r.path || _fgFirstLine(t))}</em></span>
+        <span class="fg-sw-text"><strong>${name}${fgLangOf(t) !== 'c' ? ' <span class="fg-tab-lang" data-lang="' + fgLangOf(t) + '">' + FG_LANGS[fgLangOf(t)].short + '</span>' : ''}</strong><em>${escapeHTML(r.path || _fgFirstLine(t))}</em></span>
         ${!shelf && t.kept ? '<i data-lucide="archive" class="fg-sw-keptmark" aria-label="On the shelf"></i>' : ''}
         ${shelf && !t.shelved ? '<span class="fg-sw-when fg-sw-isopen">open</span>' : `<span class="fg-sw-when">${_fgAgo(t.updatedAt)}</span>`}
         ${shelf && t.shelved ? `<button type="button" class="fg-sw-del" data-fg-del="${t.id}" title="Delete for good" aria-label="Delete ${name} for good"><i data-lucide="trash-2"></i></button>` : ''}
@@ -1266,7 +1366,7 @@ function fgRenderFileTabs() {
         <i data-lucide="x" style="width:11px;height:11px;"></i></button>`}
     </div>`).join('')
     + (state.userFiles.length < FG_LIMITS.files
-      ? `<button class="file-tab-add" onclick="fgAddFile(this)" title="Add a header or another source file"><i data-lucide="plus" style="width:13px;height:13px;"></i></button>`
+      ? `<button class="file-tab-add" onclick="fgAddFile(this)" title="${fgLangOf(fgActiveTab()) === 'html' ? 'Add a stylesheet, a script or another page' : fgLangOf(fgActiveTab()) === 'c' ? 'Add a header or another source file' : 'Add another file'}"><i data-lucide="plus" style="width:13px;height:13px;"></i></button>`
       : '');
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: bar });
 }
@@ -1278,10 +1378,38 @@ function fgSwitchFile(fi) {
   _fgWriteBuffer();
 }
 
+/** The file types a tab in another language offers; null for C (the dialog's own). */
+function _fgLangExts(lang) {
+  if (lang === 'js') return [{ ext: '.js', hint: 'JavaScript. Run runs the file that is open.' }, { ext: '.txt', hint: 'Notes only; never run.' }];
+  if (lang === 'html') {
+    return [{ ext: '.css', hint: 'A stylesheet. Link it: <link rel="stylesheet" href="style.css">' },
+      { ext: '.js', hint: 'A script. Load it: <script src="app.js"></script>' },
+      { ext: '.html', hint: 'Another page. The preview shows the page that is open.' },
+      { ext: '.txt', hint: 'Notes only.' }];
+  }
+  if (lang === 'asm') return [{ ext: '.asm', hint: 'Another program. Run runs the file that is open.' }, { ext: '.txt', hint: 'Notes only; never assembled.' }];
+  return null;
+}
+
 function fgAddFile(anchor) {
   if (!state.userFiles || typeof openFileDialog !== 'function') return;
   if (state.userFiles.length >= FG_LIMITS.files) return;
   savePracticeFileCode();
+  const exts = _fgLangExts(fgLangOf(fgActiveTab()));
+  if (exts) {
+    openFileDialog({
+      mode: 'add', files: state.userFiles, mainCode: '', canPair: false, exts,
+      anchor: anchor || document.querySelector('.file-tab-add'),
+      onSubmit: (r) => {
+        if (state.userFiles.length >= FG_LIMITS.files || state.userFiles.some(x => x.name === r.name && x.ext === r.ext)) return;
+        state.userFiles.push({ id: generateId(), name: r.name, ext: r.ext, starterCode: '', code: '', userCode: '' });
+        loadPracticeFile(state.userFiles.length - 1);
+        fgRenderFileTabs();
+        fgCommit();
+      }
+    });
+    return;
+  }
   openFileDialog({
     mode: 'add',
     files: state.userFiles,
@@ -1310,7 +1438,7 @@ function fgAddFile(anchor) {
 function fgRenameFile(fi, anchor) {
   if (!state.userFiles || fi >= state.userFiles.length || typeof openFileDialog !== 'function') return;
   openFileDialog({
-    mode: 'rename', files: state.userFiles, index: fi, anchor: anchor,
+    mode: 'rename', files: state.userFiles, index: fi, anchor: anchor, exts: _fgLangExts(fgLangOf(fgActiveTab())),
     onSubmit: (r) => {
       state.userFiles[fi].name = r.name;
       state.userFiles[fi].ext = r.ext;

@@ -271,3 +271,17 @@ function syntaxHighlight(code) {
     .replace(/\uE011/g, '<span class="syntax-usertype">')
     .replace(/\uE00F/g, '</span>');
 }
+
+/**
+ * What the code editor paints with: C, except in a Freeground tab whose open
+ * file is another language (js/fg-lang-syntax.js picks by the extension).
+ */
+function edHighlight(code) {
+  const c = typeof state === 'object' && state ? state.activeChallenge : null;
+  if (c && c.isFreeground && typeof fgLangHighlight === 'function') {
+    const f = (state.userFiles || [])[state.activeFileIndex || 0];
+    const ext = f ? String(f.ext || '').toLowerCase() : '.c';
+    if (ext !== '.c' && ext !== '.h') return fgLangHighlight(ext, code);
+  }
+  return syntaxHighlight(code);
+}

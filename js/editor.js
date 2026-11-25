@@ -138,7 +138,7 @@ function setupSpecificEditor(textareaId, preId, codeId, isPracticeMode, stateFie
       } else if (typeof adminState !== 'undefined' && adminState?.variants && typeof adminState.activeVariantIndex !== 'undefined') {
         adminState.variants[adminState.activeVariantIndex][stateField] = newVal;
       }
-      preCode.innerHTML = syntaxHighlight(e.target.value) + '<br/>';
+      preCode.innerHTML = edHighlight(e.target.value) + '<br/>';
       /* Put the drawn text back level with the real one, now and once the
          browser has scrolled the caret into view. The drawn layer is a line
          taller (the <br/> above), so after a large delete the two could each
@@ -833,7 +833,7 @@ function updateVal(newVal, cursorOffset, textarea, preCode, isPracticeMode, stat
   } else if (typeof adminState !== 'undefined' && adminState?.variants && typeof adminState.activeVariantIndex !== 'undefined') {
     adminState.variants[adminState.activeVariantIndex][stateField] = newVal;
   }
-  if (preCode) preCode.innerHTML = syntaxHighlight(newVal) + '<br/>';
+  if (preCode) preCode.innerHTML = edHighlight(newVal) + '<br/>';
 }
 
 /* ============================================================

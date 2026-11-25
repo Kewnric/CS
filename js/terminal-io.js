@@ -306,7 +306,7 @@ function termTranscriptHTML(session, pending, waiting) {
    that line. A span rather than <a href="#">, because an empty hash is a
    navigation to the dashboard in this app's router. */
 function termLinkLocations(html) {
-  return html.replace(/([A-Za-z0-9_.\-]+\.(?:c|h|cpp)):(\d+)(?::(\d+))?/g, (m, file, line) =>
+  return html.replace(/([A-Za-z0-9_.\-]+\.(?:c|h|cpp|js|asm|html|css)):(\d+)(?::(\d+))?/g, (m, file, line) =>
     `<span class="term-loc" role="link" tabindex="0" data-file="${file}" data-line="${line}" title="Show line ${line} in the editor">${m}</span>`);
 }
 
@@ -491,6 +491,11 @@ function termEngineLabel(pref) { return pref === 'gcc' ? 'GCC' : 'XCC'; }
 
 /** The engine badge in the status bar: click to switch, and re-run. */
 function termToggleEngine(idPrefix) {
+  // A Freeground tab in another language has no C compiler to switch (fg-run.js).
+  if (idPrefix === 'term' && typeof fgTermLang === 'function' && fgTermLang()) {
+    if (typeof toast === 'function') toast('JavaScript runs in your browser; there is no compiler to switch.', { type: 'info', duration: 1800 });
+    return;
+  }
   termSetEnginePref(termEnginePref() === 'gcc' ? 'xcc' : 'gcc');
   document.querySelectorAll('input[name="' + idPrefix + '-engine"]').forEach(r => { r.checked = r.value === termEnginePref(); });
   if (typeof toast === 'function') {

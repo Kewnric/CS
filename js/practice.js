@@ -1038,7 +1038,7 @@ function loadPracticeFile(fi, opts) {
     animateStarterCode(file.starterCode, textarea, preCode);
   } else {
     textarea.value = code;
-    preCode.innerHTML = syntaxHighlight(code) + '<br/>';
+    preCode.innerHTML = edHighlight(code) + '<br/>';
   }
 
   if (typeof setupSpecificEditor === 'function') {
@@ -1341,7 +1341,7 @@ function _starterAnimFlush() {
   _starterAnimator = null;
   if (!textarea) return;
   textarea.value = anim.targetCode;
-  if (preCode) preCode.innerHTML = syntaxHighlight(anim.targetCode) + '<br/>';
+  if (preCode) preCode.innerHTML = edHighlight(anim.targetCode) + '<br/>';
   state.userCode = anim.targetCode;
   // Supersedes the fill's last debounced boss update, which carries the partial text.
   updateBossHealthBar(anim.targetCode);
@@ -1410,7 +1410,7 @@ async function animateStarterCode(code, textarea, preCode) {
 
     // Sync state as animation progresses
     const anim = _starterAnimator;
-    await anim.animate(code, preCode, textarea, syntaxHighlight);
+    await anim.animate(code, preCode, textarea, edHighlight);
     /* Released once it is over. Neither _aborted nor _forceComplete is set by
        a natural finish, so without this the animator sat there looking like a
        live one and every later click called complete() on a corpse. Only if it
@@ -1419,7 +1419,7 @@ async function animateStarterCode(code, textarea, preCode) {
   } else {
     // Fallback if animation class is missing
     textarea.value = code;
-    preCode.innerHTML = syntaxHighlight(code) + '<br/>';
+    preCode.innerHTML = edHighlight(code) + '<br/>';
   }
 
   if (!_starterAnimAborted && typeof state !== 'undefined') {
@@ -3704,6 +3704,13 @@ function runCodeWithPiston(seedStdin) {
   `;
 
   if (typeof lucide !== 'undefined') lucide.createIcons({ root: overlay });
+  // Another language has no compiler to pick or options to set.
+  if (typeof fgTermLang === 'function' && fgTermLang()) {
+    const opts = document.getElementById('term-opts-btn');
+    if (opts) opts.style.display = 'none';
+    const badge = document.getElementById('run-code-engine');
+    if (badge) badge.title = 'JavaScript runs in your browser, in a sandbox of its own.';
+  }
 
   document.getElementById('run-code-close-btn').onclick = () => _termClose(true);
   _termWireFloat(overlay);
@@ -3830,7 +3837,9 @@ function _termInit(code, seedStdin) {
   // be asked of the WHOLE translation unit: main.c may contain no scanf at all
   // while the read lives in an inlined header, and answering "no" skipped the
   // interactive stepping entirely — every prompt appeared at once.
-  const merged = code ? preprocessMultiFile(code) : code;
+  // A Freeground tab in another language (fg-run.js) runs as it is: no C merge.
+  const lang = typeof fgTermLang === 'function' ? fgTermLang() : null;
+  const merged = lang ? code : (code ? preprocessMultiFile(code) : code);
   _term = {
     code: code,
     merged: merged,
@@ -3849,12 +3858,14 @@ function _termInit(code, seedStdin) {
     aborter: null,      // in-flight request, so Stop can cancel it
     startedAt: 0,
     warnedLoop: false,  // "this never terminates" notice, shown at most once
-    engine: termEngineLabel(termEnginePref()),
+    engine: lang ? fgTermEngineLabel(lang) : termEngineLabel(termEnginePref()),
+    lang: lang,
     linkLocations: true,   // "main.c:12" in an error jumps the editor there
     sample: _termTakeSample(seed),
     exitCode: null,
-    expectsInput: _termExpectsInput(merged),
-    instrumented: undefined,  // probe build, compiled lazily on first step
+    // Another language's runner marks every read itself, so it is always the probe.
+    expectsInput: lang ? true : _termExpectsInput(merged),
+    instrumented: lang ? merged : undefined,  // probe build, compiled lazily on first step
     noInstrument: false,      // the probe build wouldn't compile — use the fallback
   };
   if (seed.trim()) termQueueSet(_term, seed);
@@ -4076,6 +4087,10 @@ function _termViewHistory(index) {
  * replays instantly instead of paying a round trip per prompt.
  */
 async function _termCompile(session, source, stdin) {
+  // Not C: the language's own runner (fg-run.js), in the same result shape.
+  if (session.lang && typeof fgTermRun === 'function') {
+    return fgTermRun(session.lang, source, stdin, session.aborter, stdin === session.accStdin ? (text) => _termLive(session, text) : null);
+  }
   /* The in-browser compiler is the default (termEnginePref): it answers in
      about 50 ms where GCC takes one to two seconds a step. If it cannot start,
      GCC takes over for the rest of this run. */
@@ -4232,11 +4247,11 @@ async function _termRunStep() {
   // Show spinner line while compiling
   const spinIdx = session.lines.length;
   session.spinIdx = spinIdx;
-  session.lines.push({ type: 'info', text: firstRun ? '⏳ Compiling & running...' : '⏳ Running...' });
+  session.lines.push({ type: 'info', text: firstRun && !session.lang ? '⏳ Compiling & running...' : '⏳ Running...' });
   _termRender();
 
-  session.engine = session.xccFailed ? 'GCC' : termEngineLabel(termEnginePref());
-  if (statusEl) statusEl.textContent = firstRun ? (session.engine === 'GCC' ? '⏳ Compiling with GCC...' : '⏳ Compiling...') : '⏳ Re-running with input...';
+  if (!session.lang) session.engine = session.xccFailed ? 'GCC' : termEngineLabel(termEnginePref());
+  if (statusEl) statusEl.textContent = firstRun ? (session.lang ? '⏳ Running...' : session.engine === 'GCC' ? '⏳ Compiling with GCC...' : '⏳ Compiling...') : '⏳ Re-running with input...';
   if (engineEl) engineEl.textContent = session.engine;
   _termStartClock(session);
 
@@ -4276,7 +4291,7 @@ async function _termRunStep() {
         probe = await _termCompile(session, session.instrumented, session.accStdin);
         // A build that only fails WITH the shim means the shim is the problem
         // (an odd use of one of the wrapped names) — drop back to the old way.
-        if (!probe.didExecute) { session.noInstrument = true; probe = null; }
+        if (!probe.didExecute && !session.lang) { session.noInstrument = true; probe = null; }
       } else {
         session.noInstrument = true;
       }
@@ -4333,9 +4348,9 @@ async function _termRunStep() {
   // Handle compilation failure
   if (!resA.didExecute) {
     _termCue(session, 'punch');
-    session.lines.push({ type: 'error', text: 'Compilation Error:\n' + (_termRelocate(termCleanDiagnostics(resA.buildStderr || resA.stderr, session.code), session) || 'Unknown error') });
-    // Kept, not just shown: see mistakes.js.
-    if (typeof mistakeNoteText === 'function') mistakeNoteText(resA.buildStderr || resA.stderr);
+    session.lines.push({ type: 'error', text: (session.lang ? 'Syntax Error:\n' : 'Compilation Error:\n') + (_termRelocate(termCleanDiagnostics(resA.buildStderr || resA.stderr, session.code), session) || 'Unknown error') });
+    // Kept, not just shown: see mistakes.js. (C only: its notebook is of C mistakes.)
+    if (typeof mistakeNoteText === 'function' && !session.lang) mistakeNoteText(resA.buildStderr || resA.stderr);
     termPushLint(session);
     session.completed = true;
     session.running = false;
@@ -4427,7 +4442,7 @@ async function _termRunStep() {
     };
     _termCue(session, 'punch');
     session.lines.push({ type: 'error', text: 'Runtime Error: ' + (signalMap[sig] || 'Signal ' + sig) });
-    if (typeof mistakeNoteText === 'function') mistakeNoteText(signalMap[sig] || 'Signal ' + sig);
+    if (typeof mistakeNoteText === 'function' && !session.lang) mistakeNoteText(signalMap[sig] || 'Signal ' + sig);
     const errText = _termRelocate(termCleanDiagnostics(resA.stderr, session.code), session);
     if (errText) session.lines.push({ type: 'error', text: errText });
     session.completed = true;
@@ -4443,7 +4458,7 @@ async function _termRunStep() {
   if (warnText) session.lines.push({ type: 'warning', text: '⚠️ ' + warnText });
   /* A program that compiled with warnings and ran anyway is where the quiet
      mistakes live -- the stray %, the = that should have been ==. */
-  if (typeof mistakeNoteText === 'function') mistakeNoteText((resA.buildStderr || '') + '\n' + (resA.stderr || ''));
+  if (typeof mistakeNoteText === 'function' && !session.lang) mistakeNoteText((resA.buildStderr || '') + '\n' + (resA.stderr || ''));
   termPushLint(session);
 
   session.completed = true;

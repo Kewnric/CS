@@ -208,5 +208,39 @@ const tab = (id, name, code, extra) => Object.assign({ id, name, files: [{ id: '
   eq(c.fgShelfRows(new Set(), 'needle').map(r => r.tab.name), ['zz'], 'search: matches code too');
 }
 
+/* ── Languages ─────────────────────────────────────────────── */
+{
+  const c = app();
+  const t = c.fgNewTab({});
+  eq([c.fgLangOf(t), t.files[0].name + t.files[0].ext], ['c', 'main.c'], 'lang: a new tab is C');
+  eq(c.fgLangOf({ files: [] }), 'c', 'lang: a tab saved before languages is C');
+  eq(c.fgLangOf({ lang: 'mysql' }), 'c', 'lang: MySQL is coming soon, so it never runs');
+  const j = c.fgNewTab({ lang: 'js' });
+  eq([j.lang, j.files[0].name + j.files[0].ext], ['js', 'main.js'], 'lang: a JavaScript tab is main.js');
+  const h = c.fgNewTab({ lang: 'html' });
+  eq(h.files[0].name + h.files[0].ext, 'index.html', 'lang: an HTML tab is index.html');
+  ok(/<body>\n  \n<\/body>/.test(h.files[0].code), 'lang: the HTML starter has an empty body to write in');
+  const a = c.fgNewTab({ lang: 'asm' });
+  eq(a.files[0].name + a.files[0].ext, 'main.asm', 'lang: an Assembly tab is main.asm');
+  ok(/int 20h/.test(a.files[0].code), 'lang: the Assembly starter ends with INT 20h');
+  eq(c.fgLangCaret('asm', a.files[0].code), a.files[0].code.indexOf('\t\n') + 1, 'caret: the indented blank line of the Assembly starter');
+  eq(c.fgLangCaret('js', j.files[0].code), j.files[0].code.length, 'caret: the end of the JavaScript starter');
+  eq(c.fgNewTab({ lang: 'mysql' }).lang, 'c', 'lang: asking for MySQL gives C');
+  eq(c.fgDuplicateTab(a.id).lang, 'asm', 'lang: a duplicate keeps its language');
+
+  // Switching: an untouched starter is replaced; written code stays and is renamed.
+  eq(c.fgSetTabLang(t.id, 'asm'), 'starter', 'switch: an untouched C starter becomes the Assembly starter');
+  eq([t.lang, t.files[0].ext, /int 20h/.test(t.files[0].code)], ['asm', '.asm', true], 'switch: files and code follow');
+  const w = c.fgNewTab({ files: [{ name: 'main', ext: '.c', code: 'console.log(1)' }, { name: 'util', ext: '.h', code: '' }] });
+  eq(c.fgSetTabLang(w.id, 'js'), 'kept', 'switch: written code is kept');
+  eq(w.files.map(f => f.name + f.ext + ':' + f.code), ['main.js:console.log(1)', 'util.h:'], 'switch: only the old language\'s files are renamed');
+  eq(c.fgSetTabLang(w.id, 'js'), 'same', 'switch: to the same language changes nothing');
+  eq(c.fgSetTabLang(w.id, 'mysql'), false, 'switch: MySQL is refused');
+  ok(c._fgIsBlankStarter(j), 'blank: a JavaScript starter counts as untouched');
+  // An old store's untouched JS starter on the shelf goes in the migration, like a C one.
+  const m = app({ tabs: [Object.assign(tab('x', 'scratch-1', c.fgLangStarter('js'), { shelved: true }), { lang: 'js' })], activeId: null });
+  eq(m.fgStore().tabs.length, 0, 'migrate: an untouched starter of any language on the shelf is dropped');
+}
+
 console.log((failed ? 'FAILED ' + failed + ', ' : '') + passed + ' passed');
 process.exit(failed ? 1 : 0);
