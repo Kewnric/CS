@@ -127,12 +127,17 @@
   line-height: var(--dos-line);
   color: #aaaaaa;
   background: #000;
-  white-space: pre;
+  overflow: hidden;
   outline: none;
   cursor: text;
 }
 .fg-dos-screen:focus-visible { box-shadow: 0 0 0 2px rgba(74, 222, 128, 0.5); }
-.fg-dos-row { height: var(--dos-line); overflow: hidden; }
+/* The text sits at the screen's top-left whatever else is in the box. Only the
+   rows keep their spaces: `pre` on the screen itself turned the line breaks
+   between its children into blank lines, which pushed row 0 down and cut the
+   last rows off. */
+.fg-dos-text { position: absolute; top: 0; left: 0; width: 80ch; }
+.fg-dos-row { height: var(--dos-line); overflow: hidden; white-space: pre; }
 .fg-dos-cursor {
   position: absolute;
   left: 0;
