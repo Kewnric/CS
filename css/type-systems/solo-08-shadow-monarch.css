@@ -1,0 +1,81 @@
+/* Ultima kit: type system solo-08 "Shadow Monarch" - default tokens exported with the "Copy CSS" button of
+   Fonts/type-systems.html (base, ratio and accent at their defaults).
+   The @import below loads the fonts (or use <link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,wght@0,500;0,700;1,500&family=Manrope:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap\">).
+*/
+/* 08 Shadow Monarch · Solo Leveling inspired · ratio 1.5 · Perfect fifth · base 16px */
+@import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,wght@0,500;0,700;1,500&family=Manrope:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap');
+
+:root {
+  --type-accent: #8B6CFF;
+  --type-d-family: 'Bodoni Moda', serif;
+  --type-d-size: 5.0625rem; /* 81px */
+  --type-d-line: 0.98;
+  --type-d-weight: 700;
+  --type-d-tracking: normal;
+  --type-h1-family: 'Bodoni Moda', serif;
+  --type-h1-size: 3.375rem; /* 54px */
+  --type-h1-line: 1;
+  --type-h1-weight: 700;
+  --type-h1-tracking: normal;
+  --type-h2-family: 'Bodoni Moda', serif;
+  --type-h2-size: 2.75rem; /* 44px */
+  --type-h2-line: 1.05;
+  --type-h2-weight: 700;
+  --type-h2-tracking: normal;
+  --type-h3-family: 'Bodoni Moda', serif;
+  --type-h3-size: 2.25rem; /* 36px */
+  --type-h3-line: 1.1;
+  --type-h3-weight: 500;
+  --type-h3-tracking: normal;
+  --type-h4-family: 'Bodoni Moda', serif;
+  --type-h4-size: 1.8125rem; /* 29px */
+  --type-h4-line: 1.1;
+  --type-h4-weight: 700;
+  --type-h4-tracking: normal;
+  --type-h5-family: Manrope, sans-serif;
+  --type-h5-size: 1.5rem; /* 24px */
+  --type-h5-line: 1.25;
+  --type-h5-weight: 700;
+  --type-h5-tracking: normal;
+  --type-bl-family: 'Bodoni Moda', serif;
+  --type-bl-size: 1.25rem; /* 20px */
+  --type-bl-line: 1.45;
+  --type-bl-weight: 500;
+  --type-bl-tracking: normal;
+  --type-b-family: Manrope, sans-serif;
+  --type-b-size: 1rem; /* 16px */
+  --type-b-line: 1.6;
+  --type-b-weight: 400;
+  --type-b-tracking: normal;
+  --type-sm-family: 'Space Mono', monospace;
+  --type-sm-size: 0.8125rem; /* 13px */
+  --type-sm-line: 1.45;
+  --type-sm-weight: 400;
+  --type-sm-tracking: normal;
+  --type-xs-family: 'Space Mono', monospace;
+  --type-xs-size: 0.75rem; /* 12px */
+  --type-xs-line: 1.4;
+  --type-xs-weight: 400;
+  --type-xs-tracking: 0.1em;
+}
+
+/* Display */
+.type-d { font-family: var(--type-d-family); font-size: var(--type-d-size); line-height: var(--type-d-line); font-weight: var(--type-d-weight); letter-spacing: var(--type-d-tracking); }
+/* Heading 1 */
+.type-h1 { font-family: var(--type-h1-family); font-size: var(--type-h1-size); line-height: var(--type-h1-line); font-weight: var(--type-h1-weight); letter-spacing: var(--type-h1-tracking); }
+/* Heading 2 */
+.type-h2 { font-family: var(--type-h2-family); font-size: var(--type-h2-size); line-height: var(--type-h2-line); font-weight: var(--type-h2-weight); letter-spacing: var(--type-h2-tracking); }
+/* Heading 3 */
+.type-h3 { font-family: var(--type-h3-family); font-size: var(--type-h3-size); line-height: var(--type-h3-line); font-weight: var(--type-h3-weight); letter-spacing: var(--type-h3-tracking); font-style: italic; }
+/* Heading 4 */
+.type-h4 { font-family: var(--type-h4-family); font-size: var(--type-h4-size); line-height: var(--type-h4-line); font-weight: var(--type-h4-weight); letter-spacing: var(--type-h4-tracking); }
+/* Heading 5 */
+.type-h5 { font-family: var(--type-h5-family); font-size: var(--type-h5-size); line-height: var(--type-h5-line); font-weight: var(--type-h5-weight); letter-spacing: var(--type-h5-tracking); }
+/* Lore line */
+.type-bl { font-family: var(--type-bl-family); font-size: var(--type-bl-size); line-height: var(--type-bl-line); font-weight: var(--type-bl-weight); letter-spacing: var(--type-bl-tracking); font-style: italic; }
+/* Body */
+.type-b { font-family: var(--type-b-family); font-size: var(--type-b-size); line-height: var(--type-b-line); font-weight: var(--type-b-weight); letter-spacing: var(--type-b-tracking); }
+/* Data */
+.type-sm { font-family: var(--type-sm-family); font-size: var(--type-sm-size); line-height: var(--type-sm-line); font-weight: var(--type-sm-weight); letter-spacing: var(--type-sm-tracking); }
+/* Label */
+.type-xs { font-family: var(--type-xs-family); font-size: var(--type-xs-size); line-height: var(--type-xs-line); font-weight: var(--type-xs-weight); letter-spacing: var(--type-xs-tracking); text-transform: uppercase; }

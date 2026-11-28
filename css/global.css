@@ -238,6 +238,154 @@
   --color-primary-subtle: rgba(16, 185, 129, 0.15);
 }
 
+/* --- Ultima themes (js/themes.js) ---
+   Colours taken from Ultima: the Borders & Frames theme tokens (Aerial HUD,
+   The System, Crystal Realm), the welcome-window themes and the cursors. */
+
+/* Sword Art Online: Aerial HUD (#f2a33a on #0c1328) and the SAO welcome
+   windows (sky #2a5378 / #0f2238 / #07101c, panel white, orange #f5a623). */
+[data-theme="sao"] {
+  --bg-body: #0c1328;
+  --bg-surface: #0f2238;
+  --bg-surface-hover: #1d2b52;
+  --bg-elevated: #07101c;
+  --bg-nav: linear-gradient(135deg, #07101c 0%, #0f2238 100%);
+  --bg-nav-solid: #07101c;
+
+  --border-color: #2a5378;
+  --border-color-subtle: #1d2b52;
+
+  --text-primary: #f4f6f8;
+  --text-secondary: #c9ced4;
+  --text-tertiary: #6a9cbc;
+
+  --shadow-sm: 0 1px 2px rgba(0, 10, 30, 0.4);
+  --shadow-md: 0 4px 8px rgba(0, 10, 30, 0.4);
+  --shadow-lg: 0 10px 20px rgba(0, 10, 30, 0.45);
+  --shadow-xl: 0 18px 50px rgba(0, 10, 30, 0.45);
+  --shadow-glow: 0 3px 14px rgba(243, 154, 30, 0.35);
+
+  --glass-bg: rgba(15, 34, 56, 0.8);
+  --glass-border: rgba(42, 83, 120, 0.5);
+
+  --color-primary: #f5a623;
+  --color-primary-hover: #ffc56b;
+  --color-primary-dark: #ef8d12;
+  --color-primary-glow: rgba(243, 154, 30, 0.25);
+  --color-primary-subtle: rgba(243, 154, 30, 0.15);
+  --color-accent: #6a9cbc;
+  --color-accent-hover: #9fc3dc;
+}
+
+/* Solo Leveling: The System (#4cc9ff on #03060d) and the Solo Leveling
+   welcome windows (#0d2547 / #071428 / #02060e, frame #79cfff, glow #29a8ff). */
+[data-theme="solo"] {
+  --bg-body: #03060d;
+  --bg-surface: #071428;
+  --bg-surface-hover: #0d2547;
+  --bg-elevated: #06142a;
+  --bg-nav: linear-gradient(135deg, #02060e 0%, #071428 100%);
+  --bg-nav-solid: #02060e;
+
+  --border-color: #1a5fb4;
+  --border-color-subtle: #0d2547;
+
+  --text-primary: #e8f6ff;
+  --text-secondary: #9fe1ff;
+  --text-tertiary: #8f98a8;
+  --text-on-primary: #03060d;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.55);
+  --shadow-xl: 0 20px 30px rgba(0, 0, 0, 0.6);
+  --shadow-glow: 0 0 22px rgba(41, 168, 255, 0.55);
+
+  --glass-bg: rgba(14, 40, 78, 0.84);
+  --glass-border: rgba(121, 207, 255, 0.5);
+
+  --color-primary: #4cc9ff;
+  --color-primary-hover: #9fe1ff;
+  --color-primary-dark: #29a8ff;
+  --color-primary-glow: rgba(41, 168, 255, 0.25);
+  --color-primary-subtle: rgba(41, 168, 255, 0.15);
+  --color-accent: #a274ff;
+  --color-accent-hover: #c2a2ff;
+}
+
+/* Genshin Impact: Crystal Realm (#f1d27a on #080b26, sky #1d2760 / #0b1030 /
+   #05071a, frame #eef1fb, muted #c7cff2) and the Genshin type accent #d9ae4e. */
+[data-theme="genshin"] {
+  --bg-body: #080b26;
+  --bg-surface: #0b1030;
+  --bg-surface-hover: #1c2560;
+  --bg-elevated: #05071a;
+  --bg-nav: linear-gradient(135deg, #05071a 0%, #0b1030 100%);
+  --bg-nav-solid: #05071a;
+
+  --border-color: #1d2760;
+  --border-color-subtle: #141b4a;
+
+  --text-primary: #eef1fb;
+  --text-secondary: #c7cff2;
+  --text-tertiary: #8f98a8;
+  --text-on-primary: #05071a;
+
+  --shadow-sm: 0 1px 2px rgba(5, 8, 40, 0.5);
+  --shadow-md: 0 4px 8px rgba(5, 8, 40, 0.5);
+  --shadow-lg: 0 10px 20px rgba(5, 8, 40, 0.55);
+  --shadow-xl: 0 14px 34px rgba(0, 0, 0, 0.55);
+  --shadow-glow: 0 0 30px rgba(241, 210, 122, 0.2);
+
+  --glass-bg: rgba(11, 16, 48, 0.82);
+  --glass-border: rgba(199, 207, 242, 0.35);
+
+  --color-primary: #d9ae4e;
+  --color-primary-hover: #f1d27a;
+  --color-primary-dark: #b8913a;
+  --color-primary-glow: rgba(217, 174, 78, 0.25);
+  --color-primary-subtle: rgba(217, 174, 78, 0.15);
+  --color-accent: #ffc23d;
+  --color-accent-hover: #f1d27a;
+}
+
+/* Final Fantasy VII: the FF7 Remake welcome windows (#03070d / #071523 /
+   #0b2233, glass rgba(22,54,88), frame rgba(150,205,255,.34), cyan #7fd6ff,
+   label #8fc8ec) and the Reactor energy green #46ffbe. */
+[data-theme="ff7"] {
+  --bg-body: #03070d;
+  --bg-surface: #071523;
+  --bg-surface-hover: #0b2233;
+  --bg-elevated: #0e243e;
+  --bg-nav: linear-gradient(135deg, #03070d 0%, #071523 100%);
+  --bg-nav-solid: #03070d;
+
+  --border-color: rgba(150, 205, 255, 0.34);
+  --border-color-subtle: rgba(150, 205, 255, 0.16);
+
+  --text-primary: #eaf4ff;
+  --text-secondary: #8fc8ec;
+  --text-tertiary: #8f98a8;
+  --text-on-primary: #03070d;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 20px rgba(0, 0, 0, 0.55);
+  --shadow-xl: 0 24px 60px rgba(0, 0, 0, 0.55);
+  --shadow-glow: 0 0 30px rgba(70, 255, 190, 0.2);
+
+  --glass-bg: rgba(14, 36, 62, 0.9);
+  --glass-border: rgba(150, 205, 255, 0.34);
+
+  --color-primary: #7fd6ff;
+  --color-primary-hover: #a6e0ff;
+  --color-primary-dark: #29a8ff;
+  --color-primary-glow: rgba(127, 214, 255, 0.25);
+  --color-primary-subtle: rgba(127, 214, 255, 0.15);
+  --color-accent: #46ffbe;
+  --color-accent-hover: #8dffd6;
+}
+
 /* --- CSS Reset & Base --- */
 *,
 *::before,

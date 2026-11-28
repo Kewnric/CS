@@ -1,0 +1,81 @@
+/* Ultima kit: type system ff7-12 "Mako Reactor" - default tokens exported with the "Copy CSS" button of
+   Fonts/type-systems.html (base, ratio and accent at their defaults).
+   The @import below loads the fonts (or use <link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Titillium+Web:wght@400;600;700&family=Azeret+Mono:wght@400;500&display=swap\">).
+*/
+/* 12 Mako Reactor · FF7 Remake Intergrade inspired · ratio 1.333 · Perfect fourth · base 16px */
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Titillium+Web:wght@400;600;700&family=Azeret+Mono:wght@400;500&display=swap');
+
+:root {
+  --type-accent: #5CF2A4;
+  --type-d-family: Rajdhani, sans-serif;
+  --type-d-size: 4.1875rem; /* 67px */
+  --type-d-line: 0.95;
+  --type-d-weight: 700;
+  --type-d-tracking: 0.02em;
+  --type-h1-family: Rajdhani, sans-serif;
+  --type-h1-size: 3.1875rem; /* 51px */
+  --type-h1-line: 1;
+  --type-h1-weight: 700;
+  --type-h1-tracking: 0.02em;
+  --type-h2-family: Rajdhani, sans-serif;
+  --type-h2-size: 2.375rem; /* 38px */
+  --type-h2-line: 1.05;
+  --type-h2-weight: 700;
+  --type-h2-tracking: 0.02em;
+  --type-h3-family: Rajdhani, sans-serif;
+  --type-h3-size: 1.75rem; /* 28px */
+  --type-h3-line: 1.1;
+  --type-h3-weight: 600;
+  --type-h3-tracking: 0.03em;
+  --type-h4-family: Rajdhani, sans-serif;
+  --type-h4-size: 1.5625rem; /* 25px */
+  --type-h4-line: 1.15;
+  --type-h4-weight: 700;
+  --type-h4-tracking: 0.04em;
+  --type-h5-family: 'Titillium Web', sans-serif;
+  --type-h5-size: 1.3125rem; /* 21px */
+  --type-h5-line: 1.3;
+  --type-h5-weight: 600;
+  --type-h5-tracking: normal;
+  --type-bl-family: 'Titillium Web', sans-serif;
+  --type-bl-size: 1.125rem; /* 18px */
+  --type-bl-line: 1.55;
+  --type-bl-weight: 400;
+  --type-bl-tracking: normal;
+  --type-b-family: 'Titillium Web', sans-serif;
+  --type-b-size: 1rem; /* 16px */
+  --type-b-line: 1.6;
+  --type-b-weight: 400;
+  --type-b-tracking: normal;
+  --type-sm-family: 'Azeret Mono', monospace;
+  --type-sm-size: 0.875rem; /* 14px */
+  --type-sm-line: 1.45;
+  --type-sm-weight: 400;
+  --type-sm-tracking: normal;
+  --type-xs-family: 'Azeret Mono', monospace;
+  --type-xs-size: 0.75rem; /* 12px */
+  --type-xs-line: 1.4;
+  --type-xs-weight: 500;
+  --type-xs-tracking: 0.08em;
+}
+
+/* Display */
+.type-d { font-family: var(--type-d-family); font-size: var(--type-d-size); line-height: var(--type-d-line); font-weight: var(--type-d-weight); letter-spacing: var(--type-d-tracking); text-transform: uppercase; }
+/* Heading 1 */
+.type-h1 { font-family: var(--type-h1-family); font-size: var(--type-h1-size); line-height: var(--type-h1-line); font-weight: var(--type-h1-weight); letter-spacing: var(--type-h1-tracking); text-transform: uppercase; }
+/* Heading 2 */
+.type-h2 { font-family: var(--type-h2-family); font-size: var(--type-h2-size); line-height: var(--type-h2-line); font-weight: var(--type-h2-weight); letter-spacing: var(--type-h2-tracking); text-transform: uppercase; }
+/* Heading 3 */
+.type-h3 { font-family: var(--type-h3-family); font-size: var(--type-h3-size); line-height: var(--type-h3-line); font-weight: var(--type-h3-weight); letter-spacing: var(--type-h3-tracking); text-transform: uppercase; }
+/* Heading 4 */
+.type-h4 { font-family: var(--type-h4-family); font-size: var(--type-h4-size); line-height: var(--type-h4-line); font-weight: var(--type-h4-weight); letter-spacing: var(--type-h4-tracking); text-transform: uppercase; }
+/* Heading 5 */
+.type-h5 { font-family: var(--type-h5-family); font-size: var(--type-h5-size); line-height: var(--type-h5-line); font-weight: var(--type-h5-weight); letter-spacing: var(--type-h5-tracking); }
+/* Body large */
+.type-bl { font-family: var(--type-bl-family); font-size: var(--type-bl-size); line-height: var(--type-bl-line); font-weight: var(--type-bl-weight); letter-spacing: var(--type-bl-tracking); }
+/* Body */
+.type-b { font-family: var(--type-b-family); font-size: var(--type-b-size); line-height: var(--type-b-line); font-weight: var(--type-b-weight); letter-spacing: var(--type-b-tracking); }
+/* Data */
+.type-sm { font-family: var(--type-sm-family); font-size: var(--type-sm-size); line-height: var(--type-sm-line); font-weight: var(--type-sm-weight); letter-spacing: var(--type-sm-tracking); }
+/* Label */
+.type-xs { font-family: var(--type-xs-family); font-size: var(--type-xs-size); line-height: var(--type-xs-line); font-weight: var(--type-xs-weight); letter-spacing: var(--type-xs-tracking); text-transform: uppercase; }

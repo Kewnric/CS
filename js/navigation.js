@@ -177,7 +177,7 @@ function closeMobileSidebar() {
   if (btn) btn.setAttribute('aria-expanded', 'false');
 }
 
-const THEMES = ['dark', 'light', 'purple', 'green'];
+const THEMES = ['dark', 'light', 'purple', 'green', 'sao', 'solo', 'genshin', 'ff7'];
 
 function toggleTheme() {
   const root = document.documentElement;
@@ -269,6 +269,10 @@ function updateThemeIcon(theme) {
     if (theme === 'light') iconName = 'sun';
     else if (theme === 'purple') iconName = 'sparkles';
     else if (theme === 'green') iconName = 'leaf';
+    else if (theme === 'sao') iconName = 'sword';
+    else if (theme === 'solo') iconName = 'swords';
+    else if (theme === 'genshin') iconName = 'star';
+    else if (theme === 'ff7') iconName = 'zap';
 
     themeIcon.setAttribute('data-lucide', iconName);
     if (window.lucide) {

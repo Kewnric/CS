@@ -1,0 +1,199 @@
+/* ============================================================
+   THEMES — the Themes window (js/themes.js), the Ultima type
+   systems on the app's text, and the login intro overlay
+   ============================================================ */
+
+/* --- Fonts: an Ultima type system (css/type-systems/*.css) sets --type-*;
+       body text and headings take its families, sizes stay the app's. --- */
+html.ssp-type {
+  --font-sans: var(--type-b-family, 'Inter', sans-serif);
+}
+html.ssp-type h1 { font-family: var(--type-h1-family, var(--font-sans)); }
+html.ssp-type h2 { font-family: var(--type-h2-family, var(--font-sans)); }
+html.ssp-type h3 { font-family: var(--type-h3-family, var(--font-sans)); }
+html.ssp-type h4 { font-family: var(--type-h4-family, var(--font-sans)); }
+html.ssp-type h5,
+html.ssp-type h6 { font-family: var(--type-h5-family, var(--font-sans)); }
+
+/* --- The window --- */
+.thm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100010;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(2, 6, 16, 0.62);
+}
+.thm-overlay.hidden { display: none; }
+
+.thm-win {
+  width: min(760px, 100%);
+  max-height: min(88vh, 860px);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+}
+
+.thm-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-color-subtle);
+}
+.thm-head svg { width: 18px; height: 18px; color: var(--color-primary); }
+.thm-head h2 { flex: 1; font-size: 1.05rem; margin: 0; }
+.thm-close {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.thm-close:hover { background: var(--bg-surface-hover); color: var(--text-primary); }
+.thm-close svg { width: 18px; height: 18px; }
+
+.thm-body { padding: 14px 16px 18px; overflow: auto; }
+.thm-sec {
+  margin: 4px 0 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+.thm-sec ~ .thm-sec { margin-top: 20px; }
+
+.thm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+  gap: 10px;
+}
+.thm-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 44px;
+  padding: 12px 13px 11px;
+  text-align: left;
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+.thm-card:hover { background: var(--bg-surface-hover); }
+.thm-card[aria-pressed="true"] {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary), var(--shadow-glow);
+}
+.thm-card[aria-pressed="true"]::after {
+  content: '';
+  position: absolute;
+  left: 13px;
+  right: 13px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--color-primary);
+}
+.thm-sw { display: flex; gap: 5px; margin-bottom: 8px; }
+.thm-sw i { width: 22px; height: 6px; border-radius: 3px; box-shadow: 0 0 0 1px rgba(127, 127, 127, 0.35); }
+.thm-card b { font-size: 0.9rem; font-weight: 600; }
+.thm-card small { font-size: 0.74rem; color: var(--text-secondary); line-height: 1.35; }
+
+.thm-parts { display: flex; flex-direction: column; gap: 8px; }
+.thm-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-color-subtle);
+  border-radius: var(--radius-md);
+}
+.thm-row-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.thm-row-label { font-size: 0.88rem; font-weight: 600; }
+.thm-row-desc { font-size: 0.74rem; color: var(--text-secondary); }
+.thm-select {
+  width: 220px;
+  max-width: 46%;
+  min-height: 36px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+}
+.thm-select:focus { outline: 2px solid var(--color-primary); outline-offset: 1px; }
+.thm-play {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--color-primary);
+  cursor: pointer;
+}
+.thm-play:hover:not(:disabled) { background: var(--bg-surface-hover); }
+.thm-play:disabled { opacity: 0.4; cursor: default; }
+.thm-play svg { width: 15px; height: 15px; }
+
+@media (max-width: 560px) {
+  .thm-row { flex-wrap: wrap; }
+  .thm-select { width: auto; max-width: none; flex: 1; }
+}
+
+/* --- Login intro: the Ultima stage (960x600, scaled), over everything --- */
+.thm-intro {
+  position: fixed;
+  inset: 0;
+  z-index: 100020;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  transition: opacity 0.42s ease;
+}
+.thm-intro.is-out { opacity: 0; pointer-events: none; }
+.thm-intro-box { width: min(100vw, 160vh); }
+.thm-intro-skip {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  min-height: 36px;
+  padding: 0 16px;
+  font: inherit;
+  font-size: 0.8rem;
+  color: #e8ecf2;
+  background: rgba(13, 16, 22, 0.7);
+  border: 1px solid #29313f;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.thm-intro-skip:hover { background: #1e2430; }
+
+/* From the Ultima page's own stylesheet, scoped to the overlay. */
+.thm-intro .stage{position:relative;width:100%;aspect-ratio:16/10;overflow:hidden;background:#000;contain:layout paint}
+.thm-intro .vp{position:absolute;left:0;top:0;width:960px;height:600px;transform-origin:0 0;overflow:hidden;user-select:none;-webkit-user-select:none}
+.thm-intro svg.i{fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;width:1em;height:1em;display:block}
+.thm-intro button{font:inherit}
